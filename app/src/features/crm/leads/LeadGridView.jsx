@@ -1,0 +1,60 @@
+import { Pencil, Phone } from "lucide-react";
+import LeadAvatar from "./LeadAvatar";
+
+export default function LeadGridView({ rows = [], onAddNote, onOpenLead }) {
+  return (
+    <div className="lead-tile-grid">
+      {rows.map((row) => (
+        <article key={row.id} className="lead-tile-card">
+          <div className="lead-tile-head">
+            <div className="lead-tile-person">
+              <LeadAvatar lead={row} className="lead-tile-avatar" />
+              <div>
+                <strong>{row.status}</strong>
+                <button type="button" className="lead-name-button" onClick={() => onOpenLead(row)}>
+                  <span>{row.name}</span>
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="lead-tile-action"
+              aria-label={`Open ${row.name}`}
+              onClick={() => onAddNote(row)}
+            >
+              <Pencil size={15} />
+            </button>
+          </div>
+
+          <div className="lead-tile-body">
+            <div className="lead-tile-line">
+              <label>Title</label>
+              <span>{row.jobTitle}</span>
+            </div>
+            <div className="lead-tile-line">
+              <label>Company</label>
+              <span>{row.company}</span>
+            </div>
+            <div className="lead-tile-line">
+              <label>Industry</label>
+              <span>{row.industry}</span>
+            </div>
+            <a className="lead-tile-email" href={`mailto:${row.email}`}>
+              {row.email}
+            </a>
+            <div className="lead-tile-phone">
+              <a href={`tel:${row.phone}`}>{row.phone}</a>
+              <Phone size={16} />
+            </div>
+            <div className="lead-tile-line">
+              <label>Lead Source</label>
+              <span>{row.source}</span>
+            </div>
+          </div>
+        </article>
+      ))}
+
+      {rows.length === 0 && <div className="table-card lead-grid-empty">No leads match the current filters.</div>}
+    </div>
+  );
+}

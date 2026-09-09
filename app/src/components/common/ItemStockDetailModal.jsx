@@ -1,0 +1,208 @@
+import React, { useState } from 'react';
+import { X, ArrowDownLeft, ArrowUpRight, AlertTriangle, Layers, Sliders, ShieldCheck } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
+export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
+    const { calculateItemStock, getItemMovements, adjustItemStock } = useERP();
+    const [showAdjust, setShowAdjust] = useState(false);
+    const [adjAmount, setAdjAmount] = useState(0);
+    const [adjReason, setAdjReason] = useState('Cycle Count Verification');
+    if (!isOpen)
+        return null;
+    const stock = calculateItemStock(item.id);
+    const movements = getItemMovements(item.id);
+    const handleApplyAdjustment = (e) => {
+        e.preventDefault();
+        if (adjAmount === 0)
+            return;
+        adjustItemStock(item.id, adjAmount, false, adjReason);
+        setShowAdjust(false);
+        setAdjAmount(0);
+    };
+    const getMovementTypeBadge = (type, qty) => {
+        switch (type) {
+            case 'PURCHASE':
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+            <ArrowDownLeft className="w-3 h-3"/> Purchase In
+          </span>);
+            case 'SALE':
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+            <ArrowUpRight className="w-3 h-3"/> Sales Dispatch
+          </span>);
+            case 'SALES_RETURN':
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+            <ArrowDownLeft className="w-3 h-3"/> Customer Return
+          </span>);
+            case 'PURCHASE_RETURN':
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+            <ArrowUpRight className="w-3 h-3"/> Vendor Return
+          </span>);
+            case 'TRANSFER_IN':
+            case 'TRANSFER_OUT':
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+            <Layers className="w-3 h-3"/> {type.replace('_', ' ')}
+          </span>);
+            case 'FAULTY':
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+            <AlertTriangle className="w-3 h-3"/> Faulty Defect
+          </span>);
+            case 'SERVICE_USAGE':
+            case 'ZONE_ISSUE':
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+            Internal Issue
+          </span>);
+            default:
+                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+            {qty > 0 ? '+' : ''}{type}
+          </span>);
+        }
+    };
+    return (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+          <div>
+            <div className="flex items-center gap-3">
+              <h3 className="text-lg font-bold text-slate-900">{item.name}</h3>
+              <span className="font-mono text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                {item.sku}
+              </span>
+              <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                {item.category}
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Primary Location: {item.location} • UOM: {item.uom} • Reorder Threshold: {item.reorderLevel} units
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+            <X className="w-5 h-5"/>
+          </button>
+        </div>
+
+        {/* Content Body */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Stock Metrics Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
+              <span className="text-xs text-slate-500 font-medium">Physical On Hand</span>
+              <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
+                {stock.onHand} <span className="text-xs font-normal text-slate-400">{item.uom}s</span>
+              </p>
+            </div>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
+              <span className="text-xs text-emerald-700 font-medium flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5"/> Available to Sell
+              </span>
+              <p className="text-2xl font-bold font-mono text-emerald-800 mt-1">
+                {stock.available} <span className="text-xs font-normal text-emerald-600">{item.uom}s</span>
+              </p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
+              <span className="text-xs text-amber-700 font-medium">SO Reserved</span>
+              <p className="text-2xl font-bold font-mono text-amber-800 mt-1">
+                {stock.reserved} <span className="text-xs font-normal text-amber-600">{item.uom}s</span>
+              </p>
+            </div>
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5">
+              <span className="text-xs text-rose-700 font-medium">Defective / Damaged</span>
+              <p className="text-2xl font-bold font-mono text-rose-800 mt-1">
+                {stock.damaged} <span className="text-xs font-normal text-rose-600">{item.uom}s</span>
+              </p>
+            </div>
+          </div>
+
+          {/* Quick Stock Adjustment Trigger */}
+          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Physical Inventory Adjustment</h4>
+              <p className="text-xs text-slate-500 mt-0.5">Need to record cycle count discrepancy or write-off?</p>
+            </div>
+            <button onClick={() => setShowAdjust(!showAdjust)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg shadow-sm transition-colors">
+              <Sliders className="w-3.5 h-3.5"/>
+              {showAdjust ? 'Cancel Adjustment' : 'Adjust Stock Quantity'}
+            </button>
+          </div>
+
+          {showAdjust && (<form onSubmit={handleApplyAdjustment} className="bg-blue-50/50 border border-blue-200 p-4 rounded-xl space-y-3 animate-in fade-in duration-150">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Quantity Delta (+ Add / - Subtract)
+                  </label>
+                  <input type="number" value={adjAmount} onChange={(e) => setAdjAmount(Number(e.target.value))} placeholder="e.g. +5 or -2" className="w-full text-xs font-mono font-semibold bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" required/>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Adjustment Reason / Reference
+                  </label>
+                  <input type="text" value={adjReason} onChange={(e) => setAdjReason(e.target.value)} placeholder="Cycle count, damaged write-off..." className="w-full text-xs bg-white border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:outline-none" required/>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setShowAdjust(false)} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-lg">
+                  Cancel
+                </button>
+                <button type="submit" className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">
+                  Confirm & Post to Ledger
+                </button>
+              </div>
+            </form>)}
+
+          {/* Movement Audit History Table */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Inventory Movement Audit Ledger ({movements.length} events)
+              </h4>
+              <span className="text-[11px] text-slate-400">Strict chronological order</span>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Type</th>
+                    <th className="py-2.5 px-3">Reference #</th>
+                    <th className="py-2.5 px-3 text-right">Qty Change</th>
+                    <th className="py-2.5 px-3">Location</th>
+                    <th className="py-2.5 px-3">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {movements.length === 0 ? (<tr>
+                      <td colSpan={6} className="py-6 text-center text-slate-400">
+                        No ledger movements recorded for this item yet.
+                      </td>
+                    </tr>) : (movements.map((m) => (<tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{m.date}</td>
+                        <td className="py-2 px-3">{getMovementTypeBadge(m.type, m.quantity)}</td>
+                        <td className="py-2 px-3 font-mono font-medium text-slate-800">
+                          {m.referenceNumber || m.referenceType}
+                        </td>
+                        <td className={`py-2 px-3 text-right font-mono font-bold ${m.quantity > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {m.quantity > 0 ? `+${m.quantity}` : m.quantity} {item.uom}
+                        </td>
+                        <td className="py-2 px-3 text-slate-500 text-[11px]">{m.locationName || 'Main Warehouse'}</td>
+                        <td className="py-2 px-3 text-slate-500 text-[11px] max-w-xs truncate">
+                          {m.notes || '-'}
+                        </td>
+                      </tr>)))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="text-xs text-slate-500">
+            Valuation: <span className="font-mono font-bold text-slate-900">${(stock.onHand * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> (Cost: ${item.costPrice.toFixed(2)} | Price: ${item.sellingPrice.toFixed(2)})
+          </div>
+          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg shadow-sm transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>);
+};

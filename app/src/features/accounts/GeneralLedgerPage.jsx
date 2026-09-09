@@ -1,0 +1,204 @@
+import React, { useState } from 'react';
+import { useERP } from '../../context/ERPContext';
+import { DataTable } from '../../components/ui/DataTable';
+import { Button } from '../../components/ui/Button';
+import { Plus, BookOpen, Scale, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
+import { PageHeader } from '../../components/common/PageHeader';
+const generalLedgerGuide = {
+    title: 'General Ledger & Journal Entries',
+    subtitle: 'Double-entry accounting journal vouchers and Chart of Accounts postings',
+    purpose: 'Use this page to view every debit and credit transaction posted across the business. System events (Sales Invoices, Purchase Bills, Payments, Inventory adjustments) create balanced journal entries automatically.',
+    workflow: ['Operational Transaction Occurs', 'Auto-Generate Double Entry (Debit = Credit)', 'Post to Chart of Accounts', 'Balance Trial Sheet'],
+    keyTerms: [
+        {
+            term: 'Double-Entry Accounting',
+            definition: 'A fundamental principle where every financial entry has equal and opposite Debit (Dr) and Credit (Cr) postings.',
+        },
+        {
+            term: 'Debit (Dr)',
+            definition: 'Increases Asset and Expense accounts; decreases Liability, Equity, and Revenue accounts.',
+        },
+        {
+            term: 'Credit (Cr)',
+            definition: 'Increases Liability, Equity, and Revenue accounts; decreases Asset and Expense accounts.',
+        },
+        {
+            term: 'Chart of Accounts (COA)',
+            definition: 'Structured financial classification index (1xxx Assets, 2xxx Liabilities, 3xxx Equity, 4xxx Revenue, 5xxx COGS).',
+        },
+    ],
+    tips: [
+        'All system actions automatically balance Debits and Credits to maintain strict accounting compliance.',
+    ],
+};
+export const GeneralLedgerPage = () => {
+    const { journalEntries, addJournalEntry } = useERP();
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [description, setDescription] = useState('');
+    const [debitAccount, setDebitAccount] = useState('1010 - Cash & Bank');
+    const [creditAccount, setCreditAccount] = useState('4010 - Sales Revenue');
+    const [amount, setAmount] = useState('');
+    const [reference, setReference] = useState('');
+    const handleCreate = (e) => {
+        e.preventDefault();
+        const parsedAmount = parseFloat(amount) || 1000;
+        addJournalEntry({
+            entryNumber: `JE-2026-${String(journalEntries.length + 80).padStart(3, '0')}`,
+            date: new Date().toISOString().split('T')[0],
+            description: description || 'Manual Adjustment Entry',
+            reference: reference || 'MEMO-01',
+            debitAccount,
+            creditAccount,
+            amount: parsedAmount,
+            status: 'Posted',
+        });
+        setShowAddModal(false);
+        setDescription('');
+        setAmount('');
+        setReference('');
+    };
+    const totalDebits = journalEntries.reduce((acc, e) => acc + e.amount, 0);
+    const totalCredits = totalDebits; // By double-entry definition
+    const columns = [
+        {
+            key: 'entryNumber',
+            header: 'Voucher Ref',
+            render: (e) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
+          <BookOpen size={13} className="text-[#1F2E4A]"/> {e.entryNumber}
+        </span>),
+        },
+        {
+            key: 'date',
+            header: 'Posting Date',
+            render: (e) => <span className="text-slate-600">{e.date}</span>,
+        },
+        {
+            key: 'description',
+            header: 'Transaction Narrative',
+            render: (e) => (<div>
+          <p className="font-semibold text-slate-800">{e.description}</p>
+          <span className="font-mono text-[10px] text-slate-500">{e.reference}</span>
+        </div>),
+        },
+        {
+            key: 'debitAccount',
+            header: 'Debit Ledger (Dr)',
+            render: (e) => (<span className="font-mono text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1">
+          <ArrowDownLeft size={11}/> {e.debitAccount}
+        </span>),
+        },
+        {
+            key: 'creditAccount',
+            header: 'Credit Ledger (Cr)',
+            render: (e) => (<span className="font-mono text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1">
+          <ArrowUpRight size={11}/> {e.creditAccount}
+        </span>),
+        },
+        {
+            key: 'amount',
+            header: 'Entry Balance ($)',
+            align: 'right',
+            render: (e) => (<span className="font-mono font-bold text-slate-900">
+          ${e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+        </span>),
+        },
+    ];
+    return (<div className="space-y-6">
+      <PageHeader title="General Ledger & Journal Entries" subtitle="Double-entry accounting journal vouchers, chart of accounts debit/credit postings, and audit trails." guide={generalLedgerGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+            New Journal Voucher
+          </Button>}/>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-500 font-semibold uppercase">Total Debits (Dr)</span>
+            <p className="text-lg font-bold text-blue-900 mt-1">
+              ${totalDebits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <ArrowDownLeft className="text-blue-600" size={24}/>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-500 font-semibold uppercase">Total Credits (Cr)</span>
+            <p className="text-lg font-bold text-emerald-900 mt-1">
+              ${totalCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <ArrowUpRight className="text-emerald-600" size={24}/>
+        </div>
+        <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
+          <div>
+            <span className="text-xs text-slate-500 font-semibold uppercase">Trial Balance Net</span>
+            <p className="text-lg font-bold text-slate-800 mt-1">$0.00 (Balanced)</p>
+          </div>
+          <Scale className="text-emerald-600" size={24}/>
+        </div>
+      </div>
+
+      <DataTable title="Journal Ledger Postings" columns={columns} data={journalEntries} keyExtractor={(e) => e.id} searchPlaceholder="Filter journal ref, account, or narrative..." searchFilter={(e, term) => e.entryNumber.toLowerCase().includes(term) ||
+            e.description.toLowerCase().includes(term) ||
+            e.debitAccount.toLowerCase().includes(term) ||
+            e.creditAccount.toLowerCase().includes(term)}/>
+
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
+          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">
+            <h3 className="font-bold text-base text-[#1F2E4A] mb-1">
+              Create Journal Voucher Entry
+            </h3>
+            <p className="text-xs text-slate-500 mb-4">
+              Enter balanced debit and credit accounts for general ledger posting.
+            </p>
+
+            <form onSubmit={handleCreate} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Narration / Description</label>
+                <input required value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]" placeholder="e.g. Accrued utility adjustment for Q3"/>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Debit Account (Dr)</label>
+                  <select value={debitAccount} onChange={(e) => setDebitAccount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]">
+                    <option value="1010 - Cash & Bank">1010 - Cash & Bank</option>
+                    <option value="1200 - Accounts Receivable">1200 - Accounts Receivable</option>
+                    <option value="1300 - Inventory Asset">1300 - Inventory Asset</option>
+                    <option value="5010 - Cost of Goods Sold">5010 - COGS</option>
+                    <option value="6020 - Logistics & Shipping">6020 - Logistics</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Credit Account (Cr)</label>
+                  <select value={creditAccount} onChange={(e) => setCreditAccount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]">
+                    <option value="4010 - Sales Revenue">4010 - Sales Revenue</option>
+                    <option value="2010 - Accounts Payable">2010 - Accounts Payable</option>
+                    <option value="1010 - Cash & Bank">1010 - Cash & Bank</option>
+                    <option value="1300 - Inventory Asset">1300 - Inventory Asset</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Amount ($)</label>
+                  <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono" placeholder="2500"/>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Reference Doc #</label>
+                  <input value={reference} onChange={(e) => setReference(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono" placeholder="MEMO-991"/>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-3.5 py-1.5 border border-[#CED4DA] rounded text-slate-600 hover:bg-slate-100">
+                  Cancel
+                </button>
+                <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded font-semibold">
+                  Post to General Ledger
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>)}
+    </div>);
+};
