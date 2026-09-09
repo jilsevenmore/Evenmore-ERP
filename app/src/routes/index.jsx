@@ -4,10 +4,14 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
 // ── CRM ─────────────────────────────────────────────────────
 import LeadsPage from '../features/crm/leads/LeadsPage';
+import LeadDetailPage from '../features/crm/leads/LeadDetailPage';
 import LeadFormBuilderPage from '../features/crm/leads/LeadFormBuilderPage';
 import DynamicLeadFormPage from '../features/crm/leads/DynamicLeadFormPage';
 import TasksPage from '../features/crm/tasks/TasksPage';
 import CRMDashboard from '../features/crm/dashboard/CRMDashboard';
+import DealsPage from '../features/crm/deals/DealsPage';
+import UserAllocationPage from '../features/crm/allocation/UserAllocationPage';
+import CRMSystemSetupPage from '../features/crm/setup/CRMSystemSetupPage';
 
 // ── HRMS ─────────────────────────────────────────────────────
 import HRMSDashboard from '../features/hrms/dashboard/Dashboard';
@@ -124,10 +128,14 @@ const router = createBrowserRouter([
       { path: 'crm', element: <Navigate to="/crm/leads" replace /> },
       { path: 'crm/dashboard', element: <Page component={CRMDashboard} /> },
       { path: 'crm/leads', element: <Page component={LeadsPage} /> },
+      { path: 'crm/leads/:id', element: <Page component={LeadDetailPage} /> },
       { path: 'crm/leads/form-builder', element: <Page component={LeadFormBuilderPage} /> },
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
+      { path: 'crm/deals', element: <Page component={DealsPage} /> },
+      { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
+      { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
 
       // ── Sales ─────────────────────────────────────────────

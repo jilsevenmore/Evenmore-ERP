@@ -50,19 +50,11 @@ const NAV = [
     icon: LayoutGrid,
     defaultOpen: true,
     children: [
-      {
-        label: 'Leads',
-        icon: Target,
-        defaultOpen: true,
-        children: [
-          { label: 'All Leads', to: '/crm/leads', dot: true },
-          { label: 'Lead Form Builder', to: '/crm/leads/form-builder' },
-          { label: 'Lead Create Form', to: '/crm/leads/create-form' },
-        ],
-      },
-      { label: 'Customers', icon: Users, to: '/crm/customers' },
+      { label: 'Leads', icon: Target, to: '/crm/leads', dot: true },
       { label: 'Tasks', icon: ListChecks, to: '/crm/tasks' },
-      { label: 'Quotations', icon: ClipboardList, to: '/crm/quotations' },
+      { label: 'User Allocation & Tracking', icon: Users, to: '/crm/user-allocation' },
+      { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
+      { label: 'CRM System Setup', icon: Settings, to: '/crm/system-setup' },
     ],
   },
 
@@ -323,6 +315,19 @@ export default function Sidebar() {
             <ExpandableRow key={item.label} item={item} depth={0} />
           ))}
         </nav>
+      </div>
+
+      {/* Need Help Support Widget */}
+      <div className="px-2 pt-3 pb-1">
+        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 text-white shadow-xs">
+          <div className="w-10 h-10 rounded-full bg-blue-600/30 border border-blue-400/40 text-blue-300 flex items-center justify-center shrink-0">
+            <Headphones size={20} />
+          </div>
+          <div className="min-w-0">
+            <span className="text-[11px] font-semibold text-slate-300 block">Need Help?</span>
+            <span className="text-xs font-bold text-white block truncate">Contact Support</span>
+          </div>
+        </div>
       </div>
 
       {/* Footer */}
