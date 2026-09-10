@@ -27,5 +27,5 @@ dist-ssr
 .env
 .env.production
 
-graphify-out
 hrms-app
+graphify-out/

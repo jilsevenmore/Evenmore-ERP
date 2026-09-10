@@ -199,7 +199,7 @@ export const ItemsMasterPage = () => {
           <button onClick={() => setSelectedBarcodeItem(i)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Print SKU Barcode Shelf Tag">
             <Tag size={14}/>
           </button>
-          <Link to={`/items/edit/${i.id}`} className="text-xs font-semibold text-[#1F2E4A] hover:underline px-2 py-1 rounded hover:bg-slate-100">
+          <Link to={`/inventory/items/edit/${i.id}`} className="text-xs font-semibold text-[#1F2E4A] hover:underline px-2 py-1 rounded hover:bg-slate-100">
             Edit
           </Link>
         </div>),
@@ -252,12 +252,12 @@ export const ItemsMasterPage = () => {
             <Button variant="outline" icon={Upload} onClick={() => setIsImportOpen(true)}>
               Import CSV
             </Button>
-            <Link to={isMachineView ? '/categories/machine' : '/categories/stock'}>
+            <Link to={isMachineView ? '/inventory/categories/machines' : '/inventory/categories/stock'}>
               <Button variant="outline" icon={Layers}>
                 {isMachineView ? 'Machine Categories' : 'Stock Categories'}
               </Button>
             </Link>
-            <Link to={`/items/new?kind=${newItemKind}`}>
+            <Link to={`/inventory/items/new?kind=${newItemKind}`}>
               <Button icon={Plus}>
                 {isMachineView ? 'Add New Machine' : 'Add New Stock Part'}
               </Button>
@@ -265,6 +265,40 @@ export const ItemsMasterPage = () => {
           </div>
         }
       />
+
+      {/* View Segmented Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit text-xs font-semibold">
+        <Link
+          to="/inventory/items"
+          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+            !isMachineView && !isStockView
+              ? 'bg-white text-blue-600 shadow-2xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Boxes size={15} /> All Items ({items.length})
+        </Link>
+        <Link
+          to="/inventory/items/machines"
+          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+            isMachineView
+              ? 'bg-white text-blue-600 shadow-2xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Cpu size={15} /> Machine Master ({items.filter((i) => i.itemKind === 'Machine').length})
+        </Link>
+        <Link
+          to="/inventory/items/stock"
+          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+            isStockView
+              ? 'bg-white text-blue-600 shadow-2xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Package size={15} /> Stock Parts ({items.filter((i) => i.itemKind !== 'Machine').length})
+        </Link>
+      </div>
 
       {/* Item Master KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

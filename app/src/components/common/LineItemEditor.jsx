@@ -256,25 +256,25 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
     }, 0);
     const grandTotal = Math.round((subtotal - totalDiscount + totalTax) * 100) / 100;
 
-    return (<div className="space-y-4">
-      <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-2xs">
-        <table className="w-full text-left text-xs text-slate-600">
-          <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+    return (<div className="erp-lines">
+      <div className="erp-lines-table">
+        <table>
+          <thead>
             <tr>
-              <th className="py-3 px-3">Item / Description</th>
-              <th className="py-3 px-3 w-28 text-center">Available Stock</th>
-              <th className="py-3 px-3 w-20 text-center">Qty</th>
-              <th className="py-3 px-3 w-28 text-right">Unit Rate (₹)</th>
-              <th className="py-3 px-3 w-20 text-center">Disc (%)</th>
-              <th className="py-3 px-3 w-20 text-center">GST (%)</th>
-              <th className="py-3 px-3 w-28 text-right">Amount (₹)</th>
-              {!readOnly && <th className="py-3 px-2 w-10 text-center"></th>}
+              <th>Item / Description</th>
+              <th className="ctr">Available Stock</th>
+              <th className="ctr">Qty</th>
+              <th className="num">Unit Rate (₹)</th>
+              <th className="ctr">Disc (%)</th>
+              <th className="ctr">GST (%)</th>
+              <th className="num">Amount (₹)</th>
+              {!readOnly && <th className="ctr"></th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
+          <tbody>
             {items.length === 0 ? (<tr>
-                <td colSpan={readOnly ? 7 : 8} className="py-8 text-center text-slate-400">
-                  <Package className="w-8 h-8 mx-auto mb-2 text-slate-300"/>
+                <td colSpan={readOnly ? 7 : 8} className="erp-lines-empty">
+                  <Package className="w-8 h-8 mx-auto mb-2" size={28} style={{ margin: '0 auto 8px', opacity: 0.4 }} />
                   No line items added yet. Click &quot;Add Line Item&quot; or &quot;Add Stock Item&quot; below.
                 </td>
               </tr>) : (items.map((item, index) => {
@@ -283,13 +283,13 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             const deficit = Math.max(0, (item.qty || 1) - availableStock);
             const isShortage = deficit > 0;
 
-            return (<tr key={item.id || index} className={`hover:bg-slate-50/70 transition-colors ${item.isBomPart ? 'bg-purple-50/30' : isShortage ? 'bg-amber-50/40' : ''}`}>
-                    <td className="p-3 space-y-1">
+            return (<tr key={item.id || index} className={`${item.isBomPart ? 'is-bom' : isShortage ? 'is-short' : ''}`}>
+                    <td>
                       {!readOnly ? (<>
-                          <div className="flex items-center gap-1.5">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {item.isBomPart && (
                               <span
-                                className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded shrink-0 border border-purple-200"
+                                className="erp-bom-tag"
                                 title={`Auto-generated from Machine BOM (${item.parentSku || 'Machine'})`}
                               >
                                 <Boxes size={11} /> BOM Part
@@ -298,7 +298,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             <select
                               value={item.itemId || ''}
                               onChange={(e) => handleItemSelect(index, e.target.value)}
-                              className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              className="erp-line-select"
                             >
                               <option value="">-- Select Master Item --</option>
                               {masterItems.map((mi) => (
@@ -313,12 +313,12 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             placeholder="Custom line description / serial notes..."
                             value={item.description || ''}
                             onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
-                            className="w-full text-[11px] text-slate-500 bg-transparent border-b border-dashed border-slate-200 px-1 py-0.5 focus:outline-none focus:border-blue-400"
+                            className="erp-line-desc"
                           />
                         </>) : (<div>
-                          <div className="flex items-center gap-1.5">
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                             {item.isBomPart && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded border border-purple-200">
+                              <span className="erp-bom-tag">
                                 <Boxes size={11} /> BOM Part
                               </span>
                             )}
@@ -329,19 +329,19 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             </span>)}
                         </div>)}
                     </td>
-                    <td className="p-3 text-center">
-                      <div className="flex flex-col items-center gap-1">
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                    <td className="ctr">
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                        <span className={`erp-stock-pill ${
                           availableStock <= 0
-                            ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                            ? 'out'
                             : isShortage
-                            ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            ? 'low'
+                            : 'ok'
                         }`}>
                           {availableStock} Avail
                         </span>
                         {isShortage && (
-                          <span className="text-[10px] font-bold text-amber-700 flex items-center gap-0.5">
+                          <span className="erp-short-flag">
                             <AlertTriangle size={10} /> Short: {deficit}
                           </span>
                         )}
@@ -349,7 +349,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                           <button
                             type="button"
                             onClick={() => onRequestPO(item, deficit)}
-                            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold bg-amber-500 hover:bg-amber-600 text-white rounded shadow-2xs cursor-pointer transition-colors"
+                            className="erp-po-btn"
                             title={`Shortage of ${deficit} units. Click to raise an Auto PO to supplier.`}
                           >
                             <ShoppingCart size={10}/> +PO ({deficit})
@@ -357,7 +357,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                         )}
                       </div>
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="ctr">
                       {!readOnly ? (() => {
                         const unit = (masterObj?.salesUnit || masterObj?.uom || masterObj?.unit || 'Nos').toLowerCase();
                         const allowsDecimal = ['kg', 'mtr', 'meter', 'ltr', 'liter', 'ton'].includes(unit);
@@ -375,14 +375,14 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                 handleFieldChange(index, 'qty', allowsDecimal ? val : Math.floor(val));
                               }
                             }}
-                            className="w-16 text-center text-xs font-bold text-slate-800 border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="erp-line-input ctr"
                           />
                         );
                       })() : (
                         <span className="font-bold">{item.qty}</span>
                       )}
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="num">
                       {!readOnly ? (
                         <input
                           type="number"
@@ -390,13 +390,13 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                           step="0.01"
                           value={item.rate}
                           onChange={(e) => handleFieldChange(index, 'rate', Math.max(0, Number(e.target.value)))}
-                          className="w-24 text-right text-xs font-mono text-slate-800 border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="erp-line-input num"
                         />
                       ) : (
                         <span className="font-mono font-semibold">₹{Number(item.rate || 0).toFixed(2)}</span>
                       )}
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="ctr">
                       {!readOnly ? (
                         <input
                           type="number"
@@ -404,13 +404,13 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                           max="100"
                           value={item.discount || 0}
                           onChange={(e) => handleFieldChange(index, 'discount', Number(e.target.value))}
-                          className="w-14 text-center text-xs text-slate-700 border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="erp-line-input ctr"
                         />
                       ) : (
                         <span>{item.discount || 0}%</span>
                       )}
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="ctr">
                       {!readOnly ? (
                         <input
                           type="number"
@@ -418,17 +418,17 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                           max="100"
                           value={item.tax ?? 18}
                           onChange={(e) => handleFieldChange(index, 'tax', Number(e.target.value))}
-                          className="w-14 text-center text-xs text-slate-700 border border-slate-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="erp-line-input ctr"
                         />
                       ) : (
                         <span>{item.tax ?? 18}%</span>
                       )}
                     </td>
-                    <td className="p-3 text-right font-semibold font-mono text-slate-900">
+                    <td className="num" style={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>
                       ₹{(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </td>
                     {!readOnly && (
-                      <td className="p-3 text-center">
+                      <td className="ctr">
                         <button
                           type="button"
                           onClick={() => handleRemove(index)}
@@ -446,13 +446,13 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
       </div>
 
       {/* Action Footer & Summary */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
+      <div className="erp-lines-footer">
         {!readOnly && (
-          <div className="flex items-center gap-2">
+          <div className="erp-lines-actions">
             <button
               type="button"
               onClick={() => handleAddItem()}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-200 shadow-2xs cursor-pointer"
+              className="erp-lines-btn primary"
             >
               <Plus className="w-4 h-4"/>
               Add Line Item
@@ -460,7 +460,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             <button
               type="button"
               onClick={() => setIsStockPickerOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors border border-purple-200 shadow-2xs cursor-pointer"
+              className="erp-lines-btn plum"
             >
               <Boxes className="w-4 h-4"/>
               + Add Stock Item
@@ -468,24 +468,24 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
           </div>
         )}
 
-        <div className="w-full sm:w-72 bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs ml-auto shadow-2xs">
-          <div className="flex justify-between text-slate-600">
+        <div className="erp-lines-total">
+          <div className="row">
             <span>Subtotal:</span>
-            <span className="font-mono font-semibold">₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <strong>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
           {totalDiscount > 0 && (
-            <div className="flex justify-between text-amber-600">
+            <div className="row" style={{ color: '#b45309' }}>
               <span>Total Discount:</span>
-              <span className="font-mono">-₹{totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <strong>-₹{totalDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
             </div>
           )}
-          <div className="flex justify-between text-slate-600">
+          <div className="row">
             <span>Estimated GST / Tax:</span>
-            <span className="font-mono">₹{totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <strong>₹{totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
-          <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-slate-900 text-sm">
+          <div className="grand">
             <span>Grand Total:</span>
-            <span className="font-mono text-[#1F2E4A]">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <strong>₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
         </div>
       </div>
@@ -536,21 +536,22 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             </div>
 
             {/* List of items */}
-            <div className="overflow-y-auto max-h-60 border border-slate-200 rounded-lg divide-y divide-slate-100 text-xs">
+            <div className="erp-picker-list">
               {filteredStockPickerItems.length === 0 ? (
-                <div className="p-6 text-center text-slate-400">
+                <div className="erp-lines-empty">
                   No inventory items match your search.
                 </div>
               ) : (
                 filteredStockPickerItems.map((it) => (
-                  <div
+                  <button
                     key={it.id}
+                    type="button"
                     onClick={() => {
                       handleAddItem(it);
                       setIsStockPickerOpen(false);
                       setPickerSearch('');
                     }}
-                    className="p-3 flex items-center justify-between hover:bg-purple-50/50 cursor-pointer transition-colors"
+                    className="erp-picker-row"
                   >
                     <div>
                       <div className="font-bold text-slate-900 flex items-center gap-2">
@@ -575,7 +576,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                       </span>
                       <div className="text-[10px] text-slate-400">In Stock</div>
                     </div>
-                  </div>
+                  </button>
                 ))
               )}
             </div>
