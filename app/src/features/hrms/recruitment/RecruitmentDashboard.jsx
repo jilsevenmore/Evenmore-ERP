@@ -27,7 +27,7 @@ export default function RecruitmentDashboard() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {kpis.map((k) => <button key={k.label} onClick={() => navigate(k.to)} className="bg-white border border-bdr rounded-xl p-4 shadow-sm text-left hover:shadow-subtle transition">
+        {kpis.map((k) => <button key={k.label} onClick={() => navigate(k.to)} className="bg-white border border-[#e8edf3] rounded-2xl p-4 shadow-sm text-left hover:shadow-subtle transition">
             <div className="flex justify-between items-start"><span className="text-[11px] font-semibold tracking-widest uppercase text-muted">{k.label}</span><k.icon size={14} className="text-muted" /></div>
             <div className="text-[22px] font-bold mt-2">{k.value}</div>
             <div className="text-[11px] text-emerald-600">{k.sub}</div>
@@ -44,13 +44,13 @@ export default function RecruitmentDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8 bg-white border border-bdr rounded-xl p-5 shadow-sm">
-          <h3 className="font-semibold">Today's Interviews</h3>
-          {todays.length === 0 ? <div className="text-[13px] text-muted mt-3">No interviews today</div> : todays.map((it) => <div key={it.id} className="mt-3 border border-bdr rounded-xl p-4 bg-off/30">
+        <div className="lg:col-span-8 bg-white border border-[#e8edf3] rounded-2xl p-5 shadow-sm">
+          <h3 className="font-semibold text-[#111827]">Today's Interviews</h3>
+          {todays.length === 0 ? <div className="text-[13px] text-muted mt-3">No interviews today</div> : todays.map((it) => <div key={it.id} className="mt-3 rounded-xl p-4 bg-[#f8fafc] border border-[#f1f5f9]">
               <div className="text-[12px] font-medium text-navy">{it.start} - {it.end} • {it.date} • {it.duration} • {it.mode}</div>
               <div className="flex gap-3 mt-2">
                 <img src={it.avatar} alt="" className="w-10 h-10 rounded-full" />
-                <div><div className="font-semibold">{it.candidateName}</div><div className="text-[13px] text-muted">{it.job}</div><div className="text-[12px] text-muted">{it.type} • Interviewer: {it.interviewer}</div></div>
+                <div><div className="font-semibold text-[#111827]">{it.candidateName}</div><div className="text-[13px] text-muted">{it.job}</div><div className="text-[12px] text-muted">{it.type} • Interviewer: {it.interviewer}</div></div>
               </div>
               <div className="text-[12px] mt-2">{it.mode === "Video Call" ? <span className="px-2 py-1 bg-blue-50 border border-blue-200 rounded-full text-blue-700">Google Meet</span> : it.location}</div>
               <div className="flex gap-2 mt-3">
@@ -59,20 +59,20 @@ export default function RecruitmentDashboard() {
               </div>
             </div>)}
         </div>
-        <div className="lg:col-span-4 bg-white border border-bdr rounded-xl p-5 shadow-sm">
-          <h3 className="font-semibold">Upcoming Interviews</h3>
+        <div className="lg:col-span-4 bg-white border border-[#e8edf3] rounded-2xl p-5 shadow-sm">
+          <h3 className="font-semibold text-[#111827]">Upcoming Interviews</h3>
           <div className="mt-3 space-y-3">
             <div className="text-[11px] font-semibold text-muted uppercase">Today</div>
-            {upcoming.map((it) => <button key={it.id} onClick={() => navigate(`/hrms/recruitment/interviews/${it.id}`)} className="w-full text-left border border-bdr rounded-xl p-3 hover:bg-off">
-                <div className="text-[12px] font-medium">{it.start} • {it.candidateName}</div><div className="text-[11px] text-muted">{it.type} • {it.interviewer}</div>
+            {upcoming.map((it) => <button key={it.id} onClick={() => navigate(`/hrms/recruitment/interviews/${it.id}`)} className="w-full text-left rounded-xl p-3 bg-[#f8fafc] hover:bg-[#f1f5f9] border border-[#f1f5f9] transition">
+                <div className="text-[12px] font-medium text-[#111827]">{it.start} • {it.candidateName}</div><div className="text-[11px] text-muted">{it.type} • {it.interviewer}</div>
               </button>)}
             <div className="text-[11px] font-semibold text-muted uppercase mt-2">Tomorrow • 2:00 PM Chen Li • Manager Interview • Amit Patel</div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white border border-bdr rounded-xl p-5 shadow-sm">
-        <h3 className="font-semibold">Requires Your Attention</h3>
+      <div className="bg-white border border-[#e8edf3] rounded-2xl p-5 shadow-sm">
+        <h3 className="font-semibold text-[#111827]">Requires Your Attention</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-[13px]">
           {[
     { t: "3 interviews today", to: "/hrms/recruitment/interviews" },
@@ -81,30 +81,30 @@ export default function RecruitmentDashboard() {
     { t: `${offers.filter((o) => o.status === "Pending").length} offers pending`, to: "/hrms/recruitment/offers" },
     { t: "2 jobs closing soon", to: "/hrms/recruitment/jobs" },
     { t: "3 candidates awaiting recruiter action", to: "/hrms/recruitment/applications" }
-  ].map((x) => <div key={x.t} className="flex justify-between items-center border border-bdr rounded-xl px-3 py-2 bg-off/30"><span>{x.t}</span><Button size="sm" variant="secondary" onClick={() => navigate(x.to)}>View</Button></div>)}
+  ].map((x) => <div key={x.t} className="flex justify-between items-center rounded-xl px-4 py-3 bg-[#f8fafc] border border-[#f1f5f9]"><span>{x.t}</span><Button size="sm" variant="secondary" onClick={() => navigate(x.to)}>View</Button></div>)}
         </div>
       </div>
 
       <CandidatePipeline />
 
-      <div className="bg-white border border-bdr rounded-xl p-5 shadow-sm overflow-x-auto">
-        <div className="flex justify-between items-center"><h3 className="font-semibold">Recent Candidates</h3><Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/candidates")}>View All</Button></div>
+      <div className="bg-white border border-[#e8edf3] rounded-2xl p-5 shadow-sm overflow-x-auto">
+        <div className="flex justify-between items-center"><h3 className="font-semibold text-[#111827]">Recent Candidates</h3><Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/candidates")}>View All</Button></div>
         <table className="w-full text-left mt-3 min-w-[800px]">
-          <thead className="bg-off border-y border-bdr text-[11px] uppercase text-muted"><tr><th className="py-2 px-3">Candidate</th><th className="py-2 px-3">Position</th><th className="py-2 px-3">Experience</th><th className="py-2 px-3">Applied Date</th><th className="py-2 px-3">Stage</th><th className="py-2 px-3">Recruiter</th><th className="py-2 px-3">Action</th></tr></thead>
-          <tbody className="divide-y divide-bdr/60 text-[13px]">
-            {recent.map((c) => <tr key={c.id}><td className="py-2 px-3"><div className="flex items-center gap-2"><img src={c.avatar} alt="" className="w-7 h-7 rounded-full" />{c.name}</div></td><td className="py-2 px-3">{c.position}</td><td className="py-2 px-3">{c.experience}</td><td className="py-2 px-3">{c.appliedDate}</td><td className="py-2 px-3"><span className="px-2 py-1 bg-off border border-bdr rounded-full text-[11px]">{c.stage}</span></td><td className="py-2 px-3">{c.recruiter}</td><td className="py-2 px-3"><button onClick={() => navigate(`/hrms/recruitment/candidates/${c.id}`)} className="text-navy text-[12px] underline">View</button></td></tr>)}
+          <thead className="bg-[#f8fafc] border-y border-[#e2e8f0] text-[11px] uppercase text-muted"><tr><th className="py-2.5 px-3">Candidate</th><th className="py-2.5 px-3">Position</th><th className="py-2.5 px-3">Experience</th><th className="py-2.5 px-3">Applied Date</th><th className="py-2.5 px-3">Stage</th><th className="py-2.5 px-3">Recruiter</th><th className="py-2.5 px-3">Action</th></tr></thead>
+          <tbody className="divide-y divide-[#f1f5f9] text-[13px]">
+            {recent.map((c) => <tr key={c.id}><td className="py-2.5 px-3"><div className="flex items-center gap-2"><img src={c.avatar} alt="" className="w-7 h-7 rounded-full" />{c.name}</div></td><td className="py-2.5 px-3">{c.position}</td><td className="py-2.5 px-3">{c.experience}</td><td className="py-2.5 px-3">{c.appliedDate}</td><td className="py-2.5 px-3"><span className="px-2 py-1 bg-[#f1f5f9] border border-[#cbd5e1] rounded-full text-[11px]">{c.stage}</span></td><td className="py-2.5 px-3">{c.recruiter}</td><td className="py-2.5 px-3"><button onClick={() => navigate(`/hrms/recruitment/candidates/${c.id}`)} className="text-navy text-[12px] underline">View</button></td></tr>)}
           </tbody>
         </table>
       </div>
 
-      <div className="bg-white border border-bdr rounded-xl p-5 shadow-sm">
-        <h3 className="font-semibold">Shortlisted / Selected Candidates</h3>
+      <div className="bg-white border border-[#e8edf3] rounded-2xl p-5 shadow-sm">
+        <h3 className="font-semibold text-[#111827]">Shortlisted / Selected Candidates</h3>
         {shortlisted.length === 0 ? <div className="text-[13px] text-muted mt-2">No shortlisted candidates</div> : <div className="grid md:grid-cols-3 gap-3 mt-3">
-            {shortlisted.map((c) => <div key={c.id} className="border border-bdr rounded-xl p-4 bg-off/20">
+            {shortlisted.map((c) => <div key={c.id} className="rounded-xl p-4 bg-[#f8fafc] border border-[#f1f5f9]">
                 <div className="flex items-center gap-2"><img src={c.avatar} alt="" className="w-8 h-8 rounded-full" /><div><div className="font-medium text-[13px]">{c.name}</div><div className="text-[11px] text-muted">{c.position}</div></div></div>
                 <div className="text-[12px] mt-2">Technical: <b>{c.technicalScore}%</b> • HR: <b>{c.hrScore}%</b></div>
                 <div className="text-[11px] px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-full w-fit mt-2 text-emerald-700">{c.recommendation}</div>
-                <div className="text-[12px] text-muted mt-2">Next: Final Interview • <span className="px-2 py-0.5 bg-off border border-bdr rounded-full">{c.stage}</span></div>
+                <div className="text-[12px] text-muted mt-2">Next: Final Interview • <span className="px-2 py-0.5 bg-[#f1f5f9] border border-[#cbd5e1] rounded-full">{c.stage}</span></div>
                 <div className="flex gap-1 mt-3"><Button size="sm" variant="secondary" onClick={() => navigate(`/hrms/recruitment/candidates/${c.id}`)}>View</Button><Button size="sm" onClick={() => {
     const s = useRecruitmentStore.getState();
     s.changeStage(c.id, "Offer");

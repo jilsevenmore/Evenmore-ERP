@@ -1,176 +1,483 @@
 import { useState, useMemo } from "react";
-import PageHeader from "../../../components/ui/PageHeader";
-import StatusBadge from "../../../components/ui/StatusBadge";
-import DataTable from "../../../components/ui/DataTable";
+import { Download, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
-import { getInitial, safeString } from "../../../utils/stringUtils";
 
 const MOCK_EMPLOYEES = [
-  { id: "EMP1001", name: "Rohan Sharma", email: "rohan@evenmore.in", designation: "Senior React Developer", department: "Engineering", location: "Bangalore", joining: "Mar 15, 2022", status: "Active", manager: "Priya Nair" },
-  { id: "EMP1002", name: "Priya Nair", email: "priya@evenmore.in", designation: "Engineering Manager", department: "Engineering", location: "Bangalore", joining: "Jan 10, 2021", status: "Active", manager: "Rajesh Kumar" },
-  { id: "EMP1003", name: "Amit Joshi", email: "amit@evenmore.in", designation: "Product Designer", department: "Design", location: "Mumbai", joining: "Jun 01, 2023", status: "Active", manager: "Priya Nair" },
-  { id: "EMP1004", name: "Sneha Reddy", email: "sneha@evenmore.in", designation: "HR Specialist", department: "HR", location: "Hyderabad", joining: "Aug 20, 2022", status: "Active", manager: "Kavita Rao" },
-  { id: "EMP1005", name: "Vikram Malhotra", email: "vikram@evenmore.in", designation: "Sales Director", department: "Sales", location: "Delhi", joining: "Feb 14, 2020", status: "Active", manager: "Rajesh Kumar" },
-  { id: "EMP1006", name: "Pooja Hegde", email: "pooja@evenmore.in", designation: "Financial Analyst", department: "Finance", location: "Mumbai", joining: "Nov 05, 2023", status: "On Leave", manager: "Suresh Iyer" },
-  { id: "EMP1007", name: "Karan Patel", email: "karan@evenmore.in", designation: "DevOps Engineer", department: "Engineering", location: "Bangalore", joining: "Jul 18, 2023", status: "Probation", manager: "Priya Nair" },
-  { id: "EMP1008", name: "Anjali Verma", email: "anjali@evenmore.in", designation: "Marketing Head", department: "Marketing", location: "Delhi", joining: "Jan 03, 2020", status: "Active", manager: "David Patel" }
-];
-const DEPARTMENTS = ["All", "Engineering", "HR", "Sales", "Finance", "Operations", "Design", "Marketing"];
-const STATUSES = ["All", "Active", "On Leave", "Probation"];
-const COLUMNS = [
   {
-    key: "name",
-    label: "Employee",
-    sortable: true,
-    render: (val, row) => <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span
-      className="profile-avatar"
-      style={{ width: 32, height: 32, fontSize: "0.75rem", background: "#1f6bff" }}
-    >
-          {getInitial(val, 'E')}
-        </span>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#173562" }}>{safeString(val, 'Unnamed Employee')}</div>
-          <div style={{ fontSize: "0.78rem", color: "#7184a3" }}>{safeString(row?.email, '—')}</div>
-        </div>
-      </div>
+    id: "EMP1024",
+    name: "Priya Patel",
+    email: "priya.p@company.com",
+    designation: "Senior Engineer",
+    department: "Engineering",
+    location: "Bangalore",
+    joining: "Mar 15, 2022",
+    status: "Active",
+    img: "https://randomuser.me/api/portraits/women/44.jpg",
   },
-  { key: "id", label: "Employee ID" },
-  { key: "designation", label: "Designation", sortable: true },
-  { key: "department", label: "Department", sortable: true },
-  { key: "location", label: "Location" },
-  { key: "joining", label: "Joining Date", sortable: true },
   {
-    key: "status",
-    label: "Status",
-    render: (val) => <StatusBadge status={val} />
-  }
+    id: "EMP1025",
+    name: "Marcus Chen",
+    email: "marcus.c@company.com",
+    designation: "Lead Designer",
+    department: "Design",
+    location: "Mumbai",
+    joining: "Jan 10, 2021",
+    status: "Active",
+    img: "https://randomuser.me/api/portraits/men/32.jpg",
+  },
+  {
+    id: "EMP1026",
+    name: "Liam Cooper",
+    email: "liam.c@company.com",
+    designation: "DevOps Engineer",
+    department: "Engineering",
+    location: "Bangalore",
+    joining: "Jun 01, 2023",
+    status: "On Leave",
+    img: "https://randomuser.me/api/portraits/men/75.jpg",
+  },
+  {
+    id: "EMP1027",
+    name: "Elena Rostova",
+    email: "elena.r@company.com",
+    designation: "Brand Strategist",
+    department: "Marketing",
+    location: "Delhi",
+    joining: "Aug 20, 2022",
+    status: "Active",
+    img: "https://randomuser.me/api/portraits/women/68.jpg",
+  },
+  {
+    id: "EMP1028",
+    name: "James Wilson",
+    email: "james.w@company.com",
+    designation: "Finance Manager",
+    department: "Finance",
+    location: "Mumbai",
+    joining: "Feb 14, 2020",
+    status: "Probation",
+    img: "https://randomuser.me/api/portraits/men/54.jpg",
+  },
+  {
+    id: "EMP1029",
+    name: "Sophia Lindqvist",
+    email: "sophia.l@company.com",
+    designation: "System Architect",
+    department: "Engineering",
+    location: "Bangalore",
+    joining: "Nov 05, 2023",
+    status: "Active",
+    img: "https://randomuser.me/api/portraits/women/33.jpg",
+  },
+  {
+    id: "EMP1030",
+    name: "Tariq Al-Mansoor",
+    email: "tariq.a@company.com",
+    designation: "People Ops Lead",
+    department: "HR",
+    location: "Hyderabad",
+    joining: "Jul 18, 2023",
+    status: "Active",
+    img: "https://randomuser.me/api/portraits/men/46.jpg",
+  },
+  {
+    id: "EMP1031",
+    name: "Ayesha Khan",
+    email: "ayesha.k@company.com",
+    designation: "Product Manager",
+    department: "Operations",
+    location: "Delhi",
+    joining: "Jan 03, 2020",
+    status: "Active",
+    img: "https://randomuser.me/api/portraits/women/24.jpg",
+  },
 ];
+
+const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations", "Sales"];
+const STATUSES = ["All", "Active", "On Leave", "Probation"];
+
+const statusStyles = {
+  Active: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
+  "On Leave": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
+  Probation: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+};
+
 export default function Employees() {
   const setToast = useAppStore((s) => s.setToast);
   const [dept, setDept] = useState("All");
   const [status, setStatus] = useState("All");
+  const [viewMode, setViewMode] = useState("Table");
   const [showForm, setShowForm] = useState(false);
   const [employees, setEmployees] = useState(MOCK_EMPLOYEES);
-  const [form, setForm] = useState({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai" });
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    designation: "Senior Engineer",
+    dept: "Engineering",
+    location: "Mumbai",
+  });
+
   const filtered = useMemo(
-    () => employees.filter(
-      (e) => (dept === "All" || e.department === dept) && (status === "All" || e.status === status)
-    ),
+    () =>
+      employees.filter(
+        (e) => (dept === "All" || e.department === dept) && (status === "All" || e.status === status)
+      ),
     [employees, dept, status]
   );
+
+  const totalPages = Math.ceil(filtered.length / pageSize) || 1;
+  const paginatedEmployees = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, currentPage, pageSize]);
+
   function handleAdd() {
     if (!form.name || !form.email) return setToast("Name and email are required.", "error");
     const next = {
-      id: `EMP${1e3 + employees.length + 1}`,
+      id: `EMP${1000 + employees.length + 1}`,
       name: form.name,
       email: form.email,
       designation: form.designation,
       department: form.dept,
       location: form.location,
-      joining: (/* @__PURE__ */ new Date()).toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" }),
+      joining: new Date().toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" }),
       status: "Active",
-      manager: "David Patel"
+      img: `https://randomuser.me/api/portraits/${employees.length % 2 === 0 ? "women" : "men"}/${(employees.length * 7) % 90}.jpg`,
     };
     setEmployees((prev) => [...prev, next]);
     setToast("Employee added successfully.");
     setShowForm(false);
     setForm({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai" });
   }
-  return <>
-      <PageHeader
-    title="Employee Directory"
-    subtitle={`${filtered.length} employees across ${DEPARTMENTS.length - 1} departments`}
-    breadcrumb={[{ label: "HRMS" }, { label: "Employees" }]}
-    actions={<>
-            <button type="button" className="btn-outline btn-sm">Export</button>
-            <button type="button" className="btn-primary btn-sm" onClick={() => setShowForm(true)}>
-              + Add Employee
-            </button>
-          </>}
-  />
 
-      <div className="section-wrap">
-        {
-    /* Filters */
+  function handleDelete(id, name) {
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
+    setToast(`Employee ${name} removed.`);
   }
-        <div className="card" style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <label style={{ fontSize: "0.84rem", color: "#294364", fontWeight: 600 }}>Department:</label>
-          <select
-    className="form-select"
-    style={{ width: 160, height: 34 }}
-    value={dept}
-    onChange={(e) => setDept(e.target.value)}
-  >
-            {DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}
+
+  const handleExport = () => {
+    const header = "ID,Name,Email,Designation,Department,Status";
+    const rows = filtered.map((e) => `"${e.id}","${e.name}","${e.email}","${e.designation}","${e.department}","${e.status}"`);
+    const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "employee-directory.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="emp-dir-page">
+      {/* Breadcrumb */}
+      <nav className="emp-crumb">
+        <span style={{ cursor: "pointer" }}>Home</span>
+        <ChevronRight size={13} style={{ color: "#9aa7bd" }} />
+        <span style={{ color: "#111f36", fontWeight: 600 }}>Employee Setup</span>
+      </nav>
+
+      {/* Header Row */}
+      <div className="emp-title-row">
+        <div>
+          <h1 className="emp-title">Employee Directory</h1>
+          <p className="emp-sub">
+            {filtered.length} employees • 12 departments
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button type="button" onClick={handleExport} className="emp-export-btn">
+            <Download size={15} /> Export
+          </button>
+          <button type="button" onClick={() => setShowForm(true)} className="emp-add-btn">
+            Add Employee
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Card */}
+      <div className="emp-card emp-filter-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <select value={dept} onChange={(e) => setDept(e.target.value)} className="emp-select">
+            {DEPARTMENTS.map((d) => (
+              <option key={d} value={d}>
+                {d === "All" ? "All" : d}
+              </option>
+            ))}
           </select>
-          <label style={{ fontSize: "0.84rem", color: "#294364", fontWeight: 600 }}>Status:</label>
-          <select
-    className="form-select"
-    style={{ width: 140, height: 34 }}
-    value={status}
-    onChange={(e) => setStatus(e.target.value)}
-  >
-            {STATUSES.map((s) => <option key={s}>{s}</option>)}
+
+          <select value={status} onChange={(e) => setStatus(e.target.value)} className="emp-select">
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s === "All" ? "All" : s}
+              </option>
+            ))}
           </select>
         </div>
 
-        {
-    /* Table */
-  }
-        <DataTable
-    columns={COLUMNS}
-    data={filtered}
-    rowKey="id"
-    selectable
-    searchable
-    searchPlaceholder="Search employees..."
-    emptyMessage="No employees match the current filters."
-    pageSize={10}
-  />
+        {/* Table / Grid Toggle */}
+        <div className="emp-tabs">
+          <button
+            type="button"
+            onClick={() => setViewMode("Table")}
+            className={viewMode === "Table" ? "emp-tab active" : "emp-tab"}
+          >
+            Table
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("Grid")}
+            className={viewMode === "Grid" ? "emp-tab active" : "emp-tab"}
+          >
+            Grid
+          </button>
+        </div>
       </div>
 
-      {
-    /* Add Employee Modal */
-  }
+      {/* Main Table / Grid Card */}
+      <div className="emp-card emp-main-card">
+        {viewMode === "Table" ? (
+          <div style={{ overflowX: "auto" }}>
+            <table className="emp-table">
+              <thead>
+                <tr>
+                  <th>EMPLOYEE</th>
+                  <th>ID</th>
+                  <th>DESIGNATION</th>
+                  <th>DEPARTMENT</th>
+                  <th>STATUS</th>
+                  <th style={{ width: 40 }}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedEmployees.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <img src={row.img} alt={row.name} className="emp-avatar" loading="lazy" />
+                        <div>
+                          <span style={{ fontWeight: 600, color: "#111827", display: "inline-block", marginRight: 8 }}>
+                            {row.name}
+                          </span>
+                          <span style={{ fontSize: "12.5px", color: "#6b7280" }}>{row.email}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="emp-id">{row.id}</td>
+                    <td style={{ color: "#374151" }}>{row.designation}</td>
+                    <td style={{ color: "#374151" }}>{row.department}</td>
+                    <td>
+                      <span className="emp-status" style={{ ...statusStyles[row.status] }}>
+                        {row.status}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(row.id, row.name)}
+                        className="emp-trash-btn"
+                        title="Delete employee"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {paginatedEmployees.length === 0 && (
+                  <tr>
+                    <td colSpan={6} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                      No employees match the selected filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="emp-grid-view">
+            {paginatedEmployees.map((row) => (
+              <div key={row.id} className="emp-grid-item">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <img src={row.img} alt={row.name} className="emp-avatar-large" />
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(row.id, row.name)}
+                    className="emp-trash-btn"
+                    title="Delete employee"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+                <h3 style={{ margin: "10px 0 2px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>
+                  {row.name}
+                </h3>
+                <p style={{ margin: 0, fontSize: "12.5px", color: "#6b7280" }}>{row.email}</p>
+                <div style={{ margin: "12px 0 10px", fontSize: "13px", color: "#374151" }}>
+                  <strong>{row.designation}</strong> • {row.department}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
+                  <span className="emp-id">{row.id}</span>
+                  <span className="emp-status" style={{ ...statusStyles[row.status] }}>
+                    {row.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Pagination Footer */}
+        <div className="emp-footer">
+          <span style={{ fontSize: "13px", color: "#6b7280" }}>
+            Showing {paginatedEmployees.length} of {filtered.length}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="emp-page-btn"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="emp-page-indicator">
+              {currentPage}/{totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="emp-page-btn"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Employee Modal */}
       <Modal
-    isOpen={showForm}
-    onClose={() => setShowForm(false)}
-    title="Add Employee"
-    footer={<>
-            <button type="button" className="btn-outline" onClick={() => setShowForm(false)}>Cancel</button>
-            <button type="button" className="btn-primary" onClick={handleAdd}>Add Employee</button>
-          </>}
-  >
+        isOpen={showForm}
+        onClose={() => setShowForm(false)}
+        title="Add Employee"
+        footer={
+          <>
+            <button type="button" className="btn-outline" onClick={() => setShowForm(false)}>
+              Cancel
+            </button>
+            <button type="button" className="btn-primary" onClick={handleAdd}>
+              Add Employee
+            </button>
+          </>
+        }
+      >
         <div style={{ display: "grid", gap: 16 }}>
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Full Name <span className="required">*</span></label>
-              <input className="form-input" placeholder="Enter full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <label className="form-label">
+                Full Name <span className="required">*</span>
+              </label>
+              <input
+                className="form-input"
+                placeholder="Enter full name"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
             </div>
             <div className="form-group">
-              <label className="form-label">Email <span className="required">*</span></label>
-              <input className="form-input" type="email" placeholder="Enter email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <label className="form-label">
+                Email <span className="required">*</span>
+              </label>
+              <input
+                className="form-input"
+                type="email"
+                placeholder="Enter email"
+                value={form.email}
+                onChange={(e) => setForm({ ...form, email: e.target.value })}
+              />
             </div>
           </div>
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Department</label>
-              <select className="form-select" value={form.dept} onChange={(e) => setForm({ ...form, dept: e.target.value })}>
-                {DEPARTMENTS.slice(1).map((d) => <option key={d}>{d}</option>)}
+              <select
+                className="form-select"
+                value={form.dept}
+                onChange={(e) => setForm({ ...form, dept: e.target.value })}
+              >
+                {DEPARTMENTS.slice(1).map((d) => (
+                  <option key={d}>{d}</option>
+                ))}
               </select>
             </div>
             <div className="form-group">
               <label className="form-label">Designation</label>
-              <input className="form-input" value={form.designation} onChange={(e) => setForm({ ...form, designation: e.target.value })} />
+              <input
+                className="form-input"
+                value={form.designation}
+                onChange={(e) => setForm({ ...form, designation: e.target.value })}
+              />
             </div>
           </div>
           <div className="form-group">
             <label className="form-label">Location</label>
-            <input className="form-input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+            <input
+              className="form-input"
+              value={form.location}
+              onChange={(e) => setForm({ ...form, location: e.target.value })}
+            />
           </div>
         </div>
       </Modal>
-    </>;
+
+      <style>{`
+        .emp-dir-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .emp-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
+        .emp-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .emp-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
+        .emp-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+        .emp-export-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+        .emp-export-btn:hover { background: #f9fafb; }
+        .emp-add-btn { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .emp-add-btn:hover { background: #0f172a; }
+        
+        .emp-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
+        .emp-filter-card { padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        
+        .emp-select { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 34px 7px 16px; font-size: 13.5px; color: #1e293b; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 13px; min-width: 110px; transition: border-color 0.15s ease; }
+        .emp-select:focus { border-color: #94a3b8; }
+        
+        .emp-tabs { display: inline-flex; align-items: center; gap: 3px; background: #f4f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 3px 4px; }
+        .emp-tab { border: 1.5px solid transparent; border-radius: 999px; padding: 4px 16px; font-size: 13px; font-weight: 500; color: #8e9baa; background: transparent; cursor: pointer; transition: all 0.15s ease; }
+        .emp-tab.active { font-weight: 600; color: #000000; background: #ffffff; border-color: #000000; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        
+        .emp-main-card { overflow: hidden; }
+        .emp-table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 13.5px; }
+        .emp-table thead tr { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+        .emp-table th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #7b8aa0; padding: 14px 20px; white-space: nowrap; }
+        .emp-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s ease; }
+        .emp-table tbody tr:hover { background: #f8fafc; }
+        .emp-table td { padding: 14px 20px; vertical-align: middle; }
+        
+        .emp-avatar { width: 34px; height: 34px; border-radius: 999px; object-fit: cover; }
+        .emp-avatar-large { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; }
+        .emp-id { font-family: inherit; font-size: 12.5px; color: #6b7280; white-space: nowrap; }
+        .emp-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 13px; border: 1px solid; white-space: nowrap; }
+        .emp-trash-btn { border: none; background: transparent; color: #9ca3af; cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center; transition: color 0.15s ease; }
+        .emp-trash-btn:hover { color: #ef4444; background: #fee2e2; }
+        
+        .emp-grid-view { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; padding: 18px 20px; }
+        .emp-grid-item { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; background: #fff; }
+        
+        .emp-footer { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #ffffff; border-top: 1px solid #f1f5f9; }
+        .emp-page-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 8px; border: 1px solid #e5e7eb; background: #fff; color: #4b5563; cursor: pointer; transition: all 0.15s ease; }
+        .emp-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .emp-page-btn:not(:disabled):hover { background: #f9fafb; border-color: #d1d5db; }
+        .emp-page-indicator { display: inline-flex; align-items: center; justify-content: center; background: #16233a; color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 12px; height: 26px; }
+      `}</style>
+    </div>
+  );
 }

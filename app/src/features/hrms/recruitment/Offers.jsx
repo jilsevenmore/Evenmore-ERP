@@ -64,18 +64,33 @@ export default function Offers() {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-[22px] font-bold">Offers</h1><p className="text-[13px] text-muted">{offers.length} offers</p></div><Button onClick={openCreate}>+ Create Offer</Button></div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
         {[
-          { k: "Pending", v: summary.Pending, color: "bg-amber-50 border-amber-200 text-amber-700" },
-          { k: "Accepted", v: summary.Accepted, color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
-          { k: "Rejected", v: summary.Rejected, color: "bg-red-50 border-red-200 text-red-600" },
-          { k: "Expired", v: summary.Expired, color: "bg-gray-50 border-bdr text-slate" },
+          { k: "Pending", v: summary.Pending, color: "bg-[#fefce8] border-[#fef08a] text-[#854d0e]" },
+          { k: "Accepted", v: summary.Accepted, color: "bg-[#f0fdf4] border-[#dcfce7] text-[#166534]" },
+          { k: "Rejected", v: summary.Rejected, color: "bg-[#fef2f2] border-[#fee2e2] text-[#991b1b]" },
+          { k: "Expired", v: summary.Expired, color: "bg-[#f8fafc] border-[#e2e8f0] text-[#64748b]" },
         ].map((x) => (
-          <button key={x.k} onClick={() => setFilter(x.k)} className={`border rounded-xl p-4 text-left ${x.color} ${filter === x.k ? "ring-2 ring-navy/20" : ""}`}>
-            <div className="text-[11px] tracking-widest uppercase font-semibold">{x.k}</div><div className="text-[20px] font-bold mt-1">{x.v}</div>
+          <button
+            key={x.k}
+            onClick={() => setFilter(x.k)}
+            className={`border rounded-xl p-4 text-left transition-all ${x.color} ${
+              filter === x.k ? "ring-2 ring-slate-400 border-slate-400 font-semibold shadow-xs" : "hover:opacity-90"
+            }`}
+          >
+            <div className="text-[11px] tracking-widest uppercase font-semibold">{x.k}</div>
+            <div className="text-[20px] font-bold mt-1">{x.v}</div>
           </button>
         ))}
-        <button onClick={() => setFilter("All")} className={`border rounded-xl p-4 text-left bg-white border-bdr ${filter === "All" ? "ring-2 ring-navy/20" : ""}`}><div className="text-[11px] tracking-widest uppercase text-muted">All</div><div className="text-[20px] font-bold">{offers.length}</div></button>
+        <button
+          onClick={() => setFilter("All")}
+          className={`border rounded-xl p-4 text-left transition-all bg-white border-[#e2e8f0] text-slate-800 ${
+            filter === "All" ? "ring-2 ring-slate-400 border-slate-400 font-semibold shadow-xs" : "hover:opacity-90"
+          }`}
+        >
+          <div className="text-[11px] tracking-widest uppercase text-muted font-semibold">All</div>
+          <div className="text-[20px] font-bold mt-1">{offers.length}</div>
+        </button>
       </div>
       <DataTable columns={cols} data={filtered} emptyTitle="No offers found" emptyDesc="Create an offer to get started." emptyAction={<Button onClick={openCreate}>+ Create Offer</Button>} />
 

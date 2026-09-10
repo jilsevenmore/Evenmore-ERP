@@ -1,87 +1,300 @@
 import { useState, useMemo } from "react";
+import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
-import { useAttendanceStore } from "../../../stores/attendanceStore";
-import { attendanceEmployees } from "../../../data/hrms/mocks/attendanceExtended";
-import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { ConfirmModal } from "../../../components/hrms/Shared";
+
+const INITIAL_EMPLOYEES = [
+  { id: "EMP1024", name: "Priya Patel", dept: "Engineering", status: "Present", avatar: "https://randomuser.me/api/portraits/women/44.jpg" },
+  { id: "EMP1025", name: "Marcus Chen", dept: "Design", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/32.jpg" },
+  { id: "EMP1026", name: "Liam Cooper", dept: "Engineering", status: "Absent", avatar: "https://randomuser.me/api/portraits/men/75.jpg" },
+  { id: "EMP1027", name: "Sarah Wilson", dept: "Marketing", status: "WFH", avatar: "https://randomuser.me/api/portraits/women/68.jpg" },
+  { id: "EMP1028", name: "James Wilson", dept: "Finance", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/54.jpg" },
+  { id: "EMP1029", name: "Ayesha Khan", dept: "HR", status: "WFH", avatar: "https://randomuser.me/api/portraits/women/24.jpg" },
+  { id: "EMP1030", name: "David Park", dept: "Engineering", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/46.jpg" },
+  { id: "EMP1031", name: "Chen Li", dept: "Operations", status: "WFH", avatar: "https://randomuser.me/api/portraits/women/33.jpg" },
+  { id: "EMP1032", name: "Rahul Verma", dept: "Design", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/62.jpg" },
+];
+
+const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations"];
+const LOCATIONS = ["All", "Bangalore", "Mumbai", "Delhi", "Hyderabad"];
+const SHIFTS = ["All", "General", "Flexible", "Night"];
+const STATUS_OPTIONS = ["Present", "Absent", "Late", "Half Day", "WFH", "On Leave"];
+
+const statusStyles = {
+  Present: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
+  Late: { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
+  Absent: { background: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
+  WFH: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  "Half Day": { background: "#f3e8ff", color: "#7e22ce", border: "#d8b4fe" },
+  "On Leave": { background: "#eff6ff", color: "#2563eb", border: "#bfdbfe" },
+};
+
 export default function BulkAttendance() {
-  const showToast = useAppStore((s) => s.showToast);
-  const bulkUpdate = useAttendanceStore((s) => s.bulkUpdate);
-  const role = useAttendanceStore((s) => s.role);
+  const setToast = useAppStore((s) => s.setToast);
+
   const [date, setDate] = useState("2024-10-11");
   const [dept, setDept] = useState("All");
   const [location, setLocation] = useState("All");
   const [shift, setShift] = useState("All");
-  const [selected, setSelected] = useState(/* @__PURE__ */ new Set());
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState("Present");
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const filtered = useMemo(() => attendanceEmployees.filter((e) => {
-    if (dept !== "All" && e.dept !== dept) return false;
-    return true;
-  }), [dept]);
-  const allSelected = filtered.length > 0 && filtered.every((e) => selected.has(e.id));
+
+  const filtered = useMemo(() => {
+    return employees.filter((e) => {
+      if (dept !== "All" && e.dept !== dept) return false;
+      if (statusFilter !== "All" && e.status !== statusFilter) return false;
+      return true;
+    });
+  }, [employees, dept, statusFilter]);
+
+  const allSelected = filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
+
   function toggleAll(v) {
-    const ns = new Set(selected);
-    filtered.forEach((e) => v ? ns.add(e.id) : ns.delete(e.id));
-    setSelected(ns);
+    const next = new Set(selectedIds);
+    filtered.forEach((e) => (v ? next.add(e.id) : next.delete(e.id)));
+    setSelectedIds(next);
   }
-  function toggle(id) {
-    const ns = new Set(selected);
-    ns.has(id) ? ns.delete(id) : ns.add(id);
-    setSelected(ns);
+
+  function toggleOne(id) {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
   }
-  function apply() {
-    if (selected.size === 0) {
-      showToast("Select at least one employee");
-      return;
+
+  function handlePillClick(st) {
+    setBulkStatus(st);
+    if (selectedIds.size > 0) {
+      setEmployees((prev) =>
+        prev.map((e) => (selectedIds.has(e.id) ? { ...e, status: st } : e))
+      );
+      setToast(`Updated ${selectedIds.size} selected employee(s) status to "${st}"`);
+    } else {
+      setToast(`Selected "${st}" status. Check employees to apply or click Save.`);
     }
-    if (role === "Employee") {
-      showToast("Only HR/Admin can bulk update");
-      return;
+  }
+
+  function handleSaveClick() {
+    if (selectedIds.size === 0) {
+      return setToast("Please select at least one employee or check 'Select All'.", "error");
     }
     setConfirmOpen(true);
   }
-  function confirm() {
-    bulkUpdate(Array.from(selected), bulkStatus);
-    showToast(`Bulk attendance updated for ${selected.size} employees \u2014 ${bulkStatus} on ${date}`);
+
+  function handleConfirmSave() {
+    setEmployees((prev) =>
+      prev.map((e) => (selectedIds.has(e.id) ? { ...e, status: bulkStatus } : e))
+    );
+    setToast(`Bulk attendance saved as "${bulkStatus}" for ${selectedIds.size} employees on ${date}`);
     setConfirmOpen(false);
-    setSelected(/* @__PURE__ */ new Set());
+    setSelectedIds(new Set());
   }
-  return <div className="flex flex-col gap-5">
-      <div><h1 className="text-[24px] font-bold">Bulk Attendance</h1><p className="text-[13px] text-muted">Update attendance for multiple employees at once.</p></div>
 
-      <div className="bg-white border border-bdr rounded-xl p-4 shadow-subtle flex flex-wrap gap-2">
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]" />
-        <select value={dept} onChange={(e) => setDept(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>All</option><option>Engineering</option><option>Design</option><option>Marketing</option><option>HR</option><option>Finance</option><option>Operations</option></select>
-        <select value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>All</option><option>New York</option><option>London</option><option>Dubai</option></select>
-        <select value={shift} onChange={(e) => setShift(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>All</option><option>General</option><option>Flexible</option><option>Night</option></select>
-      </div>
+  return (
+    <div className="bulk-att-page">
+      {/* Breadcrumb */}
+      <nav className="bulk-crumb">
+        <span style={{ cursor: "pointer" }}>Home</span>
+        <ChevronRight size={13} style={{ color: "#9aa7bd" }} />
+        <span style={{ color: "#111f36", fontWeight: 600 }}>Attendance / Bulk Attendance</span>
+      </nav>
 
-      <div className="bg-white border border-bdr rounded-xl p-4 shadow-subtle flex flex-wrap gap-2 items-center">
-        <label className="flex items-center gap-2 text-[13px]"><input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} /> Select All ({selected.size} selected)</label>
-        <div className="flex gap-1 ml-auto flex-wrap">
-          {["Present", "Absent", "Late", "Half Day", "WFH", "On Leave"].map((s) => <button key={s} onClick={() => setBulkStatus(s)} className={`px-3 py-1.5 rounded-xl border text-[12px] font-medium ${bulkStatus === s ? "bg-navy text-white border-navy" : "bg-white border-bdr hover:bg-off"}`}>{s}</button>)}
+      {/* Header Row */}
+      <div className="bulk-title-row">
+        <div>
+          <h1 className="bulk-title">Bulk Attendance</h1>
+          <p className="bulk-sub">Update attendance for multiple employees at once.</p>
         </div>
-        <button onClick={apply} className="px-6 py-2 bg-navy text-white rounded-xl text-[13.5px] font-medium">Save Attendance</button>
       </div>
 
-      <div className="bg-white border border-bdr rounded-xl shadow-subtle overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[700px]">
-            <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-4"><input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} /></th><th className="py-3 px-3">Employee</th><th className="py-3 px-3">Employee ID</th><th className="py-3 px-3">Department</th><th className="py-3 px-3">Current Status</th></tr></thead>
-            <tbody className="divide-y divide-bdr/60 text-[13px]">
-              {filtered.map((e) => <tr key={e.id} className="hover:bg-off/60">
-                  <td className="py-3 px-4"><input type="checkbox" checked={selected.has(e.id)} onChange={() => toggle(e.id)} /></td>
-                  <td className="py-3 px-3"><div className="flex items-center gap-2"><img src={e.avatar} className="w-7 h-7 rounded-full" />{e.name}</div></td>
-                  <td className="py-3 px-3 text-muted text-[12px]">{e.id}</td>
-                  <td className="py-3 px-3">{e.dept}</td>
-                  <td className="py-3 px-3"><StatusBadge status={e.id === "EMP1026" ? "Absent" : e.id === "EMP1024" ? "Present" : "WFH"} /></td>
-                </tr>)}
+      {/* Top Filter Card */}
+      <div className="bulk-card bulk-filter-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {/* Date Picker Input */}
+          <div className="bulk-date-wrap">
+            <span>{date.split("-").reverse().join("-")}</span>
+            <CalendarIcon size={14} style={{ color: "#475569" }} />
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+              className="bulk-date-native"
+              aria-label="Select date"
+            />
+          </div>
+
+          <select value={dept} onChange={(e) => setDept(e.target.value)} className="bulk-select">
+            {DEPARTMENTS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+
+          <select value={location} onChange={(e) => setLocation(e.target.value)} className="bulk-select">
+            {LOCATIONS.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+
+          <select value={shift} onChange={(e) => setShift(e.target.value)} className="bulk-select">
+            {SHIFTS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Action & Selection Bar Card */}
+      <div className="bulk-card bulk-action-card">
+        <label className="bulk-checkbox-label">
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={(e) => toggleAll(e.target.checked)}
+            className="bulk-checkbox"
+          />
+          <span>Select All ({selectedIds.size} selected)</span>
+        </label>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          {/* Status Options Pills */}
+          <div className="bulk-pills-group">
+            {STATUS_OPTIONS.map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => handlePillClick(st)}
+                className={bulkStatus === st ? "bulk-pill active" : "bulk-pill"}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          <button type="button" onClick={handleSaveClick} className="bulk-btn-save">
+            Save Attendance
+          </button>
+        </div>
+      </div>
+
+      {/* Employee List Table */}
+      <div className="bulk-card bulk-main-card">
+        <div style={{ overflowX: "auto" }}>
+          <table className="bulk-table">
+            <thead>
+              <tr>
+                <th style={{ width: 40, paddingLeft: 20 }}>
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    className="bulk-checkbox"
+                  />
+                </th>
+                <th>EMPLOYEE</th>
+                <th>EMPLOYEE ID</th>
+                <th>DEPARTMENT</th>
+                <th>CURRENT STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((e) => (
+                <tr key={e.id}>
+                  <td style={{ paddingLeft: 20 }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(e.id)}
+                      onChange={() => toggleOne(e.id)}
+                      className="bulk-checkbox"
+                    />
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <img src={e.avatar} alt={e.name} className="bulk-avatar" loading="lazy" />
+                      <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>
+                        {e.name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="bulk-id">{e.id}</td>
+                  <td style={{ color: "#374151" }}>{e.dept}</td>
+                  <td>
+                    <span className="bulk-status" style={{ ...statusStyles[e.status] }}>
+                      {e.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                    No employees match the selected department filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </div>
 
-      <ConfirmModal open={confirmOpen} title="Confirm bulk update?" desc={`Update attendance for ${selected.size} employees to "${bulkStatus}" on ${date}?`} confirmLabel="Confirm Update" onClose={() => setConfirmOpen(false)} onConfirm={confirm} />
-    </div>;
+      <ConfirmModal
+        open={confirmOpen}
+        title="Confirm bulk update?"
+        desc={`Update attendance status to "${bulkStatus}" for ${selectedIds.size} selected employees on ${date}?`}
+        confirmLabel="Confirm Update"
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={handleConfirmSave}
+      />
+
+      <style>{`
+        .bulk-att-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .bulk-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
+        .bulk-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .bulk-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
+        .bulk-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+
+        .bulk-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
+        .bulk-filter-card { padding: 14px 18px; margin-bottom: 16px; }
+
+        .bulk-date-wrap { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 14px; font-size: 13px; color: #374151; min-width: 110px; cursor: pointer; }
+        .bulk-date-native { position: absolute; right: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+        .bulk-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 100px; }
+        .bulk-select:focus { border-color: #94a3b8; background-color: #fff; }
+
+        .bulk-action-card { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .bulk-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; cursor: pointer; user-select: none; }
+        .bulk-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: #16233a; cursor: pointer; }
+
+        .bulk-pills-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .bulk-pill { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 14px; font-size: 12.5px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
+        .bulk-pill:hover { background: #f8fafc; color: #111827; }
+        .bulk-pill.active { background: #16233a; color: #fff; border-color: #16233a; font-weight: 600; }
+
+        .bulk-btn-save { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .bulk-btn-save:hover { background: #0f172a; }
+
+        .bulk-main-card { overflow: hidden; }
+        .bulk-table { width: 100%; border-collapse: collapse; min-width: 700px; font-size: 13.5px; }
+        .bulk-table thead tr { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+        .bulk-table th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #7b8aa0; padding: 14px 20px; white-space: nowrap; }
+        .bulk-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s ease; }
+        .bulk-table tbody tr:hover { background: #f8fafc; }
+        .bulk-table td { padding: 14px 20px; vertical-align: middle; }
+
+        .bulk-avatar { width: 32px; height: 32px; border-radius: 999px; object-fit: cover; }
+        .bulk-id { font-family: inherit; font-size: 12.5px; color: #6b7280; white-space: nowrap; }
+        .bulk-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 13px; border: 1px solid; white-space: nowrap; }
+      `}</style>
+    </div>
+  );
 }
