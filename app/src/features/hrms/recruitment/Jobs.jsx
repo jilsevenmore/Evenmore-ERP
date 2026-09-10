@@ -59,7 +59,7 @@ export default function Jobs() {
     setDrawerOpen(false);
   }
   const cols = [
-    { key: "title", header: "Job", sortable: true, render: (r) => <button onClick={() => navigate(`/recruitment/jobs/${r.id}`)} className="font-medium text-navy underline">{r.title}</button> },
+    { key: "title", header: "Job", sortable: true, render: (r) => <button onClick={() => navigate(`/hrms/recruitment/jobs/${r.id}`)} className="font-medium text-navy underline">{r.title}</button> },
     { key: "department", header: "Department", sortable: true },
     { key: "branch", header: "Branch" },
     { key: "openings", header: "Openings" },
@@ -68,9 +68,9 @@ export default function Jobs() {
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status === "Open" ? "Active" : r.status === "Closed" ? "Cancelled" : "Draft"} /> },
     { key: "createdAt", header: "Created At" },
     { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
-        <button aria-label="View" onClick={() => navigate(`/recruitment/jobs/${r.id}`)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center"><Eye size={14} /></button>
+        <button aria-label="View" onClick={() => navigate(`/hrms/recruitment/jobs/${r.id}`)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center"><Eye size={14} /></button>
         <button aria-label="Edit" onClick={() => openEdit(r)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center"><Pencil size={14} /></button>
-        <button aria-label="Applicants" onClick={() => navigate(`/recruitment/applications`)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center"><Users size={14} /></button>
+        <button aria-label="Applicants" onClick={() => navigate(`/hrms/recruitment/applications`)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center"><Users size={14} /></button>
         <button aria-label="Duplicate" onClick={() => {
       addJob({ ...r, id: `JOB-${Date.now()}`, title: r.title + " Copy" });
       showToast("Job duplicated");
@@ -100,11 +100,11 @@ export default function Jobs() {
       <DataTable columns={cols} data={filtered} emptyTitle="No active jobs" emptyDesc="Create your first job opening." emptyAction={<Button onClick={openCreate}>+ Create Job</Button>} />
 
       <Drawer
-    open={drawerOpen}
+    isOpen={drawerOpen}
     onClose={() => setDrawerOpen(false)}
     title={editing ? "Edit Job" : "Create Job Opening"}
     subtitle={editing ? "Update job details" : "Basic information, details, location and timeline"}
-    actions={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>Cancel</Button><Button variant="secondary" onClick={() => save(false)}>Save Draft</Button><Button onClick={() => save(true)}>{editing ? "Update Job" : "Publish Job"}</Button></>}
+    footer={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>Cancel</Button><Button variant="secondary" onClick={() => save(false)}>Save Draft</Button><Button onClick={() => save(true)}>{editing ? "Update Job" : "Publish Job"}</Button></>}
   >
         <div className="space-y-6 text-[13px]">
           <div><h4 className="font-semibold">Basic Information</h4><div className="grid sm:grid-cols-2 gap-3 mt-2">
@@ -130,7 +130,7 @@ export default function Jobs() {
           </div></div>
         </div>
       </Drawer>
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Job?" footer={<><Button variant="secondary" onClick={() => setDeleteId(null)}>Cancel</Button><Button variant="danger" onClick={() => {
+      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Job?" footer={<><Button variant="secondary" onClick={() => setDeleteId(null)}>Cancel</Button><Button variant="danger" onClick={() => {
     if (deleteId) deleteJob(deleteId);
     setDeleteId(null);
     showToast("Job deleted");

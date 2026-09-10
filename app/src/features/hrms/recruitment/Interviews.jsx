@@ -38,7 +38,7 @@ export default function Interviews() {
     { key: "mode", header: "Mode" },
     { key: "status", header: "Status", render: (r) => <span className={`px-2 py-1 rounded-full text-[11px] border ${r.status === "Completed" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : r.status === "Cancelled" ? "bg-red-50 border-red-200 text-red-600" : "bg-amber-50 border-amber-200 text-amber-700"}`}>{r.status}</span> },
     { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
-        <button onClick={() => navigate(`/recruitment/interviews/${r.id}`)} className="text-navy text-[12px] underline">View</button>
+        <button onClick={() => navigate(`/hrms/recruitment/interviews/${r.id}`)} className="text-navy text-[12px] underline">View</button>
         <button onClick={() => window.open(r.meetingLink || "#", "_blank")} className="text-[11px] border border-bdr rounded-lg px-2">Join</button>
       </div> }
   ];
@@ -61,17 +61,17 @@ export default function Interviews() {
             {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="bg-off py-2 font-medium text-muted">{d}</div>)}
             {Array.from({ length: 28 }).map((_, i) => {
     const day = interviews.find((iv) => iv.date.includes(String(i + 1).padStart(2, "0")));
-    return <div key={i} className="bg-white h-20 p-1 text-left"><span className="text-[11px]">{i + 1}</span>{day && <div onClick={() => navigate(`/recruitment/interviews/${day.id}`)} className="mt-1 px-1 py-0.5 bg-navy text-white rounded text-[10px] truncate cursor-pointer">{day.start} {day.candidateName}</div>}</div>;
+    return <div key={i} className="bg-white h-20 p-1 text-left"><span className="text-[11px]">{i + 1}</span>{day && <div onClick={() => navigate(`/hrms/recruitment/interviews/${day.id}`)} className="mt-1 px-1 py-0.5 bg-navy text-white rounded text-[10px] truncate cursor-pointer">{day.start} {day.candidateName}</div>}</div>;
   })}
           </div>
         </div>}
 
       <Drawer
-    open={drawerOpen}
+    isOpen={drawerOpen}
     onClose={() => setDrawerOpen(false)}
     title="Schedule Interview"
     subtitle="Candidate, job, type, interviewer and time"
-    actions={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>Cancel</Button><Button onClick={schedule}>Schedule Interview</Button></>}
+    footer={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>Cancel</Button><Button onClick={schedule}>Schedule Interview</Button></>}
   >
         <div className="grid sm:grid-cols-2 gap-3 text-[13px]">
           <label className="flex flex-col gap-1"><span className="text-[11px] font-medium text-muted">Candidate *</span><select value={form.candidateId} onChange={(e) => setForm({ ...form, candidateId: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl"><option value="">Select</option>{candidates.slice(0, 8).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>

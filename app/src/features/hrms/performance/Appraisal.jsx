@@ -89,12 +89,12 @@ export default function Appraisal() {
     }}
   />
       <DataTable columns={cols} data={filtered} emptyTitle="No appraisals" emptyDesc="Add your first appraisal to get started." emptyAction={<Button onClick={() => setAddOpen(true)}>+ Add Appraisal</Button>} />
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Appraisal" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Appraisal</Button></>}><FormFields /></Modal>
-      <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Appraisal" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Appraisal</Button></>}><FormFields /></Modal>
-      <Drawer open={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.employee ?? ""} subtitle={`${viewRow?.cycle} \u2022 Reviewer: ${viewRow?.reviewer}`} actions={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
+      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Appraisal" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Appraisal</Button></>}><FormFields /></Modal>
+      <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit Appraisal" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Appraisal</Button></>}><FormFields /></Modal>
+      <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.employee ?? ""} subtitle={`${viewRow?.cycle} \u2022 Reviewer: ${viewRow?.reviewer}`} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && <div className="space-y-2 text-[13px]"><div>Rating: {viewRow.rating} / 5</div><div>Status: <StatusBadge status={viewRow.status} /></div><div>Due: {viewRow.due}</div></div>}
       </Drawer>
-      <Modal open={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete Appraisal?" footer={<><Button variant="secondary" onClick={() => setDeleteRow(null)}>Cancel</Button><Button variant="danger" onClick={() => {
+      <Modal isOpen={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete Appraisal?" footer={<><Button variant="secondary" onClick={() => setDeleteRow(null)}>Cancel</Button><Button variant="danger" onClick={() => {
     if (deleteRow) setData((d) => d.filter((x) => x.id !== deleteRow.id));
     setDeleteRow(null);
     showToast("Appraisal deleted successfully.");

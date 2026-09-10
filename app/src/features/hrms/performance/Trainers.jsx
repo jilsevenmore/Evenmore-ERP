@@ -85,12 +85,12 @@ export default function Trainers() {
     }}
   />
       <DataTable columns={cols} data={filtered} emptyTitle="No trainers" emptyDesc="Add a trainer to get started." emptyAction={<Button onClick={() => setAddOpen(true)}>+ Add Trainer</Button>} />
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Trainer" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Trainer</Button></>}><FormFields /></Modal>
-      <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit Trainer" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Trainer</Button></>}><FormFields /></Modal>
-      <Drawer open={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name ?? ""} subtitle={`${viewRow?.specialization} \u2022 ${viewRow?.email}`} actions={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
+      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Trainer" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Trainer</Button></>}><FormFields /></Modal>
+      <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit Trainer" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Trainer</Button></>}><FormFields /></Modal>
+      <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name ?? ""} subtitle={`${viewRow?.specialization} \u2022 ${viewRow?.email}`} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && <div className="space-y-2 text-[13px]"><div>Phone: {viewRow.phone}</div><div>Programs: {viewRow.programs}</div><div>Status: <StatusBadge status={viewRow.status} /></div></div>}
       </Drawer>
-      <Modal open={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete Trainer?" footer={<><Button variant="secondary" onClick={() => setDeleteRow(null)}>Cancel</Button><Button variant="danger" onClick={() => {
+      <Modal isOpen={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete Trainer?" footer={<><Button variant="secondary" onClick={() => setDeleteRow(null)}>Cancel</Button><Button variant="danger" onClick={() => {
     if (deleteRow) setData((d) => d.filter((x) => x.id !== deleteRow.id));
     setDeleteRow(null);
     showToast("Trainer deleted successfully.");

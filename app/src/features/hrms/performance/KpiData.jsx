@@ -90,12 +90,12 @@ export default function KpiData() {
     }}
   />
       <DataTable columns={cols} data={filtered} emptyTitle="No KPI data" emptyDesc="Add your first KPI to get started." emptyAction={<Button onClick={() => setAddOpen(true)}>+ Add KPI</Button>} />
-      <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add KPI" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save KPI</Button></>}><FormFields /></Modal>
-      <Modal open={!!editRow} onClose={() => setEditRow(null)} title="Edit KPI" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save KPI</Button></>}><FormFields /></Modal>
-      <Drawer open={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name ?? ""} subtitle={`${viewRow?.department} \u2022 ${viewRow?.designation}`} actions={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
+      <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add KPI" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save KPI</Button></>}><FormFields /></Modal>
+      <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit KPI" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save KPI</Button></>}><FormFields /></Modal>
+      <Drawer isOpen={!!viewRow} onClose={() => setViewRow(null)} title={viewRow?.name ?? ""} subtitle={`${viewRow?.department} \u2022 ${viewRow?.designation}`} footer={<Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button>}>
         {viewRow && <div className="space-y-3 text-[13px]"><div><b>Target:</b> {viewRow.target}</div><div><b>Weight:</b> {viewRow.weight}</div><div><b>Status:</b> <StatusBadge status={viewRow.status} /></div><div><b>Created:</b> {viewRow.createdAt}</div></div>}
       </Drawer>
-      <Modal open={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete KPI?" footer={<><Button variant="secondary" onClick={() => setDeleteRow(null)}>Cancel</Button><Button variant="danger" onClick={() => {
+      <Modal isOpen={!!deleteRow} onClose={() => setDeleteRow(null)} title="Delete KPI?" footer={<><Button variant="secondary" onClick={() => setDeleteRow(null)}>Cancel</Button><Button variant="danger" onClick={() => {
     if (deleteRow) setData((d) => d.filter((x) => x.id !== deleteRow.id));
     setDeleteRow(null);
     showToast("KPI deleted successfully.");
