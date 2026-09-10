@@ -1,3 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --color-primary: var(--primary);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-subtle: var(--primary-subtle);
+  --color-page: var(--page);
+  --color-text-main: var(--text);
+  --color-text-secondary: var(--text-secondary);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-soft: var(--soft);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-card-alt: var(--card-alt);
+  --color-danger: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --radius-default: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-modal: var(--shadow-modal);
+  --shadow-popover: var(--shadow-popover);
+}
+
+@layer base {
 /* =========================================================
    EVENMORE UNIFIED PLATFORM — GLOBAL STYLES
    Design System Baseline: CRM Application & Multi-Theme Engine
@@ -165,7 +197,9 @@ button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 a { text-decoration: none; color: inherit; }
 img { display: block; max-width: 100%; }
+}
 
+@layer components {
 /* ── App Shell ──────────────────────────────────────────── */
 .app-shell {
   min-height: 100vh;
@@ -2409,6 +2443,7 @@ img { display: block; max-width: 100%; }
   color: var(--text);
   font-size: 0.88rem;
 }
+}
 
 /* ── Print Styles (from ERP) ─────────────────────────────── */
 @media print {
@@ -2446,25 +2481,10 @@ img { display: block; max-width: 100%; }
 }
 
 /* ── Utilities ───────────────────────────────────────────── */
-.flex { display: flex; }
-.flex-col { flex-direction: column; }
-.items-center { align-items: center; }
-.justify-between { justify-content: space-between; }
-.gap-2 { gap: 8px; }
-.gap-3 { gap: 12px; }
-.gap-4 { gap: 16px; }
-.mt-4 { margin-top: 16px; }
-.mt-3 { margin-top: 12px; }
-.mt-2 { margin-top: 8px; }
-.mb-4 { margin-bottom: 16px; }
-.w-full { width: 100%; }
-.text-sm { font-size: 0.875rem; }
-.text-xs { font-size: 0.75rem; }
-.font-bold { font-weight: 700; }
-.font-semibold { font-weight: 600; }
-.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.text-muted { color: var(--muted); }
-.text-primary { color: var(--primary); }
-.text-danger { color: var(--danger); }
-.text-success { color: var(--success); }
-.rounded { border-radius: var(--radius); }
+@layer utilities {
+  .text-muted { color: var(--muted); }
+  .text-primary { color: var(--primary); }
+  .text-danger { color: var(--danger); }
+  .text-success { color: var(--success); }
+  .rounded { border-radius: var(--radius); }
+}
