@@ -1,13 +1,22 @@
-import { Building2, Mail, MapPin, Phone, UserRound } from "lucide-react";
+import { Building2, Mail, MapPin, Phone, Pin, Trash2, UserRound } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 import { formatCurrency } from "../../../utils/currencyUtils";
 
-export default function LeadCardGridView({ rows = [], onAddNote, onOpenLead }) {
-  const activeCurrency = localStorage.getItem('evenmore_currency') || 'USD ($)';
+export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadIds = [], onTogglePin, onToggleOne, onRequestDelete, onAddNote, onOpenLead, onDelete }) {
   return (
     <div className="lead-grid">
       {rows.map((row) => (
         <article key={row.id} className="lead-grid-card">
+          <input
+            type="checkbox"
+            className="lead-grid-select row-check"
+            checked={selected.includes(row.id)}
+            onChange={() => {
+              onToggleOne?.(row.id);
+              onRequestDelete?.(row);
+            }}
+            aria-label={`Select ${row.name}`}
+          />
           <div className="lead-grid-top">
             <div className="lead-grid-person">
               <LeadAvatar lead={row} />
@@ -18,10 +27,31 @@ export default function LeadCardGridView({ rows = [], onAddNote, onOpenLead }) {
                 <span>{row.status}</span>
               </div>
             </div>
-            <button type="button" className="lead-grid-open" onClick={() => onAddNote(row)}>
-              Open
-            </button>
+            <div className="lead-grid-top-actions">
+              <button
+                type="button"
+                className={`pinned-indicator${pinnedLeadIds.includes(row.id) ? " active" : ""}`}
+                aria-label={`${pinnedLeadIds.includes(row.id) ? "Unpin" : "Pin"} ${row.name}`}
+                title={pinnedLeadIds.includes(row.id) ? "Unpin record" : "Pin record"}
+                onClick={() => onTogglePin?.(row)}
+              >
+                <Pin size={14} />
+              </button>
+              <button type="button" className="lead-grid-open" onClick={() => onAddNote(row)}>
+                Open
+              </button>
+            </div>
           </div>
+
+          <button
+            type="button"
+            className="lead-grid-delete row-action-icon row-delete-action"
+            onClick={() => onDelete?.(row.id)}
+            aria-label={`Delete ${row.name}`}
+          >
+            <Trash2 size={15} />
+            <span className="toolbar-tooltip">Delete</span>
+          </button>
 
           <div className="lead-grid-company">
             <Building2 size={16} />

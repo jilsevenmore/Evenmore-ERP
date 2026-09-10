@@ -70,10 +70,27 @@ const NAV = [
     icon: LayoutGrid,
     defaultOpen: false,
     children: [
-      { label: 'CRM Dashboard', icon: Home, to: '/crm/dashboard' },
-      { label: 'Leads', icon: Target, to: '/crm/leads', dot: true },
-      { label: 'Customers', icon: Users, to: '/crm/customers' },
-      { label: 'Tasks', icon: ListChecks, to: '/crm/tasks' },
+      {
+        label: 'Leads',
+        icon: Target,
+        defaultOpen: true,
+        children: [
+          { label: 'Leads', to: '/crm/leads', dot: true },
+          { label: 'Lead Create Form', to: '/crm/leads/forms' },
+          { label: 'Lead Tasks Master', to: '/crm/leads/tasks-master' },
+          { label: 'Lead Task Form', to: '/crm/leads/task-form' },
+          { label: 'Lead Stage Tasks', to: '/crm/leads/stage-tasks' },
+        ],
+      },
+      {
+        label: 'Tasks',
+        icon: ListChecks,
+        defaultOpen: true,
+        children: [
+          { label: 'Tasks List', to: '/crm/tasks' },
+          { label: 'Task Allocation', to: '/crm/tasks/allocation' },
+        ],
+      },
       { label: 'User Allocation & Tracking', icon: Users, to: '/crm/user-allocation' },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
       { label: 'CRM System Setup', icon: Settings, to: '/crm/system-setup' },
@@ -84,6 +101,7 @@ const NAV = [
     label: 'Sales',
     icon: BarChart3,
     children: [
+      { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
       { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
@@ -319,8 +337,26 @@ function filterNavTree(items, query) {
 // ── Sub-item (leaf node) ────────────────────────────────────
 function SubItem({ item, badges = {} }) {
   const location = useLocation();
-  const isActive = isRouteActive(item.to, location.pathname);
-  const count = item.badgeKey ? badges[item.badgeKey] : 0;
+  const currentPath = location.pathname;
+  const isExact = currentPath === item.to;
+  const isFormBuilderAlias =
+    item.label === 'Lead Create Form' &&
+    (currentPath === '/crm/leads/forms' || currentPath === '/crm/leads/form-builder' || currentPath === '/crm/leads/create-form');
+  const isPrefix = Boolean(item.to && currentPath.startsWith(item.to + '/'));
+  const hasBetterMatch =
+    isPrefix &&
+    (isFormBuilderAlias ||
+      ALL_NAV_PATHS.some(
+        (p) =>
+          p !== item.to &&
+          (currentPath === p || (currentPath.startsWith(p + '/') && p.length > item.to.length))
+      ) ||
+      (item.to === '/crm/leads' &&
+        (currentPath === '/crm/leads/forms' ||
+          currentPath === '/crm/leads/form-builder' ||
+          currentPath === '/crm/leads/create-form')));
+  const isActive = isFormBuilderAlias || isExact || (isPrefix && !hasBetterMatch);
+  const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
 
   return (
     <NavLink
@@ -363,20 +399,23 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
   const [open, setOpen] = useState(false);
   const Icon = item.icon;
 
-  // Auto-open if a child route is active or forced open by search
-  const isChildActive = item.children?.some((c) => {
-    if (c.to && isRouteActive(c.to, location.pathname)) return true;
-    if (c.children?.some((sub) => sub.to && isRouteActive(sub.to, location.pathname))) return true;
-    return false;
-  });
+  function handleClick() {
+    setOpen((v) => !v);
+  }
+
+  // Auto-open if a child route is active
+  const isChildActive = item.children?.some(
+    (c) => (c.to && (location.pathname === c.to || location.pathname.startsWith(c.to + '/'))) ||
+      (c.children?.some((sub) => sub.to && (location.pathname === sub.to || location.pathname.startsWith(sub.to + '/'))))
+  );
 
   useEffect(() => {
-    if (isChildActive || item.forceOpen) {
+    if (isChildActive) {
       setOpen(true);
     }
-  }, [isChildActive, item.forceOpen]);
+  }, [isChildActive]);
 
-  const isActive = isRouteActive(item.to, location.pathname);
+  const isActive = item.to && (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
 
   if (item.to && !item.children) {
     // Simple nav row (direct link like Dashboard, Parties, Reports)
@@ -450,6 +489,16 @@ export default function Sidebar() {
     }
   } catch { }
 
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+  
   useEffect(() => {
     function handleMove(e) {
       if (!dragRef.current.dragging) return;

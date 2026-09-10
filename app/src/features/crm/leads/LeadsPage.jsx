@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../../../components/ui/PageHeader';
 import LeadsTabs from './LeadsTabs';
 import FilterPanel from './FilterPanel';
@@ -9,10 +9,10 @@ import LeadMapView from './LeadMapView';
 import Pagination from '../../../components/ui/Pagination';
 import NotesDrawer from './NotesDrawer';
 import CreateLeadModal from './CreateLeadModal';
-import LeadDetailView from './LeadDetailView';
+import DeleteLeadModal from './DeleteLeadModal';
 import { useNavigate } from 'react-router-dom';
-import { leads } from '../../../data/crm/mockLeads';
-import { createFieldFromType, defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
+import { leads as seedLeads } from '../../../data/crm/mockLeads';
+import { exportToCSV } from '../../../services/exportUtils';
 
 const INITIAL_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const INITIAL_SORT = { field: '', direction: 'ascending' };
@@ -29,6 +29,73 @@ const SORT_OPTIONS = [
   { value: 'createdOn', label: 'Created On' },
 ];
 
+const LEAD_EXPORT_FIELDS = [
+  ['Lead Name', 'name'],
+  ['Company', 'company'],
+  ['Email', 'email'],
+  ['Phone', 'phone'],
+  ['Lead Source', 'source'],
+  ['Title', 'jobTitle'],
+  ['Industry', 'industry'],
+  ['Lead Owner', 'owner'],
+  ['Status', 'status'],
+  ['Created On', 'createdOn'],
+];
+
+function escapeExportHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function exportLeadRows(rows) {
+  return rows.map((lead) => LEAD_EXPORT_FIELDS.map(([, key]) => lead[key] ?? ''));
+}
+
+function downloadLeadsAsExcel(rows) {
+  const headers = LEAD_EXPORT_FIELDS.map(([label]) => label);
+  const tableRows = rows.map((lead) => `<tr>${LEAD_EXPORT_FIELDS.map(([, key]) => `<td>${escapeExportHtml(lead[key])}</td>`).join('')}</tr>`).join('');
+  const table = `<table><thead><tr>${headers.map((header) => `<th>${escapeExportHtml(header)}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table>`;
+  const blob = new Blob([table], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'leads_details.xls';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function printLeadsAsPdf(rows) {
+  const printWindow = window.open('', '_blank', 'width=1200,height=800');
+  if (!printWindow) return;
+  const headers = LEAD_EXPORT_FIELDS.map(([label]) => `<th>${escapeExportHtml(label)}</th>`).join('');
+  const tableRows = rows.map((lead) => `<tr>${LEAD_EXPORT_FIELDS.map(([, key]) => `<td>${escapeExportHtml(lead[key])}</td>`).join('')}</tr>`).join('');
+  printWindow.document.write(`<!doctype html><html><head><title>Lead Details</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:24px}h1{font-size:22px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}</style></head><body><h1>Lead Details</h1><table><thead><tr>${headers}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
+
+const leadsGuide = {
+  title: 'CRM Leads',
+  subtitle: 'Capture, qualify, and convert prospective customer opportunities.',
+  purpose: 'A lead is a prospective customer or business opportunity that can be qualified, assigned, followed up, and converted into a customer or sales opportunity.',
+  workflow: ['Lead Captured', 'Assigned to Owner', 'Qualification', 'Follow-up', 'Converted'],
+  keyTerms: [
+    { term: 'Lead', definition: 'A person or company that may become a customer.' },
+    { term: 'Lead Source', definition: 'The channel that generated the lead, such as a referral, campaign, or website.' },
+    { term: 'Lead Owner', definition: 'The team member responsible for follow-up and progress.' },
+    { term: 'Qualification', definition: 'The process of confirming need, fit, timing, and purchase intent.' },
+    { term: 'Follow-up', definition: 'A planned call, email, note, or task used to move the lead forward.' },
+    { term: 'Conversion', definition: 'Turning a qualified lead into a customer or active sales opportunity.' },
+  ],
+};
+
 function getSortValue(lead, field) {
   if (field === 'createdOn') return new Date(lead.createdOn).getTime();
   return String(lead[field] ?? '').toLowerCase();
@@ -36,20 +103,32 @@ function getSortValue(lead, field) {
 
 export default function LeadsPage() {
   const navigate = useNavigate();
+  const [leadRows, setLeadRows] = useState(seedLeads);
   const [activeTab, setActiveTab] = useState('All Leads');
   const [selected, setSelected] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [leadView, setLeadView] = useState('list');
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [draftFilters, setDraftFilters] = useState(INITIAL_FILTERS);
   const [appliedSort, setAppliedSort] = useState(INITIAL_SORT);
   const [draftSort, setDraftSort] = useState(INITIAL_SORT);
   const [noteTarget, setNoteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [bulkDeleteTargets, setBulkDeleteTargets] = useState([]);
+  const [pinnedLeadIds, setPinnedLeadIds] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const selectedLeads = useMemo(
+    () => leadRows.filter((lead) => selected.includes(lead.id)),
+    [leadRows, selected],
+  );
+  const selectedLead = selectedLeads[0] ?? null;
 
   const rows = useMemo(() => {
-    const filtered = leads.filter((l) => {
+    const filtered = leadRows.filter((l) => {
       if (activeTab !== 'All Leads' && l.status !== activeTab) return false;
       if (appliedFilters.statuses.length > 0 && !appliedFilters.statuses.includes(l.status)) return false;
       if (appliedFilters.sources.length > 0 && !appliedFilters.sources.includes(l.source)) return false;
@@ -69,7 +148,25 @@ export default function LeadsPage() {
       if (av > bv) return 1 * dir;
       return a.id - b.id;
     });
-  }, [activeTab, appliedFilters, appliedSort]);
+  }, [activeTab, appliedFilters, appliedSort, leadRows]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, appliedFilters, appliedSort, leadRows, pageSize]);
+
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
+  function handlePageSizeChange(nextSize) {
+    setPageSize(nextSize);
+    setPage(1);
+  }
+
+  function updateLead(id, updates) {
+    setLeadRows((current) => current.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)));
+  }
 
   const toggleOne = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   const toggleAll = () => {
@@ -78,18 +175,173 @@ export default function LeadsPage() {
     setSelected(allIn ? selected.filter((id) => !ids.includes(id)) : [...new Set([...selected, ...ids])]);
   };
 
-  const selectedLead = leads.find((l) => selected.includes(l.id)) ?? rows[0] ?? leads[0];
+  function clearSelected() {
+    setSelected([]);
+  }
+
+  function openNotes(lead) {
+    setNoteTarget(lead ?? selectedLead);
+  }
+
+  function closeNotes() {
+    setNoteTarget(null);
+  }
+
+  function openLeadDetails(lead) {
+    const target = lead ?? selectedLead;
+    if (!target) return;
+    navigate(`/crm/leads/${target.id}`);
+  }
+
+  function goToLeads() {
+    navigate('/crm/leads');
+  }
+
+  function openTaskForm(lead) {
+    const target = lead ?? selectedLead;
+    if (target && !selected.includes(target.id)) {
+      setSelected([target.id]);
+    }
+    navigate('/crm/tasks');
+  }
+
+  function openFilterPanel() {
+    setDraftFilters(appliedFilters);
+    setIsFilterOpen(true);
+  }
+
+  function closeFilterPanel() {
+    setDraftFilters(appliedFilters);
+    setIsFilterOpen(false);
+  }
+
+  function openSortPanel() {
+    setDraftSort(appliedSort);
+    setIsSortOpen(true);
+  }
+
+  function closeSortPanel() {
+    setDraftSort(appliedSort);
+    setIsSortOpen(false);
+  }
+
+  function updateDraftFilter(key, value) {
+    setDraftFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateDraftSort(key, value) {
+    setDraftSort((current) => ({ ...current, [key]: value }));
+  }
+
+  function clearDraftFilters() {
+    setDraftFilters(INITIAL_FILTERS);
+  }
+
+  function applyFilters() {
+    setAppliedFilters(draftFilters);
+    setIsFilterOpen(false);
+  }
+
+  function applySort() {
+    setAppliedSort(draftSort.field ? draftSort : INITIAL_SORT);
+    setIsSortOpen(false);
+  }
+
+  function clearSort() {
+    setAppliedSort(INITIAL_SORT);
+    setDraftSort(INITIAL_SORT);
+    setIsSortOpen(false);
+  }
+
+  function exportLeads(format) {
+    const headers = LEAD_EXPORT_FIELDS.map(([label]) => label);
+    if (format === 'CSV') exportToCSV('leads_details', headers, exportLeadRows(rows));
+    if (format === 'Excel') downloadLeadsAsExcel(rows);
+    if (format === 'PDF') printLeadsAsPdf(rows);
+    setIsPrintOpen(false);
+  }
+
+  function openCreateLeadModal() {
+    setIsCreateLeadOpen(true);
+  }
+
+  function openLeadFormBuilder() {
+    navigate('/crm/leads/form-builder');
+  }
+
+  function openLeadCreateForm() {
+    navigate('/crm/leads/create-form');
+  }
+
+  function requestDeleteLead(lead) {
+    setDeleteTarget(lead);
+    setBulkDeleteTargets([]);
+  }
+
+  function requestDeleteAll(visibleLeads) {
+    if (!visibleLeads || visibleLeads.length === 0) return;
+    setDeleteTarget(null);
+    setBulkDeleteTargets(visibleLeads);
+  }
+
+  function closeDeleteLead() {
+    setDeleteTarget(null);
+    setBulkDeleteTargets([]);
+  }
+
+  function deleteLead(id) {
+    setLeadRows((current) => current.filter((lead) => lead.id !== id));
+    setSelected((current) => current.filter((selectedId) => selectedId !== id));
+    setPinnedLeadIds((current) => current.filter((pinnedId) => pinnedId !== id));
+    closeDeleteLead();
+  }
+
+  function deleteAllLeads(leadsToDelete) {
+    const ids = new Set(leadsToDelete.map((lead) => lead.id));
+    setLeadRows((current) => current.filter((lead) => !ids.has(lead.id)));
+    setSelected((current) => current.filter((id) => !ids.has(id)));
+    setPinnedLeadIds((current) => current.filter((id) => !ids.has(id)));
+    closeDeleteLead();
+  }
+
+  function pinLead(lead) {
+    if (!lead) return;
+    setPinnedLeadIds((current) => (current.includes(lead.id) ? current : [...current, lead.id]));
+    setSelected((current) => current.filter((id) => id !== lead.id));
+    closeDeleteLead();
+  }
+
+  function togglePinLead(lead) {
+    if (!lead) return;
+    setPinnedLeadIds((current) => (
+      current.includes(lead.id)
+        ? current.filter((pinnedId) => pinnedId !== lead.id)
+        : [...current, lead.id]
+    ));
+  }
+
+  const recordActionLead = selectedLeads.length === 1 ? selectedLeads[0] : null;
+
+  function requestDeleteSelection(target) {
+    if (Array.isArray(target)) {
+      requestDeleteAll(target);
+      return;
+    }
+
+    const targetLead = leadRows.find((lead) => lead.id === target) ?? recordActionLead;
+    if (targetLead) {
+      requestDeleteLead(targetLead);
+    }
+  }
 
   return (
     <>
       <PageHeader
         title="Leads"
         subtitle="Manage and track all your CRM leads."
+        guide={leadsGuide}
         actions={
           <>
-            <button type="button" className="btn-outline btn-sm" onClick={() => setIsFilterOpen(!isFilterOpen)}>
-              Filter
-            </button>
             <button type="button" className="btn-primary btn-sm" onClick={() => setIsCreateLeadOpen(true)}>
               + Create Lead
             </button>
@@ -101,20 +353,46 @@ export default function LeadsPage() {
         activeTab={activeTab}
         onChange={setActiveTab}
         isFilterOpen={isFilterOpen}
-        onToggleFilter={() => isFilterOpen ? (setDraftFilters(appliedFilters), setIsFilterOpen(false)) : (setDraftFilters(appliedFilters), setIsFilterOpen(true))}
+        onToggleFilter={() => (isFilterOpen ? closeFilterPanel() : openFilterPanel())}
         isSortOpen={isSortOpen}
         sortDraft={draftSort}
         sortApplied={appliedSort}
         sortOptions={SORT_OPTIONS}
-        onToggleSort={() => isSortOpen ? (setDraftSort(appliedSort), setIsSortOpen(false)) : (setDraftSort(appliedSort), setIsSortOpen(true))}
-        onSortDraftChange={(k, v) => setDraftSort((c) => ({ ...c, [k]: v }))}
-        onApplySort={() => { setAppliedSort(draftSort.field ? draftSort : INITIAL_SORT); setIsSortOpen(false); }}
-        onCancelSort={() => { setDraftSort(appliedSort); setIsSortOpen(false); }}
-        onClearSort={() => { setAppliedSort(INITIAL_SORT); setDraftSort(INITIAL_SORT); setIsSortOpen(false); }}
+        onToggleSort={() => (isSortOpen ? closeSortPanel() : openSortPanel())}
+        onSortDraftChange={updateDraftSort}
+        onApplySort={applySort}
+        onCancelSort={closeSortPanel}
+        onClearSort={clearSort}
         leadView={leadView}
         onLeadViewChange={setLeadView}
-        onCreateLead={() => setIsCreateLeadOpen(true)}
+        onCreateLead={openCreateLeadModal}
+        recordActionLead={recordActionLead}
+        recordActionLeads={selectedLeads}
+        onCloseRecordAction={clearSelected}
+        onDeleteRecord={requestDeleteSelection}
+        onPrint={() => setIsPrintOpen(true)}
       />
+
+      {isPrintOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsPrintOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Print Leads</h2>
+                <p className="text-xs text-slate-500 mt-1">Choose a format for {rows.length} lead records</p>
+              </div>
+              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsPrintOpen(false)} aria-label="Close print options">×</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {['CSV', 'Excel', 'PDF'].map((format) => (
+                <button key={format} type="button" className="border border-slate-200 rounded-lg px-3 py-3 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50" onClick={() => exportLeads(format)}>
+                  {format}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`content-grid${isFilterOpen && leadView !== 'map' ? '' : ' content-grid-wide'}`}>
         {isFilterOpen && leadView !== 'map' && (
@@ -123,48 +401,110 @@ export default function LeadsPage() {
             sourceFilters={draftFilters.sources}
             systemDefinedFilters={draftFilters.systemDefined}
             searchFilter={draftFilters.search}
-            onStatusChange={(v) => setDraftFilters((c) => ({ ...c, statuses: v }))}
-            onSourceChange={(v) => setDraftFilters((c) => ({ ...c, sources: v }))}
-            onSystemDefinedChange={(v) => setDraftFilters((c) => ({ ...c, systemDefined: v }))}
-            onSearchChange={(v) => setDraftFilters((c) => ({ ...c, search: v }))}
-            onApply={() => { setAppliedFilters(draftFilters); setIsFilterOpen(false); }}
-            onClear={() => setDraftFilters(INITIAL_FILTERS)}
-            onClose={() => { setDraftFilters(appliedFilters); setIsFilterOpen(false); }}
+            onStatusChange={(v) => updateDraftFilter('statuses', v)}
+            onSourceChange={(v) => updateDraftFilter('sources', v)}
+            onSystemDefinedChange={(v) => updateDraftFilter('systemDefined', v)}
+            onSearchChange={(v) => updateDraftFilter('search', v)}
+            onApply={applyFilters}
+            onClear={clearDraftFilters}
+            onClose={closeFilterPanel}
           />
         )}
         <div className="table-col">
           {leadView === 'list' ? (
             <>
               <LeadsTable
-                rows={rows}
+                rows={pagedRows}
                 selected={selected}
+                pinnedLeadIds={pinnedLeadIds}
+                onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
+                onRequestDelete={requestDeleteLead}
+                onRequestDeleteAll={requestDeleteAll}
                 onToggleAll={toggleAll}
-                onAddNote={(lead) => setNoteTarget(lead)}
-                onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)}
+                onAddNote={openNotes}
+                onCreateTask={openTaskForm}
+                onOpenLead={openLeadDetails}
+                onUpdateLead={updateLead}
+                onDelete={deleteLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
-                <Pagination total={rows.length} page={1} pageSize={20} />
+                <Pagination
+                  total={rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onChange={setPage}
+                  showTotalRecords
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={handlePageSizeChange}
+                />
               </div>
             </>
           ) : leadView === 'grid' ? (
-            <LeadCardGridView rows={rows} onAddNote={setNoteTarget} onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)} />
+            <>
+              <LeadsTable
+                rows={pagedRows}
+                selected={selected}
+                pinnedLeadIds={pinnedLeadIds}
+                onTogglePin={togglePinLead}
+                onToggleOne={toggleOne}
+                onRequestDelete={requestDeleteLead}
+                onRequestDeleteAll={requestDeleteAll}
+                onToggleAll={toggleAll}
+                onAddNote={openNotes}
+                onCreateTask={openTaskForm}
+                onOpenLead={openLeadDetails}
+                onUpdateLead={updateLead}
+                variant="grid"
+                onDelete={deleteLead}
+              />
+              <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
+                <Pagination
+                  total={rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onChange={setPage}
+                  showTotalRecords
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </div>
+            </>
           ) : leadView === 'tile' ? (
-            <LeadGridView rows={rows} onAddNote={setNoteTarget} onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)} />
+            <LeadCardGridView
+              rows={pagedRows}
+              selected={selected}
+              pinnedLeadIds={pinnedLeadIds}
+              onTogglePin={togglePinLead}
+              onToggleOne={toggleOne}
+              onRequestDelete={requestDeleteLead}
+              onAddNote={openNotes}
+              onOpenLead={openLeadDetails}
+              onDelete={deleteLead}
+            />
           ) : (
             <LeadMapView
               rows={rows}
               selected={selected}
               onToggleOne={toggleOne}
-              onAddNote={setNoteTarget}
+              onAddNote={openNotes}
               onOpenListView={() => setLeadView('list')}
-              onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)}
+              onOpenLead={openLeadDetails}
             />
           )}
         </div>
       </div>
 
-      <NotesDrawer lead={noteTarget} isOpen={Boolean(noteTarget)} onClose={() => setNoteTarget(null)} onCreateTask={() => navigate('/crm/tasks')} />
+      <NotesDrawer lead={noteTarget} isOpen={Boolean(noteTarget)} onClose={closeNotes} onCreateTask={openTaskForm} />
+      {(deleteTarget || bulkDeleteTargets.length > 0) && (
+        <DeleteLeadModal
+          lead={deleteTarget}
+          leads={bulkDeleteTargets}
+          onClose={closeDeleteLead}
+          onConfirm={deleteLead}
+          onConfirmAll={deleteAllLeads}
+        />
+      )}
       <CreateLeadModal
         isOpen={isCreateLeadOpen}
         onClose={() => setIsCreateLeadOpen(false)}

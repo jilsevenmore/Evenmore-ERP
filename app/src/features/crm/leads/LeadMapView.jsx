@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
   Mail,
   MapPin,
   Phone,
-  Search,
   Settings2,
   X,
 } from "lucide-react";
@@ -33,10 +31,16 @@ export default function LeadMapView({
   selected = [],
   onToggleOne,
   onAddNote,
-  onOpenListView,
   onOpenLead,
 }) {
   const [activeLeadId, setActiveLeadId] = useState(rows[0]?.id ?? null);
+  const [listPage, setListPage] = useState(1);
+  const [mapMode, setMapMode] = useState("map");
+  const [zoom, setZoom] = useState(1);
+  const [sortMode, setSortMode] = useState(0);
+  const [detailClosedId, setDetailClosedId] = useState(null);
+
+  const LIST_PAGE_SIZE = 8;
 
   useEffect(() => {
     if (!rows.some((row) => row.id === activeLeadId)) {
@@ -44,101 +48,56 @@ export default function LeadMapView({
     }
   }, [rows, activeLeadId]);
 
+  useEffect(() => {
+    setListPage(1);
+  }, [rows.length, sortMode]);
+
+  function selectLead(id) {
+    setActiveLeadId(id);
+    setDetailClosedId(null);
+  }
+
+  function cycleSort() {
+    setSortMode((mode) => (mode + 1) % 4);
+  }
+
   const activeLead = useMemo(
     () => rows.find((row) => row.id === activeLeadId) ?? rows[0] ?? null,
     [rows, activeLeadId],
   );
 
+  const sortedRows = useMemo(() => {
+    const list = [...rows];
+    if (sortMode === 1) list.sort((a, b) => (b.amount || 0) - (a.amount || 0));
+    if (sortMode === 2) list.sort((a, b) => (a.amount || 0) - (b.amount || 0));
+    if (sortMode === 3) list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    return list;
+  }, [rows, sortMode]);
+
+  const totalListPages = Math.max(1, Math.ceil(sortedRows.length / LIST_PAGE_SIZE));
+  const safeListPage = Math.min(listPage, totalListPages);
+  const pagedRows = sortedRows.slice((safeListPage - 1) * LIST_PAGE_SIZE, safeListPage * LIST_PAGE_SIZE);
+  const listPageNumbers = [];
+  for (let p = Math.max(1, safeListPage - 1); p <= Math.min(totalListPages, safeListPage + 1); p += 1) {
+    listPageNumbers.push(p);
+  }
+
+  const showDetailPane = Boolean(activeLead) && detailClosedId !== activeLead.id;
+
   return (
     <section className="leads-map-page">
-      <div className="leads-map-top">
-        <div>
-          <h2>Leads Map</h2>
-          <p>Visualize your leads on a map and explore location-wise opportunities.</p>
-        </div>
-        <div className="leads-map-view-switch">
-          <button type="button" className="btn-outline" onClick={onOpenListView}>
-            List View
-          </button>
-          <button type="button" className="btn-primary">Map View</button>
-        </div>
-      </div>
-
-      <div className="leads-map-filter-card">
-        <label className="leads-map-filter-field">
-          <span>Pipeline</span>
-          <select defaultValue="Sales">
-            <option>Sales</option>
-            <option>Support</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Status</span>
-          <select defaultValue="All Statuses">
-            <option>All Statuses</option>
-            <option>Qualified</option>
-            <option>Contacted</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Source</span>
-          <select defaultValue="All Sources">
-            <option>All Sources</option>
-            <option>Cold Call</option>
-            <option>Advertisement</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Product</span>
-          <select defaultValue="All Products">
-            <option>All Products</option>
-            <option>Endoscopy System</option>
-            <option>OT Light</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Assigned User</span>
-          <select defaultValue="All Users">
-            <option>All Users</option>
-            <option>Drashti Evenmore</option>
-            <option>Priya Mehta</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>From Date</span>
-          <div className="input-icon-wrap">
-            <input type="text" placeholder="dd-mm-yyyy" />
-            <CalendarDays size={16} />
-          </div>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>To Date</span>
-          <div className="input-icon-wrap">
-            <input type="text" placeholder="dd-mm-yyyy" />
-            <CalendarDays size={16} />
-          </div>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Search</span>
-          <div className="input-icon-wrap">
-            <input type="text" placeholder="Search by name, subject, email, phone, lead number" />
-            <Search size={16} />
-          </div>
-        </label>
-      </div>
-
       <div className="leads-map-layout">
         <aside className="leads-map-list-pane">
           <div className="leads-map-pane-head">
             <h3>Leads ({rows.length})</h3>
-            <button type="button" className="leads-map-pane-action">
+            <button type="button" className="leads-map-pane-action" onClick={cycleSort} title="Cycle sort: none, amount high-low, amount low-high, name">
               Sort
               <ChevronsUpDown size={14} />
             </button>
           </div>
 
           <div className="leads-map-listing">
-            {rows.map((row) => (
+            {pagedRows.map((row) => (
               <div
                 key={row.id}
                 className={`leads-map-list-item${row.id === activeLead?.id ? " active" : ""}`}
@@ -153,7 +112,7 @@ export default function LeadMapView({
                 <button
                   type="button"
                   className="leads-map-list-main"
-                  onClick={() => setActiveLeadId(row.id)}
+                  onClick={() => selectLead(row.id)}
                 >
                   <LeadAvatar lead={row} className="leads-map-list-avatar" />
                   <div className="leads-map-list-copy">
@@ -170,27 +129,76 @@ export default function LeadMapView({
           </div>
 
           <div className="leads-map-pagination">
-            <button type="button" className="page-nav"><ChevronLeft size={15} /></button>
-            <button type="button" className="page-num active">1</button>
-            <button type="button" className="page-num">2</button>
-            <button type="button" className="page-num">3</button>
-            <span>...</span>
-            <button type="button" className="page-nav"><ChevronRight size={15} /></button>
+            <button
+              type="button"
+              className="page-nav"
+              aria-label="Previous page"
+              disabled={safeListPage <= 1}
+              onClick={() => setListPage((p) => Math.max(1, p - 1))}
+            >
+              <ChevronLeft size={15} />
+            </button>
+            {listPageNumbers[0] > 1 && (
+              <>
+                <button type="button" className="page-num" onClick={() => setListPage(1)}>1</button>
+                {listPageNumbers[0] > 2 && <span>...</span>}
+              </>
+            )}
+            {listPageNumbers.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`page-num${p === safeListPage ? " active" : ""}`}
+                onClick={() => setListPage(p)}
+              >
+                {p}
+              </button>
+            ))}
+            {listPageNumbers[listPageNumbers.length - 1] < totalListPages && (
+              <>
+                {listPageNumbers[listPageNumbers.length - 1] < totalListPages - 1 && <span>...</span>}
+                <button type="button" className="page-num" onClick={() => setListPage(totalListPages)}>
+                  {totalListPages}
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              className="page-nav"
+              aria-label="Next page"
+              disabled={safeListPage >= totalListPages}
+              onClick={() => setListPage((p) => Math.min(totalListPages, p + 1))}
+            >
+              <ChevronRight size={15} />
+            </button>
           </div>
         </aside>
 
         <div className="leads-map-stage">
           <div className="leads-map-stage-top">
             <div className="leads-map-tabs">
-              <button type="button" className="active">Map</button>
-              <button type="button">Satellite</button>
+              <button
+                type="button"
+                className={mapMode === "map" ? "active" : ""}
+                onClick={() => setMapMode("map")}
+              >
+                Map
+              </button>
+              <button
+                type="button"
+                className={mapMode === "satellite" ? "active" : ""}
+                onClick={() => setMapMode("satellite")}
+              >
+                Satellite
+              </button>
             </div>
-            <button type="button" className="leads-map-focus-btn">
+            <button type="button" className="leads-map-focus-btn" onClick={() => setZoom(1)} title="Reset view">
               <Settings2 size={18} />
             </button>
           </div>
 
-          <div className="leads-map-canvas-pro">
+          <div className={`leads-map-canvas-pro${mapMode === "satellite" ? " satellite" : ""}`}>
+            <div className="leads-map-canvas-zoom" style={{ transform: `scale(${zoom})` }}>
             <div className="map-water-edge" />
             <div className="map-region-label ahmedabad">Ahmedabad</div>
             <div className="map-region-label gujarat">GUJARAT</div>
@@ -209,7 +217,8 @@ export default function LeadMapView({
                 type="button"
                 className={`leads-map-marker-pro ${getStatusTone(row.status)}`}
                 style={{ left: `${row.mapX}%`, top: `${row.mapY}%` }}
-                onClick={() => setActiveLeadId(row.id)}
+                onClick={() => selectLead(row.id)}
+                aria-label={`Show ${row.name} on map`}
               >
                 <span className="leads-map-marker-photo">
                   <LeadAvatar lead={row} className="leads-map-marker-avatar" />
@@ -243,18 +252,24 @@ export default function LeadMapView({
             )}
 
             <div className="leads-map-zoom">
-              <button type="button">+</button>
-              <button type="button">-</button>
+              <button type="button" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(2, Math.round((z + 0.2) * 10) / 10))}>+</button>
+              <button type="button" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.6, Math.round((z - 0.2) * 10) / 10))}>-</button>
+            </div>
             </div>
           </div>
         </div>
 
         <aside className="leads-map-detail-pane">
-          {activeLead && (
+          {showDetailPane && (
             <>
               <div className="leads-map-detail-head">
                 <h3>Lead Details</h3>
-                <button type="button" className="modal-close" aria-label="Close lead details">
+                <button
+                  type="button"
+                  className="modal-close"
+                  aria-label="Close lead details"
+                  onClick={() => setDetailClosedId(activeLead.id)}
+                >
                   <X size={18} />
                 </button>
               </div>
