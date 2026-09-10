@@ -189,30 +189,30 @@ export const ReportsPage = () => {
             </Button>
           </div>}/>
 
-      <div className="flex flex-wrap gap-2 border-b border-[#CED4DA] pb-3">
-        <button onClick={() => setActiveReport('inventory')} className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition ${activeReport === 'inventory'
-            ? 'bg-[#1F2E4A] text-white'
-            : 'bg-white text-slate-700 hover:bg-slate-100 border border-[#CED4DA]'}`}>
+      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+        <button onClick={() => setActiveReport('inventory')} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${activeReport === 'inventory'
+            ? 'bg-primary text-white shadow-xs'
+            : 'bg-card text-text-secondary hover:bg-soft border border-border'}`}>
           Stock Summary & Ageing
         </button>
-        <button onClick={() => setActiveReport('sales')} className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition ${activeReport === 'sales'
-            ? 'bg-[#1F2E4A] text-white'
-            : 'bg-white text-slate-700 hover:bg-slate-100 border border-[#CED4DA]'}`}>
+        <button onClick={() => setActiveReport('sales')} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${activeReport === 'sales'
+            ? 'bg-primary text-white shadow-xs'
+            : 'bg-card text-text-secondary hover:bg-soft border border-border'}`}>
           Sales & Customer Turnover
         </button>
-        <button onClick={() => setActiveReport('purchases')} className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition ${activeReport === 'purchases'
-            ? 'bg-[#1F2E4A] text-white'
-            : 'bg-white text-slate-700 hover:bg-slate-100 border border-[#CED4DA]'}`}>
+        <button onClick={() => setActiveReport('purchases')} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${activeReport === 'purchases'
+            ? 'bg-primary text-white shadow-xs'
+            : 'bg-card text-text-secondary hover:bg-soft border border-border'}`}>
           Procurement & Vendor Ledger
         </button>
-        <button onClick={() => setActiveReport('aging')} className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition ${activeReport === 'aging'
-            ? 'bg-[#1F2E4A] text-white'
-            : 'bg-white text-slate-700 hover:bg-slate-100 border border-[#CED4DA]'}`}>
+        <button onClick={() => setActiveReport('aging')} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${activeReport === 'aging'
+            ? 'bg-primary text-white shadow-xs'
+            : 'bg-card text-text-secondary hover:bg-soft border border-border'}`}>
           AR / AP Aging Schedules
         </button>
-        <button onClick={() => setActiveReport('pnl')} className={`px-3.5 py-1.5 rounded-md text-xs font-semibold cursor-pointer transition ${activeReport === 'pnl'
-            ? 'bg-[#1F2E4A] text-white'
-            : 'bg-white text-slate-700 hover:bg-slate-100 border border-[#CED4DA]'}`}>
+        <button onClick={() => setActiveReport('pnl')} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${activeReport === 'pnl'
+            ? 'bg-primary text-white shadow-xs'
+            : 'bg-card text-text-secondary hover:bg-soft border border-border'}`}>
           Profit & Loss Statement
         </button>
       </div>
