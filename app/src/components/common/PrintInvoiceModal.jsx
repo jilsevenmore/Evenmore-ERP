@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, FileText } from 'lucide-react';
 export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, }) => {
+    // UX only: Esc dismisses. No logic changes.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [isOpen, onClose]);
     if (!isOpen || !invoice)
         return null;
     const handlePrint = () => {

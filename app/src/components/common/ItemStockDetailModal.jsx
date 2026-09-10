@@ -1,11 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ArrowDownLeft, ArrowUpRight, AlertTriangle, Layers, Sliders, ShieldCheck } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+// Display unit without double-pluralizing ("Pcs" -> "Pcs", "Unit" -> "Units").
+const pluralizeUom = (uom) => {
+    if (!uom) return '';
+    return /s$/i.test(uom) ? uom : `${uom}s`;
+};
 export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
     const { calculateItemStock, getItemMovements, adjustItemStock } = useERP();
     const [showAdjust, setShowAdjust] = useState(false);
     const [adjAmount, setAdjAmount] = useState(0);
     const [adjReason, setAdjReason] = useState('Cycle Count Verification');
+    // UX only: Esc dismisses. Hooks before early return to keep order stable.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [isOpen, onClose]);
     if (!isOpen)
         return null;
     const stock = calculateItemStock(item.id);
@@ -56,8 +68,8 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
           </span>);
         }
     };
-    return (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200">
+    return (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${item.name} stock detail`}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
           <div>
@@ -71,10 +83,10 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-1">
-              Primary Location: {item.location} • UOM: {item.uom} • Reorder Threshold: {item.reorderLevel} units
+              Primary Location: {item.location} • UOM: {item.uom} • Reorder Threshold: {item.reorderLevel} {pluralizeUom(item.uom)}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors" aria-label="Close stock detail">
             <X className="w-5 h-5"/>
           </button>
         </div>
@@ -86,7 +98,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
               <span className="text-xs text-slate-500 font-medium">Physical On Hand</span>
               <p className="text-2xl font-bold font-mono text-slate-900 mt-1">
-                {stock.onHand} <span className="text-xs font-normal text-slate-400">{item.uom}s</span>
+                {stock.onHand} <span className="text-xs font-normal text-slate-400">{pluralizeUom(item.uom)}</span>
               </p>
             </div>
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5">
@@ -94,19 +106,19 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                 <ShieldCheck className="w-3.5 h-3.5"/> Available to Sell
               </span>
               <p className="text-2xl font-bold font-mono text-emerald-800 mt-1">
-                {stock.available} <span className="text-xs font-normal text-emerald-600">{item.uom}s</span>
+                {stock.available} <span className="text-xs font-normal text-emerald-600">{pluralizeUom(item.uom)}</span>
               </p>
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5">
               <span className="text-xs text-amber-700 font-medium">SO Reserved</span>
               <p className="text-2xl font-bold font-mono text-amber-800 mt-1">
-                {stock.reserved} <span className="text-xs font-normal text-amber-600">{item.uom}s</span>
+                {stock.reserved} <span className="text-xs font-normal text-amber-600">{pluralizeUom(item.uom)}</span>
               </p>
             </div>
             <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5">
               <span className="text-xs text-rose-700 font-medium">Defective / Damaged</span>
               <p className="text-2xl font-bold font-mono text-rose-800 mt-1">
-                {stock.damaged} <span className="text-xs font-normal text-rose-600">{item.uom}s</span>
+                {stock.damaged} <span className="text-xs font-normal text-rose-600">{pluralizeUom(item.uom)}</span>
               </p>
             </div>
           </div>

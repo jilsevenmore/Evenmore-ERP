@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
-
 export const AutoPOModal = ({
   isOpen,
   onClose,
@@ -43,6 +42,14 @@ export const AutoPOModal = ({
       setUnitCost(masterItems[0].costPrice || masterItems[0].unitCost || 100);
     }
   }, [activeItem, initialQty, activeSource, masterItems, selectedItemId]);
+
+  // UX only: Esc dismisses. No logic changes.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -86,8 +93,8 @@ export const AutoPOModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 text-xs flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150 overflow-y-auto" onClick={onClose} role="dialog" aria-modal="true" aria-label="Auto-PO shortage requisition">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 text-xs flex flex-col overflow-hidden my-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -122,12 +129,13 @@ export const AutoPOModal = ({
           </div>
         </div>
 
-        <form onSubmit={handleCreatePO} className="space-y-4">
+        <form onSubmit={handleCreatePO} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
           <div>
             <label className="block font-semibold text-slate-700 mb-1">
               Target Inventory Item / SKU *
             </label>
             <select
+              autoFocus
               value={selectedItemId}
               onChange={(e) => {
                 setSelectedItemId(e.target.value);
