@@ -136,9 +136,12 @@ export default function LeadFormBuilder({
   onRemoveField,
   onMoveField,
   onAddSection,
+  onRemoveSection,
+  onPreview,
   onSaveAndOpen,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [isPropertiesOpen, setIsPropertiesOpen] = useState(true);
   const SelectedTypeIcon = FIELD_ICONS[selectedField?.type] ?? Type;
 
   const libraryItems = useMemo(() => {
@@ -183,6 +186,11 @@ export default function LeadFormBuilder({
     }
   }
 
+  function selectField(fieldId) {
+    onSelectField(fieldId);
+    setIsPropertiesOpen(true);
+  }
+
   return (
     <section className="form-builder-shell">
       <div className="form-builder-top">
@@ -192,7 +200,7 @@ export default function LeadFormBuilder({
           <p>Create and manage your lead form with custom fields. Drag, drop and configure fields easily.</p>
         </div>
         <div className="form-builder-actions">
-          <button type="button" className="btn-outline" onClick={onSaveAndOpen}>
+          <button type="button" className="btn-outline" onClick={onPreview}>
             <Eye size={16} />
             Preview
           </button>
@@ -203,7 +211,7 @@ export default function LeadFormBuilder({
         </div>
       </div>
 
-      <div className="form-builder-grid">
+      <div className={`form-builder-grid${isPropertiesOpen ? "" : " properties-closed"}`}>
         <aside className="builder-panel">
           <h3>Fields</h3>
           <label className="builder-search">
@@ -263,7 +271,7 @@ export default function LeadFormBuilder({
                     </div>
                     <div className="builder-section-tools">
                       <button type="button" className="icon-lite"><Copy size={15} /></button>
-                      <button type="button" className="icon-lite"><Trash2 size={15} /></button>
+                      <button type="button" className="icon-lite" onClick={() => onRemoveSection?.(section.id)} aria-label={`Remove ${section.title}`}><Trash2 size={15} /></button>
                     </div>
                   </div>
 
@@ -281,7 +289,7 @@ export default function LeadFormBuilder({
                         field={field}
                         sectionId={section.id}
                         selected={field.id === selectedFieldId}
-                        onSelect={() => onSelectField(field.id)}
+                        onSelect={() => selectField(field.id)}
                         onRemove={onRemoveField}
                         onDragStart={handleDragStart}
                         onDropField={(payload, targetSectionId, position) =>
@@ -298,7 +306,7 @@ export default function LeadFormBuilder({
         <aside className="builder-panel">
           <div className="builder-properties-head">
             <h3>Field Properties</h3>
-            <button type="button" className="modal-close" aria-label="Close properties">
+            <button type="button" className="modal-close" aria-label="Close properties" onClick={() => setIsPropertiesOpen(false)}>
               <X size={18} />
             </button>
           </div>
@@ -403,7 +411,7 @@ export default function LeadFormBuilder({
                 <button type="button" className="btn-outline" onClick={() => onRemoveField(selectedField.id)}>
                   Remove Field
                 </button>
-                <button type="button" className="btn-primary" onClick={onSaveAndOpen}>Save Field</button>
+                <button type="button" className="btn-primary" onClick={() => setIsPropertiesOpen(false)}>Save Field</button>
               </div>
             </>
           ) : (

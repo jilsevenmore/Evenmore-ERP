@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { tabs } from '../../../data/crm/mockLeads';
 import SortPopover from "./SortPopover";
+import RecordActionPanel from "./RecordActionPanel";
 
 function ViewButton({ label, active, onClick, children }) {
   return (
@@ -43,7 +44,13 @@ export default function LeadsTabs({
   leadView,
   onLeadViewChange,
   onCreateLead,
+  recordActionLead,
+  recordActionLeads,
+  onCloseRecordAction,
+  onDeleteRecord,
+  onPinRecord,
 }) {
+  const hasRecordAction = Boolean(recordActionLead) || (recordActionLeads && recordActionLeads.length > 0);
   return (
     <div className="leads-toolbar-wrap">
       <div className="tabs-bar">
@@ -78,7 +85,16 @@ export default function LeadsTabs({
           </button>
         </div>
       </div>
-      <div className="list-toolbar">
+      <div className={`list-toolbar${hasRecordAction ? " list-toolbar-actions" : ""}`}>
+        {hasRecordAction ? (
+          <RecordActionPanel
+            lead={recordActionLead}
+            leads={recordActionLeads || []}
+            onClose={onCloseRecordAction}
+            onDelete={onDeleteRecord}
+            onPin={onPinRecord}
+          />
+        ) : (
         <div className="list-toolbar-left">
           <button
             type="button"
@@ -118,6 +134,7 @@ export default function LeadsTabs({
             <ChevronDown size={16} />
           </button>
         </div>
+        )}
       </div>
     </div>
   );

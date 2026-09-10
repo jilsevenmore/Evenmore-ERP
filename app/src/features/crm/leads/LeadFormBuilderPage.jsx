@@ -80,6 +80,27 @@ export default function LeadFormBuilderPage() {
     ]);
   }
 
+  function removeLeadFormSection(sectionId) {
+    const remaining = leadFormSections.filter((section) => section.id !== sectionId);
+    if (remaining.length === leadFormSections.length) return;
+    setLeadFormSections(remaining);
+    const nextField = remaining.flatMap((section) => section.fields)[0];
+    setSelectedBuilderFieldId(nextField?.id ?? null);
+  }
+
+  function openLeadCreateForm() {
+    navigate('/crm/leads/create-form');
+  }
+
+  function saveLeadForm() {
+    try {
+      localStorage.setItem('leadFormSections', JSON.stringify(leadFormSections));
+    } catch {
+      // storage unavailable — keep in-memory sections
+    }
+    navigate('/crm/leads/forms');
+  }
+
   return (
     <LeadFormBuilder
       sections={leadFormSections}
@@ -91,7 +112,9 @@ export default function LeadFormBuilderPage() {
       onRemoveField={removeLeadFormField}
       onMoveField={moveLeadFormField}
       onAddSection={addLeadFormSection}
-      onSaveAndOpen={() => navigate('/crm/leads/create-form')}
+      onRemoveSection={removeLeadFormSection}
+      onPreview={openLeadCreateForm}
+      onSaveAndOpen={saveLeadForm}
     />
   );
 }

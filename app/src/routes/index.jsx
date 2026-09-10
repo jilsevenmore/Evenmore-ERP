@@ -6,8 +6,11 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import LeadsPage from '../features/crm/leads/LeadsPage';
 import LeadDetailPage from '../features/crm/leads/LeadDetailPage';
 import LeadFormBuilderPage from '../features/crm/leads/LeadFormBuilderPage';
+import LeadFormsPage from '../features/crm/leads/LeadFormsPage';
 import DynamicLeadFormPage from '../features/crm/leads/DynamicLeadFormPage';
 import TasksPage from '../features/crm/tasks/TasksPage';
+import StageTasksPage from '../features/crm/tasks/StageTasksPage';
+import TaskFormPage from '../features/crm/tasks/TaskFormPage';
 import CRMDashboard from '../features/crm/dashboard/CRMDashboard';
 import DealsPage from '../features/crm/deals/DealsPage';
 import UserAllocationPage from '../features/crm/allocation/UserAllocationPage';
@@ -51,6 +54,7 @@ import AssetsPage from '../features/hrms/organization/AssetsPage';
 import DocumentsPage from '../features/hrms/organization/DocumentsPage';
 
 // ── ERP — Sales ───────────────────────────────────────────────
+import { EstimatesPage } from '../features/sales/EstimatesPage';
 import { QuotationsPage } from '../features/sales/QuotationsPage';
 import { SalesOrdersPage } from '../features/sales/SalesOrdersPage';
 import { SalesInvoicesPage } from '../features/sales/SalesInvoicesPage';
@@ -137,10 +141,16 @@ const router = createBrowserRouter([
       { path: 'crm/dashboard', element: <Page component={CRMDashboard} /> },
       { path: 'crm/leads', element: <Page component={LeadsPage} /> },
       { path: 'crm/leads/:id', element: <Page component={LeadDetailPage} /> },
+      { path: 'crm/leads/forms', element: <Page component={LeadFormsPage} /> },
+      { path: 'crm/leads/tasks-master', element: <Page component={TasksPage} /> },
+      { path: 'crm/leads/task-form', element: <Page component={TaskFormPage} /> },
+      { path: 'crm/leads/stage-tasks', element: <Page component={StageTasksPage} /> },
       { path: 'crm/leads/form-builder', element: <Page component={LeadFormBuilderPage} /> },
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
+      { path: 'crm/tasks/allocation', element: <Page component={UserAllocationPage} /> },
+      { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> },
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
@@ -148,6 +158,7 @@ const router = createBrowserRouter([
 
       // ── Sales ─────────────────────────────────────────────
       { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },
+      { path: 'sales/estimates', element: <Page component={EstimatesPage} /> },
       { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
       { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },

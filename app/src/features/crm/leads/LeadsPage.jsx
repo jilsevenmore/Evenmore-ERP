@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../../../components/ui/PageHeader';
 import LeadsTabs from './LeadsTabs';
 import FilterPanel from './FilterPanel';
@@ -9,10 +9,9 @@ import LeadMapView from './LeadMapView';
 import Pagination from '../../../components/ui/Pagination';
 import NotesDrawer from './NotesDrawer';
 import CreateLeadModal from './CreateLeadModal';
-import LeadDetailView from './LeadDetailView';
+import DeleteLeadModal from './DeleteLeadModal';
 import { useNavigate } from 'react-router-dom';
-import { leads } from '../../../data/crm/mockLeads';
-import { createFieldFromType, defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
+import { leads as seedLeads } from '../../../data/crm/mockLeads';
 
 const INITIAL_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const INITIAL_SORT = { field: '', direction: 'ascending' };
@@ -36,6 +35,7 @@ function getSortValue(lead, field) {
 
 export default function LeadsPage() {
   const navigate = useNavigate();
+  const [leadRows, setLeadRows] = useState(seedLeads);
   const [activeTab, setActiveTab] = useState('All Leads');
   const [selected, setSelected] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -47,9 +47,14 @@ export default function LeadsPage() {
   const [appliedSort, setAppliedSort] = useState(INITIAL_SORT);
   const [draftSort, setDraftSort] = useState(INITIAL_SORT);
   const [noteTarget, setNoteTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [bulkDeleteTargets, setBulkDeleteTargets] = useState([]);
+  const [pinnedLeadIds, setPinnedLeadIds] = useState([]);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const rows = useMemo(() => {
-    const filtered = leads.filter((l) => {
+    const filtered = leadRows.filter((l) => {
       if (activeTab !== 'All Leads' && l.status !== activeTab) return false;
       if (appliedFilters.statuses.length > 0 && !appliedFilters.statuses.includes(l.status)) return false;
       if (appliedFilters.sources.length > 0 && !appliedFilters.sources.includes(l.source)) return false;
@@ -69,7 +74,25 @@ export default function LeadsPage() {
       if (av > bv) return 1 * dir;
       return a.id - b.id;
     });
-  }, [activeTab, appliedFilters, appliedSort]);
+  }, [activeTab, appliedFilters, appliedSort, leadRows]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, appliedFilters, appliedSort, leadRows, pageSize]);
+
+  const pagedRows = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize]);
+
+  function handlePageSizeChange(nextSize) {
+    setPageSize(nextSize);
+    setPage(1);
+  }
+
+  function updateLead(id, updates) {
+    setLeadRows((current) => current.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)));
+  }
 
   const toggleOne = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
   const toggleAll = () => {
@@ -78,7 +101,132 @@ export default function LeadsPage() {
     setSelected(allIn ? selected.filter((id) => !ids.includes(id)) : [...new Set([...selected, ...ids])]);
   };
 
-  const selectedLead = leads.find((l) => selected.includes(l.id)) ?? rows[0] ?? leads[0];
+  function openNotes(lead) {
+    setNoteTarget(lead ?? selectedLead);
+  }
+
+  function closeNotes() {
+    setNoteTarget(null);
+  }
+
+  function openLeadDetails(lead) {
+    const target = lead ?? selectedLead;
+    if (!target) return;
+    navigate(`/crm/leads/${target.id}`);
+  }
+
+  function goToLeads() {
+    navigate('/crm/leads');
+  }
+
+  function openTaskForm(lead) {
+    const target = lead ?? selectedLead;
+    if (target && !selected.includes(target.id)) {
+      setSelected([target.id]);
+    }
+    navigate('/crm/tasks');
+  }
+
+  function openFilterPanel() {
+    setDraftFilters(appliedFilters);
+    setIsFilterOpen(true);
+  }
+
+  function closeFilterPanel() {
+    setDraftFilters(appliedFilters);
+    setIsFilterOpen(false);
+  }
+
+  function openSortPanel() {
+    setDraftSort(appliedSort);
+    setIsSortOpen(true);
+  }
+
+  function closeSortPanel() {
+    setDraftSort(appliedSort);
+    setIsSortOpen(false);
+  }
+
+  function updateDraftFilter(key, value) {
+    setDraftFilters((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateDraftSort(key, value) {
+    setDraftSort((current) => ({ ...current, [key]: value }));
+  }
+
+  function clearDraftFilters() {
+    setDraftFilters(INITIAL_FILTERS);
+  }
+
+  function applyFilters() {
+    setAppliedFilters(draftFilters);
+    setIsFilterOpen(false);
+  }
+
+  function applySort() {
+    setAppliedSort(draftSort.field ? draftSort : INITIAL_SORT);
+    setIsSortOpen(false);
+  }
+
+  function clearSort() {
+    setAppliedSort(INITIAL_SORT);
+    setDraftSort(INITIAL_SORT);
+    setIsSortOpen(false);
+  }
+
+  function openCreateLeadModal() {
+    setIsCreateLeadOpen(true);
+  }
+
+  function openLeadFormBuilder() {
+    navigate('/crm/leads/form-builder');
+  }
+
+  function openLeadCreateForm() {
+    navigate('/crm/leads/create-form');
+  }
+
+  function requestDeleteLead(lead) {
+    setDeleteTarget(lead);
+    setBulkDeleteTargets([]);
+  }
+
+  function requestDeleteAll(visibleLeads) {
+    if (!visibleLeads || visibleLeads.length === 0) return;
+    setDeleteTarget(null);
+    setBulkDeleteTargets(visibleLeads);
+  }
+
+  function closeDeleteLead() {
+    setDeleteTarget(null);
+    setBulkDeleteTargets([]);
+  }
+
+  function deleteLead(id) {
+    setLeadRows((current) => current.filter((lead) => lead.id !== id));
+    setSelected((current) => current.filter((selectedId) => selectedId !== id));
+    closeDeleteLead();
+  }
+
+  function deleteAllLeads(leadsToDelete) {
+    const ids = new Set(leadsToDelete.map((lead) => lead.id));
+    setLeadRows((current) => current.filter((lead) => !ids.has(lead.id)));
+    setSelected((current) => current.filter((id) => !ids.has(id)));
+    closeDeleteLead();
+  }
+
+  function pinLead(lead) {
+    setPinnedLeadIds((current) => (current.includes(lead.id) ? current : [...current, lead.id]));
+    setSelected((current) => current.filter((id) => id !== lead.id));
+    closeDeleteLead();
+  }
+
+  function togglePinLead(id) {
+    setPinnedLeadIds((current) => current.filter((pinnedId) => pinnedId !== id));
+  }
+
+  const selectedLead = leadRows.find((l) => selected.includes(l.id)) ?? rows[0] ?? leadRows[0];
 
   return (
     <>
@@ -101,19 +249,24 @@ export default function LeadsPage() {
         activeTab={activeTab}
         onChange={setActiveTab}
         isFilterOpen={isFilterOpen}
-        onToggleFilter={() => isFilterOpen ? (setDraftFilters(appliedFilters), setIsFilterOpen(false)) : (setDraftFilters(appliedFilters), setIsFilterOpen(true))}
+        onToggleFilter={() => (isFilterOpen ? closeFilterPanel() : openFilterPanel())}
         isSortOpen={isSortOpen}
         sortDraft={draftSort}
         sortApplied={appliedSort}
         sortOptions={SORT_OPTIONS}
-        onToggleSort={() => isSortOpen ? (setDraftSort(appliedSort), setIsSortOpen(false)) : (setDraftSort(appliedSort), setIsSortOpen(true))}
-        onSortDraftChange={(k, v) => setDraftSort((c) => ({ ...c, [k]: v }))}
-        onApplySort={() => { setAppliedSort(draftSort.field ? draftSort : INITIAL_SORT); setIsSortOpen(false); }}
-        onCancelSort={() => { setDraftSort(appliedSort); setIsSortOpen(false); }}
-        onClearSort={() => { setAppliedSort(INITIAL_SORT); setDraftSort(INITIAL_SORT); setIsSortOpen(false); }}
+        onToggleSort={() => (isSortOpen ? closeSortPanel() : openSortPanel())}
+        onSortDraftChange={updateDraftSort}
+        onApplySort={applySort}
+        onCancelSort={closeSortPanel}
+        onClearSort={clearSort}
         leadView={leadView}
         onLeadViewChange={setLeadView}
-        onCreateLead={() => setIsCreateLeadOpen(true)}
+        onCreateLead={openCreateLeadModal}
+        recordActionLead={deleteTarget}
+        recordActionLeads={bulkDeleteTargets}
+        onCloseRecordAction={closeDeleteLead}
+        onDeleteRecord={(target) => (Array.isArray(target) ? deleteAllLeads(target) : deleteLead(target))}
+        onPinRecord={pinLead}
       />
 
       <div className={`content-grid${isFilterOpen && leadView !== 'map' ? '' : ' content-grid-wide'}`}>
@@ -123,48 +276,106 @@ export default function LeadsPage() {
             sourceFilters={draftFilters.sources}
             systemDefinedFilters={draftFilters.systemDefined}
             searchFilter={draftFilters.search}
-            onStatusChange={(v) => setDraftFilters((c) => ({ ...c, statuses: v }))}
-            onSourceChange={(v) => setDraftFilters((c) => ({ ...c, sources: v }))}
-            onSystemDefinedChange={(v) => setDraftFilters((c) => ({ ...c, systemDefined: v }))}
-            onSearchChange={(v) => setDraftFilters((c) => ({ ...c, search: v }))}
-            onApply={() => { setAppliedFilters(draftFilters); setIsFilterOpen(false); }}
-            onClear={() => setDraftFilters(INITIAL_FILTERS)}
-            onClose={() => { setDraftFilters(appliedFilters); setIsFilterOpen(false); }}
+            onStatusChange={(v) => updateDraftFilter('statuses', v)}
+            onSourceChange={(v) => updateDraftFilter('sources', v)}
+            onSystemDefinedChange={(v) => updateDraftFilter('systemDefined', v)}
+            onSearchChange={(v) => updateDraftFilter('search', v)}
+            onApply={applyFilters}
+            onClear={clearDraftFilters}
+            onClose={closeFilterPanel}
           />
         )}
         <div className="table-col">
           {leadView === 'list' ? (
             <>
               <LeadsTable
-                rows={rows}
+                rows={pagedRows}
                 selected={selected}
+                pinnedLeadIds={pinnedLeadIds}
+                onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
                 onToggleAll={toggleAll}
-                onAddNote={(lead) => setNoteTarget(lead)}
-                onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)}
+                onRequestDelete={requestDeleteLead}
+                onRequestDeleteAll={requestDeleteAll}
+                onAddNote={openNotes}
+                onCreateTask={openTaskForm}
+                onOpenLead={openLeadDetails}
+                onUpdateLead={updateLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
-                <Pagination total={rows.length} page={1} pageSize={20} />
+                <Pagination
+                  total={rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onChange={setPage}
+                  showTotalRecords
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={handlePageSizeChange}
+                />
               </div>
             </>
           ) : leadView === 'grid' ? (
-            <LeadCardGridView rows={rows} onAddNote={setNoteTarget} onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)} />
+            <>
+              <LeadsTable
+                rows={pagedRows}
+                selected={selected}
+                pinnedLeadIds={pinnedLeadIds}
+                onTogglePin={togglePinLead}
+                onToggleOne={toggleOne}
+                onToggleAll={toggleAll}
+                onRequestDelete={requestDeleteLead}
+                onRequestDeleteAll={requestDeleteAll}
+                onAddNote={openNotes}
+                onCreateTask={openTaskForm}
+                onOpenLead={openLeadDetails}
+                onUpdateLead={updateLead}
+                variant="grid"
+              />
+              <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
+                <Pagination
+                  total={rows.length}
+                  page={page}
+                  pageSize={pageSize}
+                  onChange={setPage}
+                  showTotalRecords
+                  pageSizeOptions={[10, 20, 50]}
+                  onPageSizeChange={handlePageSizeChange}
+                />
+              </div>
+            </>
           ) : leadView === 'tile' ? (
-            <LeadGridView rows={rows} onAddNote={setNoteTarget} onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)} />
+            <LeadGridView
+              rows={pagedRows}
+              selected={selected}
+              onToggleOne={toggleOne}
+              onRequestDelete={requestDeleteLead}
+              onAddNote={openNotes}
+              onOpenLead={openLeadDetails}
+            />
           ) : (
             <LeadMapView
               rows={rows}
               selected={selected}
               onToggleOne={toggleOne}
-              onAddNote={setNoteTarget}
+              onAddNote={openNotes}
               onOpenListView={() => setLeadView('list')}
-              onOpenLead={(lead) => navigate(`/crm/leads/${lead.id}`)}
+              onOpenLead={openLeadDetails}
             />
           )}
         </div>
       </div>
 
-      <NotesDrawer lead={noteTarget} isOpen={Boolean(noteTarget)} onClose={() => setNoteTarget(null)} onCreateTask={() => navigate('/crm/tasks')} />
+      <NotesDrawer lead={noteTarget} isOpen={Boolean(noteTarget)} onClose={closeNotes} onCreateTask={openTaskForm} />
+      {(deleteTarget || bulkDeleteTargets.length > 0) && (
+        <DeleteLeadModal
+          lead={deleteTarget}
+          leads={bulkDeleteTargets}
+          onClose={closeDeleteLead}
+          onConfirm={deleteLead}
+          onConfirmAll={deleteAllLeads}
+          onPin={pinLead}
+        />
+      )}
       <CreateLeadModal
         isOpen={isCreateLeadOpen}
         onClose={() => setIsCreateLeadOpen(false)}

@@ -50,8 +50,27 @@ const NAV = [
     icon: LayoutGrid,
     defaultOpen: true,
     children: [
-      { label: 'Leads', icon: Target, to: '/crm/leads', dot: true },
-      { label: 'Tasks', icon: ListChecks, to: '/crm/tasks' },
+      {
+        label: 'Leads',
+        icon: Target,
+        defaultOpen: true,
+        children: [
+          { label: 'Leads', to: '/crm/leads', dot: true },
+          { label: 'Lead Create Form', to: '/crm/leads/create-form' },
+          { label: 'Lead Tasks Master', to: '/crm/leads/tasks-master' },
+          { label: 'Lead Task Form', to: '/crm/leads/task-form' },
+          { label: 'Lead Stage Tasks', to: '/crm/leads/stage-tasks' },
+        ],
+      },
+      {
+        label: 'Tasks',
+        icon: ListChecks,
+        defaultOpen: true,
+        children: [
+          { label: 'Tasks List', to: '/crm/tasks' },
+          { label: 'Task Allocation', to: '/crm/tasks/allocation' },
+        ],
+      },
       { label: 'User Allocation & Tracking', icon: Users, to: '/crm/user-allocation' },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
       { label: 'CRM System Setup', icon: Settings, to: '/crm/system-setup' },
@@ -62,6 +81,7 @@ const NAV = [
     label: 'Sales',
     icon: BarChart3,
     children: [
+      { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
       { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
@@ -238,6 +258,10 @@ function ExpandableRow({ item, depth = 0 }) {
   const [open, setOpen] = useState(item.defaultOpen ?? (depth === 0));
   const Icon = item.icon;
 
+  function handleClick() {
+    setOpen((v) => !v);
+  }
+
   // Auto-open if a child route is active
   const isChildActive = item.children?.some(
     (c) => c.to && (location.pathname === c.to || location.pathname.startsWith(c.to + '/'))
@@ -262,7 +286,7 @@ function ExpandableRow({ item, depth = 0 }) {
     <div className="nav-group">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleClick}
         className={`nav-row${isChildActive || isActive ? ' section-active' : ''}`}
       >
         {Icon && <Icon size={17} strokeWidth={1.9} className="nav-ico" />}

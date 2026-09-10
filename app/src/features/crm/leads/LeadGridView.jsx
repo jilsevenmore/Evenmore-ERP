@@ -1,11 +1,23 @@
 import { Pencil, Phone } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 
-export default function LeadGridView({ rows = [], onAddNote, onOpenLead }) {
+export default function LeadGridView({ rows = [], selected = [], onToggleOne, onRequestDelete, onAddNote, onOpenLead }) {
   return (
     <div className="lead-tile-grid">
       {rows.map((row) => (
         <article key={row.id} className="lead-tile-card">
+          <div className="lead-tile-select">
+            <input
+              type="checkbox"
+              className="row-check"
+              checked={selected.includes(row.id)}
+              onChange={() => {
+                onToggleOne?.(row.id);
+                onRequestDelete?.(row);
+              }}
+              aria-label={`Select ${row.name}`}
+            />
+          </div>
           <div className="lead-tile-head">
             <div className="lead-tile-person">
               <LeadAvatar lead={row} className="lead-tile-avatar" />
