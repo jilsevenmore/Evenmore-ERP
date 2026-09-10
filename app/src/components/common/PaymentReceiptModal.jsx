@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2 } from 'lucide-react';
 export const PaymentReceiptModal = ({ receipt, onClose }) => {
+    // UX only: Esc dismisses. No logic changes.
+    useEffect(() => {
+        if (!receipt) return;
+        const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [receipt, onClose]);
     if (!receipt)
         return null;
-    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl text-xs flex flex-col overflow-hidden">
+    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label="Official payment receipt">
+      <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl text-xs flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">

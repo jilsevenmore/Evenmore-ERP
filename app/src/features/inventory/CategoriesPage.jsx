@@ -273,7 +273,7 @@ export const CategoriesPage = () => {
         guide={categoryGuide}
         actions={
           <div className="flex items-center gap-2">
-            <Link to={isMachineView ? '/items/machines' : '/items/stock'}>
+            <Link to={isMachineView ? '/inventory/items/machines' : '/inventory/items/stock'}>
               <Button variant="outline">
                 {isMachineView ? 'View Machines' : 'View Stock Items'}
               </Button>
@@ -284,6 +284,40 @@ export const CategoriesPage = () => {
           </div>
         }
       />
+
+      {/* View Segmented Tabs */}
+      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit text-xs font-semibold">
+        <Link
+          to="/inventory/categories"
+          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+            !isMachineView && !isStockView
+              ? 'bg-white text-blue-600 shadow-2xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Layers size={15} /> All Categories ({categories.length})
+        </Link>
+        <Link
+          to="/inventory/categories/machines"
+          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+            isMachineView
+              ? 'bg-white text-blue-600 shadow-2xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Cpu size={15} /> Machine Categories ({categories.filter((c) => c.hasSubParts).length})
+        </Link>
+        <Link
+          to="/inventory/categories/stock"
+          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+            isStockView
+              ? 'bg-white text-blue-600 shadow-2xs font-bold'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Boxes size={15} /> Stock Categories ({categories.filter((c) => !c.hasSubParts).length})
+        </Link>
+      </div>
 
       <DataTable
         title={isMachineView ? 'Machine Equipment Categories' : isStockView ? 'Stock & Component Categories' : 'Inventory Taxonomic Categories'}

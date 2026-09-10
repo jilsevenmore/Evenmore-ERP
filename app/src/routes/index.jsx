@@ -42,9 +42,13 @@ import CustomQuestions from '../features/hrms/recruitment/CustomQuestions';
 import RecruitmentFunnel from '../features/hrms/recruitment/RecruitmentFunnel';
 import PerformanceDashboard from '../features/hrms/performance/Dashboard';
 import Indicators from '../features/hrms/performance/Indicators';
+import KpiData from '../features/hrms/performance/KpiData';
 import Appraisal from '../features/hrms/performance/Appraisal';
+import AppraisalFunnel from '../features/hrms/performance/AppraisalFunnel';
 import GoalTracking from '../features/hrms/performance/GoalTracking';
+import GoalFunnel from '../features/hrms/performance/GoalFunnel';
 import TrainingList from '../features/hrms/performance/TrainingList';
+import TrainingFunnel from '../features/hrms/performance/TrainingFunnel';
 import Trainers from '../features/hrms/performance/Trainers';
 import OrgChartPage from '../features/hrms/organization/OrgChartPage';
 import DepartmentsPage from '../features/hrms/organization/DepartmentsPage';
@@ -181,10 +185,17 @@ const router = createBrowserRouter([
       // ── Inventory ─────────────────────────────────────────
       { path: 'inventory', element: <Navigate to="/inventory/items" replace /> },
       { path: 'inventory/items', element: <Page component={ItemsMasterPage} /> },
+      { path: 'inventory/items/machines', element: <Page component={ItemsMasterPage} /> },
+      { path: 'inventory/items/stock', element: <Page component={ItemsMasterPage} /> },
+      { path: 'inventory/machines', element: <Navigate to="/inventory/items/machines" replace /> },
       { path: 'inventory/items/new', element: <Page component={AddEditItemPage} /> },
       { path: 'inventory/items/edit/:id', element: <Page component={AddEditItemPage} /> },
       { path: 'inventory/categories', element: <Page component={CategoriesPage} /> },
-      { path: 'inventory/stock', element: <Page component={StockPositionPage} /> },
+      { path: 'inventory/categories/machines', element: <Page component={CategoriesPage} /> },
+      { path: 'inventory/categories/machine', element: <Navigate to="/inventory/categories/machines" replace /> },
+      { path: 'inventory/categories/stock', element: <Page component={CategoriesPage} /> },
+      { path: 'inventory/stock-position', element: <Page component={StockPositionPage} /> },
+      { path: 'inventory/stock', element: <Navigate to="/inventory/stock-position" replace /> },
       { path: 'inventory/transfers', element: <Page component={TransfersPage} /> },
       { path: 'inventory/locations', element: <Page component={ERPLocationsPage} /> },
       { path: 'inventory/faulty-parts', element: <Page component={FaultyPartsPage} /> },
@@ -192,6 +203,18 @@ const router = createBrowserRouter([
       { path: 'inventory/zone-requests', element: <Page component={ZoneRequestsPage} /> },
       { path: 'inventory/valuation', element: <Page component={ValuationAgeingPage} /> },
       { path: 'inventory/audit', element: <Page component={MonthEndAuditPage} /> },
+
+      // ── Legacy Root Aliases ───────────────────────────────
+      { path: 'items', element: <Navigate to="/inventory/items" replace /> },
+      { path: 'items/machines', element: <Navigate to="/inventory/items/machines" replace /> },
+      { path: 'items/stock', element: <Navigate to="/inventory/items/stock" replace /> },
+      { path: 'items/new', element: <Navigate to="/inventory/items/new" replace /> },
+      { path: 'items/edit/:id', element: <Page component={AddEditItemPage} /> },
+      { path: 'categories', element: <Navigate to="/inventory/categories" replace /> },
+      { path: 'categories/machine', element: <Navigate to="/inventory/categories/machines" replace /> },
+      { path: 'categories/machines', element: <Navigate to="/inventory/categories/machines" replace /> },
+      { path: 'categories/stock', element: <Navigate to="/inventory/categories/stock" replace /> },
+      { path: 'stock', element: <Navigate to="/inventory/stock-position" replace /> },
 
       // ── Accounts ──────────────────────────────────────────
       { path: 'accounts', element: <Navigate to="/accounts/cash-bank" replace /> },
@@ -226,10 +249,14 @@ const router = createBrowserRouter([
       { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> },
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },
+      { path: 'hrms/performance/kpi-data', element: <Page component={KpiData} /> },
       { path: 'hrms/performance/appraisal', element: <Page component={Appraisal} /> },
+      { path: 'hrms/performance/appraisal/funnel', element: <Page component={AppraisalFunnel} /> },
       { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> },
+      { path: 'hrms/performance/goal-tracking/funnel', element: <Page component={GoalFunnel} /> },
       { path: 'hrms/training', element: <Page component={TrainingList} /> },
       { path: 'hrms/training/trainers', element: <Page component={Trainers} /> },
+      { path: 'hrms/training/funnel', element: <Page component={TrainingFunnel} /> },
       { path: 'hrms/org-chart', element: <Page component={OrgChartPage} /> },
       { path: 'hrms/departments', element: <Page component={DepartmentsPage} /> },
       { path: 'hrms/designations', element: <Page component={DesignationsPage} /> },

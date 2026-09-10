@@ -180,6 +180,74 @@
   --body-bg: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 35%), linear-gradient(180deg, #051611 0%, #030e0b 100%);
 }
 
+/* ── Theme Adaptations for Dark / Midnight / Emerald Modes ── */
+[data-theme="dark"],
+[data-theme="midnight"],
+[data-theme="emerald"],
+.dark {
+  color-scheme: dark;
+
+  /* Card and panel containers */
+  .bg-white {
+    background-color: var(--card) !important;
+  }
+  .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100, .bg-\[\#F8F9FA\], .bg-\[\#f8fafc\] {
+    background-color: var(--soft) !important;
+  }
+  .bg-slate-200, .bg-gray-200, .bg-slate-300 {
+    background-color: var(--card-alt) !important;
+  }
+  
+  /* Text colors */
+  .text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-\[\#1F2E4A\], .text-\[\#183153\] {
+    color: var(--text) !important;
+  }
+  .text-slate-700, .text-slate-600, .text-gray-700, .text-gray-600 {
+    color: var(--text-secondary) !important;
+  }
+  .text-slate-500, .text-slate-400, .text-gray-500, .text-gray-400 {
+    color: var(--muted) !important;
+  }
+
+  /* Borders */
+  .border-slate-200, .border-slate-300, .border-slate-100, .border-gray-200, .border-gray-300, .border-\[\#CED4DA\], .border-\[\#e2e8f0\] {
+    border-color: var(--border) !important;
+  }
+
+  /* Hover states */
+  .hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover {
+    background-color: var(--card-hover) !important;
+  }
+
+  /* Inputs, selects, and textareas */
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    background-color: var(--soft) !important;
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+  input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
+    background-color: var(--card) !important;
+    border-color: var(--primary) !important;
+  }
+
+  /* Tables & DataTables */
+  table thead, table thead tr, table thead th {
+    background-color: var(--table-head-bg) !important;
+    color: var(--text-secondary) !important;
+    border-color: var(--border) !important;
+  }
+  table tbody tr {
+    border-color: var(--border) !important;
+  }
+  table tbody tr:hover {
+    background-color: var(--table-row-hover) !important;
+  }
+  table td {
+    color: var(--text) !important;
+    border-color: var(--border) !important;
+  }
+}
+
 /* ── Reset ──────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   Home,
   LayoutGrid,
@@ -37,9 +37,11 @@ import {
   Shield,
   MessagesSquare,
   Send,
-  Headphones,
+  User,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { useERP } from '../../context/ERPContext';
 
 // ── Navigation Structure ──────────────────────────────────────
 const NAV = [
@@ -48,7 +50,7 @@ const NAV = [
   {
     label: 'CRM',
     icon: LayoutGrid,
-    defaultOpen: true,
+    defaultOpen: false,
     children: [
       {
         label: 'Leads',
@@ -105,17 +107,43 @@ const NAV = [
   },
 
   {
+    label: 'Parties',
+    icon: Building2,
+    to: '/parties',
+  },
+
+  {
     label: 'Inventory',
     icon: Package,
     children: [
-      { label: 'Items', icon: Boxes, to: '/inventory/items' },
-      { label: 'Categories', icon: Layers, to: '/inventory/categories' },
-      { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock' },
+      {
+        label: 'Items Master',
+        icon: Boxes,
+        defaultOpen: false,
+        children: [
+          { label: 'All Items', to: '/inventory/items', dot: true },
+          { label: 'Machine Master', to: '/inventory/items/machines' },
+          { label: 'Stock Inventory', to: '/inventory/items/stock' },
+        ],
+      },
+      {
+        label: 'Categories',
+        icon: Layers,
+        defaultOpen: false,
+        children: [
+          { label: 'All Categories', to: '/inventory/categories', dot: true },
+          { label: 'Machine Categories', to: '/inventory/categories/machines' },
+          { label: 'Stock Categories', to: '/inventory/categories/stock' },
+        ],
+      },
+      { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
-      { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts' },
+      { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' },
       { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' },
-      { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests' },
+      { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests', badgeKey: 'zone' },
+      { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' },
+      { label: 'Month-End Audit', icon: CalendarCheck, to: '/inventory/audit' },
     ],
   },
 
@@ -145,6 +173,7 @@ const NAV = [
           { label: 'Individual', to: '/hrms/attendance/individual' },
           { label: 'Bulk', to: '/hrms/attendance/bulk' },
           { label: 'Requests', to: '/hrms/attendance/requests' },
+          { label: 'Flexibility', to: '/hrms/attendance/flexibility' },
         ],
       },
       { label: 'Leave', icon: CalendarCheck, to: '/hrms/leave' },
@@ -221,9 +250,10 @@ const NAV = [
 ];
 
 // ── Sub-item (leaf node) ────────────────────────────────────
-function SubItem({ item }) {
+function SubItem({ item, badges = {} }) {
   const location = useLocation();
   const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+  const count = item.badgeKey ? badges[item.badgeKey] : 0;
 
   return (
     <NavLink
@@ -232,30 +262,35 @@ function SubItem({ item }) {
     >
       {item.dot && <span className="sub-dot" />}
       <span className="sub-label">{item.label}</span>
+      {count > 0 && (
+        <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+          {count}
+        </span>
+      )}
     </NavLink>
   );
 }
 
 // ── Sub-list (group of sub-items) ───────────────────────────
-function SubList({ items, depth }) {
+function SubList({ items, depth, badges }) {
   return (
     <div className="sub-list" style={{ marginLeft: depth === 1 ? 22 : 18 }}>
       {items.map((item) => {
         if (item.children) {
           return (
-            <ExpandableRow key={item.label} item={item} depth={depth} />
+            <ExpandableRow key={item.label} item={item} depth={depth} badges={badges} />
           );
         }
-        return <SubItem key={item.label} item={item} />;
+        return <SubItem key={item.label} item={item} badges={badges} />;
       })}
     </div>
   );
 }
 
 // ── Expandable group row ────────────────────────────────────
-function ExpandableRow({ item, depth = 0 }) {
+function ExpandableRow({ item, depth = 0, badges = {} }) {
   const location = useLocation();
-  const [open, setOpen] = useState(item.defaultOpen ?? (depth === 0));
+  const [open, setOpen] = useState(false);
   const Icon = item.icon;
 
   function handleClick() {
@@ -264,8 +299,15 @@ function ExpandableRow({ item, depth = 0 }) {
 
   // Auto-open if a child route is active
   const isChildActive = item.children?.some(
-    (c) => c.to && (location.pathname === c.to || location.pathname.startsWith(c.to + '/'))
+    (c) => (c.to && (location.pathname === c.to || location.pathname.startsWith(c.to + '/'))) ||
+      (c.children?.some((sub) => sub.to && (location.pathname === sub.to || location.pathname.startsWith(sub.to + '/'))))
   );
+
+  useEffect(() => {
+    if (isChildActive) {
+      setOpen(true);
+    }
+  }, [isChildActive]);
 
   const isActive = item.to && (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
 
@@ -298,7 +340,7 @@ function ExpandableRow({ item, depth = 0 }) {
         )}
       </button>
       {open && item.children && (
-        <SubList items={item.children} depth={depth + 1} />
+        <SubList items={item.children} depth={depth + 1} badges={badges} />
       )}
     </div>
   );
@@ -308,29 +350,79 @@ function ExpandableRow({ item, depth = 0 }) {
 export default function Sidebar() {
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const profileRef = useRef(null);
   const dragRef = useRef({ dragging: false, startX: 0, startWidth: sidebarWidth });
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (profileRef.current && !profileRef.current.contains(e.target)) {
+        setIsProfileOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  let badges = { zone: 0, faulty: 0 };
+  try {
+    const erp = useERP();
+    if (erp) {
+      badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0;
+      badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
+    }
+  } catch { }
 
   useEffect(() => {
     function handleMove(e) {
       if (!dragRef.current.dragging) return;
-      setSidebarWidth(dragRef.current.startWidth + (e.clientX - dragRef.current.startX));
+      const dx = e.clientX - dragRef.current.startX;
+      const nextWidth = Math.min(360, Math.max(220, dragRef.current.startWidth + dx));
+      setSidebarWidth(nextWidth);
     }
+
     function handleUp() {
       dragRef.current.dragging = false;
-      document.body.classList.remove('is-resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
     }
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
+
+    if (dragRef.current.dragging) {
+      window.addEventListener('mousemove', handleMove);
+      window.addEventListener('mouseup', handleUp);
+    }
+
     return () => {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
-      document.body.classList.remove('is-resizing');
     };
   }, [setSidebarWidth]);
 
   function handleResizeStart(e) {
+    e.preventDefault();
     dragRef.current = { dragging: true, startX: e.clientX, startWidth: sidebarWidth };
-    document.body.classList.add('is-resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function handleMove(ev) {
+      const dx = ev.clientX - dragRef.current.startX;
+      const nextWidth = Math.min(360, Math.max(220, dragRef.current.startWidth + dx));
+      setSidebarWidth(nextWidth);
+    }
+
+    function handleUp() {
+      dragRef.current.dragging = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    }
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
   }
 
   return (
@@ -352,39 +444,89 @@ export default function Sidebar() {
         {/* Navigation */}
         <nav className="side-nav" aria-label="Primary navigation">
           {NAV.map((item) => (
-            <ExpandableRow key={item.label} item={item} depth={0} />
+            <ExpandableRow key={item.label} item={item} depth={0} badges={badges} />
           ))}
         </nav>
       </div>
 
-      {/* Need Help Support Widget */}
-      <div className="px-2 pt-3 pb-1">
-        <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 text-white shadow-xs">
-          <div className="w-10 h-10 rounded-full bg-blue-600/30 border border-blue-400/40 text-blue-300 flex items-center justify-center shrink-0">
-            <Headphones size={20} />
+      {/* Sticky Bottom User Profile Widget */}
+      <div className="pt-2 px-1 pb-1 mt-auto border-t border-white/10 relative" ref={profileRef}>
+        <button
+          type="button"
+          onClick={() => setIsProfileOpen(!isProfileOpen)}
+          className="w-full flex items-center justify-between p-2 rounded-xl hover:bg-white/10 transition cursor-pointer text-left group"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs ring-1 ring-white/20">
+              {currentUser?.initials || 'AG'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-white truncate leading-tight">
+                {currentUser?.name || 'Adarsh Gupta'}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
+                {currentUser?.role || 'Operations Admin'}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-slate-300 block">Need Help?</span>
-            <span className="text-xs font-bold text-white block truncate">Contact Support</span>
+          <ChevronDown
+            size={14}
+            className={`text-slate-400 group-hover:text-white transition-transform duration-150 ${isProfileOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+
+        {/* Profile Popup Menu */}
+        {isProfileOpen && (
+          <div className="absolute bottom-full left-1 right-1 mb-2 p-2 rounded-2xl bg-[#0b1222] border border-white/15 text-white shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 backdrop-blur-md">
+            <div className="p-2 border-b border-white/10 mb-1">
+              <p className="text-xs font-bold truncate">{currentUser?.name || 'Adarsh Gupta'}</p>
+              <p className="text-[10px] text-slate-400 truncate">{currentUser?.email || 'admin@evenmore.io'}</p>
+            </div>
+            <div className="space-y-0.5 text-xs">
+              <Link
+                to="/hrms/dashboard"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition"
+              >
+                <User size={13} className="text-blue-400" />
+                <span>HR Profile & Attendance</span>
+              </Link>
+              <Link
+                to="/administration/users"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition"
+              >
+                <ShieldCheck size={13} className="text-emerald-400" />
+                <span>Administration & Roles</span>
+              </Link>
+              <Link
+                to="/administration/settings"
+                onClick={() => setIsProfileOpen(false)}
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition"
+              >
+                <Settings size={13} className="text-purple-400" />
+                <span>System Preferences</span>
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Footer */}
+      {/* Footer
       <div className="side-footer">
         <div className="footer-link">Work Smarter Together</div>
         <div className="footer-copy">© 2026 Evenmore Infotech</div>
       </div>
 
       {/* Resize handle */}
-      <button
+      {/* <button
         type="button"
         className="sidebar-resize-handle"
         aria-label="Resize sidebar"
         onMouseDown={handleResizeStart}
       >
         <span className="resize-thumb" />
-      </button>
+      </button> */}
     </aside>
   );
 }
