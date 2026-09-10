@@ -1,16 +1,16 @@
 import {
   ChevronDown,
-  Filter,
   ChevronsUpDown,
-  List,
+  Filter,
+  Printer,
   LayoutGrid,
   SquareChartGantt,
   MapPin,
   MoreHorizontal,
-  Plus,
 } from "lucide-react";
 import { tabs } from '../../../data/crm/mockLeads';
 import SortPopover from "./SortPopover";
+import RecordActionPanel from "./RecordActionPanel";
 
 function ViewButton({ label, active, onClick, children }) {
   return (
@@ -43,7 +43,13 @@ export default function LeadsTabs({
   leadView,
   onLeadViewChange,
   onCreateLead,
+  recordActionLead,
+  recordActionLeads = [],
+  onCloseRecordAction,
+  onDeleteRecord,
+  onPrint,
 }) {
+  const hasRecordAction = Boolean(recordActionLead) || recordActionLeads.length > 0;
   return (
     <div className="leads-toolbar-wrap">
       <div className="tabs-bar">
@@ -66,19 +72,12 @@ export default function LeadsTabs({
           </button>
         </div>
         <div className="tabs-actions">
-          <button type="button" className="create-lead-btn" onClick={onCreateLead}>
-            <Plus size={16} strokeWidth={2.5} />
-            Create Lead
-          </button>
-          <button type="button" className="create-lead-split" aria-label="More create options">
-            <ChevronDown size={16} />
-          </button>
           <button type="button" className="toolbar-more" aria-label="More options">
             <MoreHorizontal size={18} />
           </button>
         </div>
       </div>
-      <div className="list-toolbar">
+      <div className={`list-toolbar${hasRecordAction ? " list-toolbar-actions" : ""}`}>
         <div className="list-toolbar-left">
           <button
             type="button"
@@ -102,8 +101,8 @@ export default function LeadsTabs({
           <button type="button" className="toolbar-icon" aria-label="Sort settings">
             <ChevronsUpDown size={16} />
           </button>
-          <ViewButton label="List View" active={leadView === "list"} onClick={() => onLeadViewChange("list")}>
-            <List size={18} />
+          <ViewButton label="Print Leads" onClick={onPrint}>
+            <Printer size={18} />
           </ViewButton>
           <ViewButton label="Grid View" active={leadView === "grid"} onClick={() => onLeadViewChange("grid")}>
             <LayoutGrid size={18} />
@@ -114,6 +113,14 @@ export default function LeadsTabs({
           <ViewButton label="Map View" active={leadView === "map"} onClick={() => onLeadViewChange("map")}>
             <MapPin size={18} />
           </ViewButton>
+          {hasRecordAction && (
+            <RecordActionPanel
+              lead={recordActionLead}
+              leads={recordActionLeads}
+              onClose={onCloseRecordAction}
+              onDelete={onDeleteRecord}
+            />
+          )}
           <button type="button" className="toolbar-icon" aria-label="More toolbar options">
             <ChevronDown size={16} />
           </button>

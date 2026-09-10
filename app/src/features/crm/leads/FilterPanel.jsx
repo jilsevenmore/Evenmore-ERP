@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, X, ChevronDown, ChevronRight } from "lucide-react";
 import { sourceFilters, statusFilters } from '../../../data/crm/mockLeads';
 
@@ -66,11 +66,31 @@ export default function FilterPanel({
   onClear,
   onClose,
 }) {
+  function handleClose() {
+    if (typeof onClose === "function") {
+      onClose();
+    }
+  }
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key === "Escape" && typeof onClose === "function") {
+        onClose();
+      }
+    }
+
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [onClose]);
+
   return (
     <aside className="filter-card screenshot-filter-card">
       <div className="filter-header">
         <h3>Filter Leads by</h3>
-        <button type="button" className="filter-close" aria-label="Close filters" onClick={onClose}>
+        <button type="button" className="filter-close" aria-label="Close filters" onClick={handleClose}>
           <X size={18} />
         </button>
       </div>
