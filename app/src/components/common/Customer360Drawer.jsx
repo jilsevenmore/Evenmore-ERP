@@ -1,8 +1,22 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Printer, Phone, Mail, MapPin } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 export const Customer360Drawer = ({ customer, onClose }) => {
     const { salesOrders, invoices, paymentIns, deliveryChallans } = useERP();
+
+    // UX only: Esc closes, background scroll locks while open. No data changes.
+    useEffect(() => {
+        if (!customer) return;
+        const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+        document.addEventListener('keydown', onKey);
+        const prev = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+            document.removeEventListener('keydown', onKey);
+            document.body.style.overflow = prev;
+        };
+    }, [customer, onClose]);
+
     if (!customer)
         return null;
     const customerOrders = salesOrders.filter((o) => o.customerId === customer.id || o.customer === customer.name);
@@ -12,8 +26,8 @@ export const Customer360Drawer = ({ customer, onClose }) => {
     const creditLimit = customer.creditLimit || 50000;
     const balance = customer.balance || 0;
     const creditUsedPct = Math.min(100, Math.round((balance / creditLimit) * 100));
-    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end animate-in fade-in duration-150">
-      <div className="bg-white w-full max-w-xl h-full shadow-2xl border-l border-slate-200 flex flex-col text-xs overflow-hidden">
+    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${customer.name || 'Customer'} 360 view`}>
+      <div className="bg-white w-full max-w-xl h-full shadow-2xl border-l border-slate-200 flex flex-col text-xs overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Top Header */}
         <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex items-start justify-between">
           <div>
