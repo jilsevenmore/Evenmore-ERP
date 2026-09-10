@@ -1,66 +1,32 @@
 import React, { useState } from 'react';
+import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { CheckCircle2, AlertTriangle, UserCheck, ShieldCheck } from 'lucide-react';
 export const MonthEndAuditPage = () => {
-    const [auditItems, setAuditItems] = useState([
-        {
-            id: 'aud-1',
-            sku: 'SRV-DL380-G10',
-            name: 'HPE ProLiant DL380 Gen10 Server 2U Rack',
-            location: 'Central Bay-1',
-            systemQty: 12,
-            physicalCount: 12,
+    const { items, calculateItemStock } = useERP();
+    // Point-in-time audit snapshot seeded from live book quantities
+    // (was hardcoded demo rows). physicalCount starts at book qty; the
+    // auditor adjusts via Post Adjustment / recount flows below.
+    const buildSnapshot = () => (items || []).map((it) => {
+        const live = calculateItemStock(it.id);
+        const systemQty = live?.available ?? it.availableQty ?? it.stock ?? 0;
+        const unitCost = it.costPrice ?? it.unitCost ?? 0;
+        return {
+            id: `aud-${it.id}`,
+            sku: it.sku,
+            name: it.name,
+            location: it.location || '—',
+            systemQty,
+            physicalCount: systemQty,
             variance: 0,
             varianceCost: 0,
+            unitCost,
             status: 'Reconciled',
-        },
-        {
-            id: 'aud-2',
-            sku: 'SW-CAT9300-48P',
-            name: 'Cisco Catalyst 9300 48-Port PoE+ Switch',
-            location: 'Central Bay-2',
-            systemQty: 28,
-            physicalCount: 27,
-            variance: -1,
-            varianceCost: -1950,
-            status: 'Variance Flagged',
-        },
-        {
-            id: 'aud-3',
-            sku: 'FBR-SFP-10G-SR',
-            name: '10GBASE-SR SFP+ Transceiver Module',
-            location: 'Clean Storage Drawer 4',
-            systemQty: 240,
-            physicalCount: 240,
-            variance: 0,
-            varianceCost: 0,
-            status: 'Reconciled',
-        },
-        {
-            id: 'aud-4',
-            sku: 'CAB-CAT6A-1000',
-            name: 'Cat6A Shielded Plenum Cable Spool 1000ft',
-            location: 'Rack Storage B-12',
-            systemQty: 65,
-            physicalCount: 65,
-            variance: 0,
-            varianceCost: 0,
-            status: 'Reconciled',
-        },
-        {
-            id: 'aud-5',
-            sku: 'UPS-SMT3000RM2U',
-            name: 'APC Smart-UPS 3000VA LCD RM 2U 120V',
-            location: 'Heavy Bay Floor 1',
-            systemQty: 8,
-            physicalCount: 8,
-            variance: 0,
-            varianceCost: 0,
-            status: 'Reconciled',
-        },
-    ]);
+        };
+    });
+    const [auditItems, setAuditItems] = useState(buildSnapshot);
     const [auditLocked, setAuditLocked] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
     const reconcileItem = (id) => {
@@ -79,6 +45,13 @@ export const MonthEndAuditPage = () => {
         setToastMessage('Month-End Stock Reconciliation successfully locked & posted to GL!');
         setTimeout(() => setToastMessage(null), 4000);
     };
+    // Live summary stats derived from the audit snapshot (were hardcoded).
+    const reconciledCount = auditItems.filter((i) => i.status === 'Reconciled').length;
+    const accuracyPct = auditItems.length > 0
+        ? ((reconciledCount / auditItems.length) * 100).toFixed(1)
+        : '0.0';
+    const netVarianceCost = auditItems.reduce((acc, i) => acc + (i.varianceCost || 0), 0);
+    const flaggedCount = auditItems.filter((i) => i.status === 'Variance Flagged').length;
     const columns = [
         {
             key: 'sku',
@@ -173,13 +146,13 @@ export const MonthEndAuditPage = () => {
         </div>
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA]">
           <span className="text-xs text-slate-500 font-semibold uppercase">Reconciled Accuracy</span>
-          <p className="text-lg font-bold text-emerald-700 mt-1">98.2%</p>
+          <p className="text-lg font-bold text-emerald-700 mt-1">{accuracyPct}%</p>
           <span className="text-[11px] text-slate-400">Within acceptable tolerance (±2%)</span>
         </div>
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA]">
           <span className="text-xs text-slate-500 font-semibold uppercase">Net Inventory Variance</span>
-          <p className="text-lg font-bold text-rose-700 mt-1">-$1,950.00</p>
-          <span className="text-[11px] text-slate-400">1 Unit Switch Shrinkage</span>
+          <p className="text-lg font-bold text-rose-700 mt-1">{netVarianceCost < 0 ? `-$${Math.abs(netVarianceCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `$${netVarianceCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
+          <span className="text-[11px] text-slate-400">{flaggedCount === 0 ? 'No open variances' : `${flaggedCount} open variance${flaggedCount === 1 ? '' : 's'}`}</span>
         </div>
       </div>
 

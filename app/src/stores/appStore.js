@@ -4,15 +4,24 @@ import { employeesMock, leaveRequestsMock, attendanceMock, candidatesMock } from
 const LS_KEY = "hrms_store_v1";
 const THEME_KEY = "evenmore_theme";
 
+function applyThemeAttributes(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  if (theme !== "light") {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
+}
+
 function loadTheme() {
   try {
     const saved = localStorage.getItem(THEME_KEY);
     if (saved && ["light", "dark", "midnight", "emerald"].includes(saved)) {
-      document.documentElement.setAttribute("data-theme", saved);
+      applyThemeAttributes(saved);
       return saved;
     }
   } catch {}
-  document.documentElement.setAttribute("data-theme", "light");
+  applyThemeAttributes("light");
   return "light";
 }
 
@@ -32,7 +41,7 @@ export const useAppStore = create((set) => ({
   setTheme: (theme) => {
     try {
       localStorage.setItem(THEME_KEY, theme);
-      document.documentElement.setAttribute("data-theme", theme);
+      applyThemeAttributes(theme);
     } catch {}
     set({ theme });
   },

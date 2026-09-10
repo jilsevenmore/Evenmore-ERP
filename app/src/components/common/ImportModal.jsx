@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, CheckCircle2, AlertCircle, Download, Database } from 'lucide-react';
 import { exportToCSV } from '../../services/exportUtils';
 export const ImportModal = ({ isOpen, onClose, title, templateHeaders, sampleRow, onImport, }) => {
@@ -6,6 +6,13 @@ export const ImportModal = ({ isOpen, onClose, title, templateHeaders, sampleRow
     const [parsedRows, setParsedRows] = useState([]);
     const [errorMsg, setErrorMsg] = useState(null);
     const fileInputRef = useRef(null);
+    // UX only: Esc dismisses. No logic changes.
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+        document.addEventListener('keydown', onKey);
+        return () => document.removeEventListener('keydown', onKey);
+    }, [isOpen, onClose]);
     if (!isOpen)
         return null;
     const parseCSV = (text) => {
@@ -55,8 +62,8 @@ export const ImportModal = ({ isOpen, onClose, title, templateHeaders, sampleRow
         setCsvText('');
         setParsedRows([]);
     };
-    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Import ${title} via CSV`}>
+      <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2.5">

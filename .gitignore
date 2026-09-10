@@ -27,4 +27,4 @@ dist-ssr
 .env
 .env.production
 
-graphify-out
+graphify-out/

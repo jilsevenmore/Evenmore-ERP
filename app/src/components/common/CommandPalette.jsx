@@ -37,15 +37,18 @@ export const CommandPalette = ({ isOpen, onClose }) => {
     const cleanQuery = query.trim().toLowerCase();
     // Search results grouping
     const navigationItems = [
-        { label: 'Sales Orders', path: '/sales-orders', icon: ShoppingCart, category: 'Navigation' },
-        { label: 'Delivery Challans', path: '/delivery-challans', icon: Truck, category: 'Navigation' },
-        { label: 'Sales Invoices', path: '/sales-invoices', icon: Receipt, category: 'Navigation' },
-        { label: 'Quotations & Estimates', path: '/quotations', icon: FileText, category: 'Navigation' },
-        { label: 'Inventory Items', path: '/inventory-items', icon: Package, category: 'Navigation' },
-        { label: 'Purchase Orders', path: '/purchase-orders', icon: ShoppingCart, category: 'Navigation' },
-        { label: 'Purchase Bills & AP', path: '/purchase-bills', icon: FileSpreadsheet, category: 'Navigation' },
-        { label: 'Customer Accounts', path: '/customers', icon: Users, category: 'Navigation' },
-        { label: 'Vendor Directory', path: '/vendors', icon: Building2, category: 'Navigation' },
+        { label: 'Dashboard', path: '/dashboard', icon: BarChart3, category: 'Navigation' },
+        { label: 'CRM Leads', path: '/crm/leads', icon: Users, category: 'Navigation' },
+        { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart, category: 'Navigation' },
+        { label: 'Delivery Challans', path: '/sales/delivery', icon: Truck, category: 'Navigation' },
+        { label: 'Sales Invoices', path: '/sales/invoices', icon: Receipt, category: 'Navigation' },
+        { label: 'Quotations & Estimates', path: '/sales/quotations', icon: FileText, category: 'Navigation' },
+        { label: 'Inventory Items', path: '/inventory/items', icon: Package, category: 'Navigation' },
+        { label: 'Stock Position', path: '/inventory/stock', icon: BarChart3, category: 'Navigation' },
+        { label: 'Purchase Orders', path: '/purchase/orders', icon: ShoppingCart, category: 'Navigation' },
+        { label: 'Purchase Bills & AP', path: '/purchase/bills', icon: FileSpreadsheet, category: 'Navigation' },
+        { label: 'Parties Directory', path: '/parties', icon: Building2, category: 'Navigation' },
+        { label: 'HRMS Employees', path: '/hrms/employees', icon: Users, category: 'Navigation' },
         { label: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: 'Navigation' },
     ].filter((n) => !cleanQuery || n.label.toLowerCase().includes(cleanQuery));
     const matchedItems = items
@@ -56,7 +59,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .map((i) => ({
         label: `[${i.sku}] ${i.name}`,
         sub: `Stock: ${i.stock || 0} ${i.unit || 'pcs'} • Selling: $${i.sellingPrice}`,
-        path: '/inventory-items',
+        path: '/inventory/items',
         icon: Package,
         category: 'Inventory Items',
     }));
@@ -68,7 +71,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .map((c) => ({
         label: c.name,
         sub: `Code: ${c.code} • Outstanding: $${c.balance.toFixed(2)}`,
-        path: '/customers',
+        path: '/parties',
         icon: Users,
         category: 'Customers',
     }));
@@ -79,7 +82,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .map((v) => ({
         label: v.name,
         sub: `Vendor Code: ${v.code} • Outstanding Payable: $${v.balance.toFixed(2)}`,
-        path: '/vendors',
+        path: '/purchase/vendors',
         icon: Building2,
         category: 'Suppliers & Vendors',
     }));
@@ -90,7 +93,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .map((o) => ({
         label: `${o.orderNumber} - ${o.customer}`,
         sub: `Value: $${o.amount.toFixed(2)} • Stage: ${o.stage}`,
-        path: '/sales-orders',
+        path: '/sales/orders',
         icon: ShoppingCart,
         category: 'Sales Orders',
     }));
@@ -101,7 +104,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .map((inv) => ({
         label: `${inv.invoiceNumber} - ${inv.customer}`,
         sub: `Total: $${inv.total.toFixed(2)} • Status: ${inv.status}`,
-        path: '/sales-invoices',
+        path: '/sales/invoices',
         icon: Receipt,
         category: 'Invoices',
     }));
