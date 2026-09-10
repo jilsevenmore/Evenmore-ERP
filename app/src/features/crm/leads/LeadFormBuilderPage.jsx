@@ -1,14 +1,48 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import LeadFormBuilder from './LeadFormBuilder';
 import { createFieldFromType, defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
 
+function getStoredForms() {
+  try {
+    const raw = localStorage.getItem('dynamicLeadForms');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch {
+  }
+  return [
+    {
+      id: 'lead-form-default',
+      name: 'LEAD CREATE FORM',
+      description: 'No description provided',
+      createdOn: '13/04/2026',
+      sections: defaultLeadFormSections,
+    },
+  ];
+}
+
 export default function LeadFormBuilderPage() {
   const navigate = useNavigate();
-  const [leadFormSections, setLeadFormSections] = useState(defaultLeadFormSections);
-  const [selectedBuilderFieldId, setSelectedBuilderFieldId] = useState(
-    defaultLeadFormSections[0].fields[0].id
-  );
+  const [searchParams] = useSearchParams();
+  const formId = searchParams.get('formId') || localStorage.getItem('activeLeadFormId') || 'lead-form-default';
+
+  const [currentForm] = useState(() => {
+    const forms = getStoredForms();
+    return forms.find((f) => f.id === formId) || forms[0];
+  });
+
+  const [leadFormSections, setLeadFormSections] = useState(() => {
+    return currentForm?.sections || defaultLeadFormSections;
+  });
+
+  const [selectedBuilderFieldId, setSelectedBuilderFieldId] = useState(() => {
+    const emailField = leadFormSections.flatMap((s) => s.fields).find((f) => f.id === 'email');
+    return emailField?.id ?? leadFormSections[0]?.fields?.[0]?.id ?? null;
+  });
 
   const selectedBuilderField =
     leadFormSections.flatMap((s) => s.fields).find((f) => f.id === selectedBuilderFieldId) ?? null;
@@ -25,10 +59,11 @@ export default function LeadFormBuilderPage() {
   }
 
   function addLeadFormField(sectionId, type, index) {
+    const targetSecId = sectionId || leadFormSections[0]?.id;
     const nextField = createFieldFromType(type, Date.now());
     setLeadFormSections((current) =>
       current.map((section) => {
-        if (section.id !== sectionId) return section;
+        if (section.id !== targetSecId) return section;
         const nextFields = [...section.fields];
         const insertAt = typeof index === 'number' ? index : nextFields.length;
         nextFields.splice(insertAt, 0, nextField);
@@ -56,7 +91,10 @@ export default function LeadFormBuilderPage() {
       const stripped = current.map((section) => ({
         ...section,
         fields: section.fields.filter((f) => {
-          if (f.id === fieldId) { movingField = f; return false; }
+          if (f.id === fieldId) {
+            movingField = f;
+            return false;
+          }
           return true;
         }),
       }));
@@ -82,23 +120,41 @@ export default function LeadFormBuilderPage() {
 
   function removeLeadFormSection(sectionId) {
     const remaining = leadFormSections.filter((section) => section.id !== sectionId);
-    if (remaining.length === leadFormSections.length) return;
+    if (remaining.length === 0) return;
     setLeadFormSections(remaining);
     const nextField = remaining.flatMap((section) => section.fields)[0];
     setSelectedBuilderFieldId(nextField?.id ?? null);
   }
 
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
   function openLeadCreateForm() {
+    try {
+      localStorage.setItem('leadFormSections_v2', JSON.stringify(leadFormSections));
+      localStorage.setItem('leadFormSections', JSON.stringify(leadFormSections));
+    } catch {
+    }
     navigate('/crm/leads/create-form');
   }
 
   function saveLeadForm() {
     try {
+      const forms = getStoredForms();
+      const updatedForms = forms.map((f) =>
+        f.id === (currentForm?.id || formId)
+          ? { ...f, sections: leadFormSections }
+          : f
+      );
+      localStorage.setItem('dynamicLeadForms', JSON.stringify(updatedForms));
+      localStorage.setItem('leadFormSections_v2', JSON.stringify(leadFormSections));
       localStorage.setItem('leadFormSections', JSON.stringify(leadFormSections));
     } catch {
-      // storage unavailable — keep in-memory sections
     }
-    navigate('/crm/leads/forms');
+    setSaveSuccess(true);
+    setTimeout(() => {
+      setSaveSuccess(false);
+      navigate('/crm/leads/forms');
+    }, 600);
   }
 
   return (
@@ -115,6 +171,8 @@ export default function LeadFormBuilderPage() {
       onRemoveSection={removeLeadFormSection}
       onPreview={openLeadCreateForm}
       onSaveAndOpen={saveLeadForm}
+      saveSuccess={saveSuccess}
+      formTitle={currentForm?.name}
     />
   );
 }

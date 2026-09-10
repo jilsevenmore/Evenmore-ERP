@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, ArrowUpDown, ClipboardCheck, MoreVertical, NotebookPen, Phone, Pin } from "lucide-react";
+import { Activity, ArrowUpDown, ClipboardCheck, MoreVertical, NotebookPen, Phone, Pin, Trash2 } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 
 function EditableCell({ row, field, className = "", onUpdate, renderValue }) {
@@ -95,22 +95,11 @@ function RowActions({ row, selected, isPinned, onToggleOne, onTogglePin, onReque
           </div>
         )}
       </div>
-      {isPinned && (
-        <button
-          type="button"
-          className="pinned-indicator"
-          title="Unpin record"
-          aria-label={`Unpin ${row.name}`}
-          onClick={() => onTogglePin?.(row.id)}
-        >
-          <Pin size={14} />
-        </button>
-      )}
     </td>
   );
 }
 
-export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onRequestDelete, onRequestDeleteAll, onAddNote, onCreateTask, onOpenLead, onUpdateLead, variant = "list" }) {
+export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onRequestDelete, onRequestDeleteAll, onAddNote, onCreateTask, onOpenLead, onUpdateLead, onDelete, variant = "list" }) {
   const allChecked = rows.length > 0 && rows.every((row) => selected.includes(row.id));
 
   return (
@@ -145,6 +134,7 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                 <span className="th-inner">Created On <ArrowUpDown size={13} className="sort-ico" /></span>
               </th>
               <th className="col-more"><MoreVertical size={15} /></th>
+              <th className="col-delete"><Trash2 size={15} /></th>
             </tr>
           </thead>
           <tbody>
@@ -166,18 +156,29 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                     field="name"
                     onUpdate={onUpdateLead}
                     renderValue={(lead) => (
-                      <button
-                        type="button"
-                        className="lead-link-btn"
-                        onClick={() => onOpenLead?.(lead)}
-                        aria-label={`Open details for ${lead.name}`}
-                      >
-                        <LeadAvatar
-                          lead={lead}
-                          className={variant === "grid" ? "grid-lead-avatar" : "screenshot-avatar"}
-                        />
-                        <strong>{lead.name}</strong>
-                      </button>
+                      <div className="lead-name-cell">
+                        <button
+                          type="button"
+                          className="lead-link-btn"
+                          onClick={() => onOpenLead?.(lead)}
+                          aria-label={`Open details for ${lead.name}`}
+                        >
+                          <LeadAvatar
+                            lead={lead}
+                            className={variant === "grid" ? "grid-lead-avatar" : "screenshot-avatar"}
+                          />
+                          <strong>{lead.name}</strong>
+                        </button>
+                        <button
+                          type="button"
+                          className={`pinned-indicator${pinnedLeadIds.includes(lead.id) ? " active" : ""}`}
+                          title={pinnedLeadIds.includes(lead.id) ? "Unpin record" : "Pin record"}
+                          aria-label={`${pinnedLeadIds.includes(lead.id) ? "Unpin" : "Pin"} ${lead.name}`}
+                          onClick={() => onTogglePin?.(lead)}
+                        >
+                          <Pin size={14} />
+                        </button>
+                      </div>
                     )}
                   />
                   <EditableCell row={row} field="company" className="muted" onUpdate={onUpdateLead} />
@@ -203,12 +204,23 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                       <MoreVertical size={16} />
                     </button>
                   </td>
+                  <td className="col-delete-cell">
+                    <button
+                      type="button"
+                      className="row-action-icon row-delete-action"
+                      onClick={() => onDelete?.(row.id)}
+                      aria-label={`Delete ${row.name}`}
+                    >
+                      <Trash2 size={15} />
+                      <span className="toolbar-tooltip">Delete</span>
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={11} className="empty-row">No leads match the current filters.</td>
+                <td colSpan={12} className="empty-row">No leads match the current filters.</td>
               </tr>
             )}
           </tbody>

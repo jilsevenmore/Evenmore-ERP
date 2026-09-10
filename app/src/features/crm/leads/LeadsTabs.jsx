@@ -1,13 +1,12 @@
 import {
   ChevronDown,
-  Filter,
   ChevronsUpDown,
+  Filter,
   List,
   LayoutGrid,
   SquareChartGantt,
   MapPin,
   MoreHorizontal,
-  Plus,
 } from "lucide-react";
 import { tabs } from '../../../data/crm/mockLeads';
 import SortPopover from "./SortPopover";
@@ -45,12 +44,11 @@ export default function LeadsTabs({
   onLeadViewChange,
   onCreateLead,
   recordActionLead,
-  recordActionLeads,
+  recordActionLeads = [],
   onCloseRecordAction,
   onDeleteRecord,
-  onPinRecord,
 }) {
-  const hasRecordAction = Boolean(recordActionLead) || (recordActionLeads && recordActionLeads.length > 0);
+  const hasRecordAction = Boolean(recordActionLead) || recordActionLeads.length > 0;
   return (
     <div className="leads-toolbar-wrap">
       <div className="tabs-bar">
@@ -73,28 +71,12 @@ export default function LeadsTabs({
           </button>
         </div>
         <div className="tabs-actions">
-          <button type="button" className="create-lead-btn" onClick={onCreateLead}>
-            <Plus size={16} strokeWidth={2.5} />
-            Create Lead
-          </button>
-          <button type="button" className="create-lead-split" aria-label="More create options">
-            <ChevronDown size={16} />
-          </button>
           <button type="button" className="toolbar-more" aria-label="More options">
             <MoreHorizontal size={18} />
           </button>
         </div>
       </div>
       <div className={`list-toolbar${hasRecordAction ? " list-toolbar-actions" : ""}`}>
-        {hasRecordAction ? (
-          <RecordActionPanel
-            lead={recordActionLead}
-            leads={recordActionLeads || []}
-            onClose={onCloseRecordAction}
-            onDelete={onDeleteRecord}
-            onPin={onPinRecord}
-          />
-        ) : (
         <div className="list-toolbar-left">
           <button
             type="button"
@@ -130,11 +112,18 @@ export default function LeadsTabs({
           <ViewButton label="Map View" active={leadView === "map"} onClick={() => onLeadViewChange("map")}>
             <MapPin size={18} />
           </ViewButton>
+          {hasRecordAction && (
+            <RecordActionPanel
+              lead={recordActionLead}
+              leads={recordActionLeads}
+              onClose={onCloseRecordAction}
+              onDelete={onDeleteRecord}
+            />
+          )}
           <button type="button" className="toolbar-icon" aria-label="More toolbar options">
             <ChevronDown size={16} />
           </button>
         </div>
-        )}
       </div>
     </div>
   );

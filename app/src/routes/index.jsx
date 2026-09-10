@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
@@ -115,15 +115,28 @@ function Page({ component: Component }) {
   );
 }
 
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <MainLayout />,
-    errorElement: (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 24 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 480, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', textAlign: 'center' }}>
-          <h2 style={{ color: '#0f172a', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Application Encountered an Issue</h2>
-          <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>An unexpected error occurred while loading this view.</p>
+function RootErrorBoundary() {
+  const error = useRouteError();
+  console.error('RootErrorBoundary caught error:', error);
+  const errorMessage = error?.message || (typeof error === 'string' ? error : 'An unexpected error occurred while loading this view.');
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 520, width: '100%', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', textAlign: 'center' }}>
+        <h2 style={{ color: '#0f172a', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Application Encountered an Issue</h2>
+        <p style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>An unexpected error occurred while loading this view.</p>
+        {errorMessage && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: 8, padding: '10px 14px', marginBottom: 20, textAlign: 'left', color: '#b91c1c', fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-word' }}>
+            {errorMessage}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Reload Page
+          </button>
           <button
             onClick={() => window.location.href = '/dashboard'}
             style={{ background: '#1f6bff', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 600, cursor: 'pointer' }}
@@ -132,7 +145,15 @@ const router = createBrowserRouter([
           </button>
         </div>
       </div>
-    ),
+    </div>
+  );
+}
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <MainLayout />,
+    errorElement: <RootErrorBoundary />,
     children: [
       // Root redirect
       { index: true, element: <Navigate to="/dashboard" replace /> },

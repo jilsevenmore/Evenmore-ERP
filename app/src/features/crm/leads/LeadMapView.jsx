@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   ChevronsUpDown,
   Mail,
   MapPin,
   Phone,
-  Search,
   Settings2,
   X,
 } from "lucide-react";
@@ -30,7 +28,6 @@ export default function LeadMapView({
   selected = [],
   onToggleOne,
   onAddNote,
-  onOpenListView,
   onOpenLead,
 }) {
   const [activeLeadId, setActiveLeadId] = useState(rows[0]?.id ?? null);
@@ -86,82 +83,6 @@ export default function LeadMapView({
 
   return (
     <section className="leads-map-page">
-      <div className="leads-map-top">
-        <div>
-          <h2>Leads Map</h2>
-          <p>Visualize your leads on a map and explore location-wise opportunities.</p>
-        </div>
-        <div className="leads-map-view-switch">
-          <button type="button" className="btn-outline" onClick={onOpenListView}>
-            List View
-          </button>
-          <button type="button" className="btn-primary">Map View</button>
-        </div>
-      </div>
-
-      <div className="leads-map-filter-card">
-        <label className="leads-map-filter-field">
-          <span>Pipeline</span>
-          <select defaultValue="Sales">
-            <option>Sales</option>
-            <option>Support</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Status</span>
-          <select defaultValue="All Statuses">
-            <option>All Statuses</option>
-            <option>Qualified</option>
-            <option>Contacted</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Source</span>
-          <select defaultValue="All Sources">
-            <option>All Sources</option>
-            <option>Cold Call</option>
-            <option>Advertisement</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Product</span>
-          <select defaultValue="All Products">
-            <option>All Products</option>
-            <option>Endoscopy System</option>
-            <option>OT Light</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Assigned User</span>
-          <select defaultValue="All Users">
-            <option>All Users</option>
-            <option>Drashti Evenmore</option>
-            <option>Priya Mehta</option>
-          </select>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>From Date</span>
-          <div className="input-icon-wrap">
-            <input type="text" placeholder="dd-mm-yyyy" />
-            <CalendarDays size={16} />
-          </div>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>To Date</span>
-          <div className="input-icon-wrap">
-            <input type="text" placeholder="dd-mm-yyyy" />
-            <CalendarDays size={16} />
-          </div>
-        </label>
-        <label className="leads-map-filter-field">
-          <span>Search</span>
-          <div className="input-icon-wrap">
-            <input type="text" placeholder="Search by name, subject, email, phone, lead number" />
-            <Search size={16} />
-          </div>
-        </label>
-      </div>
-
       <div className="leads-map-layout">
         <aside className="leads-map-list-pane">
           <div className="leads-map-pane-head">

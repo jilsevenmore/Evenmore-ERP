@@ -58,7 +58,7 @@ const NAV = [
         defaultOpen: true,
         children: [
           { label: 'Leads', to: '/crm/leads', dot: true },
-          { label: 'Lead Create Form', to: '/crm/leads/create-form' },
+          { label: 'Lead Create Form', to: '/crm/leads/forms' },
           { label: 'Lead Tasks Master', to: '/crm/leads/tasks-master' },
           { label: 'Lead Task Form', to: '/crm/leads/task-form' },
           { label: 'Lead Stage Tasks', to: '/crm/leads/stage-tasks' },
@@ -249,16 +249,48 @@ const NAV = [
   },
 ];
 
+function getAllNavPaths(navItems) {
+  const paths = [];
+  function recurse(items) {
+    for (const item of items) {
+      if (item.to) paths.push(item.to);
+      if (item.children) recurse(item.children);
+    }
+  }
+  recurse(navItems);
+  return paths;
+}
+
+const ALL_NAV_PATHS = getAllNavPaths(NAV);
+
 // ── Sub-item (leaf node) ────────────────────────────────────
 function SubItem({ item, badges = {} }) {
   const location = useLocation();
-  const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
-  const count = item.badgeKey ? badges[item.badgeKey] : 0;
+  const currentPath = location.pathname;
+  const isExact = currentPath === item.to;
+  const isFormBuilderAlias =
+    item.label === 'Lead Create Form' &&
+    (currentPath === '/crm/leads/forms' || currentPath === '/crm/leads/form-builder' || currentPath === '/crm/leads/create-form');
+  const isPrefix = Boolean(item.to && currentPath.startsWith(item.to + '/'));
+  const hasBetterMatch =
+    isPrefix &&
+    (isFormBuilderAlias ||
+      ALL_NAV_PATHS.some(
+        (p) =>
+          p !== item.to &&
+          (currentPath === p || (currentPath.startsWith(p + '/') && p.length > item.to.length))
+      ) ||
+      (item.to === '/crm/leads' &&
+        (currentPath === '/crm/leads/forms' ||
+          currentPath === '/crm/leads/form-builder' ||
+          currentPath === '/crm/leads/create-form')));
+  const isActive = isFormBuilderAlias || isExact || (isPrefix && !hasBetterMatch);
+  const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
 
   return (
     <NavLink
       to={item.to || '#'}
-      className={`sub-item${isActive ? ' active' : ''}`}
+      className={() => `sub-item${isActive ? ' active' : ''}`}
     >
       {item.dot && <span className="sub-dot" />}
       <span className="sub-label">{item.label}</span>

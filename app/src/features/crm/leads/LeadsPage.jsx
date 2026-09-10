@@ -28,6 +28,21 @@ const SORT_OPTIONS = [
   { value: 'createdOn', label: 'Created On' },
 ];
 
+const leadsGuide = {
+  title: 'CRM Leads',
+  subtitle: 'Capture, qualify, and convert prospective customer opportunities.',
+  purpose: 'A lead is a prospective customer or business opportunity that can be qualified, assigned, followed up, and converted into a customer or sales opportunity.',
+  workflow: ['Lead Captured', 'Assigned to Owner', 'Qualification', 'Follow-up', 'Converted'],
+  keyTerms: [
+    { term: 'Lead', definition: 'A person or company that may become a customer.' },
+    { term: 'Lead Source', definition: 'The channel that generated the lead, such as a referral, campaign, or website.' },
+    { term: 'Lead Owner', definition: 'The team member responsible for follow-up and progress.' },
+    { term: 'Qualification', definition: 'The process of confirming need, fit, timing, and purchase intent.' },
+    { term: 'Follow-up', definition: 'A planned call, email, note, or task used to move the lead forward.' },
+    { term: 'Conversion', definition: 'Turning a qualified lead into a customer or active sales opportunity.' },
+  ],
+};
+
 function getSortValue(lead, field) {
   if (field === 'createdOn') return new Date(lead.createdOn).getTime();
   return String(lead[field] ?? '').toLowerCase();
@@ -52,6 +67,11 @@ export default function LeadsPage() {
   const [pinnedLeadIds, setPinnedLeadIds] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const selectedLeads = useMemo(
+    () => leadRows.filter((lead) => selected.includes(lead.id)),
+    [leadRows, selected],
+  );
+  const selectedLead = selectedLeads[0] ?? null;
 
   const rows = useMemo(() => {
     const filtered = leadRows.filter((l) => {
@@ -100,6 +120,10 @@ export default function LeadsPage() {
     const allIn = ids.length > 0 && ids.every((id) => selected.includes(id));
     setSelected(allIn ? selected.filter((id) => !ids.includes(id)) : [...new Set([...selected, ...ids])]);
   };
+
+  function clearSelected() {
+    setSelected([]);
+  }
 
   function openNotes(lead) {
     setNoteTarget(lead ?? selectedLead);
@@ -206,6 +230,7 @@ export default function LeadsPage() {
   function deleteLead(id) {
     setLeadRows((current) => current.filter((lead) => lead.id !== id));
     setSelected((current) => current.filter((selectedId) => selectedId !== id));
+    setPinnedLeadIds((current) => current.filter((pinnedId) => pinnedId !== id));
     closeDeleteLead();
   }
 
@@ -213,31 +238,48 @@ export default function LeadsPage() {
     const ids = new Set(leadsToDelete.map((lead) => lead.id));
     setLeadRows((current) => current.filter((lead) => !ids.has(lead.id)));
     setSelected((current) => current.filter((id) => !ids.has(id)));
+    setPinnedLeadIds((current) => current.filter((id) => !ids.has(id)));
     closeDeleteLead();
   }
 
   function pinLead(lead) {
+    if (!lead) return;
     setPinnedLeadIds((current) => (current.includes(lead.id) ? current : [...current, lead.id]));
     setSelected((current) => current.filter((id) => id !== lead.id));
     closeDeleteLead();
   }
 
-  function togglePinLead(id) {
-    setPinnedLeadIds((current) => current.filter((pinnedId) => pinnedId !== id));
+  function togglePinLead(lead) {
+    if (!lead) return;
+    setPinnedLeadIds((current) => (
+      current.includes(lead.id)
+        ? current.filter((pinnedId) => pinnedId !== lead.id)
+        : [...current, lead.id]
+    ));
   }
 
-  const selectedLead = leadRows.find((l) => selected.includes(l.id)) ?? rows[0] ?? leadRows[0];
+  const recordActionLead = selectedLeads.length === 1 ? selectedLeads[0] : null;
+
+  function requestDeleteSelection(target) {
+    if (Array.isArray(target)) {
+      requestDeleteAll(target);
+      return;
+    }
+
+    const targetLead = leadRows.find((lead) => lead.id === target) ?? recordActionLead;
+    if (targetLead) {
+      requestDeleteLead(targetLead);
+    }
+  }
 
   return (
     <>
       <PageHeader
         title="Leads"
         subtitle="Manage and track all your CRM leads."
+        guide={leadsGuide}
         actions={
           <>
-            <button type="button" className="btn-outline btn-sm" onClick={() => setIsFilterOpen(!isFilterOpen)}>
-              Filter
-            </button>
             <button type="button" className="btn-primary btn-sm" onClick={() => setIsCreateLeadOpen(true)}>
               + Create Lead
             </button>
@@ -262,11 +304,10 @@ export default function LeadsPage() {
         leadView={leadView}
         onLeadViewChange={setLeadView}
         onCreateLead={openCreateLeadModal}
-        recordActionLead={deleteTarget}
-        recordActionLeads={bulkDeleteTargets}
-        onCloseRecordAction={closeDeleteLead}
-        onDeleteRecord={(target) => (Array.isArray(target) ? deleteAllLeads(target) : deleteLead(target))}
-        onPinRecord={pinLead}
+        recordActionLead={recordActionLead}
+        recordActionLeads={selectedLeads}
+        onCloseRecordAction={clearSelected}
+        onDeleteRecord={requestDeleteSelection}
       />
 
       <div className={`content-grid${isFilterOpen && leadView !== 'map' ? '' : ' content-grid-wide'}`}>
@@ -294,13 +335,14 @@ export default function LeadsPage() {
                 pinnedLeadIds={pinnedLeadIds}
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
-                onToggleAll={toggleAll}
                 onRequestDelete={requestDeleteLead}
                 onRequestDeleteAll={requestDeleteAll}
+                onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onCreateTask={openTaskForm}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
+                onDelete={deleteLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -322,14 +364,15 @@ export default function LeadsPage() {
                 pinnedLeadIds={pinnedLeadIds}
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
-                onToggleAll={toggleAll}
                 onRequestDelete={requestDeleteLead}
                 onRequestDeleteAll={requestDeleteAll}
+                onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onCreateTask={openTaskForm}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
                 variant="grid"
+                onDelete={deleteLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -344,13 +387,16 @@ export default function LeadsPage() {
               </div>
             </>
           ) : leadView === 'tile' ? (
-            <LeadGridView
+            <LeadCardGridView
               rows={pagedRows}
               selected={selected}
+              pinnedLeadIds={pinnedLeadIds}
+              onTogglePin={togglePinLead}
               onToggleOne={toggleOne}
               onRequestDelete={requestDeleteLead}
               onAddNote={openNotes}
               onOpenLead={openLeadDetails}
+              onDelete={deleteLead}
             />
           ) : (
             <LeadMapView
@@ -373,7 +419,6 @@ export default function LeadsPage() {
           onClose={closeDeleteLead}
           onConfirm={deleteLead}
           onConfirmAll={deleteAllLeads}
-          onPin={pinLead}
         />
       )}
       <CreateLeadModal

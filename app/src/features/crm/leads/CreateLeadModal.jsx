@@ -194,10 +194,11 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
         </div>
 
         <div className="lead-create-modal-body">
+          <h3 className="lead-create-section-title">Lead Information</h3>
           <label className="lead-create-field">
-            <span>Client Name</span>
+            <span>Lead Name *</span>
             <select defaultValue="">
-              <option value="" disabled>Search or add client name</option>
+              <option value="" disabled>Enter lead name</option>
               <option>Christopher Maclead</option>
               <option>Carissa Kidman</option>
               <option>James Merced</option>
@@ -205,7 +206,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
           </label>
 
           <div className="lead-create-field lead-create-photo-field">
-            <span>Client Photo</span>
+            <span>Lead Photo</span>
             <input
               ref={photoInputRef}
               type="file"
@@ -225,7 +226,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
                   <span className="lead-photo-placeholder">
                     <ImagePlus size={24} />
                   </span>
-                  <strong>Upload client photo</strong>
+                    <strong>Upload Image</strong>
                   <small>JPG, PNG or WebP</small>
                 </>
               )}
@@ -233,43 +234,55 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
           </div>
 
           <label className="lead-create-field">
-            <span>Hospital Name</span>
-            <input type="text" placeholder="Enter hospital name" />
+            <span>Company *</span>
+            <input type="text" placeholder="Enter company name" />
           </label>
 
           <label className="lead-create-field">
-            <span>Phone Number *</span>
+            <span>Email</span>
+            <input type="email" placeholder="Enter email address" />
+          </label>
+
+          <label className="lead-create-field">
+            <span>Phone</span>
             <input type="tel" placeholder="Enter phone number" />
           </label>
 
           <label className="lead-create-field">
-            <span>Speciality</span>
-            <select defaultValue="">
-              <option value="" disabled>Select speciality</option>
-              <option>Cardiology</option>
-              <option>Neurology</option>
-              <option>Orthopaedics</option>
-            </select>
-          </label>
-
-          <label className="lead-create-field">
-            <span>City, State</span>
-            <input type="text" placeholder="Enter city and state" />
-          </label>
-
-          <label className="lead-create-field">
-            <span>Remark If Any</span>
-            <input type="text" placeholder="Add short remark" />
-          </label>
-
-          <label className="lead-create-field lead-create-field-wide">
             <span>Lead Source</span>
             <select defaultValue="">
-              <option value="" disabled>Select Lead Source</option>
+              <option value="" disabled>Select source</option>
               <option>Cold Call</option>
               <option>Advertisement</option>
               <option>Partner</option>
             </select>
+          </label>
+
+          <label className="lead-create-field">
+            <span>Title</span>
+            <input type="text" placeholder="Enter title" />
+          </label>
+
+          <label className="lead-create-field">
+            <span>Industry</span>
+            <input type="text" placeholder="Enter industry" />
+          </label>
+
+          <label className="lead-create-field">
+            <span>Lead Owner *</span>
+            <select defaultValue="">
+              <option value="" disabled>Select User</option>
+              <option>David Patel</option>
+              <option>Priya Mehta</option>
+            </select>
+          </label>
+
+          <label className="lead-create-field">
+            <span>Created On</span>
+            <div className="input-icon-wrap">
+              <input type="text" placeholder="dd-mm-yyyy" />
+              <CalendarDays size={16} />
+            </div>
           </label>
 
           <MultiValueSelect

@@ -39,12 +39,13 @@ import {
   Tag,
   Megaphone,
   User,
+  ChevronDown,
 } from 'lucide-react';
 import LeadAvatar from './LeadAvatar';
 
 const DETAIL_TABS = [
   'General',
-  'Users | Products',
+  'Users & Products',
   'Sources & Emails',
   'Discussion & Notes',
   'Files',
@@ -73,22 +74,21 @@ function statusClass(value) {
   return String(value || '').toLowerCase() === 'active' ? 'green' : 'amber';
 }
 
-function buildUsers(lead) {
-  const owner = lead?.owner || 'David Patel';
+function buildUsers() {
   return [
-    { id: 1, name: owner, role: 'Account Owner', email: 'david@evenmore.io', status: 'Active', color: '#2F6FED', leadCompany: lead?.company },
-    { id: 2, name: 'Priya Mehta', role: 'Sales Executive', email: 'priya@evenmore.io', status: 'Active', color: '#7C3AED', leadCompany: lead?.company },
-    { id: 3, name: 'Rohit Sharma', role: 'Technical Lead', email: 'rohit@evenmore.io', status: 'Active', color: '#059669', leadCompany: lead?.company },
-    { id: 4, name: 'Sarah Chen', role: 'Sales Support Executive', email: 'sarah@evenmore.io', status: 'Active', color: '#EA580C', leadCompany: lead?.company },
-    { id: 5, name: 'Alex Rivera', role: 'BDE', email: 'alex@evenmore.io', status: 'Active', color: '#0891B2', leadCompany: lead?.company },
+    { id: 1, initials: 'PP', name: 'Priya Patel', email: 'priya@company.com', role: 'Sales Executive', status: 'Active', bg: '#c084fc' },
+    { id: 2, initials: 'JN', name: 'Jayesh Nair', email: 'jayesh@company.com', role: 'Pre Sales', status: 'Active', bg: '#ca8a04' },
+    { id: 3, initials: 'CC', name: 'Chetan Chaudhari', email: 'chetan@company.com', role: 'Technical', status: 'Active', bg: '#3b82f6' },
+    { id: 4, initials: 'AS', name: 'Anuska Shah', email: 'anuska@company.com', role: 'Support', status: 'Inactive', bg: '#0d9488' },
+    { id: 5, initials: 'UF', name: 'Utsav Faldu', email: 'utsav@company.com', role: 'Manager', status: 'Active', bg: '#3b82f6' },
   ];
 }
 
 function buildProducts() {
   return [
-    { id: 1, name: 'Endoscopy Vision Machine', sku: 'EVM-2026', price: 120000, qty: 1, status: 'Active', category: 'Imaging' },
-    { id: 2, name: 'High-Definition Surgical Monitor 4K', sku: 'MON-4K-01', price: 45000, qty: 1, status: 'Active', category: 'Display' },
-    { id: 3, name: 'Surgical Light Head', sku: 'SLH-09', price: 28000, qty: 1, status: 'Active', category: 'Lighting' },
+    { id: 1, name: 'Endoscopy Machine', sku: 'END-001', price: 'Rs. 1,20,000', qty: 1, status: 'Active' },
+    { id: 2, name: 'Monitor 4K', sku: 'MON-004', price: 'Rs. 45,000', qty: 2, status: 'Active' },
+    { id: 3, name: 'Surgical Kit', sku: 'SK-010', price: 'Rs. 25,000', qty: 1, status: 'Draft' },
   ];
 }
 
@@ -885,7 +885,7 @@ function GeneralTab({ lead }) {
   const infoRows = [
     ['Company', lead.company || 'Hirapara Industries'],
     ['First Name', (lead.name || 'Chirag').split(' ')[0]],
-    ['Last Name', (lead.name || 'Hirapara').split(' ')[1] || ''],
+    ['Last Name', (lead.name || 'Hirapara').split(' ').slice(1).join(' ') || 'Hirapara'],
     ['Title', lead.jobTitle || 'Managing Director'],
     ['Email', lead.email || 'chirag@hirapara.com'],
     ['Phone', `+91 ${lead.phone || '98765 43210'}`],
@@ -894,82 +894,109 @@ function GeneralTab({ lead }) {
     ['Lead Status', lead.status || 'Qualified'],
     ['Industry', lead.industry || 'Manufacturing & Electronics'],
     ['Annual Revenue', formatAmount(lead.amount || 185000)],
-    ['Website', `www.${(lead.company || 'hirapara').toLowerCase().replace(/[^a-z0-9]+/g, '')}.com`],
+    ['Website', `www.${(lead.company || 'hiraparaindustries').toLowerCase().replace(/[^a-z0-9]+/g, '')}.com`],
   ];
 
   const addressRows = [
-    ['Address', `123, GIDC Industrial Estate, Ring Road`],
+    ['Address', `123, Mumbai Industrial Estate`],
     ['City', lead.city || 'Surat'],
     ['State', lead.state || 'Gujarat'],
     ['Country', lead.country || 'India'],
-    ['Zip Code', '395006'],
+    ['Zip Code', lead.zipCode || '394201'],
+  ];
+
+  const activities = [
+    {
+      id: 1,
+      title: 'Stage updated to Qualified',
+      time: '2 hours ago',
+      color: '#8b5cf6',
+    },
+    {
+      id: 2,
+      title: 'Task created - Follow up call',
+      time: '5 hours ago',
+      color: '#f59e0b',
+    },
+    {
+      id: 3,
+      title: 'Email sent to lead',
+      time: '1 day ago',
+      color: '#3b82f6',
+    },
+    {
+      id: 4,
+      title: 'Lead record updated',
+      time: '2 days ago',
+      color: '#10b981',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      {/* Lead Information */}
-      <div className="card p-4 space-y-3">
-        <h3 className="font-bold text-sm border-b border-slate-100 pb-2">Lead Information</h3>
-        <div className="space-y-2 text-xs">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs">
+        <h3 className="font-bold text-sm text-slate-900 mb-5">Lead Information</h3>
+        <div className="space-y-3.5 text-xs">
           {infoRows.map(([label, val]) => (
-            <div key={label} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
-              <span className="text-slate-400">{label}</span>
-              <strong className="text-slate-700 dark:text-slate-200 font-semibold">{val}</strong>
+            <div key={label} className="flex items-center justify-between gap-3">
+              <span className="text-slate-400 font-normal shrink-0">{label}</span>
+              <span className="text-slate-900 font-semibold text-right truncate">{val}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Address Information & Map */}
-      <div className="card p-4 space-y-3">
-        <h3 className="font-bold text-sm border-b border-slate-100 pb-2">Address Information</h3>
-        <div className="space-y-2 text-xs">
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs space-y-5">
+        <h3 className="font-bold text-sm text-slate-900">Address Information</h3>
+        <div className="space-y-3.5 text-xs">
           {addressRows.map(([label, val]) => (
-            <div key={label} className="flex items-center justify-between py-1 border-b border-slate-50 last:border-0">
-              <span className="text-slate-400">{label}</span>
-              <strong className="text-slate-700 dark:text-slate-200 font-semibold">{val}</strong>
+            <div key={label} className="flex items-center justify-between gap-3">
+              <span className="text-slate-400 font-normal shrink-0">{label}</span>
+              <span className="text-slate-900 font-semibold text-right truncate">{val}</span>
             </div>
           ))}
         </div>
-        <div className="pt-2">
-          <div className="h-28 rounded-xl bg-gradient-to-tr from-blue-50 to-indigo-100 dark:from-slate-800 dark:to-slate-700 border border-blue-200 dark:border-slate-600 flex flex-col items-center justify-center gap-2 p-3 text-center">
-            <MapPin size={24} className="text-blue-600 animate-bounce" />
-            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{lead.city || 'Surat'}, Gujarat</span>
-            <span className="text-[10px] text-slate-500">Geo-coordinates: 21.1702° N, 72.8311° E</span>
+
+        <div className="h-44 rounded-2xl bg-gradient-to-b from-slate-50 via-slate-50 to-emerald-50/40 border border-slate-100 flex flex-col items-center justify-center relative overflow-hidden">
+          <div className="flex flex-col items-center">
+            <div className="w-8 h-8 rounded-full bg-white shadow-md border border-slate-100 flex items-center justify-center text-rose-500 mb-2">
+              <MapPin size={16} />
+            </div>
+            <div className="w-10 h-10 rounded-full bg-rose-500/15 -mt-6 mb-3" />
+            <button
+              type="button"
+              className="px-3.5 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-md border border-slate-200 shadow-xs transition cursor-pointer"
+            >
+              View on Map
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Recent Activity Feed */}
-      <div className="card p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-          <h3 className="font-bold text-sm">Recent Activity</h3>
-          <button type="button" className="text-xs text-blue-600 font-semibold hover:underline">
-            + Log Activity
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-bold text-sm text-slate-900">Recent Activity</h3>
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+          >
+            <Plus size={13} /> Add
           </button>
         </div>
-        <div className="space-y-3 text-xs">
-          <div className="flex gap-2.5 items-start">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mt-1 shrink-0" />
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">Stage upgraded to Qualified</p>
-              <span className="text-[10px] text-slate-400">2 hours ago by David Patel</span>
+
+        <div className="space-y-4">
+          {activities.map((item) => (
+            <div key={item.id} className="flex items-start gap-3">
+              <span
+                className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
+                style={{ backgroundColor: item.color }}
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-slate-900 leading-snug">{item.title}</p>
+                <span className="text-[11px] text-slate-400 mt-0.5 block">{item.time}</span>
+              </div>
             </div>
-          </div>
-          <div className="flex gap-2.5 items-start">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 mt-1 shrink-0" />
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">Quotation EST-2026-081 sent</p>
-              <span className="text-[10px] text-slate-400">Yesterday at 11:10 AM by Priya Mehta</span>
-            </div>
-          </div>
-          <div className="flex gap-2.5 items-start">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 mt-1 shrink-0" />
-            <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-200">Technical requirements review</p>
-              <span className="text-[10px] text-slate-400">2 days ago by Rohit Sharma</span>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
@@ -977,25 +1004,25 @@ function GeneralTab({ lead }) {
 }
 
 // ── 3. Users | Products Tab ──────────────────────────────────
-function UsersProductsTab({ lead, onCountsChange }) {
-  const [users, setUsers] = useState(() => buildUsers(lead));
+function UsersProductsTab({ onCountsChange }) {
+  const [users, setUsers] = useState(() => buildUsers());
   const [products, setProducts] = useState(() => buildProducts());
   const [userSearch, setUserSearch] = useState('');
-  const [userRole, setUserRole] = useState('All');
+  const [userFilter, setUserFilter] = useState('All Users');
   const [productSearch, setProductSearch] = useState('');
-  const [productCategory, setProductCategory] = useState('All');
+  const [productFilter, setProductFilter] = useState('All Products');
 
   const filteredUsers = useMemo(() => users.filter((u) => {
-    if (userRole !== 'All' && u.role !== userRole) return false;
-    if (userSearch && !`${u.name} ${u.email}`.toLowerCase().includes(userSearch.toLowerCase())) return false;
+    if (userFilter !== 'All Users' && u.status !== userFilter) return false;
+    if (userSearch && !`${u.name} ${u.email} ${u.role}`.toLowerCase().includes(userSearch.toLowerCase())) return false;
     return true;
-  }), [users, userSearch, userRole]);
+  }), [users, userSearch, userFilter]);
 
   const filteredProducts = useMemo(() => products.filter((p) => {
-    if (productCategory !== 'All' && p.category !== productCategory) return false;
+    if (productFilter !== 'All Products' && p.status !== productFilter) return false;
     if (productSearch && !`${p.name} ${p.sku}`.toLowerCase().includes(productSearch.toLowerCase())) return false;
     return true;
-  }), [products, productSearch, productCategory]);
+  }), [products, productSearch, productFilter]);
 
   React.useEffect(() => {
     onCountsChange?.({ users: users.length, products: products.length });
@@ -1004,7 +1031,20 @@ function UsersProductsTab({ lead, onCountsChange }) {
   function addUser() {
     const name = window.prompt('Enter user name');
     if (!name?.trim()) return;
-    setUsers((current) => [...current, { id: Date.now(), name: name.trim(), role: 'Sales Executive', email: '', status: 'Active', avatar: '' }]);
+    const parts = name.trim().split(' ');
+    const initials = (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+    setUsers((current) => [
+      ...current,
+      {
+        id: Date.now(),
+        initials,
+        name: name.trim(),
+        email: `${parts[0].toLowerCase()}@company.com`,
+        role: 'Sales Executive',
+        status: 'Active',
+        bg: '#3b82f6',
+      },
+    ]);
   }
 
   function editUser(user) {
@@ -1013,10 +1053,24 @@ function UsersProductsTab({ lead, onCountsChange }) {
     setUsers((current) => current.map((u) => (u.id === user.id ? { ...u, name: name.trim() } : u)));
   }
 
+  function deleteUser(id) {
+    setUsers((current) => current.filter((u) => u.id !== id));
+  }
+
   function addProduct() {
     const name = window.prompt('Enter product name');
     if (!name?.trim()) return;
-    setProducts((current) => [...current, { id: Date.now(), name: name.trim(), sku: `SKU-${Date.now()}`, price: 0, qty: 1, status: 'Active', category: 'General' }]);
+    setProducts((current) => [
+      ...current,
+      {
+        id: Date.now(),
+        name: name.trim(),
+        sku: `PRD-${Date.now().toString().slice(-3)}`,
+        price: 'Rs. 50,000',
+        qty: 1,
+        status: 'Active',
+      },
+    ]);
   }
 
   function editProduct(product) {
@@ -1025,78 +1079,230 @@ function UsersProductsTab({ lead, onCountsChange }) {
     setProducts((current) => current.map((p) => (p.id === product.id ? { ...p, name: name.trim() } : p)));
   }
 
+  function deleteProduct(id) {
+    setProducts((current) => current.filter((p) => p.id !== id));
+  }
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-start">
       {/* Users Card */}
-      <div className="card">
-        <div className="card-header flex items-center justify-between">
-          <h3 className="font-bold text-sm">Assigned Users ({users.length})</h3>
-          <button type="button" onClick={addUser} className="btn-primary btn-sm flex items-center gap-1">
-            <Plus size={13} /> Add User
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-sm text-slate-900">Users ({filteredUsers.length})</h3>
+          <button
+            type="button"
+            onClick={addUser}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+          >
+            <Plus size={14} /> Add User
           </button>
         </div>
-        <div className="table-scroll">
-          <table className="data-table text-xs">
+
+        {/* Filter Controls */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search users..."
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 text-slate-800 focus:outline-none focus:border-blue-500 transition"
+            />
+          </div>
+          <div className="relative">
+            <select
+              value={userFilter}
+              onChange={(e) => setUserFilter(e.target.value)}
+              className="appearance-none pl-3 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All Users">All Users</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
             <thead>
-              <tr>
-                <th>User Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
+              <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-700">
+                <th className="py-2.5 px-2 w-7 font-bold">#</th>
+                <th className="py-2.5 px-2 font-bold">User Name</th>
+                <th className="py-2.5 px-2 font-bold">Email</th>
+                <th className="py-2.5 px-2 font-bold">Role</th>
+                <th className="py-2.5 px-2 text-center font-bold">Status</th>
+                <th className="py-2.5 px-2 text-center font-bold">Action</th>
               </tr>
             </thead>
-            <tbody>
-              {filteredUsers.map((u) => (
-                <tr key={u.id} onDoubleClick={() => editUser(u)}>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <img src={u.avatar} alt={u.name} className="w-6 h-6 rounded-full object-cover" />
-                      <span className="font-semibold">{u.name}</span>
+            <tbody className="divide-y divide-slate-100">
+              {filteredUsers.map((u, idx) => (
+                <tr key={u.id} className="hover:bg-slate-50/70 transition">
+                  <td className="py-3 px-2 text-slate-400 font-normal">{idx + 1}</td>
+                  <td className="py-3 px-2">
+                    <div className="flex items-center gap-2.5">
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 shadow-2xs"
+                        style={{ backgroundColor: u.bg || '#3b82f6' }}
+                      >
+                        {u.initials}
+                      </div>
+                      <span className="font-semibold text-slate-900">{u.name}</span>
                     </div>
                   </td>
-                  <td className="text-slate-500">{u.email}</td>
-                  <td className="font-medium">{u.role}</td>
-                  <td>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  <td className="py-3 px-2 text-slate-500">{u.email}</td>
+                  <td className="py-3 px-2 text-slate-600">{u.role}</td>
+                  <td className="py-3 px-2 text-center">
+                    <span
+                      className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
+                        u.status === 'Active'
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60'
+                          : 'bg-amber-50 text-amber-600 border border-amber-200/60'
+                      }`}
+                    >
                       {u.status}
                     </span>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <div className="inline-flex items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => editUser(u)}
+                        className="w-7 h-7 rounded-lg border border-blue-200 text-blue-500 bg-white flex items-center justify-center hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-2xs"
+                        title="Edit User"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteUser(u.id)}
+                        className="w-7 h-7 rounded-lg border border-rose-200 text-rose-400 bg-white flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 transition cursor-pointer shadow-2xs"
+                        title="Delete User"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="pt-3.5 mt-2 border-t border-slate-100 text-[11px] text-slate-400">
+          Showing 1 to {filteredUsers.length} of {filteredUsers.length} entries
         </div>
       </div>
 
       {/* Products Card */}
-      <div className="card">
-        <div className="card-header flex items-center justify-between">
-          <h3 className="font-bold text-sm">Interested Products ({products.length})</h3>
-          <button type="button" onClick={addProduct} className="btn-primary btn-sm flex items-center gap-1">
-            <Plus size={13} /> Add Product
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-sm text-slate-900">Products ({filteredProducts.length})</h3>
+          <button
+            type="button"
+            onClick={addProduct}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+          >
+            <Plus size={14} /> Add Product
           </button>
         </div>
-        <div className="table-scroll">
-          <table className="data-table text-xs">
+
+        {/* Filter Controls */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+              className="w-full pl-8.5 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg placeholder:text-slate-400 text-slate-800 focus:outline-none focus:border-blue-500 transition"
+            />
+          </div>
+          <div className="relative">
+            <select
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+              className="appearance-none pl-3 pr-7 py-1.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-700 font-medium focus:outline-none focus:border-blue-500 cursor-pointer"
+            >
+              <option value="All Products">All Products</option>
+              <option value="Active">Active</option>
+              <option value="Draft">Draft</option>
+            </select>
+            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
             <thead>
-              <tr>
-                <th>Product Name</th>
-                <th>SKU</th>
-                <th>Price</th>
-                <th>Qty</th>
+              <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-700">
+                <th className="py-2.5 px-2 w-7 font-bold">#</th>
+                <th className="py-2.5 px-2 font-bold">Product Name</th>
+                <th className="py-2.5 px-2 font-bold">SKU</th>
+                <th className="py-2.5 px-2 font-bold">Price</th>
+                <th className="py-2.5 px-2 font-bold">Quantity</th>
+                <th className="py-2.5 px-2 text-center font-bold">Status</th>
+                <th className="py-2.5 px-2 text-center font-bold">Action</th>
               </tr>
             </thead>
-            <tbody>
-              {filteredProducts.map((p) => (
-                <tr key={p.id} onDoubleClick={() => editProduct(p)}>
-                  <td className="font-semibold">{p.name}</td>
-                  <td className="font-mono text-slate-400">{p.sku}</td>
-                  <td className="font-bold">{formatAmount(p.price)}</td>
-                  <td>{p.qty}</td>
+            <tbody className="divide-y divide-slate-100">
+              {filteredProducts.map((p, idx) => (
+                <tr key={p.id} className="hover:bg-slate-50/70 transition">
+                  <td className="py-3 px-2 text-slate-400 font-normal">{idx + 1}</td>
+                  <td className="py-3 px-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-6 h-6 rounded-md bg-blue-100/70 border border-blue-200/50 flex items-center justify-center shrink-0">
+                        <div className="w-2.5 h-2.5 bg-slate-700 rounded-[2px]" />
+                      </div>
+                      <span className="font-semibold text-slate-900">{p.name}</span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-2 text-slate-500 font-mono text-[11px]">{p.sku}</td>
+                  <td className="py-3 px-2 text-slate-600 font-medium">{p.price}</td>
+                  <td className="py-3 px-2 text-slate-700">{p.qty}</td>
+                  <td className="py-3 px-2 text-center">
+                    <span
+                      className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
+                        p.status === 'Active'
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-200/60'
+                          : 'bg-amber-50 text-amber-600 border border-amber-200/60'
+                      }`}
+                    >
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-2 text-center">
+                    <div className="inline-flex items-center justify-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => editProduct(p)}
+                        className="w-7 h-7 rounded-lg border border-blue-200 text-blue-500 bg-white flex items-center justify-center hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-2xs"
+                        title="Edit Product"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteProduct(p.id)}
+                        className="w-7 h-7 rounded-lg border border-rose-200 text-rose-400 bg-white flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 transition cursor-pointer shadow-2xs"
+                        title="Delete Product"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+
+        <div className="pt-3.5 mt-2 border-t border-slate-100 text-[11px] text-slate-400">
+          Showing 1 to {filteredProducts.length} of {filteredProducts.length} entries
         </div>
       </div>
     </div>
@@ -1106,7 +1312,7 @@ function UsersProductsTab({ lead, onCountsChange }) {
 // ── 4. Main Lead Detail View ─────────────────────────────────
 export default function LeadDetailView({ lead, onBackToLeads }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('Sources & Emails');
+  const [activeTab, setActiveTab] = useState('Users & Products');
   const { addCustomer, showToast } = useERP() || {};
   const [isConverted, setIsConverted] = useState(lead?.status === 'Converted');
   const [detailCounts, setDetailCounts] = useState({ users: 3, products: 2, sources: 3, files: 2 });
@@ -1123,18 +1329,14 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
   if (!lead) return null;
 
-  const cards = metricCards({ products: detailCounts.products, sources: detailCounts.sources, files: detailCounts.files });
-
-  // 8 Pastel Metric Cards exactly as in the reference screenshot
   const metrics = [
     { label: 'Products', value: lead.productsCount ?? 1, icon: ShoppingBag, color: '#ec4899', bg: '#fdf2f8' },
-    { label: 'Source', value: lead.sourcesCount ?? 0, icon: Globe, color: '#10b981', bg: '#f0fdf4' },
+    { label: 'Source', value: lead.sourcesCount ?? 3, icon: Globe, color: '#10b981', bg: '#f0fdf4' },
     { label: 'Files', value: lead.filesCount ?? 0, icon: FileStack, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Open Tasks', value: lead.openTasksCount ?? 2, icon: ListChecks, color: '#f59e0b', bg: '#fffbeb' },
     { label: 'Calls', value: lead.callsCount ?? 0, icon: Phone, color: '#3b82f6', bg: '#eff6ff' },
     { label: 'Estimates', value: lead.estimatesCount ?? 0, icon: Receipt, color: '#06b6d4', bg: '#ecfeff' },
     { label: 'Delivery Challans', value: lead.deliveryChallansCount ?? 0, icon: Truck, color: '#f97316', bg: '#fff7ed' },
-    { label: 'Sales Invoices', value: lead.salesInvoicesCount ?? 0, icon: FileText, color: '#a855f7', bg: '#faf5ff' },
   ];
 
   const handleConvert = () => {
@@ -1154,55 +1356,64 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     showToast?.(`Lead "${lead.name}" converted to Customer.`);
   };
 
+  const displayName = lead.name?.replace(/\s*\(Sample\)/i, '') || 'Christopher Maclead';
+
   return (
     <div className="space-y-4">
-      {/* Top Breadcrumb & Action Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-        <div className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
+        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <Link to="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
-          <span>&gt;</span>
+          <span className="text-slate-300">&gt;</span>
           <Link to="/crm/leads" className="text-blue-600 hover:underline">Leads</Link>
-          <span>&gt;</span>
-          <span className="text-slate-800 dark:text-slate-200 font-bold">{lead.name}</span>
+          <span className="text-slate-300">&gt;</span>
+          <span className="text-slate-900 font-semibold">{displayName}</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <button type="button" className="btn-outline btn-sm flex items-center gap-1">
-            <Pencil size={13} /> Edit
+          <button
+            type="button"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+          >
+            <Pencil size={13} className="text-slate-500" /> Edit
           </button>
           <button
             type="button"
             onClick={handleConvert}
-            className={`btn-sm flex items-center gap-1 ${isConverted ? 'btn-primary' : 'btn-outline text-blue-600'}`}
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer ${
+              isConverted
+                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                : 'bg-white hover:bg-blue-50 text-blue-600 border border-blue-200'
+            }`}
           >
             <CheckCircle size={13} /> {isConverted ? 'Converted' : 'Convert'}
           </button>
-          <button type="button" className="btn-outline btn-sm flex items-center gap-1">
-            More <MoreVertical size={13} />
+          <button
+            type="button"
+            className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+          >
+            More <MoreVertical size={13} className="text-slate-400" />
           </button>
         </div>
       </div>
 
-      {/* Hero Lead Profile Summary Card */}
-      <div className="card p-5">
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-          {/* Left: Lead Identity */}
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-full overflow-hidden ring-4 ring-slate-100 dark:ring-slate-700 shrink-0 shadow-md">
+            <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-xs border border-slate-100 ring-2 ring-slate-50">
               <img
                 src={lead.photo || 'https://i.pravatar.cc/160?img=60'}
-                alt={lead.name}
+                alt={displayName}
                 className="w-full h-full object-cover"
               />
             </div>
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
-                <h1 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">{lead.name}</h1>
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
-                  {isConverted ? 'Converted' : (lead.status || 'Qualified')}
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight">{displayName}</h1>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  {lead.status || 'Qualified'}
                 </span>
               </div>
-              <p className="text-xs font-semibold text-slate-600 dark:text-slate-300">{lead.company || 'Hirapara Industries'}</p>
+              <p className="text-xs text-slate-500 font-medium">{lead.company || 'Hirapara Industries'}</p>
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-0.5">
                 <span className="flex items-center gap-1.5"><Phone size={13} className="text-slate-400" /> +91 {lead.phone || '98765 43210'}</span>
                 <span className="flex items-center gap-1.5"><Mail size={13} className="text-slate-400" /> {lead.email || 'chirag@hirapara.com'}</span>
@@ -1211,61 +1422,47 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
             </div>
           </div>
 
-          {/* Right: Key Meta Attributes */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs border-t md:border-t-0 md:border-l border-slate-200 dark:border-slate-700 pt-3 md:pt-0 md:pl-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-xs border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-8">
             <div>
-              <span className="text-[11px] text-slate-400 block font-medium">Lead Number</span>
-              <strong className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">{lead.leadNumber || 'L00000185'}</strong>
+              <span className="text-[11px] text-slate-400 block font-normal mb-1">Lead Number</span>
+              <strong className="text-xs font-bold text-slate-900 font-mono">{lead.leadNumber || 'L00000185'}</strong>
             </div>
             <div>
-              <span className="text-[11px] text-slate-400 block font-medium">Source</span>
-              <strong className="text-xs font-semibold text-slate-800 dark:text-slate-200">{lead.source || 'Website'}</strong>
+              <span className="text-[11px] text-slate-400 block font-normal mb-1">Source</span>
+              <strong className="text-xs font-bold text-slate-900">{lead.source || 'Website'}</strong>
             </div>
             <div>
-              <span className="text-[11px] text-slate-400 block font-medium">Owner</span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <img
-                  src={lead.ownerAvatar || 'https://i.pravatar.cc/160?img=68'}
-                  alt={lead.owner || 'David Patel'}
-                  className="w-4 h-4 rounded-full object-cover"
-                />
-                <strong className="text-xs font-semibold text-slate-800 dark:text-slate-200">{lead.owner || 'David Patel'}</strong>
-              </div>
-            </div>
-            <div>
-              <span className="text-[11px] text-slate-400 block font-medium">Created On</span>
-              <strong className="text-xs font-semibold text-slate-800 dark:text-slate-200">{lead.createdOn || '27/08/2026'}</strong>
+              <span className="text-[11px] text-slate-400 block font-normal mb-1">Created On</span>
+              <strong className="text-xs font-bold text-slate-900">{lead.createdOn || '27/08/2026'}</strong>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Horizontal Pastel Metrics Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {metrics.map((m, idx) => {
           const Icon = m.icon;
           return (
             <div
               key={idx}
-              className="card p-3 flex items-center gap-3 transition hover:shadow-md cursor-pointer"
+              className="bg-white rounded-2xl border border-slate-200/80 p-3.5 flex items-center gap-3 shadow-xs hover:border-slate-300 transition"
             >
               <div
                 className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                 style={{ background: m.bg, color: m.color }}
               >
-                <Icon size={18} strokeWidth={2.2} />
+                <Icon size={17} strokeWidth={2} />
               </div>
               <div className="min-w-0 leading-tight">
                 <span className="text-[11px] font-medium text-slate-500 block truncate">{m.label}</span>
-                <strong className="text-base font-extrabold text-slate-900 dark:text-slate-100">{m.value}</strong>
+                <strong className="text-sm font-bold text-slate-900">{m.value}</strong>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* Tabs Navigation Bar */}
-      <div className="border-b border-slate-200 dark:border-slate-700 flex items-center gap-1 overflow-x-auto text-xs font-bold scrollbar-none">
+      <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
         {DETAIL_TABS.map((tab) => {
           const isActive = activeTab === tab;
           return (
@@ -1273,10 +1470,10 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-3 whitespace-nowrap transition cursor-pointer border-b-2 font-semibold ${
+              className={`px-3.5 py-1.5 whitespace-nowrap rounded-lg text-xs font-semibold transition cursor-pointer ${
                 isActive
-                  ? 'border-blue-600 text-blue-600 dark:text-blue-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
               }`}
             >
               {tab}
@@ -1288,10 +1485,10 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       {/* Tab Content Display */}
       {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={lead} sourceEntries={sourceEntries} onSourcesChange={updateSourceEntries} onCountsChange={updateDetailCounts} />}
       {activeTab === 'General' && <GeneralTab lead={lead} />}
-      {activeTab === 'Users | Products' && <UsersProductsTab lead={lead} onCountsChange={updateDetailCounts} />}
+      {activeTab === 'Users & Products' && <UsersProductsTab lead={lead} onCountsChange={updateDetailCounts} />}
       {activeTab === 'Discussion & Notes' && <DiscussionNotesTab lead={lead} />}
       {activeTab === 'Files' && <FilesTab lead={lead} onCountsChange={updateDetailCounts} />}
-      {!['Sources & Emails', 'General', 'Users | Products', 'Discussion & Notes', 'Files'].includes(activeTab) && (
+      {!['Sources & Emails', 'General', 'Users & Products', 'Discussion & Notes', 'Files'].includes(activeTab) && (
         <div className="card p-8 text-center space-y-2">
           <Info size={28} className="text-blue-500 mx-auto" />
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{activeTab} Details</h4>

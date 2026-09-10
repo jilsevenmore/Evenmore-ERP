@@ -1,6 +1,6 @@
-import { AlertTriangle, Pin, X } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 
-export default function DeleteLeadModal({ lead, leads = [], onClose, onConfirm, onConfirmAll, onPin }) {
+export default function DeleteLeadModal({ lead, leads = [], onClose, onConfirm, onConfirmAll }) {
   const isBulk = leads.length > 0;
   if (!lead && !isBulk) return null;
   const recordLabel = isBulk ? `${leads.length} records` : "this record";
@@ -27,13 +27,6 @@ export default function DeleteLeadModal({ lead, leads = [], onClose, onConfirm, 
           Are you sure you want to delete <strong>{isBulk ? recordLabel : lead.name}</strong>? This action cannot be undone.
         </p>
         <div className="delete-lead-actions">
-          <button type="button" className="btn-outline" onClick={onClose}>Cancel</button>
-          {!isBulk && (
-            <button type="button" className="pin-record-btn" onClick={() => onPin(lead)}>
-              <Pin size={16} />
-              Pin Record
-            </button>
-          )}
           <button
             type="button"
             className="delete-confirm-btn"
