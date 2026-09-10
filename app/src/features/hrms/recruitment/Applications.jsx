@@ -16,7 +16,7 @@ export default function Applications() {
     { key: "recruiter", header: "Recruiter" },
     { key: "interviewStatus", header: "Interview" },
     { key: "actions", header: "Action", render: (r) => <div className="flex gap-1 text-[11px]">
-        <button onClick={() => navigate(`/recruitment/candidates/${r.id}`)} className="px-2 py-1 bg-white border border-bdr rounded-lg">View</button>
+        <button onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)} className="px-2 py-1 bg-white border border-bdr rounded-lg">View</button>
         <select value={r.stage} onChange={(e) => {
       changeStage(r.id, e.target.value);
       showToast("Moved to " + e.target.value);

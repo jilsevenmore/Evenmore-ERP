@@ -26,9 +26,17 @@ import Leave from '../features/hrms/leave/Leave';
 import Payroll from '../features/hrms/payroll/Payroll';
 import RecruitmentDashboard from '../features/hrms/recruitment/RecruitmentDashboard';
 import Jobs from '../features/hrms/recruitment/Jobs';
+import JobDetails from '../features/hrms/recruitment/JobDetails';
 import Candidates from '../features/hrms/recruitment/Candidates';
+import CandidateDetails from '../features/hrms/recruitment/CandidateDetails';
 import Interviews from '../features/hrms/recruitment/Interviews';
+import InterviewDetails from '../features/hrms/recruitment/InterviewDetails';
 import Applications from '../features/hrms/recruitment/Applications';
+import Offers from '../features/hrms/recruitment/Offers';
+import Onboarding from '../features/hrms/recruitment/Onboarding';
+import Career from '../features/hrms/recruitment/Career';
+import CustomQuestions from '../features/hrms/recruitment/CustomQuestions';
+import RecruitmentFunnel from '../features/hrms/recruitment/RecruitmentFunnel';
 import PerformanceDashboard from '../features/hrms/performance/Dashboard';
 import Indicators from '../features/hrms/performance/Indicators';
 import Appraisal from '../features/hrms/performance/Appraisal';
@@ -194,9 +202,17 @@ const router = createBrowserRouter([
       { path: 'hrms/payroll', element: <Page component={Payroll} /> },
       { path: 'hrms/recruitment', element: <Page component={RecruitmentDashboard} /> },
       { path: 'hrms/recruitment/jobs', element: <Page component={Jobs} /> },
+      { path: 'hrms/recruitment/jobs/:id', element: <Page component={JobDetails} /> },
       { path: 'hrms/recruitment/candidates', element: <Page component={Candidates} /> },
+      { path: 'hrms/recruitment/candidates/:id', element: <Page component={CandidateDetails} /> },
       { path: 'hrms/recruitment/interviews', element: <Page component={Interviews} /> },
+      { path: 'hrms/recruitment/interviews/:id', element: <Page component={InterviewDetails} /> },
       { path: 'hrms/recruitment/applications', element: <Page component={Applications} /> },
+      { path: 'hrms/recruitment/offers', element: <Page component={Offers} /> },
+      { path: 'hrms/recruitment/onboarding', element: <Page component={Onboarding} /> },
+      { path: 'hrms/recruitment/career', element: <Page component={Career} /> },
+      { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> },
+      { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> },
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },
       { path: 'hrms/performance/appraisal', element: <Page component={Appraisal} /> },

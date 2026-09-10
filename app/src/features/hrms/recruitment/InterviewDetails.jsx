@@ -9,7 +9,7 @@ export default function InterviewDetails() {
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const it = interviews.find((i) => i.id === id);
-  if (!it) return <div className="py-10 text-center">Interview not found <Button variant="secondary" onClick={() => navigate("/recruitment/interviews")}>Back</Button></div>;
+  if (!it) return <div className="py-10 text-center">Interview not found <Button variant="secondary" onClick={() => navigate("/hrms/recruitment/interviews")}>Back</Button></div>;
   return <div className="flex flex-col gap-6">
       <div className="bg-white border border-bdr rounded-xl p-6 shadow-sm">
         <div className="flex flex-wrap gap-4 justify-between">
@@ -26,7 +26,7 @@ export default function InterviewDetails() {
     updateInterview(it.id, { status: "Completed", score: 88, feedback: "Good fit" });
     showToast("Marked completed");
   }}>Mark Completed</Button>
-            <Button size="sm" variant="secondary" onClick={() => navigate(`/recruitment/candidates/${it.candidateId}`)}>View Candidate</Button>
+            <Button size="sm" variant="secondary" onClick={() => navigate(`/hrms/recruitment/candidates/${it.candidateId}`)}>View Candidate</Button>
           </div>
         </div>
         {it.status === "Completed" && <div className="mt-6 grid md:grid-cols-3 gap-3 text-center">

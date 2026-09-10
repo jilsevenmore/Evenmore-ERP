@@ -55,7 +55,7 @@ export default function Candidates() {
     { key: "interviewStatus", header: "Interview" },
     { key: "recruiter", header: "Recruiter" },
     { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
-        <button onClick={() => navigate(`/recruitment/candidates/${r.id}`)} className="text-navy text-[12px] underline">View</button>
+        <button onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)} className="text-navy text-[12px] underline">View</button>
         <button onClick={() => {
       setForm({ name: r.name, email: r.email, phone: r.phone, location: r.location, position: r.position, experience: r.experience, skills: r.skills, jobId: r.jobId, stage: r.stage, recruiter: r.recruiter });
       setEditing(r.id);
@@ -84,11 +84,11 @@ export default function Candidates() {
       <DataTable columns={cols} data={filtered} emptyTitle="No candidates found" emptyDesc="Add a candidate to get started." emptyAction={<Button onClick={openAdd}>+ Add Candidate</Button>} />
 
       <Drawer
-    open={drawerOpen}
+    isOpen={drawerOpen}
     onClose={() => setDrawerOpen(false)}
     title={editing ? "Edit Candidate" : "Add Candidate"}
     subtitle="Personal, professional and application information"
-    actions={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>Cancel</Button><Button onClick={save}>{editing ? "Update" : "Save Candidate"}</Button></>}
+    footer={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>Cancel</Button><Button onClick={save}>{editing ? "Update" : "Save Candidate"}</Button></>}
   >
         <div className="space-y-6 text-[13px]">
           <div><h4 className="font-semibold">Personal Information</h4><div className="grid sm:grid-cols-2 gap-3 mt-2">
@@ -106,7 +106,7 @@ export default function Candidates() {
           <div className="border border-dashed border-bdr rounded-xl p-4 bg-off flex items-center gap-2 text-muted"><span className="material-symbols-outlined">upload</span>Resume file UI (mock)</div>
         </div>
       </Drawer>
-      <Modal open={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Candidate?" footer={<><Button variant="secondary" onClick={() => setDeleteId(null)}>Cancel</Button><Button variant="danger" onClick={() => {
+      <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} title="Delete Candidate?" footer={<><Button variant="secondary" onClick={() => setDeleteId(null)}>Cancel</Button><Button variant="danger" onClick={() => {
     if (deleteId) deleteCandidate(deleteId);
     setDeleteId(null);
     showToast("Candidate deleted");

@@ -11,7 +11,7 @@ export default function CandidateDetails() {
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const c = candidates.find((x) => x.id === id);
-  if (!c) return <div className="py-10 text-center">Candidate not found <Button variant="secondary" onClick={() => navigate("/recruitment/candidates")}>Back</Button></div>;
+  if (!c) return <div className="py-10 text-center">Candidate not found <Button variant="secondary" onClick={() => navigate("/hrms/recruitment/candidates")}>Back</Button></div>;
   const history = interviews.filter((i) => i.candidateId === c.id);
   return <div className="flex flex-col gap-6">
       <div className="bg-white border border-bdr rounded-xl p-5 shadow-sm flex flex-wrap gap-4 items-center">
@@ -22,12 +22,12 @@ export default function CandidateDetails() {
     changeStage(c.id, e.target.value);
     showToast("Stage changed to " + e.target.value);
   }} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>Applied</option><option>Screening</option><option>Interview</option><option>Shortlisted</option><option>Offer</option><option>Hired</option><option>Rejected</option></select>
-          <Button size="sm" onClick={() => navigate("/recruitment/interviews")}>Schedule Interview</Button>
+          <Button size="sm" onClick={() => navigate("/hrms/recruitment/interviews")}>Schedule Interview</Button>
           <Button size="sm" variant="secondary" onClick={() => {
     changeStage(c.id, "Shortlisted");
     showToast("Shortlisted");
   }}>Shortlist</Button>
-          <Button size="sm" variant="secondary" onClick={() => navigate("/recruitment/offers")}>Create Offer</Button>
+          <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/offers")}>Create Offer</Button>
           <Button size="sm" variant="danger" onClick={() => {
     changeStage(c.id, "Rejected");
     showToast("Rejected");

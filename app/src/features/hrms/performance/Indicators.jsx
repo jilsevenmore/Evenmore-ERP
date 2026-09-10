@@ -173,7 +173,7 @@ export default function Indicators() {
     /* Add Modal */
   }
       <Modal
-    open={addOpen}
+    isOpen={addOpen}
     onClose={() => setAddOpen(false)}
     title="Add Indicator"
     footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Indicator</Button></>}
@@ -185,7 +185,7 @@ export default function Indicators() {
     /* Edit Modal */
   }
       <Modal
-    open={!!editRow}
+    isOpen={!!editRow}
     onClose={() => setEditRow(null)}
     title="Edit Indicator"
     footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Indicator</Button></>}
@@ -197,11 +197,11 @@ export default function Indicators() {
     /* View Drawer */
   }
       <Drawer
-    open={!!viewRow}
+    isOpen={!!viewRow}
     onClose={() => setViewRow(null)}
     title={viewRow?.name ?? ""}
     subtitle={`${viewRow?.branch} \u2022 ${viewRow?.department} \u2022 ${viewRow?.designation}`}
-    actions={<><Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button><Button onClick={() => {
+    footer={<><Button variant="secondary" onClick={() => setViewRow(null)}>Close</Button><Button onClick={() => {
       if (viewRow) openEdit(viewRow);
       setViewRow(null);
     }}>Edit</Button></>}
@@ -223,7 +223,7 @@ export default function Indicators() {
     /* Delete confirm */
   }
       <Modal
-    open={!!deleteRow}
+    isOpen={!!deleteRow}
     onClose={() => setDeleteRow(null)}
     title="Delete Indicator?"
     footer={<><Button variant="secondary" onClick={() => setDeleteRow(null)}>Cancel</Button><Button variant="danger" onClick={() => {

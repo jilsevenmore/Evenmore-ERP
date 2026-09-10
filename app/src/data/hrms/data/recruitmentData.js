@@ -18,13 +18,13 @@ export const candidatesMock = [
   { id:'CAND-006', name:'Sofia Reyes', avatar:'https://i.pravatar.cc/100?img=26', email:'sofia.reyes@email.com', phone:'+1 212-555-0106', location:'New York', position:'Frontend Developer', jobId:'JOB-004', experience:'2 years', appliedDate:'11 Sep 2024', stage:'Interview', recruiter:'Priya Patel', source:'Career Page', skills:'React', interviewStatus:'Scheduled' },
   { id:'CAND-007', name:'James Wilson Jr', avatar:'https://i.pravatar.cc/100?img=12', email:'james.jr@email.com', phone:'+1 212-555-0107', location:'New York', position:'Financial Analyst', jobId:'JOB-006', experience:'3 years', appliedDate:'07 Sep 2024', stage:'Applied', recruiter:'James Wilson', source:'LinkedIn', skills:'Excel' , interviewStatus:'Not Scheduled' },
   { id:'CAND-008', name:'Liam Cooper', avatar:'https://i.pravatar.cc/100?img=20', email:'liam.cooper@email.com', phone:'+1 212-555-0108', location:'New York', position:'Senior Backend Developer', jobId:'JOB-001', experience:'4 years', appliedDate:'06 Sep 2024', stage:'Hired', recruiter:'Ayesha Khan', source:'Referral', skills:'Node.js', interviewStatus:'Completed', technicalScore:90, hrScore:89, recommendation:'Hired' },
-  { id:'CAND-009', name:'Elena Rostova', avatar:'https://i.pravatar.cc/100?img=21', email:'elena.r@email.com', phone:'+44 20-7946-0109', location:'London', position:'Brand Strategist', jobId:'JOB-005', experience:'5 years', appliedDate:'04 Sep 2024', stage:'Rejected', recruiter:'Elena Rostova', source:'LinkedIn', skills:'Brand' },
-  { id:'CAND-010', name:'David Park Jr', avatar:'https://i.pravatar.cc/100?img=11', email:'david.jr@email.com', phone:'+44 20-7946-0110', location:'London', position:'Mobile Engineer', jobId:'JOB-008', experience:'3 years', appliedDate:'03 Sep 2024', stage:'Screening', recruiter:'David Park', source:'Career Page', skills:'React Native' },
-  { id:'CAND-011', name:'Amit Patel', avatar:'https://i.pravatar.cc/100?img=15', email:'amit.patel@email.com', phone:'+1 212-555-0111', location:'New York', position:'Frontend Developer', jobId:'JOB-004', experience:'3 years', appliedDate:'02 Sep 2024', stage:'Applied', recruiter:'Priya Patel', source:'LinkedIn', skills:'TypeScript' },
-  { id:'CAND-012', name:'Sarah Wilson', avatar:'https://i.pravatar.cc/100?img=8', email:'sarah.w@email.com', phone:'+1 212-555-0112', location:'New York', position:'Brand Strategist', jobId:'JOB-005', experience:'4 years', appliedDate:'01 Sep 2024', stage:'Shortlisted', recruiter:'Elena Rostova', source:'Referral', skills:'Content', technicalScore:88, hrScore:92, recommendation:'Strongly Recommended' },
-  { id:'CAND-013', name:'Rahul Mehta', avatar:'https://i.pravatar.cc/100?img=14', email:'rahul.mehta@email.com', phone:'+1 212-555-0113', location:'New York', position:'Senior Backend Developer', jobId:'JOB-001', experience:'6 years', appliedDate:'15 Aug 2024', stage:'Interview', recruiter:'Ayesha Khan', source:'LinkedIn', skills:'AWS' },
-  { id:'CAND-014', name:'Priya Patel', avatar:'https://i.pravatar.cc/100?img=15', email:'priya.p@email.com', phone:'+1 212-555-0114', location:'London', position:'Product Designer', jobId:'JOB-002', experience:'5 years', appliedDate:'14 Aug 2024', stage:'Applied', recruiter:'Marcus Chen', source:'Career Page', skills:'Figma' },
-  { id:'CAND-015', name:'Michael Brown', avatar:'https://i.pravatar.cc/100?img=18', email:'michael.b@email.com', phone:'+971 4-555-0115', location:'Dubai', position:'Ops Manager', jobId:'JOB-007', experience:'8 years', appliedDate:'13 Aug 2024', stage:'Screening', recruiter:'Chen Li', source:'LinkedIn', skills:'Ops' },
+  { id:'CAND-009', name:'Elena Rostova', avatar:'https://i.pravatar.cc/100?img=21', email:'elena.r@email.com', phone:'+44 20-7946-0109', location:'London', position:'Brand Strategist', jobId:'JOB-005', experience:'5 years', appliedDate:'04 Sep 2024', stage:'Rejected', recruiter:'Elena Rostova', source:'LinkedIn', skills:'Brand', interviewStatus:'Not Scheduled' },
+  { id:'CAND-010', name:'David Park Jr', avatar:'https://i.pravatar.cc/100?img=11', email:'david.jr@email.com', phone:'+44 20-7946-0110', location:'London', position:'Mobile Engineer', jobId:'JOB-008', experience:'3 years', appliedDate:'03 Sep 2024', stage:'Screening', recruiter:'David Park', source:'Career Page', skills:'React Native', interviewStatus:'Pending' },
+  { id:'CAND-011', name:'Amit Patel', avatar:'https://i.pravatar.cc/100?img=15', email:'amit.patel@email.com', phone:'+1 212-555-0111', location:'New York', position:'Frontend Developer', jobId:'JOB-004', experience:'3 years', appliedDate:'02 Sep 2024', stage:'Applied', recruiter:'Priya Patel', source:'LinkedIn', skills:'TypeScript', interviewStatus:'Not Scheduled' },
+  { id:'CAND-012', name:'Sarah Wilson', avatar:'https://i.pravatar.cc/100?img=8', email:'sarah.w@email.com', phone:'+1 212-555-0112', location:'New York', position:'Brand Strategist', jobId:'JOB-005', experience:'4 years', appliedDate:'01 Sep 2024', stage:'Shortlisted', recruiter:'Elena Rostova', source:'Referral', skills:'Content', technicalScore:88, hrScore:92, recommendation:'Strongly Recommended', interviewStatus:'Completed' },
+  { id:'CAND-013', name:'Rahul Mehta', avatar:'https://i.pravatar.cc/100?img=14', email:'rahul.mehta@email.com', phone:'+1 212-555-0113', location:'New York', position:'Senior Backend Developer', jobId:'JOB-001', experience:'6 years', appliedDate:'15 Aug 2024', stage:'Interview', recruiter:'Ayesha Khan', source:'LinkedIn', skills:'AWS', interviewStatus:'Scheduled' },
+  { id:'CAND-014', name:'Priya Patel', avatar:'https://i.pravatar.cc/100?img=15', email:'priya.p@email.com', phone:'+1 212-555-0114', location:'London', position:'Product Designer', jobId:'JOB-002', experience:'5 years', appliedDate:'14 Aug 2024', stage:'Applied', recruiter:'Marcus Chen', source:'Career Page', skills:'Figma', interviewStatus:'Not Scheduled' },
+  { id:'CAND-015', name:'Michael Brown', avatar:'https://i.pravatar.cc/100?img=18', email:'michael.b@email.com', phone:'+971 4-555-0115', location:'Dubai', position:'Ops Manager', jobId:'JOB-007', experience:'8 years', appliedDate:'13 Aug 2024', stage:'Screening', recruiter:'Chen Li', source:'LinkedIn', skills:'Ops', interviewStatus:'Pending' },
 ];
 
 export const interviewsMock = [
@@ -38,4 +38,28 @@ export const interviewsMock = [
 
 export const offersMock = [
   { id:'OFF-001', candidateId:'CAND-005', candidateName:'Tariq Al-Mansoor', avatar:'https://i.pravatar.cc/100?img=17', position:'HR Manager', salary:'$95,000', sentDate:'02 Sep 2024', joiningDate:'01 Oct 2024', status:'Pending', expiry:'15 Sep 2024' },
+  { id:'OFF-002', candidateId:'CAND-008', candidateName:'Liam Cooper', avatar:'https://i.pravatar.cc/100?img=20', position:'Senior Backend Developer', salary:'$105,000', sentDate:'28 Aug 2024', joiningDate:'20 Sep 2024', status:'Accepted', expiry:'05 Sep 2024' },
+  { id:'OFF-003', candidateId:'CAND-003', candidateName:'Chen Li', avatar:'https://i.pravatar.cc/100?img=34', position:'Senior Backend Developer', salary:'$102,000', sentDate:'30 Aug 2024', joiningDate:'25 Sep 2024', status:'Pending', expiry:'10 Sep 2024' },
+];
+
+export const onboardingMock = [
+  { candidateId:'CAND-008', name:'Liam Cooper', avatar:'https://i.pravatar.cc/100?img=20', position:'Senior Backend Developer', steps:[{label:'Offer Accepted',status:'Done'},{label:'Documents Pending',status:'Current'},{label:'Documents Verified',status:'Pending'},{label:'Joining Scheduled',status:'Pending'},{label:'Onboarding Complete',status:'Pending'}] },
+];
+
+export const questionsMock = [
+  { id:'Q-01', text:'What is your current notice period?', type:'Short Answer', enabled:true, assignedJobs:['JOB-001','JOB-004'] },
+  { id:'Q-02', text:'Describe a challenging technical problem you solved.', type:'Long Answer', enabled:true, assignedJobs:['JOB-001'] },
+  { id:'Q-03', text:'Are you willing to relocate?', type:'Yes / No', enabled:true, assignedJobs:['JOB-003'] },
+  { id:'Q-04', text:'Preferred work mode?', type:'Single Select', enabled:false, assignedJobs:[] },
+];
+
+export const careerJobsMock = jobsMock.filter((j) => j.status === 'Open').map((j) => ({ id:j.id, title:j.title, department:j.department, location:j.location, type:j.employmentType, description:j.description }));
+
+export const funnelData = [
+  { stage:'Applications', count:142, pct:100 },
+  { stage:'Screening', count:68, pct:48 },
+  { stage:'Interview', count:38, pct:27 },
+  { stage:'Shortlisted', count:18, pct:13 },
+  { stage:'Offer', count:12, pct:8 },
+  { stage:'Hired', count:8, pct:6 },
 ];
