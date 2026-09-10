@@ -427,7 +427,7 @@ export default function AttendanceOverview() {
         .att-stat-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
 
         .att-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
-        .att-filter-card { padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .att-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .att-filter-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .att-filter-right { display: flex; align-items: center; gap: 8px; }
 

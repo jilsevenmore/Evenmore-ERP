@@ -445,7 +445,7 @@ export default function Employees() {
         .emp-add-btn:hover { background: #0f172a; }
         
         .emp-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
-        .emp-filter-card { padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .emp-filter-card { border: none; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         
         .emp-select { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 34px 7px 16px; font-size: 13.5px; color: #1e293b; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 13px; min-width: 110px; transition: border-color 0.15s ease; }
         .emp-select:focus { border-color: #94a3b8; }

@@ -762,7 +762,7 @@ export default function Requests() {
         .req-tab.active { font-weight: 600; color: #000000; background: #ffffff; border-color: #000000; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
 
         .req-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
-        .req-filter-card { padding: 14px 18px; margin-bottom: 16px; }
+        .req-filter-card { border: none; padding: 14px 18px; margin-bottom: 16px; }
 
         .req-search-wrap { display: flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 12px; min-width: 170px; }
         .req-search-input { border: none; background: transparent; font-size: 13px; color: #1e293b; outline: none; width: 100%; }

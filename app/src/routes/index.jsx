@@ -39,9 +39,13 @@ import CustomQuestions from '../features/hrms/recruitment/CustomQuestions';
 import RecruitmentFunnel from '../features/hrms/recruitment/RecruitmentFunnel';
 import PerformanceDashboard from '../features/hrms/performance/Dashboard';
 import Indicators from '../features/hrms/performance/Indicators';
+import KpiData from '../features/hrms/performance/KpiData';
 import Appraisal from '../features/hrms/performance/Appraisal';
+import AppraisalFunnel from '../features/hrms/performance/AppraisalFunnel';
 import GoalTracking from '../features/hrms/performance/GoalTracking';
+import GoalFunnel from '../features/hrms/performance/GoalFunnel';
 import TrainingList from '../features/hrms/performance/TrainingList';
+import TrainingFunnel from '../features/hrms/performance/TrainingFunnel';
 import Trainers from '../features/hrms/performance/Trainers';
 import OrgChartPage from '../features/hrms/organization/OrgChartPage';
 import DepartmentsPage from '../features/hrms/organization/DepartmentsPage';
@@ -49,6 +53,7 @@ import DesignationsPage from '../features/hrms/organization/DesignationsPage';
 import LocationsPage from '../features/hrms/organization/LocationsPage';
 import AssetsPage from '../features/hrms/organization/AssetsPage';
 import DocumentsPage from '../features/hrms/organization/DocumentsPage';
+import { CompanyPolicy, CalendarPage, HrmsSetup } from '../features/hrms/organization/SimplePages';
 
 // ── ERP — Sales ───────────────────────────────────────────────
 import { QuotationsPage } from '../features/sales/QuotationsPage';
@@ -215,9 +220,13 @@ const router = createBrowserRouter([
       { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> },
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },
+      { path: 'hrms/performance/kpi-data', element: <Page component={KpiData} /> },
       { path: 'hrms/performance/appraisal', element: <Page component={Appraisal} /> },
+      { path: 'hrms/performance/appraisal-funnel', element: <Page component={AppraisalFunnel} /> },
       { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> },
+      { path: 'hrms/performance/goal-funnel', element: <Page component={GoalFunnel} /> },
       { path: 'hrms/training', element: <Page component={TrainingList} /> },
+      { path: 'hrms/training/training-funnel', element: <Page component={TrainingFunnel} /> },
       { path: 'hrms/training/trainers', element: <Page component={Trainers} /> },
       { path: 'hrms/org-chart', element: <Page component={OrgChartPage} /> },
       { path: 'hrms/departments', element: <Page component={DepartmentsPage} /> },
@@ -225,6 +234,9 @@ const router = createBrowserRouter([
       { path: 'hrms/locations', element: <Page component={LocationsPage} /> },
       { path: 'hrms/assets', element: <Page component={AssetsPage} /> },
       { path: 'hrms/documents', element: <Page component={DocumentsPage} /> },
+      { path: 'hrms/company-policy', element: <Page component={CompanyPolicy} /> },
+      { path: 'hrms/calendar', element: <Page component={CalendarPage} /> },
+      { path: 'hrms/hrms-setup', element: <Page component={HrmsSetup} /> },
 
       // ── Reports ───────────────────────────────────────────
       { path: 'reports', element: <Page component={ReportsPage} /> },

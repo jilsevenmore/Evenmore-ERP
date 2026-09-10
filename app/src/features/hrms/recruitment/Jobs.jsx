@@ -247,7 +247,7 @@ export default function Jobs() {
       </div>
 
       {/* Filter Bar Card */}
-      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-3.5 flex flex-wrap items-center gap-3 shadow-2xs">
+      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-3.5 flex flex-wrap items-center gap-2.5 shadow-2xs">
         <div className="relative flex-1 min-w-[200px] max-w-[240px]">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -262,7 +262,7 @@ export default function Jobs() {
         <select
           value={dept}
           onChange={(e) => setDept(e.target.value)}
-          className="h-9 pl-3 pr-8 bg-white border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a]"
+          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
         >
           <option value="All">All Departments</option>
           <option value="Engineering">Engineering</option>
@@ -276,7 +276,7 @@ export default function Jobs() {
         <select
           value={branch}
           onChange={(e) => setBranch(e.target.value)}
-          className="h-9 pl-3 pr-8 bg-white border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a]"
+          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
         >
           <option value="All">All Branches</option>
           <option value="New York">New York</option>
@@ -287,7 +287,7 @@ export default function Jobs() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="h-9 pl-3 pr-8 bg-white border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a]"
+          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
         >
           <option value="All">All Status</option>
           <option value="Open">Active</option>
@@ -298,7 +298,7 @@ export default function Jobs() {
         <select
           value={workMode}
           onChange={(e) => setWorkMode(e.target.value)}
-          className="h-9 pl-3 pr-8 bg-white border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a]"
+          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
         >
           <option value="All">All Work Mode</option>
           <option value="On-site">On-site</option>
@@ -314,7 +314,7 @@ export default function Jobs() {
             setStatus("All");
             setWorkMode("All");
           }}
-          className="h-9 px-4 bg-white border border-[#e2e8f0] rounded-xl text-[13px] font-medium text-slate-600 hover:bg-[#f8fafc] transition shadow-2xs"
+          className="h-9 px-4 bg-white border border-[#e2e8f0] rounded-xl text-[13px] font-medium text-slate-700 hover:bg-[#f8fafc] transition shadow-2xs"
         >
           Clear Filters
         </button>
