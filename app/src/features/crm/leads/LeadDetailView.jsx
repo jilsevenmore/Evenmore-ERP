@@ -22,7 +22,6 @@ import {
   Building2,
   Paperclip,
   Share2,
-  MoreVertical,
   ArrowRight,
   Sparkles,
   ShoppingBag,
@@ -33,6 +32,7 @@ import {
   FileText,
   Truck,
   Receipt,
+  Printer,
   Download,
   Upload,
   Globe,
@@ -42,6 +42,8 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import LeadAvatar from './LeadAvatar';
+import { exportToCSV } from '../../../services/exportUtils';
+import { employeesMock } from '../../../data/hrms/mocks/data';
 
 const DETAIL_TABS = [
   'General',
@@ -55,6 +57,19 @@ const DETAIL_TABS = [
   'Delivery Challans',
   'Activity',
 ];
+
+const DETAIL_TAB_ICONS = {
+  General: Info,
+  'Users & Products': UserCheck,
+  'Sources & Emails': Globe,
+  'Discussion & Notes': Share2,
+  Files: FileStack,
+  Tasks: ListChecks,
+  Calls: Phone,
+  Estimates: Receipt,
+  'Delivery Challans': Truck,
+  Activity: Sparkles,
+};
 
 function formatAmount(value) {
   return `Rs. ${(value || 0).toLocaleString('en-IN')}`;
@@ -86,9 +101,9 @@ function buildUsers() {
 
 function buildProducts() {
   return [
-    { id: 1, name: 'Endoscopy Machine', sku: 'END-001', price: 'Rs. 1,20,000', qty: 1, status: 'Active' },
-    { id: 2, name: 'Monitor 4K', sku: 'MON-004', price: 'Rs. 45,000', qty: 2, status: 'Active' },
-    { id: 3, name: 'Surgical Kit', sku: 'SK-010', price: 'Rs. 25,000', qty: 1, status: 'Draft' },
+    { id: 1, name: 'Endoscopy Machine', sku: 'END-001', price: 'Rs. 1,20,000', qty: 1, status: 'Active', image: '' },
+    { id: 2, name: 'Monitor 4K', sku: 'MON-004', price: 'Rs. 45,000', qty: 2, status: 'Active', image: '' },
+    { id: 3, name: 'Surgical Kit', sku: 'SK-010', price: 'Rs. 25,000', qty: 1, status: 'Draft', image: '' },
   ];
 }
 
@@ -175,6 +190,59 @@ function addressRows(lead) {
     ['Country', lead.country],
     ['Zip Code', `39${4200 + (lead.id || 0)}`],
   ];
+}
+
+function leadExportRows(lead) {
+  return [
+    ['Lead Name', lead.name],
+    ['Company', lead.company],
+    ['Title', lead.jobTitle],
+    ['Email', lead.email],
+    ['Phone', lead.phone],
+    ['Lead Source', lead.source],
+    ['Lead Owner', lead.owner],
+    ['Status', lead.status],
+    ['Created On', lead.createdOn],
+    ['City', lead.city],
+    ['State', lead.state],
+    ['Country', lead.country],
+    ['Zip Code', `39${4200 + (lead.id || 0)}`],
+    ['Amount', formatAmount(lead.amount)],
+  ];
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function downloadLeadAsExcel(lead) {
+  const rows = leadExportRows(lead);
+  const table = rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('');
+  const workbook = `<table><thead><tr><th>Field</th><th>Value</th></tr></thead><tbody>${table}</tbody></table>`;
+  const blob = new Blob([workbook], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${String(lead.name || 'lead').replace(/\s+/g, '_')}_details.xls`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function printLeadAsPdf(lead) {
+  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!printWindow) return;
+  const rows = leadExportRows(lead).map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`).join('');
+  printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(lead.name)} - Lead Details</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:40px}h1{margin:0 0 8px;font-size:24px}p{color:#64748b;margin:0 0 24px}table{border-collapse:collapse;width:100%;max-width:700px}th,td{border:1px solid #dbe2ea;padding:10px;text-align:left;font-size:14px}th{background:#f1f5f9;width:35%}</style></head><body><h1>${escapeHtml(lead.name)}</h1><p>Lead Details</p><table>${rows}</table></body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
 }
 
 function metricCards(counts) {
@@ -1007,6 +1075,10 @@ function GeneralTab({ lead }) {
 function UsersProductsTab({ onCountsChange }) {
   const [users, setUsers] = useState(() => buildUsers());
   const [products, setProducts] = useState(() => buildProducts());
+  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
+  const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [productDraft, setProductDraft] = useState({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState('All Users');
   const [productSearch, setProductSearch] = useState('');
@@ -1024,27 +1096,32 @@ function UsersProductsTab({ onCountsChange }) {
     return true;
   }), [products, productSearch, productFilter]);
 
+  const availableEmployees = useMemo(
+    () => employeesMock.filter((employee) => !users.some((user) => user.name === employee.name)),
+    [users],
+  );
+
   React.useEffect(() => {
     onCountsChange?.({ users: users.length, products: products.length });
   }, [users.length, products.length, onCountsChange]);
 
   function addUser() {
-    const name = window.prompt('Enter user name');
-    if (!name?.trim()) return;
-    const parts = name.trim().split(' ');
-    const initials = (parts[0][0] + (parts[1]?.[0] || '')).toUpperCase();
+    const employee = employeesMock.find((item) => item.id === selectedEmployeeId);
+    if (!employee) return;
     setUsers((current) => [
       ...current,
       {
-        id: Date.now(),
-        initials,
-        name: name.trim(),
-        email: `${parts[0].toLowerCase()}@company.com`,
-        role: 'Sales Executive',
-        status: 'Active',
+        id: employee.id,
+        initials: getInitials(employee.name),
+        name: employee.name,
+        email: employee.email,
+        role: employee.designation,
+        status: employee.status === 'Active' ? 'Active' : 'Inactive',
         bg: '#3b82f6',
       },
     ]);
+    setSelectedEmployeeId('');
+    setIsAddUserOpen(false);
   }
 
   function editUser(user) {
@@ -1058,19 +1135,21 @@ function UsersProductsTab({ onCountsChange }) {
   }
 
   function addProduct() {
-    const name = window.prompt('Enter product name');
-    if (!name?.trim()) return;
+    if (!productDraft.name.trim() || !productDraft.sku.trim() || !productDraft.price || Number(productDraft.qty) < 1) return;
     setProducts((current) => [
       ...current,
       {
         id: Date.now(),
-        name: name.trim(),
-        sku: `PRD-${Date.now().toString().slice(-3)}`,
-        price: 'Rs. 50,000',
-        qty: 1,
-        status: 'Active',
+        name: productDraft.name.trim(),
+        sku: productDraft.sku.trim().toUpperCase(),
+        price: `Rs. ${Number(productDraft.price).toLocaleString('en-IN')}`,
+        qty: Number(productDraft.qty),
+        status: productDraft.status,
+        image: productDraft.image,
       },
     ]);
+    setProductDraft({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+    setIsAddProductOpen(false);
   }
 
   function editProduct(product) {
@@ -1091,12 +1170,55 @@ function UsersProductsTab({ onCountsChange }) {
           <h3 className="font-bold text-sm text-slate-900">Users ({filteredUsers.length})</h3>
           <button
             type="button"
-            onClick={addUser}
+            onClick={() => {
+              setSelectedEmployeeId(availableEmployees[0]?.id || '');
+              setIsAddUserOpen(true);
+            }}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
           >
             <Plus size={14} /> Add User
           </button>
         </div>
+
+        {isAddUserOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsAddUserOpen(false)}>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Add Employee</h4>
+                  <p className="text-xs text-slate-500 mt-1">Select an employee to assign to this lead.</p>
+                </div>
+                <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsAddUserOpen(false)} aria-label="Close add employee dialog">×</button>
+              </div>
+              <label className="block text-xs font-semibold text-slate-700">
+                Employee
+                <select
+                  value={selectedEmployeeId}
+                  onChange={(event) => setSelectedEmployeeId(event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
+                >
+                  {availableEmployees.length === 0 ? (
+                    <option value="">All employees are already added</option>
+                  ) : (
+                    availableEmployees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.name} · {employee.designation} · {employee.department}
+                      </option>
+                    ))
+                  )}
+                </select>
+              </label>
+              <div className="flex justify-end gap-2 mt-5">
+                <button type="button" className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsAddUserOpen(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50" onClick={addUser} disabled={!selectedEmployeeId}>
+                  Add User
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filter Controls */}
         <div className="flex items-center gap-3 mb-4">
@@ -1202,12 +1324,107 @@ function UsersProductsTab({ onCountsChange }) {
           <h3 className="font-bold text-sm text-slate-900">Products ({filteredProducts.length})</h3>
           <button
             type="button"
-            onClick={addProduct}
+            onClick={() => setIsAddProductOpen(true)}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
           >
             <Plus size={14} /> Add Product
           </button>
         </div>
+
+        {isAddProductOpen && (
+          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsAddProductOpen(false)}>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-5" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Add Product</h4>
+                  <p className="text-xs text-slate-500 mt-1">Enter the product details for this lead.</p>
+                </div>
+                <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsAddProductOpen(false)} aria-label="Close add product dialog">×</button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
+                  Product Name
+                  <input
+                    type="text"
+                    value={productDraft.name}
+                    onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))}
+                    placeholder="Enter product name"
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                    autoFocus
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
+                  Product Image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) setProductDraft((current) => ({ ...current, image: URL.createObjectURL(file) }));
+                    }}
+                    className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700"
+                  />
+                  {productDraft.image && <img src={productDraft.image} alt="Product preview" className="mt-3 h-16 w-16 rounded-lg border border-slate-200 object-cover" />}
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  SKU
+                  <input
+                    type="text"
+                    value={productDraft.sku}
+                    onChange={(event) => setProductDraft((current) => ({ ...current, sku: event.target.value }))}
+                    placeholder="e.g. PRD-001"
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Price
+                  <input
+                    type="number"
+                    min="0"
+                    value={productDraft.price}
+                    onChange={(event) => setProductDraft((current) => ({ ...current, price: event.target.value }))}
+                    placeholder="Enter price"
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Quantity
+                  <input
+                    type="number"
+                    min="1"
+                    value={productDraft.qty}
+                    onChange={(event) => setProductDraft((current) => ({ ...current, qty: event.target.value }))}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Status
+                  <select
+                    value={productDraft.status}
+                    onChange={(event) => setProductDraft((current) => ({ ...current, status: event.target.value }))}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Draft">Draft</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button type="button" className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsAddProductOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  onClick={addProduct}
+                  disabled={!productDraft.name.trim() || !productDraft.sku.trim() || !productDraft.price || Number(productDraft.qty) < 1}
+                >
+                  Add Product
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filter Controls */}
         <div className="flex items-center gap-3 mb-4">
@@ -1255,8 +1472,8 @@ function UsersProductsTab({ onCountsChange }) {
                   <td className="py-3 px-2 text-slate-400 font-normal">{idx + 1}</td>
                   <td className="py-3 px-2">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-6 h-6 rounded-md bg-blue-100/70 border border-blue-200/50 flex items-center justify-center shrink-0">
-                        <div className="w-2.5 h-2.5 bg-slate-700 rounded-[2px]" />
+                      <div className="w-6 h-6 rounded-md bg-blue-100/70 border border-blue-200/50 flex items-center justify-center shrink-0 overflow-hidden">
+                        {p.image ? <img src={p.image} alt="" className="w-full h-full object-cover" /> : <div className="w-2.5 h-2.5 bg-slate-700 rounded-[2px]" />}
                       </div>
                       <span className="font-semibold text-slate-900">{p.name}</span>
                     </div>
@@ -1315,6 +1532,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
   const [activeTab, setActiveTab] = useState('Users & Products');
   const { addCustomer, showToast } = useERP() || {};
   const [isConverted, setIsConverted] = useState(lead?.status === 'Converted');
+  const [isExportOpen, setIsExportOpen] = useState(false);
   const [detailCounts, setDetailCounts] = useState({ users: 3, products: 2, sources: 3, files: 2 });
   const [sourceEntries, setSourceEntries] = useState([]);
 
@@ -1325,6 +1543,20 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
   function updateSourceEntries(entries) {
     setSourceEntries(entries);
     setDetailCounts((current) => ({ ...current, sources: entries.length || current.sources }));
+  }
+
+  function exportLead(format) {
+    const filename = `${String(lead.name || 'lead').replace(/\s+/g, '_')}_details`;
+    if (format === 'CSV') {
+      exportToCSV(filename, ['Field', 'Value'], leadExportRows(lead));
+    }
+    if (format === 'Excel') {
+      downloadLeadAsExcel(lead);
+    }
+    if (format === 'PDF') {
+      printLeadAsPdf(lead);
+    }
+    setIsExportOpen(false);
   }
 
   if (!lead) return null;
@@ -1390,11 +1622,33 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
           <button
             type="button"
             className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            onClick={() => setIsExportOpen(true)}
           >
-            More <MoreVertical size={13} className="text-slate-400" />
+            <Printer size={13} className="text-slate-500" /> Print
           </button>
         </div>
       </div>
+
+      {isExportOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsExportOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Print Lead Details</h2>
+                <p className="text-xs text-slate-500 mt-1">Choose a format for {displayName}</p>
+              </div>
+              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsExportOpen(false)} aria-label="Close print options">×</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {['CSV', 'Excel', 'PDF'].map((format) => (
+                <button key={format} type="button" className="border border-slate-200 rounded-lg px-3 py-3 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50" onClick={() => exportLead(format)}>
+                  {format}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
@@ -1462,20 +1716,22 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
         })}
       </div>
 
-      <div className="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none">
+      <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-xs scrollbar-none">
         {DETAIL_TABS.map((tab) => {
           const isActive = activeTab === tab;
+          const TabIcon = DETAIL_TAB_ICONS[tab];
           return (
             <button
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-3.5 py-1.5 whitespace-nowrap rounded-lg text-xs font-semibold transition cursor-pointer ${
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 whitespace-nowrap rounded-lg text-xs font-semibold transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200 ${
                 isActive
-                  ? 'bg-blue-600 text-white shadow-xs'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-white hover:shadow-xs'
               }`}
             >
+              <TabIcon size={14} strokeWidth={isActive ? 2.3 : 2} />
               {tab}
             </button>
           );

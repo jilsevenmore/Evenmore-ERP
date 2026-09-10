@@ -12,6 +12,7 @@ import CreateLeadModal from './CreateLeadModal';
 import DeleteLeadModal from './DeleteLeadModal';
 import { useNavigate } from 'react-router-dom';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
+import { exportToCSV } from '../../../services/exportUtils';
 
 const INITIAL_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const INITIAL_SORT = { field: '', direction: 'ascending' };
@@ -27,6 +28,58 @@ const SORT_OPTIONS = [
   { value: 'status', label: 'Lead Status' },
   { value: 'createdOn', label: 'Created On' },
 ];
+
+const LEAD_EXPORT_FIELDS = [
+  ['Lead Name', 'name'],
+  ['Company', 'company'],
+  ['Email', 'email'],
+  ['Phone', 'phone'],
+  ['Lead Source', 'source'],
+  ['Title', 'jobTitle'],
+  ['Industry', 'industry'],
+  ['Lead Owner', 'owner'],
+  ['Status', 'status'],
+  ['Created On', 'createdOn'],
+];
+
+function escapeExportHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function exportLeadRows(rows) {
+  return rows.map((lead) => LEAD_EXPORT_FIELDS.map(([, key]) => lead[key] ?? ''));
+}
+
+function downloadLeadsAsExcel(rows) {
+  const headers = LEAD_EXPORT_FIELDS.map(([label]) => label);
+  const tableRows = rows.map((lead) => `<tr>${LEAD_EXPORT_FIELDS.map(([, key]) => `<td>${escapeExportHtml(lead[key])}</td>`).join('')}</tr>`).join('');
+  const table = `<table><thead><tr>${headers.map((header) => `<th>${escapeExportHtml(header)}</th>`).join('')}</tr></thead><tbody>${tableRows}</tbody></table>`;
+  const blob = new Blob([table], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'leads_details.xls';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function printLeadsAsPdf(rows) {
+  const printWindow = window.open('', '_blank', 'width=1200,height=800');
+  if (!printWindow) return;
+  const headers = LEAD_EXPORT_FIELDS.map(([label]) => `<th>${escapeExportHtml(label)}</th>`).join('');
+  const tableRows = rows.map((lead) => `<tr>${LEAD_EXPORT_FIELDS.map(([, key]) => `<td>${escapeExportHtml(lead[key])}</td>`).join('')}</tr>`).join('');
+  printWindow.document.write(`<!doctype html><html><head><title>Lead Details</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:24px}h1{font-size:22px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}</style></head><body><h1>Lead Details</h1><table><thead><tr>${headers}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  printWindow.print();
+}
 
 const leadsGuide = {
   title: 'CRM Leads',
@@ -56,6 +109,7 @@ export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [leadView, setLeadView] = useState('list');
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [draftFilters, setDraftFilters] = useState(INITIAL_FILTERS);
@@ -199,6 +253,14 @@ export default function LeadsPage() {
     setIsSortOpen(false);
   }
 
+  function exportLeads(format) {
+    const headers = LEAD_EXPORT_FIELDS.map(([label]) => label);
+    if (format === 'CSV') exportToCSV('leads_details', headers, exportLeadRows(rows));
+    if (format === 'Excel') downloadLeadsAsExcel(rows);
+    if (format === 'PDF') printLeadsAsPdf(rows);
+    setIsPrintOpen(false);
+  }
+
   function openCreateLeadModal() {
     setIsCreateLeadOpen(true);
   }
@@ -308,7 +370,29 @@ export default function LeadsPage() {
         recordActionLeads={selectedLeads}
         onCloseRecordAction={clearSelected}
         onDeleteRecord={requestDeleteSelection}
+        onPrint={() => setIsPrintOpen(true)}
       />
+
+      {isPrintOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsPrintOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Print Leads</h2>
+                <p className="text-xs text-slate-500 mt-1">Choose a format for {rows.length} lead records</p>
+              </div>
+              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsPrintOpen(false)} aria-label="Close print options">×</button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {['CSV', 'Excel', 'PDF'].map((format) => (
+                <button key={format} type="button" className="border border-slate-200 rounded-lg px-3 py-3 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50" onClick={() => exportLeads(format)}>
+                  {format}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`content-grid${isFilterOpen && leadView !== 'map' ? '' : ' content-grid-wide'}`}>
         {isFilterOpen && leadView !== 'map' && (

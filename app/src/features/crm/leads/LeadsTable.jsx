@@ -174,9 +174,10 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                           className={`pinned-indicator${pinnedLeadIds.includes(lead.id) ? " active" : ""}`}
                           title={pinnedLeadIds.includes(lead.id) ? "Unpin record" : "Pin record"}
                           aria-label={`${pinnedLeadIds.includes(lead.id) ? "Unpin" : "Pin"} ${lead.name}`}
+                          aria-pressed={pinnedLeadIds.includes(lead.id)}
                           onClick={() => onTogglePin?.(lead)}
                         >
-                          <Pin size={14} />
+                          <Pin size={14} fill={pinnedLeadIds.includes(lead.id) ? "currentColor" : "none"} />
                         </button>
                       </div>
                     )}

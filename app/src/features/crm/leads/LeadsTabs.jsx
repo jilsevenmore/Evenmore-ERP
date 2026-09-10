@@ -2,7 +2,7 @@ import {
   ChevronDown,
   ChevronsUpDown,
   Filter,
-  List,
+  Printer,
   LayoutGrid,
   SquareChartGantt,
   MapPin,
@@ -47,6 +47,7 @@ export default function LeadsTabs({
   recordActionLeads = [],
   onCloseRecordAction,
   onDeleteRecord,
+  onPrint,
 }) {
   const hasRecordAction = Boolean(recordActionLead) || recordActionLeads.length > 0;
   return (
@@ -100,8 +101,8 @@ export default function LeadsTabs({
           <button type="button" className="toolbar-icon" aria-label="Sort settings">
             <ChevronsUpDown size={16} />
           </button>
-          <ViewButton label="List View" active={leadView === "list"} onClick={() => onLeadViewChange("list")}>
-            <List size={18} />
+          <ViewButton label="Print Leads" onClick={onPrint}>
+            <Printer size={18} />
           </ViewButton>
           <ViewButton label="Grid View" active={leadView === "grid"} onClick={() => onLeadViewChange("grid")}>
             <LayoutGrid size={18} />
