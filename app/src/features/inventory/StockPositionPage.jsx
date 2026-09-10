@@ -4,11 +4,12 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Boxes, MapPin, Eye } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Boxes, MapPin, Eye, ArrowLeftRight, ShoppingCart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ItemStockDetailModal } from '../../components/common/ItemStockDetailModal';
 export const StockPositionPage = () => {
-    const { items, calculateItemStock } = useERP();
+    const { items, calculateItemStock, formatCurrency } = useERP();
+    const navigate = useNavigate();
     const [filterState, setFilterState] = useState('All');
     const [selectedItem, setSelectedItem] = useState(null);
     const enrichedItems = items.map((i) => {
@@ -58,43 +59,39 @@ export const StockPositionPage = () => {
             key: 'name',
             header: 'Item Description',
             render: (i) => (<div>
-          <p className="font-bold text-[#1F2E4A]">{i.name}</p>
-          <span className="text-[10px] text-slate-500">{i.category}</span>
+          <button onClick={() => setSelectedItem(i)} className="font-bold text-[#1F2E4A] hover:underline text-left">
+            {i.name}
+          </button>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-[10px] text-slate-500">{i.category}</span>
+            <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+              <MapPin size={9}/> {i.location}
+            </span>
+          </div>
         </div>),
         },
         {
-            key: 'location',
-            header: 'Storage Bin / Facility',
-            render: (i) => (<span className="text-slate-600 flex items-center gap-1 text-[11px]">
-          <MapPin size={11} className="text-slate-400"/> {i.location}
-        </span>),
-        },
-        {
             key: 'calculatedOnHand',
-            header: 'Physical On-Hand',
+            header: 'Total Physical On-Hand',
             align: 'center',
-            render: (i) => (<span className="font-mono font-bold text-slate-800">
-          {i.calculatedOnHand} {i.uom}
+            render: (i) => (<span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+          {i.calculatedOnHand} {i.unit}
         </span>),
         },
         {
             key: 'calculatedAvailable',
-            header: 'Available to Sell',
+            header: 'Available to Promise',
             align: 'center',
-            render: (i) => (<span className={`font-mono font-bold ${i.status === 'Critical'
-                    ? 'text-rose-600'
-                    : i.status === 'Low Stock'
-                        ? 'text-amber-600'
-                        : 'text-emerald-700'}`}>
-          {i.calculatedAvailable} {i.uom}
+            render: (i) => (<span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+          {i.calculatedAvailable} {i.unit}
         </span>),
         },
         {
             key: 'calculatedReserved',
-            header: 'Committed / Reserved',
+            header: 'Sales Reserved',
             align: 'center',
-            render: (i) => (<span className="font-mono text-slate-500">
-          {i.calculatedReserved || 0} {i.uom}
+            render: (i) => (<span className="font-mono text-slate-600">
+          {i.calculatedReserved || 0} {i.unit}
         </span>),
         },
         {
@@ -110,9 +107,7 @@ export const StockPositionPage = () => {
             render: (i) => {
                 const itemVal = (i.costPrice ?? i.unitCost ?? 0) * (i.calculatedOnHand || 0);
                 return (<span className="font-mono font-semibold text-slate-800">
-            ${itemVal.toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                    })}
+            {formatCurrency(itemVal)}
           </span>);
             },
         },
@@ -143,18 +138,25 @@ export const StockPositionPage = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/transfers">
-            <Button variant="outline">Stock Transfers</Button>
-          </Link>
-          <Link to="/purchase-orders">
-            <Button>Procure Replenishment</Button>
-          </Link>
+          <Button
+            variant="outline"
+            icon={ArrowLeftRight}
+            onClick={() => navigate('/inventory/transfers')}
+          >
+            Stock Transfers
+          </Button>
+          <Button
+            icon={ShoppingCart}
+            onClick={() => navigate('/purchase/orders')}
+          >
+            Procure Replenishment
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard label="Total Tracked SKUs" value={items.length} icon={Boxes}/>
-        <StatCard label="Total Inventory Value" value={`$${Math.round(totalValue).toLocaleString()}`}/>
+        <StatCard label="Total Inventory Value" value={formatCurrency(Math.round(totalValue), { noDecimals: true })}/>
         <StatCard label="Critical Depletions" value={criticalCount} trend={{ positive: false, text: 'Requires PO' }}/>
         <StatCard label="Low Stock Warnings" value={lowCount} trend={{ positive: false, text: 'Nearing Reorder' }}/>
       </div>

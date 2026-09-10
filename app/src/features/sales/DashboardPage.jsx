@@ -24,7 +24,7 @@ const dashboardGuide = {
 };
 export const DashboardPage = () => {
     const navigate = useNavigate();
-    const { items, transfers, zoneRequests, faultyParts, salesOrders, customers, addSalesOrder, calculateItemStock, } = useERP();
+    const { items, transfers, zoneRequests, faultyParts, salesOrders, customers, addSalesOrder, calculateItemStock, formatCurrency } = useERP();
     const [showQuickOrderModal, setShowQuickOrderModal] = useState(false);
     const [quickCustomerId, setQuickCustomerId] = useState(customers[0]?.id || '');
     const [quickLineItems, setQuickLineItems] = useState([]);
@@ -85,7 +85,7 @@ export const DashboardPage = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <StatCard label="Total SKUs" value={totalSkus.toLocaleString()} icon={Package}/>
         <StatCard label="Low Stock" value={lowStockItems.length} trend={{ positive: false, text: 'Requires Order' }} icon={AlertCircle}/>
-        <StatCard label="Stock Value" value={`$${Math.round(totalStockValue).toLocaleString()}`} icon={DollarSign}/>
+        <StatCard label="Stock Value" value={formatCurrency(Math.round(totalStockValue), { noDecimals: true })} icon={DollarSign}/>
         <StatCard label="Transfers" value={transfers.length} subtext={`${pendingTransfers} In Transit`} icon={ArrowLeftRight}/>
         <StatCard label="Zone Requests" value={pendingZoneReqs} subtext="Pending review" icon={Send}/>
         <StatCard label="Faulty Open" value={openFaulty} subtext="Under assessment" icon={Wrench}/>

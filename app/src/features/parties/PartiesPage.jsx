@@ -50,7 +50,7 @@ export default function PartiesPage() {
   const isCustomerContext = location.pathname.includes('/crm/customers');
   const isVendorContext = location.pathname.includes('/purchase/vendors');
 
-  const { parties = [], addParty, updateParty } = useERP();
+  const { parties = [], addParty, updateParty, formatCurrency } = useERP();
   const [selectedType, setSelectedType] = useState(() => {
     if (isCustomerContext) return 'Customer';
     if (isVendorContext) return 'Vendor';
@@ -191,7 +191,7 @@ export default function PartiesPage() {
       ),
     },
     {
-      header: 'Balance (₹)',
+      header: 'Balance',
       key: 'balance',
       align: 'right',
       render: (party) => {
@@ -200,7 +200,7 @@ export default function PartiesPage() {
         return (
           <div className="text-right">
             <div className={`font-semibold font-mono text-xs ${isPositive ? 'text-amber-700 font-bold' : 'text-slate-500'}`}>
-              ₹{bal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrency(bal)}
             </div>
             <div className="text-[10px] text-slate-400">
               {party.type === 'Vendor' ? 'Payable' : 'Receivable'}
@@ -293,7 +293,7 @@ export default function PartiesPage() {
         <MetricChip
           icon={TrendingUp}
           label="Total Receivables"
-          value={`₹${stats.totalReceivable.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
+          value={formatCurrency(stats.totalReceivable, { noDecimals: true })}
           colorScheme="rose"
         />
       </div>

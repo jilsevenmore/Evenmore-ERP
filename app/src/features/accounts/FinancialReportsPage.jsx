@@ -7,7 +7,7 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { Printer, Download, TrendingUp, TrendingDown, DollarSign, PieChart, FileText } from 'lucide-react';
 
 export function FinancialReportsPage() {
-  const { salesInvoices = [], purchaseBills = [], expenses = [], payments = [] } = useERP();
+  const { salesInvoices = [], purchaseBills = [], expenses = [], formatCurrency, formatDateDDMMYYYY } = useERP();
   const [reportType, setReportType] = useState('pl'); // 'pl' | 'cashflow' | 'sales_summary'
 
   // Calculate financials
@@ -32,10 +32,10 @@ export function FinancialReportsPage() {
   const profitMargin = totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : '0.0';
 
   const stats = [
-    { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, icon: 'dollar', tone: 'blue', trend: '+12.5%' },
-    { label: 'Cost of Goods', value: `$${totalCOGS.toLocaleString()}`, icon: 'cart', tone: 'amber' },
-    { label: 'Operating Expenses', value: `$${totalExpenses.toLocaleString()}`, icon: 'file', tone: 'pink' },
-    { label: 'Net Profit', value: `$${netIncome.toLocaleString()}`, icon: 'chart', tone: netIncome >= 0 ? 'green' : 'pink', trend: `${profitMargin}% margin` },
+    { label: 'Total Revenue', value: formatCurrency(totalRevenue), icon: 'dollar', tone: 'blue', trend: '+12.5%' },
+    { label: 'Cost of Goods', value: formatCurrency(totalCOGS), icon: 'cart', tone: 'amber' },
+    { label: 'Operating Expenses', value: formatCurrency(totalExpenses), icon: 'file', tone: 'pink' },
+    { label: 'Net Profit', value: formatCurrency(netIncome), icon: 'chart', tone: netIncome >= 0 ? 'green' : 'pink', trend: `${profitMargin}% margin` },
   ];
 
   const plRows = [
@@ -53,13 +53,13 @@ export function FinancialReportsPage() {
       </strong>
     )},
     { key: 'item', label: 'Description', render: (val) => <span style={{ color: '#64748b' }}>{val}</span> },
-    { key: 'amount', label: 'Amount ($)', render: (val, row) => (
+    { key: 'amount', label: 'Amount', render: (val, row) => (
       <span style={{
         fontWeight: row.type === 'net' || row.type === 'summary' ? 800 : 600,
         color: val > 0 ? '#1bb878' : val < 0 ? '#ef4444' : '#64748b',
         fontSize: row.type === 'net' ? 15 : 13,
       }}>
-        {val >= 0 ? `$${val.toLocaleString()}` : `-$${Math.abs(val).toLocaleString()}`}
+        {val < 0 ? `-${formatCurrency(Math.abs(val))}` : formatCurrency(val)}
       </span>
     )},
   ];
@@ -140,8 +140,8 @@ export function FinancialReportsPage() {
               columns={[
                 { key: 'invoiceNumber', label: 'Invoice #' },
                 { key: 'customerName', label: 'Customer' },
-                { key: 'date', label: 'Date' },
-                { key: 'grandTotal', label: 'Total ($)', render: (v) => `$${Number(v || 0).toLocaleString()}` },
+                { key: 'date', label: 'Date', render: (v) => formatDateDDMMYYYY(v) },
+                { key: 'grandTotal', label: 'Total', render: (v) => formatCurrency(Number(v || 0)) },
                 { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
               ]}
               data={salesInvoices}

@@ -26,23 +26,25 @@ const quotationGuide = {
     workflow: ['Quotation Created', 'Customer Approval', 'Convert to Sales Order', 'Warehouse Dispatch', 'Invoiced'],
 };
 export const QuotationsPage = () => {
-    const { quotations, customers, addQuotation, convertQuotationToSalesOrder } = useERP();
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedQuote, setSelectedQuote] = useState(null);
-    const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
-    const [validUntil, setValidUntil] = useState('30 Days');
-    const [lineItems, setLineItems] = useState([]);
-    const [autoPOState, setAutoPOState] = useState({ isOpen: false });
     const navigate = useNavigate();
+    const { quotations, customers, addQuotation, convertQuotationToSalesOrder, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
+    const [validUntil, setValidUntil] = useState('In 30 days');
+    const [selectedQuote, setSelectedQuote] = useState(null);
+    const [autoPOState, setAutoPOState] = useState({ isOpen: false, item: null, deficitQty: 5 });
+    const [lineItems, setLineItems] = useState([]);
     const totalPipeline = quotations.reduce((sum, q) => sum + (q.amount || 0), 0);
     const handleConvert = (quoteId) => {
-        convertQuotationToSalesOrder(quoteId);
-        navigate('/sales/orders');
+        const order = convertQuotationToSalesOrder(quoteId);
+        if (order) {
+            navigate('/sales/orders');
+        }
     };
-    const handleCloneQuote = (q) => {
-        setSelectedCustomerId(q.customerId || customers[0]?.id || '');
-        setValidUntil('30 Days');
-        setLineItems((q.items || []).map((it) => ({
+    const handleCloneQuote = (quote) => {
+        setSelectedCustomerId(quote.customerId || customers[0]?.id || '');
+        setValidUntil(quote.validUntil || 'In 30 days');
+        setLineItems((quote.items || []).map((it) => ({
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         })));
@@ -50,10 +52,10 @@ export const QuotationsPage = () => {
     };
     const columns = [
         {
-            header: 'Quote Number',
+            header: 'Quote #',
             accessor: 'quoteNumber',
-            render: (q) => (<button onClick={() => setSelectedQuote(q)} className="font-mono font-bold text-blue-600 hover:underline text-left">
-          {q.quoteNumber}
+            render: (q) => (<button onClick={() => setSelectedQuote(q)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left cursor-pointer">
+          <FileText size={13} className="text-slate-400"/> {q.quoteNumber}
         </button>),
         },
         {
@@ -64,6 +66,7 @@ export const QuotationsPage = () => {
         {
             header: 'Quote Date',
             accessor: 'date',
+            render: (q) => <span className="font-mono text-[11px] text-slate-600">{formatDateDDMMYYYY(q.date)}</span>,
         },
         {
             header: 'Valid Until',
@@ -73,7 +76,7 @@ export const QuotationsPage = () => {
             header: 'Estimated Total',
             accessor: 'amount',
             align: 'right',
-            render: (q) => (<span className="font-bold font-mono text-slate-900">${q.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>),
+            render: (q) => (<span className="font-bold font-mono text-slate-900">{formatCurrency(q.amount)}</span>),
         },
         {
             header: 'Lifecycle Status',
@@ -84,10 +87,10 @@ export const QuotationsPage = () => {
             header: 'Actions',
             align: 'right',
             render: (q) => (<div className="flex items-center justify-end gap-1.5">
-          <button onClick={() => setSelectedQuote(q)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="View & Print Quote">
+          <button onClick={() => setSelectedQuote(q)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="View & Print Quote">
             <Eye size={13}/>
           </button>
-          <button onClick={() => handleCloneQuote(q)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Clone / Duplicate Quote">
+          <button onClick={() => handleCloneQuote(q)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate Quote">
             <Copy size={13}/>
           </button>
           {q.status === 'Confirmed' ? (<button onClick={() => navigate('/sales/orders')} className="text-xs font-semibold text-emerald-700 hover:underline inline-flex items-center gap-1 cursor-pointer">
@@ -105,7 +108,7 @@ export const QuotationsPage = () => {
         addQuotation({
             customerId: cust?.id,
             customer: cust?.name || 'Acme Corp',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             validUntil: validUntil || '30 Days',
             amount: computedTotal > 0 ? computedTotal : 1500,
             status: 'Draft',
@@ -121,7 +124,7 @@ export const QuotationsPage = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total Quotations" value={quotations.length} icon={FileText}/>
-        <StatCard label="Estimated Pipeline Value" value={`$${totalPipeline.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}/>
+        <StatCard label="Estimated Pipeline Value" value={formatCurrency(totalPipeline)}/>
         <StatCard label="Confirmed Conversion" value={`${quotations.filter((q) => q.status === 'Confirmed' || q.status === 'Invoiced').length} Quotes`} trend={{ positive: true, text: 'Direct SO conversion' }}/>
       </div>
 
@@ -130,7 +133,7 @@ export const QuotationsPage = () => {
             q.status.toLowerCase().includes(term)}/>
 
       {isModalOpen && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-5xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Create Quotation Estimate</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
@@ -142,10 +145,31 @@ export const QuotationsPage = () => {
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
                   <select required value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
-                    {customers.map((c) => (<option key={c.id} value={c.id}>
-                        {c.name} ({c.code}) - Balance: ${c.balance.toFixed(2)}
-                      </option>))}
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
+                      </option>
+                    ))}
                   </select>
+                  {(() => {
+                    const cust = customers.find(c => c.id === selectedCustomerId) || customers[0];
+                    if (!cust) return null;
+                    return (
+                      <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between font-bold text-slate-800">
+                          <span>{cust.name}</span>
+                          <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                            Limit: ₹{(cust.creditLimit || 50000).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
+                          <span>POC: <strong>{cust.contactPerson || 'Account Lead'}</strong></span>
+                          <span>Email: {cust.email}</span>
+                          <span>Phone: {cust.phone}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
@@ -223,7 +247,7 @@ export const QuotationsPage = () => {
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
               <div className="font-mono text-xs">
-                Total Estimate: <strong className="text-slate-900">${(selectedQuote.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
+                Total Estimate: <strong className="text-slate-900">{formatCurrency(selectedQuote.amount || 0)}</strong>
               </div>
               <div className="flex items-center gap-2">
                 {selectedQuote.status !== 'Confirmed' && (<Button onClick={() => { handleConvert(selectedQuote.id); setSelectedQuote(null); }}>

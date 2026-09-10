@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   Home,
@@ -39,9 +39,27 @@ import {
   Send,
   User,
   ShieldCheck,
+  Search,
+  X,
+  Sun,
+  Moon,
+  Sparkles,
+  TreePine,
+  BookOpen,
+  Check,
+  LogOut,
+  Lock,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
+import { UserGuideModal } from '../common/UserGuideModal';
+
+const SIDEBAR_THEMES = [
+  { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
+  { id: 'dark', name: 'Dark', icon: Moon, color: '#3b82f6' },
+  { id: 'midnight', name: 'Midnight', icon: Sparkles, color: '#818cf8' },
+  { id: 'emerald', name: 'Emerald', icon: TreePine, color: '#10b981' },
+];
 
 // ── Navigation Structure ──────────────────────────────────────
 const NAV = [
@@ -231,16 +249,86 @@ const NAV = [
   },
 ];
 
+// Flatten all defined navigation paths to compute accurate specificity
+function collectNavPaths(items) {
+  const paths = [];
+  function walk(list) {
+    for (const item of list) {
+      if (item.to) paths.push(item.to);
+      if (item.children) walk(item.children);
+    }
+  }
+  walk(items);
+  return paths;
+}
+
+const ALL_NAV_PATHS = collectNavPaths(NAV);
+
+function isRouteActive(targetPath, currentPath) {
+  if (!targetPath) return false;
+  // 1. Exact match
+  if (currentPath === targetPath) return true;
+
+  // 2. Prefix match only if no other nav item matches currentPath more specifically
+  if (currentPath.startsWith(targetPath + '/')) {
+    // If an exact match exists in the navigation tree for currentPath, then prefix match is false
+    const exactMatchExists = ALL_NAV_PATHS.some((p) => p === currentPath);
+    if (exactMatchExists) return false;
+
+    // Otherwise, check if this is the longest matching prefix
+    const matchingPrefixes = ALL_NAV_PATHS.filter(
+      (p) => currentPath === p || currentPath.startsWith(p + '/')
+    );
+    // Sort descending by path length
+    matchingPrefixes.sort((a, b) => b.length - a.length);
+    return matchingPrefixes[0] === targetPath;
+  }
+
+  return false;
+}
+
+// ── Filter navigation tree recursively by search query ──────
+function filterNavTree(items, query) {
+  if (!query || !query.trim()) return items;
+  const q = query.toLowerCase().trim();
+
+  function filterItem(item) {
+    const labelMatch = item.label.toLowerCase().includes(q);
+
+    if (item.children) {
+      const filteredChildren = item.children
+        .map(filterItem)
+        .filter(Boolean);
+
+      if (labelMatch || filteredChildren.length > 0) {
+        return {
+          ...item,
+          children: filteredChildren.length > 0 ? filteredChildren : item.children,
+          forceOpen: true,
+        };
+      }
+      return null;
+    }
+
+    return labelMatch ? item : null;
+  }
+
+  return items.map(filterItem).filter(Boolean);
+}
+
 // ── Sub-item (leaf node) ────────────────────────────────────
 function SubItem({ item, badges = {} }) {
   const location = useLocation();
-  const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+  const isActive = isRouteActive(item.to, location.pathname);
   const count = item.badgeKey ? badges[item.badgeKey] : 0;
 
   return (
     <NavLink
       to={item.to || '#'}
-      className={`sub-item${isActive ? ' active' : ''}`}
+      end
+      className={({ isActive: navActive }) =>
+        `sub-item${isActive || navActive ? ' active' : ''}`
+      }
     >
       {item.dot && <span className="sub-dot" />}
       <span className="sub-label">{item.label}</span>
@@ -275,26 +363,30 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
   const [open, setOpen] = useState(false);
   const Icon = item.icon;
 
-  // Auto-open if a child route is active
-  const isChildActive = item.children?.some(
-    (c) => (c.to && (location.pathname === c.to || location.pathname.startsWith(c.to + '/'))) ||
-      (c.children?.some((sub) => sub.to && (location.pathname === sub.to || location.pathname.startsWith(sub.to + '/'))))
-  );
+  // Auto-open if a child route is active or forced open by search
+  const isChildActive = item.children?.some((c) => {
+    if (c.to && isRouteActive(c.to, location.pathname)) return true;
+    if (c.children?.some((sub) => sub.to && isRouteActive(sub.to, location.pathname))) return true;
+    return false;
+  });
 
   useEffect(() => {
-    if (isChildActive) {
+    if (isChildActive || item.forceOpen) {
       setOpen(true);
     }
-  }, [isChildActive]);
+  }, [isChildActive, item.forceOpen]);
 
-  const isActive = item.to && (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
+  const isActive = isRouteActive(item.to, location.pathname);
 
   if (item.to && !item.children) {
-    // Simple nav row (direct link)
+    // Simple nav row (direct link like Dashboard, Parties, Reports)
     return (
       <NavLink
         to={item.to}
-        className={({ isActive }) => `nav-row${isActive ? ' section-active' : ''}`}
+        end
+        className={({ isActive: directActive }) =>
+          `nav-row${directActive || isActive ? ' section-active' : ''}`
+        }
       >
         {Icon && <Icon size={17} strokeWidth={1.9} className="nav-ico" />}
         <span className="nav-txt">{item.label}</span>
@@ -307,7 +399,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`nav-row${isChildActive || isActive ? ' section-active' : ''}`}
+        className={`nav-row${isChildActive ? ' parent-active' : isActive ? ' section-active' : ''}`}
       >
         {Icon && <Icon size={17} strokeWidth={1.9} className="nav-ico" />}
         <span className="nav-txt">{item.label}</span>
@@ -329,9 +421,15 @@ export default function Sidebar() {
   const sidebarWidth = useAppStore((s) => s.sidebarWidth);
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const currentUser = useAppStore((s) => s.currentUser);
+  const theme = useAppStore((s) => s.theme) || 'light';
+  const setTheme = useAppStore((s) => s.setTheme);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const profileRef = useRef(null);
   const dragRef = useRef({ dragging: false, startX: 0, startWidth: sidebarWidth });
+
+  const filteredNav = useMemo(() => filterNavTree(NAV, searchQuery), [searchQuery]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -419,11 +517,48 @@ export default function Sidebar() {
           </div>
         </div>
 
+        {/* Search Bar Above Dashboard */}
+        <div className="px-3 pb-2 pt-0.5">
+          <div className="relative flex items-center bg-white/5 border border-white/10 rounded-xl focus-within:border-blue-400/60 focus-within:bg-white/10 transition-all">
+            <Search size={14} className="ml-2.5 text-slate-400 shrink-0 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search tabs & menus..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-xs text-white placeholder:text-slate-400 py-1.5 pl-2 pr-7 focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 text-slate-400 hover:text-white p-0.5 rounded transition cursor-pointer"
+                title="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Navigation */}
         <nav className="side-nav" aria-label="Primary navigation">
-          {NAV.map((item) => (
-            <ExpandableRow key={item.label} item={item} depth={0} badges={badges} />
-          ))}
+          {filteredNav.length > 0 ? (
+            filteredNav.map((item) => (
+              <ExpandableRow key={item.label} item={item} depth={0} badges={badges} />
+            ))
+          ) : (
+            <div className="px-3 py-6 text-center text-xs text-slate-400">
+              <p>No tabs match &ldquo;{searchQuery}&rdquo;</p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="mt-2 text-blue-400 hover:underline text-[11px] cursor-pointer"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
         </nav>
       </div>
 
@@ -453,58 +588,125 @@ export default function Sidebar() {
           />
         </button>
 
-        {/* Profile Popup Menu */}
+        {/* Rich Theme-Adaptive Profile Popup Menu */}
         {isProfileOpen && (
-          <div className="absolute bottom-full left-1 right-1 mb-2 p-2 rounded-2xl bg-[#0b1222] border border-white/15 text-white shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 backdrop-blur-md">
-            <div className="p-2 border-b border-white/10 mb-1">
-              <p className="text-xs font-bold truncate">{currentUser?.name || 'Adarsh Gupta'}</p>
-              <p className="text-[10px] text-slate-400 truncate">{currentUser?.email || 'admin@evenmore.io'}</p>
+          <div className="absolute bottom-full left-1 right-1 mb-2 p-3 rounded-2xl bg-[#0f172a]/95 border border-white/20 text-white shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2 duration-150 backdrop-blur-xl ring-1 ring-black/40">
+            {/* User Profile Header */}
+            <div className="flex items-center gap-3 pb-3 border-b border-white/10 mb-2.5">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/20">
+                {currentUser?.initials || 'AG'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-xs font-bold truncate text-white">{currentUser?.name || 'Adarsh Gupta'}</p>
+                  <span className="flex items-center gap-1 text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Online
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-300 truncate">{currentUser?.email || 'admin@evenmore.io'}</p>
+                <div className="mt-1">
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/10 text-blue-300 border border-white/10">
+                    {currentUser?.role || 'Operations Admin'}
+                  </span>
+                </div>
+              </div>
             </div>
+
+            {/* Quick Theme Switcher */}
+            <div className="pb-2.5 mb-2.5 border-b border-white/10">
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+                <span>Theme Mode</span>
+                <span className="text-[9px] text-blue-400 capitalize">{theme}</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {SIDEBAR_THEMES.map((t) => {
+                  const Icon = t.icon;
+                  const isSelected = theme === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => setTheme(t.id)}
+                      className={`flex flex-col items-center justify-center p-1.5 rounded-xl transition cursor-pointer text-center ${
+                        isSelected
+                          ? 'bg-blue-600 text-white font-bold shadow-xs'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/5'
+                      }`}
+                      title={t.name}
+                    >
+                      <Icon size={12} className="mb-0.5" />
+                      <span className="text-[9px] leading-none">{t.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Quick Navigation Links */}
             <div className="space-y-0.5 text-xs">
               <Link
                 to="/hrms/dashboard"
                 onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition"
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
               >
-                <User size={13} className="text-blue-400" />
-                <span>HR Profile & Attendance</span>
+                <User size={13} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-medium">HR Profile & Attendance</span>
               </Link>
               <Link
                 to="/administration/users"
                 onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition"
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
               >
-                <ShieldCheck size={13} className="text-emerald-400" />
-                <span>Administration & Roles</span>
+                <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-medium">Administration & Roles</span>
               </Link>
               <Link
                 to="/administration/settings"
                 onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-slate-200 hover:text-white transition"
+                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
               >
-                <Settings size={13} className="text-purple-400" />
-                <span>System Preferences</span>
+                <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-medium">System Preferences & Currency</span>
               </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  setIsGuideOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition text-left cursor-pointer group"
+              >
+                <BookOpen size={13} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                <span className="text-[11px] font-medium">Interactive User Guides</span>
+              </button>
+            </div>
+
+            {/* Footer / Session */}
+            <div className="pt-2 mt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
+              <span className="text-[9px] text-slate-400">Evenmore Cloud v2.6</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  alert('Session secured. Active demo user signed in.');
+                }}
+                className="hover:text-rose-400 flex items-center gap-1 cursor-pointer transition"
+                title="Lock Session"
+              >
+                <Lock size={10} />
+                <span>Lock</span>
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Footer
-      <div className="side-footer">
-        <div className="footer-link">Work Smarter Together</div>
-        <div className="footer-copy">© 2026 Evenmore Infotech</div>
-      </div>
-
-      {/* Resize handle */}
-      {/* <button
-        type="button"
-        className="sidebar-resize-handle"
-        aria-label="Resize sidebar"
-        onMouseDown={handleResizeStart}
-      >
-        <span className="resize-thumb" />
-      </button> */}
+      {/* Interactive Global User Guide Modal */}
+      <UserGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+      />
     </aside>
   );
 }

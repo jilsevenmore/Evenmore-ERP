@@ -13,8 +13,11 @@ import {
 } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 
+import { formatCurrency } from "../../../utils/currencyUtils";
+
 function formatAmount(value) {
-  return `Rs. ${value.toLocaleString("en-IN")}`;
+  const activeCurrency = localStorage.getItem('evenmore_currency') || 'USD ($)';
+  return formatCurrency(value || 0, activeCurrency, { noDecimals: true });
 }
 
 function getStatusTone(status) {

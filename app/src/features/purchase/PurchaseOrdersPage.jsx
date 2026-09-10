@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, DollarSign, Clock, CheckCircle2, Package } from 'lucide-react';
+import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, DollarSign, Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -27,12 +27,30 @@ const purchaseOrderGuide = {
 };
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
-    const { purchaseOrders, vendors, addPurchaseOrder, updatePurchaseOrderStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, } = useERP();
+    const { purchaseOrders, vendors, addPurchaseOrder, updatePurchaseOrderStatus, deletePurchaseOrder, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedPo, setSelectedPo] = useState(null);
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
     const [expectedDate, setExpectedDate] = useState('In 10 days');
     const [lineItems, setLineItems] = useState([]);
+
+    const handleOpenCreateModal = () => {
+        setSelectedVendorId(vendors[0]?.id || '');
+        setExpectedDate('In 10 days');
+        setLineItems([]);
+        setIsFullscreen(false);
+        setShowAddModal(true);
+    };
+
+    const handleCloseCreateModal = () => {
+        setShowAddModal(false);
+        setSelectedVendorId(vendors[0]?.id || '');
+        setExpectedDate('In 10 days');
+        setLineItems([]);
+        setIsFullscreen(false);
+    };
+
     const handleClonePo = (po) => {
         setSelectedVendorId(po.vendorId || vendors[0]?.id || '');
         setExpectedDate('In 10 days (Reorder)');
@@ -40,6 +58,7 @@ export const PurchaseOrdersPage = () => {
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         })));
+        setIsFullscreen(false);
         setShowAddModal(true);
     };
     const handleCreate = (e) => {
@@ -50,13 +69,12 @@ export const PurchaseOrdersPage = () => {
             vendorId: vend?.id,
             vendor: vend?.name || 'Cisco Systems Direct',
             amount: totalAmt > 0 ? totalAmt : 2500,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             expectedDate: expectedDate || 'In 10 days',
             status: 'Draft',
             items: lineItems,
         });
-        setShowAddModal(false);
-        setLineItems([]);
+        handleCloseCreateModal();
     };
     const issuePo = (id) => {
         updatePurchaseOrderStatus(id, 'Issued');
@@ -74,7 +92,7 @@ export const PurchaseOrdersPage = () => {
             {
                 label: 'Purchase Order',
                 docNumber: po.poNumber,
-                date: po.date,
+                date: formatDateDDMMYYYY(po.date),
                 amount: po.amount,
                 status: isIssued ? 'completed' : 'current',
             },
@@ -98,7 +116,7 @@ export const PurchaseOrdersPage = () => {
                 type: 'Purchase Bill',
                 number: linkedBill.billNumber,
                 amount: linkedBill.total || linkedBill.amount,
-                date: linkedBill.date || linkedBill.billDate,
+                date: formatDateDDMMYYYY(linkedBill.date || linkedBill.billDate),
                 status: linkedBill.status,
             });
             const relatedPayments = paymentOuts.filter((p) => p.billId === linkedBill.id || p.billNumber === linkedBill.billNumber);
@@ -107,7 +125,7 @@ export const PurchaseOrdersPage = () => {
                     type: 'Payment',
                     number: p.voucherNumber,
                     amount: p.amount,
-                    date: p.date,
+                    date: formatDateDDMMYYYY(p.date),
                     status: 'Paid',
                 });
             });
@@ -118,7 +136,7 @@ export const PurchaseOrdersPage = () => {
         {
             key: 'poNumber',
             header: 'PO Number',
-            render: (p) => (<button onClick={() => setSelectedPo(p)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left">
+            render: (p) => (<button onClick={() => setSelectedPo(p)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left cursor-pointer">
           <ClipboardList size={13} className="text-slate-400"/> {p.poNumber}
         </button>),
         },
@@ -130,7 +148,7 @@ export const PurchaseOrdersPage = () => {
         {
             key: 'date',
             header: 'PO Date',
-            render: (p) => <span className="text-slate-600">{p.date}</span>,
+            render: (p) => <span className="text-slate-600 font-mono text-[11px]">{formatDateDDMMYYYY(p.date)}</span>,
         },
         {
             key: 'expectedDate',
@@ -142,7 +160,7 @@ export const PurchaseOrdersPage = () => {
             header: 'Total Order Value',
             align: 'right',
             render: (p) => (<span className="font-mono font-bold text-slate-900">
-          ${(p.amount ?? p.total ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {formatCurrency(p.amount ?? p.total ?? 0)}
         </span>),
         },
         {
@@ -156,16 +174,32 @@ export const PurchaseOrdersPage = () => {
             header: 'Actions / Intake',
             align: 'right',
             render: (p) => {
-                return (<div className="flex items-center justify-end gap-1.5">
-            <button onClick={() => handleClonePo(p)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Clone / Reorder this Purchase Order">
-              <Copy size={13}/>
-            </button>
-            {p.status === 'Draft' ? (<button onClick={() => issuePo(p.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 shadow-sm">
-                <Send size={11}/> Issue PO
-              </button>) : (<button onClick={() => handleConvertToBill(p.id)} className="text-[11px] text-blue-700 font-semibold hover:underline flex items-center gap-1 justify-end cursor-pointer">
-                Create Bill <ArrowRight size={11}/>
-              </button>)}
-          </div>);
+                return (
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button onClick={() => handleClonePo(p)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Clone / Reorder this Purchase Order">
+                      <Copy size={13}/>
+                    </button>
+                    {p.status === 'Draft' && (
+                      <button
+                        type="button"
+                        onClick={() => deletePurchaseOrder(p.id)}
+                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                        title="Delete Draft PO"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                    {p.status === 'Draft' ? (
+                      <button onClick={() => issuePo(p.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded-xl text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 shadow-2xs">
+                        <Send size={11}/> Issue PO
+                      </button>
+                    ) : (
+                      <button onClick={() => handleConvertToBill(p.id)} className="text-[11px] text-blue-700 font-semibold hover:underline flex items-center gap-1 justify-end cursor-pointer">
+                        Create Bill <ArrowRight size={11}/>
+                      </button>
+                    )}
+                  </div>
+                );
             },
         },
     ];
@@ -175,13 +209,13 @@ export const PurchaseOrdersPage = () => {
     const receivedPoCount = purchaseOrders.filter(p => p.status === 'Received' || p.status === 'Billed').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Purchase Orders Management" subtitle="Issue procurement orders to suppliers for stock intake, manage component line items, and seamlessly convert to vendor bills." guide={purchaseOrderGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+      <PageHeader title="Purchase Orders Management" subtitle="Issue procurement orders to suppliers for stock intake, manage component line items, and seamlessly convert to vendor bills." guide={purchaseOrderGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
             Create Purchase Order
           </Button>}/>
 
       {/* Purchase Orders KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Committed Procurement" value={`$${totalPoValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} />
+        <StatCard label="Committed Procurement" value={formatCurrency(totalPoValue)} icon={DollarSign} />
         <StatCard label="Active Orders In-Flight" value={`${activePoCount} Orders`} icon={Clock} trend={{ positive: true, text: 'Awaiting dock arrival' }} highlight={activePoCount > 0} />
         <StatCard label="Draft Orders" value={`${draftPoCount} Drafts`} icon={Package} subtext="Ready for vendor dispatch" />
         <StatCard label="Fulfilled & Billed" value={`${receivedPoCount} Received`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
@@ -191,15 +225,32 @@ export const PurchaseOrdersPage = () => {
             p.vendor.toLowerCase().includes(term)}/>
 
       {/* Create PO Modal */}
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {showAddModal && (
+        <div className={`fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-4'}`}>
+          <div className={`bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+            isFullscreen ? 'w-full h-full rounded-none p-8' : 'max-w-5xl w-full rounded-2xl p-6 max-h-[92vh]'
+          } text-xs`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Draft New Purchase Order
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
-                <X size={18}/>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                  title={isFullscreen ? "Exit Fullscreen" : "Maximize Fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseCreateModal}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X size={18}/>
+                </button>
+              </div>
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
@@ -207,10 +258,31 @@ export const PurchaseOrdersPage = () => {
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Vendor / Supplier *</label>
                   <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
-                    {vendors.map((v) => (<option key={v.id} value={v.id}>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
                         {v.name} ({v.code}) - Terms: {v.paymentTerms}
-                      </option>))}
+                      </option>
+                    ))}
                   </select>
+                  {(() => {
+                    const vend = vendors.find(v => v.id === selectedVendorId) || vendors[0];
+                    if (!vend) return null;
+                    return (
+                      <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between font-bold text-slate-800">
+                          <span>{vend.name}</span>
+                          <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Terms: {vend.paymentTerms || 'Net 30'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
+                          <span>POC: <strong>{vend.contactPerson || 'Vendor Rep'}</strong></span>
+                          <span>Email: {vend.email}</span>
+                          <span>Phone: {vend.phone}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
@@ -225,10 +297,10 @@ export const PurchaseOrdersPage = () => {
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
+                <button type="button" onClick={handleCloseCreateModal} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm">
+                <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm cursor-pointer">
                   Save & Issue Purchase Order
                 </button>
               </div>
@@ -275,6 +347,18 @@ export const PurchaseOrdersPage = () => {
                 PO Value: <strong className="text-slate-900">${(selectedPo.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>
               </div>
               <div className="flex items-center gap-2">
+                {selectedPo.status === 'Draft' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      deletePurchaseOrder(selectedPo.id);
+                      setSelectedPo(null);
+                    }}
+                    className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 size={13} /> Delete Draft
+                  </button>
+                )}
                 {selectedPo.status === 'Draft' && (<Button onClick={() => { issuePo(selectedPo.id); setSelectedPo(null); }}>
                     Issue PO to Vendor
                   </Button>)}

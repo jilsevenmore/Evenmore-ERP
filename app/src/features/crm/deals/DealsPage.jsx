@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, DollarSign, Filter, MoreHorizontal, User, Building, Calendar, CheckCircle2, ArrowRight } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import { useERP } from '../../../context/ERPContext';
 
 const STAGES = [
   { id: 'prospect', label: 'Prospecting', color: 'border-blue-400 text-blue-700 bg-blue-50' },
@@ -11,6 +12,7 @@ const STAGES = [
 ];
 
 export default function DealsPage() {
+  const { formatCurrency } = useERP();
   const [deals, setDeals] = useState([
     {
       id: 'd-1',
@@ -38,29 +40,29 @@ export default function DealsPage() {
       company: 'Rangoni Of Florence',
       amount: 95000,
       stage: 'qualification',
-      owner: 'Rohit Sharma',
-      expectedClose: '30/09/2026',
-      contact: 'Christopher Maclead',
+      owner: 'David Patel',
+      expectedClose: '10/10/2026',
+      contact: 'Alok Verma',
     },
     {
       id: 'd-4',
-      title: 'POS Terminal Deployment (25 Units)',
-      company: 'Kwik Kopy Printing',
-      amount: 68000,
-      stage: 'prospect',
-      owner: 'David Patel',
-      expectedClose: '10/10/2026',
-      contact: 'James Merced',
+      title: 'Automated Pharmacy Dispenser System',
+      company: 'Fortis Health Central',
+      amount: 620000,
+      stage: 'won',
+      owner: 'Priya Mehta',
+      expectedClose: '01/09/2026',
+      contact: 'Sunita Rao',
     },
     {
       id: 'd-5',
-      title: 'Commercial Network Cabling Phase 2',
-      company: 'Morlong Associates',
-      amount: 145000,
-      stage: 'won',
-      owner: 'David Patel',
-      expectedClose: '01/09/2026',
-      contact: 'Tresa Sweely',
+      title: 'Industrial Cold Chain IoT Sensors',
+      company: 'Thermax Logistics',
+      amount: 140000,
+      stage: 'prospect',
+      owner: 'Rahul Deshmukh',
+      expectedClose: '22/10/2026',
+      contact: 'Karan Mehra',
     },
   ]);
 
@@ -73,7 +75,7 @@ export default function DealsPage() {
     owner: 'David Patel',
   });
 
-  const handleAddDeal = (e) => {
+  const handleCreate = (e) => {
     e.preventDefault();
     if (!newDeal.title || !newDeal.company) return;
     const created = {
@@ -97,7 +99,7 @@ export default function DealsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Deals & Opportunities"
-        subtitle={`Active pipeline tracking (${deals.length} deals • Rs. ${totalPipeline.toLocaleString('en-IN')})`}
+        subtitle={`Active pipeline tracking (${deals.length} deals • ${formatCurrency(totalPipeline, { noDecimals: true })})`}
         actions={
           <button
             type="button"
@@ -109,54 +111,51 @@ export default function DealsPage() {
         }
       />
 
+      {/* Add Deal Form */}
       {isAddOpen && (
-        <form onSubmit={handleAddDeal} className="card p-5 space-y-4 border-2 border-blue-500/30 animate-in fade-in">
-          <h3 className="font-bold text-sm">Create New Commercial Deal</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="form-label text-xs">Deal Title *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Diagnostic Equipment Requisition"
-                value={newDeal.title}
-                onChange={(e) => setNewDeal({ ...newDeal, title: e.target.value })}
-                className="form-input text-xs"
-              />
-            </div>
-            <div>
-              <label className="form-label text-xs">Client / Company Name *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Hirapara Industries"
-                value={newDeal.company}
-                onChange={(e) => setNewDeal({ ...newDeal, company: e.target.value })}
-                className="form-input text-xs"
-              />
-            </div>
-            <div>
-              <label className="form-label text-xs">Deal Value (Rs.) *</label>
-              <input
-                type="number"
-                required
-                value={newDeal.amount}
-                onChange={(e) => setNewDeal({ ...newDeal, amount: Number(e.target.value) })}
-                className="form-input text-xs font-mono"
-              />
-            </div>
-            <div>
-              <label className="form-label text-xs">Initial Stage</label>
-              <select
-                value={newDeal.stage}
-                onChange={(e) => setNewDeal({ ...newDeal, stage: e.target.value })}
-                className="form-select text-xs"
-              >
-                {STAGES.map((s) => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
-                ))}
-              </select>
-            </div>
+        <form onSubmit={handleCreate} className="card p-4 space-y-3 bg-blue-50/50 dark:bg-slate-900/40 border border-blue-200 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">New Deal Opportunity</h3>
+            <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600">
+              ✕
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <input
+              type="text"
+              required
+              placeholder="Deal Title *"
+              value={newDeal.title}
+              onChange={(e) => setNewDeal({ ...newDeal, title: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="text"
+              required
+              placeholder="Company / Account *"
+              value={newDeal.company}
+              onChange={(e) => setNewDeal({ ...newDeal, company: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="number"
+              required
+              placeholder="Expected Value (INR)"
+              value={newDeal.amount}
+              onChange={(e) => setNewDeal({ ...newDeal, amount: Number(e.target.value) })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <select
+              value={newDeal.stage}
+              onChange={(e) => setNewDeal({ ...newDeal, stage: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            >
+              {STAGES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setIsAddOpen(false)} className="btn-ghost btn-sm">
@@ -182,7 +181,7 @@ export default function DealsPage() {
                   {stage.label} ({stageDeals.length})
                 </span>
                 <span className="text-[11px] font-mono text-slate-500 font-bold">
-                  Rs. {(stageTotal / 1000).toFixed(0)}k
+                  {formatCurrency(stageTotal, { noDecimals: true })}
                 </span>
               </div>
 
@@ -208,9 +207,11 @@ export default function DealsPage() {
                       </div>
                       <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-slate-800">
                         <span className="font-bold font-mono text-xs text-blue-600 dark:text-blue-400">
-                          Rs. {deal.amount.toLocaleString('en-IN')}
+                          {formatCurrency(deal.amount, { noDecimals: true })}
                         </span>
-                        <span className="text-[10px] text-slate-400">{deal.expectedClose}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {deal.owner.split(' ')[0]}
+                        </span>
                       </div>
 
                       {/* Stage Progression Shortcut */}

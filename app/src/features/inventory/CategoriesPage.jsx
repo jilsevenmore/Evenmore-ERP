@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Plus, Layers, Clock, Sliders, Trash2, X, Boxes, Wrench, CheckCircle2, Cpu } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 
 const categoryGuide = {
     title: 'Category Hierarchy & Taxonomy',
@@ -42,6 +42,7 @@ const categoryGuide = {
 export const CategoriesPage = () => {
     const { categories, addCategory, updateCategory, items, categoryParts = [], addCategoryPart, removeCategoryPart } = useERP();
     const location = useLocation();
+    const navigate = useNavigate();
 
     const isMachineView = location.pathname.includes('/machine');
     const isStockView = location.pathname.includes('/stock');
@@ -273,11 +274,12 @@ export const CategoriesPage = () => {
         guide={categoryGuide}
         actions={
           <div className="flex items-center gap-2">
-            <Link to={isMachineView ? '/inventory/items/machines' : '/inventory/items/stock'}>
-              <Button variant="outline">
-                {isMachineView ? 'View Machines' : 'View Stock Items'}
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              onClick={() => navigate(isMachineView ? '/inventory/items/machines' : '/inventory/items/stock')}
+            >
+              {isMachineView ? 'View Machines' : 'View Stock Items'}
+            </Button>
             <Button icon={Plus} onClick={() => setShowAddModal(true)}>
               {isMachineView ? 'Create Machine Category' : 'Create Category'}
             </Button>

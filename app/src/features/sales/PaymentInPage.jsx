@@ -34,7 +34,7 @@ const paymentInGuide = {
     ],
 };
 export const PaymentInPage = () => {
-    const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding } = useERP();
+    const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
     const [amount, setAmount] = useState(1000);
@@ -57,7 +57,7 @@ export const PaymentInPage = () => {
             customer: inv?.customer || cust?.name || 'Acme Corp',
             invoiceId: inv?.id,
             invoiceNumber: inv?.invoiceNumber || 'INV-2026-001',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             mode,
             amount: Number(amount) || 1000,
             reference: reference || `WIRE-${Date.now()}`,
@@ -86,7 +86,7 @@ export const PaymentInPage = () => {
         {
             key: 'date',
             header: 'Payment Date',
-            render: (p) => <span className="text-slate-600">{p.date}</span>,
+            render: (p) => <span className="text-slate-600">{formatDateDDMMYYYY(p.date)}</span>,
         },
         {
             key: 'mode',
@@ -105,7 +105,7 @@ export const PaymentInPage = () => {
             header: 'Amount Received',
             align: 'right',
             render: (p) => (<span className="font-mono font-bold text-emerald-700">
-          +${(p.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          +{formatCurrency(p.amount ?? 0)}
         </span>),
         },
     ];
@@ -124,9 +124,9 @@ export const PaymentInPage = () => {
 
       {/* Payment In KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Received Collections" value={`$${totalCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} highlight />
+        <StatCard label="Total Received Collections" value={formatCurrency(totalCollected)} icon={DollarSign} highlight />
         <StatCard label="Total Vouchers Issued" value={`${paymentIns.length} Receipts`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
-        <StatCard label="Avg Receipt Amount" value={`$${avgReceipt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={TrendingUp} />
+        <StatCard label="Avg Receipt Amount" value={formatCurrency(avgReceipt)} icon={TrendingUp} />
         <StatCard label="Bank & Wire Transfers" value={`${wireCount} Settlements`} icon={CheckCircle2} subtext="Direct Treasury intake" />
       </div>
 

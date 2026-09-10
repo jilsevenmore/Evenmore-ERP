@@ -32,7 +32,7 @@ const generalLedgerGuide = {
     ],
 };
 export const GeneralLedgerPage = () => {
-    const { journalEntries, addJournalEntry } = useERP();
+    const { journalEntries, addJournalEntry, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [description, setDescription] = useState('');
     const [debitAccount, setDebitAccount] = useState('1010 - Cash & Bank');
@@ -44,7 +44,7 @@ export const GeneralLedgerPage = () => {
         const parsedAmount = parseFloat(amount) || 1000;
         addJournalEntry({
             entryNumber: `JE-2026-${String(journalEntries.length + 80).padStart(3, '0')}`,
-            date: new Date().toISOString().split('T')[0],
+            date: getCurrentDateFormatted(),
             description: description || 'Manual Adjustment Entry',
             reference: reference || 'MEMO-01',
             debitAccount,
@@ -70,7 +70,7 @@ export const GeneralLedgerPage = () => {
         {
             key: 'date',
             header: 'Posting Date',
-            render: (e) => <span className="text-slate-600">{e.date}</span>,
+            render: (e) => <span className="text-slate-600">{formatDateDDMMYYYY(e.date)}</span>,
         },
         {
             key: 'description',
@@ -96,10 +96,10 @@ export const GeneralLedgerPage = () => {
         },
         {
             key: 'amount',
-            header: 'Entry Balance ($)',
+            header: 'Entry Balance',
             align: 'right',
             render: (e) => (<span className="font-mono font-bold text-slate-900">
-          ${e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {formatCurrency(e.amount)}
         </span>),
         },
     ];
@@ -113,7 +113,7 @@ export const GeneralLedgerPage = () => {
           <div>
             <span className="text-xs text-slate-500 font-semibold uppercase">Total Debits (Dr)</span>
             <p className="text-lg font-bold text-blue-900 mt-1">
-              ${totalDebits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatCurrency(totalDebits)}
             </p>
           </div>
           <ArrowDownLeft className="text-blue-600" size={24}/>
@@ -122,7 +122,7 @@ export const GeneralLedgerPage = () => {
           <div>
             <span className="text-xs text-slate-500 font-semibold uppercase">Total Credits (Cr)</span>
             <p className="text-lg font-bold text-emerald-900 mt-1">
-              ${totalCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatCurrency(totalCredits)}
             </p>
           </div>
           <ArrowUpRight className="text-emerald-600" size={24}/>
@@ -130,7 +130,7 @@ export const GeneralLedgerPage = () => {
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 font-semibold uppercase">Trial Balance Net</span>
-            <p className="text-lg font-bold text-slate-800 mt-1">$0.00 (Balanced)</p>
+            <p className="text-lg font-bold text-slate-800 mt-1">{formatCurrency(0)} (Balanced)</p>
           </div>
           <Scale className="text-emerald-600" size={24}/>
         </div>

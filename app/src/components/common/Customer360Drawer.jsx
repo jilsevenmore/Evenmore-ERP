@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { X, Printer, Phone, Mail, MapPin } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 export const Customer360Drawer = ({ customer, onClose }) => {
-    const { salesOrders, invoices, paymentIns, deliveryChallans } = useERP();
+    const { salesOrders, invoices, paymentIns, deliveryChallans, formatCurrency, formatDateDDMMYYYY } = useERP();
 
     // UX only: Esc closes, background scroll locks while open. No data changes.
     useEffect(() => {
@@ -61,19 +61,19 @@ export const Customer360Drawer = ({ customer, onClose }) => {
               <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase block">Outstanding Due</span>
                 <p className="font-mono font-bold text-sm text-slate-900 mt-0.5">
-                  ${balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatCurrency(balance)}
                 </p>
               </div>
               <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase block">Credit Limit</span>
                 <p className="font-mono font-semibold text-sm text-slate-700 mt-0.5">
-                  ${creditLimit.toLocaleString()}
+                  {formatCurrency(creditLimit, { noDecimals: true })}
                 </p>
               </div>
               <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
                 <span className="text-[10px] text-emerald-700 font-semibold uppercase block">Lifetime Billed</span>
                 <p className="font-mono font-bold text-sm text-emerald-800 mt-0.5">
-                  ${totalLifetimeSpent.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatCurrency(totalLifetimeSpent)}
                 </p>
               </div>
             </div>
@@ -82,7 +82,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
             <div className="space-y-1 pt-1">
               <div className="flex justify-between text-[11px] text-slate-600 font-medium">
                 <span>Credit Utilization ({creditUsedPct}%)</span>
-                <span>${(creditLimit - balance).toLocaleString()} available</span>
+                <span>{formatCurrency(creditLimit - balance, { noDecimals: true })} available</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2">
                 <div className={`h-2 rounded-full ${creditUsedPct > 85 ? 'bg-rose-500' : creditUsedPct > 60 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${creditUsedPct}%` }}/>
@@ -99,10 +99,10 @@ export const Customer360Drawer = ({ customer, onClose }) => {
               {customerInvoices.length === 0 ? (<p className="p-4 text-center text-slate-400">No invoices recorded for this account.</p>) : (customerInvoices.map((inv) => (<div key={inv.id} className="p-3 flex items-center justify-between hover:bg-slate-50">
                     <div>
                       <span className="font-mono font-bold text-slate-900">{inv.invoiceNumber}</span>
-                      <p className="text-[10px] text-slate-400">{inv.date} • Due: {inv.dueDate}</p>
+                      <p className="text-[10px] text-slate-400">{formatDateDDMMYYYY(inv.date)} • Due: {formatDateDDMMYYYY(inv.dueDate)}</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono font-bold text-slate-900">${inv.total.toFixed(2)}</span>
+                      <span className="font-mono font-bold text-slate-900">{formatCurrency(inv.total)}</span>
                       <span className={`block text-[10px] font-semibold ${inv.status === 'Paid' ? 'text-emerald-700' : 'text-amber-700'}`}>
                         {inv.status}
                       </span>
@@ -118,10 +118,10 @@ export const Customer360Drawer = ({ customer, onClose }) => {
               {customerOrders.length === 0 ? (<p className="p-4 text-center text-slate-400">No sales orders found.</p>) : (customerOrders.map((so) => (<div key={so.id} className="p-3 flex items-center justify-between hover:bg-slate-50">
                     <div>
                       <span className="font-mono font-bold text-blue-700">{so.orderNumber}</span>
-                      <p className="text-[10px] text-slate-400">{so.date} • {so.items?.length || 0} line items</p>
+                      <p className="text-[10px] text-slate-400">{formatDateDDMMYYYY(so.date)} • {so.items?.length || 0} line items</p>
                     </div>
                     <div className="text-right">
-                      <span className="font-mono font-bold text-slate-900">${so.amount.toFixed(2)}</span>
+                      <span className="font-mono font-bold text-slate-900">{formatCurrency(so.amount)}</span>
                       <span className="block text-[10px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-full mt-0.5">
                         {so.stage}
                       </span>

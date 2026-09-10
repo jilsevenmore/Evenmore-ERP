@@ -55,8 +55,11 @@ const DETAIL_TABS = [
   'Activity',
 ];
 
+import { formatCurrency } from '../../../utils/currencyUtils';
+
 function formatAmount(value) {
-  return `Rs. ${(value || 0).toLocaleString('en-IN')}`;
+  const activeCurrency = localStorage.getItem('evenmore_currency') || 'USD ($)';
+  return formatCurrency(value || 0, activeCurrency, { noDecimals: true });
 }
 
 // ── 1. Sources & Emails Tab (Screenshot Focus) ────────────────

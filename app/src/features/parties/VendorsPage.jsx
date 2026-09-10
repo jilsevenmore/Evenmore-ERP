@@ -33,7 +33,7 @@ const vendorGuide = {
     ],
 };
 export const VendorsPage = () => {
-    const { vendors, addVendor, getVendorLedger } = useERP();
+    const { vendors, addVendor, getVendorLedger, formatCurrency, formatDateDDMMYYYY } = useERP();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedVendor, setSelectedVendor] = useState(null);
     const [newVend, setNewVend] = useState({
@@ -85,7 +85,7 @@ export const VendorsPage = () => {
             render: (v) => {
                 const bal = v.balance ?? 0;
                 return (<span className={`font-mono font-bold ${bal > 0 ? 'text-amber-700' : 'text-slate-700'}`}>
-            ${bal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {formatCurrency(bal)}
           </span>);
             },
         },
@@ -131,7 +131,7 @@ export const VendorsPage = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total Suppliers" value={vendors.length} icon={Building2}/>
-        <StatCard label="Accounts Payable" value={`$${totalPayable.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign}/>
+        <StatCard label="Accounts Payable" value={formatCurrency(totalPayable)} icon={DollarSign}/>
         <StatCard label="Standard Terms" value="Net 30 / Net 45" icon={Clock}/>
       </div>
 
@@ -237,19 +237,19 @@ export const VendorsPage = () => {
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Total Billed (Liability Credit)</span>
                   <p className="text-lg font-bold font-mono text-slate-900 mt-0.5">
-                    ${vendorEntries.reduce((s, e) => s + e.credit, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatCurrency(vendorEntries.reduce((s, e) => s + e.credit, 0))}
                   </p>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Total Disbursed (Debit)</span>
                   <p className="text-lg font-bold font-mono text-emerald-700 mt-0.5">
-                    ${vendorEntries.reduce((s, e) => s + e.debit, 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatCurrency(vendorEntries.reduce((s, e) => s + e.debit, 0))}
                   </p>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Net Accounts Payable Balance</span>
                   <p className="text-lg font-bold font-mono text-amber-700 mt-0.5">
-                    ${(selectedVendor.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatCurrency(selectedVendor.balance || 0)}
                   </p>
                 </div>
               </div>
@@ -268,9 +268,9 @@ export const VendorsPage = () => {
                         <th className="py-2.5 px-3">Type</th>
                         <th className="py-2.5 px-3">Reference #</th>
                         <th className="py-2.5 px-3">Description</th>
-                        <th className="py-2.5 px-3 text-right">Debit (Payment/Return $)</th>
-                        <th className="py-2.5 px-3 text-right">Credit (Bill $)</th>
-                        <th className="py-2.5 px-3 text-right">Payable Balance ($)</th>
+                        <th className="py-2.5 px-3 text-right">Debit (Payment/Return)</th>
+                        <th className="py-2.5 px-3 text-right">Credit (Bill)</th>
+                        <th className="py-2.5 px-3 text-right">Payable Balance</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -279,18 +279,18 @@ export const VendorsPage = () => {
                             No statement transactions recorded for this supplier.
                           </td>
                         </tr>) : (vendorEntries.map((e) => (<tr key={e.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{e.date}</td>
+                            <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{formatDateDDMMYYYY(e.date)}</td>
                             <td className="py-2 px-3 font-semibold text-slate-800">{e.type}</td>
                             <td className="py-2 px-3 font-mono text-blue-600 font-bold">{e.reference}</td>
                             <td className="py-2 px-3 text-slate-600 max-w-xs truncate">{e.description}</td>
                             <td className="py-2 px-3 text-right font-mono text-emerald-700">
-                              {e.debit > 0 ? `$${e.debit.toFixed(2)}` : '-'}
+                              {e.debit > 0 ? formatCurrency(e.debit) : '-'}
                             </td>
                             <td className="py-2 px-3 text-right font-mono text-slate-800">
-                              {e.credit > 0 ? `$${e.credit.toFixed(2)}` : '-'}
+                              {e.credit > 0 ? formatCurrency(e.credit) : '-'}
                             </td>
                             <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
-                              ${e.balance.toFixed(2)}
+                              {formatCurrency(e.balance)}
                             </td>
                           </tr>)))}
                     </tbody>

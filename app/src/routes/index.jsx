@@ -204,6 +204,8 @@ const router = createBrowserRouter([
       { path: 'categories/machines', element: <Navigate to="/inventory/categories/machines" replace /> },
       { path: 'categories/stock', element: <Navigate to="/inventory/categories/stock" replace /> },
       { path: 'stock', element: <Navigate to="/inventory/stock-position" replace /> },
+      { path: 'transfers', element: <Navigate to="/inventory/transfers" replace /> },
+      { path: 'purchase-orders', element: <Navigate to="/purchase/orders" replace /> },
 
       // ── Accounts ──────────────────────────────────────────
       { path: 'accounts', element: <Navigate to="/accounts/cash-bank" replace /> },

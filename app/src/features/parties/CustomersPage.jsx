@@ -23,7 +23,7 @@ const customerGuide = {
     workflow: ['Customer Profile Setup', 'Sales Orders Booked', 'Tax Invoices Issued', 'Payment Vouchers Posted', 'Ledger Reconciled'],
 };
 export const CustomersPage = () => {
-    const { customers, addCustomer, getCustomerLedger } = useERP();
+    const { customers, addCustomer, getCustomerLedger, formatCurrency } = useERP();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCust360, setSelectedCust360] = useState(null);
     const [newCust, setNewCust] = useState({
@@ -67,7 +67,7 @@ export const CustomersPage = () => {
             render: (c) => {
                 const bal = c.balance ?? 0;
                 return (<span className={`font-mono font-bold ${bal > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
-            ${bal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            {formatCurrency(bal)}
           </span>);
             },
         },
@@ -75,7 +75,7 @@ export const CustomersPage = () => {
             header: 'Credit Limit',
             accessor: 'creditLimit',
             align: 'right',
-            render: (c) => `$${(c.creditLimit ?? 0).toLocaleString()}`,
+            render: (c) => formatCurrency(c.creditLimit ?? 0, { noDecimals: true }),
         },
         {
             header: 'Status',
@@ -119,7 +119,7 @@ export const CustomersPage = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total Customers" value={customers.length} icon={Users}/>
-        <StatCard label="Accounts Receivable" value={`$${totalOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign}/>
+        <StatCard label="Accounts Receivable" value={formatCurrency(totalOutstanding)} icon={DollarSign}/>
         <StatCard label="Active Accounts" value={customers.filter((c) => c.status === 'Active').length} icon={ShieldAlert}/>
       </div>
 

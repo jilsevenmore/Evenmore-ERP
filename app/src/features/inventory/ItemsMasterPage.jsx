@@ -11,7 +11,7 @@ import { BarcodeLabelModal } from '../../components/common/BarcodeLabelModal';
 import { ImportModal } from '../../components/common/ImportModal';
 
 export const ItemsMasterPage = () => {
-    const { items, itemParts = [], addInventoryItem, vendors, addPurchaseOrder } = useERP();
+    const { items, itemParts = [], addInventoryItem, vendors, addPurchaseOrder, formatCurrency } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
     
@@ -94,13 +94,15 @@ export const ItemsMasterPage = () => {
     const columns = [
         {
             key: 'sku',
-            header: 'SKU / Part No.',
+            header: 'SKU / Model #',
             render: (i) => (
-              <div>
-                <span className="font-mono font-bold text-slate-800 text-xs">{i.sku}</span>
-                {i.trackingMode === 'Serial' && (
-                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] px-1.5 py-0.2 bg-amber-50 text-amber-800 border border-amber-200 rounded font-semibold">
-                    <QrCode size={10} /> Serial
+              <div className="flex items-center gap-1.5">
+                <Link to={`/inventory/items/edit/${i.id}`} className="font-mono font-bold text-blue-600 hover:underline">
+                  {i.sku}
+                </Link>
+                {i.itemKind === 'Machine' && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase bg-purple-50 text-purple-700 px-1.5 py-0.2 rounded border border-purple-200">
+                    <Cpu size={10} /> Machine
                   </span>
                 )}
               </div>
@@ -108,19 +110,28 @@ export const ItemsMasterPage = () => {
         },
         {
             key: 'name',
-            header: isMachineView ? 'Machine Title & Specs' : 'Product / Component Description',
+            header: 'Description & Taxonomy',
             render: (i) => {
-              const partsCount = itemParts.filter((ip) => ip.parentItemId === i.id).length;
+              const machinePartsCount = i.itemKind === 'Machine'
+                ? itemParts.filter(ip => String(ip.itemId) === String(i.id)).length
+                : 0;
+
               return (
                 <div>
-                  <p className="font-bold text-[#1F2E4A] text-xs">{i.name}</p>
-                  <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
-                    <span>{i.category}</span>
-                    {i.itemKind === 'Machine' && (
+                  <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-[#1F2E4A] hover:underline block">
+                    {i.name}
+                  </Link>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] text-slate-500 font-medium">{i.category}</span>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                      <MapPin size={9}/> {i.location || 'Central Bay'}
+                    </span>
+                    {machinePartsCount > 0 && (
                       <>
-                        <span>•</span>
-                        <span className="text-purple-700 font-semibold flex items-center gap-1">
-                          <Boxes size={11} /> {partsCount} BOM Part{partsCount === 1 ? '' : 's'}
+                        <span className="text-slate-300">•</span>
+                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
+                          {machinePartsCount} BOM parts
                         </span>
                       </>
                     )}
@@ -130,42 +141,30 @@ export const ItemsMasterPage = () => {
             },
         },
         {
-            key: 'kind',
-            header: 'Kind',
+            key: 'itemKind',
+            header: 'Item Type',
             align: 'center',
-            render: (i) => {
-              const kind = i.itemKind || 'Standalone';
-              const colorClass =
-                kind === 'Machine'
+            render: (i) => (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                i.itemKind === 'Machine'
                   ? 'bg-purple-50 text-purple-700 border-purple-200'
-                  : kind === 'Part'
-                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                  : 'bg-slate-100 text-slate-700 border-slate-200';
-
-              return (
-                <span className={`text-[10px] px-2 py-0.5 rounded font-semibold border ${colorClass}`}>
-                  {kind}
-                </span>
-              );
-            },
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+              }`}>
+                {i.itemKind === 'Machine' ? <Cpu size={11} /> : <Package size={11} />}
+                {i.itemKind || 'Standard Item'}
+              </span>
+            ),
         },
         {
-            key: 'location',
-            header: 'Location / Bin',
-            render: (i) => (<span className="text-slate-600 flex items-center gap-1 text-[11px]">
-          <MapPin size={11} className="text-slate-400"/> {i.location || 'Main Warehouse'}
-        </span>),
-        },
-        {
-            key: 'availableQty',
-            header: 'Stock On Hand',
+            key: 'stock',
+            header: 'Live Stock Buffer',
             align: 'center',
-            render: (i) => (<div className="font-mono">
-          <span className={`font-bold ${i.status === 'Critical' || (i.availableQty ?? i.stock ?? 0) <= 2
+            render: (i) => (<div className="flex items-center justify-center">
+          <span className={`font-mono font-bold text-xs ${i.status === 'Critical'
                     ? 'text-rose-600'
-                    : (i.availableQty ?? i.stock ?? 0) <= (i.reorderLevel || 5)
+                    : i.status === 'Low Stock'
                         ? 'text-amber-600'
-                        : 'text-slate-900'}`}>
+                        : 'text-emerald-700'}`}>
             {i.availableQty ?? i.stock ?? 0}
           </span>
           <span className="text-[10px] text-slate-400 ml-1">{i.salesUnit || i.uom || 'Unit'}</span>
@@ -179,9 +178,9 @@ export const ItemsMasterPage = () => {
                 const cost = i.costPrice ?? i.unitCost ?? 0;
                 const selling = i.sellingPrice ?? 0;
                 return (<div className="font-mono text-[11px]">
-            <span className="text-slate-500">₹{cost.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            <span className="text-slate-500">{formatCurrency(cost)}</span>
             <span className="text-slate-300 mx-1">/</span>
-            <span className="font-semibold text-emerald-700">₹{selling.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+            <span className="font-semibold text-emerald-700">{formatCurrency(selling)}</span>
           </div>);
             },
         },
@@ -252,16 +251,19 @@ export const ItemsMasterPage = () => {
             <Button variant="outline" icon={Upload} onClick={() => setIsImportOpen(true)}>
               Import CSV
             </Button>
-            <Link to={isMachineView ? '/inventory/categories/machines' : '/inventory/categories/stock'}>
-              <Button variant="outline" icon={Layers}>
-                {isMachineView ? 'Machine Categories' : 'Stock Categories'}
-              </Button>
-            </Link>
-            <Link to={`/inventory/items/new?kind=${newItemKind}`}>
-              <Button icon={Plus}>
-                {isMachineView ? 'Add New Machine' : 'Add New Stock Part'}
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              icon={Layers}
+              onClick={() => navigate(isMachineView ? '/inventory/categories/machines' : '/inventory/categories/stock')}
+            >
+              {isMachineView ? 'Machine Categories' : 'Stock Categories'}
+            </Button>
+            <Button
+              icon={Plus}
+              onClick={() => navigate(`/inventory/items/new?kind=${newItemKind}`)}
+            >
+              {isMachineView ? 'Add New Machine' : 'Add New Stock Part'}
+            </Button>
           </div>
         }
       />
@@ -303,7 +305,7 @@ export const ItemsMasterPage = () => {
       {/* Item Master KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <StatCard label={isMachineView ? 'Total Machines' : 'Total Stock SKUs'} value={`${displayItems.length} SKUs`} icon={isMachineView ? Cpu : Package} />
-        <StatCard label="Total Asset Valuation" value={`₹${Math.round(totalCatalogValue).toLocaleString('en-IN')}`} icon={DollarSign} />
+        <StatCard label="Total Asset Valuation" value={formatCurrency(Math.round(totalCatalogValue), { noDecimals: true })} icon={DollarSign} />
         <StatCard label="Low Stock Alerts" value={`${lowStockItems.length} SKUs`} icon={AlertTriangle} trend={{ positive: lowStockItems.length === 0, text: lowStockItems.length > 0 ? 'Requires Reorder' : 'Healthy Buffers' }} highlight={lowStockItems.length > 0} />
         <StatCard label="Categories Represented" value={`${uniqueCategoriesCount} Categories`} icon={Layers} subtext="Taxonomic Hierarchy" />
       </div>

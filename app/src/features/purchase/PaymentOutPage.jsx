@@ -33,7 +33,7 @@ const paymentOutGuide = {
     ],
 };
 export const PaymentOutPage = () => {
-    const { paymentOuts, purchaseBills, vendors, addPaymentOut, getBillOutstanding } = useERP();
+    const { paymentOuts, purchaseBills, vendors, addPaymentOut, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState(purchaseBills[0]?.id || '');
     const [amount, setAmount] = useState(1000);
@@ -56,7 +56,7 @@ export const PaymentOutPage = () => {
             vendor: bill?.vendor || vend?.name || 'Arrow Electronics Supply',
             billId: bill?.id,
             billNumber: bill?.billNumber || 'PB-2026-015',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             mode,
             amount: Number(amount) || 1000,
             reference: reference || `ACH-${Date.now()}`,
@@ -85,7 +85,7 @@ export const PaymentOutPage = () => {
         {
             key: 'date',
             header: 'Disbursement Date',
-            render: (p) => <span className="text-slate-600">{p.date}</span>,
+            render: (p) => <span className="text-slate-600">{formatDateDDMMYYYY(p.date)}</span>,
         },
         {
             key: 'mode',
@@ -104,7 +104,7 @@ export const PaymentOutPage = () => {
             header: 'Disbursed Amount',
             align: 'right',
             render: (p) => (<span className="font-mono font-bold text-rose-700">
-          -${(p.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          -{formatCurrency(p.amount ?? 0)}
         </span>),
         },
     ];
@@ -123,9 +123,9 @@ export const PaymentOutPage = () => {
 
       {/* Payment Out KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Disbursed" value={`$${totalDisbursed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} />
+        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={DollarSign} />
         <StatCard label="Total Disbursed Vouchers" value={`${paymentOuts.length} Vouchers`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
-        <StatCard label="Avg Disbursement" value={`$${avgDisbursement.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={TrendingDown} />
+        <StatCard label="Avg Disbursement" value={formatCurrency(avgDisbursement)} icon={TrendingDown} />
         <StatCard label="ACH & Wire Settlements" value={`${achCount} Electronic`} icon={CheckCircle2} subtext="Direct Treasury debit" />
       </div>
 

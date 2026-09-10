@@ -19,7 +19,7 @@ const holdingAgeDays = (id) => {
     return h;
 };
 export const ValuationAgeingPage = () => {
-    const { items } = useERP();
+    const { items, formatCurrency } = useERP();
     const [selectedBucket, setSelectedBucket] = useState('All');
     // Live valuation rows derived from current inventory (was hardcoded demo data).
     const agingData = useMemo(() => (items || []).map((it) => {
@@ -79,14 +79,14 @@ export const ValuationAgeingPage = () => {
             key: 'unitCost',
             header: 'Unit Cost',
             align: 'right',
-            render: (r) => (<span className="font-mono text-slate-700">${r.unitCost.toLocaleString()}</span>),
+            render: (r) => (<span className="font-mono text-slate-700">{formatCurrency(r.unitCost)}</span>),
         },
         {
             key: 'totalValuation',
             header: 'Gross Carrying Value',
             align: 'right',
             render: (r) => (<span className="font-mono font-bold text-slate-900">
-          ${r.totalValuation.toLocaleString()}
+          {formatCurrency(r.totalValuation)}
         </span>),
         },
         {
@@ -120,8 +120,8 @@ export const ValuationAgeingPage = () => {
             align: 'right',
             render: (r) => (<span className="font-mono text-rose-700 font-semibold">
           {r.depreciationReserve > 0
-                    ? `-$${r.depreciationReserve.toLocaleString()}`
-                    : '$0.00'}
+                    ? `-${formatCurrency(r.depreciationReserve)}`
+                    : formatCurrency(0)}
         </span>),
         },
     ];
@@ -138,10 +138,10 @@ export const ValuationAgeingPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Inventory Assets" value={`$${totalValuation.toLocaleString()}`} icon={DollarSign}/>
-        <StatCard label="Current Stock (0-30 Days)" value={`$${currentStockValue.toLocaleString()}`} trend={{ positive: true, text: 'High velocity turnover' }}/>
-        <StatCard label="Stale Stock (90+ Days)" value={`$${staleValuation.toLocaleString()}`} trend={{ positive: false, text: 'Review for clearance' }}/>
-        <StatCard label="Obsolescence Provision" value={`$${totalDepreciation.toLocaleString()}`} trend={{ positive: true, text: 'Fully reserved on balance sheet' }}/>
+        <StatCard label="Total Inventory Assets" value={formatCurrency(totalValuation, { noDecimals: true })} icon={DollarSign}/>
+        <StatCard label="Current Stock (0-30 Days)" value={formatCurrency(currentStockValue, { noDecimals: true })} trend={{ positive: true, text: 'High velocity turnover' }}/>
+        <StatCard label="Stale Stock (90+ Days)" value={formatCurrency(staleValuation, { noDecimals: true })} trend={{ positive: false, text: 'Review for clearance' }}/>
+        <StatCard label="Obsolescence Provision" value={formatCurrency(totalDepreciation, { noDecimals: true })} trend={{ positive: true, text: 'Fully reserved on balance sheet' }}/>
       </div>
 
       {/* Bucket Filter */}

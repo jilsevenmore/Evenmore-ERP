@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import { useERP } from '../../../context/ERPContext';
 
 export default function UserAllocationPage() {
+  const { formatCurrency } = useERP();
   const [teamMembers, setTeamMembers] = useState([
     {
       id: 1,
@@ -38,45 +40,83 @@ export default function UserAllocationPage() {
       phone: '+91 98777 88990',
       leadsAssigned: 19,
       dealsClosed: 9,
-      conversionRate: '47.3%',
-      activePipeline: 310000,
-      avatar: 'https://i.pravatar.cc/160?img=15',
-      status: 'Online',
+      conversionRate: '47.4%',
+      activePipeline: 280000,
+      avatar: 'https://i.pravatar.cc/160?img=12',
+      status: 'Offline',
     },
     {
       id: 4,
-      name: 'Anuska Shah',
-      role: 'Customer Success & Inbound Lead Rep',
-      email: 'anuska@evenmore.io',
+      name: 'Ananya Deshmukh',
+      role: 'Customer Success & Inbound Leads',
+      email: 'ananya@evenmore.io',
       phone: '+91 98111 22334',
-      leadsAssigned: 42,
-      dealsClosed: 16,
-      conversionRate: '38.0%',
-      activePipeline: 240000,
-      avatar: 'https://i.pravatar.cc/160?img=38',
-      status: 'Offline',
+      leadsAssigned: 24,
+      dealsClosed: 11,
+      conversionRate: '45.8%',
+      activePipeline: 265000,
+      avatar: 'https://i.pravatar.cc/160?img=32',
+      status: 'Online',
     },
   ]);
 
   const [search, setSearch] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newMember, setNewMember] = useState({
+    name: '',
+    role: 'Sales Representative',
+    email: '',
+    phone: '',
+    avatar: 'https://i.pravatar.cc/160?img=33',
+  });
+
+  const totalLeads = teamMembers.reduce((sum, m) => sum + m.leadsAssigned, 0);
+  const totalDeals = teamMembers.reduce((sum, m) => sum + m.dealsClosed, 0);
+  const totalPipeline = teamMembers.reduce((sum, m) => sum + m.activePipeline, 0);
 
   const filtered = teamMembers.filter(
-    (m) => m.name.toLowerCase().includes(search.toLowerCase()) || m.role.toLowerCase().includes(search.toLowerCase())
+    (m) =>
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.role.toLowerCase().includes(search.toLowerCase()) ||
+      m.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleAddMember = (e) => {
+    e.preventDefault();
+    if (!newMember.name || !newMember.email) return;
+
+    const created = {
+      id: teamMembers.length + 1,
+      ...newMember,
+      leadsAssigned: 0,
+      dealsClosed: 0,
+      conversionRate: '0.0%',
+      activePipeline: 0,
+      status: 'Online',
+    };
+
+    setTeamMembers([...teamMembers, created]);
+    setNewMember({ name: '', role: 'Sales Representative', email: '', phone: '', avatar: 'https://i.pravatar.cc/160?img=33' });
+    setIsAddOpen(false);
+  };
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="User Allocation & Tracking"
-        subtitle="Sales representative capacity, lead assignment rules, and workload metrics"
+        title="User & Representative Allocation"
+        subtitle="Manage CRM team members, lead quotas, sales performance, and active deals pipeline allocation."
         actions={
-          <button type="button" className="btn-primary btn-sm flex items-center gap-1.5">
-            <UserPlus size={14} /> Allocate Representative
+          <button
+            type="button"
+            onClick={() => setIsAddOpen(true)}
+            className="btn-primary btn-sm flex items-center gap-1.5"
+          >
+            <UserPlus size={14} strokeWidth={2.4} /> Add Representative
           </button>
         }
       />
 
-      {/* Overview Cards */}
+      {/* KPI Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="stat-card">
           <div className="stat-badge bg-blue-50 text-blue-600 dark:bg-blue-900/30">
@@ -92,8 +132,8 @@ export default function UserAllocationPage() {
             <CheckCircle2 size={22} />
           </div>
           <div className="stat-body">
-            <span className="stat-num">121</span>
-            <span className="stat-label">Total Allocated Leads</span>
+            <span className="stat-num">{totalDeals}</span>
+            <span className="stat-label">Total Won Deals</span>
           </div>
         </div>
         <div className="stat-card">
@@ -110,7 +150,7 @@ export default function UserAllocationPage() {
             <ArrowUpRight size={22} />
           </div>
           <div className="stat-body">
-            <span className="stat-num">Rs. 16.5L</span>
+            <span className="stat-num">{formatCurrency(totalPipeline, { noDecimals: true })}</span>
             <span className="stat-label">Allocated Pipeline</span>
           </div>
         </div>
@@ -167,7 +207,7 @@ export default function UserAllocationPage() {
                   <td className="font-bold font-mono text-center">{m.leadsAssigned}</td>
                   <td className="font-bold font-mono text-center text-emerald-600">{m.dealsClosed}</td>
                   <td className="font-bold font-mono text-center text-blue-600">{m.conversionRate}</td>
-                  <td className="font-bold font-mono">Rs. {m.activePipeline.toLocaleString('en-IN')}</td>
+                  <td className="font-bold font-mono">{formatCurrency(m.activePipeline, { noDecimals: true })}</td>
                   <td>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${

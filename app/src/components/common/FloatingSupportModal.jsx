@@ -1,15 +1,45 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Headphones, X, Send, PhoneCall, Mail, BookOpen, Clock, CheckCircle2, MessageSquare } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { UserGuideModal } from './UserGuideModal';
 
 export function FloatingSupportModal() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [message, setMessage] = useState('');
   const [subject, setSubject] = useState('');
   const [sent, setSent] = useState(false);
+  const [hasActiveOverlay, setHasActiveOverlay] = useState(false);
   const setToast = useAppStore((s) => s.setToast);
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
   const modalRef = useRef(null);
+
+  // Auto-detect when any external drawer, modal, or dialog is active
+  useEffect(() => {
+    function checkOverlays() {
+      const allDialogs = Array.from(
+        document.querySelectorAll('[role="dialog"], .modal-backdrop, [aria-modal="true"]')
+      );
+      // Exclude this support modal itself
+      const externalDialogs = allDialogs.filter(
+        (el) => !modalRef.current || !modalRef.current.contains(el)
+      );
+      const isBodyLocked = document.body.style.overflow === 'hidden';
+      setHasActiveOverlay(externalDialogs.length > 0 || isBodyLocked);
+    }
+
+    checkOverlays();
+
+    const observer = new MutationObserver(checkOverlays);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class', 'aria-modal'],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -36,22 +66,30 @@ export function FloatingSupportModal() {
     }, 1800);
   };
 
+  // Automatically hide when any modal, drawer, or dialog is open
+  if (hasActiveOverlay && !isOpen) {
+    return null;
+  }
+
   return (
-    <div className="fixed bottom-6 right-6 z-50 font-sans" ref={modalRef}>
-      {/* Floating Action Trigger Button */}
+    <div className="fixed bottom-6 right-6 z-30 font-sans" ref={modalRef}>
+      {/* Floating Action Trigger Button — Compact & Expanding */}
       {!isOpen && (
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer ring-2 ring-white/30 backdrop-blur-sm"
+          className="group flex items-center h-11 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer ring-2 ring-white/30 backdrop-blur-sm px-3 hover:px-4"
           aria-label="Need Help? Contact Support"
+          title="Need Help? Contact Support"
         >
-          <div className="relative flex items-center justify-center">
+          <div className="relative flex items-center justify-center shrink-0">
             <Headphones size={18} />
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-emerald-400 rounded-full ring-1 ring-white" />
           </div>
-          <span className="text-xs font-bold tracking-wide">Need Help?</span>
+          <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-xs group-hover:ml-2 text-xs font-bold tracking-wide transition-all duration-300 ease-out opacity-0 group-hover:opacity-100">
+            Need Help?
+          </span>
         </button>
       )}
 
@@ -114,14 +152,17 @@ export function FloatingSupportModal() {
               <MessageSquare size={13} className="text-blue-500" />
               <span>Search (Ctrl+K)</span>
             </button>
-            <a
-              href="/reports"
-              onClick={() => setIsOpen(false)}
-              className="flex-1 py-1.5 px-2 rounded-lg border border-border bg-card hover:bg-soft text-[11px] font-semibold text-text-secondary transition flex items-center justify-center gap-1.5 text-center"
+            <button
+              type="button"
+              onClick={() => {
+                setIsOpen(false);
+                setIsGuideOpen(true);
+              }}
+              className="flex-1 py-1.5 px-2 rounded-xl border border-border bg-card hover:bg-soft text-[11px] font-semibold text-text-secondary transition flex items-center justify-center gap-1.5 text-center cursor-pointer"
             >
               <BookOpen size={13} className="text-emerald-500" />
               <span>User Guides</span>
-            </a>
+            </button>
           </div>
 
           {/* Quick Ticket Form */}
@@ -172,6 +213,12 @@ export function FloatingSupportModal() {
           </div>
         </div>
       )}
+
+      {/* Interactive Global User Guide Modal */}
+      <UserGuideModal
+        isOpen={isGuideOpen}
+        onClose={() => setIsGuideOpen(false)}
+      />
     </div>
   );
 }

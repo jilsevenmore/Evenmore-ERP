@@ -22,7 +22,7 @@ const expensesGuide = {
 };
 
 export const ExpensesPage = () => {
-    const { expenses, addExpense } = useERP();
+    const { expenses, addExpense, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [category, setCategory] = useState('Logistics');
     const [payee, setPayee] = useState('');
@@ -32,7 +32,7 @@ export const ExpensesPage = () => {
         e.preventDefault();
         addExpense({
             category,
-            date: 'Today',
+            date: getCurrentDateFormatted(),
             payee: payee || 'Service Vendor',
             amount: parseFloat(amount) || 150,
             paidVia,
@@ -65,7 +65,7 @@ export const ExpensesPage = () => {
         {
             key: 'date',
             header: 'Date Paid',
-            render: (e) => <span className="text-slate-600">{e.date}</span>,
+            render: (e) => <span className="text-slate-600">{formatDateDDMMYYYY(e.date)}</span>,
         },
         {
             key: 'paidVia',
@@ -82,10 +82,10 @@ export const ExpensesPage = () => {
         },
         {
             key: 'amount',
-            header: 'Amount ($)',
+            header: 'Amount',
             align: 'right',
             render: (e) => (<span className="font-mono font-bold text-slate-900">
-          ${(e.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {formatCurrency(e.amount ?? 0)}
         </span>),
         },
     ];
@@ -100,9 +100,9 @@ export const ExpensesPage = () => {
 
       {/* Expenses KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Operating Expenses" value={`$${totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} highlight />
+        <StatCard label="Total Operating Expenses" value={formatCurrency(totalSpent)} icon={DollarSign} highlight />
         <StatCard label="Expense Vouchers" value={`${expenses.length} Vouchers`} icon={Receipt} trend={{ positive: true, text: 'Logged to P&L' }} />
-        <StatCard label="Avg Expense Cost" value={`$${avgExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={TrendingDown} />
+        <StatCard label="Avg Expense Cost" value={formatCurrency(avgExpense)} icon={TrendingDown} />
         <StatCard label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} subtext="Logistics, Facilities, Admin" />
       </div>
 

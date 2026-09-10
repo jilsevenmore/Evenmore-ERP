@@ -33,7 +33,7 @@ const cashBankGuide = {
     ],
 };
 export const CashBankPage = () => {
-    const { bankAccounts, addBankAccount } = useERP();
+    const { bankAccounts, addBankAccount, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [newAcc, setNewAcc] = useState({
         bankName: '',
@@ -69,7 +69,7 @@ export const CashBankPage = () => {
             key: 'balance',
             align: 'right',
             render: (a) => (<span className="font-bold text-slate-900 font-mono text-sm">
-          ${a.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {formatCurrency(a.balance)}
         </span>),
         },
         {
@@ -77,7 +77,7 @@ export const CashBankPage = () => {
             key: 'lastReconciled',
             align: 'center',
             render: (a) => (<span className="text-slate-500 text-xs">
-          {a.lastReconciled || 'Oct 24, 2026'}
+          {formatDateDDMMYYYY(a.lastReconciled || 'Oct 24, 2026')}
         </span>),
         },
         {
@@ -100,7 +100,7 @@ export const CashBankPage = () => {
             accountType: newAcc.accountType || 'Current Operating',
             currency: 'USD',
             balance: Number(newAcc.balance) || 0,
-            lastReconciled: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            lastReconciled: getCurrentDateFormatted(),
         });
         setIsModalOpen(false);
     };
@@ -110,7 +110,7 @@ export const CashBankPage = () => {
           </Button>}/>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Total Liquid Cash & Treasury" value={`$${totalLiquidity.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign} highlight/>
+        <StatCard label="Total Liquid Cash & Treasury" value={formatCurrency(totalLiquidity)} icon={DollarSign} highlight/>
         <StatCard label="Operating Accounts" value={`${bankAccounts.length} Accounts`} icon={Landmark}/>
         <StatCard label="Statement Reconciliation" value="100% Up to Date" icon={CheckCircle2}/>
       </div>

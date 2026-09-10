@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Plus, Printer, Edit2, CheckCircle2, Truck, } from 'lucide-react';
+import { Plus, Printer, Edit2, CheckCircle2, Truck, X, Save, FileText } from 'lucide-react';
 import { ReportFaultyModal } from './ReportFaultyModal';
 import { PrintLabelModal } from './PrintLabelModal';
-export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, searchTerm = '', }) => {
+export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdatePartNotes, searchTerm = '', }) => {
     const [selectedPartId, setSelectedPartId] = useState(parts[0]?.id || 'fp-1');
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [isEditNotesModalOpen, setIsEditNotesModalOpen] = useState(false);
+    const [editNotesValue, setEditNotesValue] = useState('');
     const [toastMessage, setToastMessage] = useState(null);
     const showToast = (msg) => {
         setToastMessage(msg);
@@ -25,6 +27,23 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, searchTe
     const handleMarkAsShipped = (partId) => {
         onUpdatePartStatus(partId, 'Sent for Replacement');
         showToast(`RMA Package marked as shipped to vendor courier.`);
+    };
+
+    const handleOpenEditNotes = () => {
+        if (!selectedPart) return;
+        setEditNotesValue(selectedPart.notes || '');
+        setIsEditNotesModalOpen(true);
+    };
+
+    const handleSaveNotes = (e) => {
+        e.preventDefault();
+        if (!selectedPart) return;
+        if (onUpdatePartNotes) {
+            onUpdatePartNotes(selectedPart.id, editNotesValue);
+        }
+        selectedPart.notes = editNotesValue;
+        setIsEditNotesModalOpen(false);
+        showToast('RMA diagnostic notes updated successfully.');
     };
     const getStatusBadgeStyle = (status) => {
         switch (status) {
@@ -127,17 +146,17 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, searchTe
             </p>
 
             <div className="flex gap-2 mt-4">
-              <button onClick={() => {
-                const newNotes = prompt('Edit diagnostic/notes for this RMA:', selectedPart.notes);
-                if (newNotes !== null) {
-                    selectedPart.notes = newNotes;
-                    showToast('RMA notes updated.');
-                }
-            }} className="flex-1 bg-white border border-[#CED4DA] text-[#1F2E4A] py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5">
+              <button
+                onClick={handleOpenEditNotes}
+                className="flex-1 bg-white border border-[#CED4DA] text-[#1F2E4A] py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              >
                 <Edit2 className="w-3.5 h-3.5"/>
-                Edit
+                Edit Diagnostics
               </button>
-              <button onClick={() => setIsPrintModalOpen(true)} className="flex-1 bg-white border border-[#CED4DA] text-[#1F2E4A] py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5">
+              <button
+                onClick={() => setIsPrintModalOpen(true)}
+                className="flex-1 bg-white border border-[#CED4DA] text-[#1F2E4A] py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              >
                 <Printer className="w-3.5 h-3.5"/>
                 Print Label
               </button>
@@ -262,5 +281,83 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, searchTe
       <ReportFaultyModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} onSubmit={onAddPart}/>
 
       {selectedPart && (<PrintLabelModal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} part={selectedPart}/>)}
+
+      {/* Edit Diagnostic Notes Modal */}
+      {isEditNotesModalOpen && selectedPart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] flex flex-col text-[#1F2E4A]">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#1F2E4A]">
+                    Edit RMA Diagnostic Notes
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    {selectedPart.rmaNumber} • S/N: {selectedPart.serialNumber}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditNotesModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveNotes} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Part / Equipment Name
+                </label>
+                <input
+                  type="text"
+                  disabled
+                  value={selectedPart.product}
+                  className="w-full text-xs px-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-slate-600 font-medium cursor-not-allowed"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Technical Diagnostic & Failure Observations <span className="text-rose-500">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={editNotesValue}
+                  onChange={(e) => setEditNotesValue(e.target.value)}
+                  placeholder="Detail the failure symptoms, test bench findings, error codes, burn-in diagnostics..."
+                  className="w-full text-xs p-3 border border-slate-300 rounded-xl bg-white text-slate-800 focus:outline-none focus:border-blue-600 focus:ring-1 focus:ring-blue-600 resize-y transition font-sans"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  These notes will appear on warranty RMA logs, courier manifests, and vendor credit slips.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setIsEditNotesModalOpen(false)}
+                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-xs font-bold text-white bg-[#1F2E4A] hover:bg-[#152033] rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                >
+                  <Save size={14} />
+                  Save Diagnostics
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>);
 };

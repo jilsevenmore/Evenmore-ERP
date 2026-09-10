@@ -34,7 +34,7 @@ const purchaseReturnGuide = {
     ],
 };
 export const PurchaseReturnsPage = () => {
-    const { purchaseReturns, vendors, purchaseBills, addPurchaseReturn, updatePurchaseReturnStatus } = useERP();
+    const { purchaseReturns, vendors, purchaseBills, addPurchaseReturn, updatePurchaseReturnStatus, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState(purchaseBills[0]?.id || '');
     const [reason, setReason] = useState('Damaged casing detected on intake inspection');
@@ -56,7 +56,7 @@ export const PurchaseReturnsPage = () => {
             vendor: bill?.vendor || vend?.name || 'Delta Controls & Hydraulics',
             billId: bill?.id,
             billRef: bill?.billNumber || 'PB-2026-015',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             amount: totalAmt > 0 ? totalAmt : 500,
             reason,
             status: 'Pending Credit',
@@ -89,7 +89,7 @@ export const PurchaseReturnsPage = () => {
         {
             key: 'date',
             header: 'Issue Date',
-            render: (r) => <span className="text-slate-600">{r.date}</span>,
+            render: (r) => <span className="text-slate-600">{formatDateDDMMYYYY(r.date)}</span>,
         },
         {
             key: 'reason',
@@ -101,7 +101,7 @@ export const PurchaseReturnsPage = () => {
             header: 'Debit Amount',
             align: 'right',
             render: (r) => (<span className="font-mono font-bold text-slate-900">
-          ${(r.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+          {formatCurrency(r.amount ?? 0)}
         </span>),
         },
         {
@@ -136,13 +136,13 @@ export const PurchaseReturnsPage = () => {
             (r.billRef && r.billRef.toLowerCase().includes(term)) ||
             r.reason.toLowerCase().includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Issue Vendor Debit Note
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer">
                 <X size={18}/>
               </button>
             </div>

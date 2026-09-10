@@ -5,7 +5,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { CheckCircle2, AlertTriangle, UserCheck, ShieldCheck } from 'lucide-react';
 export const MonthEndAuditPage = () => {
-    const { items, calculateItemStock } = useERP();
+    const { items, calculateItemStock, formatCurrency } = useERP();
     // Point-in-time audit snapshot seeded from live book quantities
     // (was hardcoded demo rows). physicalCount starts at book qty; the
     // auditor adjusts via Post Adjustment / recount flows below.
@@ -61,32 +61,34 @@ export const MonthEndAuditPage = () => {
         {
             key: 'name',
             header: 'Item Description',
-            render: (a) => (<div>
-          <p className="font-bold text-[#1F2E4A]">{a.name}</p>
-          <span className="text-[10px] text-slate-500">{a.location}</span>
-        </div>),
+            render: (a) => (<span className="font-semibold text-[#1F2E4A]">{a.name}</span>),
+        },
+        {
+            key: 'location',
+            header: 'Assigned Bay / Zone',
+            render: (a) => <span className="text-slate-600 text-xs">{a.location}</span>,
         },
         {
             key: 'systemQty',
-            header: 'System ERP Book Qty',
+            header: 'System Book Qty',
             align: 'center',
             render: (a) => <span className="font-mono text-slate-700">{a.systemQty}</span>,
         },
         {
             key: 'physicalCount',
-            header: 'Physical Floor Count',
+            header: 'Physical Headcount',
             align: 'center',
-            render: (a) => (<span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
+            render: (a) => (<span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
           {a.physicalCount}
         </span>),
         },
         {
             key: 'variance',
-            header: 'Count Discrepancy',
+            header: 'Unit Variance',
             align: 'center',
-            render: (a) => a.variance === 0 ? (<span className="text-emerald-700 font-mono font-semibold flex items-center justify-center gap-1">
-            <CheckCircle2 size={12}/> Match (0)
-          </span>) : (<span className="text-rose-700 font-mono font-bold flex items-center justify-center gap-1">
+            render: (a) => a.variance === 0 ? (<span className="text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1">
+            <CheckCircle2 size={12}/> Match
+          </span>) : (<span className="text-rose-700 text-xs font-semibold flex items-center justify-center gap-1">
             <AlertTriangle size={12}/> {a.variance} units
           </span>),
         },
@@ -96,8 +98,8 @@ export const MonthEndAuditPage = () => {
             align: 'right',
             render: (a) => (<span className={`font-mono font-bold ${a.varianceCost < 0 ? 'text-rose-700' : 'text-slate-900'}`}>
           {a.varianceCost < 0
-                    ? `-$${Math.abs(a.varianceCost).toLocaleString()}`
-                    : `$${a.varianceCost.toLocaleString()}`}
+                    ? `-${formatCurrency(Math.abs(a.varianceCost))}`
+                    : formatCurrency(a.varianceCost)}
         </span>),
         },
         {
@@ -151,7 +153,7 @@ export const MonthEndAuditPage = () => {
         </div>
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA]">
           <span className="text-xs text-slate-500 font-semibold uppercase">Net Inventory Variance</span>
-          <p className="text-lg font-bold text-rose-700 mt-1">{netVarianceCost < 0 ? `-$${Math.abs(netVarianceCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `$${netVarianceCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
+          <p className="text-lg font-bold text-rose-700 mt-1">{netVarianceCost < 0 ? `-${formatCurrency(Math.abs(netVarianceCost))}` : formatCurrency(netVarianceCost)}</p>
           <span className="text-[11px] text-slate-400">{flaggedCount === 0 ? 'No open variances' : `${flaggedCount} open variance${flaggedCount === 1 ? '' : 's'}`}</span>
         </div>
       </div>
