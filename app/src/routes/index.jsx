@@ -47,13 +47,15 @@ import GoalFunnel from '../features/hrms/performance/GoalFunnel';
 import TrainingList from '../features/hrms/performance/TrainingList';
 import TrainingFunnel from '../features/hrms/performance/TrainingFunnel';
 import Trainers from '../features/hrms/performance/Trainers';
+import TrainingDashboard from '../features/hrms/performance/TrainingDashboard';
 import OrgChartPage from '../features/hrms/organization/OrgChartPage';
 import DepartmentsPage from '../features/hrms/organization/DepartmentsPage';
 import DesignationsPage from '../features/hrms/organization/DesignationsPage';
 import LocationsPage from '../features/hrms/organization/LocationsPage';
 import AssetsPage from '../features/hrms/organization/AssetsPage';
 import DocumentsPage from '../features/hrms/organization/DocumentsPage';
-import { CompanyPolicy, CalendarPage, HrmsSetup } from '../features/hrms/organization/SimplePages';
+import { CompanyPolicy, CalendarPage, HrmsSetup, HRAdminPage } from '../features/hrms/organization/SimplePages';
+import { Generic } from '../features/hrms/Generic';
 
 // ── ERP — Sales ───────────────────────────────────────────────
 import { QuotationsPage } from '../features/sales/QuotationsPage';
@@ -244,7 +246,8 @@ const router = createBrowserRouter([
       { path: 'hrms/performance/appraisal-funnel', element: <Page component={AppraisalFunnel} /> },
       { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> },
       { path: 'hrms/performance/goal-funnel', element: <Page component={GoalFunnel} /> },
-      { path: 'hrms/training', element: <Page component={TrainingList} /> },
+      { path: 'hrms/training', element: <Page component={TrainingDashboard} /> },
+      { path: 'hrms/training/list', element: <Page component={TrainingList} /> },
       { path: 'hrms/training/training-funnel', element: <Page component={TrainingFunnel} /> },
       { path: 'hrms/training/trainers', element: <Page component={Trainers} /> },
       { path: 'hrms/training/funnel', element: <Page component={TrainingFunnel} /> },
@@ -257,6 +260,11 @@ const router = createBrowserRouter([
       { path: 'hrms/company-policy', element: <Page component={CompanyPolicy} /> },
       { path: 'hrms/calendar', element: <Page component={CalendarPage} /> },
       { path: 'hrms/hrms-setup', element: <Page component={HrmsSetup} /> },
+      { path: 'hrms/hr-admin', element: <Page component={HRAdminPage} /> },
+      { path: 'hrms/hr-admin/terminations', element: <Page component={() => <HRAdminPage defaultTab="terminations" />} /> },
+      { path: 'hrms/hr-admin/resignations', element: <Page component={() => <HRAdminPage defaultTab="resignations" />} /> },
+      { path: 'hrms/hr-admin/complaints', element: <Page component={() => <HRAdminPage defaultTab="complaints" />} /> },
+      { path: 'hrms/hr-admin/holidays', element: <Page component={() => <HRAdminPage defaultTab="holidays" />} /> },
 
       // ── Reports ───────────────────────────────────────────
       { path: 'reports', element: <Page component={ReportsPage} /> },

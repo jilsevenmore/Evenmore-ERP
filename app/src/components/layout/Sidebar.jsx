@@ -39,6 +39,8 @@ import {
   Send,
   User,
   ShieldCheck,
+  Calendar,
+  Sliders,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
@@ -196,11 +198,15 @@ const NAV = [
         icon: GraduationCap,
         defaultOpen: false,
         children: [
-          { label: 'Training List', to: '/hrms/training', dot: true },
+          { label: 'Dashboard', to: '/hrms/training', dot: true },
+          { label: 'Training List', to: '/hrms/training/list' },
           { label: 'Training Funnel', to: '/hrms/training/training-funnel' },
           { label: 'Trainers', to: '/hrms/training/trainers' },
         ],
       },
+      { label: 'HR Admin', icon: ShieldCheck, to: '/hrms/hr-admin' },
+      { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
+      { label: 'Documents', icon: FileText, to: '/hrms/documents' },
       {
         label: 'Organization',
         icon: Building2,
@@ -210,13 +216,11 @@ const NAV = [
           { label: 'Departments', to: '/hrms/departments' },
           { label: 'Locations', to: '/hrms/locations' },
           { label: 'Designations', to: '/hrms/designations' },
-          { label: 'Company Policy', to: '/hrms/company-policy' },
-          { label: 'Calendar', to: '/hrms/calendar' },
-          { label: 'HRMS Setup', to: '/hrms/hrms-setup' },
         ],
       },
-      { label: 'Assets', icon: Briefcase, to: '/hrms/assets' },
-      { label: 'Documents', icon: FileText, to: '/hrms/documents' },
+      { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
+      { label: 'Personal Calendar', icon: Calendar, to: '/hrms/calendar' },
+      { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' },
     ],
   },
 

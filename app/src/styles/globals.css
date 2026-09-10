@@ -20,6 +20,10 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
+  --color-navy: #1F2E4A;
+  --color-off: #F8F9FA;
+  --color-bdr: #E2E8F0;
+  --color-slate: #1F2937;
   --radius-default: var(--radius);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);

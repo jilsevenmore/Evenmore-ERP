@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
+import AnalyticsVolumeChart from "./AnalyticsVolumeChart";
 
 const TOP_STATS = [
   {
@@ -294,6 +295,9 @@ export default function HRMSDashboard() {
           <StatCard key={s.label} {...s} />
         ))}
       </div>
+
+      {/* Analytics Volume Chart (Workforce, Attendance, Leave, Payroll, etc.) */}
+      <AnalyticsVolumeChart />
 
       {/* Main grid */}
       <div className="hrms-main-grid">
