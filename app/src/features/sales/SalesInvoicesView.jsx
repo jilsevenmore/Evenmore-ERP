@@ -24,7 +24,7 @@ const invoiceGuide = {
     workflow: ['Sales Order Dispatched', 'Tax Invoice Issued', 'Payment Received', 'Receipt Voucher Issued', 'AR Balance Cleared'],
 };
 export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globalSearch = '', }) => {
-    const { customers, salesOrders, paymentIns, addPaymentIn, getInvoiceOutstanding, deliveryChallans } = useERP();
+    const { customers, salesOrders, paymentIns, addPaymentIn, getInvoiceOutstanding, deliveryChallans, formatCurrency, formatDateDDMMYYYY } = useERP();
     const [filterText, setFilterText] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -258,9 +258,9 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
     return (<div className="flex-1 overflow-y-auto flex flex-col gap-6 font-sans">
       {/* Sales Invoices KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Invoiced Value" value={`$${totalInvoiced.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} />
-        <StatCard label="AR Outstanding Due" value={`$${totalBalanceDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
-        <StatCard label="Total Collected" value={`$${totalCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
+        <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={DollarSign} />
+        <StatCard label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
+        <StatCard label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
         <StatCard label="Total Invoices" value={`${invoices.length} Invoices`} icon={FileText} subtext={`${unpaidCount} requiring payment`} />
       </div>
 
@@ -309,7 +309,7 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
             const outstanding = getInvoiceOutstanding(inv.id);
             return (<tr key={inv.id} className="hover:bg-slate-50/80 transition-colors group">
                       <td className="py-2.5 px-6 font-mono font-bold text-blue-600">
-                        <button onClick={() => setSelectedInvoice(inv)} className="hover:underline text-left">
+                        <button onClick={() => setSelectedInvoice(inv)} className="hover:underline text-left cursor-pointer">
                           {inv.invoiceNumber}
                         </button>
                       </td>
@@ -319,7 +319,7 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
                       <td className="py-2.5 px-6 text-slate-500 font-mono text-[11px]">
                         {inv.linkedSo || '-'}
                       </td>
-                      <td className="py-2.5 px-6 text-slate-600">{inv.date}</td>
+                      <td className="py-2.5 px-6 text-slate-600 font-mono text-[11px]">{formatDateDDMMYYYY(inv.date)}</td>
                       <td className="py-2.5 px-6 text-slate-600">{inv.dueDate}</td>
                       <td className="py-2.5 px-6">
                         <span className={`inline-flex items-center px-2 py-0.5 border rounded-full text-[10px] ${getStatusBadge(outstanding.status)}`}>
@@ -327,11 +327,11 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
                         </span>
                       </td>
                       <td className="py-2.5 px-6 text-right font-semibold text-slate-900 font-mono">
-                        ${inv.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        {formatCurrency(inv.total)}
                       </td>
                       <td className="py-2.5 px-6 text-right font-mono font-bold">
                         <span className={outstanding.balanceDue > 0 ? 'text-rose-600' : 'text-emerald-700'}>
-                          ${outstanding.balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatCurrency(outstanding.balanceDue)}
                         </span>
                       </td>
                       <td className="py-2.5 px-4 text-center">
@@ -378,13 +378,13 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
 
       {/* Create New Invoice Modal */}
       {showCreateModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden text-text">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div>
-                <h2 className="text-base font-bold text-[#1F2E4A]">Issue New Commercial Tax Invoice</h2>
-                <p className="text-[11px] text-slate-500 mt-0.5">Select a customer or link directly to a confirmed Sales Order for automatic pricing calculations.</p>
+                <h2 className="text-base font-bold text-text">Issue New Commercial Tax Invoice</h2>
+                <p className="text-[11px] text-muted mt-0.5">Select a customer or link directly to a confirmed Sales Order for automatic pricing calculations.</p>
               </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer p-1">
+              <button onClick={() => setShowCreateModal(false)} className="text-muted hover:text-text cursor-pointer p-1">
                 <X size={18}/>
               </button>
             </div>
@@ -393,8 +393,8 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
               {/* Top Form Row: Customer, Linked SO, Invoice Date, Due Date */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-slate-700">Customer Account *</label>
-                  <select value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 font-medium">
+                  <label className="font-semibold text-text">Customer Account *</label>
+                  <select value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text font-medium focus:outline-none focus:border-primary">
                     {customers.map((c) => (<option key={c.id} value={c.id}>
                         {c.name} ({c.code})
                       </option>))}
@@ -402,8 +402,8 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-slate-700">Linked Sales Order</label>
-                  <select value={linkedSoId} onChange={(e) => handleSoSelect(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800 font-medium">
+                  <label className="font-semibold text-text">Linked Sales Order</label>
+                  <select value={linkedSoId} onChange={(e) => handleSoSelect(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text font-medium focus:outline-none focus:border-primary">
                     <option value="None">None (Direct Invoicing)</option>
                     {salesOrders.map((so) => (<option key={so.id} value={so.id}>
                         {so.orderNumber} - {so.customer} (${so.amount.toFixed(2)})
@@ -412,43 +412,65 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-slate-700">Invoice Issue Date</label>
-                  <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800"/>
+                  <label className="font-semibold text-text">Invoice Issue Date</label>
+                  <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text focus:outline-none focus:border-primary"/>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-slate-700">Payment Due Date</label>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 bg-white text-slate-800"/>
+                  <label className="font-semibold text-text">Payment Due Date</label>
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text focus:outline-none focus:border-primary"/>
                 </div>
               </div>
 
+              {/* Selected Customer Information Card */}
+              {(() => {
+                const cust = customers.find(c => c.id === selectedCustomerId) || customers[0];
+                if (!cust) return null;
+                return (
+                  <div className="p-2.5 rounded-xl border border-border bg-soft text-[11px] space-y-1">
+                    <div className="flex items-center justify-between font-bold text-text">
+                      <span>{cust.name} <span className="text-muted font-mono font-normal">({cust.code})</span></span>
+                      <span className="text-blue-600 dark:text-blue-400 font-mono text-[10px] bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                        Credit Limit: ₹{(cust.creditLimit || 50000).toLocaleString('en-IN')}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-muted text-[10px]">
+                      <span>POC: <strong>{cust.contactPerson || 'Account Lead'}</strong></span>
+                      <span>Email: {cust.email}</span>
+                      <span>Phone: {cust.phone}</span>
+                      <span>Outstanding Balance: ₹{(cust.balance || 0).toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Line Items Editor */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-2">Invoice Line Items</label>
+                <label className="text-xs font-semibold text-text block mb-2">Invoice Line Items</label>
                 <LineItemEditor items={lineItems} onChange={setLineItems} type="sales"/>
               </div>
 
               {/* Notes */}
               <div>
-                <label className="text-xs font-semibold text-slate-700 block mb-1.5">
+                <label className="text-xs font-semibold text-text block mb-1.5">
                   Payment Terms & Commercial Notes
                 </label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Standard Net 30 terms. Remit payment to Chase Operating Account..." className="w-full border border-slate-300 rounded-lg p-3 text-xs bg-white h-16 text-slate-800"/>
+                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Standard Net 30 terms. Remit payment to Chase Operating Account..." className="w-full border border-border rounded-xl p-3 text-xs bg-soft h-16 text-text focus:outline-none focus:border-primary"/>
               </div>
             </div>
 
             {/* Footer Actions */}
-            <div className="pt-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
-              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-white transition-colors text-xs cursor-pointer">
+            <div className="pt-3 border-t border-border flex justify-end gap-2 bg-soft/60 -mx-6 -mb-6 px-6 py-3">
+              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-border text-text-secondary font-medium rounded-xl hover:bg-card transition-colors text-xs cursor-pointer">
                 Cancel
               </button>
-              <button onClick={() => handleSave('Draft')} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-white transition-colors text-xs cursor-pointer">
+              <button onClick={() => handleSave('Draft')} className="px-4 py-2 border border-border text-text-secondary font-medium rounded-xl hover:bg-card transition-colors text-xs cursor-pointer">
                 Save Draft
               </button>
-              <button onClick={() => handleSave('Unpaid')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors text-xs shadow-sm cursor-pointer">
+              <button onClick={() => handleSave('Unpaid')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors text-xs shadow-sm cursor-pointer">
                 Issue Invoice (Unpaid)
               </button>
-              <button onClick={() => handleSave('Paid')} className="px-5 py-2 bg-[#1F2E4A] hover:bg-[#152036] text-white font-medium rounded-lg transition-colors text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
+              <button onClick={() => handleSave('Paid')} className="px-5 py-2 bg-primary hover:bg-primary-hover text-white font-medium rounded-xl transition-colors text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
                 <CheckCircle2 className="w-3.5 h-3.5"/>
                 Issue & Record Full Payment
               </button>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { getCurrentDateFormatted } from '../../utils/dateUtils';
 export const AutoPOModal = ({
   isOpen,
   onClose,
@@ -74,11 +75,7 @@ export const AutoPOModal = ({
     const newPO = addPurchaseOrder?.({
       vendorId: selectedVendor?.id,
       vendor: selectedVendor?.name || 'Arrow Electronics Supply',
-      date: new Date().toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      }),
+      date: getCurrentDateFormatted(),
       expectedDate: expectedDate || 'In 7 business days',
       amount: totalPOAmount,
       total: totalPOAmount,

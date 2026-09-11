@@ -57,6 +57,7 @@ import LeadAvatar from './LeadAvatar';
 import LeadFormBuilder from './LeadFormBuilder';
 import { createFieldFromType } from '../../../data/crm/leadFormSchema';
 import { exportToCSV } from '../../../services/exportUtils';
+import { formatCurrency } from '../../../utils/currencyUtils';
 import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { employeesMock } from '../../../data/hrms/mocks/data';
@@ -158,7 +159,8 @@ function readFileAsDataUrl(file) {
 }
 
 function formatAmount(value) {
-  return `Rs. ${(value || 0).toLocaleString('en-IN')}`;
+  const activeCurrency = localStorage.getItem('evenmore_currency') || 'USD ($)';
+  return formatCurrency(value || 0, activeCurrency, { noDecimals: true });
 }
 
 function getInitials(name) {
@@ -649,6 +651,14 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
   React.useEffect(() => {
     updateStoredLeadDetail(lead?.id, { sources: sources.map((s) => ({ ...s, icon: sourceIconName(s.icon) })), emails, timeline });
+  }, [lead?.id, sources, emails, timeline]);
+
+  React.useEffect(() => {
+    onCountsChange?.({ sources: sources.length });
+  }, [sources.length, onCountsChange]);
+
+  React.useEffect(() => {
+    updateStoredLeadDetail(lead?.id, { sources, emails, timeline });
   }, [lead?.id, sources, emails, timeline]);
 
   React.useEffect(() => {
@@ -1482,7 +1492,10 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     return [...new Set(names)];
   }, [initialState.users, lead?.owner, tasks]);
   const defaultAssignee = assigneeOptions.includes('Utsav Faldu') ? 'Utsav Faldu' : (assigneeOptions[0] || '');
-  const masterTaskOptions = useMemo(() => getMasterTaskOptions(), [isModalOpen]);
+  const [masterTaskOptions, setMasterTaskOptions] = useState(() => getMasterTaskOptions());
+  React.useEffect(() => {
+    setMasterTaskOptions(getMasterTaskOptions());
+  }, [isModalOpen]);
   const linkedQuotations = useMemo(
     () => (quotations || []).filter((quotation) => quotationMatchesLead(quotation, lead)),
     [lead, quotations]

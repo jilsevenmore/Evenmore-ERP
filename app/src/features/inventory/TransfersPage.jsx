@@ -54,54 +54,62 @@ export const TransfersPage = () => {
         {
             key: 'transferNumber',
             header: 'Transfer Ref #',
-            render: (t) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <ArrowLeftRight size={13} className="text-[#1F2E4A]"/> {t.transferNumber}
+            width: '15%',
+            render: (t) => (<span className="font-mono font-bold text-text-secondary flex items-center gap-1.5">
+          <ArrowLeftRight size={13} className="text-primary"/> {t.transferNumber}
         </span>),
         },
         {
             key: 'sourceLocation',
             header: 'Origin Facility',
-            render: (t) => <span className="font-semibold text-slate-700">{t.sourceLocation}</span>,
+            width: '15%',
+            render: (t) => <span className="font-semibold text-text-secondary">{t.sourceLocation}</span>,
         },
         {
             key: 'destLocation',
             header: 'Destination Facility',
-            render: (t) => <span className="font-bold text-[#1F2E4A]">{t.destLocation}</span>,
+            width: '15%',
+            render: (t) => <span className="font-bold text-text">{t.destLocation}</span>,
         },
         {
             key: 'date',
             header: 'Movement Date',
-            render: (t) => <span className="text-slate-600">{t.date}</span>,
+            width: '12%',
+            render: (t) => <span className="text-muted font-mono text-[11px]">{t.date}</span>,
         },
         {
             key: 'itemsCount',
             header: 'Line Items Moved',
             align: 'center',
-            render: (t) => (<span className="font-mono font-bold text-slate-800">
+            width: '11%',
+            render: (t) => (<span className="font-mono font-bold text-text">
           {t.items?.length || t.itemsCount || 1} SKUs
         </span>),
         },
         {
             key: 'shippedBy',
             header: 'Dispatched By',
-            render: (t) => (<span className="text-slate-600 text-xs flex items-center gap-1">
-          <User size={12} className="text-slate-400"/> {t.shippedBy}
+            width: '12%',
+            render: (t) => (<span className="text-text-secondary text-xs flex items-center gap-1">
+          <User size={12} className="text-muted"/> {t.shippedBy}
         </span>),
         },
         {
             key: 'status',
             header: 'Transfer Status',
             align: 'center',
+            width: '10%',
             render: (t) => <StatusBadge status={t.status}/>,
         },
         {
             key: 'actions',
             header: 'Intake Confirmation',
             align: 'right',
-            render: (t) => t.status !== 'Received' ? (<button onClick={() => markReceived(t.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 ml-auto shadow-sm">
+            width: '10%',
+            render: (t) => t.status !== 'Received' ? (<button onClick={() => markReceived(t.id)} className="px-2.5 py-1 bg-primary text-white rounded text-[11px] font-semibold hover:bg-primary-hover cursor-pointer flex items-center gap-1 ml-auto shadow-2xs">
             <CheckCircle2 size={11}/> Confirm Intake
-          </button>) : (<span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1 justify-end">
-            <CheckCircle2 size={12}/> Stock Restocked
+          </button>) : (<span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end">
+            <CheckCircle2 size={12}/> Restocked
           </span>),
         },
     ];
@@ -126,13 +134,13 @@ export const TransfersPage = () => {
             t.sourceLocation.toLowerCase().includes(term) ||
             t.destLocation.toLowerCase().includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Create Stock Transfer Manifest
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer">
                 <X size={18}/>
               </button>
             </div>

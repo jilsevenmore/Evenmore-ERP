@@ -21,7 +21,7 @@ const faultyGuide = {
 };
 
 export const FaultyPartsPage = () => {
-    const { faultyParts, addFaultyPart, updateFaultyPartStatus } = useERP();
+    const { faultyParts, addFaultyPart, updateFaultyPartStatus, updateFaultyPartNotes } = useERP();
     const totalDefectiveUnits = faultyParts.reduce((acc, p) => acc + (p.qty || 1), 0);
     const reportedCount = faultyParts.filter(p => p.status === 'Reported').length;
     const inTransitCount = faultyParts.filter(p => p.status === 'Sent for Replacement').length;
@@ -38,6 +38,11 @@ export const FaultyPartsPage = () => {
         <StatCard label="Resolved & Restocked" value={`${resolvedCount} Replaced`} icon={CheckCircle2} trend={{ positive: true, text: 'Stock replenished' }} />
       </div>
 
-      <FaultyPartsView parts={faultyParts} onAddPart={addFaultyPart} onUpdatePartStatus={updateFaultyPartStatus}/>
+      <FaultyPartsView
+        parts={faultyParts}
+        onAddPart={addFaultyPart}
+        onUpdatePartStatus={updateFaultyPartStatus}
+        onUpdatePartNotes={updateFaultyPartNotes}
+      />
     </div>);
 };

@@ -1,6 +1,8 @@
 import React from 'react';
 import { AlertTriangle, Receipt, GitPullRequest, ArrowRight, ShieldCheck, ArrowUpRight, } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
 export const DashboardView = ({ onSelectScreen, faultyParts, invoices, zoneRequests, }) => {
+    const { formatCurrency } = useERP();
     const reportedFaulty = faultyParts.filter((p) => p.status === 'Reported').length;
     const inProgressFaulty = faultyParts.filter((p) => p.status === 'Sent for Replacement').length;
     const totalInvoiceSum = invoices.reduce((s, i) => s + i.total, 0);
@@ -95,13 +97,13 @@ export const DashboardView = ({ onSelectScreen, faultyParts, invoices, zoneReque
               <div className="flex justify-between items-center">
                 <span className="text-[#5a6062]">Total Billed (YTD):</span>
                 <span className="font-bold text-[#1F2E4A] font-mono">
-                  ${totalInvoiceSum.toLocaleString('en-US', { minimumFractionDigits: 0 })}
+                  {formatCurrency(totalInvoiceSum, { noDecimals: true })}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[#5a6062]">Pending Collections:</span>
                 <span className="font-semibold text-amber-700 font-mono">
-                  ${unpaidSum.toLocaleString('en-US', { minimumFractionDigits: 0 })} ({unpaidInvoices.length} unpaid)
+                  {formatCurrency(unpaidSum, { noDecimals: true })} ({unpaidInvoices.length} unpaid)
                 </span>
               </div>
               <div className="flex justify-between items-center">

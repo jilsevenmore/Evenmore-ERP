@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Plus, Layers, Clock, Sliders, Trash2, X, Boxes, Wrench, CheckCircle2, Cpu } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom';
 
 const categoryGuide = {
     title: 'Category Hierarchy & Taxonomy',
@@ -42,6 +42,7 @@ const categoryGuide = {
 export const CategoriesPage = () => {
     const { categories, addCategory, updateCategory, items, categoryParts = [], addCategoryPart, removeCategoryPart } = useERP();
     const location = useLocation();
+    const navigate = useNavigate();
 
     const isMachineView = location.pathname.includes('/machine');
     const isStockView = location.pathname.includes('/stock');
@@ -145,15 +146,17 @@ export const CategoriesPage = () => {
         {
             key: 'code',
             header: 'Category Code',
-            render: (c) => <span className="font-mono font-bold text-slate-700">{c.code}</span>,
+            width: '12%',
+            render: (c) => <span className="font-mono font-bold text-text-secondary">{c.code}</span>,
         },
         {
             key: 'name',
             header: 'Category Hierarchy Name',
+            width: '24%',
             render: (c) => (
               <div>
-                <span className="font-bold text-[#1F2E4A] flex items-center gap-1.5">
-                  <Layers size={13} className="text-[#1F2E4A]/70"/> {c.name}
+                <span className="font-bold text-text flex items-center gap-1.5">
+                  <Layers size={13} className="text-muted"/> {c.name}
                 </span>
                 {c.hasSubParts && (
                   <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-purple-700 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded mt-0.5 border border-purple-200 dark:border-purple-800">
@@ -167,20 +170,22 @@ export const CategoriesPage = () => {
             key: 'itemCount',
             header: 'Active SKUs',
             align: 'center',
+            width: '10%',
             render: (c) => {
                 const count = items.filter(i => i.category?.toLowerCase() === c.name?.toLowerCase() || i.categoryId === c.id).length;
-                return <span className="font-mono font-semibold text-slate-800">{count}</span>;
+                return <span className="font-mono font-semibold text-text">{count}</span>;
             },
         },
         {
             key: 'bomParts',
             header: 'Linked BOM Parts',
             align: 'center',
+            width: '12%',
             render: (c) => {
-                if (!c.hasSubParts) return <span className="text-slate-400 text-xs">—</span>;
+                if (!c.hasSubParts) return <span className="text-muted text-xs">—</span>;
                 const partsCount = categoryParts.filter(cp => cp.categoryId === c.id).length;
                 return (
-                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30">
                     {partsCount} Sub-Part{partsCount === 1 ? '' : 's'}
                   </span>
                 );
@@ -190,12 +195,13 @@ export const CategoriesPage = () => {
             key: 'totalValuation',
             header: 'Assigned Asset Value',
             align: 'right',
+            width: '14%',
             render: (c) => {
                 const valuation = items
                     .filter(i => i.category?.toLowerCase() === c.name?.toLowerCase() || i.categoryId === c.id)
                     .reduce((sum, i) => sum + ((i.availableQty ?? i.stock ?? 0) * (i.costPrice ?? i.unitCost ?? 0)), 0);
                 return (
-                    <span className="font-mono font-bold text-slate-900">
+                    <span className="font-mono font-bold text-text">
                         ₹{valuation.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                 );
@@ -205,8 +211,9 @@ export const CategoriesPage = () => {
             key: 'customFields',
             header: 'Custom Attributes',
             align: 'center',
+            width: '10%',
             render: (c) => (
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-text-secondary border border-border">
                     {(c.customFields || []).length} field(s)
                 </span>
             ),
@@ -215,14 +222,16 @@ export const CategoriesPage = () => {
             key: 'leadTimeDays',
             header: 'Supplier Lead Time',
             align: 'center',
-            render: (c) => (<span className="text-slate-600 flex items-center justify-center gap-1 text-xs">
-          <Clock size={12} className="text-slate-400"/> {c.leadTimeDays ?? 7} days
+            width: '10%',
+            render: (c) => (<span className="text-text-secondary flex items-center justify-center gap-1 text-xs">
+          <Clock size={12} className="text-muted"/> {c.leadTimeDays ?? 7} days
         </span>),
         },
         {
             key: 'actions',
             header: 'Actions',
             align: 'right',
+            width: '14%',
             render: (c) => (
                 <div className="flex items-center justify-end gap-1.5">
                     {c.hasSubParts && (
@@ -231,7 +240,7 @@ export const CategoriesPage = () => {
                           variant="secondary"
                           icon={Boxes}
                           onClick={() => setManagingBomCategory(c)}
-                          className="text-xs py-1 px-2.5 bg-purple-50 text-purple-700 hover:bg-purple-100 border border-purple-200"
+                          className="text-xs py-1 px-2.5 bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 hover:bg-purple-100 border border-purple-200 dark:border-purple-800"
                       >
                           Manage BOM
                       </Button>
@@ -273,11 +282,12 @@ export const CategoriesPage = () => {
         guide={categoryGuide}
         actions={
           <div className="flex items-center gap-2">
-            <Link to={isMachineView ? '/inventory/items/machines' : '/inventory/items/stock'}>
-              <Button variant="outline">
-                {isMachineView ? 'View Machines' : 'View Stock Items'}
-              </Button>
-            </Link>
+            <Button
+              variant="outline"
+              onClick={() => navigate(isMachineView ? '/inventory/items/machines' : '/inventory/items/stock')}
+            >
+              {isMachineView ? 'View Machines' : 'View Stock Items'}
+            </Button>
             <Button icon={Plus} onClick={() => setShowAddModal(true)}>
               {isMachineView ? 'Create Machine Category' : 'Create Category'}
             </Button>

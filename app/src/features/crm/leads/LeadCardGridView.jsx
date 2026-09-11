@@ -1,7 +1,9 @@
 import { Building2, Mail, MapPin, Phone, Pin, Trash2, UserRound } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
+import { formatCurrency } from "../../../utils/currencyUtils";
 
 export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadIds = [], onTogglePin, onToggleOne, onRequestDelete, onAddNote, onOpenLead, onDelete }) {
+  const activeCurrency = (typeof localStorage !== 'undefined' && localStorage.getItem('evenmore_currency')) || 'USD ($)';
   return (
     <div className="lead-grid">
       {rows.map((row) => (
@@ -66,7 +68,7 @@ export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadI
 
           <div className="lead-grid-footer">
             <small>{row.source}</small>
-            <b>Rs. {row.amount.toLocaleString("en-IN")}</b>
+            <b>{formatCurrency(row.amount || 0, activeCurrency, { noDecimals: true })}</b>
           </div>
         </article>
       ))}

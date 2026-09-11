@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone, MapPin, ListChecks } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import { useERP } from '../../../context/ERPContext';
 import UserLocationTracking from './UserLocationTracking';
 
 export default function UserAllocationPage() {
+  const { formatCurrency } = useERP();
   const [teamMembers, setTeamMembers] = useState([
     {
       id: 1,
@@ -39,32 +41,66 @@ export default function UserAllocationPage() {
       phone: '+91 98777 88990',
       leadsAssigned: 19,
       dealsClosed: 9,
-      conversionRate: '47.3%',
-      activePipeline: 310000,
-      avatar: 'https://i.pravatar.cc/160?img=15',
-      status: 'Online',
+      conversionRate: '47.4%',
+      activePipeline: 280000,
+      avatar: 'https://i.pravatar.cc/160?img=12',
+      status: 'Offline',
     },
     {
       id: 4,
-      name: 'Anuska Shah',
-      role: 'Customer Success & Inbound Lead Rep',
-      email: 'anuska@evenmore.io',
+      name: 'Ananya Deshmukh',
+      role: 'Customer Success & Inbound Leads',
+      email: 'ananya@evenmore.io',
       phone: '+91 98111 22334',
-      leadsAssigned: 42,
-      dealsClosed: 16,
-      conversionRate: '38.0%',
-      activePipeline: 240000,
-      avatar: 'https://i.pravatar.cc/160?img=38',
-      status: 'Offline',
+      leadsAssigned: 24,
+      dealsClosed: 11,
+      conversionRate: '45.8%',
+      activePipeline: 265000,
+      avatar: 'https://i.pravatar.cc/160?img=32',
+      status: 'Online',
     },
   ]);
 
   const [search, setSearch] = useState('');
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newMember, setNewMember] = useState({
+    name: '',
+    role: 'Sales Representative',
+    email: '',
+    phone: '',
+    avatar: 'https://i.pravatar.cc/160?img=33',
+  });
+
+  const totalLeads = teamMembers.reduce((sum, m) => sum + m.leadsAssigned, 0);
+  const totalDeals = teamMembers.reduce((sum, m) => sum + m.dealsClosed, 0);
+  const totalPipeline = teamMembers.reduce((sum, m) => sum + m.activePipeline, 0);
   const [view, setView] = useState('tracking');
 
   const filtered = teamMembers.filter(
-    (m) => m.name.toLowerCase().includes(search.toLowerCase()) || m.role.toLowerCase().includes(search.toLowerCase())
+    (m) =>
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.role.toLowerCase().includes(search.toLowerCase()) ||
+      m.email.toLowerCase().includes(search.toLowerCase())
   );
+
+  const handleAddMember = (e) => {
+    e.preventDefault();
+    if (!newMember.name || !newMember.email) return;
+
+    const created = {
+      id: teamMembers.length + 1,
+      ...newMember,
+      leadsAssigned: 0,
+      dealsClosed: 0,
+      conversionRate: '0.0%',
+      activePipeline: 0,
+      status: 'Online',
+    };
+
+    setTeamMembers([...teamMembers, created]);
+    setNewMember({ name: '', role: 'Sales Representative', email: '', phone: '', avatar: 'https://i.pravatar.cc/160?img=33' });
+    setIsAddOpen(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -82,13 +118,71 @@ export default function UserAllocationPage() {
               </button>
             </div>
             {view === 'allocation' && (
-              <button type="button" className="btn-primary btn-sm flex items-center gap-1.5">
-                <UserPlus size={14} /> Allocate Representative
+              <button
+                type="button"
+                onClick={() => setIsAddOpen(true)}
+                className="btn-primary btn-sm flex items-center gap-1.5"
+              >
+                <UserPlus size={14} strokeWidth={2.4} /> Add Representative
               </button>
             )}
           </div>
         }
       />
+
+      {/* Add Representative Form */}
+      {isAddOpen && view === 'allocation' && (
+        <form onSubmit={handleAddMember} className="card p-4 space-y-3 bg-blue-50/50 dark:bg-slate-900/40 border border-blue-200 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">New Representative</h3>
+            <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600">
+              ✕
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <input
+              type="text"
+              required
+              placeholder="Representative Name *"
+
+              value={newMember.name}
+              onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="text"
+              required
+              placeholder="Role / Designation *"
+              value={newMember.role}
+              onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="email"
+              required
+              placeholder="Work Email *"
+              value={newMember.email}
+              onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="text"
+              placeholder="Phone Number"
+              value={newMember.phone}
+              onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setIsAddOpen(false)} className="btn-secondary btn-sm">
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary btn-sm">
+              Save Representative
+            </button>
+          </div>
+        </form>
+      )}
 
       {view === 'tracking' ? (
         <UserLocationTracking />
@@ -110,8 +204,8 @@ export default function UserAllocationPage() {
             <CheckCircle2 size={22} />
           </div>
           <div className="stat-body">
-            <span className="stat-num">121</span>
-            <span className="stat-label">Total Allocated Leads</span>
+            <span className="stat-num">{totalDeals}</span>
+            <span className="stat-label">Total Won Deals</span>
           </div>
         </div>
         <div className="stat-card">
@@ -128,7 +222,7 @@ export default function UserAllocationPage() {
             <ArrowUpRight size={22} />
           </div>
           <div className="stat-body">
-            <span className="stat-num">Rs. 16.5L</span>
+            <span className="stat-num">{formatCurrency(totalPipeline, { noDecimals: true })}</span>
             <span className="stat-label">Allocated Pipeline</span>
           </div>
         </div>
@@ -185,7 +279,7 @@ export default function UserAllocationPage() {
                   <td className="font-bold font-mono text-center">{m.leadsAssigned}</td>
                   <td className="font-bold font-mono text-center text-emerald-600">{m.dealsClosed}</td>
                   <td className="font-bold font-mono text-center text-blue-600">{m.conversionRate}</td>
-                  <td className="font-bold font-mono">Rs. {m.activePipeline.toLocaleString('en-IN')}</td>
+                  <td className="font-bold font-mono">{formatCurrency(m.activePipeline, { noDecimals: true })}</td>
                   <td>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${

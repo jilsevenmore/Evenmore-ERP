@@ -25,6 +25,7 @@ export default function TaskAllocationDetailPage() {
       setStatusDraft(task.status);
       setReassignTo(task.assignee);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
 
   if (!task) {

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
+import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import { Building2, Sliders, FileCheck, CheckCircle2, Save, } from 'lucide-react';
 export const SettingsPage = () => {
+    const { currency: globalCurrency, setCurrency: setGlobalCurrency } = useERP();
     const [savedToast, setSavedToast] = useState(false);
     // Settings State
     const [companyName, setCompanyName] = useState('Horizon Industrial & Hardware Solutions');
     const [taxId, setTaxId] = useState('US-EIN-94-2039481');
-    const [currency, setCurrency] = useState('USD ($)');
+    const [currency, setCurrency] = useState(globalCurrency || 'USD ($)');
     const [fiscalYear, setFiscalYear] = useState('January - December (Calendar)');
     const [invoicePrefix, setInvoicePrefix] = useState('INV-2026-');
     const [soPrefix, setSoPrefix] = useState('SO-2026-');
@@ -15,6 +17,7 @@ export const SettingsPage = () => {
     const [autoApprovalThreshold, setAutoApprovalThreshold] = useState('5000');
     const handleSave = (e) => {
         e.preventDefault();
+        setGlobalCurrency(currency);
         setSavedToast(true);
         setTimeout(() => setSavedToast(false), 3000);
     };
@@ -51,10 +54,10 @@ export const SettingsPage = () => {
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Base Accounting Currency</label>
               <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]">
-                <option value="USD ($)">USD ($) — United States Dollar</option>
-                <option value="EUR (€)">EUR (€) — Euro</option>
-                <option value="GBP (£)">GBP (£) — British Pound</option>
-                <option value="CAD ($)">CAD ($) — Canadian Dollar</option>
+                <option value="USD ($)">USD ($) - United States Dollar</option>
+                <option value="EUR (€)">EUR (€) - Euro</option>
+                <option value="GBP (£)">GBP (£) - British Pound</option>
+                <option value="INR (₹)">INR (₹) - Indian Rupee</option>
               </select>
             </div>
             <div>
