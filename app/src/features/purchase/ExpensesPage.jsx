@@ -22,7 +22,7 @@ const expensesGuide = {
 };
 
 export const ExpensesPage = () => {
-    const { expenses, addExpense } = useERP();
+    const { expenses, addExpense, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [category, setCategory] = useState('Logistics');
     const [payee, setPayee] = useState('');
@@ -32,7 +32,7 @@ export const ExpensesPage = () => {
         e.preventDefault();
         addExpense({
             category,
-            date: 'Today',
+            date: getCurrentDateFormatted(),
             payee: payee || 'Service Vendor',
             amount: parseFloat(amount) || 150,
             paidVia,
@@ -46,47 +46,63 @@ export const ExpensesPage = () => {
         {
             key: 'expenseNumber',
             header: 'Expense Voucher #',
-            render: (e) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <TrendingDown size={13} className="text-amber-600"/> {e.expenseNumber}
-        </span>),
+            width: '15%',
+            render: (e) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <TrendingDown size={13} className="text-amber-600 dark:text-amber-400 shrink-0"/>
+                <span>{e.expenseNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'category',
             header: 'Expense Category',
-            render: (e) => (<span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-800 text-[11px] font-semibold rounded border border-slate-300">
-          {e.category}
-        </span>),
+            width: '16%',
+            render: (e) => (
+              <span className="inline-block px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-text-secondary text-[11px] font-semibold rounded border border-border whitespace-nowrap">
+                {e.category}
+              </span>
+            ),
         },
         {
             key: 'payee',
             header: 'Vendor / Payee Entity',
-            render: (e) => <span className="font-bold text-[#1F2E4A]">{e.payee}</span>,
+            width: '22%',
+            render: (e) => <span className="font-bold text-text block">{e.payee}</span>,
         },
         {
             key: 'date',
             header: 'Date Paid',
-            render: (e) => <span className="text-slate-600">{e.date}</span>,
+            width: '12%',
+            render: (e) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(e.date)}</span>,
         },
         {
             key: 'paidVia',
             header: 'Disbursement Method',
-            render: (e) => <span className="text-slate-700 text-xs">{e.paidVia}</span>,
+            width: '13%',
+            render: (e) => <span className="text-muted text-xs whitespace-nowrap">{e.paidVia}</span>,
         },
         {
             key: 'taxDeductible',
             header: 'Tax Status',
             align: 'center',
-            render: (e) => (<span className="text-emerald-700 text-[11px] font-semibold flex items-center justify-center gap-1">
-          <CheckCircle2 size={12}/> Tax Deductible
-        </span>),
+            width: '10%',
+            render: (e) => (
+              <span className="text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold flex items-center justify-center gap-1 whitespace-nowrap">
+                <CheckCircle2 size={12}/> Tax Deductible
+              </span>
+            ),
         },
         {
             key: 'amount',
-            header: 'Amount ($)',
+            header: 'Amount',
             align: 'right',
-            render: (e) => (<span className="font-mono font-bold text-slate-900">
-          ${(e.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </span>),
+            width: '12%',
+            render: (e) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(e.amount ?? 0)}
+              </span>
+            ),
         },
     ];
     const totalSpent = expenses.reduce((acc, curr) => acc + curr.amount, 0);
@@ -100,9 +116,9 @@ export const ExpensesPage = () => {
 
       {/* Expenses KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Operating Expenses" value={`$${totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} highlight />
+        <StatCard label="Total Operating Expenses" value={formatCurrency(totalSpent)} icon={DollarSign} highlight />
         <StatCard label="Expense Vouchers" value={`${expenses.length} Vouchers`} icon={Receipt} trend={{ positive: true, text: 'Logged to P&L' }} />
-        <StatCard label="Avg Expense Cost" value={`$${avgExpense.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={TrendingDown} />
+        <StatCard label="Avg Expense Cost" value={formatCurrency(avgExpense)} icon={TrendingDown} />
         <StatCard label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} subtext="Logistics, Facilities, Admin" />
       </div>
 

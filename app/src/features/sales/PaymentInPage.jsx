@@ -34,7 +34,7 @@ const paymentInGuide = {
     ],
 };
 export const PaymentInPage = () => {
-    const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding } = useERP();
+    const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
     const [amount, setAmount] = useState(1000);
@@ -57,7 +57,7 @@ export const PaymentInPage = () => {
             customer: inv?.customer || cust?.name || 'Acme Corp',
             invoiceId: inv?.id,
             invoiceNumber: inv?.invoiceNumber || 'INV-2026-001',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             mode,
             amount: Number(amount) || 1000,
             reference: reference || `WIRE-${Date.now()}`,
@@ -69,44 +69,61 @@ export const PaymentInPage = () => {
         {
             key: 'receiptNumber',
             header: 'Receipt Ref',
-            render: (p) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <ArrowDownLeft size={13} className="text-emerald-600"/> {p.receiptNumber}
-        </span>),
+            width: '14%',
+            render: (p) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <ArrowDownLeft size={13} className="text-emerald-600 dark:text-emerald-400 shrink-0"/>
+                <span>{p.receiptNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'customer',
             header: 'Customer Account',
-            render: (p) => <span className="font-bold text-[#1F2E4A]">{p.customer}</span>,
+            width: '24%',
+            render: (p) => <span className="font-bold text-text block">{p.customer}</span>,
         },
         {
             key: 'invoiceNumber',
             header: 'Settled Invoice',
-            render: (p) => <span className="font-mono font-semibold text-blue-600">{p.invoiceNumber}</span>,
+            width: '14%',
+            render: (p) => <span className="font-mono font-semibold text-primary whitespace-nowrap">{p.invoiceNumber}</span>,
         },
         {
             key: 'date',
             header: 'Payment Date',
-            render: (p) => <span className="text-slate-600">{p.date}</span>,
+            width: '12%',
+            render: (p) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(p.date)}</span>,
         },
         {
             key: 'mode',
             header: 'Payment Mode',
-            render: (p) => (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
-          <CreditCard size={11} className="text-slate-500"/> {p.mode}
-        </span>),
+            align: 'center',
+            width: '14%',
+            render: (p) => (
+              <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-text-secondary bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded border border-border whitespace-nowrap">
+                <CreditCard size={11} className="text-muted"/> {p.mode}
+              </span>
+            ),
         },
         {
             key: 'reference',
             header: 'Transaction / Wire Ref',
-            render: (p) => (<span className="font-mono text-[11px] text-slate-500">{p.reference}</span>),
+            width: '12%',
+            render: (p) => (
+              <span className="font-mono text-[11px] text-muted whitespace-nowrap">{p.reference}</span>
+            ),
         },
         {
             key: 'amount',
             header: 'Amount Received',
             align: 'right',
-            render: (p) => (<span className="font-mono font-bold text-emerald-700">
-          +${(p.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </span>),
+            width: '14%',
+            render: (p) => (
+              <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
+                +{formatCurrency(p.amount ?? 0)}
+              </span>
+            ),
         },
     ];
     const avgReceipt = paymentIns.length > 0 ? (totalCollected / paymentIns.length) : 0;
@@ -124,9 +141,9 @@ export const PaymentInPage = () => {
 
       {/* Payment In KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Received Collections" value={`$${totalCollected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} highlight />
+        <StatCard label="Total Received Collections" value={formatCurrency(totalCollected)} icon={DollarSign} highlight />
         <StatCard label="Total Vouchers Issued" value={`${paymentIns.length} Receipts`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
-        <StatCard label="Avg Receipt Amount" value={`$${avgReceipt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={TrendingUp} />
+        <StatCard label="Avg Receipt Amount" value={formatCurrency(avgReceipt)} icon={TrendingUp} />
         <StatCard label="Bank & Wire Transfers" value={`${wireCount} Settlements`} icon={CheckCircle2} subtext="Direct Treasury intake" />
       </div>
 

@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2 } from 'lucide-react';
+import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -29,9 +29,10 @@ const salesOrderGuide = {
 };
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, convertSalesOrderToInvoice, convertSalesOrderToChallan, deliveryChallans, invoices, paymentIns, } = useERP();
+    const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, convertSalesOrderToInvoice, convertSalesOrderToChallan, deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY } = useERP();
     const [stageFilter, setStageFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [deliveryDate, setDeliveryDate] = useState('In 10 days');
@@ -42,6 +43,23 @@ export const SalesOrdersPage = () => {
     const totalAmt = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
     const creditLimit = selectedCustomer?.creditLimit || 50000;
     const isCreditExceeded = selectedCustomer ? (selectedCustomer.balance + totalAmt) > creditLimit : false;
+
+    const handleOpenCreateModal = () => {
+        setSelectedCustomerId(customers[0]?.id || '');
+        setDeliveryDate('In 10 days');
+        setLineItems([]);
+        setIsFullscreen(false);
+        setShowAddModal(true);
+    };
+
+    const handleCloseCreateModal = () => {
+        setShowAddModal(false);
+        setSelectedCustomerId(customers[0]?.id || '');
+        setDeliveryDate('In 10 days');
+        setLineItems([]);
+        setIsFullscreen(false);
+    };
+
     const handleCloneOrder = (order) => {
         setSelectedCustomerId(order.customerId || customers[0]?.id || '');
         setDeliveryDate('In 10 days (Repeat Order)');
@@ -49,6 +67,7 @@ export const SalesOrdersPage = () => {
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         })));
+        setIsFullscreen(false);
         setShowAddModal(true);
     };
     const handleCreate = (e) => {
@@ -64,8 +83,7 @@ export const SalesOrdersPage = () => {
             paymentStatus: 'Unpaid',
             items: lineItems,
         });
-        setShowAddModal(false);
-        setLineItems([]);
+        handleCloseCreateModal();
     };
     const advanceStage = (orderId, currentStage) => {
         if (currentStage === 'Draft') {
@@ -167,44 +185,50 @@ export const SalesOrdersPage = () => {
         {
             key: 'orderNumber',
             header: 'Sales Order #',
-            render: (o) => (<button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left">
-          <ShoppingCart size={13} className="text-slate-400"/> {o.orderNumber}
+            width: '13%',
+            render: (o) => (<button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
+          <ShoppingCart size={13} className="text-muted"/> {o.orderNumber}
         </button>),
         },
         {
             key: 'customer',
             header: 'Customer Account',
-            render: (o) => <span className="font-bold text-[#1F2E4A]">{o.customer}</span>,
+            width: '20%',
+            render: (o) => <span className="font-bold text-text">{o.customer}</span>,
         },
         {
             key: 'date',
-            header: 'Order Date',
-            render: (o) => <span className="text-slate-600">{o.date}</span>,
+            header: 'SO Date',
+            width: '11%',
+            render: (o) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(o.date)}</span>,
         },
         {
             key: 'deliveryDate',
             header: 'Target Delivery',
-            render: (o) => <span className="text-slate-600">{o.deliveryDate}</span>,
+            width: '12%',
+            render: (o) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(o.deliveryDate)}</span>,
         },
         {
             key: 'amount',
             header: 'Order Value',
             align: 'right',
-            render: (o) => (<span className="font-mono font-bold text-slate-900">
-          ${(o.amount ?? o.total ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            width: '12%',
+            render: (o) => (<span className="font-mono font-bold text-text whitespace-nowrap">
+          {formatCurrency(o.amount ?? o.total ?? 0)}
         </span>),
         },
         {
             key: 'stage',
             header: 'Stage Lifecycle',
             align: 'center',
+            width: '14%',
             render: (o) => {
                 const stageVal = o.stage || o.status || 'Draft';
                 const stages = ['Draft', 'Confirmed', 'Delivered', 'Invoiced'];
                 const currentIdx = stages.indexOf(stageVal);
-                return (<div className="flex items-center gap-1">
-            {stages.map((stg, i) => (<span key={stg} title={stg} className={`w-2.5 h-2.5 rounded-full ${i <= currentIdx ? 'bg-[#1F2E4A]' : 'bg-slate-200'}`}/>))}
-            <span className="ml-1.5 text-[11px] font-semibold text-slate-700">
+                return (<div className="flex items-center justify-center gap-1">
+            {stages.map((stg, i) => (<span key={stg} title={stg} className={`w-2.5 h-2.5 rounded-full ${i <= currentIdx ? 'bg-primary' : 'bg-border'}`}/>))}
+            <span className="ml-1.5 text-[11px] font-semibold text-text">
               {stageVal}
             </span>
           </div>);
@@ -214,28 +238,30 @@ export const SalesOrdersPage = () => {
             key: 'paymentStatus',
             header: 'Payment Status',
             align: 'center',
+            width: '10%',
             render: (o) => <StatusBadge status={o.paymentStatus || 'Unpaid'}/>,
         },
         {
             key: 'actions',
             header: 'Actions / Lifecycle',
             align: 'right',
+            width: '18%',
             render: (o) => {
-                return (<div className="flex items-center justify-end gap-1.5">
-            <button onClick={() => handleCloneOrder(o)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
+                return (<div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <button onClick={() => handleCloneOrder(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
               <Copy size={13}/>
             </button>
 
-            {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 cursor-pointer shadow-sm transition-colors">
+            {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
               </button>)}
-            {o.stage === 'Confirmed' && (<button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded text-[11px] font-semibold hover:bg-indigo-700 cursor-pointer flex items-center gap-1 shadow-sm transition-colors">
-                <Truck size={11}/> Issue Challan
+            {o.stage === 'Confirmed' && (<button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
+                <Truck size={12}/> Issue Challan
               </button>)}
-            {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer flex items-center gap-1 shadow-sm transition-colors">
-                <Receipt size={11}/> Invoice
+            {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
+                <Receipt size={12}/> Invoice
               </button>)}
-            {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-700 inline-flex items-center gap-1">
+            {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1 whitespace-nowrap">
                 <CheckCircle size={12}/> Fulfilled
               </span>)}
           </div>);
@@ -248,14 +274,14 @@ export const SalesOrdersPage = () => {
     const fulfilledOrdersCount = salesOrders.filter(o => o.stage === 'Invoiced').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Sales Orders" subtitle="Confirmed customer purchase agreements driving warehouse stock reservation, dispatch manifests, and automated invoicing." guide={salesOrderGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+      <PageHeader title="Sales Orders" subtitle="Confirmed customer purchase agreements driving warehouse stock reservation, dispatch manifests, and automated invoicing." guide={salesOrderGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
             Create Sales Order
           </Button>}/>
 
       {/* Sales Orders KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Booked Pipeline" value={`$${totalSoValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} />
-        <StatCard label="Active In-Fulfillment" value={`$${confirmedValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={Truck} trend={{ positive: true, text: `${openOrdersCount} orders active` }} highlight={openOrdersCount > 0} />
+        <StatCard label="Total Booked Pipeline" value={formatCurrency(totalSoValue)} icon={DollarSign} />
+        <StatCard label="Active In-Fulfillment" value={formatCurrency(confirmedValue)} icon={Truck} trend={{ positive: true, text: `${openOrdersCount} orders active` }} highlight={openOrdersCount > 0} />
         <StatCard label="Open Backlog Orders" value={`${openOrdersCount} Orders`} icon={Clock} subtext="Pending warehouse dispatch" />
         <StatCard label="Invoiced & Fulfilled" value={`${fulfilledOrdersCount} Completed`} icon={CheckCircle2} trend={{ positive: true, text: 'Invoices created' }} />
       </div>
@@ -272,23 +298,58 @@ export const SalesOrdersPage = () => {
       <DataTable title="Sales Order Register" data={filteredOrders} columns={columns} keyExtractor={(o) => o.id} searchPlaceholder="Search order number or customer..."/>
 
       {/* Create Modal */}
-      {showAddModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {showAddModal && (
+        <div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-4'}`}>
+          <div className={`bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+            isFullscreen ? 'w-full h-full rounded-none p-8' : 'max-w-5xl w-full rounded-2xl p-6 max-h-[92vh]'
+          } text-xs`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Create New Sales Order</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <X size={18}/>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                  title={isFullscreen ? "Exit Fullscreen" : "Maximize Fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseCreateModal}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X size={18}/>
+                </button>
+              </div>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
                   <select required value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
-                    {customers.map((c) => (<option key={c.id} value={c.id}>
-                        {c.name} ({c.code}) - Balance: ${c.balance.toFixed(2)} / Limit: ${(c.creditLimit || 50000).toLocaleString()}
-                      </option>))}
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
+                      </option>
+                    ))}
                   </select>
+                  {selectedCustomer && (
+                    <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
+                      <div className="flex items-center justify-between font-bold text-slate-800">
+                        <span>{selectedCustomer.name}</span>
+                        <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                          Credit Limit: ₹{(selectedCustomer.creditLimit || 50000).toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
+                        <span>POC: <strong>{selectedCustomer.contactPerson || 'Account Lead'}</strong></span>
+                        <span>Email: {selectedCustomer.email}</span>
+                        <span>Phone: {selectedCustomer.phone}</span>
+                        <span>Outstanding: ₹{(selectedCustomer.balance || 0).toLocaleString('en-IN')}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Target Delivery Date</label>
@@ -319,7 +380,7 @@ export const SalesOrdersPage = () => {
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
-                <Button variant="outline" type="button" onClick={() => setShowAddModal(false)}>
+                <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
                   Cancel
                 </Button>
                 <Button type="submit">
@@ -373,7 +434,7 @@ export const SalesOrdersPage = () => {
 
             <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
               <div className="font-mono text-xs">
-                Total Value: <span className="font-bold text-slate-900">${(selectedOrder.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                Total Value: <span className="font-bold text-slate-900">{formatCurrency(selectedOrder.amount || 0)}</span>
               </div>
               <div className="flex items-center gap-2">
                 {selectedOrder.stage === 'Draft' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Draft'); setSelectedOrder(null); }}>

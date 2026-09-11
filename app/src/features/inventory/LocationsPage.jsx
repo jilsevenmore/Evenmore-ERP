@@ -28,19 +28,22 @@ export const LocationsPage = () => {
         {
             key: 'code',
             header: 'Location Code',
-            render: (l) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <MapPin size={13} className="text-slate-400"/> {l.code}
+            width: '16%',
+            render: (l) => (<span className="font-mono font-bold text-text-secondary flex items-center gap-1.5">
+          <MapPin size={13} className="text-muted"/> {l.code}
         </span>),
         },
         {
             key: 'name',
             header: 'Facility Zone Name',
-            render: (l) => <span className="font-bold text-[#1F2E4A]">{l.name}</span>,
+            width: '26%',
+            render: (l) => <span className="font-bold text-text">{l.name}</span>,
         },
         {
             key: 'type',
             header: 'Zone Type',
-            render: (l) => (<span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-700 text-[11px] font-semibold rounded border border-slate-300">
+            width: '14%',
+            render: (l) => (<span className="inline-block px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-text-secondary text-[11px] font-semibold rounded border border-border">
           {l.type}
         </span>),
         },
@@ -48,11 +51,12 @@ export const LocationsPage = () => {
             key: 'capacityPct',
             header: 'Capacity Utilization',
             align: 'center',
+            width: '20%',
             render: (l) => (<div className="flex items-center justify-center gap-2">
-          <div className="w-24 bg-slate-200 h-2 rounded-full overflow-hidden">
-            <div className={`h-full ${l.capacityPct > 85 ? 'bg-rose-500' : 'bg-[#1F2E4A]'}`} style={{ width: `${l.capacityPct}%` }}/>
+          <div className="w-24 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div className={`h-full ${l.capacityPct > 85 ? 'bg-rose-500' : 'bg-primary'}`} style={{ width: `${l.capacityPct}%` }}/>
           </div>
-          <span className="font-mono text-xs font-semibold text-slate-700">
+          <span className="font-mono text-xs font-semibold text-text">
             {l.capacityPct}%
           </span>
         </div>),
@@ -61,13 +65,15 @@ export const LocationsPage = () => {
             key: 'totalSkus',
             header: 'Assigned SKUs',
             align: 'center',
-            render: (l) => (<span className="font-mono font-bold text-slate-800">{l.totalSkus}</span>),
+            width: '12%',
+            render: (l) => (<span className="font-mono font-bold text-text">{l.totalSkus}</span>),
         },
         {
             key: 'manager',
             header: 'Zone Manager',
-            render: (l) => (<span className="text-slate-600 flex items-center gap-1 text-xs">
-          <User size={12} className="text-slate-400"/> {l.manager}
+            width: '12%',
+            render: (l) => (<span className="text-text-secondary flex items-center gap-1 text-xs">
+          <User size={12} className="text-muted"/> {l.manager}
         </span>),
         },
     ];

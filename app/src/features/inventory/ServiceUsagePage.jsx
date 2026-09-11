@@ -26,38 +26,44 @@ export const ServiceUsagePage = () => {
     const columns = [
         {
             key: 'ticketNumber',
-            header: 'Work Order / Ticket #',
-            render: (s) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <Wrench size={13} className="text-[#1F2E4A]"/> {s.ticketNumber}
+            header: 'Service Ticket #',
+            width: '16%',
+            render: (s) => (<span className="font-mono font-bold text-text-secondary flex items-center gap-1.5">
+          <Wrench size={13} className="text-primary"/> {s.ticketNumber}
         </span>),
         },
         {
             key: 'technician',
             header: 'Assigned Field Tech',
-            render: (s) => (<span className="text-slate-800 font-semibold flex items-center gap-1">
-          <User size={12} className="text-slate-400"/> {s.technician}
+            width: '16%',
+            render: (s) => (<span className="text-text font-semibold flex items-center gap-1">
+          <User size={12} className="text-muted"/> {s.technician}
         </span>),
         },
         {
             key: 'sku',
             header: 'Consumed SKU',
-            render: (s) => <span className="font-mono font-bold text-slate-700">{s.sku}</span>,
+            width: '14%',
+            render: (s) => <span className="font-mono font-bold text-primary">{s.sku}</span>,
         },
         {
             key: 'qtyUsed',
             header: 'Quantity Consumed',
             align: 'center',
-            render: (s) => (<span className="font-mono font-bold text-slate-900">{s.qtyUsed} Units</span>),
+            width: '14%',
+            render: (s) => (<span className="font-mono font-bold text-text">{s.qtyUsed} Units</span>),
         },
         {
             key: 'date',
             header: 'Consumption Date',
-            render: (s) => <span className="text-slate-600">{s.date}</span>,
+            width: '14%',
+            render: (s) => <span className="text-muted font-mono text-[11px]">{s.date}</span>,
         },
         {
             key: 'purpose',
             header: 'Work Description / Purpose',
-            render: (s) => <span className="text-slate-700 text-xs">{s.purpose}</span>,
+            width: '26%',
+            render: (s) => <span className="text-text-secondary text-xs">{s.purpose}</span>,
         },
     ];
     return (<div className="space-y-6">

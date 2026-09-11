@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts } from '../data/erp/mockData';
+import { formatDateDDMMYYYY, getCurrentDateFormatted } from '../utils/dateUtils';
+import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES } from '../utils/currencyUtils';
 const STORAGE_KEY = 'horizon_erp_v2_state';
 const initialJournalEntries = [
     {
@@ -111,7 +113,34 @@ export const ERPProvider = ({ children, }) => {
     const [bankAccounts, setBankAccounts] = useState(initial?.bankAccounts || mockBankAccounts);
     const [journalEntries, setJournalEntries] = useState(initial?.journalEntries || initialJournalEntries);
     const [inventoryMovements, setInventoryMovements] = useState(initial?.inventoryMovements || mockInventoryMovements);
+    const [currency, setCurrencyState] = useState(() => {
+        return initial?.currency || localStorage.getItem('evenmore_currency') || 'USD ($)';
+    });
+    const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
+
+    useEffect(() => {
+        fetchLiveExchangeRates()
+            .then((rates) => {
+                if (rates) setLiveRates(rates);
+            })
+            .catch((err) => console.warn('Live forex rate sync:', err));
+    }, []);
+
+    const setCurrency = (newCurr) => {
+        setCurrencyState(newCurr);
+        try {
+            localStorage.setItem('evenmore_currency', newCurr);
+        } catch (e) {}
+        showToast(`System base currency updated to ${newCurr}`);
+    };
+
+    const formatCurrency = (amount, opts = {}) => {
+        return formatCurrencyUtil(amount, currency, { ...opts, customRates: liveRates });
+    };
+
+    const currencySymbol = getCurrencySymbol(currency);
+
     // Auto-save to localStorage
     useEffect(() => {
         try {
@@ -145,6 +174,7 @@ export const ERPProvider = ({ children, }) => {
                 bankAccounts,
                 journalEntries,
                 inventoryMovements,
+                currency,
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
         }
@@ -537,6 +567,16 @@ export const ERPProvider = ({ children, }) => {
             return {
                 ...p,
                 status: newStatus,
+            };
+        }));
+    };
+    const updateFaultyPartNotes = (id, newNotes) => {
+        setFaultyParts((prev) => prev.map((p) => {
+            if (p.id !== id)
+                return p;
+            return {
+                ...p,
+                notes: newNotes,
             };
         }));
     };
@@ -952,12 +992,49 @@ export const ERPProvider = ({ children, }) => {
             creditLimit: cust.creditLimit ?? 25000,
             status: cust.status || 'Active',
         };
-        setCustomers((prev) => [newCust, ...prev]);
-        showToast(`Customer ${newCust.name} created.`);
+        setCustomers((prev) => {
+            const exists = prev.some(c => c.id === newCust.id || c.code === newCust.code);
+            return exists ? prev.map(c => c.id === newCust.id ? { ...c, ...newCust } : c) : [newCust, ...prev];
+        });
+
+        // Synchronize automatically with Parties
+        setParties((prev) => {
+            const exists = prev.some(p => p.id === newCust.id || p.code === newCust.code || (p.name && p.name.toLowerCase() === newCust.name.toLowerCase()));
+            if (exists) {
+                return prev.map(p => (p.id === newCust.id || p.code === newCust.code || (p.name && p.name.toLowerCase() === newCust.name.toLowerCase())) ? {
+                    ...p,
+                    name: newCust.name,
+                    email: newCust.email || p.email,
+                    phone: newCust.phone || p.phone,
+                    balance: newCust.balance ?? p.balance,
+                    creditLimit: newCust.creditLimit ?? p.creditLimit,
+                } : p);
+            }
+            const newParty = {
+                id: newCust.id,
+                code: newCust.code,
+                name: newCust.name,
+                type: 'Customer',
+                partyType: 'Customer',
+                contactPerson: newCust.contactPerson,
+                email: newCust.email,
+                phone: newCust.phone,
+                balance: newCust.balance ?? 0,
+                creditLimit: newCust.creditLimit ?? 25000,
+                status: newCust.status || 'Active',
+                billingAddress: { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+                shippingAddress: { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+                contacts: [{ id: `cnt-${Date.now()}`, name: newCust.contactPerson || newCust.name, role: 'Primary Contact', phone: newCust.phone, email: newCust.email }],
+            };
+            return [newParty, ...prev];
+        });
+
+        showToast(`Customer ${newCust.name} created and synced to Parties.`);
         return newCust;
     };
     const updateCustomer = (id, updates) => {
         setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+        setParties((prev) => prev.map((p) => (p.id === id || p.code === id ? { ...p, ...updates } : p)));
     };
     const addVendor = (ven) => {
         const newVendor = {
@@ -972,12 +1049,50 @@ export const ERPProvider = ({ children, }) => {
             paymentTerms: ven.paymentTerms || 'Net 30',
             status: ven.status || 'Active',
         };
-        setVendors((prev) => [newVendor, ...prev]);
-        showToast(`Vendor ${newVendor.name} added.`);
+        setVendors((prev) => {
+            const exists = prev.some(v => v.id === newVendor.id || v.code === newVendor.code);
+            return exists ? prev.map(v => v.id === newVendor.id ? { ...v, ...newVendor } : v) : [newVendor, ...prev];
+        });
+
+        // Synchronize automatically with Parties
+        setParties((prev) => {
+            const exists = prev.some(p => p.id === newVendor.id || p.code === newVendor.code || (p.name && p.name.toLowerCase() === newVendor.name.toLowerCase()));
+            if (exists) {
+                return prev.map(p => (p.id === newVendor.id || p.code === newVendor.code || (p.name && p.name.toLowerCase() === newVendor.name.toLowerCase())) ? {
+                    ...p,
+                    name: newVendor.name,
+                    email: newVendor.email || p.email,
+                    phone: newVendor.phone || p.phone,
+                    balance: newVendor.balance ?? p.balance,
+                    paymentTerms: newVendor.paymentTerms ?? p.paymentTerms,
+                } : p);
+            }
+            const newParty = {
+                id: newVendor.id,
+                code: newVendor.code,
+                name: newVendor.name,
+                type: 'Vendor',
+                partyType: 'Vendor',
+                category: newVendor.category,
+                contactPerson: newVendor.contactPerson,
+                email: newVendor.email,
+                phone: newVendor.phone,
+                balance: newVendor.balance ?? 0,
+                paymentTerms: newVendor.paymentTerms || 'Net 30',
+                status: newVendor.status || 'Active',
+                billingAddress: { line1: 'Supplier Facility', city: 'Delhi', state: 'Delhi', pincode: '110001' },
+                shippingAddress: { line1: 'Supplier Facility', city: 'Delhi', state: 'Delhi', pincode: '110001' },
+                contacts: [{ id: `cnt-${Date.now()}`, name: newVendor.contactPerson || newVendor.name, role: 'Sales Contact', phone: newVendor.phone, email: newVendor.email }],
+            };
+            return [newParty, ...prev];
+        });
+
+        showToast(`Vendor ${newVendor.name} added and synced to Parties.`);
         return newVendor;
     };
     const updateVendor = (id, updates) => {
         setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, ...updates } : v)));
+        setParties((prev) => prev.map((p) => (p.id === id || p.code === id ? { ...p, ...updates } : p)));
     };
     const addCategory = (cat) => {
         const newCat = {
@@ -1007,7 +1122,7 @@ export const ERPProvider = ({ children, }) => {
             quoteNumber: quote.quoteNumber || `EST-2026-${String(quotations.length + 91).padStart(3, '0')}`,
             customerId: quote.customerId,
             customer: quote.customer || 'Acme Corp',
-            date: quote.date || 'Today',
+            date: formatDateDDMMYYYY(quote.date || 'Today'),
             validUntil: quote.validUntil || 'In 30 days',
             amount: totalAmount,
             status: quote.status || 'Draft',
@@ -1033,7 +1148,7 @@ export const ERPProvider = ({ children, }) => {
             quotationNumber: quote.quoteNumber,
             customerId: quote.customerId,
             customer: quote.customer,
-            date: 'Today',
+            date: getCurrentDateFormatted(),
             deliveryDate: 'In 14 days',
             amount: quote.amount,
             stage: 'Confirmed',
@@ -1064,7 +1179,7 @@ export const ERPProvider = ({ children, }) => {
             quotationNumber: order.quotationNumber,
             customerId: order.customerId,
             customer: order.customer || 'Acme Corp',
-            date: order.date || 'Today',
+            date: formatDateDDMMYYYY(order.date || 'Today'),
             deliveryDate: order.deliveryDate || 'In 10 days',
             amount: orderAmt,
             stage: order.stage || 'Draft',
@@ -1093,8 +1208,8 @@ export const ERPProvider = ({ children, }) => {
             linkedSo: order.orderNumber,
             customerId: order.customerId,
             customer: order.customer,
-            date: 'Today',
-            dispatchDate: 'Today',
+            date: getCurrentDateFormatted(),
+            dispatchDate: getCurrentDateFormatted(),
             transporter: 'FedEx Freight Direct',
             vehicleNo: 'TRK-8821-WA',
             status: 'In Transit',
@@ -1167,7 +1282,7 @@ export const ERPProvider = ({ children, }) => {
             customerId: order.customerId,
             customer: order.customer,
             linkedSo: order.orderNumber,
-            date: 'Today',
+            date: getCurrentDateFormatted(),
             dueDate: '30 Days from now',
             status: 'Unpaid',
             items: itemsList,
@@ -1415,7 +1530,7 @@ export const ERPProvider = ({ children, }) => {
                 `PO-2026-${String(purchaseOrders.length + 201).padStart(4, '0')}`,
             vendorId: po.vendorId,
             vendor: po.vendor || 'Arrow Electronics Supply',
-            date: po.date || 'Today',
+            date: formatDateDDMMYYYY(po.date || 'Today'),
             expectedDate: po.expectedDate || 'In 10 days',
             amount: poAmt,
             total: poAmt,
@@ -1431,6 +1546,16 @@ export const ERPProvider = ({ children, }) => {
     const updatePurchaseOrderStatus = (id, status) => {
         setPurchaseOrders((prev) => prev.map((po) => (po.id === id ? { ...po, status } : po)));
         showToast(`PO updated to ${status}.`);
+    };
+    const deletePurchaseOrder = (id) => {
+        const po = purchaseOrders.find((p) => p.id === id);
+        if (!po) return;
+        if (po.status !== 'Draft') {
+            showToast(`Only Draft Purchase Orders can be deleted.`);
+            return;
+        }
+        setPurchaseOrders((prev) => prev.filter((p) => p.id !== id));
+        showToast(`Draft Purchase Order ${po.poNumber || ''} deleted.`);
     };
     const convertPurchaseOrderToBill = (poId) => {
         const po = purchaseOrders.find((p) => p.id === poId);
@@ -1946,6 +2071,12 @@ export const ERPProvider = ({ children, }) => {
             bankAccounts,
             journalEntries,
             inventoryMovements,
+            currency,
+            setCurrency,
+            formatCurrency,
+            currencySymbol,
+            formatDateDDMMYYYY,
+            getCurrentDateFormatted,
             toastMessage,
             showToast,
             calculateItemStock,
@@ -1957,6 +2088,7 @@ export const ERPProvider = ({ children, }) => {
             recordMovement,
             addFaultyPart,
             updateFaultyPartStatus,
+            updateFaultyPartNotes,
             createInvoice,
             updateInvoiceStatus,
             addZoneRequest,
@@ -1984,6 +2116,7 @@ export const ERPProvider = ({ children, }) => {
             addSalesReturn,
             addPurchaseOrder,
             updatePurchaseOrderStatus,
+            deletePurchaseOrder,
             convertPurchaseOrderToBill,
             addPurchaseBill,
             updatePurchaseBillStatus,

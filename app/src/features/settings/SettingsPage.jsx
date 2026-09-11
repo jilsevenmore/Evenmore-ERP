@@ -3,16 +3,17 @@ import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import { Building, Bell, Database, Save, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 export const SettingsPage = () => {
-    const { resetDemoData } = useERP();
+    const { resetDemoData, currency: globalCurrency, setCurrency: setGlobalCurrency, showToast } = useERP();
     const [saved, setSaved] = useState(false);
     const [companyName, setCompanyName] = useState('Horizon Global Industrial Corp');
-    const [currency, setCurrency] = useState('USD ($)');
+    const [currency, setCurrency] = useState(globalCurrency || 'USD ($)');
     const [fiscalYear, setFiscalYear] = useState('Jan - Dec');
     const [autoReorder, setAutoReorder] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(true);
     const [showConfirmReset, setShowConfirmReset] = useState(false);
     const handleSave = (e) => {
         e.preventDefault();
+        setGlobalCurrency(currency);
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
     };

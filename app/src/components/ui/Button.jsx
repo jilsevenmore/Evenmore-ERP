@@ -9,7 +9,7 @@ export const Button = ({
   ...props
 }) => {
   const baseStyles =
-    'inline-flex items-center justify-center font-semibold rounded-lg transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs';
+    'inline-flex items-center justify-center font-semibold rounded-xl transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs';
 
   const sizeStyles = {
     sm: 'px-2.5 py-1 text-xs gap-1.5',

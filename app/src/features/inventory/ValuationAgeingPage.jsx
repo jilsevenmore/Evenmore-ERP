@@ -19,7 +19,7 @@ const holdingAgeDays = (id) => {
     return h;
 };
 export const ValuationAgeingPage = () => {
-    const { items } = useERP();
+    const { items, formatCurrency } = useERP();
     const [selectedBucket, setSelectedBucket] = useState('All');
     // Live valuation rows derived from current inventory (was hardcoded demo data).
     const agingData = useMemo(() => (items || []).map((it) => {
@@ -59,70 +59,88 @@ export const ValuationAgeingPage = () => {
         {
             key: 'sku',
             header: 'SKU Code',
-            render: (r) => <span className="font-mono font-bold text-slate-800">{r.sku}</span>,
+            width: '12%',
+            render: (r) => <span className="font-mono font-bold text-primary whitespace-nowrap">{r.sku}</span>,
         },
         {
             key: 'name',
             header: 'Item Description',
-            render: (r) => (<div>
-          <p className="font-bold text-[#1F2E4A]">{r.name}</p>
-          <span className="text-[10px] text-slate-500">{r.category}</span>
-        </div>),
+            width: '24%',
+            render: (r) => (
+              <div>
+                <p className="font-bold text-text">{r.name}</p>
+                <span className="text-[10px] text-muted">{r.category}</span>
+              </div>
+            ),
         },
         {
             key: 'qty',
             header: 'Holding Qty',
             align: 'center',
-            render: (r) => <span className="font-mono font-semibold text-slate-900">{r.qty}</span>,
+            width: '10%',
+            render: (r) => <span className="font-mono font-semibold text-text whitespace-nowrap">{r.qty}</span>,
         },
         {
             key: 'unitCost',
             header: 'Unit Cost',
             align: 'right',
-            render: (r) => (<span className="font-mono text-slate-700">${r.unitCost.toLocaleString()}</span>),
+            width: '12%',
+            render: (r) => <span className="font-mono text-muted whitespace-nowrap">{formatCurrency(r.unitCost)}</span>,
         },
         {
             key: 'totalValuation',
             header: 'Gross Carrying Value',
             align: 'right',
-            render: (r) => (<span className="font-mono font-bold text-slate-900">
-          ${r.totalValuation.toLocaleString()}
-        </span>),
+            width: '14%',
+            render: (r) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(r.totalValuation)}
+              </span>
+            ),
         },
         {
             key: 'ageDays',
             header: 'Holding Shelf Age',
             align: 'center',
-            render: (r) => (<span className="font-mono text-slate-800 text-xs">
-          {r.ageDays} days
-        </span>),
+            width: '11%',
+            render: (r) => (
+              <span className="font-mono text-text text-xs whitespace-nowrap">
+                {r.ageDays} days
+              </span>
+            ),
         },
         {
             key: 'agingBucket',
             header: 'Aging Bracket',
             align: 'center',
+            width: '15%',
             render: (r) => {
-                let color = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                let color = 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30';
                 if (r.agingBucket === '31-60 Days')
-                    color = 'bg-blue-50 text-blue-800 border-blue-200';
+                    color = 'bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30';
                 else if (r.agingBucket === '61-90 Days')
-                    color = 'bg-amber-50 text-amber-800 border-amber-200';
+                    color = 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30';
                 else if (r.agingBucket === '90+ Days (Stale)')
-                    color = 'bg-rose-50 text-rose-800 border-rose-200';
-                return (<span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold border ${color}`}>
-            {r.agingBucket}
-          </span>);
+                    color = 'bg-rose-50 text-rose-800 border-rose-200 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/30';
+                return (
+                  <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold border whitespace-nowrap ${color}`}>
+                    {r.agingBucket}
+                  </span>
+                );
             },
         },
         {
             key: 'depreciationReserve',
             header: 'Obsolescence Reserve',
             align: 'right',
-            render: (r) => (<span className="font-mono text-rose-700 font-semibold">
-          {r.depreciationReserve > 0
-                    ? `-$${r.depreciationReserve.toLocaleString()}`
-                    : '$0.00'}
-        </span>),
+            width: '12%',
+            render: (r) => (
+              <span className="font-mono text-rose-600 dark:text-rose-400 font-semibold whitespace-nowrap">
+                {r.depreciationReserve > 0
+                    ? `-${formatCurrency(r.depreciationReserve)}`
+                    : formatCurrency(0)}
+              </span>
+            ),
         },
     ];
     return (<div className="space-y-6">
@@ -138,10 +156,10 @@ export const ValuationAgeingPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Inventory Assets" value={`$${totalValuation.toLocaleString()}`} icon={DollarSign}/>
-        <StatCard label="Current Stock (0-30 Days)" value={`$${currentStockValue.toLocaleString()}`} trend={{ positive: true, text: 'High velocity turnover' }}/>
-        <StatCard label="Stale Stock (90+ Days)" value={`$${staleValuation.toLocaleString()}`} trend={{ positive: false, text: 'Review for clearance' }}/>
-        <StatCard label="Obsolescence Provision" value={`$${totalDepreciation.toLocaleString()}`} trend={{ positive: true, text: 'Fully reserved on balance sheet' }}/>
+        <StatCard label="Total Inventory Assets" value={formatCurrency(totalValuation, { noDecimals: true })} icon={DollarSign}/>
+        <StatCard label="Current Stock (0-30 Days)" value={formatCurrency(currentStockValue, { noDecimals: true })} trend={{ positive: true, text: 'High velocity turnover' }}/>
+        <StatCard label="Stale Stock (90+ Days)" value={formatCurrency(staleValuation, { noDecimals: true })} trend={{ positive: false, text: 'Review for clearance' }}/>
+        <StatCard label="Obsolescence Provision" value={formatCurrency(totalDepreciation, { noDecimals: true })} trend={{ positive: true, text: 'Fully reserved on balance sheet' }}/>
       </div>
 
       {/* Bucket Filter */}
