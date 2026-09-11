@@ -1,11 +1,9 @@
 import { useState, useMemo } from 'react';
-import { Plus, CheckCircle, Clock, AlertCircle, Calendar, User, Search, Filter } from 'lucide-react';
+import { Calendar, User, Search } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import DataTable from '../../../components/ui/DataTable';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import StatCard from '../../../components/ui/StatCard';
-import Modal from '../../../components/ui/Modal';
-import TaskForm from './TaskForm';
 
 const INITIAL_TASKS = [
   { id: 'TSK-001', title: 'Follow up on Enterprise Quote', lead: 'Sarah Jenkins (Acme Corp)', owner: 'Alex Rivera', dueDate: '2026-09-12', priority: 'High', status: 'In Progress' },
@@ -16,8 +14,7 @@ const INITIAL_TASKS = [
 ];
 
 export default function TasksPage() {
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tasks] = useState(INITIAL_TASKS);
   const [activeStatus, setActiveStatus] = useState('All');
   const [search, setSearch] = useState('');
 
@@ -66,11 +63,6 @@ export default function TasksPage() {
         title="CRM Tasks"
         subtitle="Track follow-ups, scheduled calls, demos, and sales milestones."
         breadcrumb={[{ label: 'CRM', to: '/crm/leads' }, { label: 'Tasks' }]}
-        actions={
-          <button type="button" className="btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> Create Task
-          </button>
-        }
       />
 
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, margin: '20px 0 24px' }}>
@@ -128,18 +120,6 @@ export default function TasksPage() {
           emptyMessage="No tasks found matching your filters."
         />
       </div>
-
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Create New Task"
-        size="lg"
-      >
-        <TaskForm
-          onBack={() => setIsModalOpen(false)}
-          onAddNote={() => {}}
-        />
-      </Modal>
     </div>
   );
 }

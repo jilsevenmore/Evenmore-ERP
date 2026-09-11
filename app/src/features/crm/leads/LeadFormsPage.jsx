@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import LeadFormsManager from '../leads/LeadFormsManager';
+import LeadGuideModal from '../leads/LeadGuideModal';
 import { defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
 
 function getStoredForms() {
@@ -30,6 +31,7 @@ export default function LeadFormsPage() {
   const navigate = useNavigate();
   const [leadForms, setLeadForms] = useState(getStoredForms);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
 
@@ -96,7 +98,9 @@ export default function LeadFormsPage() {
         onCreateForm={openCreateModal}
         onEditForm={handleEditForm}
         onDeleteForm={handleDeleteForm}
+        onOpenGuide={() => setIsGuideOpen(true)}
       />
+      <LeadGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} variant="form" />
 
       {isModalOpen && (
         <div

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, ArrowUpDown, ClipboardCheck, MoreVertical, NotebookPen, Phone, Pin, Trash2 } from "lucide-react";
+import { Activity, ArrowUpDown, MoreVertical, NotebookPen, Phone, Pin } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 
 function EditableCell({ row, field, className = "", onUpdate, renderValue }) {
@@ -47,60 +47,9 @@ function EditableCell({ row, field, className = "", onUpdate, renderValue }) {
   );
 }
 
-function RowActions({ row, selected, isPinned, onToggleOne, onTogglePin, onRequestDelete, onAddNote, onCreateTask }) {
-  const [isActivityOpen, setIsActivityOpen] = useState(false);
-
-  function createTask() {
-    setIsActivityOpen(false);
-    onCreateTask?.(row);
-  }
-
-  return (
-    <td className="lead-row-actions">
-      <button
-        type="button"
-        className="row-action-icon"
-        onClick={() => onAddNote?.(row)}
-        aria-label={`Add note for ${row.name}`}
-      >
-        <NotebookPen size={15} />
-        <span className="toolbar-tooltip">Add Note</span>
-      </button>
-      <input
-        type="checkbox"
-        className="row-check"
-        checked={selected.includes(row.id)}
-        onChange={() => {
-          onToggleOne?.(row.id);
-          onRequestDelete?.(row);
-        }}
-        aria-label={`Select ${row.name}`}
-      />
-      <div className="activity-action-wrap">
-        <button
-          type="button"
-          className="row-action-icon"
-          onClick={() => setIsActivityOpen((current) => !current)}
-          aria-label={`Add activity for ${row.name}`}
-        >
-          <Activity size={15} />
-          <span className="toolbar-tooltip">Add Activity</span>
-        </button>
-        {isActivityOpen && (
-          <div className="activity-menu">
-            <button type="button" onClick={createTask}>
-              <ClipboardCheck size={16} />
-              Create Task
-            </button>
-          </div>
-        )}
-      </div>
-    </td>
-  );
-}
-
-export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onRequestDelete, onRequestDeleteAll, onAddNote, onCreateTask, onOpenLead, onUpdateLead, onDelete, variant = "list" }) {
+export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onRequestDelete, onRequestDeleteAll, onAddNote, onCreateTask, onOpenLead, onUpdateLead, variant = "list" }) {
   const allChecked = rows.length > 0 && rows.every((row) => selected.includes(row.id));
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   return (
     <div className={`table-card screenshot-table-card${variant === "grid" ? " grid-table-card" : ""}`}>
@@ -134,23 +83,24 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                 <span className="th-inner">Created On <ArrowUpDown size={13} className="sort-ico" /></span>
               </th>
               <th className="col-more"><MoreVertical size={15} /></th>
-              <th className="col-delete"><Trash2 size={15} /></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
               return (
                 <tr key={row.id}>
-                  <RowActions
-                    row={row}
-                    selected={selected}
-                    isPinned={pinnedLeadIds.includes(row.id)}
-                    onToggleOne={onToggleOne}
-                    onTogglePin={onTogglePin}
-                    onRequestDelete={onRequestDelete}
-                    onAddNote={onAddNote}
-                    onCreateTask={onCreateTask}
-                  />
+                  <td className="lead-row-actions">
+                    <input
+                      type="checkbox"
+                      className="row-check"
+                      checked={selected.includes(row.id)}
+                      onChange={() => {
+                        onToggleOne?.(row.id);
+                        onRequestDelete?.(row);
+                      }}
+                      aria-label={`Select ${row.name}`}
+                    />
+                  </td>
                   <EditableCell
                     row={row}
                     field="name"
@@ -201,27 +151,47 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                   <EditableCell row={row} field="owner" className="muted" onUpdate={onUpdateLead} />
                   <EditableCell row={row} field="createdOn" className="muted nowrap" onUpdate={onUpdateLead} />
                   <td>
-                    <button type="button" className="row-more" aria-label={`More actions for ${row.name}`}>
-                      <MoreVertical size={16} />
-                    </button>
-                  </td>
-                  <td className="col-delete-cell">
-                    <button
-                      type="button"
-                      className="row-action-icon row-delete-action"
-                      onClick={() => onDelete?.(row.id)}
-                      aria-label={`Delete ${row.name}`}
-                    >
-                      <Trash2 size={15} />
-                      <span className="toolbar-tooltip">Delete</span>
-                    </button>
+                    <div className="activity-action-wrap">
+                      <button
+                        type="button"
+                        className="row-more"
+                        aria-label={`More actions for ${row.name}`}
+                        onClick={() => setOpenMenuId((current) => (current === row.id ? null : row.id))}
+                      >
+                        <MoreVertical size={16} />
+                      </button>
+                      {openMenuId === row.id && (
+                        <div className="activity-menu" style={{ left: "auto", right: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              onAddNote?.(row);
+                            }}
+                          >
+                            <NotebookPen size={16} />
+                            Add Note
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              onCreateTask?.(row);
+                            }}
+                          >
+                            <Activity size={16} />
+                            Add Activity
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={12} className="empty-row">No leads match the current filters.</td>
+                <td colSpan={11} className="empty-row">No leads match the current filters.</td>
               </tr>
             )}
           </tbody>

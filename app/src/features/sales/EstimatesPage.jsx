@@ -4,10 +4,29 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Maximize2, Minimize2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2 } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
+import { useEstimates, addEstimate, updateEstimate } from '../../services/estimateStore';
+
+function logLeadActivity(leadId, title, color) {
+    if (!leadId || !title) return;
+    try {
+        const key = 'evenmore-crm-lead-details-v1';
+        const raw = localStorage.getItem(key);
+        const all = raw ? JSON.parse(raw) : {};
+        const lid = String(leadId);
+        const prev = all[lid] && Array.isArray(all[lid].activities) ? all[lid].activities : [];
+        all[lid] = {
+            ...(all[lid] || {}),
+            activities: [{ id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' }, ...prev],
+        };
+        localStorage.setItem(key, JSON.stringify(all));
+    } catch {
+        return;
+    }
+}
 
 const estimateGuide = {
     title: 'Sales Estimates',
@@ -27,8 +46,12 @@ const estimateGuide = {
 };
 
 export const EstimatesPage = () => {
-    const { estimates = [], addEstimate, convertEstimateToQuotation, customers, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { customers, addQuotation, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
+    const location = useLocation();
+    const leadRequest = location.state && location.state.fromLead ? location.state : null;
+    const autoOpened = React.useRef(false);
+    const estimates = useEstimates();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedEstimate, setSelectedEstimate] = useState(null);
@@ -46,21 +69,53 @@ export const EstimatesPage = () => {
 
     const handleCloseCreateModal = () => {
         setIsModalOpen(false);
-        setSelectedCustomerId(customers[0]?.id || '');
-        setValidUntil('15 Days');
-        setLineItems([]);
         setIsFullscreen(false);
     };
+
+    React.useEffect(() => {
+        if (!leadRequest || autoOpened.current) return;
+        autoOpened.current = true;
+        const match = customers.find((c) => c.name === leadRequest.company) || customers[0];
+        if (match) setSelectedCustomerId(match.id);
+        if (Array.isArray(leadRequest.items) && leadRequest.items.length > 0) {
+            setLineItems(leadRequest.items.map((it, i) => ({
+                id: `li-${Date.now()}-${i}`,
+                description: it.name,
+                qty: 1,
+                rate: it.rate || 0,
+                amount: it.rate || 0,
+            })));
+        }
+        setIsModalOpen(true);
+    }, [leadRequest, customers]);
 
     const totalValue = estimates
         .filter((e) => e.status !== 'Converted')
         .reduce((sum, e) => sum + (e.amount || 0), 0);
 
     const handleConvert = (estimateId) => {
-        const quote = convertEstimateToQuotation(estimateId);
-        if (quote) {
-            navigate('/sales/quotations');
+        const estimate = estimates.find((e) => e.id === estimateId);
+        if (!estimate) return;
+        const cust = customers.find((c) => c.id === estimate.customerId) ||
+            customers.find((c) => c.name === estimate.customer) ||
+            customers[0];
+        addQuotation({
+            customerId: cust?.id,
+            customer: estimate.customer,
+            leadId: estimate.leadId || '',
+            leadName: estimate.leadName || '',
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            validUntil: '30 Days',
+            amount: estimate.amount,
+            status: 'Draft',
+            items: estimate.items || [],
+            notes: `Converted from estimate ${estimate.estimateNumber}`,
+        });
+        updateEstimate(estimateId, { status: 'Converted' });
+        if (estimate.leadId) {
+            logLeadActivity(estimate.leadId, `Estimate ${estimate.estimateNumber} converted to quotation`, '#10b981');
         }
+        navigate('/sales/quotations');
     };
 
     const handleClone = (estimate) => {
@@ -174,6 +229,8 @@ export const EstimatesPage = () => {
             estimateNumber: `EST-2026-${String(estimates.length + 3).padStart(3, '0')}`,
             customerId: cust?.id || '',
             customer: cust?.name || 'Acme Corp',
+            leadId: leadRequest?.leadId || '',
+            leadName: leadRequest?.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             validUntil: validUntil || '15 Days',
             amount: computedTotal > 0 ? computedTotal : 1500,
@@ -181,7 +238,11 @@ export const EstimatesPage = () => {
             items: lineItems,
         };
         addEstimate(next);
-        handleCloseCreateModal();
+        if (leadRequest?.leadId) {
+            logLeadActivity(leadRequest.leadId, `Estimate ${next.estimateNumber} created for ${leadRequest.leadName || 'lead'}`, '#ec4899');
+        }
+        setIsModalOpen(false);
+        setLineItems([]);
     };
 
     return (
@@ -196,6 +257,16 @@ export const EstimatesPage = () => {
                     </Button>
                 }
             />
+
+            {leadRequest && (
+                <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs">
+                    <FileText size={15} className="text-blue-600 shrink-0" />
+                    <span className="text-slate-700">
+                        Creating estimate for lead <strong className="text-slate-900">{leadRequest.leadName}</strong>
+                        {leadRequest.company && <span> • {leadRequest.company}</span>}
+                    </span>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <StatCard label="Total Estimates" value={estimates.length} icon={FileText} />

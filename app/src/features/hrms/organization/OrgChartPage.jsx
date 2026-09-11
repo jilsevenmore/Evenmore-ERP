@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
 import {
@@ -189,7 +189,7 @@ export function OrgChartPage() {
   }
 
   // Check if a person or their children match query
-  function matchesQuery(person) {
+  const matchesQuery = useCallback((person) => {
     if (!q.trim()) return true;
     const term = q.toLowerCase();
     return (
@@ -197,16 +197,16 @@ export function OrgChartPage() {
       person.role.toLowerCase().includes(term) ||
       person.department.toLowerCase().includes(term)
     );
-  }
+  }, [q]);
 
   // Check if any report matches query to keep branch visible
-  function branchHasMatch(node) {
+  const branchHasMatch = useCallback((node) => {
     if (matchesQuery(node)) return true;
     if (node.reports) {
       return node.reports.some((r) => branchHasMatch(r));
     }
     return false;
-  }
+  }, [matchesQuery]);
 
   // Handle Add Department submission
   function handleAddDepartment(e) {
@@ -268,7 +268,7 @@ export function OrgChartPage() {
   // Filtered children of root
   const filteredLevel1 = useMemo(() => {
     return INITIAL_TREE.reports.filter((person) => branchHasMatch(person));
-  }, [q]);
+  }, [branchHasMatch]);
 
   const rootMatches = matchesQuery(INITIAL_TREE);
 

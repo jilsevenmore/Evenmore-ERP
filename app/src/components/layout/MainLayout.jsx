@@ -32,8 +32,11 @@ export default function MainLayout() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [commandPaletteOpen, setCommandPaletteOpen]);
 
-  // Auto-dismiss toast
-  if (toast) setTimeout(() => clearToast?.(), 3000);
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = window.setTimeout(() => clearToast?.(), 3000);
+    return () => window.clearTimeout(timer);
+  }, [clearToast, toast]);
 
   return (
     <div

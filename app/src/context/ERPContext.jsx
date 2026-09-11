@@ -1802,6 +1802,8 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: createAddressSnapshot(quote.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(quote.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(quote.date || 'Today'),
+            leadId: quote.leadId || '',
+            leadName: quote.leadName || '',
             validUntil: quote.validUntil || 'In 30 days',
             amount: totalAmount,
             status: quote.status || 'Draft',

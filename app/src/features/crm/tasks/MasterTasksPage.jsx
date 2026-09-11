@@ -20,9 +20,10 @@ import {
   FileText,
   ArrowUp,
   ArrowDown,
-  Info,
   Check,
 } from 'lucide-react';
+
+import MasterTasksGuideModal from './MasterTasksGuideModal';
 
 const STORAGE_KEY = 'leadMasterTasksV1';
 const BANNER_KEY = 'leadMasterTasksBannerV1';
@@ -124,7 +125,7 @@ export default function MasterTasksPage() {
   const [deleteId, setDeleteId] = useState(null);
   const [bulkDelete, setBulkDelete] = useState(false);
   const [menuId, setMenuId] = useState(null);
-  const [howItWorks, setHowItWorks] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -300,10 +301,12 @@ export default function MasterTasksPage() {
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setHowItWorks(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-blue-600 text-xs font-semibold rounded-lg border border-blue-100 transition"
+            onClick={() => setIsGuideOpen(true)}
+            className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2 text-[13px] font-semibold text-[#1d6bff]"
+            aria-label="How to create lead tasks master"
           >
-            <Info size={14} /> How it works?
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+            <span>How to create lead tasks master?</span>
           </button>
           <button
             type="button"
@@ -661,29 +664,7 @@ export default function MasterTasksPage() {
         </div>
       )}
 
-      {howItWorks && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" role="presentation" onMouseDown={() => setHowItWorks(false)}>
-          <div onMouseDown={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-bold text-slate-900">How Master Tasks Work</h2>
-              <button type="button" onClick={() => setHowItWorks(false)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Close">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-3 text-xs text-slate-600 leading-relaxed">
-              <p><strong className="text-slate-900">1. Create once.</strong> Define a reusable task with role, department, priority and due days.</p>
-              <p><strong className="text-slate-900">2. Assign stages.</strong> Tick one or more lead stages where this task should appear.</p>
-              <p><strong className="text-slate-900">3. Auto-create.</strong> When a lead enters a stage, its mapped master tasks are created automatically.</p>
-              <p><strong className="text-slate-900">4. Edit anywhere.</strong> Every edit here is saved permanently and reflects in Stage Tasks.</p>
-            </div>
-            <div className="flex items-center justify-end px-5 py-3.5 bg-slate-50/70 border-t border-slate-100">
-              <button type="button" onClick={() => setHowItWorks(false)} className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition">
-                Got It
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <MasterTasksGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </section>
   );
 }
