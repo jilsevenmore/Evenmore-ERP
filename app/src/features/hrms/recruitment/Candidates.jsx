@@ -1,16 +1,20 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { FilterBar } from "../../../components/hrms/FilterBar";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
+import { ArrowLeft, FileText } from "lucide-react";
+import OfferLetterModal from "../organization/OfferLetterModal";
+
 export default function Candidates() {
-  const { candidates, addCandidate, updateCandidate, deleteCandidate } = useRecruitmentStore();
+  const { candidates, addCandidate, updateCandidate, deleteCandidate, offers, addOffer, updateOffer, changeStage } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
+  const location = useLocation();
   const [search, setSearch] = useState("");
   const [job, setJob] = useState("All");
   const [stage, setStage] = useState("All");
@@ -18,7 +22,17 @@ export default function Candidates() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [activeOffer, setActiveOffer] = useState(null);
+
   const [form, setForm] = useState({ name: "", email: "", phone: "", location: "New York", position: "Senior Backend Developer", experience: "5 years", skills: "Node.js", jobId: "JOB-001", stage: "Applied", recruiter: "Ayesha Khan" });
+
+  useEffect(() => {
+    if (location.state?.openAdd) {
+      openAdd();
+    }
+  }, [location.state]);
   const filtered = useMemo(() => candidates.filter((c) => {
     if (search && !`${c.name} ${c.email} ${c.phone}`.toLowerCase().includes(search.toLowerCase())) return false;
     if (job !== "All" && c.position !== job) return false;
@@ -46,6 +60,48 @@ export default function Candidates() {
       setDrawerOpen(false);
     }
   }
+  const handleOpenOffer = (cand) => {
+    const existing = offers.find((o) => o.candidateId === cand.id);
+    if (existing) {
+      setActiveOffer(existing);
+    } else {
+      setActiveOffer({
+        id: `OFF-${Math.floor(100 + Math.random() * 900)}`,
+        candidateId: cand.id,
+        candidateName: cand.name,
+        email: cand.email,
+        position: cand.position,
+        jobType: "Full-time",
+        dept: cand.position?.includes("Design") ? "Design" : cand.position?.includes("HR") ? "HR" : "Engineering",
+        salary: "$95,000 / annum",
+        location: cand.location || "New York HQ",
+        workMode: "Hybrid",
+        sentDate: new Date().toISOString().split("T")[0],
+        joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
+        reportingManager: "David Park (CTO)",
+        probationPeriod: "3 Months",
+        status: cand.stage === "Offer" || cand.stage === "Hired" ? "Confirmed" : "Draft",
+      });
+    }
+    setIsOfferModalOpen(true);
+  };
+
+  const handleConfirmOffer = (offerData) => {
+    const existingIndex = offers.findIndex((o) => o.id === offerData.id || o.candidateId === offerData.candidateId);
+    if (existingIndex >= 0) {
+      updateOffer(offers[existingIndex].id, { ...offerData, status: "Pending" });
+    } else {
+      addOffer({ ...offerData, status: "Pending" });
+    }
+    changeStage(offerData.candidateId, "Offer");
+    showToast(`Offer letter confirmed and generated for ${offerData.candidateName}`);
+  };
+
+  const handleUpdateOffer = (offerData) => {
+    updateOffer(offerData.id, offerData);
+    showToast(`Offer letter updated for ${offerData.candidateName}`);
+  };
+
   const cols = [
     { key: "name", header: "Candidate", sortable: true, render: (r) => <div className="flex items-center gap-2"><img src={r.avatar} alt="" className="w-7 h-7 rounded-full" />{r.name}</div> },
     { key: "position", header: "Applied Position", sortable: true },
@@ -54,8 +110,20 @@ export default function Candidates() {
     { key: "stage", header: "Stage", render: (r) => <span className="px-2 py-1 bg-off border border-bdr rounded-full text-[11px]">{r.stage}</span> },
     { key: "interviewStatus", header: "Interview" },
     { key: "recruiter", header: "Recruiter" },
-    { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
-        <button onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)} className="text-navy text-[12px] underline">View</button>
+    { key: "actions", header: "Actions", render: (r) => <div className="flex items-center gap-1.5">
+        <button onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)} className="text-navy text-[12px] underline font-medium">View</button>
+        <button
+          onClick={() => handleOpenOffer(r)}
+          className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg border font-medium transition ${
+            r.stage === "Offer" || r.stage === "Hired" || offers.some((o) => o.candidateId === r.id)
+              ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+              : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+          }`}
+          title="Open Offer Letter (Preview / Edit / Confirm)"
+        >
+          <FileText size={12} />
+          <span>Offer</span>
+        </button>
         <button onClick={() => {
       setForm({ name: r.name, email: r.email, phone: r.phone, location: r.location, position: r.position, experience: r.experience, skills: r.skills, jobId: r.jobId, stage: r.stage, recruiter: r.recruiter });
       setEditing(r.id);
@@ -64,8 +132,20 @@ export default function Candidates() {
         <button onClick={() => setDeleteId(r.id)} className="text-red-600 text-[11px]">Delete</button>
       </div> }
   ];
-  return <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-[22px] font-bold">Candidates</h1><p className="text-[13px] text-muted">{candidates.length} total</p></div><Button onClick={openAdd}>+ Add Candidate</Button></div>
+  return <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate("/hrms/recruitment")}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Recruitment Setup</span>
+      </button>
+
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <div><h1 className="text-[22px] font-bold">Candidates</h1><p className="text-[13px] text-muted">{candidates.length} total</p></div>
+        <Button onClick={openAdd}>+ Add Candidate</Button>
+      </div>
       <FilterBar
     search={search}
     onSearch={setSearch}
@@ -111,5 +191,13 @@ export default function Candidates() {
     setDeleteId(null);
     showToast("Candidate deleted");
   }}>Delete</Button></>}><p className="text-[13px] text-muted">Delete this candidate?</p></Modal>
+
+      <OfferLetterModal
+        isOpen={isOfferModalOpen}
+        onClose={() => setIsOfferModalOpen(false)}
+        offer={activeOffer}
+        onConfirmOffer={handleConfirmOffer}
+        onUpdateOffer={handleUpdateOffer}
+      />
     </div>;
 }

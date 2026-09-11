@@ -1,6 +1,7 @@
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useNavigate } from "react-router-dom";
 import { funnelData } from "../../../data/hrms/data/recruitmentData";
+import { ArrowLeft } from "lucide-react";
 
 export default function RecruitmentFunnel() {
   const candidates = useRecruitmentStore((s) => s.candidates);
@@ -15,7 +16,16 @@ export default function RecruitmentFunnel() {
   };
   const max = counts.Applications || 1;
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate("/hrms/recruitment")}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Recruitment Setup</span>
+      </button>
+
       <div><h1 className="text-[22px] font-bold">Recruitment Funnel</h1><p className="text-[13px] text-muted">Applications → Hired conversion, drop-off and avg processing time.</p></div>
       <div className="bg-white border border-bdr rounded-xl p-6 shadow-sm">
         <div className="flex flex-col gap-3">

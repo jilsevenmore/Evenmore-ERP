@@ -1,83 +1,212 @@
 import { useState } from 'react';
-import PageHeader from '../../../components/ui/PageHeader';
-import DataTable from '../../../components/ui/DataTable';
+import { useAppStore } from '../../../stores/appStore';
 import Modal from '../../../components/ui/Modal';
-import { Plus, Award, Tag } from 'lucide-react';
+import { Plus, Award, Search, Edit2, Trash2 } from 'lucide-react';
 
 const INITIAL_DESIGNATIONS = [
-  { id: 'DSG-01', title: 'Senior Software Engineer', level: 'L4', department: 'Engineering', count: 18 },
-  { id: 'DSG-02', title: 'Staff Backend Architect', level: 'L5', department: 'Engineering', count: 4 },
-  { id: 'DSG-03', title: 'Product Manager', level: 'L4', department: 'Product', count: 6 },
-  { id: 'DSG-04', title: 'Enterprise Account Executive', level: 'L4', department: 'Sales & CRM', count: 12 },
-  { id: 'DSG-05', title: 'HR Business Partner', level: 'L3', department: 'HR', count: 5 },
-  { id: 'DSG-06', title: 'Inventory Controller', level: 'L3', department: 'Warehouse', count: 8 },
+  { id: 'DSG-01', title: 'Chief Executive Officer', level: 'L7', department: 'Executive', count: 1 },
+  { id: 'DSG-02', title: 'Chief Technology Officer', level: 'L6', department: 'Engineering', count: 1 },
+  { id: 'DSG-03', title: 'Head of People & HRMS', level: 'L6', department: 'Human Resources', count: 1 },
+  { id: 'DSG-04', title: 'Chief Financial Officer', level: 'L6', department: 'Finance', count: 1 },
+  { id: 'DSG-05', title: 'Staff Backend Architect', level: 'L5', department: 'Engineering', count: 4 },
+  { id: 'DSG-06', title: 'Senior Software Engineer', level: 'L4', department: 'Engineering', count: 32 },
+  { id: 'DSG-07', title: 'Product Manager', level: 'L5', department: 'Product', count: 14 },
+  { id: 'DSG-08', title: 'HR Operations Lead', level: 'L4', department: 'Human Resources', count: 6 },
+  { id: 'DSG-09', title: 'DevOps & Cloud Lead', level: 'L5', department: 'Engineering', count: 5 },
 ];
 
 export function DesignationsPage() {
+  const showToast = useAppStore((s) => s.showToast);
   const [designations, setDesignations] = useState(INITIAL_DESIGNATIONS);
+  const [q, setQ] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newDesig, setNewDesig] = useState({ title: '', level: 'L3', department: 'Engineering' });
+  const [newDesig, setNewDesig] = useState({ title: '', level: 'L4', department: 'Engineering' });
+
+  const filtered = designations.filter(
+    (d) =>
+      d.title.toLowerCase().includes(q.toLowerCase()) ||
+      d.department.toLowerCase().includes(q.toLowerCase()) ||
+      d.level.toLowerCase().includes(q.toLowerCase())
+  );
 
   function handleCreate(e) {
     e.preventDefault();
-    if (!newDesig.title) return;
-    setDesignations([...designations, { id: `DSG-0${designations.length + 1}`, ...newDesig, count: 0 }]);
+    if (!newDesig.title.trim()) return;
+    setDesignations([
+      { id: `DSG-0${designations.length + 1}`, ...newDesig, count: 0 },
+      ...designations,
+    ]);
+    showToast(`Designation "${newDesig.title}" created successfully`);
     setIsModalOpen(false);
-    setNewDesig({ title: '', level: 'L3', department: 'Engineering' });
+    setNewDesig({ title: '', level: 'L4', department: 'Engineering' });
   }
 
-  const columns = [
-    { key: 'title', label: 'Job Title', render: (val) => (
-      <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#0f172a' }}>
-        <Award size={15} color="#1f6bff" /> {val}
-      </strong>
-    )},
-    { key: 'level', label: 'Hierarchy Level', render: (val) => <span className="badge badge-purple">{val}</span> },
-    { key: 'department', label: 'Department' },
-    { key: 'count', label: 'Assigned Employees', render: (val) => <span className="badge badge-blue">{val} members</span> },
-  ];
+  function handleDelete(id, title) {
+    setDesignations(designations.filter((x) => x.id !== id));
+    showToast(`Designation "${title}" removed`);
+  }
 
   return (
-    <div className="feature-page" style={{ padding: '24px 32px' }}>
-      <PageHeader
-        title="Designations"
-        subtitle="Define job profiles, titles, leveling frameworks, and competencies."
-        breadcrumb={[{ label: 'HRMS', to: '/hrms/dashboard' }, { label: 'Organization' }, { label: 'Designations' }]}
-        actions={
-          <button type="button" className="btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> Add Designation
-          </button>
-        }
-      />
-
-      <div className="card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20, marginTop: 20 }}>
-        <DataTable columns={columns} data={designations} rowKey="id" searchable={true} searchPlaceholder="Search designations..." />
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h1 className="text-[24px] font-bold tracking-tight">Designations</h1>
+          <p className="text-[13px] text-muted">
+            Define corporate job roles, leveling framework, and departmental allocations
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsModalOpen(true)}
+          className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+        >
+          <Plus size={16} /> Add Designation
+        </button>
       </div>
 
+      {/* Filter Bar */}
+      <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap justify-between items-center gap-3">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by title, level, or department..."
+            className="pl-9 pr-4 h-9 w-72 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
+          />
+        </div>
+      </div>
+
+      {/* Main Table View */}
+      <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
+              <tr>
+                <th className="py-3 px-5">Job Title</th>
+                <th className="py-3 px-5">Level</th>
+                <th className="py-3 px-5">Department</th>
+                <th className="py-3 px-5">Assigned Employees</th>
+                <th className="py-3 px-5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-bdr/40 text-[13px]">
+              {filtered.map((r) => (
+                <tr key={r.id} className="hover:bg-off/60 transition-colors">
+                  <td className="py-4 px-5 font-semibold text-slate-900 flex items-center gap-2">
+                    <Award size={15} className="text-navy shrink-0" />
+                    {r.title}
+                  </td>
+                  <td className="py-4 px-5">
+                    <span
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${
+                        r.level === 'L7' || r.level === 'L6'
+                          ? 'bg-navy text-white border-navy'
+                          : r.level === 'L5'
+                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                          : 'bg-off border-bdr text-slate-700'
+                      }`}
+                    >
+                      {r.level}
+                    </span>
+                  </td>
+                  <td className="py-4 px-5 text-slate-700">{r.department}</td>
+                  <td className="py-4 px-5 font-medium text-slate-700">{r.count} members</td>
+                  <td className="py-4 px-5 text-right">
+                    <div className="flex justify-end gap-1">
+                      <button
+                        type="button"
+                        onClick={() => showToast(`Edit ${r.title}`)}
+                        className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted transition-colors cursor-pointer"
+                        title="Edit"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(r.id, r.title)}
+                        className="w-8 h-8 rounded-lg hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal: Create Designation */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Create Designation">
-        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleCreate} className="flex flex-col gap-4">
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>Title</label>
-            <input type="text" required placeholder="e.g. Lead Frontend Architect" value={newDesig.title} onChange={e => setNewDesig({ ...newDesig, title: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }} />
+            <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+              Designation Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Lead Product Designer"
+              value={newDesig.title}
+              onChange={(e) => setNewDesig({ ...newDesig, title: e.target.value })}
+              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+            />
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>Level</label>
-            <select value={newDesig.level} onChange={e => setNewDesig({ ...newDesig, level: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}>
-              <option>L1 (Junior / Associate)</option>
-              <option>L2 (Mid)</option>
-              <option>L3 (Senior)</option>
-              <option>L4 (Lead / Staff)</option>
-              <option>L5 (Principal / Director)</option>
-              <option>L6 (Executive)</option>
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+                Level Framework
+              </label>
+              <select
+                value={newDesig.level}
+                onChange={(e) => setNewDesig({ ...newDesig, level: e.target.value })}
+                className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              >
+                <option value="L1">L1 — Associate</option>
+                <option value="L2">L2 — Junior</option>
+                <option value="L3">L3 — Mid-Level</option>
+                <option value="L4">L4 — Senior</option>
+                <option value="L5">L5 — Staff / Lead</option>
+                <option value="L6">L6 — Director / Head</option>
+                <option value="L7">L7 — Executive</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+                Department
+              </label>
+              <select
+                value={newDesig.department}
+                onChange={(e) => setNewDesig({ ...newDesig, department: e.target.value })}
+                className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              >
+                <option>Engineering</option>
+                <option>Human Resources</option>
+                <option>Finance</option>
+                <option>Product</option>
+                <option>Sales & CRM</option>
+                <option>Marketing</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>Department</label>
-            <input type="text" placeholder="e.g. Engineering" value={newDesig.department} onChange={e => setNewDesig({ ...newDesig, department: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-            <button type="button" className="btn-outline" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary">Save Designation</button>
+          <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-bdr">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+            >
+              Save Designation
+            </button>
           </div>
         </form>
       </Modal>
@@ -85,4 +214,6 @@ export function DesignationsPage() {
   );
 }
 
+export const Designations = DesignationsPage;
 export default DesignationsPage;
+

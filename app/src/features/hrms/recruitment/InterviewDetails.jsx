@@ -2,6 +2,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
 import { Button } from "../../../components/hrms/Button";
+import { ArrowLeft } from "lucide-react";
 export default function InterviewDetails() {
   const { id } = useParams();
   const interviews = useRecruitmentStore((s) => s.interviews);
@@ -10,7 +11,16 @@ export default function InterviewDetails() {
   const navigate = useNavigate();
   const it = interviews.find((i) => i.id === id);
   if (!it) return <div className="py-10 text-center">Interview not found <Button variant="secondary" onClick={() => navigate("/hrms/recruitment/interviews")}>Back</Button></div>;
-  return <div className="flex flex-col gap-6">
+  return <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Interviews</span>
+      </button>
+
       <div className="bg-white border border-bdr rounded-xl p-6 shadow-sm">
         <div className="flex flex-wrap gap-4 justify-between">
           <div><h1 className="text-[20px] font-bold">{it.candidateName} — {it.job}</h1><p className="text-[13px] text-muted">{it.type} • {it.date} • {it.start} - {it.end} ({it.duration}) • Interviewer: {it.interviewer} • {it.mode} • <span className="px-2 py-1 bg-off border border-bdr rounded-full text-[11px]">{it.status}</span></p><p className="text-[12px] text-muted mt-1">{it.mode === "Video Call" ? <a href={it.meetingLink} target="_blank" className="text-navy underline">{it.meetingLink}</a> : it.location}</p></div>
