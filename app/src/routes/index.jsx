@@ -68,6 +68,7 @@ import { SalesInvoicesPage } from '../features/sales/SalesInvoicesPage';
 import { SalesReturnsPage } from '../features/sales/SalesReturnsPage';
 import { PaymentInPage } from '../features/sales/PaymentInPage';
 import { DeliveryChallansPage } from '../features/sales/DeliveryChallansPage';
+import { WarrantyListPage } from '../features/sales/WarrantyListPage';
 
 // ── ERP — Purchase ────────────────────────────────────────────
 import { PurchaseOrdersPage } from '../features/purchase/PurchaseOrdersPage';
@@ -195,6 +196,8 @@ const router = createBrowserRouter([
       { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
       { path: 'sales/payments', element: <Page component={PaymentInPage} /> },
       { path: 'sales/delivery', element: <Page component={DeliveryChallansPage} /> },
+      { path: 'sales/warranty', element: <Page component={WarrantyListPage} /> },
+      { path: 'warranty', element: <Navigate to="/sales/warranty" replace /> },
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },

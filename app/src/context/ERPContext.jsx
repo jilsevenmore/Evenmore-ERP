@@ -3352,7 +3352,79 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Journal entry ${newEntry.entryNumber} posted to GL.`);
         return newEntry;
     };
+    const addWarrantyCard = (cardData) => {
+        const nextNum = `WC-2026-${String(warranties.length + 100).padStart(5, '0')}`;
+        const newCard = {
+            id: cardData.id || `wc-${Date.now()}`,
+            cardNumber: cardData.cardNumber || nextNum,
+            createdAt: new Date().toISOString().split('T')[0],
+            generatedAt: cardData.documentStatus === 'Generated' ? new Date().toISOString().split('T')[0] : undefined,
+            documentStatus: cardData.documentStatus || 'Generated',
+            ...cardData,
+        };
+        // Compute coverage status dynamically if not set
+        if (!newCard.coverageStatus || newCard.coverageStatus === 'Active' || newCard.coverageStatus === 'Pending Activation') {
+            newCard.coverageStatus = calculateWarrantyCoverageStatus(newCard.startDate, newCard.expiryDate, newCard.documentStatus);
+        }
+        setWarranties((prev) => [newCard, ...prev]);
+        showToast(`Warranty Card ${newCard.cardNumber} saved.`);
+        return newCard;
+    };
+
+    const updateWarrantyCard = (id, updates) => {
+        setWarranties((prev) => prev.map((w) => {
+            if (w.id !== id && w.cardNumber !== id) return w;
+            const updated = { ...w, ...updates };
+            if (updates.startDate || updates.expiryDate || updates.documentStatus) {
+                updated.coverageStatus = calculateWarrantyCoverageStatus(
+                    updated.startDate,
+                    updated.expiryDate,
+                    updated.documentStatus || w.documentStatus
+                );
+            }
+            return updated;
+        }));
+        showToast('Warranty Card updated successfully.');
+    };
+
+    const cancelWarrantyCard = (id) => {
+        setWarranties((prev) => prev.map((w) => {
+            if (w.id !== id && w.cardNumber !== id) return w;
+            return {
+                ...w,
+                documentStatus: 'Cancelled',
+                coverageStatus: 'Cancelled',
+            };
+        }));
+        showToast('Warranty Card marked as Cancelled.');
+    };
+
+    const getWarrantyByChallanId = (challanId) => {
+        return warranties.find((w) => (w.deliveryChallanId === challanId || w.challanNumber === challanId) && w.documentStatus !== 'Cancelled');
+    };
+
+    const getWarrantyBySerial = (serialNumber) => {
+        if (!serialNumber) return null;
+        const sNorm = String(serialNumber).trim().toLowerCase();
+        return warranties.find((w) => {
+            if (w.documentStatus === 'Cancelled') return false;
+            const matchesItem = (w.items || []).some((it) => {
+                if (Array.isArray(it.serialNumbers) && it.serialNumbers.some((s) => String(s).trim().toLowerCase() === sNorm)) return true;
+                if (it.serialNumber && String(it.serialNumber).trim().toLowerCase() === sNorm) return true;
+                if (it.components && it.components.some((c) => c.serialNumber && String(c.serialNumber).trim().toLowerCase() === sNorm)) return true;
+                return false;
+            });
+            return matchesItem;
+        });
+    };
+
     return (<ERPContext.Provider value={{
+            warranties,
+            addWarrantyCard,
+            updateWarrantyCard,
+            cancelWarrantyCard,
+            getWarrantyByChallanId,
+            getWarrantyBySerial,
             faultyParts,
             invoices,
             zoneRequests,

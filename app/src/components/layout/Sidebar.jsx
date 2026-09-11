@@ -116,6 +116,7 @@ const NAV = [
       { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
+      { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' },
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
     ],

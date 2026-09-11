@@ -30,7 +30,8 @@ import {
   Wand2,
   RefreshCw,
   Eye,
-  Check
+  Check,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const AddEditItemPage = () => {
@@ -89,6 +90,14 @@ export const AddEditItemPage = () => {
     const [singleSerialInput, setSingleSerialInput] = useState('');
     const [serialSearchFilter, setSerialSearchFilter] = useState('');
     const [duplicateSerialNotice, setDuplicateSerialNotice] = useState('');
+
+    // Warranty Policy & Default Configuration
+    const [warrantyApplicable, setWarrantyApplicable] = useState(false);
+    const [warrantyPeriod, setWarrantyPeriod] = useState(1);
+    const [warrantyUnit, setWarrantyUnit] = useState('Years');
+    const [warrantyStartEvent, setWarrantyStartEvent] = useState('Delivery');
+    const [manufacturerWarrantyPeriod, setManufacturerWarrantyPeriod] = useState('');
+    const [manufacturerWarrantyUnit, setManufacturerWarrantyUnit] = useState('Years');
 
     // Serial Batch Generator Modal
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -202,6 +211,12 @@ export const AddEditItemPage = () => {
             setItemLifecycle(existingItem.lifecycleStatus || 'Active');
             setStatus(existingItem.status || 'Optimal');
             setCustomFieldValues(existingItem.customFieldValues || {});
+            setWarrantyApplicable(Boolean(existingItem.warrantyApplicable));
+            setWarrantyPeriod(existingItem.warrantyPeriod !== undefined ? existingItem.warrantyPeriod : 1);
+            setWarrantyUnit(existingItem.warrantyUnit || 'Years');
+            setWarrantyStartEvent(existingItem.warrantyStartEvent || 'Delivery');
+            setManufacturerWarrantyPeriod(existingItem.manufacturerWarrantyPeriod !== undefined ? String(existingItem.manufacturerWarrantyPeriod) : '');
+            setManufacturerWarrantyUnit(existingItem.manufacturerWarrantyUnit || 'Years');
             if (existingItem.customFieldValues && Object.keys(existingItem.customFieldValues).length > 0) {
               setShowCustomParameters(true);
             }
@@ -545,6 +560,12 @@ export const AddEditItemPage = () => {
             manufactureDate: trackingMode === 'Batch' ? manufactureDate : undefined,
             expiryDate: trackingMode === 'Batch' ? expiryDate : undefined,
             taxRate: parseFloat(taxRate) || 18,
+            warrantyApplicable,
+            warrantyPeriod: Number(warrantyPeriod) || 1,
+            warrantyUnit,
+            warrantyStartEvent,
+            manufacturerWarrantyPeriod: manufacturerWarrantyPeriod ? Number(manufacturerWarrantyPeriod) : undefined,
+            manufacturerWarrantyUnit: manufacturerWarrantyPeriod ? manufacturerWarrantyUnit : undefined,
             costPrice: parsedCost,
             unitCost: parsedCost,
             sellingPrice: parsedSelling,
@@ -1333,6 +1354,116 @@ export const AddEditItemPage = () => {
                         />
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Default Warranty Policy Section */}
+                <div className="p-4 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl space-y-3.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800">Default Warranty Configuration</h4>
+                        <p className="text-[11px] text-slate-500">Default warranty policy applied to physical serials and auto-populated on customer cards</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={warrantyApplicable}
+                        onChange={(e) => setWarrantyApplicable(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                      <span className="ml-2 text-xs font-semibold text-slate-700">
+                        {warrantyApplicable ? 'Warranty Applicable' : 'No Warranty'}
+                      </span>
+                    </label>
+                  </div>
+
+                  {warrantyApplicable ? (
+                    <div className="space-y-3 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Company Warranty Period *
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={warrantyPeriod}
+                            onChange={(e) => setWarrantyPeriod(Math.max(1, Number(e.target.value) || 1))}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-emerald-600"
+                            placeholder="e.g. 5"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Warranty Unit
+                          </label>
+                          <select
+                            value={warrantyUnit}
+                            onChange={(e) => setWarrantyUnit(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
+                          >
+                            <option value="Years">Years</option>
+                            <option value="Months">Months</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Warranty Start Event *
+                          </label>
+                          <select
+                            value={warrantyStartEvent}
+                            onChange={(e) => setWarrantyStartEvent(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
+                          >
+                            <option value="Delivery">Delivery (Default — Delivery Challan date)</option>
+                            <option value="Invoice">Invoice (Final Invoice date)</option>
+                            <option value="Manual Date">Manual Date (Custom specified)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-emerald-100">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Manufacturer Warranty Period (Optional)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={manufacturerWarrantyPeriod}
+                            onChange={(e) => setManufacturerWarrantyPeriod(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-emerald-600"
+                            placeholder="e.g. 10 (OEM coverage)"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Manufacturer Warranty Unit
+                          </label>
+                          <select
+                            value={manufacturerWarrantyUnit}
+                            onChange={(e) => setManufacturerWarrantyUnit(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
+                          >
+                            <option value="Years">Years</option>
+                            <option value="Months">Months</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-emerald-800 bg-emerald-100/50 p-2 rounded-lg border border-emerald-200">
+                        💡 <strong>Default Warranty Rule:</strong> When physical machines or components are dispatched via Delivery Challan, this rule automatically populates the Customer Warranty Card without requiring repetitive entry.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic py-1">
+                      No warranty policy configured for this SKU. Toggle above if this item includes standard equipment warranty.
+                    </p>
                   )}
                 </div>
 
