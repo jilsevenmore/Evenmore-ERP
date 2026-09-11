@@ -343,7 +343,7 @@ function filterNavTree(items, query) {
 }
 
 // ── Sub-item (leaf node) ────────────────────────────────────
-function SubItem({ item, badges = {} }) {
+function SubItem({ item, depth = 1, badges = {} }) {
   const location = useLocation();
   const currentPath = location.pathname;
   const isExact = currentPath === item.to;
@@ -367,14 +367,15 @@ function SubItem({ item, badges = {} }) {
   const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
   const Icon = item.icon;
 
-  // Icon leaves (e.g. CRM > Dashboard) render like screenshot: nav-row pill with icon
+  // Icon leaves (e.g. CRM > Dashboard) render like nav row with icon
   if (Icon && item.to) {
     return (
       <NavLink
         to={item.to}
-        className={() => `nav-row${isActive ? ' section-active' : ''}`}
+        title={item.label}
+        className={() => `sub-group-row${isActive ? ' section-active' : ''}`}
       >
-        <Icon size={17} strokeWidth={1.9} className="nav-ico" />
+        <Icon size={16} strokeWidth={2} className="nav-ico" />
         <span className="nav-txt">{item.label}</span>
         {count > 0 && (
           <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
@@ -389,11 +390,12 @@ function SubItem({ item, badges = {} }) {
     <NavLink
       to={item.to || '#'}
       end
+      title={item.label}
       className={({ isActive: navActive }) =>
         `sub-item${isActive || navActive ? ' active' : ''}`
       }
     >
-      {item.dot && <span className="sub-dot" />}
+      <span className="sub-dot" />
       <span className="sub-label">{item.label}</span>
       {count > 0 && (
         <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
@@ -405,16 +407,17 @@ function SubItem({ item, badges = {} }) {
 }
 
 // ── Sub-list (group of sub-items) ───────────────────────────
-function SubList({ items, depth, badges }) {
+function SubList({ items, depth = 1, badges }) {
+  const isDeep = depth >= 2;
   return (
-    <div className="sub-list" style={{ marginLeft: depth === 1 ? 22 : 18 }}>
+    <div className={isDeep ? 'sub-list-deep' : 'sub-list'}>
       {items.map((item) => {
         if (item.children) {
           return (
             <ExpandableRow key={item.label} item={item} depth={depth} badges={badges} />
           );
         }
-        return <SubItem key={item.label} item={item} badges={badges} />;
+        return <SubItem key={item.label} item={item} depth={depth} badges={badges} />;
       })}
     </div>
   );
@@ -425,10 +428,6 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
   const location = useLocation();
   const [open, setOpen] = useState(Boolean(item.defaultOpen));
   const Icon = item.icon;
-
-  function handleClick() {
-    setOpen((v) => !v);
-  }
 
   // Auto-open if a child route is active
   const isChildActive = item.children?.some(
@@ -445,33 +444,41 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
   const isActive = item.to && (location.pathname === item.to || location.pathname.startsWith(item.to + '/'));
 
   if (item.to && !item.children) {
-    // Simple nav row (direct link like Dashboard, Parties, Reports)
+    // Simple root nav row (direct link like Parties, Reports)
     return (
       <NavLink
         to={item.to}
         end
+        title={item.label}
         className={({ isActive: directActive }) =>
           `nav-row${directActive || isActive ? ' section-active' : ''}`
         }
       >
-        {Icon && <Icon size={17} strokeWidth={1.9} className="nav-ico" />}
+        {Icon && <Icon size={18} strokeWidth={1.9} className="nav-ico" />}
         <span className="nav-txt">{item.label}</span>
       </NavLink>
     );
   }
+
+  const isRoot = depth === 0;
 
   return (
     <div className="nav-group">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`nav-row${isChildActive ? ' parent-active' : isActive ? ' section-active' : ''}`}
+        title={item.label}
+        className={
+          isRoot
+            ? `nav-row${isChildActive ? ' parent-active' : isActive ? ' section-active' : ''}`
+            : `sub-group-row${isChildActive ? ' parent-active' : ''}`
+        }
       >
-        {Icon && <Icon size={17} strokeWidth={1.9} className="nav-ico" />}
+        {Icon && <Icon size={isRoot ? 18 : 16} strokeWidth={1.9} className="nav-ico" />}
         <span className="nav-txt">{item.label}</span>
         {item.children && (
           <span className="nav-chev">
-            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            {open ? <ChevronDown size={isRoot ? 14 : 12} /> : <ChevronRight size={isRoot ? 14 : 12} />}
           </span>
         )}
       </button>
@@ -484,7 +491,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
 
 // ── Sidebar ─────────────────────────────────────────────────
 export default function Sidebar() {
-  const sidebarWidth = useAppStore((s) => s.sidebarWidth);
+  const sidebarWidth = useAppStore((s) => s.sidebarWidth) ?? 280;
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const currentUser = useAppStore((s) => s.currentUser);
   const theme = useAppStore((s) => s.theme) || 'light';
@@ -517,20 +524,10 @@ export default function Sidebar() {
   } catch { }
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (profileRef.current && !profileRef.current.contains(e.target)) {
-        setIsProfileOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-  
-  useEffect(() => {
     function handleMove(e) {
       if (!dragRef.current.dragging) return;
       const dx = e.clientX - dragRef.current.startX;
-      const nextWidth = Math.min(360, Math.max(220, dragRef.current.startWidth + dx));
+      const nextWidth = Math.min(380, Math.max(240, dragRef.current.startWidth + dx));
       setSidebarWidth(nextWidth);
     }
 
@@ -561,7 +558,7 @@ export default function Sidebar() {
 
     function handleMove(ev) {
       const dx = ev.clientX - dragRef.current.startX;
-      const nextWidth = Math.min(360, Math.max(220, dragRef.current.startWidth + dx));
+      const nextWidth = Math.min(380, Math.max(240, dragRef.current.startWidth + dx));
       setSidebarWidth(nextWidth);
     }
 
@@ -580,21 +577,21 @@ export default function Sidebar() {
   return (
     <aside className="sidebar" style={{ width: sidebarWidth }}>
       <div className="side-top">
-        {/* Brand */}
+        {/* Brand Header */}
         <div className="brand-block">
           <div className="brand-left">
             <span className="brand-logo">
-              <InfinityIcon size={30} strokeWidth={2.6} />
+              <InfinityIcon size={28} strokeWidth={2.6} />
             </span>
-            <div>
+            <div className="min-w-0">
               <div className="brand-name">EVENMORE INFOTECH</div>
               <div className="brand-tag">PEOPLE | PROCESS | PROGRESS</div>
             </div>
           </div>
         </div>
 
-        {/* Search Bar Above Dashboard */}
-        <div className="px-3 pb-2 pt-0.5">
+        {/* Search Bar Above Navigation */}
+        <div className="px-1 pb-2.5 pt-0.5">
           <div className="relative flex items-center bg-white/5 border border-white/10 rounded-xl focus-within:border-blue-400/60 focus-within:bg-white/10 transition-all">
             <Search size={14} className="ml-2.5 text-slate-400 shrink-0 pointer-events-none" />
             <input
@@ -602,7 +599,7 @@ export default function Sidebar() {
               placeholder="Search tabs & menus..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-transparent text-xs text-white placeholder:text-slate-400 py-1.5 pl-2 pr-7 focus:outline-none"
+              className="w-full bg-transparent text-xs text-white placeholder:text-slate-400 py-2 pl-2 pr-7 focus:outline-none"
             />
             {searchQuery && (
               <button
@@ -783,6 +780,15 @@ export default function Sidebar() {
         isOpen={isGuideOpen}
         onClose={() => setIsGuideOpen(false)}
       />
+
+      {/* Visual Drag Handle for Sidebar Width */}
+      <div
+        className="sidebar-resize-handle"
+        onMouseDown={handleResizeStart}
+        title="Drag to resize sidebar width"
+      >
+        <div className="resize-thumb" />
+      </div>
     </aside>
   );
 }
