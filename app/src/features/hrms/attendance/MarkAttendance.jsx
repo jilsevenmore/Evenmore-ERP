@@ -1,84 +1,438 @@
-import { useState, useMemo } from "react";
-import { useAttendanceStore } from "../../../stores/attendanceStore";
+import { useState, useMemo, useEffect } from "react";
+import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
-import { attendanceEmployees } from "../../../data/hrms/mocks/attendanceExtended";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
+
+const INITIAL_EMPLOYEES = [
+  {
+    id: "EMP1024",
+    name: "Priya Patel",
+    dept: "Engineering",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Present",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+  },
+  {
+    id: "EMP1025",
+    name: "Marcus Chen",
+    dept: "Design",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Present",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+  },
+  {
+    id: "EMP1026",
+    name: "Liam Cooper",
+    dept: "Engineering",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Late",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/men/75.jpg",
+  },
+  {
+    id: "EMP1027",
+    name: "Sarah Wilson",
+    dept: "Marketing",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Absent",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
+  },
+  {
+    id: "EMP1028",
+    name: "James Wilson",
+    dept: "Finance",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "WFH",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/men/54.jpg",
+  },
+  {
+    id: "EMP1029",
+    name: "Ayesha Khan",
+    dept: "HR",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "On Leave",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/women/24.jpg",
+  },
+  {
+    id: "EMP1030",
+    name: "David Park",
+    dept: "Engineering",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Present",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/men/46.jpg",
+  },
+  {
+    id: "EMP1031",
+    name: "Chen Li",
+    dept: "Operations",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Present",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/women/33.jpg",
+  },
+  {
+    id: "EMP1032",
+    name: "Rahul Verma",
+    dept: "Design",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Late",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/men/62.jpg",
+  },
+  {
+    id: "EMP1033",
+    name: "Ana Silva",
+    dept: "Marketing",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "Absent",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/women/51.jpg",
+  },
+  {
+    id: "EMP1034",
+    name: "Tariq Al-Mansoor",
+    dept: "HR",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "WFH",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/men/82.jpg",
+  },
+  {
+    id: "EMP1035",
+    name: "Sofia Reyes",
+    dept: "Finance",
+    checkIn: "09:02",
+    checkOut: "18:04",
+    status: "On Leave",
+    remarks: "",
+    checked: false,
+    avatar: "https://randomuser.me/api/portraits/women/63.jpg",
+  },
+];
+
+const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations"];
+const LOCATIONS = ["All", "Bangalore", "Mumbai", "Delhi", "Hyderabad"];
+const SHIFTS = ["All", "General", "Flexible", "Night"];
+const STATUSES = ["Present", "Late", "Absent", "WFH", "Half Day", "On Leave"];
+
 export default function MarkAttendance() {
-  const showToast = useAppStore((s) => s.showToast);
-  const role = useAttendanceStore((s) => s.role);
-  const canEdit = role === "HR" || role === "Admin";
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const storeRecords = useAttendanceStore((s) => s.records);
+  const saveDailyAttendance = useAttendanceStore((s) => s.saveDailyAttendance);
+  const bulkUpdateStore = useAttendanceStore((s) => s.bulkUpdate);
+
   const [date, setDate] = useState("2024-10-11");
   const [dept, setDept] = useState("All");
   const [location, setLocation] = useState("All");
   const [shift, setShift] = useState("All");
-  const [initialRows] = useState(() => attendanceEmployees.slice(0, 12).map((e, i) => ({ id: e.id, name: e.name, avatar: e.avatar, dept: e.dept, checkIn: "09:02", checkOut: "18:04", status: ["Present", "Present", "Late", "Absent", "WFH", "On Leave"][i % 6], remarks: "", checked: false })));
-  const [rows, setRows] = useState(initialRows);
+
+  const [rows, setRows] = useState(() => {
+    if (storeRecords && storeRecords.length > 0) {
+      return storeRecords.map((r) => ({
+        ...r,
+        avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+        remarks: r.remarks || "",
+        checked: false,
+      }));
+    }
+    return INITIAL_EMPLOYEES;
+  });
+
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const filtered = useMemo(() => rows.filter((r) => {
-    if (dept !== "All" && r.dept !== dept) return false;
-    return true;
-  }), [rows, dept]);
+
+  // Sync rows if store records change externally
+  useEffect(() => {
+    if (storeRecords && storeRecords.length > 0) {
+      setRows((prev) => {
+        return storeRecords.map((r) => {
+          const existing = prev.find((p) => p.id === r.id);
+          return {
+            ...r,
+            avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+            remarks: existing ? existing.remarks : r.remarks || "",
+            checked: existing ? existing.checked : false,
+          };
+        });
+      });
+    }
+  }, [storeRecords]);
+
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      if (dept !== "All" && r.dept !== dept) return false;
+      return true;
+    });
+  }, [rows, dept]);
+
   const selectedCount = rows.filter((r) => r.checked).length;
+
   function toggleAll(v) {
-    setRows(rows.map((r) => filtered.some((f) => f.id === r.id) ? { ...r, checked: v } : r));
+    setRows(rows.map((r) => (filtered.some((f) => f.id === r.id) ? { ...r, checked: v } : r)));
   }
-  function update(id, patch) {
-    setRows(rows.map((r) => r.id === id ? { ...r, ...patch } : r));
+
+  function updateRow(id, patch) {
+    setRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
-  function save() {
-    if (!canEdit) {
-      showToast("Only HR/Admin can save");
-      return;
-    }
-    if (selectedCount > 10) {
-      setConfirmOpen(true);
-      return;
-    }
-    showToast(`Attendance saved for ${filtered.length} employees on ${date}`);
+
+  function handleSave() {
+    saveDailyAttendance(date, rows);
+    setToast(`Attendance saved for ${rows.length} employees on ${date}`);
   }
-  if (!canEdit) {
-    return <div className="flex flex-col gap-4">
-        <h1 className="text-[24px] font-bold">Mark Attendance</h1>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-[13px] text-amber-800">Your role ({role}) cannot mark attendance. Switch to HR/Admin via top bar role selector.</div>
-      </div>;
-  }
-  return <div className="flex flex-col gap-5">
-      <div><h1 className="text-[24px] font-bold">Mark Attendance</h1><p className="text-[13px] text-muted">Record daily employee attendance.</p></div>
-      <div className="bg-white border border-bdr rounded-xl p-4 shadow-subtle flex flex-wrap gap-2">
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]" />
-        <select value={dept} onChange={(e) => setDept(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>All</option><option>Engineering</option><option>Design</option><option>Marketing</option><option>HR</option><option>Finance</option><option>Operations</option></select>
-        <select value={location} onChange={(e) => setLocation(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>All</option><option>New York</option><option>London</option><option>Dubai</option></select>
-        <select value={shift} onChange={(e) => setShift(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>All</option><option>General</option><option>Flexible</option><option>Night</option></select>
-        <span className="ml-auto text-[12px] text-muted self-center">{selectedCount} selected</span>
+
+  return (
+    <div className="mark-att-page">
+      {/* Breadcrumb */}
+      <nav className="mark-crumb">
+        <span style={{ cursor: "pointer" }}>Home</span>
+        <ChevronRight size={13} style={{ color: "#9aa7bd" }} />
+        <span style={{ color: "#111f36", fontWeight: 600 }}>Attendance / Mark Attendance</span>
+      </nav>
+
+      {/* Header Row */}
+      <div className="mark-title-row">
+        <div>
+          <h1 className="mark-title">Mark Attendance</h1>
+          <p className="mark-sub">Record daily employee attendance.</p>
+        </div>
       </div>
 
-      <div className="bg-white border border-bdr rounded-xl shadow-subtle overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
-            <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-4"><input type="checkbox" checked={filtered.length > 0 && filtered.every((r) => r.checked)} onChange={(e) => toggleAll(e.target.checked)} /></th><th className="py-3 px-3">Employee</th><th className="py-3 px-3">Employee ID</th><th className="py-3 px-3">Department</th><th className="py-3 px-3">Check In</th><th className="py-3 px-3">Check Out</th><th className="py-3 px-3">Status</th><th className="py-3 px-3">Remarks</th></tr></thead>
-            <tbody className="divide-y divide-bdr/60 text-[13px]">
-              {filtered.map((r) => <tr key={r.id} className="hover:bg-off/60">
-                  <td className="py-2 px-4"><input type="checkbox" checked={r.checked} onChange={(e) => update(r.id, { checked: e.target.checked })} /></td>
-                  <td className="py-2 px-3"><div className="flex items-center gap-2"><img src={r.avatar} className="w-7 h-7 rounded-full" />{r.name}</div></td>
-                  <td className="py-2 px-3 text-muted text-[12px]">{r.id}</td>
-                  <td className="py-2 px-3">{r.dept}</td>
-                  <td className="py-2 px-3"><input value={r.checkIn} onChange={(e) => update(r.id, { checkIn: e.target.value })} className="w-20 h-7 px-2 bg-white border border-bdr rounded-lg text-[13px] focus:outline-none focus:border-navy" /></td>
-                  <td className="py-2 px-3"><input value={r.checkOut} onChange={(e) => update(r.id, { checkOut: e.target.value })} className="w-20 h-7 px-2 bg-white border border-bdr rounded-lg text-[13px] focus:outline-none focus:border-navy" /></td>
-                  <td className="py-2 px-3"><select value={r.status} onChange={(e) => update(r.id, { status: e.target.value })} className="h-7 px-2 bg-white border border-bdr rounded-lg text-[12px]"><option>Present</option><option>Absent</option><option>Late</option><option>Half Day</option><option>WFH</option><option>On Leave</option></select></td>
-                  <td className="py-2 px-3"><input value={r.remarks} onChange={(e) => update(r.id, { remarks: e.target.value })} placeholder="—" className="w-28 h-7 px-2 bg-white border border-bdr rounded-lg text-[12px]" /></td>
-                </tr>)}
+      {/* Filter Control Bar */}
+      <div className="mark-card mark-filter-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {/* Date Picker Input */}
+          <div className="mark-date-wrap">
+            <span>{date.split("-").reverse().join("-")}</span>
+            <CalendarIcon size={14} style={{ color: "#475569" }} />
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => e.target.value && setDate(e.target.value)}
+              className="mark-date-native"
+              aria-label="Select date"
+            />
+          </div>
+
+          <select value={dept} onChange={(e) => setDept(e.target.value)} className="mark-select">
+            {DEPARTMENTS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+
+          <select value={location} onChange={(e) => setLocation(e.target.value)} className="mark-select">
+            {LOCATIONS.map((l) => (
+              <option key={l} value={l}>
+                {l}
+              </option>
+            ))}
+          </select>
+
+          <select value={shift} onChange={(e) => setShift(e.target.value)} className="mark-select">
+            {SHIFTS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <span style={{ fontSize: "13px", color: "#6b7280" }}>{selectedCount} selected</span>
+      </div>
+
+      {/* Main Table Card */}
+      <div className="mark-card mark-main-card">
+        <div style={{ overflowX: "auto" }}>
+          <table className="mark-table">
+            <thead>
+              <tr>
+                <th style={{ width: 40, paddingLeft: 20 }}>
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every((r) => r.checked)}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                    className="mark-checkbox"
+                  />
+                </th>
+                <th>EMPLOYEE</th>
+                <th>EMPLOYEE ID</th>
+                <th>DEPARTMENT</th>
+                <th>CHECK IN</th>
+                <th>CHECK OUT</th>
+                <th>STATUS</th>
+                <th>REMARKS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ paddingLeft: 20 }}>
+                    <input
+                      type="checkbox"
+                      checked={r.checked}
+                      onChange={(e) => updateRow(r.id, { checked: e.target.checked })}
+                      className="mark-checkbox"
+                    />
+                  </td>
+                  <td>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <img src={r.avatar} alt={r.name} className="mark-avatar" loading="lazy" />
+                      <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>{r.name}</span>
+                    </div>
+                  </td>
+                  <td className="mark-id">{r.id}</td>
+                  <td style={{ color: "#374151" }}>{r.dept}</td>
+                  <td>
+                    <input
+                      type="text"
+                      value={r.checkIn}
+                      onChange={(e) => updateRow(r.id, { checkIn: e.target.value })}
+                      className="mark-input mark-input-time"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={r.checkOut}
+                      onChange={(e) => updateRow(r.id, { checkOut: e.target.value })}
+                      className="mark-input mark-input-time"
+                    />
+                  </td>
+                  <td>
+                    <select
+                      value={r.status}
+                      onChange={(e) => updateRow(r.id, { status: e.target.value })}
+                      className="mark-select-status"
+                    >
+                      {STATUSES.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      value={r.remarks}
+                      onChange={(e) => updateRow(r.id, { remarks: e.target.value })}
+                      placeholder="—"
+                      className="mark-input mark-input-remarks"
+                    />
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                    No employees match the selected department filter.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-        <div className="p-4 border-t border-bdr flex justify-end gap-2 bg-off">
-          <button onClick={() => setRows(initialRows)} className="px-4 py-2 bg-white border border-bdr rounded-xl text-[13.5px]">Cancel</button>
-          <button onClick={save} className="px-6 py-2 bg-navy text-white rounded-xl text-[13.5px] font-medium">Save Attendance</button>
+
+        {/* Footer Actions */}
+        <div className="mark-footer">
+          <button
+            type="button"
+            onClick={() => setRows(INITIAL_EMPLOYEES)}
+            className="mark-btn-cancel"
+          >
+            Cancel
+          </button>
+          <button type="button" onClick={handleSave} className="mark-btn-save">
+            Save Attendance
+          </button>
         </div>
       </div>
 
-      <ConfirmModal open={confirmOpen} title="Confirm bulk update?" desc={`You are about to update attendance for ${selectedCount} employees on ${date}. This will overwrite previous records.`} confirmLabel="Confirm Update" onClose={() => setConfirmOpen(false)} onConfirm={() => {
-    setConfirmOpen(false);
-    showToast("Attendance saved for " + selectedCount + " employees");
-  }} />
-    </div>;
+      <ConfirmModal
+        open={confirmOpen}
+        title="Confirm bulk update?"
+        desc={`You are about to update attendance for ${selectedCount} employees on ${date}. This will overwrite previous records.`}
+        confirmLabel="Confirm Update"
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          const selectedIds = rows.filter((r) => r.checked).map((r) => r.id);
+          saveDailyAttendance(date, rows);
+          setConfirmOpen(false);
+          setToast(`Attendance saved for ${selectedIds.length || rows.length} employees`);
+        }}
+      />
+
+      <style>{`
+        .mark-att-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .mark-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
+        .mark-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .mark-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
+        .mark-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+
+        .mark-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
+        .mark-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+
+        .mark-date-wrap { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 14px; font-size: 13px; color: #374151; min-width: 110px; cursor: pointer; }
+        .mark-date-native { position: absolute; right: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+
+        .mark-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 100px; }
+        .mark-select:focus { border-color: #94a3b8; background-color: #fff; }
+
+        .mark-main-card { overflow: hidden; }
+        .mark-table { width: 100%; border-collapse: collapse; min-width: 800px; font-size: 13.5px; }
+        .mark-table thead tr { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+        .mark-table th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #7b8aa0; padding: 14px 16px; white-space: nowrap; }
+        .mark-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s ease; }
+        .mark-table tbody tr:hover { background: #f8fafc; }
+        .mark-table td { padding: 12px 16px; vertical-align: middle; }
+
+        .mark-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: #16233a; cursor: pointer; }
+        .mark-avatar { width: 32px; height: 32px; border-radius: 999px; object-fit: cover; }
+        .mark-id { font-family: inherit; font-size: 12.5px; color: #6b7280; white-space: nowrap; }
+
+        .mark-input { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 12px; font-size: 13px; color: #1e293b; outline: none; transition: border-color 0.15s ease; }
+        .mark-input:focus { border-color: #94a3b8; }
+        .mark-input-time { width: 84px; text-align: center; }
+        .mark-input-remarks { width: 110px; }
+
+        .mark-select-status { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 28px 6px 12px; font-size: 13px; color: #1e293b; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; width: 110px; }
+        .mark-select-status:focus { border-color: #94a3b8; }
+
+        .mark-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px; background: #ffffff; border-top: 1px solid #f1f5f9; }
+        .mark-btn-cancel { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 18px; font-size: 13.5px; font-weight: 500; color: #475569; cursor: pointer; transition: background 0.15s ease; }
+        .mark-btn-cancel:hover { background: #f8fafc; color: #111827; }
+        .mark-btn-save { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .mark-btn-save:hover { background: #0f172a; }
+      `}</style>
+    </div>
+  );
 }

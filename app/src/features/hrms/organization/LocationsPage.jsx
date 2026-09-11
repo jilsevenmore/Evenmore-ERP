@@ -1,73 +1,206 @@
 import { useState } from 'react';
-import PageHeader from '../../../components/ui/PageHeader';
-import DataTable from '../../../components/ui/DataTable';
+import { useAppStore } from '../../../stores/appStore';
 import Modal from '../../../components/ui/Modal';
-import { Plus, MapPin, Building, Globe } from 'lucide-react';
+import { Plus, MapPin, Search, Edit2, Trash2, Globe, Building } from 'lucide-react';
 
 const INITIAL_LOCATIONS = [
-  { id: 'LOC-01', name: 'Global HQ — New York', address: '350 5th Avenue, New York, NY 10118', timezone: 'EST • UTC-5', headCount: 64, type: 'Headquarters' },
-  { id: 'LOC-02', name: 'London Regional Office', address: '1 Canada Square, Canary Wharf, London', timezone: 'GMT • UTC+0', headCount: 38, type: 'Branch' },
-  { id: 'LOC-03', name: 'Dubai Operations Hub', address: 'DIFC Gate Precinct 4, Dubai, UAE', timezone: 'GST • UTC+4', headCount: 22, type: 'Branch' },
-  { id: 'LOC-04', name: 'Distributed / Remote', address: 'Global remote workforce', timezone: 'Multiple Zones', headCount: 14, type: 'Remote' },
+  { id: 'LOC-01', name: 'Headquarters — New York', address: '350 5th Avenue, New York, NY 10118', timezone: 'EST • UTC-5', count: 342, type: 'Headquarters' },
+  { id: 'LOC-02', name: 'London Regional Office', address: '1 Canada Square, Canary Wharf, London E14 5AB', timezone: 'GMT • UTC+0', count: 128, type: 'Branch' },
+  { id: 'LOC-03', name: 'Dubai Operations Hub', address: 'DIFC Gate Precinct 4, Level 12, Dubai, UAE', timezone: 'GST • UTC+4', count: 84, type: 'Branch' },
+  { id: 'LOC-04', name: 'Distributed / Remote', address: 'Global remote workforce across 14 countries', timezone: 'Multiple Zones', count: 694, type: 'Remote' },
 ];
 
 export function LocationsPage() {
+  const showToast = useAppStore((s) => s.showToast);
   const [locations, setLocations] = useState(INITIAL_LOCATIONS);
+  const [q, setQ] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newLoc, setNewLoc] = useState({ name: '', address: '', timezone: 'EST • UTC-5', type: 'Branch' });
 
+  const filtered = locations.filter((l) =>
+    l.name.toLowerCase().includes(q.toLowerCase()) ||
+    l.address.toLowerCase().includes(q.toLowerCase())
+  );
+
   function handleCreate(e) {
     e.preventDefault();
-    if (!newLoc.name) return;
-    setLocations([...locations, { id: `LOC-0${locations.length + 1}`, ...newLoc, headCount: 0 }]);
+    if (!newLoc.name.trim()) return;
+    setLocations([
+      ...locations,
+      { id: `LOC-0${locations.length + 1}`, ...newLoc, count: 0 },
+    ]);
+    showToast(`Location "${newLoc.name}" added successfully`);
     setIsModalOpen(false);
     setNewLoc({ name: '', address: '', timezone: 'EST • UTC-5', type: 'Branch' });
   }
 
-  const columns = [
-    { key: 'name', label: 'Office Location', render: (val, row) => (
-      <div>
-        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#0f172a' }}>
-          <MapPin size={15} color="#1f6bff" /> {val}
-        </strong>
-        <p style={{ margin: '2px 0 0', fontSize: 12, color: '#64748b' }}>{row.address}</p>
-      </div>
-    )},
-    { key: 'type', label: 'Office Type', render: (val) => <span className="badge badge-purple">{val}</span> },
-    { key: 'timezone', label: 'Timezone' },
-    { key: 'headCount', label: 'Staff Count', render: (val) => <span className="badge badge-blue">{val} members</span> },
-  ];
+  function handleDelete(id, name) {
+    setLocations(locations.filter((x) => x.id !== id));
+    showToast(`Location "${name}" removed`);
+  }
 
   return (
-    <div className="feature-page" style={{ padding: '24px 32px' }}>
-      <PageHeader
-        title="Company Locations"
-        subtitle="Manage regional offices, headquarters, work facilities, and timezone hubs."
-        breadcrumb={[{ label: 'HRMS', to: '/hrms/dashboard' }, { label: 'Organization' }, { label: 'Locations' }]}
-        actions={
-          <button type="button" className="btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> Add Location
-          </button>
-        }
-      />
-
-      <div className="card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20, marginTop: 20 }}>
-        <DataTable columns={columns} data={locations} rowKey="id" searchable={true} searchPlaceholder="Search locations..." />
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h1 className="text-[24px] font-bold tracking-tight">Locations</h1>
+          <p className="text-[13px] text-muted">
+            {locations.length} global offices and distributed workspaces
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsModalOpen(true)}
+          className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+        >
+          <Plus size={16} /> Add Location
+        </button>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Location">
-        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Search Bar */}
+      <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap justify-between items-center gap-3">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search location by name or address..."
+            className="pl-9 pr-4 h-9 w-72 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
+          />
+        </div>
+      </div>
+
+      {/* Grid of Location Cards */}
+      <div className="grid md:grid-cols-2 gap-5">
+        {filtered.map((l) => (
+          <div
+            key={l.id}
+            className="bg-white border border-bdr rounded-xl p-5 shadow-xs hover:border-slate-400 transition-all flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-off border border-bdr grid place-items-center text-navy shrink-0">
+                    <Building size={17} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-[15px] text-slate-900">{l.name}</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-off border border-bdr text-slate-600">
+                      {l.type}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => showToast(`Edit ${l.name}`)}
+                    className="w-8 h-8 rounded-lg border border-bdr hover:bg-off grid place-items-center text-muted transition-colors cursor-pointer"
+                    title="Edit"
+                  >
+                    <Edit2 size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(l.id, l.name)}
+                    className="w-8 h-8 rounded-lg border border-bdr hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="text-[13px] text-muted flex items-start gap-1.5 mt-3.5">
+                <MapPin size={15} className="shrink-0 mt-0.5 text-navy" />
+                <span>{l.address}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-bdr/60 text-[11px]">
+              <span className="px-2.5 py-1 bg-off border border-bdr rounded-full text-slate-700 font-medium">
+                {l.timezone}
+              </span>
+              <span className="px-2.5 py-1 bg-off border border-bdr rounded-full text-slate-700 font-medium">
+                {l.count} staff members
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Modal: Add Location */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Office Location">
+        <form onSubmit={handleCreate} className="flex flex-col gap-4">
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>Location Name</label>
-            <input type="text" required placeholder="e.g. Singapore Innovation Center" value={newLoc.name} onChange={e => setNewLoc({ ...newLoc, name: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }} />
+            <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+              Office Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. Singapore Innovation Hub"
+              value={newLoc.name}
+              onChange={(e) => setNewLoc({ ...newLoc, name: e.target.value })}
+              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+            />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>Address</label>
-            <input type="text" placeholder="e.g. Marina Bay Financial Centre, Tower 1" value={newLoc.address} onChange={e => setNewLoc({ ...newLoc, address: e.target.value })} style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }} />
+            <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+              Street Address
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. 1 Marina Boulevard, Singapore"
+              value={newLoc.address}
+              onChange={(e) => setNewLoc({ ...newLoc, address: e.target.value })}
+              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+            />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-            <button type="button" className="btn-outline" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary">Save Location</button>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+                Office Type
+              </label>
+              <select
+                value={newLoc.type}
+                onChange={(e) => setNewLoc({ ...newLoc, type: e.target.value })}
+                className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              >
+                <option>Headquarters</option>
+                <option>Branch</option>
+                <option>Tech Hub</option>
+                <option>Remote</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
+                Timezone
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. SGT • UTC+8"
+                value={newLoc.timezone}
+                onChange={(e) => setNewLoc({ ...newLoc, timezone: e.target.value })}
+                className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-bdr">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+            >
+              Save Location
+            </button>
           </div>
         </form>
       </Modal>
@@ -75,4 +208,5 @@ export function LocationsPage() {
   );
 }
 
+export const Locations = LocationsPage;
 export default LocationsPage;

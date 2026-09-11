@@ -114,6 +114,40 @@ export const useAppStore = create((set) => ({
       );
       return { employees: ns };
     }),
+  updateEmployee: (id, updates) =>
+    set((s) => {
+      const ns = s.employees.map((x) => (x.id === id || x.name === id ? { ...x, ...updates } : x));
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          employees: ns,
+          leaves: s.leaves,
+          attendance: s.attendance,
+          candidates: s.candidates,
+          showBanner: s.showBanner,
+        })
+      );
+      return { employees: ns };
+    }),
+  updateEmployeeStatus: (idOrName, status) =>
+    set((s) => {
+      const ns = s.employees.map((x) =>
+        x.id === idOrName || x.name?.toLowerCase() === idOrName?.toLowerCase()
+          ? { ...x, status }
+          : x
+      );
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          employees: ns,
+          leaves: s.leaves,
+          attendance: s.attendance,
+          candidates: s.candidates,
+          showBanner: s.showBanner,
+        })
+      );
+      return { employees: ns };
+    }),
   addLeave: (l) =>
     set((s) => {
       const ns = [l, ...s.leaves];
@@ -132,6 +166,36 @@ export const useAppStore = create((set) => ({
   approveLeave: (id, delegate) =>
     set((s) => {
       const ns = s.leaves.map((x) => (x.id === id ? { ...x, delegate, status: "Approved" } : x));
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          employees: s.employees,
+          leaves: ns,
+          attendance: s.attendance,
+          candidates: s.candidates,
+          showBanner: s.showBanner,
+        })
+      );
+      return { leaves: ns };
+    }),
+  rejectLeave: (id, reason = "") =>
+    set((s) => {
+      const ns = s.leaves.map((x) => (x.id === id ? { ...x, status: "Rejected", rejectReason: reason } : x));
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          employees: s.employees,
+          leaves: ns,
+          attendance: s.attendance,
+          candidates: s.candidates,
+          showBanner: s.showBanner,
+        })
+      );
+      return { leaves: ns };
+    }),
+  updateLeaveStatus: (id, status, extra = {}) =>
+    set((s) => {
+      const ns = s.leaves.map((x) => (x.id === id ? { ...x, status, ...extra } : x));
       localStorage.setItem(
         LS_KEY,
         JSON.stringify({

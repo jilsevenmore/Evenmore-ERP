@@ -2,6 +2,7 @@ import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { useNavigate } from "react-router-dom";
 import { useAppStore } from "../../../stores/appStore";
+import { ArrowLeft } from "lucide-react";
 export default function Applications() {
   const candidates = useRecruitmentStore((s) => s.candidates);
   const changeStage = useRecruitmentStore((s) => s.changeStage);
@@ -23,7 +24,16 @@ export default function Applications() {
     }} className="h-7 px-1 bg-off border border-bdr rounded-lg"><option>Applied</option><option>Screening</option><option>Interview</option><option>Shortlisted</option><option>Offer</option><option>Hired</option><option>Rejected</option></select>
       </div> }
   ];
-  return <div className="flex flex-col gap-5">
+  return <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate("/hrms/recruitment")}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Recruitment Setup</span>
+      </button>
+
       <div><h1 className="text-[22px] font-bold">Job Applications</h1><p className="text-[13px] text-muted">{candidates.length} applications</p></div>
       <DataTable columns={cols} data={candidates} />
     </div>;
