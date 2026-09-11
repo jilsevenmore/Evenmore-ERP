@@ -10,6 +10,7 @@ import Pagination from '../../../components/ui/Pagination';
 import NotesDrawer from './NotesDrawer';
 import CreateLeadModal from './CreateLeadModal';
 import DeleteLeadModal from './DeleteLeadModal';
+import LeadGuideModal from './LeadGuideModal';
 import InfoBanner from '../common/InfoBanner';
 import { useNavigate } from 'react-router-dom';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
@@ -127,6 +128,7 @@ export default function LeadsPage() {
   const [showCreateArrow, setShowCreateArrow] = useState(false);
   const [showLeadTour, setShowLeadTour] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [leadView, setLeadView] = useState('list');
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
   const [draftFilters, setDraftFilters] = useState(INITIAL_FILTERS);
@@ -170,6 +172,7 @@ export default function LeadsPage() {
   useEffect(() => {
     try {
       localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leadRows));
+      window.dispatchEvent(new Event('crm:data-updated'));
     } catch {
       return;
     }
@@ -290,10 +293,6 @@ export default function LeadsPage() {
     setShowLeadTour(showCreateArrow);
     setShowCreateArrow(false);
     setIsCreateLeadOpen(true);
-  }
-
-  function handleGuideClick() {
-    setShowCreateArrow(true);
   }
 
   function formatDisplayDate(value) {
@@ -470,7 +469,7 @@ export default function LeadsPage() {
         onClearSort={clearSort}
         leadView={leadView}
         onLeadViewChange={setLeadView}
-        onCreateLead={handleGuideClick}
+        onOpenGuide={() => setIsGuideOpen(true)}
         recordActionLead={recordActionLead}
         recordActionLeads={selectedLeads}
         onCloseRecordAction={clearSelected}
@@ -617,6 +616,7 @@ export default function LeadsPage() {
         onCreate={handleCreateLead}
         onEditLayout={() => { setIsCreateLeadOpen(false); setShowLeadTour(false); navigate('/crm/leads/form-builder'); }}
       />
+      <LeadGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </>
   );
 }

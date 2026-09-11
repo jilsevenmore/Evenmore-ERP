@@ -51,7 +51,6 @@ const NAV = [
     defaultOpen: false,
     children: [
       { label: 'Main Dashboard', icon: Home, to: '/dashboard' },
-      { label: 'CRM Dashboard', icon: Home, to: '/crm/dashboard' },
     ],
   },
 
@@ -60,6 +59,7 @@ const NAV = [
     icon: LayoutGrid,
     defaultOpen: false,
     children: [
+      { label: 'CRM Dashboard', icon: Home, to: '/crm/dashboard' },
       {
         label: 'Leads',
         icon: Target,
@@ -81,7 +81,7 @@ const NAV = [
           { label: 'Task Allocation', to: '/crm/tasks/allocation' },
         ],
       },
-      { label: 'User Allocation & Tracking', icon: Users, to: '/crm/user-allocation' },
+      { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
       { label: 'CRM System Setup', icon: Settings, to: '/crm/system-setup' },
     ],

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import {
   Search,
   Plus,
@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
+import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 
 const THEMES = [
   { id: 'light', name: 'Enterprise Light', icon: Sun, desc: 'Clean high-contrast corporate palette', color: '#1f6bff' },
@@ -49,6 +50,7 @@ const NOTIFICATIONS = [
 
 export default function Topbar() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const globalSearch = useAppStore((s) => s.globalSearch);
   const setGlobalSearch = useAppStore((s) => s.setGlobalSearch);
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
@@ -65,10 +67,12 @@ export default function Topbar() {
 
   // Live ERP data for notifications
   const erp = useERP();
+  const crmDigest = useCrmNotificationDigest();
   const items = erp?.items;
   const deliveryChallans = erp?.deliveryChallans;
   const zoneRequests = erp?.zoneRequests;
   const salesInvoices = erp?.salesInvoices;
+  const isCrmRoute = pathname === '/crm' || pathname.startsWith('/crm/');
 
   const lowStockItems = useMemo(() => {
     return (items || []).filter((i) => (i.availableQty ?? i.stock ?? 0) <= (i.reorderLevel || 5));
@@ -86,7 +90,7 @@ export default function Topbar() {
     return (salesInvoices || []).filter((inv) => (inv.status || '').toLowerCase() === 'overdue');
   }, [salesInvoices]);
 
-  const dynamicNotifications = useMemo(() => {
+  const erpNotifications = useMemo(() => {
     const list = [];
     if (lowStockItems.length > 0) {
       list.push({
@@ -115,7 +119,7 @@ export default function Topbar() {
         desc: `Shipments currently out for customer delivery.`,
         time: 'In Route',
         unread: false,
-        path: '/sales/delivery-challans',
+        path: '/sales/delivery',
       });
     }
     if (overdueInvoices.length > 0) {
@@ -131,7 +135,12 @@ export default function Topbar() {
     return list.length > 0 ? list : NOTIFICATIONS;
   }, [lowStockItems, pendingZoneRequests, inTransitChallans, overdueInvoices]);
 
-  const unreadCount = dynamicNotifications.filter((n) => n.unread).length;
+  const dynamicNotifications = isCrmRoute
+    ? [...crmDigest.reminders, ...crmDigest.notifications]
+    : erpNotifications;
+  const unreadCount = isCrmRoute
+    ? crmDigest.counts.unread
+    : dynamicNotifications.filter((n) => n.unread).length;
 
   // Close popovers on click outside
   useEffect(() => {
@@ -303,30 +312,113 @@ export default function Topbar() {
             {isNotifOpen && (
               <div className="top-dropdown-menu w-80 p-3 animate-in fade-in zoom-in-95 duration-150 shadow-xl">
                 <div className="flex items-center justify-between pb-2 border-b border-border">
-                  <span className="font-bold text-xs text-text">Notifications</span>
-                  <span className="text-[10px] font-semibold cursor-pointer hover:underline text-primary">
-                    Mark all read
-                  </span>
+                  <span className="font-bold text-xs text-text">{isCrmRoute ? 'CRM Reminders' : 'Notifications'}</span>
+                  {isCrmRoute ? (
+                    <span className="text-[10px] font-semibold text-primary">
+                      {crmDigest.counts.urgent} urgent
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-primary">
+                      {unreadCount} unread
+                    </span>
+                  )}
                 </div>
-                <div className="max-h-72 overflow-y-auto mt-1 space-y-1">
-                  {dynamicNotifications.map((n) => (
-                    <div
-                      key={n.id}
-                      onClick={() => {
-                        if (n.path) navigate(n.path);
-                        setIsNotifOpen(false);
-                      }}
-                      className="py-2.5 px-2 rounded-xl transition cursor-pointer hover:bg-soft"
-                      style={{ background: n.unread ? 'var(--soft)' : 'transparent' }}
-                    >
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-text">
-                        <span>{n.title}</span>
-                        <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-card text-primary">{n.time}</span>
+                {isCrmRoute ? (
+                  <div className="mt-2 space-y-3">
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-500">Overdue</p>
+                        <p className="mt-1 text-sm font-bold text-rose-700">{crmDigest.counts.overdue}</p>
                       </div>
-                      <p className="text-[11px] mt-0.5 leading-snug text-muted">{n.desc}</p>
+                      <div className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">Today</p>
+                        <p className="mt-1 text-sm font-bold text-amber-700">{crmDigest.counts.today}</p>
+                      </div>
+                      <div className="rounded-xl border border-blue-100 bg-blue-50 px-2.5 py-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-500">All</p>
+                        <p className="mt-1 text-sm font-bold text-blue-700">{crmDigest.counts.total}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Reminders</span>
+                        <Link to="/crm/tasks" onClick={() => setIsNotifOpen(false)} className="text-[10px] font-semibold text-primary hover:underline">Open Tasks</Link>
+                      </div>
+                      <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
+                        {crmDigest.reminders.length > 0 ? crmDigest.reminders.slice(0, 6).map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              if (n.path) navigate(n.path);
+                              setIsNotifOpen(false);
+                            }}
+                            className="rounded-2xl border px-2.5 py-2.5 transition cursor-pointer hover:bg-soft"
+                            style={{
+                              background: n.tone === 'overdue' ? '#fff1f2' : n.tone === 'today' ? '#fff7ed' : 'var(--card)',
+                              borderColor: n.tone === 'overdue' ? '#fecdd3' : n.tone === 'today' ? '#fed7aa' : 'var(--border)',
+                            }}
+                          >
+                            <div className="flex items-center justify-between gap-3 text-[11px] font-semibold text-text">
+                              <span className="truncate">{n.title}</span>
+                              <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] text-primary">{n.time}</span>
+                            </div>
+                            <p className="mt-0.5 text-[11px] text-muted">{n.subtitle} • {n.desc}</p>
+                          </div>
+                        )) : (
+                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-[11px] text-emerald-700">
+                            No CRM reminders pending right now.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {crmDigest.notifications.length > 0 && (
+                      <div>
+                        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Workflow Notifications</div>
+                        <div className="space-y-1">
+                          {crmDigest.notifications.slice(0, 3).map((n) => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                if (n.path) navigate(n.path);
+                                setIsNotifOpen(false);
+                              }}
+                              className="rounded-2xl px-2.5 py-2.5 transition cursor-pointer hover:bg-soft"
+                              style={{ background: n.unread ? 'var(--soft)' : 'transparent' }}
+                            >
+                              <div className="flex items-center justify-between text-[11px] font-semibold text-text">
+                                <span>{n.title}</span>
+                                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-card text-primary">{n.time}</span>
+                              </div>
+                              <p className="text-[11px] mt-0.5 leading-snug text-muted">{n.desc}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto mt-1 space-y-1">
+                    {dynamicNotifications.map((n) => (
+                      <div
+                        key={n.id}
+                        onClick={() => {
+                          if (n.path) navigate(n.path);
+                          setIsNotifOpen(false);
+                        }}
+                        className="py-2.5 px-2 rounded-xl transition cursor-pointer hover:bg-soft"
+                        style={{ background: n.unread ? 'var(--soft)' : 'transparent' }}
+                      >
+                        <div className="flex items-center justify-between text-[11px] font-semibold text-text">
+                          <span>{n.title}</span>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-card text-primary">{n.time}</span>
+                        </div>
+                        <p className="text-[11px] mt-0.5 leading-snug text-muted">{n.desc}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

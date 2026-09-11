@@ -69,7 +69,7 @@ export default function UserAllocationPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="User Allocation & Tracking"
+        title="User Tracking"
         subtitle="Sales representative capacity, lead assignment rules, and workload metrics"
         actions={
           <div className="flex items-center gap-2">

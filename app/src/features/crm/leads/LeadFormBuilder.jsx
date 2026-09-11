@@ -189,6 +189,7 @@ export default function LeadFormBuilder({
   onSaveAndOpen,
   saveSuccess = false,
   formTitle = "Lead Form Builder",
+  hideHeader = false,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
@@ -247,7 +248,7 @@ export default function LeadFormBuilder({
 
   return (
     <section className="w-full max-w-7xl mx-auto py-2">
-      {/* Top Header */}
+      {!hideHeader && (
       <div className="mb-6">
         <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1.5">
           <span>CRM</span>
@@ -283,6 +284,7 @@ export default function LeadFormBuilder({
           </div>
         </div>
       </div>
+      )}
 
       {/* Main Two-Column Layout */}
       <div className="flex flex-col lg:flex-row items-start gap-6">

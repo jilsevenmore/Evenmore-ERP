@@ -5,7 +5,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
@@ -34,6 +34,26 @@ export const QuotationsPage = () => {
     const [lineItems, setLineItems] = useState([]);
     const [autoPOState, setAutoPOState] = useState({ isOpen: false });
     const navigate = useNavigate();
+    const location = useLocation();
+    const leadRequest = location.state && location.state.fromLead ? location.state : null;
+    const autoOpened = React.useRef(false);
+
+    React.useEffect(() => {
+        if (!leadRequest || autoOpened.current) return;
+        autoOpened.current = true;
+        const match = customers.find((c) => c.name === leadRequest.company) || customers[0];
+        if (match) setSelectedCustomerId(match.id);
+        if (Array.isArray(leadRequest.items) && leadRequest.items.length > 0) {
+            setLineItems(leadRequest.items.map((it, i) => ({
+                id: `li-${Date.now()}-${i}`,
+                description: it.name,
+                qty: 1,
+                rate: it.rate || 0,
+                amount: it.rate || 0,
+            })));
+        }
+        setIsModalOpen(true);
+    }, [leadRequest, customers]);
     const totalPipeline = quotations.reduce((sum, q) => sum + (q.amount || 0), 0);
     const handleConvert = (quoteId) => {
         convertQuotationToSalesOrder(quoteId);
@@ -105,6 +125,8 @@ export const QuotationsPage = () => {
         addQuotation({
             customerId: cust?.id,
             customer: cust?.name || 'Acme Corp',
+            leadId: leadRequest?.leadId || '',
+            leadName: leadRequest?.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             validUntil: validUntil || '30 Days',
             amount: computedTotal > 0 ? computedTotal : 1500,
@@ -118,6 +140,16 @@ export const QuotationsPage = () => {
       <PageHeader title="Quotations & Estimates" subtitle="Generate pricing estimates and convert approved quotes directly into confirmed Sales Orders." guide={quotationGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>
             New Quotation
           </Button>}/>
+
+      {leadRequest && (
+        <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs">
+          <FileText size={15} className="text-blue-600 shrink-0" />
+          <span className="text-slate-700">
+            Creating quotation for lead <strong className="text-slate-900">{leadRequest.leadName}</strong>
+            {leadRequest.company && <span> • {leadRequest.company}</span>}
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total Quotations" value={quotations.length} icon={FileText}/>

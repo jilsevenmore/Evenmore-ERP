@@ -1007,6 +1007,8 @@ export const ERPProvider = ({ children, }) => {
             quoteNumber: quote.quoteNumber || `EST-2026-${String(quotations.length + 91).padStart(3, '0')}`,
             customerId: quote.customerId,
             customer: quote.customer || 'Acme Corp',
+            leadId: quote.leadId || '',
+            leadName: quote.leadName || '',
             date: quote.date || 'Today',
             validUntil: quote.validUntil || 'In 30 days',
             amount: totalAmount,

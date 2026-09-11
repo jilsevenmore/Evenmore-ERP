@@ -36,7 +36,7 @@ export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadI
               >
                 <Pin size={14} />
               </button>
-              <button type="button" className="lead-grid-open" onClick={() => onAddNote(row)}>
+              <button type="button" className="lead-grid-open" onClick={() => onOpenLead(row)}>
                 Open
               </button>
             </div>
