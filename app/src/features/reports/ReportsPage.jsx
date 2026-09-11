@@ -33,7 +33,7 @@ const reportsGuide = {
     workflow: ['Operational Data Recorded', 'Ledger Synchronized', 'Aging Classified', 'P&L Computed', 'Executive Audit Exported'],
 };
 export const ReportsPage = () => {
-    const { customers, vendors, invoices, purchaseBills, salesOrders, expenses, items, getBillOutstanding } = useERP();
+    const { customers, vendors, invoices, purchaseBills, salesOrders, expenses, items, getBillOutstanding, formatCurrency } = useERP();
     const [activeReport, setActiveReport] = useState('inventory');
 
     // Dynamic Inventory calculations
@@ -219,7 +219,7 @@ export const ReportsPage = () => {
 
       {activeReport === 'inventory' && (<div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <StatCard label="Total Stock Valuation" value={`$${totalInventoryValuation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign}/>
+            <StatCard label="Total Stock Valuation" value={formatCurrency(totalInventoryValuation)} icon={DollarSign}/>
             <StatCard label="Total SKUs Tracked" value={`${items.length} Active`} icon={Package}/>
             <StatCard label="Stock Categories" value={`${categoryValuations.length} Groups`} highlight/>
             <StatCard label="Reorder Shortages" value={`${lowStockCount} Items`} icon={AlertTriangle}/>
@@ -235,7 +235,7 @@ export const ReportsPage = () => {
                         <div key={cat.name}>
                             <div className="flex justify-between font-semibold text-slate-700 mb-1">
                                 <span>{cat.name}</span>
-                                <span>${cat.valuation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({cat.percentage.toFixed(1)}%)</span>
+                                <span>{formatCurrency(cat.valuation)} ({cat.percentage.toFixed(1)}%)</span>
                             </div>
                             <div className="w-full bg-slate-100 rounded-full h-2">
                                 <div
@@ -252,8 +252,8 @@ export const ReportsPage = () => {
 
       {activeReport === 'sales' && (<div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Gross Sales MTD" value={`$${grossSales.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} highlight/>
-            <StatCard label="Avg Order / Invoice" value={`$${avgInvoiceValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}/>
+            <StatCard label="Gross Sales MTD" value={formatCurrency(grossSales)} icon={DollarSign} highlight/>
+            <StatCard label="Avg Order / Invoice" value={formatCurrency(avgInvoiceValue)}/>
             <StatCard label="Invoices Settled" value={`${paidInvoicesCount} / ${invoices.length} Paid`} trend={{ positive: true, text: `${invoices.length} Total` }}/>
           </div>
           <div className="bg-white border border-[#CED4DA] rounded-lg p-5">
@@ -268,7 +268,7 @@ export const ReportsPage = () => {
                                 <p className="font-semibold text-slate-800">{account.name}</p>
                                 <p className="text-[11px] text-slate-500">{account.invoiceCount} Invoice(s) billed • Code: {account.code}</p>
                             </div>
-                            <span className="font-mono font-bold text-slate-900">${account.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="font-mono font-bold text-slate-900">{formatCurrency(account.revenue)}</span>
                         </div>
                     ))}
                 </div>
@@ -278,7 +278,7 @@ export const ReportsPage = () => {
 
       {activeReport === 'purchases' && (<div className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StatCard label="Total Procurement MTD" value={`$${totalProcurement.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign}/>
+            <StatCard label="Total Procurement MTD" value={formatCurrency(totalProcurement)} icon={DollarSign}/>
             <StatCard label="Active Supplier Accounts" value={`${vendors.length} Vendors`}/>
             <StatCard label="Total Purchase Bills" value={`${purchaseBills.length} Bills`} highlight/>
           </div>
@@ -306,7 +306,7 @@ export const ReportsPage = () => {
                                     <span className="text-[11px] text-slate-500 ml-2">({vendor.billCount} bills)</span>
                                 </div>
                                 <div className="text-right">
-                                    <span className="font-mono font-bold text-slate-900 mr-2">${vendor.spend.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="font-mono font-bold text-slate-900 mr-2">{formatCurrency(vendor.spend)}</span>
                                     <span className="text-slate-500">({vendor.percentage.toFixed(1)}%)</span>
                                 </div>
                             </div>
@@ -319,9 +319,9 @@ export const ReportsPage = () => {
 
       {activeReport === 'aging' && (<div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-            <StatCard label="Total Accounts Receivable (AR)" value={`$${totalAr.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={DollarSign}/>
-            <StatCard label="Total Accounts Payable (AP)" value={`$${totalAp.toLocaleString(undefined, { minimumFractionDigits: 2 })}`} icon={Clock} highlight/>
-            <StatCard label="Net Working Capital Delta" value={`$${(totalAr - totalAp).toLocaleString(undefined, { minimumFractionDigits: 2 })}`}/>
+            <StatCard label="Total Accounts Receivable (AR)" value={formatCurrency(totalAr)} icon={DollarSign}/>
+            <StatCard label="Total Accounts Payable (AP)" value={formatCurrency(totalAp)} icon={Clock} highlight/>
+            <StatCard label="Net Working Capital Delta" value={formatCurrency(totalAr - totalAp)}/>
             <StatCard label="Collections Risk Factor" value="Active Monitoring" icon={ShieldCheck}/>
           </div>
 
@@ -336,28 +336,28 @@ export const ReportsPage = () => {
               <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
                 <span className="text-emerald-700 font-bold block text-[11px] uppercase">Current (0 - 30 Days)</span>
                 <p className="font-mono font-bold text-base text-emerald-900 mt-1">
-                  ${(totalAr * 0.65).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(totalAr * 0.65)}
                 </p>
                 <span className="text-[10px] text-emerald-600">65% of AR</span>
               </div>
               <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
                 <span className="text-blue-700 font-bold block text-[11px] uppercase">31 - 60 Days</span>
                 <p className="font-mono font-bold text-base text-blue-900 mt-1">
-                  ${(totalAr * 0.22).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(totalAr * 0.22)}
                 </p>
                 <span className="text-[10px] text-blue-600">22% of AR</span>
               </div>
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
                 <span className="text-amber-700 font-bold block text-[11px] uppercase">61 - 90 Days</span>
                 <p className="font-mono font-bold text-base text-amber-900 mt-1">
-                  ${(totalAr * 0.09).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(totalAr * 0.09)}
                 </p>
                 <span className="text-[10px] text-amber-600">9% of AR</span>
               </div>
               <div className="bg-rose-50 border border-rose-200 p-3 rounded-lg">
                 <span className="text-rose-700 font-bold block text-[11px] uppercase">90+ Days Overdue</span>
                 <p className="font-mono font-bold text-base text-rose-900 mt-1">
-                  ${(totalAr * 0.04).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(totalAr * 0.04)}
                 </p>
                 <span className="text-[10px] text-rose-600">4% of AR</span>
               </div>
@@ -383,19 +383,19 @@ export const ReportsPage = () => {
                         <span className="text-[10px] text-slate-400 font-mono">Code: {c.code}</span>
                       </td>
                       <td className="p-2.5 text-right font-mono text-slate-600">
-                        ${(c.creditLimit || 50000).toLocaleString()}
+                        {formatCurrency(c.creditLimit || 50000)}
                       </td>
                       <td className="p-2.5 text-right font-mono font-bold text-slate-900">
-                        ${c.balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatCurrency(c.balance)}
                       </td>
                       <td className="p-2.5 text-right font-mono text-emerald-700">
-                        ${(c.balance * 0.7).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatCurrency(c.balance * 0.7)}
                       </td>
                       <td className="p-2.5 text-right font-mono text-blue-700">
-                        ${(c.balance * 0.25).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatCurrency(c.balance * 0.25)}
                       </td>
                       <td className="p-2.5 text-right font-mono text-rose-700 font-semibold">
-                        ${(c.balance * 0.05).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        {formatCurrency(c.balance * 0.05)}
                       </td>
                     </tr>))}
                 </tbody>
@@ -409,26 +409,26 @@ export const ReportsPage = () => {
           <div className="space-y-3 text-xs max-w-xl">
             <div className="flex justify-between py-2 border-b border-slate-100">
               <span className="font-medium text-slate-600">Gross Operating Revenue (Recognized Invoices)</span>
-              <span className="font-bold font-mono text-slate-900">${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold font-mono text-slate-900">{formatCurrency(totalRevenue)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-slate-100 text-rose-600">
               <span className="font-medium">Less: Cost of Goods Sold (Procured Bills)</span>
-              <span className="font-bold font-mono">-${totalCogs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold font-mono">-{formatCurrency(totalCogs)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-slate-200 bg-slate-50 px-2 rounded">
               <span className="font-bold text-slate-800">Gross Margin ({grossMarginPct.toFixed(1)}%)</span>
               <span className={`font-bold font-mono ${grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
-                ${grossProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrency(grossProfit)}
               </span>
             </div>
             <div className="flex justify-between py-2 border-b border-slate-100 text-slate-600">
               <span className="font-medium">Direct & Overhead Operating Expenses</span>
-              <span className="font-bold font-mono">-${totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold font-mono">-{formatCurrency(totalExpenses)}</span>
             </div>
             <div className="flex justify-between py-3 border-t-2 border-[#1F2E4A] bg-[#F8F9FA] px-2 rounded">
               <span className="font-bold text-sm text-[#1F2E4A]">Net Operating Profit (EBITDA)</span>
               <span className={`font-bold font-mono text-base ${netOperatingProfit >= 0 ? 'text-[#1F2E4A]' : 'text-rose-600'}`}>
-                ${netOperatingProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrency(netOperatingProfit)}
               </span>
             </div>
           </div>

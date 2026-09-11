@@ -5,7 +5,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { CheckCircle2, AlertTriangle, UserCheck, ShieldCheck } from 'lucide-react';
 export const MonthEndAuditPage = () => {
-    const { items, calculateItemStock } = useERP();
+    const { items, calculateItemStock, formatCurrency } = useERP();
     // Point-in-time audit snapshot seeded from live book quantities
     // (was hardcoded demo rows). physicalCount starts at book qty; the
     // auditor adjusts via Post Adjustment / recount flows below.
@@ -56,37 +56,45 @@ export const MonthEndAuditPage = () => {
         {
             key: 'sku',
             header: 'SKU Code',
-            render: (a) => <span className="font-mono font-bold text-slate-800">{a.sku}</span>,
+            width: '12%',
+            render: (a) => <span className="font-mono font-bold text-primary">{a.sku}</span>,
         },
         {
             key: 'name',
             header: 'Item Description',
-            render: (a) => (<div>
-          <p className="font-bold text-[#1F2E4A]">{a.name}</p>
-          <span className="text-[10px] text-slate-500">{a.location}</span>
-        </div>),
+            width: '22%',
+            render: (a) => (<span className="font-semibold text-text">{a.name}</span>),
+        },
+        {
+            key: 'location',
+            header: 'Assigned Bay / Zone',
+            width: '14%',
+            render: (a) => <span className="text-muted text-xs">{a.location}</span>,
         },
         {
             key: 'systemQty',
-            header: 'System ERP Book Qty',
+            header: 'System Book Qty',
             align: 'center',
-            render: (a) => <span className="font-mono text-slate-700">{a.systemQty}</span>,
+            width: '10%',
+            render: (a) => <span className="font-mono text-text-secondary">{a.systemQty}</span>,
         },
         {
             key: 'physicalCount',
-            header: 'Physical Floor Count',
+            header: 'Physical Headcount',
             align: 'center',
-            render: (a) => (<span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
+            width: '12%',
+            render: (a) => (<span className="font-mono font-bold text-text bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
           {a.physicalCount}
         </span>),
         },
         {
             key: 'variance',
-            header: 'Count Discrepancy',
+            header: 'Unit Variance',
             align: 'center',
-            render: (a) => a.variance === 0 ? (<span className="text-emerald-700 font-mono font-semibold flex items-center justify-center gap-1">
-            <CheckCircle2 size={12}/> Match (0)
-          </span>) : (<span className="text-rose-700 font-mono font-bold flex items-center justify-center gap-1">
+            width: '10%',
+            render: (a) => a.variance === 0 ? (<span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1">
+            <CheckCircle2 size={12}/> Match
+          </span>) : (<span className="text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-1">
             <AlertTriangle size={12}/> {a.variance} units
           </span>),
         },
@@ -94,25 +102,28 @@ export const MonthEndAuditPage = () => {
             key: 'varianceCost',
             header: 'Fiscal Variance',
             align: 'right',
-            render: (a) => (<span className={`font-mono font-bold ${a.varianceCost < 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+            width: '11%',
+            render: (a) => (<span className={`font-mono font-bold ${a.varianceCost < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-text'}`}>
           {a.varianceCost < 0
-                    ? `-$${Math.abs(a.varianceCost).toLocaleString()}`
-                    : `$${a.varianceCost.toLocaleString()}`}
+                    ? `-${formatCurrency(Math.abs(a.varianceCost))}`
+                    : formatCurrency(a.varianceCost)}
         </span>),
         },
         {
             key: 'status',
             header: 'Audit Status',
             align: 'center',
+            width: '9%',
             render: (a) => <StatusBadge status={a.status}/>,
         },
         {
             key: 'actions',
             header: 'Adjustment',
             align: 'right',
-            render: (a) => a.status === 'Variance Flagged' && !auditLocked ? (<button onClick={() => reconcileItem(a.id)} className="px-2 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer">
+            width: '8%',
+            render: (a) => a.status === 'Variance Flagged' && !auditLocked ? (<button onClick={() => reconcileItem(a.id)} className="px-2 py-1 bg-primary text-white rounded text-[11px] font-semibold hover:bg-primary-hover cursor-pointer shadow-2xs">
             Post Adjustment
-          </button>) : (<span className="text-slate-400 text-xs">Locked</span>),
+          </button>) : (<span className="text-muted text-xs">Locked</span>),
         },
     ];
     return (<div className="space-y-6">
@@ -151,7 +162,7 @@ export const MonthEndAuditPage = () => {
         </div>
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA]">
           <span className="text-xs text-slate-500 font-semibold uppercase">Net Inventory Variance</span>
-          <p className="text-lg font-bold text-rose-700 mt-1">{netVarianceCost < 0 ? `-$${Math.abs(netVarianceCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : `$${netVarianceCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}</p>
+          <p className="text-lg font-bold text-rose-700 mt-1">{netVarianceCost < 0 ? `-${formatCurrency(Math.abs(netVarianceCost))}` : formatCurrency(netVarianceCost)}</p>
           <span className="text-[11px] text-slate-400">{flaggedCount === 0 ? 'No open variances' : `${flaggedCount} open variance${flaggedCount === 1 ? '' : 's'}`}</span>
         </div>
       </div>

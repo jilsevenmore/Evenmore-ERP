@@ -59,10 +59,8 @@ export const useAppStore = create((set) => ({
   setGlobalSearch: (globalSearch) => set({ globalSearch }),
   commandPaletteOpen: false,
   setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
-  sidebarWidth: 260,
+  sidebarWidth: 280,
   setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
-  sidebarCollapsed: false,
-  toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
 
   // HRMS & Unified State
   employees: saved?.employees ?? employeesMock,

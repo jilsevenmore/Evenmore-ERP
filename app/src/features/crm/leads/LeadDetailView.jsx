@@ -140,7 +140,8 @@ function readFileAsDataUrl(file) {
 }
 
 function formatAmount(value) {
-  return `Rs. ${(value || 0).toLocaleString('en-IN')}`;
+  const activeCurrency = localStorage.getItem('evenmore_currency') || 'USD ($)';
+  return formatCurrency(value || 0, activeCurrency, { noDecimals: true });
 }
 
 function getInitials(name) {

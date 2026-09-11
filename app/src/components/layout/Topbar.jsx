@@ -151,7 +151,7 @@ export default function Topbar() {
     <header className="topbar">
       {/* Search Input Bar */}
       <label className="top-search cursor-pointer">
-        <Search size={15} className="top-search-ico shrink-0" />
+        <Search size={15} className="top-search-ico shrink-0 text-muted" />
         <input
           type="text"
           placeholder="Search records, contacts, deals... (Ctrl+K)"
@@ -159,7 +159,7 @@ export default function Topbar() {
           onChange={(e) => setGlobalSearch(e.target.value)}
           onClick={() => setCommandPaletteOpen(true)}
           readOnly
-          className="w-full bg-transparent text-xs focus:outline-none cursor-pointer"
+          className="w-full bg-transparent text-xs focus:outline-none cursor-pointer text-text"
         />
         <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono rounded" style={{ background: 'var(--card)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
           <Command size={10} />K

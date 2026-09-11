@@ -1,74 +1,212 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/Button';
-import { X, ChevronRight, ChevronLeft, CheckCircle2, User, Building2, Receipt, Percent, BookOpen, CreditCard, MapPin, Plus, Trash2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+    X,
+    ChevronRight,
+    ChevronLeft,
+    CheckCircle2,
+    User,
+    Building2,
+    Receipt,
+    Percent,
+    BookOpen,
+    CreditCard,
+    MapPin,
+    Plus,
+    Trash2,
+    ShieldCheck,
+    Hash,
+    Phone,
+    Mail,
+    Check,
+    Sparkles,
+    AlertCircle
+} from 'lucide-react';
 
 const STEPS = [
-    { id: 1, label: 'Basic Info', icon: User },
-    { id: 2, label: 'GST & Tax', icon: Receipt },
-    { id: 3, label: 'TDS / TCS', icon: Percent },
-    { id: 4, label: 'Ledger', icon: BookOpen },
-    { id: 5, label: 'Payment & Bank', icon: CreditCard },
-    { id: 6, label: 'Addresses & POC', icon: MapPin },
+    { id: 1, label: 'Basic Info', sublabel: 'Identity & Type', icon: User },
+    { id: 2, label: 'GST & Tax', sublabel: 'GSTIN & PAN', icon: Receipt },
+    { id: 3, label: 'TDS / TCS', sublabel: 'Withholding Rules', icon: Percent },
+    { id: 4, label: 'Ledger', sublabel: 'Chart of Accounts', icon: BookOpen },
+    { id: 5, label: 'Payment & Bank', sublabel: 'Credit & Banking', icon: CreditCard },
+    { id: 6, label: 'Addresses & POC', sublabel: 'Locations & Contacts', icon: MapPin },
 ];
+
+const PARTY_TYPES = [
+    {
+        id: 'Customer',
+        label: 'Customer',
+        subtext: 'Client / Buyer for Sales Orders & Invoices',
+        icon: User,
+        activeClass: 'bg-blue-500/10 border-blue-500 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20',
+        activeIconClass: 'bg-blue-600 text-white',
+    },
+    {
+        id: 'Vendor',
+        label: 'Vendor',
+        subtext: 'Supplier / Provider for Purchase Orders & Bills',
+        icon: Building2,
+        activeClass: 'bg-amber-500/10 border-amber-500 text-amber-600 dark:text-amber-400 ring-2 ring-amber-500/20',
+        activeIconClass: 'bg-amber-600 text-white',
+    },
+    {
+        id: 'Both',
+        label: 'Dual Partner',
+        subtext: 'Both Supplier & Buyer across ERP workflows',
+        icon: Sparkles,
+        activeClass: 'bg-purple-500/10 border-purple-500 text-purple-600 dark:text-purple-400 ring-2 ring-purple-500/20',
+        activeIconClass: 'bg-purple-600 text-white',
+    },
+];
+
+const getInitialFormData = (party) => {
+    if (!party) {
+        return {
+            code: `PARTY-${Math.floor(100 + Math.random() * 900)}`,
+            type: 'Customer',
+            name: '',
+            phone: '',
+            email: '',
+            status: 'Active',
+            gstTreatment: 'Registered Business',
+            gstin: '',
+            pan: '',
+            placeOfSupply: 'Maharashtra (27)',
+            gstNotes: '',
+            tdsApplicable: false,
+            tdsSection: '194C',
+            tdsRate: 2,
+            tcsApplicable: false,
+            tcsSection: '206C',
+            tcsRate: 0.1,
+            ledgerAccount: '1210 - Accounts Receivable',
+            creditLimit: 50000,
+            paymentTerms: 'Net 30',
+            bankName: '',
+            bankAccountNumber: '',
+            ifscCode: '',
+            accountHolderName: '',
+            openingBalance: 0,
+            balance: 0,
+            billingAddress: {
+                line1: '',
+                line2: '',
+                city: '',
+                state: 'Maharashtra',
+                pincode: '',
+            },
+            shippingAddress: {
+                line1: '',
+                line2: '',
+                city: '',
+                state: 'Maharashtra',
+                pincode: '',
+            },
+            contacts: [
+                { id: 'cnt-1', name: '', role: 'Primary POC', phone: '', email: '' },
+            ],
+        };
+    }
+
+    const partyName = party.name || party.companyName || party.company || '';
+    const derivedPan = party.pan || (party.gstin && party.gstin.length >= 12 ? party.gstin.substring(2, 12) : '');
+
+    return {
+        id: party.id,
+        code: party.code || `PARTY-${Math.floor(100 + Math.random() * 900)}`,
+        type: party.type || 'Customer',
+        name: partyName,
+        phone: party.phone || '',
+        email: party.email || '',
+        status: party.status || 'Active',
+        gstTreatment: party.gstTreatment || 'Registered Business',
+        gstin: party.gstin || '',
+        pan: derivedPan,
+        placeOfSupply: party.placeOfSupply || 'Maharashtra (27)',
+        gstNotes: party.gstNotes || '',
+        tdsApplicable: party.tdsApplicable ?? false,
+        tdsSection: party.tdsSection || '194C',
+        tdsRate: party.tdsRate ?? 2,
+        tcsApplicable: party.tcsApplicable ?? false,
+        tcsSection: party.tcsSection || '206C',
+        tcsRate: party.tcsRate ?? 0.1,
+        ledgerAccount: party.ledgerAccount || (party.type === 'Vendor' ? '2010 - Accounts Payable' : '1210 - Accounts Receivable'),
+        creditLimit: party.creditLimit ?? 50000,
+        paymentTerms: party.paymentTerms || 'Net 30',
+        bankName: party.bankName || '',
+        bankAccountNumber: party.bankAccountNumber || '',
+        ifscCode: party.ifscCode || '',
+        accountHolderName: party.accountHolderName || partyName,
+        openingBalance: party.openingBalance ?? 0,
+        balance: party.balance ?? 0,
+        billingAddress: party.billingAddress ? {
+            line1: party.billingAddress.line1 || '',
+            line2: party.billingAddress.line2 || '',
+            city: party.billingAddress.city || '',
+            state: party.billingAddress.state || 'Maharashtra',
+            pincode: party.billingAddress.pincode || '',
+        } : {
+            line1: '',
+            line2: '',
+            city: '',
+            state: 'Maharashtra',
+            pincode: '',
+        },
+        shippingAddress: party.shippingAddress ? {
+            line1: party.shippingAddress.line1 || '',
+            line2: party.shippingAddress.line2 || '',
+            city: party.shippingAddress.city || '',
+            state: party.shippingAddress.state || 'Maharashtra',
+            pincode: party.shippingAddress.pincode || '',
+        } : {
+            line1: '',
+            line2: '',
+            city: '',
+            state: 'Maharashtra',
+            pincode: '',
+        },
+        contacts: Array.isArray(party.contacts) && party.contacts.length > 0 ? party.contacts : [
+            { id: 'cnt-1', name: '', role: 'Primary POC', phone: '', email: '' },
+        ],
+    };
+};
 
 export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null }) => {
     const [step, setStep] = useState(1);
     const [sameAsBilling, setSameAsBilling] = useState(true);
     const [errorMsg, setErrorMsg] = useState('');
+    const [formData, setFormData] = useState(() => getInitialFormData(existingParty));
 
-    const [formData, setFormData] = useState({
-        code: existingParty?.code || `PARTY-${Math.floor(100 + Math.random() * 900)}`,
-        type: existingParty?.type || 'Customer',
-        name: existingParty?.name || '',
-        phone: existingParty?.phone || '',
-        email: existingParty?.email || '',
-        status: existingParty?.status || 'Active',
-        // GST
-        gstTreatment: existingParty?.gstTreatment || 'Registered Business',
-        gstin: existingParty?.gstin || '',
-        placeOfSupply: existingParty?.placeOfSupply || 'Maharashtra (27)',
-        gstNotes: existingParty?.gstNotes || '',
-        // TDS / TCS
-        tdsApplicable: existingParty?.tdsApplicable ?? false,
-        tdsSection: existingParty?.tdsSection || '194C',
-        tdsRate: existingParty?.tdsRate ?? 2,
-        tcsApplicable: existingParty?.tcsApplicable ?? false,
-        tcsRate: existingParty?.tcsRate ?? 0.1,
-        // Ledger
-        ledgerAccount: existingParty?.ledgerAccount || '1210 - Accounts Receivable',
-        // Payment & Bank
-        creditLimit: existingParty?.creditLimit ?? 50000,
-        paymentTerms: existingParty?.paymentTerms || 'Net 30',
-        bankName: existingParty?.bankName || '',
-        bankAccountNumber: existingParty?.bankAccountNumber || '',
-        ifscCode: existingParty?.ifscCode || '',
-        accountHolderName: existingParty?.accountHolderName || '',
-        openingBalance: existingParty?.openingBalance ?? 0,
-        balance: existingParty?.balance ?? 0,
-        // Addresses & Contacts
-        billingAddress: existingParty?.billingAddress || {
-            line1: '',
-            line2: '',
-            city: '',
-            state: 'Maharashtra',
-            pincode: '',
-        },
-        shippingAddress: existingParty?.shippingAddress || {
-            line1: '',
-            line2: '',
-            city: '',
-            state: 'Maharashtra',
-            pincode: '',
-        },
-        contacts: existingParty?.contacts && existingParty.contacts.length > 0 ? existingParty.contacts : [
-            { id: 'cnt-1', name: '', role: 'Primary POC', phone: '', email: '' },
-        ],
-    });
+    useEffect(() => {
+        if (isOpen) {
+            setStep(1);
+            setErrorMsg('');
+            setFormData(getInitialFormData(existingParty));
+            if (existingParty?.shippingAddress && existingParty?.billingAddress) {
+                const isIdentical =
+                    existingParty.shippingAddress.line1 === existingParty.billingAddress.line1 &&
+                    existingParty.shippingAddress.city === existingParty.billingAddress.city &&
+                    existingParty.shippingAddress.pincode === existingParty.billingAddress.pincode;
+                setSameAsBilling(isIdentical);
+            } else {
+                setSameAsBilling(true);
+            }
+        }
+    }, [isOpen, existingParty]);
 
     if (!isOpen) return null;
 
     const updateField = (field, value) => {
         setFormData((prev) => ({ ...prev, [field]: value }));
+        setErrorMsg('');
+    };
+
+    const handleGstinChange = (val) => {
+        const uppercaseVal = val.toUpperCase();
+        const updates = { gstin: uppercaseVal };
+        if (uppercaseVal.length >= 12 && (!formData.pan || formData.pan === formData.gstin?.substring(2, 12))) {
+            updates.pan = uppercaseVal.substring(2, 12);
+        }
+        setFormData((prev) => ({ ...prev, ...updates }));
         setErrorMsg('');
     };
 
@@ -119,14 +257,14 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
     const validateStep = (currentStep) => {
         if (currentStep === 1) {
             if (!formData.name.trim()) {
-                setErrorMsg('Party / Company Legal Name is required.');
+                setErrorMsg('Legal Company / Entity Name is required to proceed.');
                 return false;
             }
         }
         if (currentStep === 2) {
             if (formData.gstTreatment === 'Registered Business') {
                 if (!formData.gstin || formData.gstin.trim().length < 5) {
-                    setErrorMsg('A valid GSTIN is required for Registered Business entities.');
+                    setErrorMsg('A valid 15-character GSTIN is required for Registered Business entities.');
                     return false;
                 }
             }
@@ -157,49 +295,96 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
         onClose();
     };
 
+    const progressPercentage = Math.round((step / 6) * 100);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-2xs p-4 animate-in fade-in duration-150">
-            <div className="bg-white rounded-2xl border border-[#CED4DA] shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col max-h-[90vh]">
-                {/* Header */}
-                <div className="bg-[#1F2E4A] text-white p-5 flex items-center justify-between">
-                    <div>
-                        <span className="text-[10px] font-mono tracking-wider uppercase text-blue-200">
-                            Partner Master Registry
-                        </span>
-                        <h2 className="text-lg font-bold">
-                            {existingParty ? `Edit Party: ${existingParty.name}` : 'Register New Commercial Party'}
-                        </h2>
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-150"
+            onClick={onClose}
+        >
+            <div
+                className="bg-card border border-border text-text rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col max-h-[92vh] transition-all"
+                onClick={(e) => e.stopPropagation()}
+            >
+                {/* Top Header: Soft Shiny Neutral Shade in Light Mode, Adaptive Card in Dark Mode */}
+                <div className="bg-gradient-to-r from-slate-50 via-[#f0f5fc] to-slate-100/90 dark:from-card dark:via-card dark:to-card border-b border-slate-200/80 dark:border-border text-slate-800 dark:text-text p-5 sm:p-6 flex flex-col gap-3.5 backdrop-blur-md">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3.5">
+                            <div className="w-11 h-11 rounded-xl bg-white dark:bg-primary/10 border border-slate-200/80 dark:border-primary/20 text-blue-600 dark:text-primary flex items-center justify-center font-bold shrink-0 shadow-xs">
+                                <Building2 size={22} />
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-mono tracking-wider uppercase text-blue-700 dark:text-primary font-bold px-2.5 py-0.5 rounded-full bg-blue-50 dark:bg-primary/10 border border-blue-200/60 dark:border-primary/20">
+                                        Commercial Registry
+                                    </span>
+                                    <span className="text-xs text-slate-500 dark:text-muted font-medium">
+                                        Step {step} of 6
+                                    </span>
+                                </div>
+                                <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-text tracking-tight mt-0.5">
+                                    {existingParty ? `Edit Commercial Party: ${existingParty.name}` : 'Register New Commercial Party'}
+                                </h2>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-white/80 border border-transparent hover:border-slate-200 transition cursor-pointer dark:text-muted dark:hover:text-text dark:hover:bg-soft dark:hover:border-border"
+                            title="Close modal"
+                        >
+                            <X size={18} />
+                        </button>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition cursor-pointer"
-                    >
-                        <X size={20} />
-                    </button>
+
+                    {/* Progress Bar (Soft Shiny Gradient in Light Mode, Primary in Dark Mode) */}
+                    <div className="w-full bg-slate-200/80 dark:bg-border/60 h-1.5 rounded-full overflow-hidden shadow-inner">
+                        <div
+                            className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 dark:bg-primary rounded-full transition-all duration-300 shadow-xs"
+                            style={{ width: `${progressPercentage}%` }}
+                        />
+                    </div>
                 </div>
 
-                {/* Step Progress Bar */}
-                <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 overflow-x-auto">
-                    <div className="flex items-center justify-between min-w-[500px] gap-2">
+                {/* Theme-Adaptive Stepper Navigation */}
+                <div className="bg-card border-b border-border px-4 py-2.5 overflow-x-auto scrollbar-none">
+                    <div className="flex items-center justify-between gap-1.5 min-w-[560px]">
                         {STEPS.map((s) => {
                             const Icon = s.icon;
                             const isActive = step === s.id;
                             const isCompleted = step > s.id;
                             return (
-                                <div
+                                <button
+                                    type="button"
                                     key={s.id}
                                     onClick={() => isCompleted && setStep(s.id)}
-                                    className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
+                                    disabled={!isCompleted && !isActive}
+                                    className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                                         isActive
-                                            ? 'bg-[#1F2E4A] text-white shadow-xs'
+                                            ? 'bg-primary/10 text-primary border border-primary/30 ring-1 ring-primary/20 font-bold'
                                             : isCompleted
-                                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-pointer hover:bg-emerald-100'
-                                            : 'text-slate-400 opacity-70'
+                                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/15'
+                                            : 'text-muted hover:text-text cursor-not-allowed opacity-50'
                                     }`}
                                 >
-                                    {isCompleted ? <CheckCircle2 size={13} className="text-emerald-600" /> : <Icon size={13} />}
-                                    <span>{s.label}</span>
-                                </div>
+                                    <div
+                                        className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                                            isActive
+                                                ? 'bg-primary text-white shadow-xs'
+                                                : isCompleted
+                                                ? 'bg-emerald-600 text-white'
+                                                : 'bg-soft text-muted'
+                                        }`}
+                                    >
+                                        {isCompleted ? <Check size={11} strokeWidth={3} /> : s.id}
+                                    </div>
+                                    <div className="text-left">
+                                        <div className="leading-tight">{s.label}</div>
+                                        <div className={`text-[9px] font-normal ${isActive ? 'text-primary' : isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted'}`}>
+                                            {s.sublabel}
+                                        </div>
+                                    </div>
+                                </button>
                             );
                         })}
                     </div>
@@ -207,91 +392,144 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
                 {/* Error Banner */}
                 {errorMsg && (
-                    <div className="mx-6 mt-4 p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-xs font-medium animate-in fade-in duration-100">
-                        {errorMsg}
+                    <div className="mx-6 mt-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-medium flex items-center gap-2.5 animate-in fade-in duration-150">
+                        <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                        <span>{errorMsg}</span>
                     </div>
                 )}
 
-                {/* Step Content */}
-                <div className="p-6 overflow-y-auto flex-1 space-y-4 text-xs">
+                {/* Scrollable Step Content */}
+                <div className="p-6 overflow-y-auto flex-1 space-y-5 text-xs text-text">
                     {/* STEP 1: Basic Info */}
                     {step === 1 && (
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-sm text-[#1F2E4A] border-b pb-2 flex items-center gap-2">
-                                <Building2 size={16} /> Step 1: Entity Classification & Basic Details
-                            </h3>
+                        <div className="space-y-5 animate-in fade-in duration-150">
+                            <div>
+                                <label className="block font-bold text-text text-xs mb-2">
+                                    Entity Role & Classification <span className="text-rose-500">*</span>
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                    {PARTY_TYPES.map((pt) => {
+                                        const Icon = pt.icon;
+                                        const isSelected = formData.type === pt.id;
+                                        return (
+                                            <div
+                                                key={pt.id}
+                                                onClick={() => updateField('type', pt.id)}
+                                                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
+                                                    isSelected
+                                                        ? pt.activeClass
+                                                        : 'bg-card border-border hover:border-primary/40 hover:bg-soft/40'
+                                                }`}
+                                            >
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className={`p-2 rounded-lg ${isSelected ? pt.activeIconClass : 'bg-soft text-muted'}`}>
+                                                        <Icon size={16} />
+                                                    </div>
+                                                    {isSelected && (
+                                                        <span className="w-5 h-5 rounded-full bg-primary text-white flex items-center justify-center shadow-xs">
+                                                            <Check size={11} strokeWidth={3} />
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <div className="font-bold text-text text-xs">{pt.label}</div>
+                                                    <div className="text-[10px] text-muted mt-0.5 leading-snug">{pt.subtext}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
 
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Party Type *</label>
-                                    <select
-                                        value={formData.type}
-                                        onChange={(e) => updateField('type', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] font-medium"
-                                    >
-                                        <option value="Customer">Customer (Client)</option>
-                                        <option value="Vendor">Vendor (Supplier)</option>
-                                        <option value="Both">Both (Dual Partner)</option>
-                                    </select>
+                                    <label className="block font-bold text-text mb-1.5">
+                                        Partner Master Code
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-muted">
+                                            <Hash size={14} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={formData.code}
+                                            onChange={(e) => updateField('code', e.target.value.toUpperCase())}
+                                            className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl font-mono text-xs uppercase font-bold text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
+                                            placeholder="PARTY-001"
+                                        />
+                                    </div>
                                 </div>
+
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Partner Code</label>
-                                    <input
-                                        type="text"
-                                        value={formData.code}
-                                        onChange={(e) => updateField('code', e.target.value.toUpperCase())}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] font-mono uppercase"
-                                        placeholder="PARTY-001"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Lifecycle Status</label>
+                                    <label className="block font-bold text-text mb-1.5">
+                                        Lifecycle Status
+                                    </label>
                                     <select
                                         value={formData.status}
                                         onChange={(e) => updateField('status', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
+                                        className="w-full p-2.5 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
                                     >
-                                        <option value="Active">Active</option>
-                                        <option value="On Hold">On Hold</option>
-                                        <option value="Inactive">Inactive</option>
+                                        <option value="Active">🟢 Active (Operational)</option>
+                                        <option value="On Hold">🟡 On Hold (Temporary Lock)</option>
+                                        <option value="Inactive">⚪ Inactive (Dormant)</option>
                                     </select>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block font-semibold text-slate-700 mb-1">
-                                    Legal Company / Entity Name *
+                                <label className="block font-bold text-text mb-1.5">
+                                    Legal Company / Trade Entity Name <span className="text-rose-500">*</span>
                                 </label>
-                                <input
-                                    required
-                                    type="text"
-                                    value={formData.name}
-                                    onChange={(e) => updateField('name', e.target.value)}
-                                    className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
-                                    placeholder="e.g. Reliance Industrial Systems Ltd"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Corporate Phone</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
+                                        <Building2 size={16} />
+                                    </div>
                                     <input
+                                        required
                                         type="text"
-                                        value={formData.phone}
-                                        onChange={(e) => updateField('phone', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
-                                        placeholder="+1 (555) 000-0000"
+                                        value={formData.name}
+                                        onChange={(e) => updateField('name', e.target.value)}
+                                        className="w-full pl-10 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
+                                        placeholder="e.g. Acme Corporation Pvt Ltd / Reliance Heavy Engineering"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Official Billing Email</label>
-                                    <input
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={(e) => updateField('email', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
-                                        placeholder="billing@partner.com"
-                                    />
+                                    <label className="block font-bold text-text mb-1.5">
+                                        Corporate Phone
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
+                                            <Phone size={14} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={formData.phone}
+                                            onChange={(e) => updateField('phone', e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
+                                            placeholder="+1 (555) 000-0000"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block font-bold text-text mb-1.5">
+                                        Official Billing / Accounts Email
+                                    </label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
+                                            <Mail size={14} />
+                                        </div>
+                                        <input
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => updateField('email', e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
+                                            placeholder="billing@partner.com"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -299,18 +537,16 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
                     {/* STEP 2: GST & Tax */}
                     {step === 2 && (
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-sm text-[#1F2E4A] border-b pb-2 flex items-center gap-2">
-                                <Receipt size={16} /> Step 2: GST Treatment & Tax Identification
-                            </h3>
-
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4 animate-in fade-in duration-150">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">GST Treatment *</label>
+                                    <label className="block font-bold text-text mb-1.5">
+                                        GST Registration Treatment <span className="text-rose-500">*</span>
+                                    </label>
                                     <select
                                         value={formData.gstTreatment}
                                         onChange={(e) => updateField('gstTreatment', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
+                                        className="w-full p-2.5 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
                                     >
                                         <option value="Registered Business">Registered Business (Regular / Composition)</option>
                                         <option value="Unregistered Business">Unregistered Business</option>
@@ -322,45 +558,86 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                 </div>
 
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">
-                                        GSTIN Number {formData.gstTreatment === 'Registered Business' && '*'}
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block font-bold text-text">
+                                            GSTIN Number {formData.gstTreatment === 'Registered Business' && <span className="text-rose-500">*</span>}
+                                        </label>
+                                        {formData.gstin && (
+                                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                                Valid Structure
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
+                                            <Receipt size={14} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={formData.gstin}
+                                            onChange={(e) => handleGstinChange(e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-mono uppercase font-bold text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none disabled:opacity-50"
+                                            placeholder="27AABCA1234F1Z5"
+                                            maxLength={15}
+                                            disabled={formData.gstTreatment !== 'Registered Business' && formData.gstTreatment !== 'SEZ'}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block font-bold text-text mb-1.5">
+                                        Place of Supply (Tax Jurisdiction)
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={formData.gstin}
-                                        onChange={(e) => updateField('gstin', e.target.value.toUpperCase())}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] font-mono uppercase"
-                                        placeholder="27AABCA1234F1Z5"
-                                        disabled={formData.gstTreatment !== 'Registered Business' && formData.gstTreatment !== 'SEZ'}
-                                    />
+                                    <select
+                                        value={formData.placeOfSupply}
+                                        onChange={(e) => updateField('placeOfSupply', e.target.value)}
+                                        className="w-full p-2.5 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
+                                    >
+                                        <option value="Maharashtra (27)">Maharashtra (27) - Intra-State CGST+SGST</option>
+                                        <option value="Karnataka (29)">Karnataka (29) - Inter-State IGST</option>
+                                        <option value="Delhi (07)">Delhi (07) - Inter-State IGST</option>
+                                        <option value="Tamil Nadu (33)">Tamil Nadu (33) - Inter-State IGST</option>
+                                        <option value="Gujarat (24)">Gujarat (24) - Inter-State IGST</option>
+                                        <option value="Telangana (36)">Telangana (36) - Inter-State IGST</option>
+                                        <option value="Other / International (99)">Other / International (99) - Export</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className="block font-bold text-text">
+                                            PAN (Permanent Account Number)
+                                        </label>
+                                        <span className="text-[10px] text-muted">10-Digit Entity PAN</span>
+                                    </div>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted">
+                                            <ShieldCheck size={14} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={formData.pan}
+                                            onChange={(e) => updateField('pan', e.target.value.toUpperCase())}
+                                            className="w-full pl-9 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-mono uppercase font-bold text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none"
+                                            placeholder="AABCA1234F"
+                                            maxLength={10}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Place of Supply (State / Region)</label>
-                                <select
-                                    value={formData.placeOfSupply}
-                                    onChange={(e) => updateField('placeOfSupply', e.target.value)}
-                                    className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
-                                >
-                                    <option value="Maharashtra (27)">Maharashtra (27)</option>
-                                    <option value="Karnataka (29)">Karnataka (29)</option>
-                                    <option value="Delhi (07)">Delhi (07)</option>
-                                    <option value="Tamil Nadu (33)">Tamil Nadu (33)</option>
-                                    <option value="Gujarat (24)">Gujarat (24)</option>
-                                    <option value="Telangana (36)">Telangana (36)</option>
-                                    <option value="Other / International (99)">Other / International (99)</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">GST / Tax Invoicing Notes</label>
+                                <label className="block font-bold text-text mb-1.5">
+                                    GST / Statutory Invoicing Remarks & Notes
+                                </label>
                                 <textarea
                                     rows={3}
                                     value={formData.gstNotes}
                                     onChange={(e) => updateField('gstNotes', e.target.value)}
-                                    className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] resize-none"
-                                    placeholder="HSN exemption codes, LUT registration number, or tax exemption declarations..."
+                                    className="w-full p-3 bg-soft border border-border rounded-xl text-xs text-text focus:bg-card focus:border-primary focus:ring-2 focus:ring-primary/20 transition outline-none resize-none"
+                                    placeholder="LUT registration reference, HSN exemptions, zero-rated export declarations, or reverse charge applicability..."
                                 />
                             </div>
                         </div>
@@ -368,78 +645,111 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
                     {/* STEP 3: TDS / TCS */}
                     {step === 3 && (
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-sm text-[#1F2E4A] border-b pb-2 flex items-center gap-2">
-                                <Percent size={16} /> Step 3: Direct Tax Withholding (TDS / TCS)
-                            </h3>
-
-                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                        <div className="space-y-4 animate-in fade-in duration-150">
+                            {/* TDS Card */}
+                            <div className={`p-4.5 rounded-2xl border transition-all ${formData.tdsApplicable ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20' : 'bg-soft/40 border-border'}`}>
                                 <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="font-bold text-slate-800 block">TDS Withholding Applicable</span>
-                                        <p className="text-slate-500 text-[11px]">Deduct Tax at Source on vendor disbursements</p>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${formData.tdsApplicable ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'}`}>
+                                            <Percent size={18} />
+                                        </div>
+                                        <div>
+                                            <span className="font-bold text-text text-xs block">TDS Withholding Tax Applicable</span>
+                                            <p className="text-muted text-[11px]">Automatically deduct tax on vendor procurement disbursements</p>
+                                        </div>
                                     </div>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.tdsApplicable}
-                                        onChange={(e) => updateField('tdsApplicable', e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#1F2E4A] focus:ring-[#1F2E4A] cursor-pointer"
-                                    />
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.tdsApplicable}
+                                            onChange={(e) => updateField('tdsApplicable', e.target.checked)}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                    </label>
                                 </div>
 
                                 {formData.tdsApplicable && (
-                                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3.5 mt-3.5 border-t border-border animate-in fade-in duration-150">
                                         <div>
-                                            <label className="block font-semibold text-slate-700 mb-1">TDS Section Code</label>
+                                            <label className="block font-bold text-text mb-1">TDS Section Code</label>
                                             <select
                                                 value={formData.tdsSection}
                                                 onChange={(e) => updateField('tdsSection', e.target.value)}
-                                                className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white"
+                                                className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-semibold text-text focus:ring-2 focus:ring-primary/20"
                                             >
-                                                <option value="194C">194C - Contractor Works (1% / 2%)</option>
-                                                <option value="194J">194J - Professional / Tech Fees (10%)</option>
-                                                <option value="194Q">194Q - Purchase of Goods (0.1%)</option>
-                                                <option value="194H">194H - Commission & Brokerage (5%)</option>
+                                                <option value="194C">194C - Contractor & Transport (1% / 2%)</option>
+                                                <option value="194J">194J - Professional & Technical Services (10%)</option>
+                                                <option value="194Q">194Q - Purchase of Commercial Goods (0.1%)</option>
+                                                <option value="194H">194H - Brokerage & Commission (5%)</option>
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block font-semibold text-slate-700 mb-1">TDS Rate (%)</label>
-                                            <input
-                                                type="number"
-                                                step="0.1"
-                                                value={formData.tdsRate}
-                                                onChange={(e) => updateField('tdsRate', parseFloat(e.target.value) || 0)}
-                                                className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white font-mono"
-                                            />
+                                            <label className="block font-bold text-text mb-1">TDS Deduction Rate (%)</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={formData.tdsRate}
+                                                    onChange={(e) => updateField('tdsRate', parseFloat(e.target.value) || 0)}
+                                                    className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
+                                                />
+                                                <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted font-bold">%</span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                            {/* TCS Card */}
+                            <div className={`p-4.5 rounded-2xl border transition-all ${formData.tcsApplicable ? 'bg-primary/5 border-primary/40 ring-1 ring-primary/20' : 'bg-soft/40 border-border'}`}>
                                 <div className="flex items-center justify-between">
-                                    <div>
-                                        <span className="font-bold text-slate-800 block">TCS Collection Applicable</span>
-                                        <p className="text-slate-500 text-[11px]">Collect Tax at Source on outward sales above limits</p>
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${formData.tcsApplicable ? 'bg-primary text-white' : 'bg-soft text-muted border border-border'}`}>
+                                            <Receipt size={18} />
+                                        </div>
+                                        <div>
+                                            <span className="font-bold text-text text-xs block">TCS Collection Applicable</span>
+                                            <p className="text-muted text-[11px]">Collect Tax at Source on outward commercial sales over thresholds</p>
+                                        </div>
                                     </div>
-                                    <input
-                                        type="checkbox"
-                                        checked={formData.tcsApplicable}
-                                        onChange={(e) => updateField('tcsApplicable', e.target.checked)}
-                                        className="w-4 h-4 rounded text-[#1F2E4A] focus:ring-[#1F2E4A] cursor-pointer"
-                                    />
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={formData.tcsApplicable}
+                                            onChange={(e) => updateField('tcsApplicable', e.target.checked)}
+                                            className="sr-only peer"
+                                        />
+                                        <div className="w-11 h-6 bg-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                    </label>
                                 </div>
 
                                 {formData.tcsApplicable && (
-                                    <div className="pt-2 border-t border-slate-200">
-                                        <label className="block font-semibold text-slate-700 mb-1">TCS Rate (%)</label>
-                                        <input
-                                            type="number"
-                                            step="0.01"
-                                            value={formData.tcsRate}
-                                            onChange={(e) => updateField('tcsRate', parseFloat(e.target.value) || 0)}
-                                            className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white font-mono"
-                                        />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3.5 mt-3.5 border-t border-border animate-in fade-in duration-150">
+                                        <div>
+                                            <label className="block font-bold text-text mb-1">TCS Section Code</label>
+                                            <select
+                                                value={formData.tcsSection}
+                                                onChange={(e) => updateField('tcsSection', e.target.value)}
+                                                className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-semibold text-text"
+                                            >
+                                                <option value="206C">206C - Collection on Sale of Goods (0.1%)</option>
+                                                <option value="206C(1H)">206C(1H) - High Turnover Sales (0.1%)</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block font-bold text-text mb-1">TCS Rate (%)</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    value={formData.tcsRate}
+                                                    onChange={(e) => updateField('tcsRate', parseFloat(e.target.value) || 0)}
+                                                    className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
+                                                />
+                                                <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted font-bold">%</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -448,110 +758,119 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
                     {/* STEP 4: Ledger */}
                     {step === 4 && (
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-sm text-[#1F2E4A] border-b pb-2 flex items-center gap-2">
-                                <BookOpen size={16} /> Step 4: General Ledger Account Assignment
-                            </h3>
-
-                            <div>
-                                <label className="block font-semibold text-slate-700 mb-1">Primary Chart of Accounts Mapping *</label>
+                        <div className="space-y-4 animate-in fade-in duration-150">
+                            <div className="p-4 bg-soft/50 border border-border rounded-2xl space-y-3">
+                                <label className="block font-bold text-text text-xs">
+                                    Primary Chart of Accounts Mapping <span className="text-rose-500">*</span>
+                                </label>
                                 <select
                                     value={formData.ledgerAccount}
                                     onChange={(e) => updateField('ledgerAccount', e.target.value)}
-                                    className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
+                                    className="w-full p-3 bg-card border border-border rounded-xl text-xs font-semibold text-text focus:ring-2 focus:ring-primary/20"
                                 >
-                                    <option value="1210 - Accounts Receivable">1210 - Accounts Receivable (Sundry Debtors)</option>
-                                    <option value="2010 - Accounts Payable">2010 - Accounts Payable (Sundry Creditors)</option>
-                                    <option value="1220 - Advance Payments to Suppliers">1220 - Advance Payments to Suppliers</option>
-                                    <option value="2020 - Client Advances & Deposits">2020 - Client Advances & Deposits</option>
+                                    <option value="1210 - Accounts Receivable">1210 - Accounts Receivable (Current Asset • Sundry Debtors)</option>
+                                    <option value="2010 - Accounts Payable">2010 - Accounts Payable (Current Liability • Sundry Creditors)</option>
+                                    <option value="1220 - Advance Payments to Suppliers">1220 - Advance Payments to Suppliers (Asset Deposit)</option>
+                                    <option value="2020 - Client Advances & Deposits">2020 - Client Advances & Deposits (Liability Holding)</option>
                                 </select>
                             </div>
 
-                            <div className="p-3 bg-blue-50 border border-blue-200 text-blue-900 rounded-lg text-xs space-y-1">
-                                <p className="font-semibold">Ledger Synchronization Notice</p>
-                                <p className="text-[11px] text-blue-700">
-                                    All invoices, bills, debit/credit notes, and cash receipts posted for this party will
-                                    automatically reflect in real-time under this selected balance sheet ledger.
-                                </p>
+                            <div className="p-4 bg-primary/5 border border-primary/20 text-text rounded-2xl flex items-start gap-3">
+                                <div className="p-2 rounded-xl bg-primary text-white shrink-0 shadow-xs">
+                                    <BookOpen size={16} />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="font-bold text-xs text-primary">Real-Time Ledger Synchronization</p>
+                                    <p className="text-[11px] text-muted leading-relaxed">
+                                        All sales orders, invoices, purchase bills, debit/credit notes, and cash receipts posted for this commercial party will automatically reflect in real-time under this selected balance sheet ledger.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* STEP 5: Payment & Bank */}
                     {step === 5 && (
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-sm text-[#1F2E4A] border-b pb-2 flex items-center gap-2">
-                                <CreditCard size={16} /> Step 5: Commercial Terms & Banking Information
-                            </h3>
-
-                            <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4 animate-in fade-in duration-150">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Credit Limit ($)</label>
-                                    <input
-                                        type="number"
-                                        value={formData.creditLimit}
-                                        onChange={(e) => updateField('creditLimit', parseFloat(e.target.value) || 0)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] font-mono"
-                                    />
+                                    <label className="block font-bold text-text mb-1.5">Approved Credit Limit</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-muted font-bold">
+                                            ₹
+                                        </div>
+                                        <input
+                                            type="number"
+                                            value={formData.creditLimit}
+                                            onChange={(e) => updateField('creditLimit', parseFloat(e.target.value) || 0)}
+                                            className="w-full pl-8 pr-3 py-2.5 bg-soft border border-border rounded-xl text-xs font-mono font-bold text-text focus:bg-card focus:ring-2 focus:ring-primary/20"
+                                        />
+                                    </div>
                                 </div>
+
                                 <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Default Payment Terms</label>
+                                    <label className="block font-bold text-text mb-1.5">Standard Payment Terms</label>
                                     <select
                                         value={formData.paymentTerms}
                                         onChange={(e) => updateField('paymentTerms', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
+                                        className="w-full p-2.5 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:bg-card focus:ring-2 focus:ring-primary/20"
                                     >
-                                        <option value="Immediate">Immediate / Advance</option>
+                                        <option value="Immediate">Immediate / Advance Payment</option>
                                         <option value="Net 15">Net 15 Days</option>
-                                        <option value="Net 30">Net 30 Days</option>
+                                        <option value="Net 30">Net 30 Days (Standard)</option>
                                         <option value="Net 45">Net 45 Days</option>
                                         <option value="Net 60">Net 60 Days</option>
                                     </select>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Bank Name</label>
-                                    <input
-                                        type="text"
-                                        value={formData.bankName}
-                                        onChange={(e) => updateField('bankName', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA]"
-                                        placeholder="e.g. HDFC Bank Ltd"
-                                    />
+                            <div className="p-4 bg-soft/50 border border-border rounded-2xl space-y-3">
+                                <span className="font-bold text-text text-xs uppercase tracking-wider block">
+                                    Banking & Disbursement Details
+                                </span>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block font-semibold text-muted text-[11px] mb-1">Bank Name</label>
+                                        <input
+                                            type="text"
+                                            value={formData.bankName}
+                                            onChange={(e) => updateField('bankName', e.target.value)}
+                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-medium text-text"
+                                            placeholder="e.g. HDFC Bank Ltd"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold text-muted text-[11px] mb-1">Bank Account Number</label>
+                                        <input
+                                            type="text"
+                                            value={formData.bankAccountNumber}
+                                            onChange={(e) => updateField('bankAccountNumber', e.target.value)}
+                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
+                                            placeholder="992810029311"
+                                        />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Bank Account Number</label>
-                                    <input
-                                        type="text"
-                                        value={formData.bankAccountNumber}
-                                        onChange={(e) => updateField('bankAccountNumber', e.target.value)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] font-mono"
-                                        placeholder="998102938192"
-                                    />
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">IFSC / Swift Routing Code</label>
-                                    <input
-                                        type="text"
-                                        value={formData.ifscCode}
-                                        onChange={(e) => updateField('ifscCode', e.target.value.toUpperCase())}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] font-mono uppercase"
-                                        placeholder="HDFC0001245"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block font-semibold text-slate-700 mb-1">Opening Balance ($)</label>
-                                    <input
-                                        type="number"
-                                        value={formData.openingBalance}
-                                        onChange={(e) => updateField('openingBalance', parseFloat(e.target.value) || 0)}
-                                        className="w-full border border-[#CED4DA] rounded-lg p-2.5 bg-[#F8F9FA] font-mono"
-                                    />
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="block font-semibold text-muted text-[11px] mb-1">IFSC / Swift Routing Code</label>
+                                        <input
+                                            type="text"
+                                            value={formData.ifscCode}
+                                            onChange={(e) => updateField('ifscCode', e.target.value.toUpperCase())}
+                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono uppercase font-bold text-text"
+                                            placeholder="HDFC0001245"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block font-semibold text-muted text-[11px] mb-1">Opening Balance</label>
+                                        <input
+                                            type="number"
+                                            value={formData.openingBalance}
+                                            onChange={(e) => updateField('openingBalance', parseFloat(e.target.value) || 0)}
+                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -559,24 +878,23 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
                     {/* STEP 6: Addresses & Contacts */}
                     {step === 6 && (
-                        <div className="space-y-5">
-                            <h3 className="font-bold text-sm text-[#1F2E4A] border-b pb-2 flex items-center gap-2">
-                                <MapPin size={16} /> Step 6: Locations, Addresses & Person of Contact
-                            </h3>
-
-                            {/* Billing Address */}
-                            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
-                                <span className="font-bold text-slate-800 block text-xs uppercase tracking-wider">
-                                    Billing Headquarters Address
-                                </span>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="col-span-2">
+                        <div className="space-y-4 animate-in fade-in duration-150">
+                            {/* Billing Address Card */}
+                            <div className="bg-soft/50 border border-border p-4 rounded-2xl space-y-3">
+                                <div className="flex items-center gap-2">
+                                    <MapPin size={15} className="text-primary" />
+                                    <span className="font-bold text-text text-xs uppercase tracking-wider">
+                                        Billing Headquarters Address
+                                    </span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="col-span-full">
                                         <input
                                             type="text"
                                             value={formData.billingAddress.line1}
                                             onChange={(e) => updateBillingAddress('line1', e.target.value)}
-                                            className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white"
-                                            placeholder="Address Line 1 (Street, Building, Suite)"
+                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-medium text-text"
+                                            placeholder="Address Line 1 (Street, Building, Unit / Floor)"
                                         />
                                     </div>
                                     <div>
@@ -584,17 +902,8 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                             type="text"
                                             value={formData.billingAddress.city}
                                             onChange={(e) => updateBillingAddress('city', e.target.value)}
-                                            className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white"
+                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-medium text-text"
                                             placeholder="City (e.g. Mumbai)"
-                                        />
-                                    </div>
-                                    <div>
-                                        <input
-                                            type="text"
-                                            value={formData.billingAddress.state}
-                                            onChange={(e) => updateBillingAddress('state', e.target.value)}
-                                            className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white"
-                                            placeholder="State"
                                         />
                                     </div>
                                     <div>
@@ -602,20 +911,23 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                             type="text"
                                             value={formData.billingAddress.pincode}
                                             onChange={(e) => updateBillingAddress('pincode', e.target.value)}
-                                            className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white font-mono"
+                                            className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                             placeholder="Pincode / Postal Code"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Shipping Address */}
-                            <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+                            {/* Shipping Address Card */}
+                            <div className="bg-soft/50 border border-border p-4 rounded-2xl space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="font-bold text-slate-800 text-xs uppercase tracking-wider">
-                                        Shipping / Warehouse Delivery Address
-                                    </span>
-                                    <label className="flex items-center gap-2 font-medium text-slate-700 cursor-pointer">
+                                    <div className="flex items-center gap-2">
+                                        <Building2 size={15} className="text-primary" />
+                                        <span className="font-bold text-text text-xs uppercase tracking-wider">
+                                            Shipping / Delivery Address
+                                        </span>
+                                    </div>
+                                    <label className="flex items-center gap-2 font-bold text-text cursor-pointer bg-card px-3 py-1.5 rounded-xl border border-border shadow-2xs hover:bg-soft">
                                         <input
                                             type="checkbox"
                                             checked={sameAsBilling}
@@ -628,21 +940,21 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                                     }));
                                                 }
                                             }}
-                                            className="w-3.5 h-3.5 rounded text-[#1F2E4A]"
+                                            className="w-4 h-4 rounded text-primary focus:ring-primary cursor-pointer"
                                         />
-                                        Same as Billing
+                                        <span>Same as Billing</span>
                                     </label>
                                 </div>
 
                                 {!sameAsBilling && (
-                                    <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-200">
-                                        <div className="col-span-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border animate-in fade-in duration-150">
+                                        <div className="col-span-full">
                                             <input
                                                 type="text"
                                                 value={formData.shippingAddress.line1}
                                                 onChange={(e) => updateShippingAddress('line1', e.target.value)}
-                                                className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white"
-                                                placeholder="Shipping Line 1"
+                                                className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-medium text-text"
+                                                placeholder="Shipping Address Line 1"
                                             />
                                         </div>
                                         <div>
@@ -650,7 +962,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                                 type="text"
                                                 value={formData.shippingAddress.city}
                                                 onChange={(e) => updateShippingAddress('city', e.target.value)}
-                                                className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white"
+                                                className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-medium text-text"
                                                 placeholder="City"
                                             />
                                         </div>
@@ -659,7 +971,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                                 type="text"
                                                 value={formData.shippingAddress.pincode}
                                                 onChange={(e) => updateShippingAddress('pincode', e.target.value)}
-                                                className="w-full border border-[#CED4DA] rounded-lg p-2 bg-white font-mono"
+                                                className="w-full p-2.5 bg-card border border-border rounded-xl text-xs font-mono font-bold text-text"
                                                 placeholder="Pincode"
                                             />
                                         </div>
@@ -667,99 +979,123 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                                 )}
                             </div>
 
-                            {/* Contacts List */}
+                            {/* Contacts Cards */}
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="font-bold text-slate-800">Person of Contact (POCs)</span>
-                                    <Button
+                                    <span className="font-bold text-text text-xs">Persons of Contact (POC Directory)</span>
+                                    <button
                                         type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        icon={Plus}
                                         onClick={handleAddContact}
-                                        className="text-xs"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl font-bold text-xs border border-primary/20 transition cursor-pointer"
                                     >
-                                        Add POC
-                                    </Button>
+                                        <Plus size={14} /> Add Contact Person
+                                    </button>
                                 </div>
 
-                                {formData.contacts.map((contact, idx) => (
-                                    <div key={contact.id} className="p-3 bg-white border border-slate-200 rounded-xl space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-semibold text-slate-700 text-[11px]">POC #{idx + 1}</span>
-                                            {formData.contacts.length > 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemoveContact(contact.id)}
-                                                    className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"
-                                                >
-                                                    <Trash2 size={13} />
-                                                </button>
-                                            )}
+                                <div className="space-y-2.5">
+                                    {formData.contacts.map((contact, idx) => (
+                                        <div key={contact.id} className="p-3.5 bg-card border border-border rounded-2xl space-y-2.5 shadow-2xs hover:border-primary/40 transition">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-[10px] flex items-center justify-center">
+                                                        {idx + 1}
+                                                    </div>
+                                                    <span className="font-bold text-text text-xs">
+                                                        {contact.name || `Contact Person #${idx + 1}`}
+                                                    </span>
+                                                </div>
+                                                {formData.contacts.length > 1 && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveContact(contact.id)}
+                                                        className="text-rose-500 hover:text-rose-700 p-1.5 rounded-lg hover:bg-rose-500/10 transition cursor-pointer"
+                                                        title="Remove contact"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={contact.name}
+                                                    onChange={(e) => handleUpdateContact(contact.id, 'name', e.target.value)}
+                                                    className="p-2 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary"
+                                                    placeholder="Full Name"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={contact.role}
+                                                    onChange={(e) => handleUpdateContact(contact.id, 'role', e.target.value)}
+                                                    className="p-2 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary"
+                                                    placeholder="Designation / Role"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={contact.phone}
+                                                    onChange={(e) => handleUpdateContact(contact.id, 'phone', e.target.value)}
+                                                    className="p-2 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary"
+                                                    placeholder="Direct Phone"
+                                                />
+                                                <input
+                                                    type="email"
+                                                    value={contact.email}
+                                                    onChange={(e) => handleUpdateContact(contact.id, 'email', e.target.value)}
+                                                    className="p-2 bg-soft border border-border rounded-xl text-xs font-medium text-text focus:bg-card focus:border-primary"
+                                                    placeholder="Email Address"
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                                            <input
-                                                type="text"
-                                                value={contact.name}
-                                                onChange={(e) => handleUpdateContact(contact.id, 'name', e.target.value)}
-                                                className="border border-[#CED4DA] rounded-lg p-2 text-xs bg-[#F8F9FA]"
-                                                placeholder="POC Name"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={contact.role}
-                                                onChange={(e) => handleUpdateContact(contact.id, 'role', e.target.value)}
-                                                className="border border-[#CED4DA] rounded-lg p-2 text-xs bg-[#F8F9FA]"
-                                                placeholder="Designation / Role"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={contact.phone}
-                                                onChange={(e) => handleUpdateContact(contact.id, 'phone', e.target.value)}
-                                                className="border border-[#CED4DA] rounded-lg p-2 text-xs bg-[#F8F9FA]"
-                                                placeholder="Direct Phone"
-                                            />
-                                            <input
-                                                type="email"
-                                                value={contact.email}
-                                                onChange={(e) => handleUpdateContact(contact.id, 'email', e.target.value)}
-                                                className="border border-[#CED4DA] rounded-lg p-2 text-xs bg-[#F8F9FA]"
-                                                placeholder="Email Address"
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     )}
                 </div>
 
                 {/* Footer Navigation */}
-                <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between">
+                <div className="bg-soft/50 border-t border-border px-6 py-4 flex items-center justify-between">
                     <div>
-                        {step > 1 && (
-                            <Button
+                        {step > 1 ? (
+                            <button
                                 type="button"
-                                variant="outline"
-                                icon={ChevronLeft}
                                 onClick={handleBack}
+                                className="flex items-center gap-1.5 px-4 py-2 bg-card border border-border hover:bg-soft text-text rounded-xl font-bold text-xs transition cursor-pointer shadow-2xs"
                             >
-                                Back
-                            </Button>
+                                <ChevronLeft size={16} /> Back
+                            </button>
+                        ) : (
+                            <div className="text-[11px] text-muted font-medium hidden sm:block">
+                                Step 1 of 6 • Commercial Profile Setup
+                            </div>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 border border-border hover:bg-soft text-text rounded-xl font-bold text-xs transition cursor-pointer"
+                        >
                             Cancel
-                        </Button>
+                        </button>
                         {step < 6 ? (
-                            <Button type="button" icon={ChevronRight} onClick={handleNext}>
-                                Continue to Step {step + 1}
-                            </Button>
+                            <button
+                                type="button"
+                                onClick={handleNext}
+                                className="flex items-center gap-1.5 px-5 py-2 bg-primary hover:bg-primary-hover text-white rounded-xl font-bold text-xs transition cursor-pointer shadow-md shadow-primary/20"
+                            >
+                                <span>Continue to Step {step + 1}</span>
+                                <ChevronRight size={16} />
+                            </button>
                         ) : (
-                            <Button type="button" icon={CheckCircle2} onClick={handleSubmit}>
-                                {existingParty ? 'Update Party' : 'Save & Register Party'}
-                            </Button>
+                            <button
+                                type="button"
+                                onClick={handleSubmit}
+                                className="flex items-center gap-2 px-6 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition cursor-pointer shadow-md shadow-emerald-600/20"
+                            >
+                                <CheckCircle2 size={16} />
+                                <span>{existingParty ? 'Save & Update Party' : 'Complete Registration'}</span>
+                            </button>
                         )}
                     </div>
                 </div>

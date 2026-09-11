@@ -32,7 +32,7 @@ const generalLedgerGuide = {
     ],
 };
 export const GeneralLedgerPage = () => {
-    const { journalEntries, addJournalEntry } = useERP();
+    const { journalEntries, addJournalEntry, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [description, setDescription] = useState('');
     const [debitAccount, setDebitAccount] = useState('1010 - Cash & Bank');
@@ -44,7 +44,7 @@ export const GeneralLedgerPage = () => {
         const parsedAmount = parseFloat(amount) || 1000;
         addJournalEntry({
             entryNumber: `JE-2026-${String(journalEntries.length + 80).padStart(3, '0')}`,
-            date: new Date().toISOString().split('T')[0],
+            date: getCurrentDateFormatted(),
             description: description || 'Manual Adjustment Entry',
             reference: reference || 'MEMO-01',
             debitAccount,
@@ -63,44 +63,61 @@ export const GeneralLedgerPage = () => {
         {
             key: 'entryNumber',
             header: 'Voucher Ref',
-            render: (e) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <BookOpen size={13} className="text-[#1F2E4A]"/> {e.entryNumber}
-        </span>),
+            width: '14%',
+            render: (e) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <BookOpen size={13} className="text-primary shrink-0"/>
+                <span>{e.entryNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'date',
             header: 'Posting Date',
-            render: (e) => <span className="text-slate-600">{e.date}</span>,
+            width: '12%',
+            render: (e) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(e.date)}</span>,
         },
         {
             key: 'description',
             header: 'Transaction Narrative',
-            render: (e) => (<div>
-          <p className="font-semibold text-slate-800">{e.description}</p>
-          <span className="font-mono text-[10px] text-slate-500">{e.reference}</span>
-        </div>),
+            width: '28%',
+            render: (e) => (
+              <div>
+                <p className="font-semibold text-text">{e.description}</p>
+                <span className="font-mono text-[10px] text-muted">{e.reference}</span>
+              </div>
+            ),
         },
         {
             key: 'debitAccount',
             header: 'Debit Ledger (Dr)',
-            render: (e) => (<span className="font-mono text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1">
-          <ArrowDownLeft size={11}/> {e.debitAccount}
-        </span>),
+            width: '16%',
+            render: (e) => (
+              <span className="font-mono text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-500/30 inline-flex items-center gap-1 whitespace-nowrap">
+                <ArrowDownLeft size={11}/> {e.debitAccount}
+              </span>
+            ),
         },
         {
             key: 'creditAccount',
             header: 'Credit Ledger (Cr)',
-            render: (e) => (<span className="font-mono text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1">
-          <ArrowUpRight size={11}/> {e.creditAccount}
-        </span>),
+            width: '16%',
+            render: (e) => (
+              <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/30 inline-flex items-center gap-1 whitespace-nowrap">
+                <ArrowUpRight size={11}/> {e.creditAccount}
+              </span>
+            ),
         },
         {
             key: 'amount',
-            header: 'Entry Balance ($)',
+            header: 'Entry Balance',
             align: 'right',
-            render: (e) => (<span className="font-mono font-bold text-slate-900">
-          ${e.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </span>),
+            width: '14%',
+            render: (e) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(e.amount)}
+              </span>
+            ),
         },
     ];
     return (<div className="space-y-6">
@@ -113,7 +130,7 @@ export const GeneralLedgerPage = () => {
           <div>
             <span className="text-xs text-slate-500 font-semibold uppercase">Total Debits (Dr)</span>
             <p className="text-lg font-bold text-blue-900 mt-1">
-              ${totalDebits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatCurrency(totalDebits)}
             </p>
           </div>
           <ArrowDownLeft className="text-blue-600" size={24}/>
@@ -122,7 +139,7 @@ export const GeneralLedgerPage = () => {
           <div>
             <span className="text-xs text-slate-500 font-semibold uppercase">Total Credits (Cr)</span>
             <p className="text-lg font-bold text-emerald-900 mt-1">
-              ${totalCredits.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatCurrency(totalCredits)}
             </p>
           </div>
           <ArrowUpRight className="text-emerald-600" size={24}/>
@@ -130,7 +147,7 @@ export const GeneralLedgerPage = () => {
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
           <div>
             <span className="text-xs text-slate-500 font-semibold uppercase">Trial Balance Net</span>
-            <p className="text-lg font-bold text-slate-800 mt-1">$0.00 (Balanced)</p>
+            <p className="text-lg font-bold text-slate-800 mt-1">{formatCurrency(0)} (Balanced)</p>
           </div>
           <Scale className="text-emerald-600" size={24}/>
         </div>

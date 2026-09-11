@@ -34,7 +34,7 @@ const purchaseReturnGuide = {
     ],
 };
 export const PurchaseReturnsPage = () => {
-    const { purchaseReturns, vendors, purchaseBills, addPurchaseReturn, updatePurchaseReturnStatus } = useERP();
+    const { purchaseReturns, vendors, purchaseBills, addPurchaseReturn, updatePurchaseReturnStatus, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState(purchaseBills[0]?.id || '');
     const [reason, setReason] = useState('Damaged casing detected on intake inspection');
@@ -56,7 +56,7 @@ export const PurchaseReturnsPage = () => {
             vendor: bill?.vendor || vend?.name || 'Delta Controls & Hydraulics',
             billId: bill?.id,
             billRef: bill?.billNumber || 'PB-2026-015',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             amount: totalAmt > 0 ? totalAmt : 500,
             reason,
             status: 'Pending Credit',
@@ -72,53 +72,73 @@ export const PurchaseReturnsPage = () => {
         {
             key: 'debitNoteNumber',
             header: 'Debit Note #',
-            render: (r) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <RotateCcw size={13} className="text-rose-600"/> {r.debitNoteNumber}
-        </span>),
+            width: '15%',
+            render: (r) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <RotateCcw size={13} className="text-rose-600 dark:text-rose-400 shrink-0"/>
+                <span>{r.debitNoteNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'vendor',
             header: 'Vendor Supplier',
-            render: (r) => <span className="font-bold text-[#1F2E4A]">{r.vendor}</span>,
+            width: '22%',
+            render: (r) => <span className="font-bold text-text block">{r.vendor}</span>,
         },
         {
             key: 'billRef',
             header: 'Matched Bill Ref',
-            render: (r) => <span className="font-mono text-slate-600 font-semibold">{r.billRef || 'PB-INTAKE'}</span>,
+            width: '14%',
+            render: (r) => <span className="font-mono text-primary font-semibold whitespace-nowrap">{r.billRef || 'PB-INTAKE'}</span>,
         },
         {
             key: 'date',
             header: 'Issue Date',
-            render: (r) => <span className="text-slate-600">{r.date}</span>,
+            width: '12%',
+            render: (r) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(r.date)}</span>,
         },
         {
             key: 'reason',
             header: 'Defect / Return Reason',
-            render: (r) => <span className="text-slate-700 text-[11px]">{r.reason}</span>,
+            width: '15%',
+            render: (r) => <span className="text-muted text-[11px] block">{r.reason}</span>,
         },
         {
             key: 'amount',
             header: 'Debit Amount',
             align: 'right',
-            render: (r) => (<span className="font-mono font-bold text-slate-900">
-          ${(r.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </span>),
+            width: '11%',
+            render: (r) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(r.amount ?? 0)}
+              </span>
+            ),
         },
         {
             key: 'status',
             header: 'Settlement Status',
             align: 'center',
+            width: '11%',
             render: (r) => <StatusBadge status={r.status}/>,
         },
         {
             key: 'actions',
             header: 'Reconciliation',
             align: 'right',
-            render: (r) => r.status !== 'Settled' ? (<button onClick={() => markSettled(r.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 ml-auto shadow-sm">
-            <CheckCircle2 size={11}/> Mark Credit Received
-          </button>) : (<span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1 justify-end">
-            <CheckCircle2 size={12}/> Settled on Payables
-          </span>),
+            width: '13%',
+            render: (r) => r.status !== 'Settled' ? (
+              <button
+                onClick={() => markSettled(r.id)}
+                className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer flex items-center gap-1 ml-auto shadow-2xs whitespace-nowrap transition-colors"
+              >
+                <CheckCircle2 size={11}/> Mark Credit
+              </button>
+            ) : (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end whitespace-nowrap">
+                <CheckCircle2 size={12}/> Settled
+              </span>
+            ),
         },
     ];
     return (<div className="space-y-6">
@@ -136,13 +156,13 @@ export const PurchaseReturnsPage = () => {
             (r.billRef && r.billRef.toLowerCase().includes(term)) ||
             r.reason.toLowerCase().includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Issue Vendor Debit Note
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer">
                 <X size={18}/>
               </button>
             </div>

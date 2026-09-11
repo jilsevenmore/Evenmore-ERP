@@ -1,5 +1,6 @@
 import { Building2, Mail, MapPin, Phone, Pin, Trash2, UserRound } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
+import { formatCurrency } from "../../../utils/currencyUtils";
 
 export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadIds = [], onTogglePin, onToggleOne, onRequestDelete, onAddNote, onOpenLead, onDelete }) {
   return (
@@ -66,7 +67,7 @@ export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadI
 
           <div className="lead-grid-footer">
             <small>{row.source}</small>
-            <b>Rs. {row.amount.toLocaleString("en-IN")}</b>
+            <b>{formatCurrency(row.amount || 0, activeCurrency, { noDecimals: true })}</b>
           </div>
         </article>
       ))}

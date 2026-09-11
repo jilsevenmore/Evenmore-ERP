@@ -118,66 +118,93 @@ export const DeliveryChallansPage = () => {
         {
             key: 'challanNumber',
             header: 'Challan / Waybill #',
-            render: (c) => (<button onClick={() => setSelectedChallan(c)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 cursor-pointer text-left">
-          <Truck size={13} className="text-slate-400"/> {c.challanNumber}
-        </button>),
+            width: '14%',
+            render: (c) => (
+              <button
+                onClick={() => setSelectedChallan(c)}
+                className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 cursor-pointer text-left whitespace-nowrap"
+              >
+                <Truck size={13} className="text-muted shrink-0"/>
+                <span>{c.challanNumber}</span>
+              </button>
+            ),
         },
         {
             key: 'salesOrderNumber',
             header: 'Linked Sales Order',
-            render: (c) => <span className="font-mono font-semibold text-slate-700">{c.salesOrderNumber || c.linkedSo}</span>,
+            width: '14%',
+            render: (c) => <span className="font-mono font-semibold text-text whitespace-nowrap">{c.salesOrderNumber || c.linkedSo}</span>,
         },
         {
             key: 'customer',
             header: 'Consignee / Destination',
-            render: (c) => (<div>
-          <span className="font-bold text-[#1F2E4A] block">{c.customer}</span>
-          <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-            <MapPin size={10}/> Dock Receiving Bay
-          </span>
-        </div>),
+            width: '24%',
+            render: (c) => (
+              <div>
+                <span className="font-bold text-text block">{c.customer}</span>
+                <span className="text-[10px] text-muted flex items-center gap-0.5">
+                  <MapPin size={10}/> Dock Receiving Bay
+                </span>
+              </div>
+            ),
         },
         {
             key: 'dispatchDate',
             header: 'Dispatch Date',
-            render: (c) => <span className="text-slate-600 font-medium">{c.dispatchDate || c.date}</span>,
+            width: '12%',
+            render: (c) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(c.dispatchDate || c.date)}</span>,
         },
         {
             key: 'transporter',
             header: 'Logistics Carrier',
-            render: (c) => (<div>
-          <p className="font-semibold text-slate-800">{c.transporter}</p>
-          <span className="font-mono text-[10px] text-slate-500">
-            {c.vehicleNo || c.trackingNumber || 'TRK-DIRECT'}
-          </span>
-        </div>),
+            width: '14%',
+            render: (c) => (
+              <div>
+                <p className="font-semibold text-text">{c.transporter}</p>
+                <span className="font-mono text-[10px] text-muted">
+                  {c.vehicleNo || c.trackingNumber || 'TRK-DIRECT'}
+                </span>
+              </div>
+            ),
         },
         {
             key: 'items',
             header: 'Total Units',
             align: 'center',
+            width: '10%',
             render: (c) => {
                 const totalUnits = (c.items || []).reduce((acc, it) => acc + (it.qty || 1), 0);
-                return (<span className="inline-flex items-center gap-1 font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full text-[11px]">
-            <Package size={11} className="text-slate-500"/> {totalUnits} pcs
-          </span>);
+                return (
+                  <span className="inline-flex items-center gap-1 font-semibold text-text-secondary bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full text-[11px] whitespace-nowrap">
+                    <Package size={11} className="text-muted"/> {totalUnits} pcs
+                  </span>
+                );
             },
         },
         {
             key: 'status',
             header: 'Dispatch Status',
             align: 'center',
+            width: '12%',
             render: (c) => <StatusBadge status={c.status}/>,
         },
         {
             key: 'actions',
             header: 'Proof of Delivery',
             align: 'right',
-            render: (c) => c.status !== 'Delivered' ? (<button onClick={() => markDelivered(c.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 ml-auto shadow-sm">
-            <CheckCircle2 size={11}/> Confirm POD
-          </button>) : (<span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1 justify-end">
-            <UserCheck size={12}/> POD Verified
-          </span>),
+            width: '12%',
+            render: (c) => c.status !== 'Delivered' ? (
+              <button
+                onClick={() => markDelivered(c.id)}
+                className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer flex items-center gap-1 ml-auto shadow-2xs whitespace-nowrap transition-colors"
+              >
+                <CheckCircle2 size={11}/> Confirm POD
+              </button>
+            ) : (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end whitespace-nowrap">
+                <UserCheck size={12}/> POD Verified
+              </span>
+            ),
         },
     ];
     // Stock shortage check for the modal

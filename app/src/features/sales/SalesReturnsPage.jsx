@@ -33,7 +33,7 @@ const salesReturnGuide = {
     ],
 };
 export const SalesReturnsPage = () => {
-    const { salesReturns, addSalesReturn, invoices, customers } = useERP();
+    const { salesReturns, addSalesReturn, invoices, customers, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
     const [reason, setReason] = useState('Incorrect cable gauge ordered by client');
@@ -56,7 +56,7 @@ export const SalesReturnsPage = () => {
             customer: inv?.customer || cust?.name || 'Cyberdyne Systems',
             invoiceId: inv?.id,
             invoiceRef: inv?.invoiceNumber || 'INV-2026-002',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: getCurrentDateFormatted(),
             amount: totalAmt > 0 ? totalAmt : 500,
             reason,
             restocked,
@@ -69,47 +69,63 @@ export const SalesReturnsPage = () => {
         {
             key: 'returnNumber',
             header: 'Return Ref / Credit Note',
-            render: (r) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <RotateCcw size={13} className="text-amber-600"/> {r.returnNumber}
-        </span>),
+            width: '16%',
+            render: (r) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <RotateCcw size={13} className="text-amber-600 dark:text-amber-400 shrink-0"/>
+                <span>{r.returnNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'customer',
             header: 'Customer',
-            render: (r) => <span className="font-bold text-[#1F2E4A]">{r.customer}</span>,
+            width: '22%',
+            render: (r) => <span className="font-bold text-text block">{r.customer}</span>,
         },
         {
             key: 'invoiceRef',
             header: 'Original Invoice',
-            render: (r) => <span className="font-mono text-slate-600">{r.invoiceRef}</span>,
+            width: '14%',
+            render: (r) => <span className="font-mono text-primary font-semibold whitespace-nowrap">{r.invoiceRef}</span>,
         },
         {
             key: 'date',
             header: 'Return Date',
-            render: (r) => <span className="text-slate-600">{r.date}</span>,
+            width: '12%',
+            render: (r) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(r.date)}</span>,
         },
         {
             key: 'reason',
             header: 'Reason for Return',
-            render: (r) => <span className="text-slate-700 text-[11px]">{r.reason}</span>,
+            width: '14%',
+            render: (r) => <span className="text-muted text-[11px] block">{r.reason}</span>,
         },
         {
             key: 'restocked',
             header: 'Inventory Reversal',
             align: 'center',
-            render: (r) => r.restocked ? (<span className="text-emerald-700 font-semibold text-[11px] flex items-center justify-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-            <CheckCircle2 size={12}/> Restocked to Bay
-          </span>) : (<span className="text-rose-700 font-semibold text-[11px] flex items-center justify-center gap-1 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-            <AlertCircle size={12}/> Damaged / Scrapped
-          </span>),
+            width: '12%',
+            render: (r) => r.restocked ? (
+              <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] flex items-center justify-center gap-1 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/30 whitespace-nowrap">
+                <CheckCircle2 size={12}/> Restocked
+              </span>
+            ) : (
+              <span className="text-rose-700 dark:text-rose-400 font-semibold text-[11px] flex items-center justify-center gap-1 bg-rose-50 dark:bg-rose-500/15 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-500/30 whitespace-nowrap">
+                <AlertCircle size={12}/> Scrapped
+              </span>
+            ),
         },
         {
             key: 'amount',
             header: 'Credit Note Amount',
             align: 'right',
-            render: (r) => (<span className="font-mono font-bold text-rose-700">
-          -${(r.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </span>),
+            width: '10%',
+            render: (r) => (
+              <span className="font-mono font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                -{formatCurrency(r.amount ?? 0)}
+              </span>
+            ),
         },
     ];
     return (<div className="space-y-6">
@@ -127,13 +143,13 @@ export const SalesReturnsPage = () => {
             (r.invoiceRef && r.invoiceRef.toLowerCase().includes(term)) ||
             r.reason.toLowerCase().includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Issue Sales Credit Note
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer">
                 <X size={18}/>
               </button>
             </div>

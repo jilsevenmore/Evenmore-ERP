@@ -146,19 +146,19 @@ export function DataTable({
   }
 
   return (
-    <div className="table-card bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+    <div className="table-card bg-card rounded-xl border border-border shadow-xs overflow-hidden">
       {/* Optional Card Header with Title, Subtitle, and Search / Action */}
       {(title || isSearchEnabled || action) && (
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/40">
+        <div className="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card-alt">
           <div>
-            {title && <h3 className="font-bold text-slate-800 text-sm tracking-tight">{title}</h3>}
-            {subtitle && <p className="text-[11px] text-slate-400 mt-0.5">{subtitle}</p>}
+            {title && <h3 className="font-bold text-text text-sm tracking-tight">{title}</h3>}
+            {subtitle && <p className="text-[11px] text-muted mt-0.5">{subtitle}</p>}
           </div>
 
           <div className="flex items-center gap-2.5">
             {isSearchEnabled && (
-              <div className="search-bar relative flex items-center">
-                <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+              <div className="relative flex items-center w-full sm:w-64">
+                <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
                 <input
                   type="text"
                   placeholder={searchPlaceholder}
@@ -167,7 +167,7 @@ export function DataTable({
                     setSearch(e.target.value);
                     setPage(1);
                   }}
-                  className="pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 w-full sm:w-64 transition shadow-2xs"
+                  className="w-full pl-8.5 pr-3 py-1.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition shadow-2xs"
                 />
               </div>
             )}
@@ -180,12 +180,12 @@ export function DataTable({
       <div className="table-scroll overflow-x-auto">
         <table className="data-table w-full border-collapse text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-200/80 bg-slate-50/70 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+            <tr className="border-b border-border bg-table-head text-text-secondary font-semibold text-[11px] uppercase tracking-wider">
               {selectable && (
                 <th className="col-check py-3 px-3.5 w-10 text-center">
                   <input
                     type="checkbox"
-                    className="row-check rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                    className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"
                     checked={allChecked}
                     onChange={toggleAll}
                     aria-label="Select all"
@@ -207,27 +207,29 @@ export function DataTable({
                     {col.sortable ? (
                       <button
                         type="button"
-                        className={`inline-flex items-center gap-1 font-bold text-slate-600 hover:text-blue-600 transition cursor-pointer ${
-                          col.align === 'right' ? 'ml-auto' : col.align === 'center' ? 'mx-auto' : ''
+                        className={`inline-flex items-center gap-1 font-bold text-text-secondary hover:text-primary transition cursor-pointer ${
+                          col.align === 'right' ? 'ml-auto justify-end' : col.align === 'center' ? 'mx-auto justify-center' : 'justify-start'
                         }`}
                         onClick={() => toggleSort(colKey)}
                       >
                         <span>{colTitle}</span>
                         <ArrowUpDown
                           size={12}
-                          className={sortKey === colKey ? 'text-blue-600' : 'text-slate-300'}
+                          className={sortKey === colKey ? 'text-primary' : 'text-muted/60'}
                         />
                       </button>
                     ) : (
-                      <span>{colTitle}</span>
+                      <div className={`w-full ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
+                        <span>{colTitle}</span>
+                      </div>
                     )}
                   </th>
                 );
               })}
-              {actions && <th className="col-more py-3 px-3.5 text-center w-12"><MoreVertical size={14} className="mx-auto text-slate-400" /></th>}
+              {actions && <th className="col-more py-3 px-3.5 text-center w-12"><MoreVertical size={14} className="mx-auto text-muted" /></th>}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border/60">
             {paginated.map((row, index) => {
               const rowId = getRowKey(row, index);
               const isRowSelected = selected.includes(rowId);
@@ -235,7 +237,7 @@ export function DataTable({
               return (
                 <tr
                   key={rowId}
-                  className={`transition-colors hover:bg-slate-50/80 ${isRowSelected ? 'bg-blue-50/40' : ''} ${
+                  className={`transition-colors hover:bg-card-hover ${isRowSelected ? 'bg-primary-subtle' : ''} ${
                     onRowClick ? 'cursor-pointer' : ''
                   }`}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
@@ -244,7 +246,7 @@ export function DataTable({
                     <td className="py-3 px-3.5 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        className="row-check rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"
                         checked={isRowSelected}
                         onChange={() => toggleRow(rowId)}
                         aria-label="Select row"
@@ -257,7 +259,11 @@ export function DataTable({
                       col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
 
                     return (
-                      <td key={colKey} className={`py-3 px-3.5 text-slate-700 align-middle ${alignCls}`}>
+                      <td
+                        key={colKey}
+                        style={col.width ? { width: col.width } : {}}
+                        className={`py-3 px-3.5 text-text align-middle ${alignCls}`}
+                      >
                         {renderCell(col, row)}
                       </td>
                     );
@@ -277,8 +283,8 @@ export function DataTable({
                   className="empty-row py-12 px-4 text-center"
                 >
                   <div className="flex flex-col items-center justify-center space-y-2">
-                    <p className="font-semibold text-slate-700 text-sm">{emptyMessage || emptyTitle}</p>
-                    <p className="text-xs text-slate-400 max-w-sm">{emptyDesc}</p>
+                    <p className="font-semibold text-text text-sm">{emptyMessage || emptyTitle}</p>
+                    <p className="text-xs text-muted max-w-sm">{emptyDesc}</p>
                     {emptyAction && <div className="pt-2">{emptyAction}</div>}
                   </div>
                 </td>
@@ -290,7 +296,7 @@ export function DataTable({
 
       {/* Pagination Footer */}
       {sorted.length > pageSize && (
-        <div className="border-t border-slate-100 bg-slate-50/30">
+        <div className="border-t border-border bg-card-alt">
           <Pagination total={sorted.length} page={page} pageSize={pageSize} onChange={setPage} />
         </div>
       )}

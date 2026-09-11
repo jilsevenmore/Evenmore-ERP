@@ -28,7 +28,7 @@ const purchaseBillGuide = {
     workflow: ['PO Issued', 'Physical Goods Intake', 'Vendor Bill Recorded', '3-Way Match Verified', 'Payment Disbursed'],
 };
 export const PurchaseBillsPage = () => {
-    const { purchaseBills, purchaseOrders, vendors, addPurchaseBill, addPaymentOut, getBillOutstanding, paymentOuts, purchaseReturns, } = useERP();
+    const { purchaseBills, purchaseOrders, vendors, addPurchaseBill, addPaymentOut, getBillOutstanding, paymentOuts, purchaseReturns, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
     const [showPayModal, setShowPayModal] = useState(null);
@@ -66,8 +66,8 @@ export const PurchaseBillsPage = () => {
             linkedPo: po?.poNumber || 'PO-DIRECT',
             vendorId: vend?.id,
             vendor: vend?.name || 'Cisco Systems Direct',
-            billDate: 'Today',
-            date: 'Today',
+            billDate: getCurrentDateFormatted(),
+            date: getCurrentDateFormatted(),
             dueDate: dueDate || '30 Days from now',
             amount: totalAmt > 0 ? totalAmt : 5000,
             total: totalAmt > 0 ? totalAmt : 5000,
@@ -98,56 +98,57 @@ export const PurchaseBillsPage = () => {
         const outstanding = getBillOutstanding(b.id);
         return [
             {
-                label: 'Purchase Order',
-                docNumber: b.poRef || b.linkedPo || 'Direct PO',
+                label: 'Purchase Order Verification',
+                docNumber: b.poRef || b.linkedPo,
+                amount: b.total || b.amount,
+                date: formatDateDDMMYYYY(b.date),
                 status: 'completed',
             },
             {
-                label: 'Vendor Bill & Intake',
+                label: 'Vendor Bill Intake',
                 docNumber: b.billNumber,
                 amount: b.total || b.amount,
-                date: b.billDate || b.date,
+                date: formatDateDDMMYYYY(b.billDate || b.date),
                 status: 'completed',
             },
             {
                 label: 'Disbursement Settlement',
+                docNumber: outstanding.paid > 0 ? 'Disbursement' : undefined,
                 amount: outstanding.paid,
-                status: outstanding.status === 'Paid' ? 'completed' : outstanding.status === 'Partially Paid' ? 'current' : 'pending',
+                status: outstanding.paid >= (b.total || b.amount) ? 'completed' : outstanding.paid > 0 ? 'current' : 'pending',
             },
         ];
     };
     const getBillRelatedDocs = (b) => {
         const docs = [];
         const poNum = b.poRef || b.linkedPo;
-        if (poNum) {
-            const po = purchaseOrders.find((p) => p.poNumber === poNum || p.id === b.purchaseOrderId);
-            if (po) {
-                docs.push({
-                    type: 'Purchase Order',
-                    number: po.poNumber,
-                    amount: po.amount,
-                    date: po.date,
-                    status: po.status,
-                });
-            }
-        }
-        const disbursements = paymentOuts.filter((p) => p.billId === b.id || p.billNumber === b.billNumber);
-        disbursements.forEach((p) => {
+        const linkedPo = purchaseOrders.find((p) => p.poNumber === poNum || p.id === b.purchaseOrderId);
+        if (linkedPo) {
             docs.push({
-                type: 'Payment',
+                type: 'Purchase Order',
+                number: linkedPo.poNumber,
+                amount: linkedPo.total || linkedPo.amount,
+                date: formatDateDDMMYYYY(linkedPo.date),
+                status: linkedPo.status,
+            });
+        }
+        const relatedPayments = paymentOuts.filter((p) => p.billId === b.id || p.billNumber === b.billNumber);
+        relatedPayments.forEach((p) => {
+            docs.push({
+                type: 'Payment Out',
                 number: p.voucherNumber,
                 amount: p.amount,
-                date: p.date,
+                date: formatDateDDMMYYYY(p.date),
                 status: 'Paid',
             });
         });
-        const debitNotes = purchaseReturns.filter((pr) => pr.billId === b.id || pr.billRef === b.billNumber);
-        debitNotes.forEach((pr) => {
+        const relatedReturns = purchaseReturns.filter((pr) => pr.billId === b.id || pr.billNumber === b.billNumber);
+        relatedReturns.forEach((pr) => {
             docs.push({
                 type: 'Debit Note',
-                number: pr.debitNoteNumber,
+                number: pr.returnNumber,
                 amount: pr.amount,
-                date: pr.date,
+                date: formatDateDDMMYYYY(pr.date),
                 status: pr.status,
             });
         });
@@ -157,19 +158,27 @@ export const PurchaseBillsPage = () => {
         {
             key: 'billNumber',
             header: 'Vendor Bill #',
-            render: (b) => (<button onClick={() => setSelectedBill(b)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left">
-          <FileSpreadsheet size={13} className="text-slate-400"/> {b.billNumber}
-        </button>),
+            width: '13%',
+            render: (b) => (
+              <button
+                onClick={() => setSelectedBill(b)}
+                className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap"
+              >
+                <FileSpreadsheet size={13} className="text-muted shrink-0"/>
+                <span>{b.billNumber}</span>
+              </button>
+            ),
         },
         {
             key: 'poRef',
             header: '3-Way Match & PO Ref',
+            width: '18%',
             render: (b) => {
                 const poNum = b.poRef || b.linkedPo;
                 const linkedPo = purchaseOrders.find((p) => p.poNumber === poNum || p.id === b.purchaseOrderId);
                 let matchBadge = {
                     label: 'Direct Entry',
-                    bg: 'bg-slate-100 text-slate-700 border-slate-200',
+                    bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
                 };
                 if (linkedPo) {
                     const poItemsCount = linkedPo.items?.reduce((acc, it) => acc + it.qty, 0) || 0;
@@ -177,68 +186,80 @@ export const PurchaseBillsPage = () => {
                     if (poItemsCount === billItemsCount && Math.abs((linkedPo.amount || 0) - (b.amount || b.total || 0)) < 1) {
                         matchBadge = {
                             label: '3-Way Matched (100%)',
-                            bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                            bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30',
                         };
                     }
                     else if (billItemsCount < poItemsCount) {
                         matchBadge = {
                             label: `Partial Intake (${billItemsCount}/${poItemsCount})`,
-                            bg: 'bg-amber-50 text-amber-700 border-amber-200',
+                            bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30',
                         };
                     }
                     else {
                         matchBadge = {
                             label: 'Audit Verified',
-                            bg: 'bg-blue-50 text-blue-700 border-blue-200',
+                            bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30',
                         };
                     }
                 }
-                return (<div className="space-y-1">
-            <span className="font-mono text-slate-600 font-semibold block">{poNum || 'N/A'}</span>
-            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${matchBadge.bg}`}>
-              {matchBadge.label}
-            </span>
-          </div>);
+                return (
+                  <div className="space-y-1">
+                    <span className="font-mono text-text font-semibold block text-xs">{poNum || 'N/A'}</span>
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${matchBadge.bg}`}>
+                      {matchBadge.label}
+                    </span>
+                  </div>
+                );
             },
         },
         {
             key: 'vendor',
             header: 'Vendor Supplier',
-            render: (b) => <span className="font-bold text-[#1F2E4A]">{b.vendor}</span>,
+            width: '18%',
+            render: (b) => <span className="font-bold text-text block">{b.vendor}</span>,
         },
         {
             key: 'billDate',
             header: 'Bill Date',
-            render: (b) => <span className="text-slate-600">{b.billDate || b.date || 'Today'}</span>,
+            width: '10%',
+            render: (b) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(b.billDate || b.date)}</span>,
         },
         {
             key: 'dueDate',
             header: 'Payment Due',
-            render: (b) => <span className="text-slate-600">{b.dueDate}</span>,
+            width: '11%',
+            render: (b) => <span className="text-muted text-[11px] whitespace-nowrap">{b.dueDate ? formatDateDDMMYYYY(b.dueDate) : '—'}</span>,
         },
         {
             key: 'amount',
             header: 'Bill Amount',
             align: 'right',
-            render: (b) => (<span className="font-mono font-bold text-slate-900">
-          ${(b.amount ?? b.total ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </span>),
+            width: '12%',
+            render: (b) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(b.amount ?? b.total ?? 0)}
+              </span>
+            ),
         },
         {
             key: 'balanceDue',
             header: 'Outstanding Due',
             align: 'right',
+            width: '12%',
             render: (b) => {
                 const outstanding = getBillOutstanding(b.id);
-                return (<span className={`font-mono font-bold ${outstanding.balanceDue > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-            ${outstanding.balanceDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-          </span>);
+                return (
+                  <span className={`font-mono font-bold whitespace-nowrap ${outstanding.balanceDue > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {formatCurrency(outstanding.balanceDue)}
+                  </span>
+                );
             },
         },
         {
             key: 'status',
             header: 'Settlement Status',
             align: 'center',
+            width: '11%',
             render: (b) => {
                 const outstanding = getBillOutstanding(b.id);
                 return <StatusBadge status={outstanding.status}/>;
@@ -248,24 +269,42 @@ export const PurchaseBillsPage = () => {
             key: 'actions',
             header: 'Disbursement',
             align: 'right',
+            width: '13%',
             render: (b) => {
                 const outstanding = getBillOutstanding(b.id);
-                return (<div className="flex items-center justify-end gap-1.5">
-            <button onClick={() => setSelectedBill(b)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="View Bill Details">
-              <Eye className="w-4 h-4"/>
-            </button>
-            <button onClick={() => setPrintBillTarget(b)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Print Official Vendor Bill">
-              <Printer className="w-4 h-4"/>
-            </button>
-            {outstanding.balanceDue > 0.01 ? (<button onClick={() => {
-                            setShowPayModal(b);
-                            setPayAmount(outstanding.balanceDue);
-                        }} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer inline-flex items-center gap-1 shadow-sm">
-                <DollarSign className="w-3 h-3"/> Pay Bill
-              </button>) : (<span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
-                <CheckCircle2 size={12}/> Disbursed
-              </span>)}
-          </div>);
+                return (
+                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <button
+                      onClick={() => setSelectedBill(b)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="View Bill & Details"
+                    >
+                      <Eye size={13}/>
+                    </button>
+                    <button
+                      onClick={() => setPrintBillTarget(b)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="Print Official Purchase Bill"
+                    >
+                      <Printer size={13}/>
+                    </button>
+                    {outstanding.balanceDue > 0.01 ? (
+                      <button
+                        onClick={() => {
+                          setShowPayModal(b);
+                          setPayAmount(outstanding.balanceDue);
+                        }}
+                        className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                      >
+                        <DollarSign size={11}/> Pay Bill
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                        <CheckCircle2 size={12}/> Settled
+                      </span>
+                    )}
+                  </div>
+                );
             },
         },
     ];
@@ -281,9 +320,9 @@ export const PurchaseBillsPage = () => {
 
       {/* Purchase Bills KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Billed Invoices" value={`$${totalBilled.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={DollarSign} />
-        <StatCard label="AP Payable Due" value={`$${totalApOutstanding.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
-        <StatCard label="Total Disbursed" value={`$${totalDisbursed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
+        <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={DollarSign} />
+        <StatCard label="AP Payable Due" value={formatCurrency(totalApOutstanding)} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
+        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
         <StatCard label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
       </div>
 
@@ -293,7 +332,7 @@ export const PurchaseBillsPage = () => {
 
       {/* Enter Bill Modal */}
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Record Vendor Purchase Bill
@@ -318,10 +357,31 @@ export const PurchaseBillsPage = () => {
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Vendor / Supplier *</label>
                   <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
-                    {vendors.map((v) => (<option key={v.id} value={v.id}>
+                    {vendors.map((v) => (
+                      <option key={v.id} value={v.id}>
                         {v.name} ({v.code})
-                      </option>))}
+                      </option>
+                    ))}
                   </select>
+                  {(() => {
+                    const vend = vendors.find(v => v.id === selectedVendorId) || vendors[0];
+                    if (!vend) return null;
+                    return (
+                      <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
+                        <div className="flex items-center justify-between font-bold text-slate-800">
+                          <span>{vend.name}</span>
+                          <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            Terms: {vend.paymentTerms || 'Net 30'}
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
+                          <span>POC: <strong>{vend.contactPerson || 'Vendor Rep'}</strong></span>
+                          <span>Email: {vend.email}</span>
+                          <span>Phone: {vend.phone}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div>
