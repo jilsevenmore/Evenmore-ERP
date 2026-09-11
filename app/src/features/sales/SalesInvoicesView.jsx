@@ -10,6 +10,7 @@ import { PrintInvoiceModal } from '../../components/common/PrintInvoiceModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/common/PageHeader';
+import { Pagination } from '../../components/ui/Pagination';
 
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
@@ -662,40 +663,16 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 </div>
 
                 {/* Pagination Footer */}
-                <div className="p-3.5 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 bg-white pr-20 sm:pr-24">
-                    <span>
-                        Showing {filteredInvoices.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(filteredInvoices.length, currentPage * pageSize)} of {filteredInvoices.length} entries
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                        <button
-                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                            disabled={currentPage === 1}
-                            className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium cursor-pointer transition-colors"
-                        >
-                            Prev
-                        </button>
-                        {Array.from({ length: totalPages }).map((_, idx) => (
-                            <button
-                                key={idx}
-                                onClick={() => setCurrentPage(idx + 1)}
-                                className={`px-2.5 py-1 border rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                                    currentPage === idx + 1
-                                        ? 'bg-[#1F2E4A] text-white border-[#1F2E4A] shadow-2xs'
-                                        : 'border-slate-200 hover:bg-slate-100 text-slate-700'
-                                }`}
-                            >
-                                {idx + 1}
-                            </button>
-                        ))}
-                        <button
-                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                            disabled={currentPage >= totalPages}
-                            className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium cursor-pointer transition-colors"
-                        >
-                            Next
-                        </button>
+                {filteredInvoices.length > 5 && (
+                    <div className="border-t border-slate-200 bg-slate-50/50 pr-16 sm:pr-20">
+                        <Pagination
+                            total={filteredInvoices.length}
+                            page={currentPage}
+                            pageSize={pageSize}
+                            onChange={setCurrentPage}
+                        />
                     </div>
-                </div>
+                )}
             </div>
 
             {/* CREATE / EDIT DRAFT INVOICE MODAL */}

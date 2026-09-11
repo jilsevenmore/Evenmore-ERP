@@ -29,7 +29,8 @@ import {
   Layers,
   ChevronRight,
   Ban,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
@@ -112,6 +113,7 @@ export const ProformaInvoicesPage = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [editingPi, setEditingPi] = useState(null);
   const [selectedPi, setSelectedPi] = useState(null);
+  const [deleteTargetPi, setDeleteTargetPi] = useState(null);
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
@@ -491,6 +493,15 @@ export const ProformaInvoicesPage = () => {
           >
             <Copy size={13} />
           </button>
+          {pi.status === 'Draft' && (
+            <button
+              onClick={() => setDeleteTargetPi(pi)}
+              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+              title="Delete Draft Proforma"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
           {pi.status !== 'Converted' && pi.status !== 'Cancelled' ? (
             <button
               onClick={() => handleDirectConvertToInvoice(pi)}
@@ -968,6 +979,19 @@ export const ProformaInvoicesPage = () => {
                 >
                   <Printer size={13} /> Print / PDF
                 </button>
+                {selectedPi.status === 'Draft' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pi = selectedPi;
+                      setSelectedPi(null);
+                      setDeleteTargetPi(pi);
+                    }}
+                    className="px-3 py-1.5 border border-rose-200 hover:bg-rose-50 text-rose-600 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <Trash2 size={13} /> Delete Draft
+                  </button>
+                )}
                 {selectedPi.status !== 'Converted' && selectedPi.status !== 'Cancelled' && (
                   <>
                     <button
@@ -1195,6 +1219,67 @@ export const ProformaInvoicesPage = () => {
               <Button variant="outline" onClick={() => setSelectedPi(null)}>
                 Close
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Draft Confirmation Modal */}
+      {deleteTargetPi && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start gap-3.5">
+              <div className="p-3 rounded-xl bg-rose-50 text-rose-600 shrink-0 border border-rose-100">
+                <Trash2 size={22} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-slate-800">Delete Draft Proforma</h3>
+                <p className="text-slate-500 text-xs mt-1 leading-relaxed">
+                  Are you sure you want to permanently delete draft proforma{' '}
+                  <strong className="text-slate-800 font-mono">{deleteTargetPi.proformaNumber}</strong>?
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2 text-slate-600 text-xs">
+              <div className="flex justify-between items-center">
+                <span>Customer Account:</span>
+                <span className="font-semibold text-slate-800">{deleteTargetPi.customer}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>PI Date:</span>
+                <span className="font-mono text-slate-700">{formatDateDDMMYYYY(deleteTargetPi.date)}</span>
+              </div>
+              <div className="flex justify-between items-center pt-1 border-t border-slate-200">
+                <span className="font-medium text-slate-700">Grand Total:</span>
+                <span className="font-mono font-bold text-slate-900">
+                  {formatCurrency(deleteTargetPi.grandTotal ?? deleteTargetPi.total ?? 0)}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-400">
+              This action will remove the draft proforma invoice from your register. This cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setDeleteTargetPi(null)}
+              >
+                Cancel
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  deleteProformaInvoice(deleteTargetPi.id);
+                  setDeleteTargetPi(null);
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold text-xs transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                <Trash2 size={13} /> Delete Draft
+              </button>
             </div>
           </div>
         </div>
