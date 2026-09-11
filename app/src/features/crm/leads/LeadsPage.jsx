@@ -10,6 +10,7 @@ import Pagination from '../../../components/ui/Pagination';
 import NotesDrawer from './NotesDrawer';
 import CreateLeadModal from './CreateLeadModal';
 import DeleteLeadModal from './DeleteLeadModal';
+import InfoBanner from '../common/InfoBanner';
 import { useNavigate } from 'react-router-dom';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { exportToCSV } from '../../../services/exportUtils';
@@ -101,14 +102,30 @@ function getSortValue(lead, field) {
   return String(lead[field] ?? '').toLowerCase();
 }
 
+const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
+
+function loadStoredLeads() {
+  try {
+    const raw = localStorage.getItem(LEADS_STORAGE_KEY);
+    if (!raw) return seedLeads;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return seedLeads;
+    return parsed;
+  } catch {
+    return seedLeads;
+  }
+}
+
 export default function LeadsPage() {
   const navigate = useNavigate();
-  const [leadRows, setLeadRows] = useState(seedLeads);
+  const [leadRows, setLeadRows] = useState(loadStoredLeads);
   const [activeTab, setActiveTab] = useState('All Leads');
   const [selected, setSelected] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+  const [showCreateArrow, setShowCreateArrow] = useState(false);
+  const [showLeadTour, setShowLeadTour] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [leadView, setLeadView] = useState('list');
   const [appliedFilters, setAppliedFilters] = useState(INITIAL_FILTERS);
@@ -149,6 +166,14 @@ export default function LeadsPage() {
       return a.id - b.id;
     });
   }, [activeTab, appliedFilters, appliedSort, leadRows]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leadRows));
+    } catch {
+      return;
+    }
+  }, [leadRows]);
 
   useEffect(() => {
     setPage(1);
@@ -262,7 +287,69 @@ export default function LeadsPage() {
   }
 
   function openCreateLeadModal() {
+    setShowLeadTour(showCreateArrow);
+    setShowCreateArrow(false);
     setIsCreateLeadOpen(true);
+  }
+
+  function handleGuideClick() {
+    setShowCreateArrow(true);
+  }
+
+  function formatDisplayDate(value) {
+    if (!value) return new Date().toLocaleDateString('en-GB');
+    const parts = String(value).split('-');
+    if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    return String(value);
+  }
+
+  function handleCreateLead(formData) {
+    const data = formData ?? {};
+    setLeadRows((current) => {
+      const nextId = current.reduce((max, lead) => Math.max(max, lead.id), 0) + 1;
+      const count = String(nextId + 184).padStart(8, '0');
+      const nextLead = {
+        id: nextId,
+        name: data.leadName || 'Untitled Lead',
+        company: data.company || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        status: 'New',
+        owner: data.owner || 'David Patel',
+        ownerAvatar: 'https://i.pravatar.cc/160?img=68',
+        createdOn: formatDisplayDate(data.createdOn),
+        source: data.source || 'Website',
+        city: '',
+        state: '',
+        country: 'India',
+        amount: 0,
+        leadNumber: `L${count}`,
+        mapX: 50,
+        mapY: 50,
+        avatarColor: '#2F6FED',
+        photo: data.photoPreview || '',
+        jobTitle: data.titleValue || '',
+        industry: data.industry || '',
+        productsCount: (data.products ?? []).length,
+        sourcesCount: 1,
+        filesCount: 0,
+        openTasksCount: 0,
+        callsCount: 0,
+        estimatesCount: 0,
+        deliveryChallansCount: 0,
+        salesInvoicesCount: 0,
+      };
+      return [nextLead, ...current];
+    });
+    setIsCreateLeadOpen(false);
+    setShowLeadTour(false);
+    setActiveTab('All Leads');
+    setAppliedFilters(INITIAL_FILTERS);
+    setDraftFilters(INITIAL_FILTERS);
+    setAppliedSort(INITIAL_SORT);
+    setDraftSort(INITIAL_SORT);
+    setLeadView('list');
+    setPage(1);
   }
 
   function openLeadFormBuilder() {
@@ -341,12 +428,30 @@ export default function LeadsPage() {
         subtitle="Manage and track all your CRM leads."
         guide={leadsGuide}
         actions={
-          <>
-            <button type="button" className="btn-primary btn-sm" onClick={() => setIsCreateLeadOpen(true)}>
+          <div className="relative inline-block">
+            {showCreateArrow && (
+              <div className="absolute right-0 top-[calc(100%+1px)] z-50 flex flex-col items-end">
+                <svg width="72" height="42" viewBox="0 0 72 42" fill="none" className="mb-[-9px] mr-[52px]" aria-hidden="true">
+                  <path d="M58 3 C 58 26, 40 37, 16 33" stroke="#1d6bff" strokeWidth="3.5" strokeLinecap="round" fill="none" />
+                  <path d="M27 27 L15 33 L25 40" stroke="#1d6bff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </svg>
+                <div className="inline-flex w-max max-w-[240px] items-start gap-2.5 rounded-[16px] bg-[#1d6bff] px-4 py-3 text-left text-[14px] font-medium leading-snug text-white shadow-[0_4px_14px_rgba(29,107,255,0.35)]">
+                  <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[15px] font-bold text-[#1d6bff]">2</span>
+                  <span>Click the Create Lead</span>
+                </div>
+              </div>
+            )}
+            <button type="button" className="btn-primary btn-sm" onClick={openCreateLeadModal}>
               + Create Lead
             </button>
-          </>
+          </div>
         }
+      />
+
+      <InfoBanner
+        storageKey="infoBannerLeadsV1"
+        title="Why use Leads?"
+        text="These are potential customers tracked across stages. You capture a lead once, then calls, tasks, quotations and deals stay linked to it."
       />
 
       <LeadsTabs
@@ -365,7 +470,7 @@ export default function LeadsPage() {
         onClearSort={clearSort}
         leadView={leadView}
         onLeadViewChange={setLeadView}
-        onCreateLead={openCreateLeadModal}
+        onCreateLead={handleGuideClick}
         recordActionLead={recordActionLead}
         recordActionLeads={selectedLeads}
         onCloseRecordAction={clearSelected}
@@ -507,9 +612,10 @@ export default function LeadsPage() {
       )}
       <CreateLeadModal
         isOpen={isCreateLeadOpen}
-        onClose={() => setIsCreateLeadOpen(false)}
-        onCreate={() => { setIsCreateLeadOpen(false); navigate('/crm/leads/create-form'); }}
-        onEditLayout={() => { setIsCreateLeadOpen(false); navigate('/crm/leads/form-builder'); }}
+        showTour={showLeadTour}
+        onClose={() => { setIsCreateLeadOpen(false); setShowLeadTour(false); }}
+        onCreate={handleCreateLead}
+        onEditLayout={() => { setIsCreateLeadOpen(false); setShowLeadTour(false); navigate('/crm/leads/form-builder'); }}
       />
     </>
   );

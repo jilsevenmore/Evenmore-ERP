@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone } from 'lucide-react';
+import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone, MapPin, ListChecks } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { useERP } from '../../../context/ERPContext';
+import UserLocationTracking from './UserLocationTracking';
 
 export default function UserAllocationPage() {
   const { formatCurrency } = useERP();
@@ -73,6 +74,7 @@ export default function UserAllocationPage() {
   const totalLeads = teamMembers.reduce((sum, m) => sum + m.leadsAssigned, 0);
   const totalDeals = teamMembers.reduce((sum, m) => sum + m.dealsClosed, 0);
   const totalPipeline = teamMembers.reduce((sum, m) => sum + m.activePipeline, 0);
+  const [view, setView] = useState('tracking');
 
   const filtered = teamMembers.filter(
     (m) =>
@@ -106,17 +108,95 @@ export default function UserAllocationPage() {
         title="User & Representative Allocation"
         subtitle="Manage CRM team members, lead quotas, sales performance, and active deals pipeline allocation."
         actions={
-          <button
-            type="button"
-            onClick={() => setIsAddOpen(true)}
-            className="btn-primary btn-sm flex items-center gap-1.5"
-          >
-            <UserPlus size={14} strokeWidth={2.4} /> Add Representative
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold">
+              <button
+                type="button"
+                onClick={() => setView('allocation')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'allocation' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
+              >
+                <ListChecks size={13} /> Allocation
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('tracking')}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'tracking' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500'}`}
+              >
+                <MapPin size={13} /> Live Tracking
+              </button>
+            </div>
+            {view === 'allocation' && (
+              <button
+                type="button"
+                onClick={() => setIsAddOpen(true)}
+                className="btn-primary btn-sm flex items-center gap-1.5"
+              >
+                <UserPlus size={14} strokeWidth={2.4} /> Add Representative
+              </button>
+            )}
+          </div>
         }
       />
 
-      {/* KPI Stats Row */}
+      {/* Add Representative Form */}
+      {isAddOpen && view === 'allocation' && (
+        <form onSubmit={handleAddMember} className="card p-4 space-y-3 bg-blue-50/50 dark:bg-slate-900/40 border border-blue-200 dark:border-slate-700">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-200">New Representative</h3>
+            <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600">
+              ✕
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
+            <input
+              type="text"
+              required
+              placeholder="Representative Name *"
+
+              value={newMember.name}
+              onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="text"
+              required
+              placeholder="Role / Designation *"
+              value={newMember.role}
+              onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="email"
+              required
+              placeholder="Work Email *"
+              value={newMember.email}
+              onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+            <input
+              type="text"
+              placeholder="Phone Number"
+              value={newMember.phone}
+              onChange={(e) => setNewMember({ ...newMember, phone: e.target.value })}
+              className="p-2 border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-800"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setIsAddOpen(false)} className="btn-secondary btn-sm">
+              Cancel
+            </button>
+            <button type="submit" className="btn-primary btn-sm">
+              Save Representative
+            </button>
+          </div>
+        </form>
+      )}
+
+      {view === 'tracking' ? (
+        <UserLocationTracking />
+      ) : (
+      <>
+      {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="stat-card">
           <div className="stat-badge bg-blue-50 text-blue-600 dark:bg-blue-900/30">
@@ -227,6 +307,8 @@ export default function UserAllocationPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
