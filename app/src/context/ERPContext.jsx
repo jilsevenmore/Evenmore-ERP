@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts, mockProformaInvoices, mockEstimates } from '../data/erp/mockData';
+import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts, mockProformaInvoices, mockEstimates, mockWarrantyCards } from '../data/erp/mockData';
 import { formatDateDDMMYYYY, getCurrentDateFormatted } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES } from '../utils/currencyUtils';
+import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
 const STORAGE_KEY = 'horizon_erp_v2_state';
 const initialJournalEntries = [
     {
@@ -89,6 +90,13 @@ const loadSavedState = () => {
                 const missingMockEstimates = mockEstimates.filter(me => !existingNumbers.has((me.estimateNumber || '').toLowerCase()));
                 parsed.estimates = [...parsed.estimates, ...missingMockEstimates];
             }
+            if (Array.isArray(parsed?.warranties) && parsed.warranties.length > 0) {
+                const existingNumbers = new Set(parsed.warranties.map(w => (w.cardNumber || '').toLowerCase()));
+                const missingMockWarranties = mockWarrantyCards.filter(mw => !existingNumbers.has((mw.cardNumber || '').toLowerCase()));
+                parsed.warranties = [...parsed.warranties, ...missingMockWarranties];
+            } else {
+                parsed.warranties = mockWarrantyCards;
+            }
             return parsed;
         }
     }
@@ -97,12 +105,42 @@ const loadSavedState = () => {
     }
     return null;
 };
+
+const normalizeProformaInvoices = (pis) => {
+    if (!Array.isArray(pis)) return [];
+    return pis.map((pi) => {
+        let paymentTerms = pi.paymentTerms;
+        let paymentSchedule = pi.paymentSchedule;
+        if (Array.isArray(paymentTerms)) {
+            if (!paymentSchedule || paymentSchedule.length === 0) {
+                paymentSchedule = paymentTerms.map((t) => ({
+                    milestone: t.milestone || t.name || 'Payment Milestone',
+                    pct: t.percentage ?? t.pct ?? 0,
+                    amount: t.amount,
+                    due: t.due || t.milestone || 'Standard Terms',
+                }));
+            }
+            paymentTerms = paymentTerms
+                .map((t) => (typeof t === 'string' ? t : `${t.percentage || t.pct || ''}% ${t.name || t.milestone || ''}`.trim()))
+                .filter(Boolean)
+                .join(' • ') || 'Custom Milestone Schedule';
+        } else if (paymentTerms && typeof paymentTerms === 'object') {
+            paymentTerms = paymentTerms.name || paymentTerms.milestone || 'Custom Terms';
+        }
+        return {
+            ...pi,
+            paymentTerms: paymentTerms || '50% Advance • 50% Before Dispatch',
+            paymentSchedule: paymentSchedule || [],
+        };
+    });
+};
+
 export const ERPProvider = ({ children, }) => {
     const initial = loadSavedState();
     const [estimates, setEstimates] = useState(initial?.estimates || mockEstimates);
     const [faultyParts, setFaultyParts] = useState(initial?.faultyParts || initialFaultyParts);
     const [invoices, setInvoices] = useState(initial?.invoices || initialSalesInvoices);
-    const [proformaInvoices, setProformaInvoices] = useState(initial?.proformaInvoices || mockProformaInvoices);
+    const [proformaInvoices, setProformaInvoices] = useState(() => normalizeProformaInvoices(initial?.proformaInvoices || mockProformaInvoices));
     const [zoneRequests, setZoneRequests] = useState(initial?.zoneRequests || initialZoneRequests);
     const [customers, setCustomers] = useState(initial?.customers || mockCustomers);
     const [vendors, setVendors] = useState(initial?.vendors || mockVendors);
@@ -130,6 +168,7 @@ export const ERPProvider = ({ children, }) => {
     const [bankAccounts, setBankAccounts] = useState(initial?.bankAccounts || mockBankAccounts);
     const [journalEntries, setJournalEntries] = useState(initial?.journalEntries || initialJournalEntries);
     const [inventoryMovements, setInventoryMovements] = useState(initial?.inventoryMovements || mockInventoryMovements);
+    const [warranties, setWarranties] = useState(initial?.warranties || mockWarrantyCards);
     const [currency, setCurrencyState] = useState(() => {
         return initial?.currency || localStorage.getItem('evenmore_currency') || 'USD ($)';
     });
@@ -193,6 +232,7 @@ export const ERPProvider = ({ children, }) => {
                 bankAccounts,
                 journalEntries,
                 inventoryMovements,
+                warranties,
                 currency,
             };
             localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
@@ -232,6 +272,7 @@ export const ERPProvider = ({ children, }) => {
         bankAccounts,
         journalEntries,
         inventoryMovements,
+        warranties,
         currency,
     ]);
     const showToast = (msg) => {
@@ -269,6 +310,7 @@ export const ERPProvider = ({ children, }) => {
         setBankAccounts(mockBankAccounts);
         setJournalEntries(initialJournalEntries);
         setInventoryMovements(mockInventoryMovements);
+        setWarranties(mockWarrantyCards);
         showToast('Factory demo data restored successfully.');
     };
     // ---------------- DOMAIN QUERIES ----------------
@@ -1128,13 +1170,18 @@ export const ERPProvider = ({ children, }) => {
             notes: pi.notes || 'Commercial Proforma Invoice.',
             termsAndConditions: pi.termsAndConditions || '',
         };
-        setProformaInvoices((prev) => [newPI, ...prev]);
-        showToast(`Proforma Invoice ${newPI.proformaNumber} created.`);
-        return newPI;
+        const normalizedPI = normalizeProformaInvoices([newPI])[0];
+        setProformaInvoices((prev) => [normalizedPI, ...prev]);
+        showToast(`Proforma Invoice ${normalizedPI.proformaNumber} created.`);
+        return normalizedPI;
     };
 
     const updateProformaInvoice = (id, updates) => {
-        setProformaInvoices((prev) => prev.map((pi) => (pi.id === id ? { ...pi, ...updates } : pi)));
+        setProformaInvoices((prev) => prev.map((pi) => {
+            if (pi.id !== id) return pi;
+            const merged = { ...pi, ...updates };
+            return normalizeProformaInvoices([merged])[0];
+        }));
         showToast(`Proforma Invoice updated.`);
     };
 
@@ -1274,6 +1321,12 @@ export const ERPProvider = ({ children, }) => {
             manufactureDate: item.manufactureDate || undefined,
             expiryDate: item.expiryDate || undefined,
             taxRate: Number(item.taxRate !== undefined ? item.taxRate : 18),
+            warrantyApplicable: Boolean(item.warrantyApplicable),
+            warrantyPeriod: item.warrantyPeriod !== undefined ? Number(item.warrantyPeriod) : 1,
+            warrantyUnit: item.warrantyUnit || 'Years',
+            warrantyStartEvent: item.warrantyStartEvent || 'Delivery',
+            manufacturerWarrantyPeriod: item.manufacturerWarrantyPeriod !== undefined ? Number(item.manufacturerWarrantyPeriod) : undefined,
+            manufacturerWarrantyUnit: item.manufacturerWarrantyUnit || undefined,
             availableQty: calculatedQty,
             reservedQty: item.reservedQty ?? 0,
             reorderLevel: item.reorderLevel ?? 5,
@@ -2201,6 +2254,19 @@ export const ERPProvider = ({ children, }) => {
 
         // 3. Mark Challan as Cancelled
         setDeliveryChallans((prev) => prev.map((c) => c.id === challanId ? { ...c, status: 'Cancelled' } : c));
+
+        // 4. Update linked Warranty Cards to Cancelled
+        setWarranties((prev) => prev.map((w) => {
+            if (w.deliveryChallanId === challanId || w.challanNumber === challan.challanNumber) {
+                return {
+                    ...w,
+                    documentStatus: 'Cancelled',
+                    coverageStatus: 'Cancelled',
+                };
+            }
+            return w;
+        }));
+
         showToast(`Delivery Challan ${challan.challanNumber} cancelled and stock reversed.`);
         return { success: true, message: `Challan ${challan.challanNumber} cancelled.` };
     };

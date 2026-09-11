@@ -411,11 +411,27 @@ export const ProformaInvoicesPage = () => {
       key: 'paymentTerms',
       header: 'Proposed Payment Terms',
       width: '17%',
-      render: (pi) => (
-        <span className="text-[11px] font-medium text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 block truncate" title={pi.paymentTerms}>
-          {pi.paymentTerms || 'Standard Terms'}
-        </span>
-      ),
+      render: (pi) => {
+        let termsText = 'Standard Terms';
+        if (typeof pi.paymentTerms === 'string' && pi.paymentTerms.trim()) {
+          termsText = pi.paymentTerms;
+        } else if (Array.isArray(pi.paymentTerms)) {
+          termsText = pi.paymentTerms.map((t) => {
+            if (typeof t === 'string') return t;
+            if (t && typeof t === 'object') return t.name || t.milestone || `${t.percentage ?? t.pct ?? ''}%`;
+            return '';
+          }).filter(Boolean).join(' • ') || 'Custom Milestone Schedule';
+        } else if (pi.paymentTerms && typeof pi.paymentTerms === 'object') {
+          termsText = pi.paymentTerms.name || pi.paymentTerms.milestone || 'Custom Terms';
+        } else if (Array.isArray(pi.paymentSchedule) && pi.paymentSchedule.length > 0) {
+          termsText = pi.paymentSchedule.map((s) => `${s.pct ?? s.percentage ?? 0}% ${s.milestone || ''}`).join(' • ');
+        }
+        return (
+          <span className="text-[11px] font-medium text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 block truncate" title={termsText}>
+            {termsText}
+          </span>
+        );
+      },
     },
     {
       key: 'amount',
@@ -557,12 +573,20 @@ export const ProformaInvoicesPage = () => {
         columns={columns}
         keyExtractor={(pi) => pi.id}
         searchPlaceholder="Search proforma #, customer, or payment terms..."
-        searchFilter={(pi, term) =>
-          (pi.proformaNumber || '').toLowerCase().includes(term) ||
-          (pi.customer || '').toLowerCase().includes(term) ||
-          (pi.paymentTerms || '').toLowerCase().includes(term) ||
-          (pi.status || '').toLowerCase().includes(term)
-        }
+        searchFilter={(pi, term) => {
+          let termsStr = '';
+          if (typeof pi.paymentTerms === 'string') {
+            termsStr = pi.paymentTerms;
+          } else if (Array.isArray(pi.paymentTerms)) {
+            termsStr = pi.paymentTerms.map((t) => (typeof t === 'string' ? t : (t.name || t.milestone || ''))).join(' ');
+          }
+          return (
+            (pi.proformaNumber || '').toLowerCase().includes(term) ||
+            (pi.customer || '').toLowerCase().includes(term) ||
+            termsStr.toLowerCase().includes(term) ||
+            (pi.status || '').toLowerCase().includes(term)
+          );
+        }}
       />
 
       {/* Create / Edit Proforma Modal (with Fullscreen option) */}

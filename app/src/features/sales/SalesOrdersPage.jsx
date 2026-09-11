@@ -162,12 +162,12 @@ export const SalesOrdersPage = () => {
             shippingAddress: cust?.shippingAddress || cust?.address || 'Plant 4, Industrial Zone, Gurgaon, HR',
             referenceSo: order.orderNumber,
             salesOrderId: order.id,
-            validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             paymentPreset: '50-40-10',
-            paymentTerms: [
-                { id: `pt-${Date.now()}-1`, name: 'Advance Booking Deposit', percentage: 50, amount: grandTotal * 0.5, milestone: 'Order Confirmation / Proforma Acceptance', status: 'Pending' },
-                { id: `pt-${Date.now()}-2`, name: 'Before Warehouse Dispatch', percentage: 40, amount: grandTotal * 0.4, milestone: 'Readiness Inspection', status: 'Pending' },
-                { id: `pt-${Date.now()}-3`, name: 'Post-Delivery / Final Invoice', percentage: 10, amount: grandTotal * 0.1, milestone: 'Final Tax Invoicing & Commissioning', status: 'Pending' },
+            paymentTerms: '50% Advance • 40% Before Dispatch • 10% Post-Delivery',
+            paymentSchedule: [
+                { milestone: 'Advance Booking Deposit', pct: 50, amount: grandTotal * 0.5, due: 'Order Confirmation / Proforma Acceptance' },
+                { milestone: 'Before Warehouse Dispatch', pct: 40, amount: grandTotal * 0.4, due: 'Readiness Inspection' },
+                { milestone: 'Post-Delivery / Final Invoice', pct: 10, amount: grandTotal * 0.1, due: 'Final Tax Invoicing & Commissioning' },
             ],
             notes: `Commercial Proforma issued for Sales Order ${order.orderNumber}. Non-negotiable price validity 30 days.`,
             termsAndConditions: '1. This Proforma Invoice is a commercial quotation and agreement document only. It does not constitute a legal Tax Invoice and creates no direct Accounting / AR liability.\n2. Machine warranties and service guarantees will commence strictly upon issuance of the Final Tax Invoice and successful site commissioning.',
