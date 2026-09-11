@@ -895,12 +895,33 @@ img { display: block; max-width: 100%; }
   color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 700;
-  text-align: left;
+  text-align: inherit;
   padding: 13px 14px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+
+.data-table thead th.text-left,
+.leads-table thead th.text-left,
+.data-table tbody td.text-left,
+.leads-table tbody td.text-left {
+  text-align: left !important;
+}
+
+.data-table thead th.text-center,
+.leads-table thead th.text-center,
+.data-table tbody td.text-center,
+.leads-table tbody td.text-center {
+  text-align: center !important;
+}
+
+.data-table thead th.text-right,
+.leads-table thead th.text-right,
+.data-table tbody td.text-right,
+.leads-table tbody td.text-right {
+  text-align: right !important;
 }
 
 .data-table thead th + th,

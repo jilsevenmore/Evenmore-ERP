@@ -28,6 +28,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
     } = useERP();
 
     const [isStockPickerOpen, setIsStockPickerOpen] = useState(false);
+    const [stockPickerTargetMachineId, setStockPickerTargetMachineId] = useState(null);
     const [pickerSearch, setPickerSearch] = useState('');
     const [pickerCategory, setPickerCategory] = useState('All');
     const [collapsedMachines, setCollapsedMachines] = useState({});
@@ -38,6 +39,20 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         [machineLineId]: !prev[machineLineId],
       }));
     };
+
+    const openStockPicker = (targetMachineId = null) => {
+      setStockPickerTargetMachineId(targetMachineId);
+      setIsStockPickerOpen(true);
+    };
+
+    // Find all machine lines currently in the document
+    const activeMachines = useMemo(() => {
+      return items.filter((it) => {
+        if (it.isBomPart) return false;
+        const mObj = masterItems.find((mi) => mi.id === it.itemId || mi.sku === it.sku);
+        return mObj?.itemKind === 'Machine' || items.some((child) => child.parentLineId === it.id);
+      });
+    }, [items, masterItems]);
 
     // Ensure there is at least one default empty line item for editable forms
     useEffect(() => {
@@ -110,6 +125,62 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             onChange([...items, newItem, ...childLines]);
         } else {
             onChange([...items, newItem]);
+        }
+    };
+
+    // Handler to add a stock item either as a Top-Level line or as a Sub-Component to a Machine
+    const handleAddStockItem = (defaultItem, targetMachineId = null) => {
+        if (!defaultItem) return;
+
+        const unitRate = type === 'sales'
+            ? (defaultItem.sellingPrice || 0)
+            : (defaultItem.costPrice || 0);
+
+        if (targetMachineId) {
+            const parentIndex = items.findIndex((it) => it.id === targetMachineId);
+            const parentMachine = items[parentIndex];
+            if (parentIndex === -1 || !parentMachine) {
+                handleAddItem(defaultItem);
+                return;
+            }
+
+            const childLine = {
+                id: `li-bom-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
+                itemId: defaultItem.id,
+                sku: defaultItem.sku || '',
+                itemSku: defaultItem.sku || '',
+                name: defaultItem.name,
+                description: `${defaultItem.name} (Custom Part for ${parentMachine.name || parentMachine.sku})`,
+                qty: 1,
+                rate: unitRate,
+                discount: 0,
+                tax: 18,
+                amount: Math.round(unitRate * 1.18 * 100) / 100,
+                isBomGenerated: true,
+                isBomPart: true,
+                isUserModified: true,
+                isCustomAddedPart: true,
+                parentLineId: parentMachine.id,
+                bomSourceItemId: parentMachine.itemId,
+                parentSku: parentMachine.sku || parentMachine.itemSku,
+            };
+
+            // Find insertion position: after the last child of this parent machine
+            let insertIndex = parentIndex + 1;
+            while (insertIndex < items.length && items[insertIndex].parentLineId === parentMachine.id) {
+                insertIndex++;
+            }
+
+            const newItems = [...items];
+            newItems.splice(insertIndex, 0, childLine);
+
+            if (collapsedMachines[parentMachine.id]) {
+                setCollapsedMachines((prev) => ({ ...prev, [parentMachine.id]: false }));
+            }
+
+            onChange(newItems);
+        } else {
+            handleAddItem(defaultItem);
         }
     };
 
@@ -361,249 +432,285 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                 const deficit = masterObj ? Math.max(0, (item.qty || 1) - availableStock) : 0;
                 const isShortage = masterObj ? deficit > 0 : false;
 
+                const nextItem = displayItems[index + 1];
+                const isLastChildOfMachine = item.isBomPart && (!nextItem || nextItem.parentLineId !== item.parentLineId);
+                const isStandaloneMachineWithoutChildren = isMachine && childPartsCount === 0 && !collapsedMachines[item.id];
+                const targetMachineIdForSubAdd = item.parentLineId || item.id;
+
                 return (
-                  <tr
-                    key={item.id || index}
-                    className={`hover:bg-card-hover transition-colors ${
-                      item.isBomPart
-                        ? 'bg-purple-500/[0.04] dark:bg-purple-950/20'
-                        : isMachine
-                        ? 'bg-blue-500/[0.03] dark:bg-blue-950/20 font-medium'
-                        : isShortage
-                        ? 'bg-amber-500/5'
-                        : ''
-                    }`}
-                  >
-                    <td className="px-3.5 py-2.5 align-top">
-                      {!readOnly ? (
-                        item.isBomPart ? (
-                          /* Indented Child Component Display */
-                          <div className="pl-6 relative">
-                            {/* Branch connector line */}
-                            <div className="absolute left-1.5 top-0 bottom-4 w-3.5 border-l-2 border-b-2 border-purple-400/50 dark:border-purple-600/60 rounded-bl-lg pointer-events-none" />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700 px-2 py-0.5 rounded-full shrink-0"
-                                  title={`Included part for ${item.parentSku || 'Machine'}`}
-                                >
-                                  <Boxes size={10} /> Component
-                                </span>
-                                <span className="font-bold text-text text-xs">
-                                  {item.name || item.description}
-                                </span>
-                                {item.itemSku && (
-                                  <span className="font-mono text-[10px] text-muted">
-                                    [{item.itemSku}]
+                  <React.Fragment key={item.id || index}>
+                    <tr
+                      className={`hover:bg-card-hover transition-colors ${
+                        item.isBomPart
+                          ? 'bg-purple-500/[0.04] dark:bg-purple-950/20'
+                          : isMachine
+                          ? 'bg-blue-500/[0.03] dark:bg-blue-950/20 font-medium'
+                          : isShortage
+                          ? 'bg-amber-500/5'
+                          : ''
+                      }`}
+                    >
+                      <td className="px-3.5 py-2.5 align-top">
+                        {!readOnly ? (
+                          item.isBomPart ? (
+                            /* Indented Child Component Display */
+                            <div className="pl-6 relative">
+                              {/* Branch connector line */}
+                              <div className="absolute left-1.5 top-0 bottom-4 w-3.5 border-l-2 border-b-2 border-purple-400/50 dark:border-purple-600/60 rounded-bl-lg pointer-events-none" />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/40 border border-purple-300 dark:border-purple-700 px-2 py-0.5 rounded-full shrink-0"
+                                    title={`Included part for ${item.parentSku || 'Machine'}`}
+                                  >
+                                    <Boxes size={10} /> Component
                                   </span>
-                                )}
+                                  <span className="font-bold text-text text-xs">
+                                    {item.name || item.description}
+                                  </span>
+                                  {item.itemSku && (
+                                    <span className="font-mono text-[10px] text-muted">
+                                      [{item.itemSku}]
+                                    </span>
+                                  )}
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="Component serial / notes..."
+                                  value={item.description || ''}
+                                  onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
+                                  className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                                />
                               </div>
+                            </div>
+                          ) : (
+                            /* Top-Level Item / Machine Selector */
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <select
+                                  value={item.itemId || ''}
+                                  onChange={(e) => handleItemSelect(index, e.target.value)}
+                                  className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition cursor-pointer"
+                                >
+                                  <option value="">-- Select Master Item --</option>
+                                  {masterItems.map((mi) => (
+                                    <option key={mi.id} value={mi.id}>
+                                      [{mi.sku}] {mi.name} {mi.itemKind === 'Machine' ? '(Machine & BOM)' : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              {isMachine && (
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                  {childPartsCount > 0 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleCollapse(item.id)}
+                                      className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold rounded-md text-purple-700 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-700 transition cursor-pointer shadow-2xs"
+                                    >
+                                      <ChevronDown
+                                        size={12}
+                                        className={`transition-transform duration-200 ${collapsedMachines[item.id] ? '-rotate-90' : 'rotate-0'}`}
+                                      />
+                                      <Layers size={11} />
+                                      <span>
+                                        {collapsedMachines[item.id]
+                                          ? `Show ${childPartsCount} Components`
+                                          : `${childPartsCount} Components Included`}
+                                      </span>
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => openStockPicker(item.id)}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/40 hover:bg-purple-100 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-700 transition cursor-pointer shadow-2xs"
+                                    title={`Pick from stock to add component specifically to ${item.name || 'this machine'}`}
+                                  >
+                                    <Boxes size={10} />
+                                    <span>+ Add Component</span>
+                                  </button>
+                                </div>
+                              )}
                               <input
                                 type="text"
-                                placeholder="Component serial / notes..."
+                                placeholder="Custom line description / serial notes..."
                                 value={item.description || ''}
                                 onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
                                 className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
                               />
                             </div>
-                          </div>
+                          )
                         ) : (
-                          /* Top-Level Item / Machine Selector */
                           <div>
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={item.itemId || ''}
-                                onChange={(e) => handleItemSelect(index, e.target.value)}
-                                className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition cursor-pointer"
-                              >
-                                <option value="">-- Select Master Item --</option>
-                                {masterItems.map((mi) => (
-                                  <option key={mi.id} value={mi.id}>
-                                    [{mi.sku}] {mi.name} {mi.itemKind === 'Machine' ? '(Machine & BOM)' : ''}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            {isMachine && childPartsCount > 0 && (
-                              <div className="flex items-center gap-2 mt-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => toggleCollapse(item.id)}
-                                  className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[10px] font-bold rounded-md text-purple-700 dark:text-purple-300 bg-purple-100/80 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 border border-purple-300 dark:border-purple-700 transition cursor-pointer shadow-2xs"
-                                >
-                                  <ChevronDown
-                                    size={12}
-                                    className={`transition-transform duration-200 ${collapsedMachines[item.id] ? '-rotate-90' : 'rotate-0'}`}
-                                  />
-                                  <Layers size={11} />
-                                  <span>
-                                    {collapsedMachines[item.id]
-                                      ? `Show ${childPartsCount} Components`
-                                      : `${childPartsCount} Components Included`}
+                            {item.isBomPart ? (
+                              <div className="pl-5 relative flex items-center gap-1.5">
+                                <div className="absolute left-1.5 top-0 bottom-2 w-2.5 border-l-2 border-b-2 border-purple-400/50 dark:border-purple-600/60 rounded-bl pointer-events-none" />
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded-full">
+                                  <Boxes size={10} /> Component
+                                </span>
+                                <span className="font-semibold text-text">{item.name || item.description}</span>
+                              </div>
+                            ) : (
+                              <div>
+                                <p className="font-bold text-text">{item.name || item.description || '—'}</p>
+                                {item.itemSku && (
+                                  <span className="text-[10px] text-muted font-mono block mt-0.5">
+                                    SKU: {item.itemSku}
                                   </span>
-                                </button>
+                                )}
                               </div>
                             )}
-                            <input
-                              type="text"
-                              placeholder="Custom line description / serial notes..."
-                              value={item.description || ''}
-                              onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
-                              className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
-                            />
                           </div>
-                        )
-                      ) : (
-                        <div>
-                          {item.isBomPart ? (
-                            <div className="pl-5 relative flex items-center gap-1.5">
-                              <div className="absolute left-1.5 top-0 bottom-2 w-2.5 border-l-2 border-b-2 border-purple-400/50 dark:border-purple-600/60 rounded-bl pointer-events-none" />
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-600 dark:text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded-full">
-                                <Boxes size={10} /> Component
-                              </span>
-                              <span className="font-semibold text-text">{item.name || item.description}</span>
-                            </div>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-2.5 text-center align-top">
+                        <div className="flex flex-col items-center gap-1">
+                          {!item.itemId ? (
+                            <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full border border-border text-muted bg-soft">
+                              —
+                            </span>
                           ) : (
-                            <div>
-                              <p className="font-bold text-text">{item.name || item.description || '—'}</p>
-                              {item.itemSku && (
-                                <span className="text-[10px] text-muted font-mono block mt-0.5">
-                                  SKU: {item.itemSku}
+                            <>
+                              <span
+                                className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full border ${
+                                  availableStock <= 0
+                                    ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800'
+                                    : isShortage
+                                    ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800'
+                                    : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
+                                }`}
+                              >
+                                {availableStock} Avail
+                              </span>
+                              {isShortage && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
+                                  <AlertTriangle size={10} /> Short: {deficit}
                                 </span>
                               )}
-                            </div>
+                              {isShortage && onRequestPO && !readOnly && (
+                                <button
+                                  type="button"
+                                  onClick={() => onRequestPO(item, deficit)}
+                                  className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 text-[10px] font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-md transition cursor-pointer shadow-2xs"
+                                  title={`Shortage of ${deficit} units. Click to raise an Auto PO to supplier.`}
+                                >
+                                  <ShoppingCart size={10}/> +PO ({deficit})
+                                </button>
+                              )}
+                            </>
                           )}
                         </div>
-                      )}
-                    </td>
+                      </td>
 
-                    <td className="px-3 py-2.5 text-center align-top">
-                      <div className="flex flex-col items-center gap-1">
-                        {!item.itemId ? (
-                          <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full border border-border text-muted bg-soft">
-                            —
-                          </span>
-                        ) : (
-                          <>
-                            <span
-                              className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                                availableStock <= 0
-                                  ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-800'
-                                  : isShortage
-                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800'
-                                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800'
-                              }`}
-                            >
-                              {availableStock} Avail
-                            </span>
-                            {isShortage && (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-600 dark:text-amber-400">
-                                <AlertTriangle size={10} /> Short: {deficit}
-                              </span>
-                            )}
-                            {isShortage && onRequestPO && !readOnly && (
-                              <button
-                                type="button"
-                                onClick={() => onRequestPO(item, deficit)}
-                                className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 text-[10px] font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-md transition cursor-pointer shadow-2xs"
-                                title={`Shortage of ${deficit} units. Click to raise an Auto PO to supplier.`}
-                              >
-                                <ShoppingCart size={10}/> +PO ({deficit})
-                              </button>
-                            )}
-                          </>
+                      <td className="px-3 py-2.5 text-center align-top">
+                        {!readOnly ? (() => {
+                          const unit = (masterObj?.salesUnit || masterObj?.uom || masterObj?.unit || 'Nos').toLowerCase();
+                          const allowsDecimal = ['kg', 'mtr', 'meter', 'ltr', 'liter', 'ton'].includes(unit);
+                          return (
+                            <input
+                              type="number"
+                              min={allowsDecimal ? "0.01" : "1"}
+                              step={allowsDecimal ? "0.01" : "1"}
+                              value={item.qty ?? 1}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (isNaN(val) || val <= 0) {
+                                  handleFieldChange(index, 'qty', allowsDecimal ? 0.01 : 1);
+                                } else {
+                                  handleFieldChange(index, 'qty', allowsDecimal ? val : Math.floor(val));
+                                }
+                              }}
+                              className="w-16 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
+                            />
+                          );
+                        })() : (
+                          <span className="font-bold text-text">{item.qty}</span>
                         )}
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="px-3 py-2.5 text-center align-top">
-                      {!readOnly ? (() => {
-                        const unit = (masterObj?.salesUnit || masterObj?.uom || masterObj?.unit || 'Nos').toLowerCase();
-                        const allowsDecimal = ['kg', 'mtr', 'meter', 'ltr', 'liter', 'ton'].includes(unit);
-                        return (
+                      <td className="px-3 py-2.5 text-right align-top">
+                        {!readOnly ? (
                           <input
                             type="number"
-                            min={allowsDecimal ? "0.01" : "1"}
-                            step={allowsDecimal ? "0.01" : "1"}
-                            value={item.qty ?? 1}
-                            onChange={(e) => {
-                              const val = parseFloat(e.target.value);
-                              if (isNaN(val) || val <= 0) {
-                                handleFieldChange(index, 'qty', allowsDecimal ? 0.01 : 1);
-                              } else {
-                                handleFieldChange(index, 'qty', allowsDecimal ? val : Math.floor(val));
-                              }
-                            }}
-                            className="w-16 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
+                            min="0"
+                            step="0.01"
+                            value={item.rate ?? 0}
+                            onChange={(e) => handleFieldChange(index, 'rate', Math.max(0, Number(e.target.value)))}
+                            className="w-24 text-right font-mono text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition ml-auto"
                           />
-                        );
-                      })() : (
-                        <span className="font-bold text-text">{item.qty}</span>
-                      )}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-right align-top">
-                      {!readOnly ? (
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.rate ?? 0}
-                          onChange={(e) => handleFieldChange(index, 'rate', Math.max(0, Number(e.target.value)))}
-                          className="w-24 text-right font-mono text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition ml-auto"
-                        />
-                      ) : (
-                        <span className="font-mono font-semibold text-text">₹{Number(item.rate || 0).toFixed(2)}</span>
-                      )}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-center align-top">
-                      {!readOnly ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={item.discount || 0}
-                          onChange={(e) => handleFieldChange(index, 'discount', Number(e.target.value))}
-                          className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
-                        />
-                      ) : (
-                        <span className="text-text">{item.discount || 0}%</span>
-                      )}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-center align-top">
-                      {!readOnly ? (
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={item.tax ?? 18}
-                          onChange={(e) => handleFieldChange(index, 'tax', Number(e.target.value))}
-                          className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
-                        />
-                      ) : (
-                        <span className="text-text">{item.tax ?? 18}%</span>
-                      )}
-                    </td>
-
-                    <td className="px-3.5 py-2.5 text-right align-top font-mono font-bold text-text tabular-nums">
-                      ₹{(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-
-                    {!readOnly && (
-                      <td className="px-2 py-2.5 text-center align-top">
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(index)}
-                          className="p-1.5 text-muted hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
-                          title={isMachine ? "Remove machine and all associated parts" : "Remove item"}
-                        >
-                          <Trash2 className="w-4 h-4"/>
-                        </button>
+                        ) : (
+                          <span className="font-mono font-semibold text-text">₹{Number(item.rate || 0).toFixed(2)}</span>
+                        )}
                       </td>
+
+                      <td className="px-3 py-2.5 text-center align-top">
+                        {!readOnly ? (
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={item.discount || 0}
+                            onChange={(e) => handleFieldChange(index, 'discount', Number(e.target.value))}
+                            className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
+                          />
+                        ) : (
+                          <span className="text-text">{item.discount || 0}%</span>
+                        )}
+                      </td>
+
+                      <td className="px-3 py-2.5 text-center align-top">
+                        {!readOnly ? (
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={item.tax ?? 18}
+                            onChange={(e) => handleFieldChange(index, 'tax', Number(e.target.value))}
+                            className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
+                          />
+                        ) : (
+                          <span className="text-text">{item.tax ?? 18}%</span>
+                        )}
+                      </td>
+
+                      <td className="px-3.5 py-2.5 text-right align-top font-mono font-bold text-text tabular-nums">
+                        ₹{(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </td>
+
+                      {!readOnly && (
+                        <td className="px-2 py-2.5 text-center align-top">
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(index)}
+                            className="p-1.5 text-muted hover:text-rose-600 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+                            title={isMachine ? "Remove machine and all associated parts" : "Remove item"}
+                          >
+                            <Trash2 className="w-4 h-4"/>
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+
+                    {/* Inline connector button to add another component to this machine */}
+                    {!readOnly && (isLastChildOfMachine || isStandaloneMachineWithoutChildren) && (
+                      <tr key={`add-part-btn-${targetMachineIdForSubAdd}`} className="bg-purple-500/[0.02] dark:bg-purple-950/10">
+                        <td colSpan={8} className="px-3.5 py-1.5 border-b border-border/40">
+                          <div className="pl-6 relative flex items-center gap-2">
+                            <div className="absolute left-1.5 top-0 bottom-1/2 w-3.5 border-l-2 border-b-2 border-dashed border-purple-400/50 dark:border-purple-600/60 rounded-bl pointer-events-none" />
+                            <button
+                              type="button"
+                              onClick={() => openStockPicker(targetMachineIdForSubAdd)}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100/70 dark:bg-purple-900/40 hover:bg-purple-200 dark:hover:bg-purple-900/60 border border-dashed border-purple-300 dark:border-purple-700 rounded-lg transition cursor-pointer shadow-2xs"
+                            >
+                              <Boxes size={11} />
+                              <span>+ Add Component to this Machine</span>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </React.Fragment>
                 );
               })
             )}
@@ -625,7 +732,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             </button>
             <button
               type="button"
-              onClick={() => setIsStockPickerOpen(true)}
+              onClick={() => openStockPicker(null)}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-purple-600 dark:text-purple-400 bg-purple-500/10 border border-purple-400/30 hover:bg-purple-600 hover:text-white transition cursor-pointer shadow-2xs"
             >
               <Boxes className="w-3.5 h-3.5"/>
@@ -656,16 +763,25 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         </div>
       </div>
 
-      {/* Stock Item Picker Modal for adding any standalone stock component */}
+      {/* Stock Item Picker Modal for adding any standalone stock item or machine component */}
       {isStockPickerOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-2xs p-4 animate-in fade-in duration-150">
           <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col text-text">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <h3 className="font-bold text-base text-text flex items-center gap-2">
-                  <Package className="text-purple-600" size={18} /> Add Stock Item to Transaction
+                  <Package className="text-purple-600 shrink-0" size={18} />
+                  <span>
+                    {stockPickerTargetMachineId
+                      ? `Add Component to Machine`
+                      : `Add Stock Item to Transaction`}
+                  </span>
                 </h3>
-                <p className="text-xs text-muted">Search and insert any product or component from active inventory.</p>
+                <p className="text-xs text-muted">
+                  {stockPickerTargetMachineId
+                    ? 'Search and attach inventory parts directly into this machine bundle for this bill.'
+                    : 'Search and insert any product or machine from active inventory.'}
+                </p>
               </div>
               <button
                 onClick={() => setIsStockPickerOpen(false)}
@@ -674,6 +790,30 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                 <X size={18} />
               </button>
             </div>
+
+            {/* Destination Target Selector (if machines exist in document) */}
+            {activeMachines.length > 0 && (
+              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-purple-500/[0.05] dark:bg-purple-950/30 border border-purple-300/60 dark:border-purple-800 text-xs">
+                <span className="font-bold text-text-secondary whitespace-nowrap">Target Destination:</span>
+                <select
+                  value={stockPickerTargetMachineId || 'top-level'}
+                  onChange={(e) => setStockPickerTargetMachineId(e.target.value === 'top-level' ? null : e.target.value)}
+                  className="flex-1 py-1.5 px-2.5 text-xs font-semibold rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary cursor-pointer"
+                >
+                  <option value="top-level">📦 New Top-Level Line Item (Independent)</option>
+                  {activeMachines.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      ⚙️ Sub-Component of: {m.name || m.description || m.sku} [{m.sku || 'Machine'}]
+                    </option>
+                  ))}
+                </select>
+                {stockPickerTargetMachineId && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/50 px-2 py-0.5 rounded-full border border-purple-300 dark:border-purple-700 shrink-0">
+                    <Boxes size={10} /> Attaching as Component
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Filter controls */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -685,13 +825,14 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                   value={pickerSearch}
                   onChange={(e) => setPickerSearch(e.target.value)}
                   className="w-full pl-8 pr-3 py-2 border border-border rounded-xl bg-soft text-text text-xs focus:bg-card focus:outline-none focus:border-primary transition"
+                  autoFocus
                 />
               </div>
               <div>
                 <select
                   value={pickerCategory}
                   onChange={(e) => setPickerCategory(e.target.value)}
-                  className="w-full py-2 px-3 border border-border rounded-xl bg-soft text-text text-xs focus:bg-card focus:outline-none focus:border-primary transition font-medium"
+                  className="w-full py-2 px-3 border border-border rounded-xl bg-soft text-text text-xs focus:bg-card focus:outline-none focus:border-primary transition font-medium cursor-pointer"
                 >
                   <option value="All">All Categories</option>
                   {categories.map((c) => (
@@ -713,14 +854,14 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                     key={it.id}
                     type="button"
                     onClick={() => {
-                      handleAddItem(it);
+                      handleAddStockItem(it, stockPickerTargetMachineId);
                       setIsStockPickerOpen(false);
                       setPickerSearch('');
                     }}
-                    className="w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-soft transition cursor-pointer text-text"
+                    className="w-full flex items-center justify-between gap-3 p-3 text-left hover:bg-card-hover transition cursor-pointer text-text group"
                   >
                     <div>
-                      <div className="font-bold text-text flex items-center gap-2">
+                      <div className="font-bold text-text flex items-center gap-2 group-hover:text-primary transition-colors">
                         {it.name}
                         {it.itemKind === 'Machine' && (
                           <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded font-semibold">
@@ -736,11 +877,13 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                         <span>Rate: ₹{type === 'sales' ? it.sellingPrice : it.costPrice}</span>
                       </div>
                     </div>
-                    <div className="text-right font-mono">
-                      <span className="text-xs font-bold text-text">
+                    <div className="text-right font-mono shrink-0">
+                      <span className="text-xs font-bold text-text block">
                         {it.availableQty ?? it.stock ?? 0} {it.salesUnit || it.uom || 'Unit'}
                       </span>
-                      <div className="text-[10px] text-muted">In Stock</div>
+                      <span className="text-[10px] text-primary font-sans font-semibold group-hover:underline">
+                        {stockPickerTargetMachineId ? '+ Attach to Machine' : '+ Insert Item'}
+                      </span>
                     </div>
                   </button>
                 ))
@@ -760,5 +903,6 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
           </div>
         </div>
       )}
-    </div>);
+    </div>
+  );
 };

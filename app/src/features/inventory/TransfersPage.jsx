@@ -54,54 +54,62 @@ export const TransfersPage = () => {
         {
             key: 'transferNumber',
             header: 'Transfer Ref #',
-            render: (t) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <ArrowLeftRight size={13} className="text-[#1F2E4A]"/> {t.transferNumber}
+            width: '15%',
+            render: (t) => (<span className="font-mono font-bold text-text-secondary flex items-center gap-1.5">
+          <ArrowLeftRight size={13} className="text-primary"/> {t.transferNumber}
         </span>),
         },
         {
             key: 'sourceLocation',
             header: 'Origin Facility',
-            render: (t) => <span className="font-semibold text-slate-700">{t.sourceLocation}</span>,
+            width: '15%',
+            render: (t) => <span className="font-semibold text-text-secondary">{t.sourceLocation}</span>,
         },
         {
             key: 'destLocation',
             header: 'Destination Facility',
-            render: (t) => <span className="font-bold text-[#1F2E4A]">{t.destLocation}</span>,
+            width: '15%',
+            render: (t) => <span className="font-bold text-text">{t.destLocation}</span>,
         },
         {
             key: 'date',
             header: 'Movement Date',
-            render: (t) => <span className="text-slate-600">{t.date}</span>,
+            width: '12%',
+            render: (t) => <span className="text-muted font-mono text-[11px]">{t.date}</span>,
         },
         {
             key: 'itemsCount',
             header: 'Line Items Moved',
             align: 'center',
-            render: (t) => (<span className="font-mono font-bold text-slate-800">
+            width: '11%',
+            render: (t) => (<span className="font-mono font-bold text-text">
           {t.items?.length || t.itemsCount || 1} SKUs
         </span>),
         },
         {
             key: 'shippedBy',
             header: 'Dispatched By',
-            render: (t) => (<span className="text-slate-600 text-xs flex items-center gap-1">
-          <User size={12} className="text-slate-400"/> {t.shippedBy}
+            width: '12%',
+            render: (t) => (<span className="text-text-secondary text-xs flex items-center gap-1">
+          <User size={12} className="text-muted"/> {t.shippedBy}
         </span>),
         },
         {
             key: 'status',
             header: 'Transfer Status',
             align: 'center',
+            width: '10%',
             render: (t) => <StatusBadge status={t.status}/>,
         },
         {
             key: 'actions',
             header: 'Intake Confirmation',
             align: 'right',
-            render: (t) => t.status !== 'Received' ? (<button onClick={() => markReceived(t.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 ml-auto shadow-sm">
+            width: '10%',
+            render: (t) => t.status !== 'Received' ? (<button onClick={() => markReceived(t.id)} className="px-2.5 py-1 bg-primary text-white rounded text-[11px] font-semibold hover:bg-primary-hover cursor-pointer flex items-center gap-1 ml-auto shadow-2xs">
             <CheckCircle2 size={11}/> Confirm Intake
-          </button>) : (<span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1 justify-end">
-            <CheckCircle2 size={12}/> Stock Restocked
+          </button>) : (<span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end">
+            <CheckCircle2 size={12}/> Restocked
           </span>),
         },
     ];

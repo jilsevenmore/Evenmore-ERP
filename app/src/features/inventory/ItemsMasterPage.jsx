@@ -95,7 +95,7 @@ export const ItemsMasterPage = () => {
         {
             key: 'sku',
             header: 'SKU / Model #',
-            width: '16%',
+            width: '14%',
             render: (i) => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
                 <Link to={`/inventory/items/edit/${i.id}`} className="font-mono font-bold text-primary hover:underline">
@@ -112,7 +112,7 @@ export const ItemsMasterPage = () => {
         {
             key: 'name',
             header: 'Description & Taxonomy',
-            width: '30%',
+            width: '26%',
             render: (i) => {
               const machinePartsCount = i.itemKind === 'Machine'
                 ? itemParts.filter(ip => String(ip.itemId) === String(i.id)).length

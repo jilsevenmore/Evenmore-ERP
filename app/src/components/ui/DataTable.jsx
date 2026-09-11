@@ -208,7 +208,7 @@ export function DataTable({
                       <button
                         type="button"
                         className={`inline-flex items-center gap-1 font-bold text-text-secondary hover:text-primary transition cursor-pointer ${
-                          col.align === 'right' ? 'ml-auto' : col.align === 'center' ? 'mx-auto' : ''
+                          col.align === 'right' ? 'ml-auto justify-end' : col.align === 'center' ? 'mx-auto justify-center' : 'justify-start'
                         }`}
                         onClick={() => toggleSort(colKey)}
                       >
@@ -219,7 +219,9 @@ export function DataTable({
                         />
                       </button>
                     ) : (
-                      <span>{colTitle}</span>
+                      <div className={`w-full ${col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'}`}>
+                        <span>{colTitle}</span>
+                      </div>
                     )}
                   </th>
                 );

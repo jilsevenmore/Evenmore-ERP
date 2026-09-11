@@ -56,29 +56,34 @@ export const MonthEndAuditPage = () => {
         {
             key: 'sku',
             header: 'SKU Code',
-            render: (a) => <span className="font-mono font-bold text-slate-800">{a.sku}</span>,
+            width: '12%',
+            render: (a) => <span className="font-mono font-bold text-primary">{a.sku}</span>,
         },
         {
             key: 'name',
             header: 'Item Description',
-            render: (a) => (<span className="font-semibold text-[#1F2E4A]">{a.name}</span>),
+            width: '22%',
+            render: (a) => (<span className="font-semibold text-text">{a.name}</span>),
         },
         {
             key: 'location',
             header: 'Assigned Bay / Zone',
-            render: (a) => <span className="text-slate-600 text-xs">{a.location}</span>,
+            width: '14%',
+            render: (a) => <span className="text-muted text-xs">{a.location}</span>,
         },
         {
             key: 'systemQty',
             header: 'System Book Qty',
             align: 'center',
-            render: (a) => <span className="font-mono text-slate-700">{a.systemQty}</span>,
+            width: '10%',
+            render: (a) => <span className="font-mono text-text-secondary">{a.systemQty}</span>,
         },
         {
             key: 'physicalCount',
             header: 'Physical Headcount',
             align: 'center',
-            render: (a) => (<span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
+            width: '12%',
+            render: (a) => (<span className="font-mono font-bold text-text bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
           {a.physicalCount}
         </span>),
         },
@@ -86,9 +91,10 @@ export const MonthEndAuditPage = () => {
             key: 'variance',
             header: 'Unit Variance',
             align: 'center',
-            render: (a) => a.variance === 0 ? (<span className="text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1">
+            width: '10%',
+            render: (a) => a.variance === 0 ? (<span className="text-emerald-600 dark:text-emerald-400 text-xs font-semibold flex items-center justify-center gap-1">
             <CheckCircle2 size={12}/> Match
-          </span>) : (<span className="text-rose-700 text-xs font-semibold flex items-center justify-center gap-1">
+          </span>) : (<span className="text-rose-600 dark:text-rose-400 text-xs font-semibold flex items-center justify-center gap-1">
             <AlertTriangle size={12}/> {a.variance} units
           </span>),
         },
@@ -96,7 +102,8 @@ export const MonthEndAuditPage = () => {
             key: 'varianceCost',
             header: 'Fiscal Variance',
             align: 'right',
-            render: (a) => (<span className={`font-mono font-bold ${a.varianceCost < 0 ? 'text-rose-700' : 'text-slate-900'}`}>
+            width: '11%',
+            render: (a) => (<span className={`font-mono font-bold ${a.varianceCost < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-text'}`}>
           {a.varianceCost < 0
                     ? `-${formatCurrency(Math.abs(a.varianceCost))}`
                     : formatCurrency(a.varianceCost)}
@@ -106,15 +113,17 @@ export const MonthEndAuditPage = () => {
             key: 'status',
             header: 'Audit Status',
             align: 'center',
+            width: '9%',
             render: (a) => <StatusBadge status={a.status}/>,
         },
         {
             key: 'actions',
             header: 'Adjustment',
             align: 'right',
-            render: (a) => a.status === 'Variance Flagged' && !auditLocked ? (<button onClick={() => reconcileItem(a.id)} className="px-2 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer">
+            width: '8%',
+            render: (a) => a.status === 'Variance Flagged' && !auditLocked ? (<button onClick={() => reconcileItem(a.id)} className="px-2 py-1 bg-primary text-white rounded text-[11px] font-semibold hover:bg-primary-hover cursor-pointer shadow-2xs">
             Post Adjustment
-          </button>) : (<span className="text-slate-400 text-xs">Locked</span>),
+          </button>) : (<span className="text-muted text-xs">Locked</span>),
         },
     ];
     return (<div className="space-y-6">

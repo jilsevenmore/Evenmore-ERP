@@ -104,6 +104,7 @@ export default function PartiesPage() {
     {
       header: 'Party Code & Name',
       key: 'name',
+      width: '26%',
       render: (party) => {
         const partyName = safeString(party?.name || party?.companyName || party?.company, 'Unnamed Party');
         const initial = getInitial(partyName, 'P');
@@ -115,21 +116,21 @@ export default function PartiesPage() {
               {initial}
             </div>
             <div>
-              <div className="font-bold text-slate-800 text-xs flex items-center gap-2">
+              <div className="font-bold text-text text-xs flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => handleView(party)}
-                  className="hover:text-blue-600 hover:underline text-left font-bold"
+                  className="hover:text-primary hover:underline text-left font-bold cursor-pointer"
                 >
                   {partyName}
                 </button>
                 {party?.type === 'Both' && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 font-bold border border-purple-200">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 font-bold border border-purple-200 dark:border-purple-800">
                     Dual
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+              <div className="text-[11px] text-muted flex items-center gap-2 mt-0.5">
                 <span className="font-mono font-medium">{partyCode}</span>
                 {gstin && (
                   <>
@@ -147,14 +148,15 @@ export default function PartiesPage() {
       header: 'Type',
       key: 'type',
       align: 'center',
+      width: '10%',
       render: (party) => {
         const type = party.type;
         const colorClasses =
           type === 'Customer'
-            ? 'bg-blue-50 text-blue-700 border-blue-200'
+            ? 'bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800'
             : type === 'Vendor'
-            ? 'bg-amber-50 text-amber-700 border-amber-200'
-            : 'bg-purple-50 text-purple-700 border-purple-200';
+            ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800'
+            : 'bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-purple-200 dark:border-purple-800';
 
         return (
           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${colorClasses}`}>
@@ -166,15 +168,16 @@ export default function PartiesPage() {
     {
       header: 'Primary Contact',
       key: 'phone',
+      width: '18%',
       render: (party) => (
         <div className="text-xs space-y-0.5">
-          <div className="font-medium text-slate-800 flex items-center gap-1.5">
-            <Phone className="w-3 h-3 text-blue-500" />
+          <div className="font-medium text-text flex items-center gap-1.5">
+            <Phone className="w-3 h-3 text-primary" />
             {party.phone || '—'}
           </div>
           {party.email && (
-            <div className="text-slate-400 text-[11px] flex items-center gap-1.5">
-              <Mail className="w-3 h-3 text-slate-400" />
+            <div className="text-muted text-[11px] flex items-center gap-1.5">
+              <Mail className="w-3 h-3 text-muted" />
               {party.email}
             </div>
           )}
@@ -184,8 +187,9 @@ export default function PartiesPage() {
     {
       header: 'GST Treatment',
       key: 'gstTreatment',
+      width: '14%',
       render: (party) => (
-        <span className="text-[11px] text-slate-600 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/80">
+        <span className="text-[11px] text-text-secondary bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md border border-border">
           {party.gstTreatment || 'Unregistered Business'}
         </span>
       ),
@@ -194,15 +198,16 @@ export default function PartiesPage() {
       header: 'Balance',
       key: 'balance',
       align: 'right',
+      width: '14%',
       render: (party) => {
         const bal = party.balance || 0;
         const isPositive = bal > 0;
         return (
           <div className="text-right">
-            <div className={`font-semibold font-mono text-xs ${isPositive ? 'text-amber-700 font-bold' : 'text-slate-500'}`}>
+            <div className={`font-semibold font-mono text-xs ${isPositive ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-text-secondary'}`}>
               {formatCurrency(bal)}
             </div>
-            <div className="text-[10px] text-slate-400">
+            <div className="text-[10px] text-muted">
               {party.type === 'Vendor' ? 'Payable' : 'Receivable'}
             </div>
           </div>
@@ -213,6 +218,7 @@ export default function PartiesPage() {
       header: 'Status',
       key: 'status',
       align: 'center',
+      width: '10%',
       render: (party) => (
         <StatusBadge status={party.status === 'Active' ? 'Active' : 'Inactive'} />
       ),
@@ -221,13 +227,14 @@ export default function PartiesPage() {
       header: 'Actions',
       key: 'actions',
       align: 'right',
+      width: '8%',
       render: (party) => (
         <div className="flex items-center justify-end gap-1.5">
           <button
             type="button"
             onClick={() => handleView(party)}
             title="View 360° Profile"
-            className="w-7 h-7 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-600 border border-sky-100 flex items-center justify-center transition cursor-pointer shadow-2xs"
+            className="w-7 h-7 rounded-lg bg-card hover:bg-soft text-muted hover:text-primary border border-border flex items-center justify-center transition cursor-pointer shadow-2xs"
           >
             <Eye className="w-3.5 h-3.5" />
           </button>
@@ -235,7 +242,7 @@ export default function PartiesPage() {
             type="button"
             onClick={() => handleEdit(party)}
             title="Edit Registration"
-            className="w-7 h-7 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-100 flex items-center justify-center transition cursor-pointer shadow-2xs"
+            className="w-7 h-7 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 flex items-center justify-center transition cursor-pointer shadow-2xs"
           >
             <Edit2 className="w-3.5 h-3.5" />
           </button>
