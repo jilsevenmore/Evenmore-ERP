@@ -1,8 +1,14 @@
 import { CalendarDays, FileText, Plus, Pencil, Trash2 } from "lucide-react";
+import InfoBanner from "../common/InfoBanner";
 
 export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDeleteForm }) {
   return (
     <section className="w-full max-w-6xl mx-auto py-4">
+      <InfoBanner
+        storageKey="infoBannerLeadCreateFormV1"
+        title="Why use Lead Create Forms?"
+        text="These define which fields appear while creating a lead. You design the form once, then every new lead follows the same structure."
+      />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Lead Create Forms</h1>

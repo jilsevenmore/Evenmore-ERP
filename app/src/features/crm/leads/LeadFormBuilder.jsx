@@ -16,6 +16,7 @@ import {
   ListChecks,
   Lock,
   Mail,
+  Pencil,
   Phone,
   Plus,
   Save,
@@ -88,7 +89,7 @@ function FieldPreview({
         onDragStart={(event) =>
           onDragStart(event, { kind: "field", fieldId: field.id, sectionId })
         }
-        onClick={onSelect}
+        onClick={onOpenProperties}
         onDoubleClick={onOpenProperties}
         className={`rounded-xl border transition-all p-3.5 bg-white cursor-pointer select-none ${
           selected
@@ -96,7 +97,7 @@ function FieldPreview({
             : "border-slate-200 hover:border-slate-300 hover:shadow-2xs"
         }`}
       >
-        {/* Field top row: Grip + Label + (Lock or Trash) */}
+        {/* Field top row: Grip + Label + (Edit / Lock / Trash) */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <GripVertical
@@ -108,7 +109,18 @@ function FieldPreview({
               {field.required && <span className="text-slate-800 ml-0.5">*</span>}
             </span>
           </div>
-          <div>
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenProperties();
+              }}
+              className="text-slate-300 hover:text-blue-600 transition-colors p-0.5 cursor-pointer"
+              title={`Edit ${field.label}`}
+            >
+              <Pencil size={13} />
+            </button>
             {field.locked ? (
               <Lock size={13} className="text-slate-300 shrink-0" />
             ) : (

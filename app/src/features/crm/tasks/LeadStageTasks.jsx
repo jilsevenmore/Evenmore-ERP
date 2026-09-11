@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -7,6 +7,7 @@ import {
   X,
   CheckCircle2,
 } from "lucide-react";
+import InfoBanner from "../common/InfoBanner";
 
 const STAGE_THEMES = [
   {
@@ -210,15 +211,55 @@ const EMPTY_MASTER_TASK = {
   description: "",
 };
 
+const STORAGE_KEY = 'leadStageTasksV1';
+const PIPELINE_KEY = 'leadStageTasksPipelineV1';
+
+function getStoredStages() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch { /* ignore */ }
+  return INITIAL_STAGES;
+}
+
+function getStoredPipeline() {
+  try {
+    return localStorage.getItem(PIPELINE_KEY) || 'Sales';
+  } catch { /* ignore */ }
+  return 'Sales';
+}
+
 export default function LeadStageTasks({ leadForms = [] }) {
-  const [stages, setStages] = useState(INITIAL_STAGES);
-  const [openStages, setOpenStages] = useState(["new", "details"]);
-  const [isTaskRolesOpen, setIsTaskRolesOpen] = useState(true);
-  const [pipeline, setPipeline] = useState("Sales");
+  const [stages, setStages] = useState(getStoredStages);
+  const [openStages, setOpenStages] = useState([]);
+  const [isTaskRolesOpen, setIsTaskRolesOpen] = useState(false);
+  const [pipeline, setPipeline] = useState(getStoredPipeline);
   const [taskModalStageId, setTaskModalStageId] = useState(null);
   const [masterTask, setMasterTask] = useState(EMPTY_MASTER_TASK);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [stageDrafts, setStageDrafts] = useState({});
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stages));
+    } catch { /* ignore */ }
+  }, [stages]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(PIPELINE_KEY, pipeline);
+    } catch { /* ignore */ }
+  }, [pipeline]);
+
+  function resetToDefaults() {
+    setStages(INITIAL_STAGES);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_STAGES));
+    } catch { /* ignore */ }
+  }
 
   function getDraft(stageId) {
     return (
@@ -386,7 +427,9 @@ export default function LeadStageTasks({ leadForms = [] }) {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-2">
           <div>
             <div className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
-              <span>Dashboard</span>
+              <span>CRM</span>
+              <span>&gt;</span>
+              <span>Leads</span>
               <span>&gt;</span>
               <span className="text-slate-600 font-semibold">Lead Stage Tasks</span>
             </div>
@@ -421,6 +464,12 @@ export default function LeadStageTasks({ leadForms = [] }) {
           </div>
         </div>
       </div>
+
+      <InfoBanner
+        storageKey="infoBannerLeadStageTasksV1"
+        title="Why use Lead Stage Tasks?"
+        text="These auto-create the right tasks when a lead enters a stage. You map tasks once, then every stage change creates follow-ups automatically."
+      />
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs mb-8 overflow-hidden">
         <div
