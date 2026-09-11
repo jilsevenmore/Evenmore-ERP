@@ -4,7 +4,7 @@ import { useERP } from '../../context/ERPContext';
 import { Search, ShoppingCart, Truck, Receipt, Package, Users, Building2, FileSpreadsheet, ArrowRight, FileText, BarChart3, X, Layers, Sparkles, } from 'lucide-react';
 export const CommandPalette = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
-    const { items, customers, vendors, salesOrders, purchaseOrders, invoices, deliveryChallans, } = useERP();
+    const { items, customers, vendors, salesOrders, purchaseOrders, invoices, deliveryChallans, proformaInvoices = [] } = useERP();
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef(null);
@@ -40,6 +40,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         { label: 'Dashboard', path: '/dashboard', icon: BarChart3, category: 'Navigation' },
         { label: 'CRM Leads', path: '/crm/leads', icon: Users, category: 'Navigation' },
         { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart, category: 'Navigation' },
+        { label: 'Proforma Invoices', path: '/sales/proforma', icon: FileSpreadsheet, category: 'Navigation' },
         { label: 'Delivery Challans', path: '/sales/delivery', icon: Truck, category: 'Navigation' },
         { label: 'Sales Invoices', path: '/sales/invoices', icon: Receipt, category: 'Navigation' },
         { label: 'Quotations & Estimates', path: '/sales/quotations', icon: FileText, category: 'Navigation' },
@@ -97,6 +98,18 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         icon: ShoppingCart,
         category: 'Sales Orders',
     }));
+    const matchedProformas = (proformaInvoices || [])
+        .filter((pi) => pi.piNumber?.toLowerCase().includes(cleanQuery) ||
+        pi.customer?.toLowerCase().includes(cleanQuery) ||
+        pi.referenceSo?.toLowerCase().includes(cleanQuery))
+        .slice(0, 3)
+        .map((pi) => ({
+        label: `${pi.piNumber} - ${pi.customer}`,
+        sub: `Total: $${(pi.grandTotal || pi.total || 0).toFixed(2)} • Status: ${pi.status}`,
+        path: '/sales/proforma',
+        icon: FileSpreadsheet,
+        category: 'Proforma Invoices',
+    }));
     const matchedInvoices = invoices
         .filter((inv) => inv.invoiceNumber.toLowerCase().includes(cleanQuery) ||
         inv.customer.toLowerCase().includes(cleanQuery))
@@ -113,6 +126,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         ...(cleanQuery ? matchedCustomers : []),
         ...(cleanQuery ? matchedVendors : []),
         ...(cleanQuery ? matchedSalesOrders : []),
+        ...(cleanQuery ? matchedProformas : []),
         ...(cleanQuery ? matchedInvoices : []),
         ...navigationItems,
     ];

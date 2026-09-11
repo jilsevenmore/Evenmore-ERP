@@ -63,6 +63,7 @@ import DocumentsPage from '../features/hrms/organization/DocumentsPage';
 import { EstimatesPage } from '../features/sales/EstimatesPage';
 import { QuotationsPage } from '../features/sales/QuotationsPage';
 import { SalesOrdersPage } from '../features/sales/SalesOrdersPage';
+import { ProformaInvoicesPage } from '../features/sales/ProformaInvoicesPage';
 import { SalesInvoicesPage } from '../features/sales/SalesInvoicesPage';
 import { SalesReturnsPage } from '../features/sales/SalesReturnsPage';
 import { PaymentInPage } from '../features/sales/PaymentInPage';
@@ -189,6 +190,7 @@ const router = createBrowserRouter([
       { path: 'sales/estimates', element: <Page component={EstimatesPage} /> },
       { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
       { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
+      { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
       { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
       { path: 'sales/payments', element: <Page component={PaymentInPage} /> },

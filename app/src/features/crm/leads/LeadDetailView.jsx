@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useERP } from '../../../context/ERPContext';
+import { formatCurrency } from '../../../utils/currencyUtils';
 import {
   BriefcaseBusiness,
   CalendarDays,

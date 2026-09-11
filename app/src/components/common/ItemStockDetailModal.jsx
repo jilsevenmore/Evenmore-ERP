@@ -7,7 +7,7 @@ const pluralizeUom = (uom) => {
     return /s$/i.test(uom) ? uom : `${uom}s`;
 };
 export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
-    const { calculateItemStock, getItemMovements, adjustItemStock } = useERP();
+    const { calculateItemStock, getItemMovements, adjustItemStock, formatCurrency } = useERP();
     const [showAdjust, setShowAdjust] = useState(false);
     const [adjAmount, setAdjAmount] = useState(0);
     const [adjReason, setAdjReason] = useState('Cycle Count Verification');
@@ -81,12 +81,18 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
               <span className="text-xs text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
                 {item.category}
               </span>
+              {item.trackingMode === 'Batch' && item.batchNumber && (
+                <span className="text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded">
+                  Batch: {item.batchNumber}
+                </span>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-1">
               Primary Location: {item.location} • UOM: {item.uom} • Reorder Threshold: {item.reorderLevel} {pluralizeUom(item.uom)}
+              {item.expiryDate ? ` • Expiry: ${item.expiryDate}` : ''}
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors" aria-label="Close stock detail">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" aria-label="Close stock detail">
             <X className="w-5 h-5"/>
           </button>
         </div>
@@ -129,7 +135,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Physical Inventory Adjustment</h4>
               <p className="text-xs text-slate-500 mt-0.5">Need to record cycle count discrepancy or write-off?</p>
             </div>
-            <button onClick={() => setShowAdjust(!showAdjust)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg shadow-sm transition-colors">
+            <button onClick={() => setShowAdjust(!showAdjust)} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg shadow-sm transition-colors cursor-pointer">
               <Sliders className="w-3.5 h-3.5"/>
               {showAdjust ? 'Cancel Adjustment' : 'Adjust Stock Quantity'}
             </button>
@@ -151,10 +157,10 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                 </div>
               </div>
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowAdjust(false)} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-lg">
+                <button type="button" onClick={() => setShowAdjust(false)} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200 rounded-lg cursor-pointer">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm">
+                <button type="submit" className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm cursor-pointer">
                   Confirm & Post to Ledger
                 </button>
               </div>
@@ -178,7 +184,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                     <th className="py-2.5 px-3">Reference #</th>
                     <th className="py-2.5 px-3 text-right">Qty Change</th>
                     <th className="py-2.5 px-3">Location</th>
-                    <th className="py-2.5 px-3">Notes</th>
+                    <th className="py-2.5 px-3">Details / Serials</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -196,8 +202,12 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                           {m.quantity > 0 ? `+${m.quantity}` : m.quantity} {item.uom}
                         </td>
                         <td className="py-2 px-3 text-slate-500 text-[11px]">{m.locationName || 'Main Warehouse'}</td>
-                        <td className="py-2 px-3 text-slate-500 text-[11px] max-w-xs truncate">
-                          {m.notes || '-'}
+                        <td className="py-2 px-3 text-slate-500 text-[11px] max-w-xs">
+                          {m.serials && m.serials.length > 0 ? (
+                            <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                              SN: {m.serials.join(', ')}
+                            </span>
+                          ) : m.notes || '-'}
                         </td>
                       </tr>)))}
                 </tbody>
@@ -209,9 +219,9 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
           <div className="text-xs text-slate-500">
-            Valuation: <span className="font-mono font-bold text-slate-900">${(stock.onHand * item.costPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> (Cost: ${item.costPrice.toFixed(2)} | Price: ${item.sellingPrice.toFixed(2)})
+            Total Asset Value: <span className="font-mono font-bold text-slate-900">{formatCurrency(stock.onHand * (item.costPrice || item.unitCost || 0))}</span> (Cost: {formatCurrency(item.costPrice || item.unitCost || 0)} | Price: {formatCurrency(item.sellingPrice || 0)})
           </div>
-          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg shadow-sm transition-colors">
+          <button onClick={onClose} className="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg shadow-sm transition-colors cursor-pointer">
             Close
           </button>
         </div>

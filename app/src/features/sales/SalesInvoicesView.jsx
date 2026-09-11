@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { StatCard } from '../../components/ui/StatCard';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
@@ -7,41 +7,310 @@ import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 import { PrintInvoiceModal } from '../../components/common/PrintInvoiceModal';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { Button } from '../../components/ui/Button';
+import { PageHeader } from '../../components/common/PageHeader';
+
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
-    subtitle: 'Commercial tax billing, accounts receivable ledger, and payment receipt settlement.',
-    purpose: 'A Sales Invoice is the official commercial demand for payment issued to a customer after order confirmation and warehouse dispatch. It posts to Accounts Receivable (AR), computes taxes, tracks remaining balances, and produces official Payment Receipts upon settlement.',
+    subtitle: 'Commercial tax billing, draft lifecycle finalization, AR ledger, and payment receipts.',
+    purpose: 'A Sales Invoice is the official commercial demand for payment. Draft invoices remain fully editable for adding/removing items or revising prices. Finalized invoices are locked commercial instruments that post to Accounts Receivable and general ledger.',
     keyTerms: [
-        { term: 'Sales Invoice', definition: 'The commercial billing instrument detailing goods sold, unit prices, applied taxes, and due date.' },
-        { term: 'Accounts Receivable (AR)', definition: 'The total unpaid money owed by customers to your company for delivered goods.' },
-        { term: 'Payment Due Date / Terms', definition: 'The agreed calendar deadline by which the customer must remit payment (e.g. Net 30 days).' },
-        { term: 'Payment Receipt / Voucher', definition: 'An official acknowledgement proving that full or partial payment has been collected and posted to the General Ledger.' },
+        { term: 'Draft Invoice', definition: 'Preliminary invoice stage that allows modifying line items, quantities, rates, and addresses without posting financial entries.' },
+        { term: 'Finalized Commercial Invoice', definition: 'Locked commercial document that posts to Accounts Receivable, General Ledger, and deducts inventory.' },
+        { term: 'Address Snapshot', definition: 'Immutable record of billing and shipping addresses preserved on the invoice at the time of creation.' },
+        { term: 'Reversible Cancellation', definition: 'Cancelling a finalized invoice safely reverses all AR and GL entries, guarding against cancelled payments.' },
     ],
     tips: [
+        'Proforma Invoices convert into Draft Sales Invoices, giving you full flexibility to adjust parts and quantities before final commercial posting.',
         'Use the ⚡ Settle button on unpaid invoices to record payment and generate an official printable receipt voucher in 1 click.',
-        'Link an invoice to a Sales Order to pull all verified line items automatically.',
     ],
-    workflow: ['Sales Order Dispatched', 'Tax Invoice Issued', 'Payment Received', 'Receipt Voucher Issued', 'AR Balance Cleared'],
+    workflow: ['Proforma / SO Draft Created', 'Adjust Line Items & Addresses', 'Finalize Commercial Invoice', 'Collect Payment', 'Receipt Voucher Issued'],
 };
-export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globalSearch = '', }) => {
-    const { customers, salesOrders, paymentIns, addPaymentIn, getInvoiceOutstanding, deliveryChallans, formatCurrency, formatDateDDMMYYYY } = useERP();
+
+export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: globalSearch = '', }) => {
+    const {
+        customers = [],
+        parties = [],
+        quotations = [],
+        salesOrders = [],
+        proformaInvoices = [],
+        paymentIns = [],
+        salesReturns = [],
+        addPaymentIn,
+        updateDraftInvoice,
+        finalizeInvoice,
+        cancelSalesInvoice,
+        getInvoiceOutstanding,
+        deliveryChallans = [],
+        formatCurrency,
+        formatDateDDMMYYYY,
+        getCurrentDateFormatted,
+    } = useERP();
+
     const [filterText, setFilterText] = useState('');
+    const [statusFilter, setStatusFilter] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Create & Edit State
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [editingDraftTarget, setEditingDraftTarget] = useState(null);
     const [selectedInvoice, setSelectedInvoice] = useState(null);
     const [showPaymentModal, setShowPaymentModal] = useState(null);
     const [activeReceipt, setActiveReceipt] = useState(null);
     const [printInvoiceTarget, setPrintInvoiceTarget] = useState(null);
+
+    // Cancellation & Finalize modals
+    const [cancelModalTarget, setCancelModalTarget] = useState(null);
+    const [finalizeModalTarget, setFinalizeModalTarget] = useState(null);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    // Payment Form state
     const [payAmount, setPayAmount] = useState(0);
     const [payMode, setPayMode] = useState('Bank Transfer');
     const [payRef, setPayRef] = useState('WIRE-2026');
-    // Form state
+
+    // Create/Edit Invoice Form state
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [linkedSoId, setLinkedSoId] = useState('None');
+    const [linkedPiId, setLinkedPiId] = useState('None');
     const [invoiceDate, setInvoiceDate] = useState('2026-10-25');
     const [dueDate, setDueDate] = useState('2026-11-25');
     const [notes, setNotes] = useState('');
     const [lineItems, setLineItems] = useState([]);
+    const [billingAddress, setBillingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
+    const [shippingAddress, setShippingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
+    const [sameAsBilling, setSameAsBilling] = useState(true);
+
+    // Populate addresses on customer select
+    const populateCustomerAddresses = (custId) => {
+        const cust = customers.find((c) => c.id === custId) || customers[0];
+        const party = parties.find((p) => p.id === custId || p.name?.toLowerCase() === cust?.name?.toLowerCase());
+        const bill = party?.billingAddress || cust?.billingAddress || {
+            line1: cust?.address || 'Industrial Area Phase 2',
+            line2: '',
+            city: cust?.city || 'Mumbai',
+            state: cust?.state || 'Maharashtra',
+            pincode: cust?.pincode || '400001',
+            country: 'India',
+        };
+        const ship = party?.shippingAddress || cust?.shippingAddress || bill;
+
+        setBillingAddress(bill);
+        setShippingAddress(sameAsBilling ? bill : ship);
+    };
+
+    const handleCustomerChange = (custId) => {
+        setSelectedCustomerId(custId);
+        populateCustomerAddresses(custId);
+    };
+
+    const handleSoSelect = (soId) => {
+        setLinkedSoId(soId);
+        if (soId !== 'None') {
+            const order = salesOrders.find((o) => o.id === soId || o.orderNumber === soId);
+            if (order) {
+                if (order.customerId) {
+                    setSelectedCustomerId(order.customerId);
+                    populateCustomerAddresses(order.customerId);
+                }
+                if (order.items && order.items.length > 0) {
+                    setLineItems(order.items);
+                }
+                if (order.billingAddress) setBillingAddress(order.billingAddress);
+                if (order.shippingAddress) setShippingAddress(order.shippingAddress);
+            }
+        }
+    };
+
+    const handlePiSelect = (piId) => {
+        setLinkedPiId(piId);
+        if (piId !== 'None') {
+            const pi = proformaInvoices.find((p) => p.id === piId || p.piNumber === piId);
+            if (pi) {
+                if (pi.customerId) {
+                    setSelectedCustomerId(pi.customerId);
+                    populateCustomerAddresses(pi.customerId);
+                }
+                if (pi.referenceSo) setLinkedSoId(pi.referenceSo);
+                if (pi.items && pi.items.length > 0) {
+                    setLineItems(pi.items);
+                }
+                if (pi.billingAddress) setBillingAddress(pi.billingAddress);
+                if (pi.shippingAddress) setShippingAddress(pi.shippingAddress);
+                if (pi.notes) setNotes(`Sourced from Proforma ${pi.proformaNumber || pi.piNumber}.\n${pi.notes}`);
+            }
+        }
+    };
+
+    const handleOpenCreateModal = () => {
+        setEditingDraftTarget(null);
+        const defaultCust = customers[0];
+        if (defaultCust) {
+            setSelectedCustomerId(defaultCust.id);
+            populateCustomerAddresses(defaultCust.id);
+        }
+        setLinkedSoId('None');
+        setLinkedPiId('None');
+        setInvoiceDate(new Date().toISOString().split('T')[0]);
+        setDueDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+        setNotes('');
+        setLineItems([]);
+        setSameAsBilling(true);
+        setErrorMessage('');
+        setShowCreateModal(true);
+    };
+
+    const handleOpenEditDraft = (inv) => {
+        setEditingDraftTarget(inv);
+        setSelectedCustomerId(inv.customerId || '');
+        setBillingAddress(inv.billingAddress || { line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
+        setShippingAddress(inv.shippingAddress || { line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
+        setLinkedSoId(inv.salesOrderId || inv.linkedSo || 'None');
+        setLinkedPiId(inv.proformaInvoiceId || inv.linkedPi || 'None');
+        setInvoiceDate(inv.date || new Date().toISOString().split('T')[0]);
+        setDueDate(inv.dueDate || '30 Days');
+        setNotes(inv.notes || '');
+        setLineItems(inv.items || []);
+        setSameAsBilling(false);
+        setErrorMessage('');
+        setShowCreateModal(true);
+    };
+
+    const handleSaveInvoice = (statusTarget) => {
+        const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
+        const party = parties.find((p) => p.id === selectedCustomerId || p.name?.toLowerCase() === cust?.name?.toLowerCase());
+        const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
+        const pi = proformaInvoices.find((p) => p.id === linkedPiId || p.proformaNumber === linkedPiId);
+
+        const pos = party?.placeOfSupply || cust?.placeOfSupply || 'Maharashtra (27)';
+        const isInterState = !pos.toLowerCase().includes('maharashtra') && !pos.includes('27');
+
+        let subtotal = 0;
+        let discountTotal = 0;
+        let totalTax = 0;
+
+        const effectiveItems = lineItems.length > 0 ? lineItems : [
+            {
+                id: `line-${Date.now()}`,
+                description: 'Standard IT Merchandise Fulfillment',
+                qty: 1,
+                rate: 1000,
+                tax: 18,
+                amount: 1000,
+            },
+        ];
+
+        effectiveItems.forEach((it) => {
+            const lineSub = Number(it.rate || 0) * Number(it.qty || 1);
+            const lineDisc = Number(it.discount || it.discountPercent || 0);
+            const discAmt = (lineSub * lineDisc) / 100;
+            const taxable = Math.max(0, lineSub - discAmt);
+            const taxRate = it.tax !== undefined ? Number(it.tax) : (it.taxRate !== undefined ? Number(it.taxRate) : 18);
+            const lineTax = Math.round(taxable * (taxRate / 100) * 100) / 100;
+            subtotal += lineSub;
+            discountTotal += discAmt;
+            totalTax += lineTax;
+        });
+
+        const taxableAmount = Math.max(0, subtotal - discountTotal);
+        let cgst = 0;
+        let sgst = 0;
+        let igst = 0;
+        if (isInterState) {
+            igst = totalTax;
+        } else {
+            cgst = Math.round((totalTax / 2) * 100) / 100;
+            sgst = Math.round((totalTax - cgst) * 100) / 100;
+        }
+
+        const grandTotal = Math.round((taxableAmount + cgst + sgst + igst) * 100) / 100;
+        const effectiveShipAddress = sameAsBilling ? billingAddress : shippingAddress;
+
+        // Check if Delivery Challan exists for linked SO
+        const hasChallan = Boolean(
+            so && deliveryChallans.some((dc) => dc.salesOrderId === so.id || dc.salesOrderNumber === so.orderNumber || dc.linkedSo === so.orderNumber)
+        );
+
+        const isDraft = statusTarget === 'Draft';
+        const isPaid = statusTarget === 'Paid';
+
+        if (editingDraftTarget) {
+            // Update existing Draft
+            updateDraftInvoice(editingDraftTarget.id, {
+                customerId: cust?.id,
+                customer: cust?.name,
+                billingAddress,
+                shippingAddress: effectiveShipAddress,
+                items: effectiveItems,
+                subtotal,
+                discountTotal,
+                taxableAmount,
+                cgst,
+                sgst,
+                igst,
+                total: grandTotal,
+                grandTotal,
+                notes,
+            });
+            setShowCreateModal(false);
+            setEditingDraftTarget(null);
+            return;
+        }
+
+        const nextNumber = `INV-2026-${String(invoices.length + 101).padStart(3, '0')}`;
+        const newInvoicePayload = {
+            invoiceNumber: nextNumber,
+            customerId: cust?.id,
+            customer: cust?.name || 'Acme Corp',
+            billingAddress,
+            shippingAddress: effectiveShipAddress,
+            salesOrderId: so?.id,
+            sourceSalesOrderId: so?.id,
+            linkedSo: so?.orderNumber || (linkedSoId !== 'None' ? linkedSoId : undefined),
+            proformaInvoiceId: pi?.id,
+            linkedPi: pi?.proformaNumber || (linkedPiId !== 'None' ? linkedPiId : undefined),
+            date: formatDateDDMMYYYY(invoiceDate),
+            dueDate: formatDateDDMMYYYY(dueDate),
+            status: isDraft ? 'Draft' : isPaid ? 'Paid' : 'Unpaid',
+            finalized: !isDraft,
+            items: effectiveItems,
+            lineItems: effectiveItems,
+            subtotal,
+            discountTotal,
+            taxableAmount,
+            cgst,
+            sgst,
+            igst,
+            tax: totalTax,
+            total: grandTotal,
+            grandTotal,
+            amount: grandTotal,
+            paidAmount: isPaid ? grandTotal : 0,
+            amountPaid: isPaid ? grandTotal : 0,
+            balanceDue: isPaid ? 0 : grandTotal,
+            notes,
+            dispatchedViaChallan: hasChallan,
+        };
+
+        const created = onCreateInvoice(newInvoicePayload);
+        if (isPaid && created) {
+            addPaymentIn({
+                customerId: cust?.id,
+                customer: cust?.name,
+                invoiceId: created.id,
+                invoiceNumber: created.invoiceNumber,
+                amount: created.total,
+                mode: 'Bank Transfer',
+                reference: `SETTLE-${created.invoiceNumber}`,
+            });
+        }
+
+        setLineItems([]);
+        setNotes('');
+        setShowCreateModal(false);
+    };
+
     const handleQuickSettleAndReceipt = (inv) => {
         const outstanding = getInvoiceOutstanding(inv.id);
         const amountToPay = outstanding.balanceDue > 0 ? outstanding.balanceDue : inv.total;
@@ -65,78 +334,10 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
             reference: `WIRE-${Date.now().toString().slice(-6)}`,
         });
     };
-    const handleSoSelect = (soId) => {
-        setLinkedSoId(soId);
-        if (soId !== 'None') {
-            const order = salesOrders.find((o) => o.id === soId || o.orderNumber === soId);
-            if (order) {
-                if (order.customerId)
-                    setSelectedCustomerId(order.customerId);
-                if (order.items && order.items.length > 0) {
-                    setLineItems(order.items);
-                }
-            }
-        }
-    };
-    const handleSave = (status) => {
-        const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
-        const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
-        const subtotal = lineItems.reduce((sum, item) => sum + (item.amount || item.qty * item.rate), 0);
-        const tax = Math.round(subtotal * 0.08 * 100) / 100;
-        const grandTotal = Math.round((subtotal + tax) * 100) / 100;
-        const nextNumber = `INV-2026-${String(invoices.length + 101).padStart(3, '0')}`;
-        const newInvoice = {
-            invoiceNumber: nextNumber,
-            customerId: cust?.id,
-            customer: cust?.name || 'Acme Corp',
-            salesOrderId: so?.id,
-            linkedSo: so?.orderNumber || (linkedSoId !== 'None' ? linkedSoId : `SO-2026-${String(invoices.length + 101).padStart(4, '0')}`),
-            date: new Date(invoiceDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-            }),
-            dueDate: new Date(dueDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-            }),
-            status: status === 'Paid' ? 'Paid' : status === 'Draft' ? 'Draft' : 'Unpaid',
-            items: lineItems.length > 0 ? lineItems : [
-                {
-                    id: `line-${Date.now()}`,
-                    description: 'Standard IT Merchandise Fulfillment',
-                    qty: 1,
-                    rate: 1000,
-                    amount: 1000,
-                },
-            ],
-            subtotal: subtotal > 0 ? subtotal : 1000,
-            tax: subtotal > 0 ? tax : 80,
-            total: subtotal > 0 ? grandTotal : 1080,
-            paidAmount: status === 'Paid' ? (subtotal > 0 ? grandTotal : 1080) : 0,
-            notes,
-        };
-        const created = onCreateInvoice(newInvoice);
-        if (status === 'Paid' && created) {
-            addPaymentIn({
-                customerId: cust?.id,
-                customer: cust?.name,
-                invoiceId: created.id,
-                invoiceNumber: created.invoiceNumber,
-                amount: created.total,
-                mode: 'Bank Transfer',
-                reference: `SETTLE-${created.invoiceNumber}`,
-            });
-        }
-        setLineItems([]);
-        setNotes('');
-        setShowCreateModal(false);
-    };
+
     const handleRecordPaymentSubmit = (e) => {
         e.preventDefault();
-        if (!showPaymentModal || payAmount <= 0)
-            return;
+        if (!showPaymentModal || payAmount <= 0) return;
         addPaymentIn({
             customerId: showPaymentModal.customerId,
             customer: showPaymentModal.customer,
@@ -159,33 +360,53 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
         setShowPaymentModal(null);
         setPayAmount(0);
     };
-    // Filtering
+
+    const handleConfirmFinalize = () => {
+        if (!finalizeModalTarget) return;
+        finalizeInvoice(finalizeModalTarget.id);
+        setFinalizeModalTarget(null);
+        if (selectedInvoice && selectedInvoice.id === finalizeModalTarget.id) {
+            setSelectedInvoice((prev) => ({ ...prev, finalized: true, status: 'Unpaid' }));
+        }
+    };
+
+    const handleConfirmCancelInvoice = () => {
+        if (!cancelModalTarget) return;
+        const result = cancelSalesInvoice(cancelModalTarget.id);
+        if (result && !result.success) {
+            setErrorMessage(result.message);
+            return;
+        }
+        setCancelModalTarget(null);
+        setErrorMessage('');
+        if (selectedInvoice && selectedInvoice.id === cancelModalTarget.id) {
+            setSelectedInvoice((prev) => ({ ...prev, status: 'Cancelled' }));
+        }
+    };
+
+    // Filtering & Tab state
     const effectiveFilter = (filterText || globalSearch).toLowerCase().trim();
     const filteredInvoices = invoices.filter((inv) => {
-        if (!effectiveFilter)
-            return true;
-        return (inv.invoiceNumber.toLowerCase().includes(effectiveFilter) ||
+        const matchesSearch = !effectiveFilter || (
+            inv.invoiceNumber.toLowerCase().includes(effectiveFilter) ||
             inv.customer.toLowerCase().includes(effectiveFilter) ||
             (inv.linkedSo && inv.linkedSo.toLowerCase().includes(effectiveFilter)) ||
-            inv.status.toLowerCase().includes(effectiveFilter));
+            (inv.status && inv.status.toLowerCase().includes(effectiveFilter))
+        );
+
+        if (!matchesSearch) return false;
+        if (statusFilter === 'All') return true;
+        if (statusFilter === 'Draft') return inv.status === 'Draft' || !inv.finalized;
+        if (statusFilter === 'Paid') return inv.status === 'Paid';
+        if (statusFilter === 'Unpaid') return inv.status === 'Unpaid';
+        if (statusFilter === 'Cancelled') return inv.status === 'Cancelled';
+        return true;
     });
+
     const pageSize = 8;
     const totalPages = Math.ceil(filteredInvoices.length / pageSize) || 1;
     const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-    const getStatusBadge = (status) => {
-        switch (status) {
-            case 'Paid':
-                return 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium';
-            case 'Partially Paid':
-                return 'bg-blue-50 text-blue-700 border-blue-200 font-medium';
-            case 'Unpaid':
-                return 'bg-amber-50 text-amber-800 border-amber-200 font-medium';
-            case 'Draft':
-                return 'bg-gray-100 text-gray-700 border-gray-300 font-medium';
-            default:
-                return 'bg-gray-50 text-gray-700 border-[#CED4DA]';
-        }
-    };
+
     const getInvoiceTimelineSteps = (inv) => {
         const outstanding = getInvoiceOutstanding(inv.id);
         const so = salesOrders.find((o) => o.id === inv.salesOrderId || o.orderNumber === inv.linkedSo);
@@ -198,11 +419,11 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
             },
             {
                 label: 'Delivery Challan',
-                docNumber: challan?.challanNumber || 'Dispatched',
+                docNumber: challan?.challanNumber || (inv.dispatchedViaChallan ? 'Dispatched' : 'Direct Fulfillment'),
                 status: 'completed',
             },
             {
-                label: 'Tax Invoice',
+                label: inv.finalized ? 'Finalized Tax Invoice' : 'Draft Invoice',
                 docNumber: inv.invoiceNumber,
                 amount: inv.total,
                 date: inv.date,
@@ -215,11 +436,24 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
             },
         ];
     };
+
     const getInvoiceRelatedDocs = (inv) => {
         const docs = [];
-        if (inv.linkedSo) {
+        if (inv.linkedSo || inv.salesOrderId) {
             const so = salesOrders.find((o) => o.orderNumber === inv.linkedSo || o.id === inv.salesOrderId);
             if (so) {
+                if (so.quotationNumber || so.sourceQuotationId) {
+                    const quote = quotations.find((q) => q.id === so.sourceQuotationId || q.quoteNumber === so.quotationNumber);
+                    if (quote) {
+                        docs.push({
+                            type: 'Quotation',
+                            number: quote.quoteNumber,
+                            amount: quote.amount,
+                            date: quote.date,
+                            status: quote.status,
+                        });
+                    }
+                }
                 docs.push({
                     type: 'Sales Order',
                     number: so.orderNumber,
@@ -229,7 +463,19 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
                 });
             }
         }
-        const challans = deliveryChallans.filter((c) => c.salesOrderNumber === inv.linkedSo || (inv.salesOrderId && c.salesOrderId === inv.salesOrderId));
+        if (inv.linkedPi || inv.proformaInvoiceId) {
+            const pi = proformaInvoices.find((p) => p.id === inv.proformaInvoiceId || p.proformaNumber === inv.linkedPi);
+            if (pi) {
+                docs.push({
+                    type: 'Proforma Invoice',
+                    number: pi.proformaNumber,
+                    amount: pi.grandTotal || pi.total,
+                    date: pi.date,
+                    status: pi.status,
+                });
+            }
+        }
+        const challans = deliveryChallans.filter((c) => (inv.linkedSo && c.salesOrderNumber === inv.linkedSo) || (inv.salesOrderId && c.salesOrderId === inv.salesOrderId));
         challans.forEach((c) => {
             docs.push({
                 type: 'Delivery Challan',
@@ -245,367 +491,713 @@ export const SalesInvoicesView = ({ invoices, onCreateInvoice, searchTerm: globa
                 number: p.receiptNumber,
                 amount: p.amount,
                 date: p.date,
-                status: 'Paid',
+                status: 'Settled',
+            });
+        });
+        const returns = salesReturns.filter((sr) => sr.invoiceId === inv.id || sr.invoiceRef === inv.invoiceNumber);
+        returns.forEach((sr) => {
+            docs.push({
+                type: 'Sales Return / Credit Note',
+                number: sr.returnNumber,
+                amount: sr.amount,
+                date: sr.date,
+                status: sr.status,
             });
         });
         return docs;
     };
-    const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
-    const totalBalanceDue = invoices.reduce((sum, inv) => sum + getInvoiceOutstanding(inv.id).balanceDue, 0);
-    const totalCollected = invoices.reduce((sum, inv) => sum + getInvoiceOutstanding(inv.id).paid, 0);
-    const unpaidCount = invoices.filter(inv => getInvoiceOutstanding(inv.id).balanceDue > 0).length;
 
-    return (<div className="flex-1 overflow-y-auto flex flex-col gap-6 font-sans">
-      {/* Sales Invoices KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={DollarSign} />
-        <StatCard label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
-        <StatCard label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
-        <StatCard label="Total Invoices" value={`${invoices.length} Invoices`} icon={FileText} subtext={`${unpaidCount} requiring payment`} />
-      </div>
+    const totalInvoiced = invoices.filter(i => i.status !== 'Cancelled' && i.status !== 'Draft').reduce((sum, inv) => sum + inv.total, 0);
+    const totalBalanceDue = invoices.filter(i => i.status !== 'Cancelled' && i.status !== 'Draft').reduce((sum, inv) => sum + getInvoiceOutstanding(inv.id).balanceDue, 0);
+    const totalCollected = invoices.filter(i => i.status !== 'Cancelled').reduce((sum, inv) => sum + getInvoiceOutstanding(inv.id).paid, 0);
+    const unpaidCount = invoices.filter(inv => inv.status !== 'Cancelled' && inv.status !== 'Draft' && getInvoiceOutstanding(inv.id).balanceDue > 0).length;
 
-      {/* Invoices List Table Card */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
-        {/* Table Card Header */}
-        <div className="p-6 border-b border-slate-200 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-white">
-          <div>
-            <h2 className="text-lg font-bold text-[#1F2E4A]">Sales Invoices & Receivables</h2>
-            <p className="text-xs text-slate-500 mt-0.5">Live invoicing status, remaining balances, and multi-mode payment settlements.</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-              <input type="text" placeholder="Filter invoice, customer, SO..." value={filterText} onChange={(e) => setFilterText(e.target.value)} className="pl-9 pr-4 py-1.5 border border-slate-300 rounded-lg text-xs w-64 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white text-slate-800"/>
+    return (
+        <div className="flex-1 overflow-y-auto flex flex-col gap-6 font-sans">
+            <PageHeader
+                title="Sales Invoices & Commercial Receivables"
+                subtitle="Draft lifecycle management, commercial locking, dynamic GST ledger posting, and multi-mode payment collection."
+                guide={invoiceGuide}
+                actions={
+                    <Button icon={Plus} onClick={handleOpenCreateModal}>
+                        Create Tax Invoice
+                    </Button>
+                }
+            />
+
+            {/* Sales Invoices KPI Stat Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={DollarSign} />
+                <StatCard label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
+                <StatCard label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
+                <StatCard label="Total Invoices" value={`${invoices.length} Invoices`} icon={FileText} subtext={`${unpaidCount} requiring payment`} />
             </div>
-            <button onClick={() => setShowCreateModal(true)} className="px-3.5 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer shrink-0">
-              <Plus size={14}/>
-              Create Tax Invoice
-            </button>
-          </div>
-        </div>
 
-        {/* Data Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-semibold select-none">
-                <th className="py-3 px-6 whitespace-nowrap">Invoice #</th>
-                <th className="py-3 px-6 whitespace-nowrap">Customer</th>
-                <th className="py-3 px-6 whitespace-nowrap">Linked SO</th>
-                <th className="py-3 px-6 whitespace-nowrap">Invoice Date</th>
-                <th className="py-3 px-6 whitespace-nowrap">Due Date</th>
-                <th className="py-3 px-6 whitespace-nowrap">Status</th>
-                <th className="py-3 px-6 text-right whitespace-nowrap">Total</th>
-                <th className="py-3 px-6 text-right whitespace-nowrap">Balance Due</th>
-                <th className="py-3 px-4 text-center whitespace-nowrap">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-slate-700">
-              {paginatedInvoices.length === 0 ? (<tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-400">
-                    No sales invoices match the current filter.
-                  </td>
-                </tr>) : (paginatedInvoices.map((inv) => {
-            const outstanding = getInvoiceOutstanding(inv.id);
-            return (<tr key={inv.id} className="hover:bg-slate-50/80 transition-colors group">
-                      <td className="py-2.5 px-6 font-mono font-bold text-blue-600">
-                        <button onClick={() => setSelectedInvoice(inv)} className="hover:underline text-left cursor-pointer">
-                          {inv.invoiceNumber}
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs">
+                {['All', 'Draft', 'Unpaid', 'Paid', 'Cancelled'].map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setStatusFilter(tab)}
+                        className={`px-3 py-1.5 rounded-t font-semibold transition-colors cursor-pointer ${
+                            statusFilter === tab
+                                ? 'bg-white border-t-2 border-[#1F2E4A] text-[#1F2E4A] shadow-xs'
+                                : 'text-slate-500 hover:text-slate-800'
+                        }`}
+                    >
+                        {tab}
+                    </button>
+                ))}
+            </div>
+
+            {/* Invoices List Table Card */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
+                <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
+                    <h3 className="font-bold text-slate-800 text-sm">Commercial Invoice Register</h3>
+                    <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
+                        <input
+                            type="text"
+                            placeholder="Filter invoice, customer, SO..."
+                            value={filterText}
+                            onChange={(e) => setFilterText(e.target.value)}
+                            className="pl-9 pr-4 py-1.5 border border-slate-300 rounded-lg text-xs w-64 focus:ring-1 focus:ring-blue-500 bg-white text-slate-800"
+                        />
+                    </div>
+                </div>
+
+                {/* Data Table */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 font-semibold select-none">
+                                <th className="py-3 px-6 whitespace-nowrap">Invoice #</th>
+                                <th className="py-3 px-6 whitespace-nowrap">Customer</th>
+                                <th className="py-3 px-6 whitespace-nowrap">Linked SO</th>
+                                <th className="py-3 px-6 whitespace-nowrap">Invoice Date</th>
+                                <th className="py-3 px-6 whitespace-nowrap">Status</th>
+                                <th className="py-3 px-6 text-right whitespace-nowrap">Total</th>
+                                <th className="py-3 px-6 text-right whitespace-nowrap">Balance Due</th>
+                                <th className="py-3 px-4 text-center whitespace-nowrap">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                            {paginatedInvoices.length === 0 ? (
+                                <tr>
+                                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                                        No sales invoices match the current filter.
+                                    </td>
+                                </tr>
+                            ) : (
+                                paginatedInvoices.map((inv) => {
+                                    const outstanding = getInvoiceOutstanding(inv.id);
+                                    const isDraft = inv.status === 'Draft' || !inv.finalized;
+                                    return (
+                                        <tr key={inv.id} className="hover:bg-slate-50/80 transition-colors group">
+                                            <td className="py-2.5 px-6 font-mono font-bold text-blue-600">
+                                                <button onClick={() => setSelectedInvoice(inv)} className="hover:underline text-left cursor-pointer flex items-center gap-1">
+                                                    {isDraft && <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1 py-0.2 rounded border border-amber-200">DRAFT</span>}
+                                                    <span>{inv.invoiceNumber}</span>
+                                                </button>
+                                            </td>
+                                            <td className="py-2.5 px-6 font-semibold text-slate-800">
+                                                {inv.customer}
+                                            </td>
+                                            <td className="py-2.5 px-6 text-slate-500 font-mono text-[11px]">
+                                                {inv.linkedSo || '-'}
+                                            </td>
+                                            <td className="py-2.5 px-6 text-slate-600 font-mono text-[11px]">
+                                                {formatDateDDMMYYYY(inv.date)}
+                                            </td>
+                                            <td className="py-2.5 px-6">
+                                                <StatusBadge status={inv.status}/>
+                                            </td>
+                                            <td className="py-2.5 px-6 text-right font-semibold text-slate-900 font-mono">
+                                                {formatCurrency(inv.total)}
+                                            </td>
+                                            <td className="py-2.5 px-6 text-right font-mono font-bold">
+                                                {isDraft ? (
+                                                    <span className="text-slate-400 italic">Unposted</span>
+                                                ) : (
+                                                    <span className={outstanding.balanceDue > 0 ? 'text-rose-600' : 'text-emerald-700'}>
+                                                        {formatCurrency(outstanding.balanceDue)}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="py-2.5 px-4 text-center">
+                                                <div className="flex items-center justify-center gap-1.5">
+                                                    <button onClick={() => setSelectedInvoice(inv)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="View Invoice">
+                                                        <Eye className="w-4 h-4"/>
+                                                    </button>
+                                                    
+                                                    {isDraft ? (
+                                                        <>
+                                                            <button onClick={() => handleOpenEditDraft(inv)} className="p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded transition-colors cursor-pointer" title="Edit Draft Items/Rates">
+                                                                <Edit className="w-4 h-4"/>
+                                                            </button>
+                                                            <button onClick={() => setFinalizeModalTarget(inv)} className="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold cursor-pointer transition-colors shadow-2xs">
+                                                                Finalize
+                                                            </button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => setPrintInvoiceTarget(inv)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="Print Official Tax Invoice">
+                                                                <Printer className="w-4 h-4"/>
+                                                            </button>
+                                                            {inv.status !== 'Cancelled' && outstanding.balanceDue > 0.01 && (
+                                                                <button onClick={() => handleQuickSettleAndReceipt(inv)} className="px-2 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-xs inline-flex items-center gap-1 transition-colors cursor-pointer" title="1-Click Settle & Print Payment Receipt">
+                                                                    <Zap className="w-3 h-3"/> Settle
+                                                                </button>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Pagination Footer */}
+                <div className="p-4 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 bg-white">
+                    <span>
+                        Showing {Math.min(1, filteredInvoices.length)} to {Math.min(filteredInvoices.length, currentPage * pageSize)} of {filteredInvoices.length} entries
+                    </span>
+                    <div className="flex gap-1">
+                        <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 text-xs font-medium">
+                            Prev
                         </button>
-                      </td>
-                      <td className="py-2.5 px-6 font-semibold text-slate-800">
-                        {inv.customer}
-                      </td>
-                      <td className="py-2.5 px-6 text-slate-500 font-mono text-[11px]">
-                        {inv.linkedSo || '-'}
-                      </td>
-                      <td className="py-2.5 px-6 text-slate-600 font-mono text-[11px]">{formatDateDDMMYYYY(inv.date)}</td>
-                      <td className="py-2.5 px-6 text-slate-600">{inv.dueDate}</td>
-                      <td className="py-2.5 px-6">
-                        <span className={`inline-flex items-center px-2 py-0.5 border rounded-full text-[10px] ${getStatusBadge(outstanding.status)}`}>
-                          {outstanding.status}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-6 text-right font-semibold text-slate-900 font-mono">
-                        {formatCurrency(inv.total)}
-                      </td>
-                      <td className="py-2.5 px-6 text-right font-mono font-bold">
-                        <span className={outstanding.balanceDue > 0 ? 'text-rose-600' : 'text-emerald-700'}>
-                          {formatCurrency(outstanding.balanceDue)}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button onClick={() => setSelectedInvoice(inv)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="View Invoice Details">
-                            <Eye className="w-4 h-4"/>
-                          </button>
-                          <button onClick={() => setPrintInvoiceTarget(inv)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Print Official Tax Invoice">
-                            <Printer className="w-4 h-4"/>
-                          </button>
-                          {outstanding.balanceDue > 0.01 && (<button onClick={() => handleQuickSettleAndReceipt(inv)} className="px-2 py-1 text-[10px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded shadow-xs inline-flex items-center gap-1 transition-colors cursor-pointer" title="1-Click Settle & Print Payment Receipt">
-                              <Zap className="w-3 h-3"/> Settle
-                            </button>)}
+                        {Array.from({ length: totalPages }).map((_, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => setCurrentPage(idx + 1)}
+                                className={`px-3 py-1 border rounded text-xs font-medium ${
+                                    currentPage === idx + 1 ? 'bg-[#1F2E4A] text-white border-[#1F2E4A]' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                                }`}
+                            >
+                                {idx + 1}
+                            </button>
+                        ))}
+                        <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 text-xs font-medium">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* CREATE / EDIT DRAFT INVOICE MODAL */}
+            {showCreateModal && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[92vh] flex flex-col overflow-hidden text-slate-800">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                            <div>
+                                <h2 className="text-base font-bold text-slate-900">
+                                    {editingDraftTarget ? `Edit Draft Invoice ${editingDraftTarget.invoiceNumber}` : 'Issue Commercial Tax Invoice'}
+                                </h2>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                    Draft invoices can be freely modified before commercial locking and financial ledger posting.
+                                </p>
+                            </div>
+                            <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-700 cursor-pointer p-1">
+                                <X size={18}/>
+                            </button>
                         </div>
-                      </td>
-                    </tr>);
-        }))}
-            </tbody>
-          </table>
-        </div>
 
-        {/* Pagination Footer */}
-        <div className="p-4 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 bg-white">
-          <span>
-            Showing {Math.min(1, filteredInvoices.length)} to{' '}
-            {Math.min(filteredInvoices.length, currentPage * pageSize)} of{' '}
-            {filteredInvoices.length} entries
-          </span>
-          <div className="flex gap-1">
-            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 text-xs font-medium">
-              Prev
-            </button>
-            {Array.from({ length: totalPages }).map((_, idx) => (<button key={idx} onClick={() => setCurrentPage(idx + 1)} className={`px-3 py-1 border rounded text-xs font-medium ${currentPage === idx + 1
-                ? 'bg-[#1F2E4A] text-white border-[#1F2E4A]'
-                : 'border-slate-200 hover:bg-slate-100 text-slate-700'}`}>
-                {idx + 1}
-              </button>))}
-            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 text-xs font-medium">
-              Next
-            </button>
-          </div>
-        </div>
-      </div>
+                        <div className="p-2 space-y-4 overflow-y-auto flex-1 my-2 pr-1">
+                            {/* Top Form Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+                                <div className="flex flex-col gap-1">
+                                    <label className="font-semibold text-slate-700">Customer Account *</label>
+                                    <select
+                                        value={selectedCustomerId}
+                                        onChange={(e) => handleCustomerChange(e.target.value)}
+                                        className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium"
+                                    >
+                                        {customers.map((c) => (
+                                            <option key={c.id} value={c.id}>
+                                                {c.name} ({c.code})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-      {/* Create New Invoice Modal */}
-      {showCreateModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden text-text">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div>
-                <h2 className="text-base font-bold text-text">Issue New Commercial Tax Invoice</h2>
-                <p className="text-[11px] text-muted mt-0.5">Select a customer or link directly to a confirmed Sales Order for automatic pricing calculations.</p>
-              </div>
-              <button onClick={() => setShowCreateModal(false)} className="text-muted hover:text-text cursor-pointer p-1">
-                <X size={18}/>
-              </button>
-            </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="font-semibold text-slate-700">Source Proforma (PI)</label>
+                                    <select value={linkedPiId} onChange={(e) => handlePiSelect(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium">
+                                        <option value="None">None (Direct Invoicing)</option>
+                                        {proformaInvoices.map((pi) => (
+                                            <option key={pi.id} value={pi.id}>
+                                                {pi.proformaNumber || pi.piNumber} - {pi.customer} ({formatCurrency(pi.grandTotal || pi.total || 0)})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-            <div className="p-2 space-y-5 overflow-y-auto flex-1 my-3 pr-1">
-              {/* Top Form Row: Customer, Linked SO, Invoice Date, Due Date */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-text">Customer Account *</label>
-                  <select value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text font-medium focus:outline-none focus:border-primary">
-                    {customers.map((c) => (<option key={c.id} value={c.id}>
-                        {c.name} ({c.code})
-                      </option>))}
-                  </select>
-                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="font-semibold text-slate-700">Linked Sales Order</label>
+                                    <select value={linkedSoId} onChange={(e) => handleSoSelect(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium">
+                                        <option value="None">None (Direct Invoicing)</option>
+                                        {salesOrders.map((so) => (
+                                            <option key={so.id} value={so.id}>
+                                                {so.orderNumber} - {so.customer} ({formatCurrency(so.amount || 0)})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-text">Linked Sales Order</label>
-                  <select value={linkedSoId} onChange={(e) => handleSoSelect(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text font-medium focus:outline-none focus:border-primary">
-                    <option value="None">None (Direct Invoicing)</option>
-                    {salesOrders.map((so) => (<option key={so.id} value={so.id}>
-                        {so.orderNumber} - {so.customer} (${so.amount.toFixed(2)})
-                      </option>))}
-                  </select>
-                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="font-semibold text-slate-700">Invoice Issue Date</label>
+                                    <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800"/>
+                                </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-text">Invoice Issue Date</label>
-                  <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text focus:outline-none focus:border-primary"/>
-                </div>
+                                <div className="flex flex-col gap-1">
+                                    <label className="font-semibold text-slate-700">Payment Due Date</label>
+                                    <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800"/>
+                                </div>
+                            </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-semibold text-text">Payment Due Date</label>
-                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="border border-border rounded-xl px-3 py-2 bg-soft text-text focus:outline-none focus:border-primary"/>
-                </div>
-              </div>
+                            {/* BILL TO & SHIP TO ADDRESS SECTION */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                                        <MapPin size={14} className="text-blue-600"/> Bill To & Ship To Address Snapshots
+                                    </h4>
+                                    <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={sameAsBilling}
+                                            onChange={(e) => {
+                                                setSameAsBilling(e.target.checked);
+                                                if (e.target.checked) setShippingAddress({ ...billingAddress });
+                                            }}
+                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                        />
+                                        Same as Billing Address
+                                    </label>
+                                </div>
 
-              {/* Selected Customer Information Card */}
-              {(() => {
-                const cust = customers.find(c => c.id === selectedCustomerId) || customers[0];
-                if (!cust) return null;
-                return (
-                  <div className="p-2.5 rounded-xl border border-border bg-soft text-[11px] space-y-1">
-                    <div className="flex items-center justify-between font-bold text-text">
-                      <span>{cust.name} <span className="text-muted font-mono font-normal">({cust.code})</span></span>
-                      <span className="text-blue-600 dark:text-blue-400 font-mono text-[10px] bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
-                        Credit Limit: ₹{(cust.creditLimit || 50000).toLocaleString('en-IN')}
-                      </span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                    {/* Billing Address */}
+                                    <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
+                                        <span className="font-bold text-slate-700 block uppercase text-[10px] text-muted">Bill To (Billing Address)</span>
+                                        <input
+                                            type="text"
+                                            placeholder="Address Line 1"
+                                            value={billingAddress.line1 || ''}
+                                            onChange={(e) => {
+                                                const updated = { ...billingAddress, line1: e.target.value };
+                                                setBillingAddress(updated);
+                                                if (sameAsBilling) setShippingAddress(updated);
+                                            }}
+                                            className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                                        />
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="City"
+                                                value={billingAddress.city || ''}
+                                                onChange={(e) => {
+                                                    const updated = { ...billingAddress, city: e.target.value };
+                                                    setBillingAddress(updated);
+                                                    if (sameAsBilling) setShippingAddress(updated);
+                                                }}
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="State"
+                                                value={billingAddress.state || ''}
+                                                onChange={(e) => {
+                                                    const updated = { ...billingAddress, state: e.target.value };
+                                                    setBillingAddress(updated);
+                                                    if (sameAsBilling) setShippingAddress(updated);
+                                                }}
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Pincode"
+                                                value={billingAddress.pincode || ''}
+                                                onChange={(e) => {
+                                                    const updated = { ...billingAddress, pincode: e.target.value };
+                                                    setBillingAddress(updated);
+                                                    if (sameAsBilling) setShippingAddress(updated);
+                                                }}
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Shipping Address */}
+                                    <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
+                                        <span className="font-bold text-slate-700 block uppercase text-[10px] text-muted">Ship To (Delivery Address)</span>
+                                        <input
+                                            type="text"
+                                            placeholder="Shipping Address Line 1"
+                                            disabled={sameAsBilling}
+                                            value={sameAsBilling ? billingAddress.line1 : (shippingAddress.line1 || '')}
+                                            onChange={(e) => setShippingAddress({ ...shippingAddress, line1: e.target.value })}
+                                            className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs disabled:bg-slate-100 disabled:text-slate-500"
+                                        />
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <input
+                                                type="text"
+                                                placeholder="City"
+                                                disabled={sameAsBilling}
+                                                value={sameAsBilling ? billingAddress.city : (shippingAddress.city || '')}
+                                                onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs disabled:bg-slate-100 disabled:text-slate-500"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="State"
+                                                disabled={sameAsBilling}
+                                                value={sameAsBilling ? billingAddress.state : (shippingAddress.state || '')}
+                                                onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs disabled:bg-slate-100 disabled:text-slate-500"
+                                            />
+                                            <input
+                                                type="text"
+                                                placeholder="Pincode"
+                                                disabled={sameAsBilling}
+                                                value={sameAsBilling ? billingAddress.pincode : (shippingAddress.pincode || '')}
+                                                onChange={(e) => setShippingAddress({ ...shippingAddress, pincode: e.target.value })}
+                                                className="p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs disabled:bg-slate-100 disabled:text-slate-500"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Line Items Editor */}
+                            <div>
+                                <label className="text-xs font-semibold text-slate-800 block mb-2">Invoice Line Items</label>
+                                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales"/>
+                            </div>
+
+                            {/* Notes */}
+                            <div>
+                                <label className="text-xs font-semibold text-slate-800 block mb-1.5">
+                                    Payment Terms & Commercial Notes
+                                </label>
+                                <textarea
+                                    value={notes}
+                                    onChange={(e) => setNotes(e.target.value)}
+                                    placeholder="e.g. Standard Net 30 terms. Remit payment to Chase Operating Account..."
+                                    className="w-full border border-slate-300 rounded-xl p-3 text-xs bg-white h-16 text-slate-800"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="pt-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+                            <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-100 transition-colors text-xs cursor-pointer">
+                                Cancel
+                            </button>
+                            <button onClick={() => handleSaveInvoice('Draft')} className="px-4 py-2 border border-slate-300 text-slate-700 font-semibold rounded-xl hover:bg-slate-100 transition-colors text-xs cursor-pointer">
+                                {editingDraftTarget ? 'Save Draft Changes' : 'Save as Draft'}
+                            </button>
+                            {!editingDraftTarget && (
+                                <>
+                                    <button onClick={() => handleSaveInvoice('Unpaid')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors text-xs shadow-sm cursor-pointer">
+                                        Finalize Invoice (Unpaid)
+                                    </button>
+                                    <button onClick={() => handleSaveInvoice('Paid')} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-colors text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
+                                        <CheckCircle2 className="w-3.5 h-3.5"/>
+                                        Finalize & Record Full Payment
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-muted text-[10px]">
-                      <span>POC: <strong>{cust.contactPerson || 'Account Lead'}</strong></span>
-                      <span>Email: {cust.email}</span>
-                      <span>Phone: {cust.phone}</span>
-                      <span>Outstanding Balance: ₹{(cust.balance || 0).toLocaleString('en-IN')}</span>
+                </div>
+            )}
+
+            {/* INVOICE DETAIL MODAL */}
+            {selectedInvoice && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                            <div className="flex items-center gap-3">
+                                <h3 className="font-bold text-lg text-[#1F2E4A] flex items-center gap-1.5">
+                                    {selectedInvoice.invoiceNumber}
+                                    {selectedInvoice.finalized && <Lock size={13} className="text-slate-400" title="Finalized Commercial Document"/>}
+                                </h3>
+                                <span className="font-semibold text-slate-700 bg-slate-100 px-2.5 py-0.5 rounded">
+                                    {selectedInvoice.customer}
+                                </span>
+                                <StatusBadge status={selectedInvoice.status}/>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setPrintInvoiceTarget(selectedInvoice)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
+                                    <Printer size={13}/>
+                                    Print Official Invoice
+                                </button>
+                                <button onClick={() => setSelectedInvoice(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer">
+                                    <X size={18}/>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="space-y-6 mt-4 overflow-y-auto pr-1 flex-1">
+                            {/* Stepper */}
+                            <DocumentTimeline steps={getInvoiceTimelineSteps(selectedInvoice)}/>
+
+                            {/* Address Snapshots */}
+                            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                                <div>
+                                    <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Billed To (Snapshot)</span>
+                                    <p className="font-semibold text-slate-800">{selectedInvoice.customer}</p>
+                                    <p className="text-slate-600">{selectedInvoice.billingAddress?.line1 || 'Headquarters'}</p>
+                                    <p className="text-slate-600">{selectedInvoice.billingAddress?.city || 'Mumbai'}, {selectedInvoice.billingAddress?.state || 'Maharashtra'} {selectedInvoice.billingAddress?.pincode}</p>
+                                </div>
+                                <div>
+                                    <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Shipped To (Snapshot)</span>
+                                    <p className="font-semibold text-slate-800">{selectedInvoice.customer}</p>
+                                    <p className="text-slate-600">{selectedInvoice.shippingAddress?.line1 || selectedInvoice.billingAddress?.line1 || 'Destination Facility'}</p>
+                                    <p className="text-slate-600">{selectedInvoice.shippingAddress?.city || selectedInvoice.billingAddress?.city || 'Mumbai'}, {selectedInvoice.shippingAddress?.state || selectedInvoice.billingAddress?.state || 'Maharashtra'} {selectedInvoice.shippingAddress?.pincode}</p>
+                                </div>
+                            </div>
+
+                            {/* Related Docs */}
+                            <RelatedDocumentsCard documents={getInvoiceRelatedDocs(selectedInvoice)}/>
+
+                            {/* Items */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
+                                        Invoiced Line Items ({selectedInvoice.items?.length || 0})
+                                    </h4>
+                                    {selectedInvoice.finalized && (
+                                        <span className="text-[11px] text-slate-400 font-semibold flex items-center gap-1">
+                                            <Lock size={11}/> Locked Commercial Instrument
+                                        </span>
+                                    )}
+                                </div>
+                                <LineItemEditor items={selectedInvoice.items || []} onChange={() => { }} readOnly={true}/>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+                            <div className="font-mono text-xs">
+                                Total: <strong className="text-slate-900">{formatCurrency(selectedInvoice.total)}</strong> | Paid: <strong className="text-emerald-700">{formatCurrency(selectedInvoice.paidAmount || 0)}</strong>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {(!selectedInvoice.finalized || selectedInvoice.status === 'Draft') && (
+                                    <>
+                                        <button
+                                            onClick={() => {
+                                                const target = selectedInvoice;
+                                                setSelectedInvoice(null);
+                                                handleOpenEditDraft(target);
+                                            }}
+                                            className="px-3 py-1.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-800 rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <Edit size={12}/> Edit Draft Items
+                                        </button>
+                                        <button
+                                            onClick={() => {
+                                                setFinalizeModalTarget(selectedInvoice);
+                                            }}
+                                            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs shadow-xs flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <Check size={12}/> Finalize Invoice
+                                        </button>
+                                    </>
+                                )}
+
+                                {selectedInvoice.status !== 'Cancelled' && (
+                                    <button
+                                        onClick={() => setCancelModalTarget(selectedInvoice)}
+                                        className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <Ban size={12}/> Cancel Invoice
+                                    </button>
+                                )}
+
+                                {selectedInvoice.status !== 'Cancelled' && getInvoiceOutstanding(selectedInvoice.id).balanceDue > 0.01 && (
+                                    <button onClick={() => {
+                                        setShowPaymentModal(selectedInvoice);
+                                        setPayAmount(getInvoiceOutstanding(selectedInvoice.id).balanceDue);
+                                    }} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
+                                        <DollarSign className="w-3.5 h-3.5"/> Settle Payment
+                                    </button>
+                                )}
+
+                                <button onClick={() => setSelectedInvoice(null)} className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs cursor-pointer">
+                                    Close
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                  </div>
-                );
-              })()}
-
-              {/* Line Items Editor */}
-              <div>
-                <label className="text-xs font-semibold text-text block mb-2">Invoice Line Items</label>
-                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales"/>
-              </div>
-
-              {/* Notes */}
-              <div>
-                <label className="text-xs font-semibold text-text block mb-1.5">
-                  Payment Terms & Commercial Notes
-                </label>
-                <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. Standard Net 30 terms. Remit payment to Chase Operating Account..." className="w-full border border-border rounded-xl p-3 text-xs bg-soft h-16 text-text focus:outline-none focus:border-primary"/>
-              </div>
-            </div>
-
-            {/* Footer Actions */}
-            <div className="pt-3 border-t border-border flex justify-end gap-2 bg-soft/60 -mx-6 -mb-6 px-6 py-3">
-              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-border text-text-secondary font-medium rounded-xl hover:bg-card transition-colors text-xs cursor-pointer">
-                Cancel
-              </button>
-              <button onClick={() => handleSave('Draft')} className="px-4 py-2 border border-border text-text-secondary font-medium rounded-xl hover:bg-card transition-colors text-xs cursor-pointer">
-                Save Draft
-              </button>
-              <button onClick={() => handleSave('Unpaid')} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-colors text-xs shadow-sm cursor-pointer">
-                Issue Invoice (Unpaid)
-              </button>
-              <button onClick={() => handleSave('Paid')} className="px-5 py-2 bg-primary hover:bg-primary-hover text-white font-medium rounded-xl transition-colors text-xs shadow-sm flex items-center gap-1.5 cursor-pointer">
-                <CheckCircle2 className="w-3.5 h-3.5"/>
-                Issue & Record Full Payment
-              </button>
-            </div>
-          </div>
-        </div>)}
-
-      {/* Invoice Detail Modal with Document Timeline & Related Docs */}
-      {selectedInvoice && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedInvoice.invoiceNumber}</h3>
-                <span className="font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded">
-                  {selectedInvoice.customer}
-                </span>
-                <span className={`px-2 py-0.5 border rounded-full text-[10px] ${getStatusBadge(selectedInvoice.status)}`}>
-                  {selectedInvoice.status}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setPrintInvoiceTarget(selectedInvoice)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
-                  <Printer size={13}/>
-                  Print Official Invoice
-                </button>
-                <button onClick={() => setSelectedInvoice(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer">
-                  <X size={18}/>
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-6 mt-4 overflow-y-auto pr-1 flex-1">
-              {/* Stepper */}
-              <DocumentTimeline steps={getInvoiceTimelineSteps(selectedInvoice)}/>
-
-              {/* Related Docs */}
-              <RelatedDocumentsCard documents={getInvoiceRelatedDocs(selectedInvoice)}/>
-
-              {/* Items */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
-                  Invoiced Line Items ({selectedInvoice.items?.length || 0})
-                </h4>
-                <LineItemEditor items={selectedInvoice.items || []} onChange={() => { }} readOnly={true}/>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
-              <div className="font-mono text-xs">
-                Total: <strong className="text-slate-900">${selectedInvoice.total.toFixed(2)}</strong> | Paid: <strong className="text-emerald-700">${(selectedInvoice.paidAmount || 0).toFixed(2)}</strong>
-              </div>
-              <div className="flex items-center gap-2">
-                {getInvoiceOutstanding(selectedInvoice.id).balanceDue > 0.01 && (<button onClick={() => {
-                    setShowPaymentModal(selectedInvoice);
-                    setPayAmount(getInvoiceOutstanding(selectedInvoice.id).balanceDue);
-                }} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs shadow-sm flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5"/> Settle Payment
-                  </button>)}
-                <button onClick={() => setSelectedInvoice(null)} className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs">
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>)}
-
-      {/* Record Payment In Modal */}
-      {showPaymentModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 shadow-2xl text-xs">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <Receipt className="w-5 h-5 text-emerald-600"/>
-                <h3 className="font-bold text-base text-slate-900">Receive Customer Payment</h3>
-              </div>
-              <button onClick={() => setShowPaymentModal(null)} className="text-slate-400 hover:text-slate-600">
-                <X size={18}/>
-              </button>
-            </div>
-            <form onSubmit={handleRecordPaymentSubmit} className="space-y-4 mt-4">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Customer:</span>
-                  <span className="font-bold text-slate-800">{showPaymentModal.customer}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Invoice #:</span>
-                  <span className="font-mono font-bold text-slate-800">{showPaymentModal.invoiceNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Invoice Total:</span>
-                  <span className="font-mono font-bold text-slate-900">${showPaymentModal.total.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-rose-600 font-semibold border-t border-slate-200 pt-1">
-                  <span>Balance Due:</span>
-                  <span className="font-mono">${getInvoiceOutstanding(showPaymentModal.id).balanceDue.toFixed(2)}</span>
-                </div>
-              </div>
+            )}
 
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Receipt Amount ($) *</label>
-                <input type="number" step="0.01" min="1" max={getInvoiceOutstanding(showPaymentModal.id).balanceDue} value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} required className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900 font-mono font-bold text-sm"/>
-              </div>
+            {/* FINALIZE CONFIRMATION MODAL */}
+            {finalizeModalTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col">
+                        <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
+                            <CheckCircle2 className="w-5 h-5 text-blue-600"/>
+                            <h3 className="font-bold text-base text-[#1F2E4A]">Finalize Sales Invoice?</h3>
+                        </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
-                  <select value={payMode} onChange={(e) => setPayMode(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800">
-                    <option value="Bank Transfer">Bank Transfer / Wire</option>
-                    <option value="Corporate Card">Corporate Card</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Cash">Cash</option>
-                  </select>
+                        <div className="py-4 space-y-2 text-slate-600">
+                            <p className="font-semibold text-slate-800">After finalization:</p>
+                            <ul className="list-disc list-inside space-y-1 text-slate-600">
+                                <li>Invoice becomes a final commercial document</li>
+                                <li>Financial records (AR & GL) will be officially posted</li>
+                                <li>Inventory stock will be deducted if direct fulfillment</li>
+                                <li>Direct item and rate editing will be locked</li>
+                            </ul>
+                        </div>
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                            <Button variant="outline" onClick={() => setFinalizeModalTarget(null)}>
+                                Back
+                            </Button>
+                            <button
+                                type="button"
+                                onClick={handleConfirmFinalize}
+                                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+                            >
+                                Finalize Invoice
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Transaction Ref #</label>
-                  <input type="text" value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="WIRE-99214" className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
+            )}
+
+            {/* CANCEL INVOICE MODAL */}
+            {cancelModalTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col">
+                        <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
+                            <ShieldAlert className="w-5 h-5 text-rose-600"/>
+                            <h3 className="font-bold text-base text-[#1F2E4A]">Cancel Invoice {cancelModalTarget.invoiceNumber}?</h3>
+                        </div>
+
+                        {errorMessage ? (
+                            <div className="my-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-800 text-xs flex items-center gap-2">
+                                <AlertCircle size={16} className="shrink-0 text-rose-600"/>
+                                <span>{errorMessage}</span>
+                            </div>
+                        ) : (
+                            <div className="py-4 space-y-2 text-slate-600">
+                                <p className="font-semibold text-slate-800">This action will:</p>
+                                <ul className="list-disc list-inside space-y-1 text-slate-600">
+                                    <li>Reverse Accounts Receivable and customer balance ({formatCurrency(cancelModalTarget.total)})</li>
+                                    <li>Post reversal journal entry to General Ledger</li>
+                                    {(!cancelModalTarget.dispatchedViaChallan) && (
+                                        <li>Reverse inventory stock movement exactly once</li>
+                                    )}
+                                    <li>Mark invoice as <strong className="text-rose-600">Cancelled</strong></li>
+                                </ul>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                            <Button variant="outline" onClick={() => { setCancelModalTarget(null); setErrorMessage(''); }}>
+                                Keep Invoice
+                            </Button>
+                            {!errorMessage && (
+                                <button
+                                    type="button"
+                                    onClick={handleConfirmCancelInvoice}
+                                    className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+                                >
+                                    Cancel Invoice & Reverse
+                                </button>
+                            )}
+                        </div>
+                    </div>
                 </div>
-              </div>
+            )}
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
-                <button type="button" onClick={() => setShowPaymentModal(null)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded hover:bg-slate-100 font-medium">
-                  Cancel
-                </button>
-                <button type="submit" className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow-sm">
-                  Post Payment & Settle Invoice
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>)}
+            {/* RECORD PAYMENT IN MODAL */}
+            {showPaymentModal && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 shadow-2xl text-xs">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                            <div className="flex items-center gap-2">
+                                <Receipt className="w-5 h-5 text-emerald-600"/>
+                                <h3 className="font-bold text-base text-slate-900">Receive Customer Payment</h3>
+                            </div>
+                            <button onClick={() => setShowPaymentModal(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                                <X size={18}/>
+                            </button>
+                        </div>
+                        <form onSubmit={handleRecordPaymentSubmit} className="space-y-4 mt-4">
+                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Customer:</span>
+                                    <span className="font-bold text-slate-800">{showPaymentModal.customer}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Invoice #:</span>
+                                    <span className="font-mono font-bold text-slate-800">{showPaymentModal.invoiceNumber}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-slate-500">Invoice Total:</span>
+                                    <span className="font-mono font-bold text-slate-900">{formatCurrency(showPaymentModal.total)}</span>
+                                </div>
+                                <div className="flex justify-between text-rose-600 font-semibold border-t border-slate-200 pt-1">
+                                    <span>Balance Due:</span>
+                                    <span className="font-mono">{formatCurrency(getInvoiceOutstanding(showPaymentModal.id).balanceDue)}</span>
+                                </div>
+                            </div>
 
-      {/* Instant Settle Payment Receipt Modal */}
-      <PaymentReceiptModal receipt={activeReceipt} onClose={() => setActiveReceipt(null)}/>
+                            <div>
+                                <label className="font-semibold text-slate-700 block mb-1">Receipt Amount *</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    min="1"
+                                    max={getInvoiceOutstanding(showPaymentModal.id).balanceDue}
+                                    value={payAmount}
+                                    onChange={(e) => setPayAmount(Number(e.target.value))}
+                                    required
+                                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-900 font-mono font-bold text-sm"
+                                />
+                            </div>
 
-      {/* Official Printable Commercial Tax Invoice Document */}
-      <PrintInvoiceModal isOpen={Boolean(printInvoiceTarget)} onClose={() => setPrintInvoiceTarget(null)} invoice={printInvoiceTarget} balanceDue={printInvoiceTarget ? getInvoiceOutstanding(printInvoiceTarget.id).balanceDue : 0}/>
-    </div>);
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
+                                    <select value={payMode} onChange={(e) => setPayMode(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800">
+                                        <option value="Bank Transfer">Bank Transfer / Wire</option>
+                                        <option value="Corporate Card">Corporate Card</option>
+                                        <option value="Cheque">Cheque</option>
+                                        <option value="Cash">Cash</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="font-semibold text-slate-700 block mb-1">Transaction Ref #</label>
+                                    <input type="text" value={payRef} onChange={(e) => setPayRef(e.target.value)} placeholder="WIRE-99214" className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                                <button type="button" onClick={() => setShowPaymentModal(null)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded hover:bg-slate-100 font-medium cursor-pointer">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow-sm cursor-pointer">
+                                    Post Payment & Settle Invoice
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Instant Settle Payment Receipt Modal */}
+            <PaymentReceiptModal receipt={activeReceipt} onClose={() => setActiveReceipt(null)}/>
+
+            {/* Official Printable Commercial Tax Invoice Document */}
+            <PrintInvoiceModal isOpen={Boolean(printInvoiceTarget)} onClose={() => setPrintInvoiceTarget(null)} invoice={printInvoiceTarget} balanceDue={printInvoiceTarget ? getInvoiceOutstanding(printInvoiceTarget.id).balanceDue : 0}/>
+        </div>
+    );
 };

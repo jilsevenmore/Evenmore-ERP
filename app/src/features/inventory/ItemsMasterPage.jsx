@@ -112,10 +112,10 @@ export const ItemsMasterPage = () => {
         {
             key: 'name',
             header: 'Description & Taxonomy',
-            width: '26%',
+            width: '24%',
             render: (i) => {
               const machinePartsCount = i.itemKind === 'Machine'
-                ? itemParts.filter(ip => String(ip.itemId) === String(i.id)).length
+                ? itemParts.filter(ip => String(ip.parentItemId || ip.itemId) === String(i.id)).length
                 : 0;
 
               return (
@@ -147,40 +147,79 @@ export const ItemsMasterPage = () => {
             header: 'Item Type',
             align: 'center',
             width: '12%',
-            render: (i) => (
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                i.itemKind === 'Machine'
-                  ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30'
-                  : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
-              }`}>
-                {i.itemKind === 'Machine' ? <Cpu size={11} /> : <Package size={11} />}
-                {i.itemKind || 'Standard Item'}
-              </span>
-            ),
+            render: (i) => {
+              const isMach = i.itemKind === 'Machine';
+              const isServ = i.itemKind === 'Service';
+              return (
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                  isMach
+                    ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30'
+                    : isServ
+                    ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30'
+                    : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+                }`}>
+                  {isMach ? <Cpu size={11} /> : isServ ? <Zap size={11} /> : <Package size={11} />}
+                  {i.itemKind || 'Standard Item'}
+                </span>
+              );
+            },
+        },
+        {
+            key: 'trackingMode',
+            header: 'Tracking',
+            align: 'center',
+            width: '10%',
+            render: (i) => {
+              const mode = i.trackingMode || (i.serialNumbers?.length ? 'Serial' : i.batchNumber ? 'Batch' : 'Quantity');
+              if (mode === 'Serial') {
+                return (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30">
+                    <QrCode size={10} /> Serial ({i.serialNumbers?.length || 0})
+                  </span>
+                );
+              }
+              if (mode === 'Batch') {
+                return (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30">
+                    <Layers size={10} /> Batch
+                  </span>
+                );
+              }
+              return (
+                <span className="text-[11px] text-muted font-medium">
+                  Quantity
+                </span>
+              );
+            },
         },
         {
             key: 'stock',
             header: 'Live Stock Buffer',
             align: 'center',
-            width: '14%',
-            render: (i) => (
-              <div className="inline-flex items-center justify-center gap-1 font-mono">
-                <span className={`font-bold text-xs ${i.status === 'Critical'
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : i.status === 'Low Stock'
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-emerald-700 dark:text-emerald-400'}`}>
-                  {i.availableQty ?? i.stock ?? 0}
-                </span>
-                <span className="text-[10px] text-muted">{i.salesUnit || i.uom || 'Unit'}</span>
-              </div>
-            ),
+            width: '12%',
+            render: (i) => {
+              if (i.itemKind === 'Service') {
+                return <span className="text-[11px] text-muted italic">N/A (Service)</span>;
+              }
+              return (
+                <div className="inline-flex items-center justify-center gap-1 font-mono">
+                  <span className={`font-bold text-xs ${i.status === 'Critical'
+                      ? 'text-rose-600 dark:text-rose-400'
+                      : i.status === 'Low Stock'
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-emerald-700 dark:text-emerald-400'}`}>
+                    {i.availableQty ?? i.stock ?? 0}
+                  </span>
+                  <span className="text-[10px] text-muted">{i.salesUnit || i.uom || 'Unit'}</span>
+                </div>
+              );
+            },
         },
         {
             key: 'costPrice',
             header: 'Unit Cost / Selling',
             align: 'right',
-            width: '18%',
+            width: '16%',
             render: (i) => {
                 const cost = i.costPrice ?? i.unitCost ?? 0;
                 const selling = i.sellingPrice ?? 0;
@@ -204,7 +243,7 @@ export const ItemsMasterPage = () => {
             key: 'id',
             header: 'Actions',
             align: 'right',
-            width: '10%',
+            width: '8%',
             render: (i) => (
               <div className="flex items-center justify-end gap-1.5">
                 <button

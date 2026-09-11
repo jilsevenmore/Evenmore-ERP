@@ -26,35 +26,9 @@ const estimateGuide = {
     workflow: ['Estimate Created', 'Prospect Review', 'Convert to Quotation', 'Customer Approval', 'Sales Order'],
 };
 
-const SEED_ESTIMATES = [
-    {
-        id: 'est-1',
-        estimateNumber: 'EST-2026-001',
-        customerId: '',
-        customer: 'Acme Corp',
-        date: 'Oct 20, 2026',
-        validUntil: '15 Days',
-        amount: 4800,
-        status: 'Sent',
-        items: [{ id: 'li-1', description: 'Discovery & site survey', qty: 1, rate: 4800, amount: 4800 }],
-    },
-    {
-        id: 'est-2',
-        estimateNumber: 'EST-2026-002',
-        customerId: '',
-        customer: 'Globex Ltd',
-        date: 'Oct 22, 2026',
-        validUntil: '15 Days',
-        amount: 12500,
-        status: 'Draft',
-        items: [{ id: 'li-2', description: 'Pilot hardware bundle', qty: 1, rate: 12500, amount: 12500 }],
-    },
-];
-
 export const EstimatesPage = () => {
-    const { customers, addQuotation, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { estimates = [], addEstimate, convertEstimateToQuotation, customers, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
-    const [estimates, setEstimates] = useState(SEED_ESTIMATES);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedEstimate, setSelectedEstimate] = useState(null);
@@ -83,23 +57,10 @@ export const EstimatesPage = () => {
         .reduce((sum, e) => sum + (e.amount || 0), 0);
 
     const handleConvert = (estimateId) => {
-        const estimate = estimates.find((e) => e.id === estimateId);
-        if (!estimate) return;
-        const cust = customers.find((c) => c.id === estimate.customerId) ||
-            customers.find((c) => c.name === estimate.customer) ||
-            customers[0];
-        addQuotation({
-            customerId: cust?.id,
-            customer: estimate.customer,
-            date: new Date().toISOString().split('T')[0],
-            validUntil: '30 Days',
-            amount: estimate.amount,
-            status: 'Draft',
-            items: estimate.items || [],
-            notes: `Converted from estimate ${estimate.estimateNumber}`,
-        });
-        setEstimates((prev) => prev.map((e) => (e.id === estimateId ? { ...e, status: 'Converted' } : e)));
-        navigate('/sales/quotations');
+        const quote = convertEstimateToQuotation(estimateId);
+        if (quote) {
+            navigate('/sales/quotations');
+        }
     };
 
     const handleClone = (estimate) => {
@@ -219,7 +180,7 @@ export const EstimatesPage = () => {
             status: 'Draft',
             items: lineItems,
         };
-        setEstimates((prev) => [next, ...prev]);
+        addEstimate(next);
         handleCloseCreateModal();
     };
 
