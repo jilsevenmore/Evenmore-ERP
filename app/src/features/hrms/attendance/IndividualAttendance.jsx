@@ -1,100 +1,486 @@
 import { useState, useMemo } from "react";
+import { ChevronRight, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
-import { attendanceEmployees, monthlyRecords } from "../../../data/hrms/mocks/attendanceExtended";
-import { StatusBadge } from "../../../components/hrms/StatusBadge";
-import { EmptyState } from "../../../components/hrms/Shared";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
+import Modal from "../../../components/ui/Modal";
+
+const DEFAULT_EMPLOYEES = [
+  {
+    id: "EMP1024",
+    name: "Priya Patel",
+    designation: "Senior Engineer",
+    dept: "Engineering",
+    manager: "David Park",
+    status: "Active",
+    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
+  },
+  {
+    id: "EMP1025",
+    name: "Marcus Chen",
+    designation: "Lead Designer",
+    dept: "Design",
+    manager: "David Park",
+    status: "Active",
+    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
+  },
+  {
+    id: "EMP1026",
+    name: "Liam Cooper",
+    designation: "DevOps Engineer",
+    dept: "Engineering",
+    manager: "David Park",
+    status: "On Leave",
+    avatar: "https://randomuser.me/api/portraits/men/75.jpg",
+  },
+  {
+    id: "EMP1027",
+    name: "Sarah Wilson",
+    designation: "Brand Strategist",
+    dept: "Marketing",
+    manager: "David Park",
+    status: "Active",
+    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
+  },
+];
+
+const MONTHS = ["October", "September", "August", "July", "June", "May"];
+const YEARS = ["2024", "2023"];
+
+const SAMPLE_RECORDS = [
+  { date: "01 Oct 2024", day: "Tue", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "Flexible", status: "Present", remarks: "—" },
+  { date: "02 Oct 2024", day: "Wed", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "General", status: "Present", remarks: "—" },
+  { date: "03 Oct 2024", day: "Thu", checkIn: "09:18", checkOut: "18:04", workHours: "08:32", shift: "General", status: "Late", remarks: "Grace 10 min" },
+  { date: "04 Oct 2024", day: "Fri", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "Flexible", status: "Present", remarks: "—" },
+  { date: "05 Oct 2024", day: "Sat", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "General", status: "WFH", remarks: "—" },
+  { date: "06 Oct 2024", day: "Sun", checkIn: "—", checkOut: "—", workHours: "—", shift: "General", status: "Absent", remarks: "—" },
+  { date: "07 Oct 2024", day: "Mon", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "Flexible", status: "Present", remarks: "—" },
+  { date: "08 Oct 2024", day: "Tue", checkIn: "09:00", checkOut: "18:00", workHours: "08:30", shift: "General", status: "Present", remarks: "—" },
+  { date: "09 Oct 2024", day: "Wed", checkIn: "09:05", checkOut: "18:10", workHours: "08:35", shift: "General", status: "Present", remarks: "—" },
+  { date: "10 Oct 2024", day: "Thu", checkIn: "—", checkOut: "—", workHours: "—", shift: "General", status: "On Leave", remarks: "Planned Annual" },
+];
+
+const statusStyles = {
+  Present: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
+  Late: { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
+  Absent: { background: "#fee2e2", color: "#dc2626", border: "#fca5a5" },
+  WFH: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  "On Leave": { background: "#eff6ff", color: "#2563eb", border: "#bfdbfe" },
+  "Half Day": { background: "#f3e8ff", color: "#7e22ce", border: "#d8b4fe" },
+};
+
 export default function IndividualAttendance() {
-  const showToast = useAppStore((s) => s.showToast);
-  const [employeeId, setEmployeeId] = useState("EMP1024");
-  const [month, setMonth] = useState("October");
-  const [year, setYear] = useState("2024");
-  const [view, setView] = useState("table");
-  const [detailDate, setDetailDate] = useState(null);
-  const [editRow, setEditRow] = useState(null);
-  const emp = useMemo(() => attendanceEmployees.find((e) => e.id === employeeId), [employeeId]);
-  const records = useMemo(() => monthlyRecords(employeeId), [employeeId]);
-  const stats = {
-    present: records.filter((r) => r.status === "Present").length,
-    absent: records.filter((r) => r.status === "Absent").length,
-    late: records.filter((r) => r.status === "Late").length,
-    leave: records.filter((r) => r.status === "On Leave").length,
-    wfh: records.filter((r) => r.status === "WFH").length,
-    overtime: "6h"
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const storeEmployees = useAppStore((s) => s.employees || []);
+  const storeRecords = useAttendanceStore((s) => s.records || []);
+  const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
+
+  const employeesList = useMemo(() => {
+    if (storeEmployees && storeEmployees.length > 0) {
+      return storeEmployees.map((e) => ({
+        id: e.id || `EMP${e.employeeId || "1024"}`,
+        name: e.name,
+        designation: e.designation || e.role || "Employee",
+        dept: e.department || e.dept || "General",
+        manager: e.manager || "HR Manager",
+        status: e.status || "Active",
+        avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
+      }));
+    }
+    return DEFAULT_EMPLOYEES;
+  }, [storeEmployees]);
+
+  const [selectedEmpId, setSelectedEmpId] = useState(() => employeesList[0]?.id || "EMP1024");
+  const [selectedMonth, setSelectedMonth] = useState("October");
+  const [selectedYear, setSelectedYear] = useState("2024");
+  const [viewMode, setViewMode] = useState("Table");
+
+  const [records, setRecords] = useState(SAMPLE_RECORDS);
+  const [editItem, setEditItem] = useState(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
+  const currentEmp = useMemo(
+    () => employeesList.find((e) => e.id === selectedEmpId) || employeesList[0] || DEFAULT_EMPLOYEES[0],
+    [employeesList, selectedEmpId]
+  );
+
+  const stats = useMemo(() => {
+    return {
+      present: records.filter((r) => r.status === "Present").length,
+      absent: records.filter((r) => r.status === "Absent").length,
+      late: records.filter((r) => r.status === "Late").length,
+      leave: records.filter((r) => r.status === "On Leave").length,
+      wfh: records.filter((r) => r.status === "WFH").length,
+      overtime: "6h",
+    };
+  }, [records]);
+
+  const handleEditSave = () => {
+    if (!editItem) return;
+    setRecords((prev) =>
+      prev.map((r) => (r.date === editItem.date ? { ...r, ...editItem } : r))
+    );
+    // If this date corresponds to the active record in store, sync it
+    if (updateStoreRecord) {
+      updateStoreRecord(selectedEmpId, {
+        checkIn: editItem.checkIn,
+        checkOut: editItem.checkOut,
+        status: editItem.status,
+      });
+    }
+    setToast(`Attendance record for ${editItem.date} updated.`);
+    setEditItem(null);
   };
-  return <div className="flex flex-col gap-5">
-      <div><h1 className="text-[24px] font-bold">Individual Attendance</h1><p className="text-[13px] text-muted">View and manage per-employee attendance history.</p></div>
 
-      <div className="bg-white border border-bdr rounded-xl p-4 shadow-subtle flex flex-wrap gap-3">
-        <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px] min-w-[180px]">
-          {attendanceEmployees.map((e) => <option key={e.id} value={e.id}>{e.name} — {e.id}</option>)}
-        </select>
-        <select value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>October</option><option>September</option><option>August</option></select>
-        <select value={year} onChange={(e) => setYear(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]"><option>2024</option><option>2023</option></select>
-        <div className="ml-auto flex p-1 bg-off border border-bdr rounded-xl">
-          <button onClick={() => setView("table")} className={`px-3 py-1.5 rounded-lg text-[12px] ${view === "table" ? "bg-white border border-bdr shadow-sm font-medium" : ""}`}>Table View</button>
-          <button onClick={() => setView("calendar")} className={`px-3 py-1.5 rounded-lg text-[12px] ${view === "calendar" ? "bg-white border border-bdr shadow-sm font-medium" : ""}`}>Calendar View</button>
+  return (
+    <div className="ind-att-page">
+      {/* Breadcrumb */}
+      <nav className="ind-crumb">
+        <span style={{ cursor: "pointer" }}>Home</span>
+        <ChevronRight size={13} style={{ color: "#9aa7bd" }} />
+        <span style={{ color: "#111f36", fontWeight: 600 }}>Attendance / Individual Attendance</span>
+      </nav>
+
+      {/* Header Row */}
+      <div className="ind-title-row">
+        <div>
+          <h1 className="ind-title">Individual Attendance</h1>
+          <p className="ind-sub">View and manage per-employee attendance history.</p>
         </div>
       </div>
 
-      <div className="bg-white border border-bdr rounded-xl p-5 shadow-subtle flex gap-4 items-center">
-        <img src={emp.avatar} className="w-14 h-14 rounded-full border border-bdr" alt="av" />
-        <div className="flex-1">
-          <div className="font-semibold">{emp.name} <span className="text-muted font-normal text-[12px]">{emp.id}</span></div>
-          <div className="text-[13px] text-muted">{emp.designation} • {emp.dept} • Manager: {emp.manager} • <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px]">{emp.status}</span></div>
+      {/* Filter Bar */}
+      <div className="ind-card ind-filter-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <select
+            value={selectedEmpId}
+            onChange={(e) => setSelectedEmpId(e.target.value)}
+            className="ind-select ind-select-emp"
+          >
+            {employeesList.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name} — {e.id}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="ind-select"
+          >
+            {MONTHS.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            className="ind-select"
+          >
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            ))}
+          </select>
         </div>
-        <button onClick={() => showToast("View Employee Profile \u2014 " + emp.name)} className="px-3 py-1.5 bg-white border border-bdr rounded-xl text-[12px] hidden sm:block">View Employee</button>
+
+        {/* View Toggle */}
+        <div className="ind-tabs">
+          <button
+            type="button"
+            onClick={() => setViewMode("Table")}
+            className={viewMode === "Table" ? "ind-tab active" : "ind-tab"}
+          >
+            Table View
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("Calendar")}
+            className={viewMode === "Calendar" ? "ind-tab active" : "ind-tab"}
+          >
+            Calendar View
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {[
-    { k: "Present Days", v: stats.present },
-    { k: "Absent Days", v: stats.absent },
-    { k: "Late Days", v: stats.late },
-    { k: "Leave Days", v: stats.leave },
-    { k: "WFH Days", v: stats.wfh },
-    { k: "Overtime Hours", v: stats.overtime }
-  ].map((x) => <div key={x.k} className="bg-white border border-bdr rounded-xl p-4 shadow-subtle text-center"><div className="text-[11px] tracking-widest uppercase text-muted">{x.k}</div><div className="text-[20px] font-bold mt-1">{x.v}</div></div>)}
+      {/* Hero Employee Card */}
+      <div className="ind-card ind-hero-card">
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <img src={currentEmp.avatar} alt={currentEmp.name} className="ind-hero-avatar" />
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111827" }}>
+                {currentEmp.name}
+              </h3>
+              <span style={{ fontSize: "12.5px", color: "#6b7280" }}>{currentEmp.id}</span>
+            </div>
+            <div style={{ margin: "4px 0 0", fontSize: "13px", color: "#6b7280" }}>
+              {currentEmp.designation} • {currentEmp.dept} • Manager: {currentEmp.manager} •{" "}
+              <span className="ind-status-pill">{currentEmp.status}</span>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowProfileModal(true)}
+          className="ind-btn-view-emp"
+        >
+          View Employee
+        </button>
       </div>
 
-      {view === "table" ? <div className="bg-white border border-bdr rounded-xl shadow-subtle overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[900px]">
-              <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Date</th><th className="py-3 px-5">Day</th><th className="py-3 px-5">Check In</th><th className="py-3 px-5">Check Out</th><th className="py-3 px-5">Work Hours</th><th className="py-3 px-5">Shift</th><th className="py-3 px-5">Status</th><th className="py-3 px-5">Remarks</th><th className="py-3 px-5">Actions</th></tr></thead>
-              <tbody className="divide-y divide-bdr/60 text-[13px]">
-                {records.map((r, i) => <tr key={i} className="hover:bg-off/60">
-                    <td className="py-3 px-5 font-mono text-[12px]">{r.date}</td><td className="py-3 px-5">{r.day}</td><td className="py-3 px-5">{r.checkIn}</td><td className="py-3 px-5">{r.checkOut}</td><td className="py-3 px-5">{r.workHours}</td><td className="py-3 px-5">{r.shift}</td><td className="py-3 px-5"><StatusBadge status={r.status} /></td><td className="py-3 px-5 text-muted">{r.remarks || "\u2014"}</td>
-                    <td className="py-3 px-5"><button onClick={() => setEditRow(r)} className="px-2 py-1 bg-white border border-bdr rounded-lg text-[11px] hover:bg-off">Edit</button></td>
-                  </tr>)}
+      {/* Stats Cards Row (6 Cards) */}
+      <div className="ind-stats-grid">
+        <div className="ind-stat-card">
+          <span className="ind-stat-label">PRESENT DAYS</span>
+          <span className="ind-stat-val">{stats.present}</span>
+        </div>
+        <div className="ind-stat-card">
+          <span className="ind-stat-label">ABSENT DAYS</span>
+          <span className="ind-stat-val">{stats.absent}</span>
+        </div>
+        <div className="ind-stat-card">
+          <span className="ind-stat-label">LATE DAYS</span>
+          <span className="ind-stat-val">{stats.late}</span>
+        </div>
+        <div className="ind-stat-card">
+          <span className="ind-stat-label">LEAVE DAYS</span>
+          <span className="ind-stat-val">{stats.leave}</span>
+        </div>
+        <div className="ind-stat-card">
+          <span className="ind-stat-label">WFH DAYS</span>
+          <span className="ind-stat-val">{stats.wfh}</span>
+        </div>
+        <div className="ind-stat-card">
+          <span className="ind-stat-label">OVERTIME HOURS</span>
+          <span className="ind-stat-val">{stats.overtime}</span>
+        </div>
+      </div>
+
+      {/* Table or Calendar View */}
+      {viewMode === "Table" ? (
+        <div className="ind-card ind-main-card">
+          <div style={{ overflowX: "auto" }}>
+            <table className="ind-table">
+              <thead>
+                <tr>
+                  <th>DATE</th>
+                  <th>DAY</th>
+                  <th>CHECK IN</th>
+                  <th>CHECK OUT</th>
+                  <th>WORK HOURS</th>
+                  <th>SHIFT</th>
+                  <th>STATUS</th>
+                  <th>REMARKS</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r, i) => (
+                  <tr key={i}>
+                    <td className="ind-date">{r.date}</td>
+                    <td style={{ color: "#374151" }}>{r.day}</td>
+                    <td className="ind-time">{r.checkIn}</td>
+                    <td className="ind-time">{r.checkOut}</td>
+                    <td className="ind-time">{r.workHours}</td>
+                    <td style={{ color: "#374151" }}>{r.shift}</td>
+                    <td>
+                      <span className="ind-status" style={{ ...statusStyles[r.status] }}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td style={{ color: "#6b7280" }}>{r.remarks || "—"}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => setEditItem({ ...r })}
+                        className="ind-btn-edit"
+                      >
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
-          {records.length === 0 && <EmptyState title="No attendance data for this period." desc="Try another month or year." />}
-        </div> : <div className="bg-white border border-bdr rounded-xl p-5 shadow-subtle">
-          <div className="grid grid-cols-7 gap-px bg-bdr border border-bdr rounded-xl overflow-hidden text-center text-[12px]">
-            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => <div key={d} className="bg-off py-2 font-medium text-muted">{d}</div>)}
-            {records.slice(0, 31).map((r, i) => <button key={i} onClick={() => setDetailDate(r.date)} className={`bg-white h-20 sm:h-24 p-1.5 text-left hover:bg-off/60 flex flex-col justify-between border border-transparent hover:border-navy/20 ${r.status === "Present" ? "" : "opacity-90"}`}>
-                <span className="text-[11px] font-medium">{i + 1}</span>
-                <span className={`inline-flex self-start px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${r.status === "Present" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : r.status === "Late" ? "bg-amber-50 text-amber-700 border-amber-200" : r.status === "Absent" ? "bg-red-50 text-red-700 border-red-200" : r.status === "On Leave" ? "bg-blue-50 text-blue-700 border-blue-200" : r.status === "WFH" ? "bg-slate-50 text-slate-600 border-bdr" : "bg-purple-50 text-purple-700 border-purple-200"}`}>{r.status}</span>
-              </button>)}
+        </div>
+      ) : (
+        <div className="ind-card" style={{ padding: "20px" }}>
+          <div className="ind-cal-grid">
+            {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+              <div key={d} className="ind-cal-header">
+                {d}
+              </div>
+            ))}
+            {records.map((r, i) => (
+              <div key={i} className="ind-cal-cell" onClick={() => setEditItem({ ...r })}>
+                <span style={{ fontSize: "11px", fontWeight: 600, color: "#475569" }}>
+                  {i + 1}
+                </span>
+                <span className="ind-status" style={{ ...statusStyles[r.status], marginTop: 4 }}>
+                  {r.status}
+                </span>
+              </div>
+            ))}
           </div>
-          <div className="flex flex-wrap gap-2 mt-3 text-[11px]"><span className="px-2 py-1 bg-emerald-50 border border-emerald-200 rounded-full">Present</span><span className="px-2 py-1 bg-amber-50 border border-amber-200 rounded-full">Late</span><span className="px-2 py-1 bg-red-50 border border-red-200 rounded-full">Absent</span><span className="px-2 py-1 bg-blue-50 border border-blue-200 rounded-full">Leave</span><span className="px-2 py-1 bg-slate-50 border border-bdr rounded-full">WFH</span><span className="px-2 py-1 bg-purple-50 border border-purple-200 rounded-full">Half Day</span></div>
-          {detailDate && <div className="mt-4 p-4 bg-off border border-bdr rounded-xl">
-              <div className="flex justify-between"><span className="font-medium text-[13px]">{detailDate} — {records.find((r) => r.date === detailDate)?.status}</span><button onClick={() => setDetailDate(null)} className="text-[12px] text-navy">Close</button></div>
-              <div className="text-[12px] text-muted mt-1">Check In: {records.find((r) => r.date === detailDate)?.checkIn} • Check Out: {records.find((r) => r.date === detailDate)?.checkOut} • Work Hours: {records.find((r) => r.date === detailDate)?.workHours}</div>
-            </div>}
-        </div>}
+        </div>
+      )}
 
-      {editRow && <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setEditRow(null)} />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-3">
-            <h3 className="font-semibold">Edit Attendance — {editRow.date}</h3>
-            <input value={editRow.checkIn} onChange={(e) => setEditRow({ ...editRow, checkIn: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]" placeholder="Check In" />
-            <input value={editRow.checkOut} onChange={(e) => setEditRow({ ...editRow, checkOut: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]" placeholder="Check Out" />
-            <div className="flex justify-end gap-2"><button onClick={() => setEditRow(null)} className="px-4 py-2 bg-white border border-bdr rounded-xl text-[13px]">Cancel</button><button onClick={() => {
-    showToast("Attendance updated");
-    setEditRow(null);
-  }} className="px-4 py-2 bg-navy text-white rounded-xl text-[13px]">Save</button></div>
+      {/* Edit Record Modal */}
+      <Modal
+        isOpen={Boolean(editItem)}
+        onClose={() => setEditItem(null)}
+        title={`Edit Attendance — ${editItem?.date || ""}`}
+        footer={
+          <>
+            <button type="button" className="btn-outline" onClick={() => setEditItem(null)}>
+              Cancel
+            </button>
+            <button type="button" className="btn-primary" onClick={handleEditSave}>
+              Save Record
+            </button>
+          </>
+        }
+      >
+        {editItem && (
+          <div style={{ display: "grid", gap: 16 }}>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Check In Time</label>
+                <input
+                  className="form-input"
+                  value={editItem.checkIn}
+                  onChange={(e) => setEditItem({ ...editItem, checkIn: e.target.value })}
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Check Out Time</label>
+                <input
+                  className="form-input"
+                  value={editItem.checkOut}
+                  onChange={(e) => setEditItem({ ...editItem, checkOut: e.target.value })}
+                />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Status</label>
+                <select
+                  className="form-select"
+                  value={editItem.status}
+                  onChange={(e) => setEditItem({ ...editItem, status: e.target.value })}
+                >
+                  <option>Present</option>
+                  <option>Late</option>
+                  <option>Absent</option>
+                  <option>WFH</option>
+                  <option>On Leave</option>
+                  <option>Half Day</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Remarks</label>
+                <input
+                  className="form-input"
+                  value={editItem.remarks}
+                  onChange={(e) => setEditItem({ ...editItem, remarks: e.target.value })}
+                  placeholder="e.g. Grace 10 min"
+                />
+              </div>
+            </div>
           </div>
-        </div>}
-    </div>;
+        )}
+      </Modal>
+
+      {/* View Employee Profile Modal */}
+      <Modal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        title={`Employee Profile — ${currentEmp.name}`}
+        footer={
+          <button type="button" className="btn-primary" onClick={() => setShowProfileModal(false)}>
+            Close
+          </button>
+        }
+      >
+        <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
+          <img src={currentEmp.avatar} alt={currentEmp.name} style={{ width: 60, height: 60, borderRadius: 999 }} />
+          <div>
+            <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{currentEmp.name}</h3>
+            <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b" }}>{currentEmp.id} • {currentEmp.designation}</p>
+          </div>
+        </div>
+        <div style={{ display: "grid", gap: 10, fontSize: 13.5, color: "#334155" }}>
+          <div><strong>Department:</strong> {currentEmp.dept}</div>
+          <div><strong>Reporting Manager:</strong> {currentEmp.manager}</div>
+          <div><strong>Employment Status:</strong> {currentEmp.status}</div>
+          <div><strong>Work Location:</strong> Bangalore HQ</div>
+        </div>
+      </Modal>
+
+      <style>{`
+        .ind-att-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .ind-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
+        .ind-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .ind-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
+        .ind-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
+
+        .ind-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
+        .ind-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+
+        .ind-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 100px; }
+        .ind-select:focus { border-color: #94a3b8; background-color: #fff; }
+        .ind-select-emp { min-width: 210px; }
+
+        .ind-tabs { display: inline-flex; align-items: center; gap: 3px; background: #f4f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 3px 4px; }
+        .ind-tab { border: 1.5px solid transparent; border-radius: 999px; padding: 4px 16px; font-size: 13px; font-weight: 500; color: #8e9baa; background: transparent; cursor: pointer; transition: all 0.15s ease; }
+        .ind-tab.active { font-weight: 600; color: #000000; background: #ffffff; border-color: #000000; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+
+        .ind-hero-card { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .ind-hero-avatar { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; }
+        .ind-status-pill { display: inline-block; font-size: 11px; font-weight: 600; color: #15803d; background: #e6f4ea; border: 1px solid #a7f3d0; border-radius: 999px; padding: 2px 9px; }
+        .ind-btn-view-emp { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 7px 16px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; }
+        .ind-btn-view-emp:hover { background: #f9fafb; }
+
+        .ind-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+        .ind-stat-card { background: #fff; border: 1px solid #e8edf3; border-radius: 14px; padding: 16px 14px; text-align: center; box-shadow: 0 1px 2px rgba(16,24,40,0.03); }
+        .ind-stat-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #6b7280; text-transform: uppercase; }
+        .ind-stat-val { display: block; font-size: 22px; font-weight: 800; color: #111827; letter-spacing: -0.02em; margin-top: 6px; }
+
+        .ind-main-card { overflow: hidden; }
+        .ind-table { width: 100%; border-collapse: collapse; min-width: 800px; font-size: 13.5px; }
+        .ind-table thead tr { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
+        .ind-table th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #7b8aa0; padding: 14px 20px; white-space: nowrap; }
+        .ind-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s ease; }
+        .ind-table tbody tr:hover { background: #f8fafc; }
+        .ind-table td { padding: 14px 20px; vertical-align: middle; }
+
+        .ind-date { font-weight: 600; color: #111827; white-space: nowrap; }
+        .ind-time { font-family: inherit; font-size: 13px; color: #374151; white-space: nowrap; }
+        .ind-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 12px; border: 1px solid; white-space: nowrap; }
+
+        .ind-btn-edit { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
+        .ind-btn-edit:hover { background: #f8fafc; color: #111827; border-color: #cbd5e1; }
+
+        .ind-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+        .ind-cal-header { text-align: center; font-size: 12px; font-weight: 700; color: #6b7280; padding: 8px 0; }
+        .ind-cal-cell { border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px; min-height: 70px; cursor: pointer; transition: background 0.15s ease; display: flex; flex-direction: column; justify-content: space-between; }
+        .ind-cal-cell:hover { background: #f8fafc; }
+
+        @media (max-width: 1200px) {
+          .ind-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        }
+        @media (max-width: 640px) {
+          .ind-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .ind-att-page { padding: 14px 14px 22px; }
+        }
+      `}</style>
+    </div>
+  );
 }

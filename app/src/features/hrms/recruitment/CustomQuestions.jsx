@@ -5,12 +5,14 @@ import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
 import { useAppStore } from "../../../stores/appStore";
-import { Eye, Pencil, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Eye, Pencil, Trash2, ArrowLeft } from "lucide-react";
 
 const QUESTION_TYPES = ["Short Answer", "Long Answer", "Single Select", "Multiple Select", "Yes / No", "Number"];
 
 export default function CustomQuestions() {
   const showToast = useAppStore((s) => s.showToast);
+  const navigate = useNavigate();
   const [data, setData] = useState(questionsMock);
   const [addOpen, setAddOpen] = useState(false);
   const [viewRow, setViewRow] = useState(null);
@@ -56,8 +58,20 @@ export default function CustomQuestions() {
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-[22px] font-bold">Custom Questions</h1><p className="text-[13px] text-muted">{data.length} questions • assign to jobs</p></div><Button onClick={() => { setForm({ text: "", type: "Short Answer", enabled: true }); setAddOpen(true); }}>+ Add Question</Button></div>
+    <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate("/hrms/recruitment")}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Recruitment Setup</span>
+      </button>
+
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <div><h1 className="text-[22px] font-bold">Custom Questions</h1><p className="text-[13px] text-muted">{data.length} questions • assign to jobs</p></div>
+        <Button onClick={() => { setForm({ text: "", type: "Short Answer", enabled: true }); setAddOpen(true); }}>+ Add Question</Button>
+      </div>
       <DataTable columns={cols} data={data} emptyTitle="No questions" emptyDesc="Add a custom question to get started." emptyAction={<Button onClick={() => setAddOpen(true)}>+ Add Question</Button>} />
       <Modal isOpen={addOpen} onClose={() => setAddOpen(false)} title="Add Question" footer={<><Button variant="secondary" onClick={() => setAddOpen(false)}>Cancel</Button><Button onClick={save}>Save Question</Button></>}><FormFields /></Modal>
       <Modal isOpen={!!editRow} onClose={() => setEditRow(null)} title="Edit Question" footer={<><Button variant="secondary" onClick={() => setEditRow(null)}>Cancel</Button><Button onClick={save}>Save Question</Button></>}><FormFields /></Modal>

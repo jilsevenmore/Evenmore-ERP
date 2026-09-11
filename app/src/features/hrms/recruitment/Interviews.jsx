@@ -1,18 +1,26 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { FilterBar } from "../../../components/hrms/FilterBar";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
+import { ArrowLeft } from "lucide-react";
 export default function Interviews() {
   const { interviews, addInterview, candidates, jobs } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
+  const location = useLocation();
   const [search, setSearch] = useState("");
   const [view, setView] = useState("List");
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useEffect(() => {
+    if (location.state?.openSchedule) {
+      setDrawerOpen(true);
+    }
+  }, [location.state]);
   const [form, setForm] = useState({ candidateId: "CAND-001", job: "Senior Backend Developer", type: "Technical Interview", interviewer: "Rahul Mehta", date: "10 Sep 2026", start: "10:30 AM", end: "11:30 AM", mode: "Video Call", meetingLink: "https://meet.google.com/abc", notes: "" });
   const filtered = useMemo(() => interviews.filter((i) => {
     if (search && !`${i.candidateName} ${i.job} ${i.interviewer}`.toLowerCase().includes(search.toLowerCase())) return false;
@@ -42,8 +50,20 @@ export default function Interviews() {
         <button onClick={() => window.open(r.meetingLink || "#", "_blank")} className="text-[11px] border border-bdr rounded-lg px-2">Join</button>
       </div> }
   ];
-  return <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-[22px] font-bold">Interviews</h1><p className="text-[13px] text-muted">Schedule and manage interviews.</p></div><Button onClick={() => setDrawerOpen(true)}>+ Schedule Interview</Button></div>
+  return <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate("/hrms/recruitment")}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Recruitment Setup</span>
+      </button>
+
+      <div className="flex flex-wrap justify-between items-center gap-3">
+        <div><h1 className="text-[22px] font-bold">Interviews</h1><p className="text-[13px] text-muted">Schedule and manage interviews.</p></div>
+        <Button onClick={() => setDrawerOpen(true)}>+ Schedule Interview</Button>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
     { k: "Today's Interviews", v: todays },

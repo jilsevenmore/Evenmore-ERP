@@ -10,7 +10,7 @@ import { Button } from "../../../components/hrms/Button";
 import { useAppStore } from "../../../stores/appStore";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 export default function GoalTracking() {
-  const showToast = useAppStore((s) => s.showToast);
+  const { showToast, employees } = useAppStore();
   const [data, setData] = useState(goalsMock);
   const [search, setSearch] = useState("");
   const [employee, setEmployee] = useState("All");
@@ -62,7 +62,28 @@ export default function GoalTracking() {
   ];
   function FormFields() {
     return <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <label className="flex flex-col gap-1"><span className="text-[11px] font-medium text-muted">Employee *</span><input value={form.employee} onChange={(e) => setForm({ ...form, employee: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]" placeholder="Priya Patel" /></label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium text-muted">Employee *</span>
+          <select
+            value={form.employee}
+            onChange={(e) => {
+              const emp = employees.find((x) => x.name === e.target.value);
+              setForm({
+                ...form,
+                employee: e.target.value,
+                department: emp?.department || form.department,
+              });
+            }}
+            className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]"
+          >
+            <option value="">Select Employee</option>
+            {employees.map((e) => (
+              <option key={e.id || e.name} value={e.name}>
+                {e.name} ({e.department || e.designation})
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex flex-col gap-1"><span className="text-[11px] font-medium text-muted">Department</span><input value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]" /></label>
         <label className="sm:col-span-2 flex flex-col gap-1"><span className="text-[11px] font-medium text-muted">Goal *</span><input value={form.goal} onChange={(e) => setForm({ ...form, goal: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]" placeholder="Reduce API latency by 30%" /></label>
         <label className="flex flex-col gap-1"><span className="text-[11px] font-medium text-muted">Target</span><input value={form.target} onChange={(e) => setForm({ ...form, target: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]" placeholder="30%" /></label>
@@ -80,7 +101,12 @@ export default function GoalTracking() {
     search={search}
     onSearch={setSearch}
     selects={[
-      { label: "Employee", value: employee, onChange: setEmployee, options: [{ value: "All", label: "All Employees" }, { value: "Priya Patel", label: "Priya Patel" }, { value: "Marcus Chen", label: "Marcus Chen" }, { value: "Liam Cooper", label: "Liam Cooper" }] },
+      {
+        label: "Employee",
+        value: employee,
+        onChange: setEmployee,
+        options: [{ value: "All", label: "All Employees" }, ...employees.map((e) => ({ value: e.name, label: e.name }))],
+      },
       { label: "Department", value: dept, onChange: setDept, options: [{ value: "All", label: "All Departments" }, { value: "Engineering", label: "Engineering" }, { value: "Design", label: "Design" }, { value: "Marketing", label: "Marketing" }] },
       { label: "Status", value: status, onChange: setStatus, options: [{ value: "All", label: "All Status" }, { value: "Not Started", label: "Not Started" }, { value: "In Progress", label: "In Progress" }, { value: "At Risk", label: "At Risk" }, { value: "Completed", label: "Completed" }] }
     ]}
