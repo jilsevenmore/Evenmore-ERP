@@ -136,7 +136,7 @@ export const PurchaseOrdersPage = () => {
         {
             key: 'poNumber',
             header: 'PO Number',
-            width: '14%',
+            width: '13%',
             render: (p) => (<button onClick={() => setSelectedPo(p)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
           <ClipboardList size={13} className="text-muted"/> {p.poNumber}
         </button>),
@@ -144,7 +144,7 @@ export const PurchaseOrdersPage = () => {
         {
             key: 'vendor',
             header: 'Supplier / Vendor',
-            width: '24%',
+            width: '22%',
             render: (p) => <span className="font-bold text-text">{p.vendor}</span>,
         },
         {
@@ -163,7 +163,7 @@ export const PurchaseOrdersPage = () => {
             key: 'amount',
             header: 'Total Order Value',
             align: 'right',
-            width: '14%',
+            width: '13%',
             render: (p) => (<span className="font-mono font-bold text-text whitespace-nowrap">
           {formatCurrency(p.amount ?? p.total ?? 0)}
         </span>),
@@ -179,10 +179,10 @@ export const PurchaseOrdersPage = () => {
             key: 'actions',
             header: 'Actions / Intake',
             align: 'right',
-            width: '14%',
+            width: '18%',
             render: (p) => {
                 return (
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                     <button onClick={() => handleClonePo(p)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Reorder this Purchase Order">
                       <Copy size={13}/>
                     </button>
@@ -197,11 +197,11 @@ export const PurchaseOrdersPage = () => {
                       </button>
                     )}
                     {p.status === 'Draft' ? (
-                      <button onClick={() => issuePo(p.id)} className="px-2.5 py-1 bg-primary text-white rounded-lg text-[11px] font-semibold hover:bg-primary-hover cursor-pointer flex items-center gap-1 shadow-xs transition-colors">
+                      <button onClick={() => issuePo(p.id)} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                         <Send size={11}/> Issue PO
                       </button>
                     ) : (
-                      <button onClick={() => handleConvertToBill(p.id)} className="text-[11px] text-primary font-semibold hover:underline flex items-center gap-1 justify-end cursor-pointer">
+                      <button onClick={() => handleConvertToBill(p.id)} className="text-xs text-primary font-semibold hover:underline inline-flex items-center gap-1 justify-end cursor-pointer whitespace-nowrap">
                         Create Bill <ArrowRight size={11}/>
                       </button>
                     )}

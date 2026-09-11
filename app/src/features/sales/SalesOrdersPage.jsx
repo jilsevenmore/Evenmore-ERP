@@ -185,7 +185,7 @@ export const SalesOrdersPage = () => {
         {
             key: 'orderNumber',
             header: 'Sales Order #',
-            width: '14%',
+            width: '13%',
             render: (o) => (<button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
           <ShoppingCart size={13} className="text-muted"/> {o.orderNumber}
         </button>),
@@ -193,7 +193,7 @@ export const SalesOrdersPage = () => {
         {
             key: 'customer',
             header: 'Customer Account',
-            width: '22%',
+            width: '20%',
             render: (o) => <span className="font-bold text-text">{o.customer}</span>,
         },
         {
@@ -205,14 +205,14 @@ export const SalesOrdersPage = () => {
         {
             key: 'deliveryDate',
             header: 'Target Delivery',
-            width: '13%',
+            width: '12%',
             render: (o) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(o.deliveryDate)}</span>,
         },
         {
             key: 'amount',
             header: 'Order Value',
             align: 'right',
-            width: '13%',
+            width: '12%',
             render: (o) => (<span className="font-mono font-bold text-text whitespace-nowrap">
           {formatCurrency(o.amount ?? o.total ?? 0)}
         </span>),
@@ -221,7 +221,7 @@ export const SalesOrdersPage = () => {
             key: 'stage',
             header: 'Stage Lifecycle',
             align: 'center',
-            width: '13%',
+            width: '14%',
             render: (o) => {
                 const stageVal = o.stage || o.status || 'Draft';
                 const stages = ['Draft', 'Confirmed', 'Delivered', 'Invoiced'];
@@ -238,30 +238,30 @@ export const SalesOrdersPage = () => {
             key: 'paymentStatus',
             header: 'Payment Status',
             align: 'center',
-            width: '12%',
+            width: '10%',
             render: (o) => <StatusBadge status={o.paymentStatus || 'Unpaid'}/>,
         },
         {
             key: 'actions',
             header: 'Actions / Lifecycle',
             align: 'right',
-            width: '14%',
+            width: '18%',
             render: (o) => {
-                return (<div className="flex items-center justify-end gap-1.5">
+                return (<div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
             <button onClick={() => handleCloneOrder(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
               <Copy size={13}/>
             </button>
 
-            {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-lg text-[11px] font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors">
+            {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
               </button>)}
-            {o.stage === 'Confirmed' && (<button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[11px] font-semibold hover:bg-indigo-700 cursor-pointer flex items-center gap-1 shadow-xs transition-colors">
-                <Truck size={11}/> Issue Challan
+            {o.stage === 'Confirmed' && (<button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
+                <Truck size={12}/> Issue Challan
               </button>)}
-            {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer flex items-center gap-1 shadow-xs transition-colors">
-                <Receipt size={11}/> Invoice
+            {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
+                <Receipt size={12}/> Invoice
               </button>)}
-            {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+            {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1 whitespace-nowrap">
                 <CheckCircle size={12}/> Fulfilled
               </span>)}
           </div>);

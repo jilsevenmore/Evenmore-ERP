@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer } from 'lucide-react';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Maximize2, Minimize2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
@@ -29,12 +29,30 @@ export const QuotationsPage = () => {
     const navigate = useNavigate();
     const { quotations, customers, addQuotation, convertQuotationToSalesOrder, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [validUntil, setValidUntil] = useState('In 30 days');
     const [selectedQuote, setSelectedQuote] = useState(null);
     const [autoPOState, setAutoPOState] = useState({ isOpen: false, item: null, deficitQty: 5 });
     const [lineItems, setLineItems] = useState([]);
     const totalPipeline = quotations.reduce((sum, q) => sum + (q.amount || 0), 0);
+
+    const handleOpenCreateModal = () => {
+        setSelectedCustomerId(customers[0]?.id || '');
+        setValidUntil('In 30 days');
+        setLineItems([]);
+        setIsFullscreen(false);
+        setIsModalOpen(true);
+    };
+
+    const handleCloseCreateModal = () => {
+        setIsModalOpen(false);
+        setSelectedCustomerId(customers[0]?.id || '');
+        setValidUntil('In 30 days');
+        setLineItems([]);
+        setIsFullscreen(false);
+    };
+
     const handleConvert = (quoteId) => {
         const order = convertQuotationToSalesOrder(quoteId);
         if (order) {
@@ -48,6 +66,7 @@ export const QuotationsPage = () => {
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         })));
+        setIsFullscreen(false);
         setIsModalOpen(true);
     };
     const columns = [
@@ -152,11 +171,10 @@ export const QuotationsPage = () => {
             status: 'Draft',
             items: lineItems,
         });
-        setIsModalOpen(false);
-        setLineItems([]);
+        handleCloseCreateModal();
     };
     return (<div className="space-y-6">
-      <PageHeader title="Quotations & Estimates" subtitle="Generate pricing estimates and convert approved quotes directly into confirmed Sales Orders." guide={quotationGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>
+      <PageHeader title="Quotations & Estimates" subtitle="Generate pricing estimates and convert approved quotes directly into confirmed Sales Orders." guide={quotationGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
             New Quotation
           </Button>}/>
 
@@ -170,13 +188,29 @@ export const QuotationsPage = () => {
             q.customer.toLowerCase().includes(term) ||
             q.status.toLowerCase().includes(term)}/>
 
-      {isModalOpen && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-5xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {isModalOpen && (<div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-4'}`}>
+          <div className={`bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
+            isFullscreen ? 'w-full h-full rounded-none p-8' : 'max-w-5xl w-full rounded-2xl p-6 max-h-[92vh]'
+          } text-xs`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Create Quotation Estimate</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <X size={18}/>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsFullscreen(!isFullscreen)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                  title={isFullscreen ? "Exit Fullscreen" : "Maximize Fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCloseCreateModal}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition cursor-pointer"
+                >
+                  <X size={18}/>
+                </button>
+              </div>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -227,7 +261,7 @@ export const QuotationsPage = () => {
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
-                <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>
+                <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
                   Cancel
                 </Button>
                 <Button type="submit">
