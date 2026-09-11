@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 
@@ -6,8 +6,13 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import LeadsPage from '../features/crm/leads/LeadsPage';
 import LeadDetailPage from '../features/crm/leads/LeadDetailPage';
 import LeadFormBuilderPage from '../features/crm/leads/LeadFormBuilderPage';
+import LeadFormsPage from '../features/crm/leads/LeadFormsPage';
 import DynamicLeadFormPage from '../features/crm/leads/DynamicLeadFormPage';
 import TasksPage from '../features/crm/tasks/TasksPage';
+import MasterTasksPage from '../features/crm/tasks/MasterTasksPage';
+import StageTasksPage from '../features/crm/tasks/StageTasksPage';
+import TaskFormPage from '../features/crm/tasks/TaskFormPage';
+import TaskFormBuilderPage from '../features/crm/tasks/TaskFormBuilderPage';
 import CRMDashboard from '../features/crm/dashboard/CRMDashboard';
 import DealsPage from '../features/crm/deals/DealsPage';
 import UserAllocationPage from '../features/crm/allocation/UserAllocationPage';
@@ -58,6 +63,7 @@ import { CompanyPolicy, CalendarPage, HrmsSetup, HRAdminPage } from '../features
 import { Generic } from '../features/hrms/Generic';
 
 // ── ERP — Sales ───────────────────────────────────────────────
+import { EstimatesPage } from '../features/sales/EstimatesPage';
 import { QuotationsPage } from '../features/sales/QuotationsPage';
 import { SalesOrdersPage } from '../features/sales/SalesOrdersPage';
 import { SalesInvoicesPage } from '../features/sales/SalesInvoicesPage';
@@ -114,15 +120,28 @@ function Page({ component: Component }) {
   );
 }
 
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <MainLayout />,
-    errorElement: (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 24 }}>
-        <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 480, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', textAlign: 'center' }}>
-          <h2 style={{ color: '#0f172a', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Application Encountered an Issue</h2>
-          <p style={{ color: '#64748b', fontSize: 13, marginBottom: 20 }}>An unexpected error occurred while loading this view.</p>
+function RootErrorBoundary() {
+  const error = useRouteError();
+  console.error('RootErrorBoundary caught error:', error);
+  const errorMessage = error?.message || (typeof error === 'string' ? error : 'An unexpected error occurred while loading this view.');
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', padding: 24 }}>
+      <div style={{ background: '#fff', borderRadius: 12, padding: 32, maxWidth: 520, width: '100%', border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', textAlign: 'center' }}>
+        <h2 style={{ color: '#0f172a', fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Application Encountered an Issue</h2>
+        <p style={{ color: '#64748b', fontSize: 13, marginBottom: 16 }}>An unexpected error occurred while loading this view.</p>
+        {errorMessage && (
+          <div style={{ background: '#fef2f2', border: '1px solid #fee2e2', borderRadius: 8, padding: '10px 14px', marginBottom: 20, textAlign: 'left', color: '#b91c1c', fontSize: 12, fontFamily: 'monospace', wordBreak: 'break-word' }}>
+            {errorMessage}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <button
+            onClick={() => window.location.reload()}
+            style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', borderRadius: 8, padding: '10px 18px', fontWeight: 600, cursor: 'pointer' }}
+          >
+            Reload Page
+          </button>
           <button
             onClick={() => window.location.href = '/dashboard'}
             style={{ background: '#1f6bff', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 20px', fontWeight: 600, cursor: 'pointer' }}
@@ -131,7 +150,15 @@ const router = createBrowserRouter([
           </button>
         </div>
       </div>
-    ),
+    </div>
+  );
+}
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <MainLayout />,
+    errorElement: <RootErrorBoundary />,
     children: [
       // Root redirect
       { index: true, element: <Navigate to="/dashboard" replace /> },
@@ -144,10 +171,17 @@ const router = createBrowserRouter([
       { path: 'crm/dashboard', element: <Page component={CRMDashboard} /> },
       { path: 'crm/leads', element: <Page component={LeadsPage} /> },
       { path: 'crm/leads/:id', element: <Page component={LeadDetailPage} /> },
+      { path: 'crm/leads/forms', element: <Page component={LeadFormsPage} /> },
+      { path: 'crm/leads/tasks-master', element: <Page component={MasterTasksPage} /> },
+      { path: 'crm/leads/task-form', element: <Page component={TaskFormPage} /> },
+      { path: 'crm/leads/task-form/builder', element: <Page component={TaskFormBuilderPage} /> },
+      { path: 'crm/leads/stage-tasks', element: <Page component={StageTasksPage} /> },
       { path: 'crm/leads/form-builder', element: <Page component={LeadFormBuilderPage} /> },
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
+      { path: 'crm/tasks/allocation', element: <Page component={UserAllocationPage} /> },
+      { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> },
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
@@ -155,6 +189,7 @@ const router = createBrowserRouter([
 
       // ── Sales ─────────────────────────────────────────────
       { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },
+      { path: 'sales/estimates', element: <Page component={EstimatesPage} /> },
       { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
       { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },

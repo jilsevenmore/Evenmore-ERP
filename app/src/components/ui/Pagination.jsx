@@ -4,8 +4,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 /**
  * Pagination — CRM-styled pagination bar.
  * Props: total, page, pageSize, onChange
+ * Opt-in (screenshot format): showTotalRecords, pageSizeOptions, onPageSizeChange
  */
-export function Pagination({ total = 0, page = 1, pageSize = 20, onChange }) {
+export function Pagination({ total = 0, page = 1, pageSize = 20, onChange, showTotalRecords = false, pageSizeOptions = null, onPageSizeChange }) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = Math.min((page - 1) * pageSize + 1, total);
   const end = Math.min(page * pageSize, total);
@@ -23,9 +24,15 @@ export function Pagination({ total = 0, page = 1, pageSize = 20, onChange }) {
 
   return (
     <div className="pagination">
-      <span>
-        {total > 0 ? `${start}–${end} of ${total} records` : 'No records'}
-      </span>
+      {showTotalRecords ? (
+        <span className="pagination-total">
+          Total Records <strong>{total}</strong>
+        </span>
+      ) : (
+        <span>
+          {total > 0 ? `${start}–${end} of ${total} records` : 'No records'}
+        </span>
+      )}
 
       <div className="pagination-pages">
         <button
@@ -76,6 +83,21 @@ export function Pagination({ total = 0, page = 1, pageSize = 20, onChange }) {
         >
           <ChevronRight size={15} />
         </button>
+
+        {Array.isArray(pageSizeOptions) && pageSizeOptions.length > 0 && (
+          <select
+            className="page-size-select"
+            value={pageSize}
+            onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
+            aria-label="Records per page"
+          >
+            {pageSizeOptions.map((size) => (
+              <option key={size} value={size}>
+                {size} / page
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
   );

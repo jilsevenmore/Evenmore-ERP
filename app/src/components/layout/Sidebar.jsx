@@ -47,17 +47,42 @@ import { useERP } from '../../context/ERPContext';
 
 // ── Navigation Structure ──────────────────────────────────────
 const NAV = [
-  { label: 'Dashboard', icon: Home, to: '/dashboard' },
+  {
+    label: 'Dashboard',
+    icon: Home,
+    defaultOpen: false,
+    children: [
+      { label: 'Main Dashboard', icon: Home, to: '/dashboard' },
+      { label: 'CRM Dashboard', icon: Home, to: '/crm/dashboard' },
+    ],
+  },
 
   {
     label: 'CRM',
     icon: LayoutGrid,
     defaultOpen: false,
     children: [
-      { label: 'CRM Dashboard', icon: Home, to: '/crm/dashboard' },
-      { label: 'Leads', icon: Target, to: '/crm/leads', dot: true },
-      { label: 'Customers', icon: Users, to: '/crm/customers' },
-      { label: 'Tasks', icon: ListChecks, to: '/crm/tasks' },
+      {
+        label: 'Leads',
+        icon: Target,
+        defaultOpen: true,
+        children: [
+          { label: 'Leads', to: '/crm/leads', dot: true },
+          { label: 'Lead Create Form', to: '/crm/leads/forms' },
+          { label: 'Lead Tasks Master', to: '/crm/leads/tasks-master' },
+          { label: 'Lead Task Form', to: '/crm/leads/task-form' },
+          { label: 'Lead Stage Tasks', to: '/crm/leads/stage-tasks' },
+        ],
+      },
+      {
+        label: 'Tasks',
+        icon: ListChecks,
+        defaultOpen: true,
+        children: [
+          { label: 'Tasks List', to: '/crm/tasks' },
+          { label: 'Task Allocation', to: '/crm/tasks/allocation' },
+        ],
+      },
       { label: 'User Allocation & Tracking', icon: Users, to: '/crm/user-allocation' },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
       { label: 'CRM System Setup', icon: Settings, to: '/crm/system-setup' },
@@ -68,6 +93,7 @@ const NAV = [
     label: 'Sales',
     icon: BarChart3,
     children: [
+      { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
       { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
@@ -241,16 +267,67 @@ const NAV = [
   },
 ];
 
+function getAllNavPaths(navItems) {
+  const paths = [];
+  function recurse(items) {
+    for (const item of items) {
+      if (item.to) paths.push(item.to);
+      if (item.children) recurse(item.children);
+    }
+  }
+  recurse(navItems);
+  return paths;
+}
+
+const ALL_NAV_PATHS = getAllNavPaths(NAV);
+
 // ── Sub-item (leaf node) ────────────────────────────────────
 function SubItem({ item, badges = {} }) {
   const location = useLocation();
-  const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
-  const count = item.badgeKey ? badges[item.badgeKey] : 0;
+  const currentPath = location.pathname;
+  const isExact = currentPath === item.to;
+  const isFormBuilderAlias =
+    item.label === 'Lead Create Form' &&
+    (currentPath === '/crm/leads/forms' || currentPath === '/crm/leads/form-builder' || currentPath === '/crm/leads/create-form');
+  const isPrefix = Boolean(item.to && currentPath.startsWith(item.to + '/'));
+  const hasBetterMatch =
+    isPrefix &&
+    (isFormBuilderAlias ||
+      ALL_NAV_PATHS.some(
+        (p) =>
+          p !== item.to &&
+          (currentPath === p || (currentPath.startsWith(p + '/') && p.length > item.to.length))
+      ) ||
+      (item.to === '/crm/leads' &&
+        (currentPath === '/crm/leads/forms' ||
+          currentPath === '/crm/leads/form-builder' ||
+          currentPath === '/crm/leads/create-form')));
+  const isActive = isFormBuilderAlias || isExact || (isPrefix && !hasBetterMatch);
+  const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
+  const Icon = item.icon;
+
+  // Icon leaves (e.g. CRM > Dashboard) render like screenshot: nav-row pill with icon
+  if (Icon && item.to) {
+    return (
+      <NavLink
+        to={item.to}
+        className={() => `nav-row${isActive ? ' section-active' : ''}`}
+      >
+        <Icon size={17} strokeWidth={1.9} className="nav-ico" />
+        <span className="nav-txt">{item.label}</span>
+        {count > 0 && (
+          <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+            {count}
+          </span>
+        )}
+      </NavLink>
+    );
+  }
 
   return (
     <NavLink
       to={item.to || '#'}
-      className={`sub-item${isActive ? ' active' : ''}`}
+      className={() => `sub-item${isActive ? ' active' : ''}`}
     >
       {item.dot && <span className="sub-dot" />}
       <span className="sub-label">{item.label}</span>
@@ -282,8 +359,12 @@ function SubList({ items, depth, badges }) {
 // ── Expandable group row ────────────────────────────────────
 function ExpandableRow({ item, depth = 0, badges = {} }) {
   const location = useLocation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(item.defaultOpen));
   const Icon = item.icon;
+
+  function handleClick() {
+    setOpen((v) => !v);
+  }
 
   // Auto-open if a child route is active
   const isChildActive = item.children?.some(
@@ -316,7 +397,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
     <div className="nav-group">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleClick}
         className={`nav-row${isChildActive || isActive ? ' section-active' : ''}`}
       >
         {Icon && <Icon size={17} strokeWidth={1.9} className="nav-ico" />}

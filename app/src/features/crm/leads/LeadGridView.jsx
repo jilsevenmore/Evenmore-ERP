@@ -1,11 +1,23 @@
-import { Pencil, Phone } from "lucide-react";
+import { Pencil, Phone, Pin } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 
-export default function LeadGridView({ rows = [], onAddNote, onOpenLead }) {
+export default function LeadGridView({ rows = [], selected = [], pinnedLeadIds = [], onTogglePin, onToggleOne, onRequestDelete, onAddNote, onOpenLead }) {
   return (
     <div className="lead-tile-grid">
       {rows.map((row) => (
         <article key={row.id} className="lead-tile-card">
+          <div className="lead-tile-select">
+            <input
+              type="checkbox"
+              className="row-check"
+              checked={selected.includes(row.id)}
+              onChange={() => {
+                onToggleOne?.(row.id);
+                onRequestDelete?.(row);
+              }}
+              aria-label={`Select ${row.name}`}
+            />
+          </div>
           <div className="lead-tile-head">
             <div className="lead-tile-person">
               <LeadAvatar lead={row} className="lead-tile-avatar" />
@@ -16,14 +28,25 @@ export default function LeadGridView({ rows = [], onAddNote, onOpenLead }) {
                 </button>
               </div>
             </div>
-            <button
-              type="button"
-              className="lead-tile-action"
-              aria-label={`Open ${row.name}`}
-              onClick={() => onAddNote(row)}
-            >
-              <Pencil size={15} />
-            </button>
+            <div className="lead-tile-head-actions">
+              <button
+                type="button"
+                className={`pinned-indicator${pinnedLeadIds.includes(row.id) ? " active" : ""}`}
+                aria-label={`${pinnedLeadIds.includes(row.id) ? "Unpin" : "Pin"} ${row.name}`}
+                title={pinnedLeadIds.includes(row.id) ? "Unpin record" : "Pin record"}
+                onClick={() => onTogglePin?.(row)}
+              >
+                <Pin size={14} />
+              </button>
+              <button
+                type="button"
+                className="lead-tile-action"
+                aria-label={`Open ${row.name}`}
+                onClick={() => onAddNote(row)}
+              >
+                <Pencil size={15} />
+              </button>
+            </div>
           </div>
 
           <div className="lead-tile-body">
