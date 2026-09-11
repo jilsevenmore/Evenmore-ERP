@@ -45,14 +45,19 @@ const loadSavedState = () => {
         if (saved) {
             const parsed = JSON.parse(saved);
             if (Array.isArray(parsed?.parties) && parsed.parties.length > 0) {
-                parsed.parties = parsed.parties.map((p, idx) => {
-                    const fallback = mockParties[idx] || mockParties[0] || {};
-                    return {
-                        ...fallback,
-                        ...p,
-                        name: p.name || p.companyName || p.company || fallback.name || `Partner ${idx + 1}`,
-                    };
-                });
+                const existingNames = new Set(parsed.parties.map(p => (p.name || '').toLowerCase()));
+                const missingMockParties = mockParties.filter(mp => !existingNames.has((mp.name || '').toLowerCase()));
+                parsed.parties = [
+                    ...parsed.parties.map((p, idx) => {
+                        const fallback = mockParties.find(mp => mp.name?.toLowerCase() === (p.name || '').toLowerCase()) || mockParties[idx] || mockParties[0] || {};
+                        return {
+                            ...fallback,
+                            ...p,
+                            name: p.name || p.companyName || p.company || fallback.name || `Partner ${idx + 1}`,
+                        };
+                    }),
+                    ...missingMockParties,
+                ];
             }
             if (Array.isArray(parsed?.customers) && parsed.customers.length > 0) {
                 parsed.customers = parsed.customers.map((c, idx) => {

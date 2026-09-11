@@ -196,7 +196,7 @@ const router = createBrowserRouter([
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },
-      { path: 'purchase/vendors', element: <Page component={VendorsPage} /> },
+      { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
       { path: 'purchase/returns', element: <Page component={PurchaseReturnsPage} /> },

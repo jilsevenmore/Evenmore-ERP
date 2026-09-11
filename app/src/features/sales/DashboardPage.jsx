@@ -317,7 +317,7 @@ export const DashboardPage = () => {
           </div>
           <div className="space-y-2 text-xs">
             <Link to="/crm/customers" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><Users size={14} /> Customers</span><strong>{fmt(customers.length)}</strong></Link>
-            <Link to="/purchase/vendors" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><Building2 size={14} /> Vendors</span><strong>{fmt(vendors.length)}</strong></Link>
+            <Link to="/parties" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><Building2 size={14} /> Vendors</span><strong>{fmt(vendors.length)}</strong></Link>
             <Link to="/parties" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><BriefcaseBusiness size={14} /> All Parties</span><strong>{fmt(parties.length)}</strong></Link>
           </div>
         </div>

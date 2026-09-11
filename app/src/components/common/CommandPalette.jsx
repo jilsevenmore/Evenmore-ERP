@@ -82,7 +82,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .map((v) => ({
         label: v.name,
         sub: `Vendor Code: ${v.code} • Outstanding Payable: $${v.balance.toFixed(2)}`,
-        path: '/purchase/vendors',
+        path: '/parties',
         icon: Building2,
         category: 'Suppliers & Vendors',
     }));

@@ -123,7 +123,6 @@ const NAV = [
     label: 'Purchase',
     icon: Truck,
     children: [
-      { label: 'Vendors', icon: Building2, to: '/purchase/vendors' },
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
       { label: 'Purchase Bills', icon: Receipt, to: '/purchase/bills' },
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
