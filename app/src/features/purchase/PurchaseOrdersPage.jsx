@@ -136,30 +136,35 @@ export const PurchaseOrdersPage = () => {
         {
             key: 'poNumber',
             header: 'PO Number',
-            render: (p) => (<button onClick={() => setSelectedPo(p)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left cursor-pointer">
-          <ClipboardList size={13} className="text-slate-400"/> {p.poNumber}
+            width: '14%',
+            render: (p) => (<button onClick={() => setSelectedPo(p)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
+          <ClipboardList size={13} className="text-muted"/> {p.poNumber}
         </button>),
         },
         {
             key: 'vendor',
             header: 'Supplier / Vendor',
-            render: (p) => <span className="font-bold text-[#1F2E4A]">{p.vendor}</span>,
+            width: '24%',
+            render: (p) => <span className="font-bold text-text">{p.vendor}</span>,
         },
         {
             key: 'date',
             header: 'PO Date',
-            render: (p) => <span className="text-slate-600 font-mono text-[11px]">{formatDateDDMMYYYY(p.date)}</span>,
+            width: '11%',
+            render: (p) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(p.date)}</span>,
         },
         {
             key: 'expectedDate',
             header: 'Expected Delivery',
-            render: (p) => <span className="text-slate-600">{p.expectedDate}</span>,
+            width: '13%',
+            render: (p) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(p.expectedDate)}</span>,
         },
         {
             key: 'amount',
             header: 'Total Order Value',
             align: 'right',
-            render: (p) => (<span className="font-mono font-bold text-slate-900">
+            width: '14%',
+            render: (p) => (<span className="font-mono font-bold text-text whitespace-nowrap">
           {formatCurrency(p.amount ?? p.total ?? 0)}
         </span>),
         },
@@ -167,34 +172,36 @@ export const PurchaseOrdersPage = () => {
             key: 'status',
             header: 'Status',
             align: 'center',
+            width: '10%',
             render: (p) => <StatusBadge status={p.status}/>,
         },
         {
             key: 'actions',
             header: 'Actions / Intake',
             align: 'right',
+            width: '14%',
             render: (p) => {
                 return (
                   <div className="flex items-center justify-end gap-1.5">
-                    <button onClick={() => handleClonePo(p)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Clone / Reorder this Purchase Order">
+                    <button onClick={() => handleClonePo(p)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Reorder this Purchase Order">
                       <Copy size={13}/>
                     </button>
                     {p.status === 'Draft' && (
                       <button
                         type="button"
                         onClick={() => deletePurchaseOrder(p.id)}
-                        className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                        className="p-1 text-muted hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
                         title="Delete Draft PO"
                       >
                         <Trash2 size={13} />
                       </button>
                     )}
                     {p.status === 'Draft' ? (
-                      <button onClick={() => issuePo(p.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded-xl text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 shadow-2xs">
+                      <button onClick={() => issuePo(p.id)} className="px-2.5 py-1 bg-primary text-white rounded-lg text-[11px] font-semibold hover:bg-primary-hover cursor-pointer flex items-center gap-1 shadow-xs transition-colors">
                         <Send size={11}/> Issue PO
                       </button>
                     ) : (
-                      <button onClick={() => handleConvertToBill(p.id)} className="text-[11px] text-blue-700 font-semibold hover:underline flex items-center gap-1 justify-end cursor-pointer">
+                      <button onClick={() => handleConvertToBill(p.id)} className="text-[11px] text-primary font-semibold hover:underline flex items-center gap-1 justify-end cursor-pointer">
                         Create Bill <ArrowRight size={11}/>
                       </button>
                     )}

@@ -54,51 +54,89 @@ export const QuotationsPage = () => {
         {
             header: 'Quote #',
             accessor: 'quoteNumber',
-            render: (q) => (<button onClick={() => setSelectedQuote(q)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left cursor-pointer">
-          <FileText size={13} className="text-slate-400"/> {q.quoteNumber}
-        </button>),
+            width: '14%',
+            render: (q) => (
+              <button
+                onClick={() => setSelectedQuote(q)}
+                className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap"
+              >
+                <FileText size={13} className="text-muted shrink-0"/>
+                <span>{q.quoteNumber}</span>
+              </button>
+            ),
         },
         {
             header: 'Customer',
             accessor: 'customer',
-            render: (q) => <span className="font-semibold text-slate-900">{q.customer}</span>,
+            width: '26%',
+            render: (q) => <span className="font-bold text-text block">{q.customer}</span>,
         },
         {
             header: 'Quote Date',
             accessor: 'date',
-            render: (q) => <span className="font-mono text-[11px] text-slate-600">{formatDateDDMMYYYY(q.date)}</span>,
+            width: '13%',
+            render: (q) => <span className="font-mono text-[11px] text-muted whitespace-nowrap">{formatDateDDMMYYYY(q.date)}</span>,
         },
         {
             header: 'Valid Until',
             accessor: 'validUntil',
+            width: '13%',
+            render: (q) => <span className="text-muted text-[11px] whitespace-nowrap">{q.validUntil ? formatDateDDMMYYYY(q.validUntil) : '—'}</span>,
         },
         {
             header: 'Estimated Total',
             accessor: 'amount',
             align: 'right',
-            render: (q) => (<span className="font-bold font-mono text-slate-900">{formatCurrency(q.amount)}</span>),
+            width: '14%',
+            render: (q) => (
+              <span className="font-bold font-mono text-text whitespace-nowrap">
+                {formatCurrency(q.amount)}
+              </span>
+            ),
         },
         {
             header: 'Lifecycle Status',
             align: 'center',
+            width: '10%',
             render: (q) => <StatusBadge status={q.status}/>,
         },
         {
             header: 'Actions',
             align: 'right',
-            render: (q) => (<div className="flex items-center justify-end gap-1.5">
-          <button onClick={() => setSelectedQuote(q)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="View & Print Quote">
-            <Eye size={13}/>
-          </button>
-          <button onClick={() => handleCloneQuote(q)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate Quote">
-            <Copy size={13}/>
-          </button>
-          {q.status === 'Confirmed' ? (<button onClick={() => navigate('/sales/orders')} className="text-xs font-semibold text-emerald-700 hover:underline inline-flex items-center gap-1 cursor-pointer">
-              <CheckCircle2 size={12}/> Converted
-            </button>) : (<button onClick={() => handleConvert(q.id)} className="text-xs font-semibold text-[#1F2E4A] hover:underline inline-flex items-center gap-1 cursor-pointer">
-              Convert to SO <ArrowRight size={12}/>
-            </button>)}
-        </div>),
+            width: '10%',
+            render: (q) => (
+              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                <button
+                  onClick={() => setSelectedQuote(q)}
+                  className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                  title="View & Print Quote"
+                >
+                  <Eye size={13}/>
+                </button>
+                <button
+                  onClick={() => handleCloneQuote(q)}
+                  className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                  title="Clone / Duplicate Quote"
+                >
+                  <Copy size={13}/>
+                </button>
+                {q.status === 'Confirmed' ? (
+                  <button
+                    onClick={() => navigate('/sales/orders')}
+                    className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <CheckCircle2 size={12}/> Converted
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleConvert(q.id)}
+                    className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    Convert <ArrowRight size={12}/>
+                  </button>
+                )}
+              </div>
+            ),
         },
     ];
     const handleCreate = (e) => {

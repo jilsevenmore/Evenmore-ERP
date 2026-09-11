@@ -51,80 +51,94 @@ export const StockPositionPage = () => {
         {
             key: 'sku',
             header: 'SKU Code',
-            render: (i) => (<button onClick={() => setSelectedItem(i)} className="font-mono font-bold text-blue-600 hover:underline text-left">
-          {i.sku}
-        </button>),
+            width: '12%',
+            render: (i) => (
+              <button
+                onClick={() => setSelectedItem(i)}
+                className="font-mono font-bold text-primary hover:underline text-left cursor-pointer whitespace-nowrap"
+              >
+                {i.sku}
+              </button>
+            ),
         },
         {
             key: 'name',
             header: 'Item Description',
-            render: (i) => (<div>
-          <button onClick={() => setSelectedItem(i)} className="font-bold text-[#1F2E4A] hover:underline text-left">
-            {i.name}
-          </button>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-[10px] text-slate-500">{i.category}</span>
-            <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-              <MapPin size={9}/> {i.location}
-            </span>
-          </div>
-        </div>),
+            width: '22%',
+            render: (i) => (
+              <div>
+                <button onClick={() => setSelectedItem(i)} className="font-bold text-text hover:underline text-left block">
+                  {i.name}
+                </button>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] text-muted">{i.category}</span>
+                  <span className="text-[10px] text-muted flex items-center gap-0.5">
+                    <MapPin size={9}/> {i.location}
+                  </span>
+                </div>
+              </div>
+            ),
         },
         {
             key: 'calculatedOnHand',
-            header: 'Total Physical On-Hand',
+            header: 'Physical On-Hand',
             align: 'center',
-            render: (i) => (<span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
-          {i.calculatedOnHand} {i.unit}
-        </span>),
+            width: '12%',
+            render: (i) => (
+              <span className="font-mono font-bold text-text bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
+                {i.calculatedOnHand} {i.unit}
+              </span>
+            ),
         },
         {
             key: 'calculatedAvailable',
-            header: 'Available to Promise',
+            header: 'Available',
             align: 'center',
-            render: (i) => (<span className="font-mono font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-          {i.calculatedAvailable} {i.unit}
-        </span>),
+            width: '11%',
+            render: (i) => (
+              <span className="font-mono font-bold text-emerald-800 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/30 whitespace-nowrap">
+                {i.calculatedAvailable} {i.unit}
+              </span>
+            ),
         },
         {
             key: 'calculatedReserved',
             header: 'Sales Reserved',
             align: 'center',
-            render: (i) => (<span className="font-mono text-slate-600">
-          {i.calculatedReserved || 0} {i.unit}
-        </span>),
+            width: '11%',
+            render: (i) => (
+              <span className="font-mono text-muted whitespace-nowrap">
+                {i.calculatedReserved || 0} {i.unit}
+              </span>
+            ),
         },
         {
             key: 'reorderLevel',
             header: 'Safety Reorder',
             align: 'center',
-            render: (i) => <span className="font-mono text-slate-600">{i.reorderLevel}</span>,
+            width: '10%',
+            render: (i) => <span className="font-mono text-muted whitespace-nowrap">{i.reorderLevel}</span>,
         },
         {
             key: 'totalValue',
             header: 'Aggregate Asset Value',
             align: 'right',
+            width: '12%',
             render: (i) => {
                 const itemVal = (i.costPrice ?? i.unitCost ?? 0) * (i.calculatedOnHand || 0);
-                return (<span className="font-mono font-semibold text-slate-800">
-            {formatCurrency(itemVal)}
-          </span>);
+                return (
+                  <span className="font-mono font-semibold text-text whitespace-nowrap">
+                    {formatCurrency(itemVal)}
+                  </span>
+                );
             },
         },
         {
             key: 'status',
             header: 'Status',
             align: 'center',
+            width: '10%',
             render: (i) => <StatusBadge status={i.status}/>,
-        },
-        {
-            key: 'actions',
-            header: '',
-            align: 'center',
-            render: (i) => (<button onClick={() => setSelectedItem(i)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors inline-flex items-center gap-1 text-xs" title="View Stock Ledger">
-          <Eye className="w-3.5 h-3.5"/>
-          <span className="text-[11px] font-medium">Ledger</span>
-        </button>),
         },
     ];
     return (<div className="space-y-6">

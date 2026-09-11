@@ -52,7 +52,7 @@ const SEED_ESTIMATES = [
 ];
 
 export const EstimatesPage = () => {
-    const { customers, addQuotation } = useERP();
+    const { customers, addQuotation, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const [estimates, setEstimates] = useState(SEED_ESTIMATES);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -74,7 +74,7 @@ export const EstimatesPage = () => {
         addQuotation({
             customerId: cust?.id,
             customer: estimate.customer,
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            date: new Date().toISOString().split('T')[0],
             validUntil: '30 Days',
             amount: estimate.amount,
             status: 'Draft',
@@ -99,8 +99,12 @@ export const EstimatesPage = () => {
         {
             header: 'Estimate Number',
             accessor: 'estimateNumber',
+            width: '15%',
             render: (e) => (
-                <button onClick={() => setSelectedEstimate(e)} className="font-mono font-bold text-blue-600 hover:underline text-left">
+                <button
+                  onClick={() => setSelectedEstimate(e)}
+                  className="font-mono font-bold text-primary hover:underline text-left cursor-pointer whitespace-nowrap"
+                >
                     {e.estimateNumber}
                 </button>
             ),
@@ -108,43 +112,71 @@ export const EstimatesPage = () => {
         {
             header: 'Customer',
             accessor: 'customer',
-            render: (e) => <span className="font-semibold text-slate-900">{e.customer}</span>,
+            width: '25%',
+            render: (e) => <span className="font-bold text-text block">{e.customer}</span>,
         },
-        { header: 'Estimate Date', accessor: 'date' },
-        { header: 'Valid Until', accessor: 'validUntil' },
+        {
+            header: 'Estimate Date',
+            accessor: 'date',
+            width: '13%',
+            render: (e) => <span className="font-mono text-[11px] text-muted whitespace-nowrap">{formatDateDDMMYYYY(e.date)}</span>,
+        },
+        {
+            header: 'Valid Until',
+            accessor: 'validUntil',
+            width: '13%',
+            render: (e) => <span className="text-muted text-[11px] whitespace-nowrap">{e.validUntil ? formatDateDDMMYYYY(e.validUntil) : '—'}</span>,
+        },
         {
             header: 'Estimated Total',
             accessor: 'amount',
             align: 'right',
+            width: '14%',
             render: (e) => (
-                <span className="font-bold font-mono text-slate-900">
-                    ${(e.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                <span className="font-bold font-mono text-text whitespace-nowrap">
+                    {formatCurrency(e.amount || 0)}
                 </span>
             ),
         },
         {
             header: 'Status',
             align: 'center',
+            width: '10%',
             render: (e) => <StatusBadge status={e.status} />,
         },
         {
             header: 'Actions',
             align: 'right',
+            width: '10%',
             render: (e) => (
-                <div className="flex items-center justify-end gap-1.5">
-                    <button onClick={() => setSelectedEstimate(e)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="View & Print Estimate">
+                <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <button
+                      onClick={() => setSelectedEstimate(e)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="View & Print Estimate"
+                    >
                         <Eye size={13} />
                     </button>
-                    <button onClick={() => handleClone(e)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Clone / Duplicate Estimate">
+                    <button
+                      onClick={() => handleClone(e)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="Clone / Duplicate Estimate"
+                    >
                         <Copy size={13} />
                     </button>
                     {e.status === 'Converted' ? (
-                        <button onClick={() => navigate('/sales/quotations')} className="text-xs font-semibold text-emerald-700 hover:underline inline-flex items-center gap-1 cursor-pointer">
+                        <button
+                          onClick={() => navigate('/sales/quotations')}
+                          className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
                             <CheckCircle2 size={12} /> Converted
                         </button>
                     ) : (
-                        <button onClick={() => handleConvert(e.id)} className="text-xs font-semibold text-[#1F2E4A] hover:underline inline-flex items-center gap-1 cursor-pointer">
-                            Convert to Quotation <ArrowRight size={12} />
+                        <button
+                          onClick={() => handleConvert(e.id)}
+                          className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                        >
+                            Convert <ArrowRight size={12} />
                         </button>
                     )}
                 </div>

@@ -72,53 +72,73 @@ export const PurchaseReturnsPage = () => {
         {
             key: 'debitNoteNumber',
             header: 'Debit Note #',
-            render: (r) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <RotateCcw size={13} className="text-rose-600"/> {r.debitNoteNumber}
-        </span>),
+            width: '15%',
+            render: (r) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <RotateCcw size={13} className="text-rose-600 dark:text-rose-400 shrink-0"/>
+                <span>{r.debitNoteNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'vendor',
             header: 'Vendor Supplier',
-            render: (r) => <span className="font-bold text-[#1F2E4A]">{r.vendor}</span>,
+            width: '22%',
+            render: (r) => <span className="font-bold text-text block">{r.vendor}</span>,
         },
         {
             key: 'billRef',
             header: 'Matched Bill Ref',
-            render: (r) => <span className="font-mono text-slate-600 font-semibold">{r.billRef || 'PB-INTAKE'}</span>,
+            width: '14%',
+            render: (r) => <span className="font-mono text-primary font-semibold whitespace-nowrap">{r.billRef || 'PB-INTAKE'}</span>,
         },
         {
             key: 'date',
             header: 'Issue Date',
-            render: (r) => <span className="text-slate-600">{formatDateDDMMYYYY(r.date)}</span>,
+            width: '12%',
+            render: (r) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(r.date)}</span>,
         },
         {
             key: 'reason',
             header: 'Defect / Return Reason',
-            render: (r) => <span className="text-slate-700 text-[11px]">{r.reason}</span>,
+            width: '15%',
+            render: (r) => <span className="text-muted text-[11px] block">{r.reason}</span>,
         },
         {
             key: 'amount',
             header: 'Debit Amount',
             align: 'right',
-            render: (r) => (<span className="font-mono font-bold text-slate-900">
-          {formatCurrency(r.amount ?? 0)}
-        </span>),
+            width: '11%',
+            render: (r) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(r.amount ?? 0)}
+              </span>
+            ),
         },
         {
             key: 'status',
             header: 'Settlement Status',
             align: 'center',
+            width: '11%',
             render: (r) => <StatusBadge status={r.status}/>,
         },
         {
             key: 'actions',
             header: 'Reconciliation',
             align: 'right',
-            render: (r) => r.status !== 'Settled' ? (<button onClick={() => markSettled(r.id)} className="px-2.5 py-1 bg-[#1F2E4A] text-white rounded text-[11px] font-semibold hover:bg-[#152033] cursor-pointer flex items-center gap-1 ml-auto shadow-sm">
-            <CheckCircle2 size={11}/> Mark Credit Received
-          </button>) : (<span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1 justify-end">
-            <CheckCircle2 size={12}/> Settled on Payables
-          </span>),
+            width: '13%',
+            render: (r) => r.status !== 'Settled' ? (
+              <button
+                onClick={() => markSettled(r.id)}
+                className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer flex items-center gap-1 ml-auto shadow-2xs whitespace-nowrap transition-colors"
+              >
+                <CheckCircle2 size={11}/> Mark Credit
+              </button>
+            ) : (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end whitespace-nowrap">
+                <CheckCircle2 size={12}/> Settled
+              </span>
+            ),
         },
     ];
     return (<div className="space-y-6">

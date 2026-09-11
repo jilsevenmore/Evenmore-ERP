@@ -69,47 +69,63 @@ export const SalesReturnsPage = () => {
         {
             key: 'returnNumber',
             header: 'Return Ref / Credit Note',
-            render: (r) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <RotateCcw size={13} className="text-amber-600"/> {r.returnNumber}
-        </span>),
+            width: '16%',
+            render: (r) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <RotateCcw size={13} className="text-amber-600 dark:text-amber-400 shrink-0"/>
+                <span>{r.returnNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'customer',
             header: 'Customer',
-            render: (r) => <span className="font-bold text-[#1F2E4A]">{r.customer}</span>,
+            width: '22%',
+            render: (r) => <span className="font-bold text-text block">{r.customer}</span>,
         },
         {
             key: 'invoiceRef',
             header: 'Original Invoice',
-            render: (r) => <span className="font-mono text-slate-600">{r.invoiceRef}</span>,
+            width: '14%',
+            render: (r) => <span className="font-mono text-primary font-semibold whitespace-nowrap">{r.invoiceRef}</span>,
         },
         {
             key: 'date',
             header: 'Return Date',
-            render: (r) => <span className="text-slate-600">{formatDateDDMMYYYY(r.date)}</span>,
+            width: '12%',
+            render: (r) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(r.date)}</span>,
         },
         {
             key: 'reason',
             header: 'Reason for Return',
-            render: (r) => <span className="text-slate-700 text-[11px]">{r.reason}</span>,
+            width: '14%',
+            render: (r) => <span className="text-muted text-[11px] block">{r.reason}</span>,
         },
         {
             key: 'restocked',
             header: 'Inventory Reversal',
             align: 'center',
-            render: (r) => r.restocked ? (<span className="text-emerald-700 font-semibold text-[11px] flex items-center justify-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-            <CheckCircle2 size={12}/> Restocked to Bay
-          </span>) : (<span className="text-rose-700 font-semibold text-[11px] flex items-center justify-center gap-1 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-            <AlertCircle size={12}/> Damaged / Scrapped
-          </span>),
+            width: '12%',
+            render: (r) => r.restocked ? (
+              <span className="text-emerald-700 dark:text-emerald-400 font-semibold text-[11px] flex items-center justify-center gap-1 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-500/30 whitespace-nowrap">
+                <CheckCircle2 size={12}/> Restocked
+              </span>
+            ) : (
+              <span className="text-rose-700 dark:text-rose-400 font-semibold text-[11px] flex items-center justify-center gap-1 bg-rose-50 dark:bg-rose-500/15 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-500/30 whitespace-nowrap">
+                <AlertCircle size={12}/> Scrapped
+              </span>
+            ),
         },
         {
             key: 'amount',
             header: 'Credit Note Amount',
             align: 'right',
-            render: (r) => (<span className="font-mono font-bold text-rose-700">
-          -{formatCurrency(r.amount ?? 0)}
-        </span>),
+            width: '10%',
+            render: (r) => (
+              <span className="font-mono font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
+                -{formatCurrency(r.amount ?? 0)}
+              </span>
+            ),
         },
     ];
     return (<div className="space-y-6">

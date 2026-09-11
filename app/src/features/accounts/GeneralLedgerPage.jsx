@@ -63,44 +63,61 @@ export const GeneralLedgerPage = () => {
         {
             key: 'entryNumber',
             header: 'Voucher Ref',
-            render: (e) => (<span className="font-mono font-bold text-slate-800 flex items-center gap-1.5">
-          <BookOpen size={13} className="text-[#1F2E4A]"/> {e.entryNumber}
-        </span>),
+            width: '14%',
+            render: (e) => (
+              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+                <BookOpen size={13} className="text-primary shrink-0"/>
+                <span>{e.entryNumber}</span>
+              </span>
+            ),
         },
         {
             key: 'date',
             header: 'Posting Date',
-            render: (e) => <span className="text-slate-600">{formatDateDDMMYYYY(e.date)}</span>,
+            width: '12%',
+            render: (e) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(e.date)}</span>,
         },
         {
             key: 'description',
             header: 'Transaction Narrative',
-            render: (e) => (<div>
-          <p className="font-semibold text-slate-800">{e.description}</p>
-          <span className="font-mono text-[10px] text-slate-500">{e.reference}</span>
-        </div>),
+            width: '28%',
+            render: (e) => (
+              <div>
+                <p className="font-semibold text-text">{e.description}</p>
+                <span className="font-mono text-[10px] text-muted">{e.reference}</span>
+              </div>
+            ),
         },
         {
             key: 'debitAccount',
             header: 'Debit Ledger (Dr)',
-            render: (e) => (<span className="font-mono text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 inline-flex items-center gap-1">
-          <ArrowDownLeft size={11}/> {e.debitAccount}
-        </span>),
+            width: '16%',
+            render: (e) => (
+              <span className="font-mono text-xs text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/15 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-500/30 inline-flex items-center gap-1 whitespace-nowrap">
+                <ArrowDownLeft size={11}/> {e.debitAccount}
+              </span>
+            ),
         },
         {
             key: 'creditAccount',
             header: 'Credit Ledger (Cr)',
-            render: (e) => (<span className="font-mono text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1">
-          <ArrowUpRight size={11}/> {e.creditAccount}
-        </span>),
+            width: '16%',
+            render: (e) => (
+              <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-500/30 inline-flex items-center gap-1 whitespace-nowrap">
+                <ArrowUpRight size={11}/> {e.creditAccount}
+              </span>
+            ),
         },
         {
             key: 'amount',
             header: 'Entry Balance',
             align: 'right',
-            render: (e) => (<span className="font-mono font-bold text-slate-900">
-          {formatCurrency(e.amount)}
-        </span>),
+            width: '14%',
+            render: (e) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(e.amount)}
+              </span>
+            ),
         },
     ];
     return (<div className="space-y-6">

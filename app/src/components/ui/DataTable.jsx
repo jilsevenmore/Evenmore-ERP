@@ -257,7 +257,11 @@ export function DataTable({
                       col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
 
                     return (
-                      <td key={colKey} className={`py-3 px-3.5 text-text align-middle ${alignCls}`}>
+                      <td
+                        key={colKey}
+                        style={col.width ? { width: col.width } : {}}
+                        className={`py-3 px-3.5 text-text align-middle ${alignCls}`}
+                      >
                         {renderCell(col, row)}
                       </td>
                     );

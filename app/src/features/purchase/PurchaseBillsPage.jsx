@@ -158,19 +158,27 @@ export const PurchaseBillsPage = () => {
         {
             key: 'billNumber',
             header: 'Vendor Bill #',
-            render: (b) => (<button onClick={() => setSelectedBill(b)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left cursor-pointer">
-          <FileSpreadsheet size={13} className="text-slate-400"/> {b.billNumber}
-        </button>),
+            width: '13%',
+            render: (b) => (
+              <button
+                onClick={() => setSelectedBill(b)}
+                className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap"
+              >
+                <FileSpreadsheet size={13} className="text-muted shrink-0"/>
+                <span>{b.billNumber}</span>
+              </button>
+            ),
         },
         {
             key: 'poRef',
             header: '3-Way Match & PO Ref',
+            width: '18%',
             render: (b) => {
                 const poNum = b.poRef || b.linkedPo;
                 const linkedPo = purchaseOrders.find((p) => p.poNumber === poNum || p.id === b.purchaseOrderId);
                 let matchBadge = {
                     label: 'Direct Entry',
-                    bg: 'bg-slate-100 text-slate-700 border-slate-200',
+                    bg: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700',
                 };
                 if (linkedPo) {
                     const poItemsCount = linkedPo.items?.reduce((acc, it) => acc + it.qty, 0) || 0;
@@ -178,68 +186,80 @@ export const PurchaseBillsPage = () => {
                     if (poItemsCount === billItemsCount && Math.abs((linkedPo.amount || 0) - (b.amount || b.total || 0)) < 1) {
                         matchBadge = {
                             label: '3-Way Matched (100%)',
-                            bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                            bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30',
                         };
                     }
                     else if (billItemsCount < poItemsCount) {
                         matchBadge = {
                             label: `Partial Intake (${billItemsCount}/${poItemsCount})`,
-                            bg: 'bg-amber-50 text-amber-700 border-amber-200',
+                            bg: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30',
                         };
                     }
                     else {
                         matchBadge = {
                             label: 'Audit Verified',
-                            bg: 'bg-blue-50 text-blue-700 border-blue-200',
+                            bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-400 dark:border-blue-500/30',
                         };
                     }
                 }
-                return (<div className="space-y-1">
-            <span className="font-mono text-slate-600 font-semibold block">{poNum || 'N/A'}</span>
-            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${matchBadge.bg}`}>
-              {matchBadge.label}
-            </span>
-          </div>);
+                return (
+                  <div className="space-y-1">
+                    <span className="font-mono text-text font-semibold block text-xs">{poNum || 'N/A'}</span>
+                    <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold border ${matchBadge.bg}`}>
+                      {matchBadge.label}
+                    </span>
+                  </div>
+                );
             },
         },
         {
             key: 'vendor',
             header: 'Vendor Supplier',
-            render: (b) => <span className="font-bold text-[#1F2E4A]">{b.vendor}</span>,
+            width: '18%',
+            render: (b) => <span className="font-bold text-text block">{b.vendor}</span>,
         },
         {
             key: 'billDate',
             header: 'Bill Date',
-            render: (b) => <span className="text-slate-600 font-mono text-[11px]">{formatDateDDMMYYYY(b.billDate || b.date)}</span>,
+            width: '10%',
+            render: (b) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(b.billDate || b.date)}</span>,
         },
         {
             key: 'dueDate',
             header: 'Payment Due',
-            render: (b) => <span className="text-slate-600">{b.dueDate}</span>,
+            width: '11%',
+            render: (b) => <span className="text-muted text-[11px] whitespace-nowrap">{b.dueDate ? formatDateDDMMYYYY(b.dueDate) : '—'}</span>,
         },
         {
             key: 'amount',
             header: 'Bill Amount',
             align: 'right',
-            render: (b) => (<span className="font-mono font-bold text-slate-900">
-          {formatCurrency(b.amount ?? b.total ?? 0)}
-        </span>),
+            width: '12%',
+            render: (b) => (
+              <span className="font-mono font-bold text-text whitespace-nowrap">
+                {formatCurrency(b.amount ?? b.total ?? 0)}
+              </span>
+            ),
         },
         {
             key: 'balanceDue',
             header: 'Outstanding Due',
             align: 'right',
+            width: '12%',
             render: (b) => {
                 const outstanding = getBillOutstanding(b.id);
-                return (<span className={`font-mono font-bold ${outstanding.balanceDue > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
-            {formatCurrency(outstanding.balanceDue)}
-          </span>);
+                return (
+                  <span className={`font-mono font-bold whitespace-nowrap ${outstanding.balanceDue > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {formatCurrency(outstanding.balanceDue)}
+                  </span>
+                );
             },
         },
         {
             key: 'status',
             header: 'Settlement Status',
             align: 'center',
+            width: '11%',
             render: (b) => {
                 const outstanding = getBillOutstanding(b.id);
                 return <StatusBadge status={outstanding.status}/>;
@@ -249,24 +269,42 @@ export const PurchaseBillsPage = () => {
             key: 'actions',
             header: 'Disbursement',
             align: 'right',
+            width: '13%',
             render: (b) => {
                 const outstanding = getBillOutstanding(b.id);
-                return (<div className="flex items-center justify-end gap-1.5">
-            <button onClick={() => setSelectedBill(b)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="View Bill & Details">
-              <Eye size={13}/>
-            </button>
-            <button onClick={() => setPrintBillTarget(b)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Print Official Purchase Bill">
-              <Printer size={13}/>
-            </button>
-            {outstanding.balanceDue > 0.01 ? (<button onClick={() => {
-                            setShowPayModal(b);
-                            setPayAmount(outstanding.balanceDue);
-                        }} className="px-2.5 py-1 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1">
-                <DollarSign size={11}/> Pay Bill
-              </button>) : (<span className="text-[11px] font-semibold text-emerald-700 inline-flex items-center gap-1">
-                <CheckCircle2 size={12}/> Settled
-              </span>)}
-          </div>);
+                return (
+                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <button
+                      onClick={() => setSelectedBill(b)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="View Bill & Details"
+                    >
+                      <Eye size={13}/>
+                    </button>
+                    <button
+                      onClick={() => setPrintBillTarget(b)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="Print Official Purchase Bill"
+                    >
+                      <Printer size={13}/>
+                    </button>
+                    {outstanding.balanceDue > 0.01 ? (
+                      <button
+                        onClick={() => {
+                          setShowPayModal(b);
+                          setPayAmount(outstanding.balanceDue);
+                        }}
+                        className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                      >
+                        <DollarSign size={11}/> Pay Bill
+                      </button>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                        <CheckCircle2 size={12}/> Settled
+                      </span>
+                    )}
+                  </div>
+                );
             },
         },
     ];

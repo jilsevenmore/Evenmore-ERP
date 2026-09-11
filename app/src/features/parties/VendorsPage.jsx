@@ -50,59 +50,87 @@ export const VendorsPage = () => {
         {
             header: 'Code',
             accessor: 'code',
-            render: (v) => (<button onClick={() => setSelectedVendor(v)} className="font-mono font-bold text-blue-600 hover:underline text-left">
-          {v.code}
-        </button>),
+            width: '12%',
+            render: (v) => (
+              <button
+                onClick={() => setSelectedVendor(v)}
+                className="font-mono font-bold text-primary hover:underline text-left cursor-pointer whitespace-nowrap"
+              >
+                {v.code}
+              </button>
+            ),
         },
         {
             header: 'Supplier / Vendor',
             accessor: 'name',
-            render: (v) => (<div>
-          <p className="font-semibold text-slate-900">{v.name}</p>
-          <p className="text-[11px] text-slate-500">{v.category}</p>
-        </div>),
+            width: '26%',
+            render: (v) => (
+              <div>
+                <p className="font-bold text-text">{v.name}</p>
+                <p className="text-[11px] text-muted">{v.category}</p>
+              </div>
+            ),
         },
         {
             header: 'Contact Person',
             accessor: 'contactPerson',
-            render: (v) => (<div>
-          <p className="text-slate-800 font-medium">{v.contactPerson}</p>
-          <p className="text-[11px] text-slate-400">{v.email}</p>
-        </div>),
+            width: '22%',
+            render: (v) => (
+              <div>
+                <p className="text-text font-medium">{v.contactPerson}</p>
+                <p className="text-[11px] text-muted">{v.email}</p>
+              </div>
+            ),
         },
         {
             header: 'Payment Terms',
             accessor: 'paymentTerms',
             align: 'center',
-            render: (v) => (<span className="px-2 py-0.5 rounded bg-slate-100 font-medium text-slate-700">
-          {v.paymentTerms}
-        </span>),
+            width: '12%',
+            render: (v) => (
+              <span className="px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 font-medium text-text-secondary text-xs whitespace-nowrap">
+                {v.paymentTerms}
+              </span>
+            ),
         },
         {
             header: 'Accounts Payable',
             accessor: 'balance',
             align: 'right',
+            width: '12%',
             render: (v) => {
                 const bal = v.balance ?? 0;
-                return (<span className={`font-mono font-bold ${bal > 0 ? 'text-amber-700' : 'text-slate-700'}`}>
-            {formatCurrency(bal)}
-          </span>);
+                return (
+                  <span className={`font-mono font-bold whitespace-nowrap ${bal > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-text-secondary'}`}>
+                    {formatCurrency(bal)}
+                  </span>
+                );
             },
         },
         {
             header: 'Status',
             align: 'center',
-            render: (v) => (<span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-          {v.status}
-        </span>),
+            width: '8%',
+            render: (v) => (
+              <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30 whitespace-nowrap">
+                {v.status}
+              </span>
+            ),
         },
         {
             header: 'AP Ledger',
             align: 'center',
-            render: (v) => (<button onClick={() => setSelectedVendor(v)} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors inline-flex items-center gap-1 text-xs" title="View AP Statement">
-          <Eye className="w-3.5 h-3.5"/>
-          <span className="text-[11px] font-medium">Statement</span>
-        </button>),
+            width: '8%',
+            render: (v) => (
+              <button
+                onClick={() => setSelectedVendor(v)}
+                className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-card-hover text-text-secondary hover:text-primary rounded-lg transition-colors inline-flex items-center gap-1 text-xs cursor-pointer font-medium whitespace-nowrap"
+                title="View AP Statement"
+              >
+                <Eye className="w-3.5 h-3.5"/>
+                <span>Statement</span>
+              </button>
+            ),
         },
     ];
     const handleCreate = (e) => {

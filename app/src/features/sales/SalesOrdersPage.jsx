@@ -185,30 +185,35 @@ export const SalesOrdersPage = () => {
         {
             key: 'orderNumber',
             header: 'Sales Order #',
-            render: (o) => (<button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-blue-600 hover:underline flex items-center gap-1.5 text-left">
-          <ShoppingCart size={13} className="text-slate-400"/> {o.orderNumber}
+            width: '14%',
+            render: (o) => (<button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
+          <ShoppingCart size={13} className="text-muted"/> {o.orderNumber}
         </button>),
         },
         {
             key: 'customer',
             header: 'Customer Account',
-            render: (o) => <span className="font-bold text-[#1F2E4A]">{o.customer}</span>,
+            width: '22%',
+            render: (o) => <span className="font-bold text-text">{o.customer}</span>,
         },
         {
             key: 'date',
             header: 'SO Date',
-            render: (o) => <span className="text-slate-600 font-mono text-[11px]">{formatDateDDMMYYYY(o.date)}</span>,
+            width: '11%',
+            render: (o) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(o.date)}</span>,
         },
         {
             key: 'deliveryDate',
             header: 'Target Delivery',
-            render: (o) => <span className="text-slate-600">{o.deliveryDate}</span>,
+            width: '13%',
+            render: (o) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(o.deliveryDate)}</span>,
         },
         {
             key: 'amount',
             header: 'Order Value',
             align: 'right',
-            render: (o) => (<span className="font-mono font-bold text-slate-900">
+            width: '13%',
+            render: (o) => (<span className="font-mono font-bold text-text whitespace-nowrap">
           {formatCurrency(o.amount ?? o.total ?? 0)}
         </span>),
         },
@@ -216,13 +221,14 @@ export const SalesOrdersPage = () => {
             key: 'stage',
             header: 'Stage Lifecycle',
             align: 'center',
+            width: '13%',
             render: (o) => {
                 const stageVal = o.stage || o.status || 'Draft';
                 const stages = ['Draft', 'Confirmed', 'Delivered', 'Invoiced'];
                 const currentIdx = stages.indexOf(stageVal);
-                return (<div className="flex items-center gap-1">
-            {stages.map((stg, i) => (<span key={stg} title={stg} className={`w-2.5 h-2.5 rounded-full ${i <= currentIdx ? 'bg-[#1F2E4A]' : 'bg-slate-200'}`}/>))}
-            <span className="ml-1.5 text-[11px] font-semibold text-slate-700">
+                return (<div className="flex items-center justify-center gap-1">
+            {stages.map((stg, i) => (<span key={stg} title={stg} className={`w-2.5 h-2.5 rounded-full ${i <= currentIdx ? 'bg-primary' : 'bg-border'}`}/>))}
+            <span className="ml-1.5 text-[11px] font-semibold text-text">
               {stageVal}
             </span>
           </div>);
@@ -232,28 +238,30 @@ export const SalesOrdersPage = () => {
             key: 'paymentStatus',
             header: 'Payment Status',
             align: 'center',
+            width: '12%',
             render: (o) => <StatusBadge status={o.paymentStatus || 'Unpaid'}/>,
         },
         {
             key: 'actions',
             header: 'Actions / Lifecycle',
             align: 'right',
+            width: '14%',
             render: (o) => {
                 return (<div className="flex items-center justify-end gap-1.5">
-            <button onClick={() => handleCloneOrder(o)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
+            <button onClick={() => handleCloneOrder(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
               <Copy size={13}/>
             </button>
 
-            {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 cursor-pointer shadow-sm transition-colors">
+            {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-lg text-[11px] font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors">
                 Confirm Order
               </button>)}
-            {o.stage === 'Confirmed' && (<button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded text-[11px] font-semibold hover:bg-indigo-700 cursor-pointer flex items-center gap-1 shadow-sm transition-colors">
+            {o.stage === 'Confirmed' && (<button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-[11px] font-semibold hover:bg-indigo-700 cursor-pointer flex items-center gap-1 shadow-xs transition-colors">
                 <Truck size={11}/> Issue Challan
               </button>)}
-            {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer flex items-center gap-1 shadow-sm transition-colors">
+            {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-semibold hover:bg-emerald-700 cursor-pointer flex items-center gap-1 shadow-xs transition-colors">
                 <Receipt size={11}/> Invoice
               </button>)}
-            {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-700 inline-flex items-center gap-1">
+            {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
                 <CheckCircle size={12}/> Fulfilled
               </span>)}
           </div>);

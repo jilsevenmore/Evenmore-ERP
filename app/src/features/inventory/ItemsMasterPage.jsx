@@ -95,13 +95,14 @@ export const ItemsMasterPage = () => {
         {
             key: 'sku',
             header: 'SKU / Model #',
+            width: '16%',
             render: (i) => (
-              <div className="flex items-center gap-1.5">
-                <Link to={`/inventory/items/edit/${i.id}`} className="font-mono font-bold text-blue-600 hover:underline">
+              <div className="flex items-center gap-1.5 whitespace-nowrap">
+                <Link to={`/inventory/items/edit/${i.id}`} className="font-mono font-bold text-primary hover:underline">
                   {i.sku}
                 </Link>
-                {i.itemKind === 'Machine' && (
-                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase bg-purple-50 text-purple-700 px-1.5 py-0.2 rounded border border-purple-200">
+                {!isMachineView && i.itemKind === 'Machine' && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-500/30">
                     <Cpu size={10} /> Machine
                   </span>
                 )}
@@ -111,26 +112,27 @@ export const ItemsMasterPage = () => {
         {
             key: 'name',
             header: 'Description & Taxonomy',
+            width: '30%',
             render: (i) => {
               const machinePartsCount = i.itemKind === 'Machine'
                 ? itemParts.filter(ip => String(ip.itemId) === String(i.id)).length
                 : 0;
 
               return (
-                <div>
-                  <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-[#1F2E4A] hover:underline block">
+                <div className="space-y-0.5">
+                  <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-text hover:text-primary hover:underline block">
                     {i.name}
                   </Link>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] text-slate-500 font-medium">{i.category}</span>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-                      <MapPin size={9}/> {i.location || 'Central Bay'}
+                  <div className="flex items-center gap-2 text-[11px] text-muted flex-wrap">
+                    <span className="font-medium text-text-secondary">{i.category}</span>
+                    <span>•</span>
+                    <span className="flex items-center gap-0.5">
+                      <MapPin size={10} className="text-muted"/> {i.location || 'Central Bay'}
                     </span>
                     {machinePartsCount > 0 && (
                       <>
-                        <span className="text-slate-300">•</span>
-                        <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded">
+                        <span>•</span>
+                        <span className="font-bold text-indigo-700 bg-indigo-50 dark:bg-indigo-500/15 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/30 text-[10px]">
                           {machinePartsCount} BOM parts
                         </span>
                       </>
@@ -144,11 +146,12 @@ export const ItemsMasterPage = () => {
             key: 'itemKind',
             header: 'Item Type',
             align: 'center',
+            width: '12%',
             render: (i) => (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                 i.itemKind === 'Machine'
-                  ? 'bg-purple-50 text-purple-700 border-purple-200'
-                  : 'bg-slate-50 text-slate-700 border-slate-200'
+                  ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
               }`}>
                 {i.itemKind === 'Machine' ? <Cpu size={11} /> : <Package size={11} />}
                 {i.itemKind || 'Standard Item'}
@@ -159,49 +162,67 @@ export const ItemsMasterPage = () => {
             key: 'stock',
             header: 'Live Stock Buffer',
             align: 'center',
-            render: (i) => (<div className="flex items-center justify-center">
-          <span className={`font-mono font-bold text-xs ${i.status === 'Critical'
-                    ? 'text-rose-600'
+            width: '14%',
+            render: (i) => (
+              <div className="inline-flex items-center justify-center gap-1 font-mono">
+                <span className={`font-bold text-xs ${i.status === 'Critical'
+                    ? 'text-rose-600 dark:text-rose-400'
                     : i.status === 'Low Stock'
-                        ? 'text-amber-600'
-                        : 'text-emerald-700'}`}>
-            {i.availableQty ?? i.stock ?? 0}
-          </span>
-          <span className="text-[10px] text-slate-400 ml-1">{i.salesUnit || i.uom || 'Unit'}</span>
-        </div>),
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-700 dark:text-emerald-400'}`}>
+                  {i.availableQty ?? i.stock ?? 0}
+                </span>
+                <span className="text-[10px] text-muted">{i.salesUnit || i.uom || 'Unit'}</span>
+              </div>
+            ),
         },
         {
             key: 'costPrice',
             header: 'Unit Cost / Selling',
             align: 'right',
+            width: '18%',
             render: (i) => {
                 const cost = i.costPrice ?? i.unitCost ?? 0;
                 const selling = i.sellingPrice ?? 0;
-                return (<div className="font-mono text-[11px]">
-            <span className="text-slate-500">{formatCurrency(cost)}</span>
-            <span className="text-slate-300 mx-1">/</span>
-            <span className="font-semibold text-emerald-700">{formatCurrency(selling)}</span>
-          </div>);
+                return (
+                  <div className="font-mono text-[11px] text-right whitespace-nowrap">
+                    <span className="text-muted" title="Cost Price">{formatCurrency(cost)}</span>
+                    <span className="text-muted/40 mx-1">/</span>
+                    <span className="font-bold text-emerald-600 dark:text-emerald-400" title="Selling Price">{formatCurrency(selling)}</span>
+                  </div>
+                );
             },
         },
         {
             key: 'status',
             header: 'Health Status',
             align: 'center',
+            width: '10%',
             render: (i) => <StatusBadge status={i.status}/>,
         },
         {
             key: 'id',
             header: 'Actions',
             align: 'right',
-            render: (i) => (<div className="flex items-center justify-end gap-1.5">
-          <button onClick={() => setSelectedBarcodeItem(i)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded cursor-pointer transition-colors" title="Print SKU Barcode Shelf Tag">
-            <Tag size={14}/>
-          </button>
-          <Link to={`/inventory/items/edit/${i.id}`} className="text-xs font-semibold text-[#1F2E4A] hover:underline px-2 py-1 rounded hover:bg-slate-100">
-            Edit
-          </Link>
-        </div>),
+            width: '10%',
+            render: (i) => (
+              <div className="flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedBarcodeItem(i)}
+                  className="w-7 h-7 rounded-lg bg-card border border-border hover:bg-soft text-muted hover:text-primary flex items-center justify-center transition cursor-pointer shadow-2xs"
+                  title="Print SKU Barcode Shelf Tag"
+                >
+                  <Tag size={13}/>
+                </button>
+                <Link
+                  to={`/inventory/items/edit/${i.id}`}
+                  className="px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 text-xs font-semibold transition inline-flex items-center shadow-2xs"
+                >
+                  Edit
+                </Link>
+              </div>
+            ),
         },
     ];
 
