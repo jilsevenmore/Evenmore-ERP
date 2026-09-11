@@ -105,23 +105,15 @@ export default function UserAllocationPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="User & Representative Allocation"
-        subtitle="Manage CRM team members, lead quotas, sales performance, and active deals pipeline allocation."
+        title="User Tracking"
+        subtitle="Sales representative capacity, lead assignment rules, and workload metrics"
         actions={
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setView('allocation')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'allocation' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}
-              >
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs font-bold">
+              <button type="button" onClick={() => setView('allocation')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'allocation' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}>
                 <ListChecks size={13} /> Allocation
               </button>
-              <button
-                type="button"
-                onClick={() => setView('tracking')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'tracking' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500'}`}
-              >
+              <button type="button" onClick={() => setView('tracking')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'tracking' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500'}`}>
                 <MapPin size={13} /> Live Tracking
               </button>
             </div>

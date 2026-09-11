@@ -5,7 +5,6 @@ import {
   Printer,
   LayoutGrid,
   SquareChartGantt,
-  MapPin,
   MoreHorizontal,
 } from "lucide-react";
 import { tabs } from '../../../data/crm/mockLeads';
@@ -42,7 +41,7 @@ export default function LeadsTabs({
   onClearSort,
   leadView,
   onLeadViewChange,
-  onCreateLead,
+  onOpenGuide,
   recordActionLead,
   recordActionLeads = [],
   onCloseRecordAction,
@@ -70,32 +69,15 @@ export default function LeadsTabs({
           <button type="button" className="toolbar-ghost" aria-label="More lead views">
             <MoreHorizontal size={20} />
           </button>
-          <div className="group relative inline-block">
-            <div className="invisible absolute bottom-[calc(100%+2px)] left-0 z-20 flex translate-y-1 flex-col items-start opacity-0 transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
-              <button
-                type="button"
-                onClick={onCreateLead}
-                className="inline-flex w-max max-w-[260px] items-start gap-2.5 rounded-[16px] bg-[#1d6bff] px-4 py-3 text-left text-[14px] font-medium leading-snug text-white shadow-[0_4px_14px_rgba(29,107,255,0.35)]"
-                aria-label="Click here to learn how to create a lead"
-              >
-                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[15px] font-bold text-[#1d6bff]">1</span>
-                <span>Click here to learn<br />how to create a lead</span>
-              </button>
-              <svg width="72" height="42" viewBox="0 0 72 42" fill="none" className="ml-[52px] mt-[-6px]" aria-hidden="true">
-                <path d="M6 2 C 6 26, 22 37, 50 34" stroke="#1d6bff" strokeWidth="3.5" strokeLinecap="round" fill="none" />
-                <path d="M41 26 L52 34 L41 40" stroke="#1d6bff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-              </svg>
-            </div>
-            <button
-              type="button"
-              onClick={onCreateLead}
-              className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2.5 text-[13px] font-semibold text-[#1d6bff]"
-              aria-label="How to create a lead"
-            >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
-              <span>How to create a lead?</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onOpenGuide}
+            className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2.5 text-[13px] font-semibold text-[#1d6bff]"
+            aria-label="How to create a lead"
+          >
+            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+            <span>How to create a lead?</span>
+          </button>
         </div>
         <div className="tabs-actions">
           <button type="button" className="toolbar-more" aria-label="More options">
@@ -136,9 +118,6 @@ export default function LeadsTabs({
           <ViewButton label="Tile View" active={leadView === "tile"} onClick={() => onLeadViewChange("tile")}>
             <SquareChartGantt size={18} />
           </ViewButton>
-          <ViewButton label="Map View" active={leadView === "map"} onClick={() => onLeadViewChange("map")}>
-            <MapPin size={18} />
-          </ViewButton>
           {hasRecordAction && (
             <RecordActionPanel
               lead={recordActionLead}
@@ -147,9 +126,6 @@ export default function LeadsTabs({
               onDelete={onDeleteRecord}
             />
           )}
-          <button type="button" className="toolbar-icon" aria-label="More toolbar options">
-            <ChevronDown size={16} />
-          </button>
         </div>
       </div>
     </div>

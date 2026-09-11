@@ -1,7 +1,7 @@
 import { CalendarDays, FileText, Plus, Pencil, Trash2 } from "lucide-react";
 import InfoBanner from "../common/InfoBanner";
 
-export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDeleteForm }) {
+export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDeleteForm, onOpenGuide }) {
   return (
     <section className="w-full max-w-6xl mx-auto py-4">
       <InfoBanner
@@ -18,14 +18,27 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
             <span className="text-slate-700">Lead Create Form</span>
           </div>
         </div>
-        <button
-          type="button"
-          className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition cursor-pointer"
-          onClick={onCreateForm}
-          aria-label="Create new lead form"
-        >
-          <Plus size={18} />
-        </button>
+        <div className="flex items-center gap-2">
+          {onOpenGuide && (
+            <button
+              type="button"
+              onClick={onOpenGuide}
+              className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2 text-[13px] font-semibold text-[#1d6bff]"
+              aria-label="How to create a lead form"
+            >
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+              <span>How to create a lead form?</span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition cursor-pointer"
+            onClick={onCreateForm}
+            aria-label="Create new lead form"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">

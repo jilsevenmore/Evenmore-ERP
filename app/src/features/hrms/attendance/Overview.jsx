@@ -474,9 +474,9 @@ export default function AttendanceOverview() {
       </Modal>
 
       <style>{`
-        .att-mgmt-page { width: 100%; display: flex; flex-direction: column; gap: 20px; }
-        .att-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 2px; }
-        .att-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+        .att-mgmt-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .att-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
+        .att-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .att-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
         .att-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
         .att-export-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
@@ -484,7 +484,7 @@ export default function AttendanceOverview() {
         .att-reg-btn { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .att-reg-btn:hover { background: #0f172a; }
 
-        .att-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; }
+        .att-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
         .att-stat-card { background: #fff; border: 1px solid #e8edf3; border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,24,40,0.03); }
         .att-stat-label { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #6b7280; text-transform: uppercase; }
         .att-stat-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
@@ -492,7 +492,7 @@ export default function AttendanceOverview() {
         .att-stat-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
 
         .att-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
-        .att-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+        .att-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .att-filter-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .att-filter-right { display: flex; align-items: center; gap: 8px; }
 
@@ -529,6 +529,7 @@ export default function AttendanceOverview() {
         }
         @media (max-width: 640px) {
           .att-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .att-mgmt-page { padding: 14px 14px 22px; }
         }
       `}</style>
     </div>

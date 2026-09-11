@@ -8,6 +8,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import InfoBanner from "../common/InfoBanner";
+import StageTasksGuideModal from "./StageTasksGuideModal";
 
 const STAGE_THEMES = [
   {
@@ -240,6 +241,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const [taskModalStageId, setTaskModalStageId] = useState(null);
   const [masterTask, setMasterTask] = useState(EMPTY_MASTER_TASK);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [stageDrafts, setStageDrafts] = useState({});
 
   useEffect(() => {
@@ -442,6 +444,15 @@ export default function LeadStageTasks({ leadForms = [] }) {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsGuideOpen(true)}
+              className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2 text-[13px] font-semibold text-[#1d6bff]"
+              aria-label="How to create lead stage tasks"
+            >
+              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+              <span>How to create lead stage tasks?</span>
+            </button>
             <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
               <span>Pipeline</span>
               <select
@@ -1024,6 +1035,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
           <span>Stage tasks updated successfully!</span>
         </div>
       )}
+      <StageTasksGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </section>
   );
 }

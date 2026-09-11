@@ -1,112 +1,592 @@
-import React, { useState } from 'react';
-import { Settings, Shield, Plus, Layers, Sliders, CheckCircle2, Tag, Globe, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  Users,
+  DollarSign,
+  Plus,
+  Search,
+  Pencil,
+  Copy,
+  Trash2,
+  GripVertical,
+  X,
+  Info,
+  User,
+  FileText,
+  FileCheck,
+  Clock,
+  CheckCircle2,
+  MessageSquare,
+  Trophy,
+  XCircle,
+  Send,
+  RefreshCw,
+  ShieldCheck,
+  GitBranch,
+  Layers
+} from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 
-export default function CRMSystemSetupPage() {
-  const [stages, setStages] = useState([
-    { id: 1, name: 'New Inbound', code: 'NEW', color: '#3b82f6', probability: 10 },
-    { id: 2, name: 'Contacted', code: 'CNT', color: '#f59e0b', probability: 30 },
-    { id: 3, name: 'Qualified', code: 'QLF', color: '#10b981', probability: 60 },
-    { id: 4, name: 'Proposal Sent', code: 'PRP', color: '#8b5cf6', probability: 80 },
-    { id: 5, name: 'Converted / Customer', code: 'CNV', color: '#059669', probability: 100 },
-    { id: 6, name: 'Lost / Disqualified', code: 'LST', color: '#ef4444', probability: 0 },
-  ]);
+const STORAGE_KEY = 'evenmore-crm-stages-v1';
+const BANNER_KEY = 'evenmore-crm-stages-banner-v1';
 
-  const [sources, setSources] = useState([
-    { id: 1, name: 'Website Form', type: 'Digital', active: true },
-    { id: 2, name: 'Client Referral', type: 'Direct', active: true },
-    { id: 3, name: 'Cold Inbound Call', type: 'Telephony', active: true },
-    { id: 4, name: 'Social Media / Instagram Ads', type: 'Paid Campaign', active: true },
-    { id: 5, name: 'Medical Trade Expo', type: 'Offline Event', active: true },
-  ]);
+const DEFAULT_LEADS = [
+  { id: 'ld-1', name: 'New Lead', status: 'Active', count: 125, icon: 'user', bg: '#e8f1ff', fg: '#2563eb' },
+  { id: 'ld-2', name: 'Details collected', status: 'Active', count: 98, icon: 'file', bg: '#f1eaff', fg: '#7c3aed' },
+  { id: 'ld-3', name: 'Quotation shared', status: 'Active', count: 76, icon: 'filecheck', bg: '#fef3d8', fg: '#d97706' },
+  { id: 'ld-4', name: 'Demo pending', status: 'Active', count: 54, icon: 'clock', bg: '#ffe8e0', fg: '#ea580c' },
+  { id: 'ld-5', name: 'Demo Done', status: 'Active', count: 42, icon: 'check', bg: '#e3f7ec', fg: '#16a34a' },
+  { id: 'ld-6', name: 'Negotiation', status: 'Active', count: 28, icon: 'chat', bg: '#efe6ff', fg: '#7c3aed' },
+  { id: 'ld-7', name: 'Won', status: 'Active', count: 210, icon: 'trophy', bg: '#e3f7ec', fg: '#16a34a' },
+  { id: 'ld-8', name: 'Lost', status: 'Active', count: 36, icon: 'lost', bg: '#ffe4e4', fg: '#dc2626' },
+  { id: 'ld-9', name: 'Future', status: 'Inactive', count: 12, icon: 'future', bg: '#eef2f7', fg: '#64748b' }
+];
+
+const DEFAULT_DEALS = [
+  { id: 'dl-1', name: 'Draft', status: 'Active', count: 4, pipeline: 'Sales', icon: 'file', bg: '#eef2f7', fg: '#475569' },
+  { id: 'dl-2', name: 'Sent', status: 'Active', count: 12, pipeline: 'Sales', icon: 'send', bg: '#e8f1ff', fg: '#2563eb' },
+  { id: 'dl-3', name: 'Open', status: 'Active', count: 8, pipeline: 'Sales', icon: 'clock', bg: '#fef3d8', fg: '#d97706' },
+  { id: 'dl-4', name: 'Revised', status: 'Active', count: 3, pipeline: 'Sales', icon: 'refresh', bg: '#efe6ff', fg: '#7c3aed' },
+  { id: 'dl-5', name: 'Declined', status: 'Active', count: 1, pipeline: 'Sales', icon: 'lost', bg: '#ffe4e4', fg: '#dc2626' }
+];
+
+function readStored() {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.leadStages) || !Array.isArray(parsed.dealStages)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function LeadStageIcon({ icon, bg, fg }) {
+  const size = 14;
+  const style = { background: bg, color: fg };
+  if (icon === 'file') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><FileText size={size} /></span>;
+  if (icon === 'filecheck') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><FileCheck size={size} /></span>;
+  if (icon === 'clock') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><Clock size={size} /></span>;
+  if (icon === 'check') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><CheckCircle2 size={size} /></span>;
+  if (icon === 'chat') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><MessageSquare size={size} /></span>;
+  if (icon === 'trophy') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><Trophy size={size} /></span>;
+  if (icon === 'lost') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><XCircle size={size} /></span>;
+  if (icon === 'future') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><Clock size={size} /></span>;
+  return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><User size={size} /></span>;
+}
+
+function DealStageIcon({ icon, bg, fg }) {
+  const size = 14;
+  const style = { background: bg, color: fg };
+  if (icon === 'send') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><Send size={size} /></span>;
+  if (icon === 'clock') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><Clock size={size} /></span>;
+  if (icon === 'refresh') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><RefreshCw size={size} /></span>;
+  if (icon === 'lost') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><X size={size} /></span>;
+  return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><FileText size={size} /></span>;
+}
+
+function StatusPill({ status, onToggle }) {
+  const active = status === 'Active';
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title="Click to toggle status"
+      className={active
+        ? 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-green-50 text-green-700 border border-green-100'
+        : 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200'}
+    >
+      <span className={active ? 'w-1.5 h-1.5 rounded-full bg-green-600' : 'w-1.5 h-1.5 rounded-full bg-slate-400'} />
+      {status}
+    </button>
+  );
+}
+
+export default function CRMSystemSetupPage() {
+  const [leadStages, setLeadStages] = useState(() => readStored()?.leadStages || DEFAULT_LEADS);
+  const [dealStages, setDealStages] = useState(() => readStored()?.dealStages || DEFAULT_DEALS);
+  const [leadQuery, setLeadQuery] = useState('');
+  const [leadFilter, setLeadFilter] = useState('All');
+  const [dealQuery, setDealQuery] = useState('');
+  const [dealFilter, setDealFilter] = useState('All');
+  const [showBanner, setShowBanner] = useState(() => {
+    try {
+      if (typeof localStorage === 'undefined') return true;
+      return localStorage.getItem(BANNER_KEY) !== 'hidden';
+    } catch {
+      return true;
+    }
+  });
+  const [leadModal, setLeadModal] = useState(null);
+  const [dealModal, setDealModal] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
+  const [dragLead, setDragLead] = useState(null);
+  const [dragDeal, setDragDeal] = useState(null);
+
+  useEffect(() => {
+    try {
+      if (typeof localStorage === 'undefined') return;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ leadStages, dealStages }));
+    } catch {
+      return;
+    }
+  }, [leadStages, dealStages]);
+
+  const leadActive = useMemo(() => leadStages.filter((s) => s.status === 'Active').length, [leadStages]);
+  const leadInactive = leadStages.length - leadActive;
+  const dealActive = useMemo(() => dealStages.filter((s) => s.status === 'Active').length, [dealStages]);
+  const dealInactive = dealStages.length - dealActive;
+
+  const visibleLeads = useMemo(() => {
+    return leadStages.filter((s) => {
+      if (leadFilter !== 'All' && s.status !== leadFilter) return false;
+      if (leadQuery && !s.name.toLowerCase().includes(leadQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [leadStages, leadQuery, leadFilter]);
+
+  const visibleDeals = useMemo(() => {
+    return dealStages.filter((s) => {
+      if (dealFilter !== 'All' && s.status !== dealFilter) return false;
+      if (dealQuery && !s.name.toLowerCase().includes(dealQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [dealStages, dealQuery, dealFilter]);
+
+  function hideBanner() {
+    setShowBanner(false);
+    try {
+      localStorage.setItem(BANNER_KEY, 'hidden');
+    } catch {
+      return;
+    }
+  }
+
+  function openAddLead() {
+    setLeadModal({ id: null, name: '', status: 'Active' });
+  }
+
+  function openEditLead(stage) {
+    setLeadModal({ id: stage.id, name: stage.name, status: stage.status });
+  }
+
+  function saveLeadModal() {
+    const name = leadModal.name.trim();
+    if (!name) return;
+    if (leadModal.id) {
+      setLeadStages((prev) => prev.map((s) => (s.id === leadModal.id ? { ...s, name, status: leadModal.status } : s)));
+    } else {
+      const item = { id: `ld-${Date.now()}`, name, status: leadModal.status, count: 0, icon: 'user', bg: '#e8f1ff', fg: '#2563eb' };
+      setLeadStages((prev) => [...prev, item]);
+    }
+    setLeadModal(null);
+  }
+
+  function duplicateLead(id) {
+    const found = leadStages.find((s) => s.id === id);
+    if (!found) return;
+    setLeadStages((prev) => [...prev, { ...found, id: `ld-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
+  }
+
+  function openAddDeal() {
+    setDealModal({ id: null, name: '', status: 'Active', pipeline: 'Sales' });
+  }
+
+  function openEditDeal(stage) {
+    setDealModal({ id: stage.id, name: stage.name, status: stage.status, pipeline: stage.pipeline || 'Sales' });
+  }
+
+  function saveDealModal() {
+    const name = dealModal.name.trim();
+    if (!name) return;
+    const pipeline = dealModal.pipeline.trim() || 'Sales';
+    if (dealModal.id) {
+      setDealStages((prev) => prev.map((s) => (s.id === dealModal.id ? { ...s, name, status: dealModal.status, pipeline } : s)));
+    } else {
+      const item = { id: `dl-${Date.now()}`, name, status: dealModal.status, count: 0, pipeline, icon: 'file', bg: '#eef2f7', fg: '#475569' };
+      setDealStages((prev) => [...prev, item]);
+    }
+    setDealModal(null);
+  }
+
+  function duplicateDeal(id) {
+    const found = dealStages.find((s) => s.id === id);
+    if (!found) return;
+    setDealStages((prev) => [...prev, { ...found, id: `dl-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
+  }
+
+  function confirmDelete() {
+    if (!deleteModal) return;
+    if (deleteModal.type === 'lead') setLeadStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
+    if (deleteModal.type === 'deal') setDealStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
+    setDeleteModal(null);
+  }
+
+  function toggleLeadStatus(id) {
+    setLeadStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
+  }
+
+  function toggleDealStatus(id) {
+    setDealStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
+  }
+
+  function dropLead(targetIndex) {
+    if (dragLead === null) return;
+    setLeadStages((prev) => {
+      const order = visibleLeads.map((s) => s.id);
+      const fromId = order[dragLead];
+      const toId = order[targetIndex];
+      if (!fromId || !toId || fromId === toId) return prev;
+      const fromIdx = prev.findIndex((s) => s.id === fromId);
+      const toIdx = prev.findIndex((s) => s.id === toId);
+      const next = [...prev];
+      const moved = next.splice(fromIdx, 1)[0];
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+    setDragLead(null);
+  }
+
+  function dropDeal(targetIndex) {
+    if (dragDeal === null) return;
+    setDealStages((prev) => {
+      const order = visibleDeals.map((s) => s.id);
+      const fromId = order[dragDeal];
+      const toId = order[targetIndex];
+      if (!fromId || !toId || fromId === toId) return prev;
+      const fromIdx = prev.findIndex((s) => s.id === fromId);
+      const toIdx = prev.findIndex((s) => s.id === toId);
+      const next = [...prev];
+      const moved = next.splice(fromIdx, 1)[0];
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+    setDragDeal(null);
+  }
+
+  function scrollToPanel(id) {
+    try {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch {
+      return;
+    }
+  }
 
   return (
     <div className="space-y-4">
       <PageHeader
-        title="CRM System Setup & Configurations"
-        subtitle="Manage lead lifecycle stages, inbound sources, scoring formulas, and automation rules"
-        actions={
-          <button type="button" className="btn-primary btn-sm flex items-center gap-1.5">
-            <Plus size={14} /> New Stage
-          </button>
-        }
+        title="CRM System Setup"
+        subtitle="Manage both Lead Stages and Deal Stages for your business process."
+        breadcrumb={[
+          { label: 'Dashboard', path: '/dashboard' },
+          { label: 'CRM', path: '/crm/leads' },
+          { label: 'CRM System Setup' }
+        ]}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Lead Stages Master */}
-        <div className="card">
-          <div className="card-header flex items-center justify-between">
-            <h3 className="font-bold text-sm">Lead Lifecycle Stages ({stages.length})</h3>
-            <span className="text-[11px] text-slate-400">Order by pipeline priority</span>
+      {showBanner && (
+        <div className="bg-[#eef6ff] border border-blue-100 rounded-xl px-4 py-3 flex items-start gap-3">
+          <span className="w-7 h-7 rounded-full bg-white border border-blue-200 text-blue-600 flex items-center justify-center shrink-0 mt-0.5">
+            <Info size={15} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-blue-900">Understand the Difference</p>
+            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Lead Stages are used to track and nurture potential leads. Deal Stages are used to track confirmed deals in the sales pipeline.</p>
+            <button type="button" className="text-xs font-semibold text-blue-600 mt-1 hover:underline">Learn More →</button>
           </div>
-          <div className="table-scroll">
-            <table className="data-table text-xs">
-              <thead>
-                <tr>
-                  <th>Stage Name</th>
-                  <th>Code</th>
-                  <th>Win Probability</th>
-                  <th>Indicator</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stages.map((s) => (
-                  <tr key={s.id}>
-                    <td>
-                      <strong className="font-semibold">{s.name}</strong>
-                    </td>
-                    <td>
-                      <span className="font-mono text-slate-400 font-bold">{s.code}</span>
-                    </td>
-                    <td>
-                      <span className="font-bold text-blue-600 font-mono">{s.probability}%</span>
-                    </td>
-                    <td>
-                      <span className="w-4 h-4 rounded-full inline-block" style={{ background: s.color }} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <button type="button" onClick={hideBanner} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Dismiss">
+            <X size={15} />
+          </button>
         </div>
+      )}
 
-        {/* Lead Inbound Sources */}
-        <div className="card">
-          <div className="card-header flex items-center justify-between">
-            <h3 className="font-bold text-sm">Inbound Source Channels ({sources.length})</h3>
-            <button type="button" className="btn-outline btn-sm flex items-center gap-1">
-              <Plus size={13} /> Add Channel
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <div id="lead-panel" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-10 h-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Users size={20} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="font-bold text-[15px] text-slate-800 leading-tight">Lead Stages</h3>
+                <p className="text-xs text-slate-500 truncate">Manage stages for your lead follow-up process.</p>
+              </div>
+            </div>
+            <button type="button" onClick={openAddLead} className="bg-[#1f6bff] hover:bg-blue-700 text-white rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 shrink-0">
+              <Plus size={14} /> Add Lead Stage
             </button>
           </div>
-          <div className="table-scroll">
-            <table className="data-table text-xs">
+
+          <div className="grid grid-cols-3 gap-3 px-4">
+            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Users size={17} /></span>
+              <span><span className="block text-[11px] text-slate-500 font-medium">Total Stages</span><span className="block text-lg font-black text-slate-800 leading-tight">{leadStages.length}</span></span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0"><ShieldCheck size={17} /></span>
+              <span><span className="flex items-center gap-1 text-[11px] text-slate-500 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Active</span><span className="block text-lg font-black text-slate-800 leading-tight">{leadActive}</span></span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0"><GitBranch size={17} /></span>
+              <span><span className="block text-[11px] text-slate-500 font-medium">Inactive</span><span className="block text-lg font-black text-slate-800 leading-tight">{leadInactive}</span></span>
+            </div>
+          </div>
+
+          <div className="flex gap-2 px-4 mt-3">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={leadQuery} onChange={(e) => setLeadQuery(e.target.value)} placeholder="Search lead stages..." className="w-full h-9 border border-slate-200 rounded-lg pl-8 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </div>
+            <select value={leadFilter} onChange={(e) => setLeadFilter(e.target.value)} className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-600 outline-none bg-white">
+              <option value="All">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-xs min-w-[520px]">
               <thead>
-                <tr>
-                  <th>Channel Name</th>
-                  <th>Category</th>
-                  <th>Status</th>
+                <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400 border-y border-slate-100">
+                  <th className="py-2.5 pl-4 pr-1 font-semibold w-10"></th>
+                  <th className="py-2.5 px-2 font-semibold w-8">#</th>
+                  <th className="py-2.5 px-2 font-semibold">Stage Name</th>
+                  <th className="py-2.5 px-2 font-semibold">Status</th>
+                  <th className="py-2.5 px-2 font-semibold">Leads</th>
+                  <th className="py-2.5 px-2 pr-4 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {sources.map((src) => (
-                  <tr key={src.id}>
-                    <td>
-                      <strong className="font-semibold">{src.name}</strong>
+                {visibleLeads.map((s, idx) => (
+                  <tr
+                    key={s.id}
+                    draggable
+                    onDragStart={() => setDragLead(idx)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => dropLead(idx)}
+                    className="border-b border-slate-50 hover:bg-slate-50/70"
+                  >
+                    <td className="pl-4 pr-1 py-2.5 text-slate-300 cursor-grab"><GripVertical size={15} /></td>
+                    <td className="px-2 py-2.5 text-slate-500 font-medium">{leadStages.findIndex((x) => x.id === s.id) + 1}</td>
+                    <td className="px-2 py-2.5">
+                      <span className="flex items-center gap-2 font-semibold text-slate-700">
+                        <LeadStageIcon icon={s.icon} bg={s.bg} fg={s.fg} />
+                        {s.name}
+                      </span>
                     </td>
-                    <td className="text-slate-500 font-medium">{src.type}</td>
-                    <td>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Active
+                    <td className="px-2 py-2.5"><StatusPill status={s.status} onToggle={() => toggleLeadStatus(s.id)} /></td>
+                    <td className="px-2 py-2.5 text-slate-600 font-medium">{s.count}</td>
+                    <td className="px-2 pr-4 py-2.5">
+                      <span className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => openEditLead(s)} className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100" title="Edit"><Pencil size={13} /></button>
+                        <button type="button" onClick={() => duplicateLead(s.id)} className="w-7 h-7 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200" title="Duplicate"><Copy size={13} /></button>
+                        <button type="button" onClick={() => setDeleteModal({ type: 'lead', id: s.id, name: s.name })} className="w-7 h-7 rounded-md bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100" title="Delete"><Trash2 size={13} /></button>
                       </span>
                     </td>
                   </tr>
                 ))}
+                {visibleLeads.length === 0 && (
+                  <tr><td colSpan={6} className="text-center py-8 text-slate-400">No lead stages found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <div className="h-3" />
+        </div>
+
+        <div id="deal-panel" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 p-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <DollarSign size={20} />
+              </span>
+              <div className="min-w-0">
+                <h3 className="font-bold text-[15px] text-slate-800 leading-tight">Deal Stages</h3>
+                <p className="text-xs text-slate-500 truncate">Manage stages for your sales pipeline process.</p>
+              </div>
+            </div>
+            <button type="button" onClick={openAddDeal} className="bg-[#1f6bff] hover:bg-blue-700 text-white rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 shrink-0">
+              <Plus size={14} /> Add Deal Stage
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 px-4">
+            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Layers size={17} /></span>
+              <span><span className="block text-[11px] text-slate-500 font-medium">Total Stages</span><span className="block text-lg font-black text-slate-800 leading-tight">{dealStages.length}</span></span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0"><ShieldCheck size={17} /></span>
+              <span><span className="flex items-center gap-1 text-[11px] text-slate-500 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Active</span><span className="block text-lg font-black text-slate-800 leading-tight">{dealActive}</span></span>
+            </div>
+            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
+              <span className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0"><GitBranch size={17} /></span>
+              <span><span className="block text-[11px] text-slate-500 font-medium">Inactive</span><span className="block text-lg font-black text-slate-800 leading-tight">{dealInactive}</span></span>
+            </div>
+          </div>
+
+          <div className="flex gap-2 px-4 mt-3">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input value={dealQuery} onChange={(e) => setDealQuery(e.target.value)} placeholder="Search deal stages..." className="w-full h-9 border border-slate-200 rounded-lg pl-8 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </div>
+            <select value={dealFilter} onChange={(e) => setDealFilter(e.target.value)} className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-600 outline-none bg-white">
+              <option value="All">All Status</option>
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </div>
+
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-xs min-w-[560px]">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400 border-y border-slate-100">
+                  <th className="py-2.5 pl-4 pr-1 font-semibold w-10"></th>
+                  <th className="py-2.5 px-2 font-semibold w-8">#</th>
+                  <th className="py-2.5 px-2 font-semibold">Stage Name</th>
+                  <th className="py-2.5 px-2 font-semibold">Pipeline</th>
+                  <th className="py-2.5 px-2 font-semibold">Status</th>
+                  <th className="py-2.5 px-2 font-semibold">Deals</th>
+                  <th className="py-2.5 px-2 pr-4 font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleDeals.map((s, idx) => (
+                  <tr
+                    key={s.id}
+                    draggable
+                    onDragStart={() => setDragDeal(idx)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => dropDeal(idx)}
+                    className="border-b border-slate-50 hover:bg-slate-50/70"
+                  >
+                    <td className="pl-4 pr-1 py-2.5 text-slate-300 cursor-grab"><GripVertical size={15} /></td>
+                    <td className="px-2 py-2.5 text-slate-500 font-medium">{dealStages.findIndex((x) => x.id === s.id) + 1}</td>
+                    <td className="px-2 py-2.5">
+                      <span className="flex items-center gap-2 font-semibold text-slate-700">
+                        <DealStageIcon icon={s.icon} bg={s.bg} fg={s.fg} />
+                        {s.name}
+                      </span>
+                    </td>
+                    <td className="px-2 py-2.5">
+                      <span className="inline-flex px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-600">{s.pipeline || 'Sales'}</span>
+                    </td>
+                    <td className="px-2 py-2.5"><StatusPill status={s.status} onToggle={() => toggleDealStatus(s.id)} /></td>
+                    <td className="px-2 py-2.5 text-slate-600 font-medium">{s.count}</td>
+                    <td className="px-2 pr-4 py-2.5">
+                      <span className="flex items-center gap-1.5">
+                        <button type="button" onClick={() => openEditDeal(s)} className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100" title="Edit"><Pencil size={13} /></button>
+                        <button type="button" onClick={() => duplicateDeal(s.id)} className="w-7 h-7 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200" title="Duplicate"><Copy size={13} /></button>
+                        <button type="button" onClick={() => setDeleteModal({ type: 'deal', id: s.id, name: s.name })} className="w-7 h-7 rounded-md bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100" title="Delete"><Trash2 size={13} /></button>
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {visibleDeals.length === 0 && (
+                  <tr><td colSpan={7} className="text-center py-8 text-slate-400">No deal stages found.</td></tr>
+                )}
               </tbody>
             </table>
           </div>
         </div>
       </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="bg-[#ecfdf5] border border-green-100 rounded-xl p-5 flex items-start gap-3">
+          <span className="w-9 h-9 rounded-full bg-white text-green-600 flex items-center justify-center shrink-0 shadow-sm"><Users size={17} /></span>
+          <div>
+            <p className="text-[13px] font-bold text-slate-800">What are Lead Stages?</p>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">Lead stages help you track the journey of a potential customer from initial contact to conversion. You can create, edit, reorder or delete lead stages as per your business process.</p>
+            <button type="button" onClick={() => scrollToPanel('lead-panel')} className="mt-3 h-8 px-3.5 rounded-lg border border-blue-400 text-blue-600 text-xs font-semibold bg-white hover:bg-blue-50">Manage Lead Stages</button>
+          </div>
+        </div>
+        <div className="bg-[#f5f0ff] border border-purple-100 rounded-xl p-5 flex items-start gap-3">
+          <span className="w-9 h-9 rounded-full bg-white text-purple-600 flex items-center justify-center shrink-0 shadow-sm"><DollarSign size={17} /></span>
+          <div>
+            <p className="text-[13px] font-bold text-slate-800">What are Deal Stages?</p>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">Deal stages represent the different steps in your sales process. Each stage belongs to a pipeline (e.g., Sales, B2B, etc.). You can create, edit, reorder or delete deal stages.</p>
+            <button type="button" onClick={() => scrollToPanel('deal-panel')} className="mt-3 h-8 px-3.5 rounded-lg border border-blue-400 text-blue-600 text-xs font-semibold bg-white hover:bg-blue-50">Manage Deal Stages</button>
+          </div>
+        </div>
+      </div>
+
+      {leadModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setLeadModal(null)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800">{leadModal.id ? 'Edit Lead Stage' : 'Add Lead Stage'}</h2>
+              <button type="button" onClick={() => setLeadModal(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={16} /></button>
+            </div>
+            <div className="space-y-3 mt-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Stage Name *</label>
+                <input value={leadModal.name} onChange={(e) => setLeadModal({ ...leadModal, name: e.target.value })} placeholder="e.g. New Lead" className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Status</label>
+                <select value={leadModal.status} onChange={(e) => setLeadModal({ ...leadModal, status: e.target.value })} className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none bg-white">
+                  <option value="Active">Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setLeadModal(null)} className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={saveLeadModal} className="h-9 px-4 rounded-lg bg-[#1f6bff] text-white text-xs font-semibold hover:bg-blue-700">Save Stage</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dealModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setDealModal(null)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800">{dealModal.id ? 'Edit Deal Stage' : 'Add Deal Stage'}</h2>
+              <button type="button" onClick={() => setDealModal(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={16} /></button>
+            </div>
+            <div className="space-y-3 mt-4">
+              <div>
+                <label className="text-xs font-semibold text-slate-600">Stage Name *</label>
+                <input value={dealModal.name} onChange={(e) => setDealModal({ ...dealModal, name: e.target.value })} placeholder="e.g. Proposal" className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Pipeline</label>
+                  <input value={dealModal.pipeline} onChange={(e) => setDealModal({ ...dealModal, pipeline: e.target.value })} placeholder="Sales" className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Status</label>
+                  <select value={dealModal.status} onChange={(e) => setDealModal({ ...dealModal, status: e.target.value })} className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none bg-white">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setDealModal(null)} className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={saveDealModal} className="h-9 px-4 rounded-lg bg-[#1f6bff] text-white text-xs font-semibold hover:bg-blue-700">Save Stage</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setDeleteModal(null)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 border border-red-100 flex items-center justify-center"><Trash2 size={17} /></div>
+            <h2 className="text-sm font-bold text-slate-800 mt-3">Delete {deleteModal.type === 'lead' ? 'Lead' : 'Deal'} Stage?</h2>
+            <p className="text-xs text-slate-500 mt-1">Are you sure you want to delete <strong className="text-slate-700">{deleteModal.name}</strong>? This action is permanent.</p>
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setDeleteModal(null)} className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+              <button type="button" onClick={confirmDelete} className="h-9 px-4 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

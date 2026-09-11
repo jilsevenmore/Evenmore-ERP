@@ -1164,6 +1164,102 @@ export function AssetsPage() {
                 className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy font-mono"
               />
             </div>
+            <form onSubmit={handleCreate} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Asset Description</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. MacBook Pro 14 (M3 Max)"
+                  value={newAsset.name}
+                  onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Category</label>
+                  <select
+                    value={newAsset.category}
+                    onChange={(e) => setNewAsset({ ...newAsset, category: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  >
+                    <option value="Laptop">Laptop</option>
+                    <option value="Monitor">Monitor</option>
+                    <option value="Mobile">Mobile</option>
+                    <option value="Workstation">Workstation</option>
+                    <option value="Tablet">Tablet</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
+                  <select
+                    value={newAsset.dept}
+                    onChange={(e) => setNewAsset({ ...newAsset, dept: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  >
+                    <option value="Engineering">Engineering</option>
+                    <option value="Design">Design</option>
+                    <option value="Product">Product</option>
+                    <option value="Operations">Operations</option>
+                    <option value="HR">HR</option>
+                    <option value="Finance">Finance</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Assigned To</label>
+                  <select
+                    value={newAsset.assignedTo}
+                    onChange={(e) => {
+                      const selected = employees.find((emp) => emp.name === e.target.value);
+                      setNewAsset({
+                        ...newAsset,
+                        assignedTo: e.target.value,
+                        dept: selected?.department || newAsset.dept,
+                      });
+                    }}
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  >
+                    <option value="">Unassigned / Stock</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id || emp.name} value={emp.name}>
+                        {emp.name} ({emp.department})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Status</label>
+                  <select
+                    value={newAsset.status}
+                    onChange={(e) => setNewAsset({ ...newAsset, status: e.target.value })}
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  >
+                    <option value="Assigned">Assigned</option>
+                    <option value="Available">Available</option>
+                    <option value="Under Maintenance">Under Maintenance</option>
+                    <option value="Lost/Damaged">Lost/Damaged</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2.5 mt-3 pt-3 border-t border-bdr">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90"
+                >
+                  Register Asset
+                </button>
+              </div>
+            </form>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">

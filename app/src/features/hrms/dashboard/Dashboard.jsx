@@ -663,15 +663,15 @@ export default function HRMSDashboard() {
       </Modal>
 
       <style>{`
-        .hrms-dash { width: 100%; display: flex; flex-direction: column; gap: 20px; }
-        .hrms-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 2px; }
-        .hrms-title-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
+        .hrms-dash { background: #f7f9fc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .hrms-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
+        .hrms-title-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
         .hrms-title { margin: 0; font-size: 24px; font-weight: 800; color: #16233a; letter-spacing: -0.01em; }
         .hrms-date-btn { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #334155; box-shadow: 0 1px 2px rgba(16,24,40,0.05); cursor: pointer; }
         .hrms-add-btn { background: #1b2b4a; color: #fff; border: none; border-radius: 10px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
-        .hrms-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #eef1f6; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #1e293b; margin-bottom: 4px; }
+        .hrms-notice { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: #eef1f6; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #1e293b; margin-bottom: 16px; }
         .hrms-notice-x { border: 0; background: transparent; display: grid; place-items: center; color: #334155; cursor: pointer; }
-        .hrms-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; }
+        .hrms-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin-bottom: 14px; }
         .hrms-stat-card { background: #fff; border: 1px solid #e8edf3; border-radius: 14px; padding: 16px 18px; box-shadow: 0 1px 2px rgba(16,24,40,0.03); }
         .hrms-pill { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
         .hrms-main-grid { display: grid; grid-template-columns: minmax(0,1fr) 340px; gap: 16px; align-items: start; }
@@ -718,6 +718,7 @@ export default function HRMSDashboard() {
         }
         @media (max-width: 640px) {
           .hrms-stat-grid { grid-template-columns: minmax(0,1fr); }
+          .hrms-dash { padding: 14px 14px 22px; }
         }
       `}</style>
     </div>
