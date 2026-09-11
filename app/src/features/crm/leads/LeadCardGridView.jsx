@@ -3,6 +3,7 @@ import LeadAvatar from "./LeadAvatar";
 import { formatCurrency } from "../../../utils/currencyUtils";
 
 export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadIds = [], onTogglePin, onToggleOne, onRequestDelete, onAddNote, onOpenLead, onDelete }) {
+  const activeCurrency = (typeof localStorage !== 'undefined' && localStorage.getItem('evenmore_currency')) || 'USD ($)';
   return (
     <div className="lead-grid">
       {rows.map((row) => (
@@ -37,7 +38,7 @@ export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadI
               >
                 <Pin size={14} />
               </button>
-              <button type="button" className="lead-grid-open" onClick={() => onAddNote(row)}>
+              <button type="button" className="lead-grid-open" onClick={() => onOpenLead(row)}>
                 Open
               </button>
             </div>

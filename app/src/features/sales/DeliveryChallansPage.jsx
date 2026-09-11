@@ -23,7 +23,7 @@ const challanGuide = {
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
 export const DeliveryChallansPage = () => {
-    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, } = useERP();
+    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, formatDateDDMMYYYY, } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedChallan, setSelectedChallan] = useState(null);
     const [selectedSoId, setSelectedSoId] = useState(salesOrders[0]?.id || '');

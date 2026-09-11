@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useERP } from '../../../context/ERPContext';
 import {
@@ -41,11 +41,27 @@ import {
   User,
   ChevronDown,
   ArrowLeft,
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Link2,
+  X,
 } from 'lucide-react';
 import LeadAvatar from './LeadAvatar';
+import LeadFormBuilder from './LeadFormBuilder';
+import { createFieldFromType } from '../../../data/crm/leadFormSchema';
 import { exportToCSV } from '../../../services/exportUtils';
+import { formatCurrency } from '../../../utils/currencyUtils';
+import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { employeesMock } from '../../../data/hrms/mocks/data';
+import { LineItemEditor } from '../../../components/common/LineItemEditor';
 
 const DETAIL_TABS = [
   'General',
@@ -56,6 +72,7 @@ const DETAIL_TABS = [
   'Tasks',
   'Calls',
   'Estimates',
+  'Quotations',
   'Delivery Challans',
   'Activity',
 ];
@@ -69,6 +86,7 @@ const DETAIL_TAB_ICONS = {
   Tasks: ListChecks,
   Calls: Phone,
   Estimates: Receipt,
+  Quotations: FileText,
   'Delivery Challans': Truck,
   Activity: Sparkles,
 };
@@ -90,6 +108,7 @@ function writeStoredJson(key, value) {
   try {
     if (typeof localStorage === 'undefined') return false;
     localStorage.setItem(key, JSON.stringify(value));
+    window.dispatchEvent(new Event('crm:data-updated'));
     return true;
   } catch {
     return false;
@@ -188,7 +207,7 @@ function buildLeadSources(lead) {
       createdBy: 'David Patel',
       avatar: 'https://i.pravatar.cc/160?img=68',
       color: '#10b981',
-      icon: Globe,
+      icon: 'globe',
     },
     {
       id: 2,
@@ -199,7 +218,7 @@ function buildLeadSources(lead) {
       createdBy: 'Priya Mehta',
       avatar: 'https://i.pravatar.cc/160?img=47',
       color: '#f59e0b',
-      icon: User,
+      icon: 'user',
     },
     {
       id: 3,
@@ -210,14 +229,32 @@ function buildLeadSources(lead) {
       createdBy: 'Rohit Sharma',
       avatar: 'https://i.pravatar.cc/160?img=15',
       color: '#ec4899',
-      icon: Megaphone,
+      icon: 'megaphone',
     },
   ];
   return limitItems(defaults, lead?.sourcesCount);
 }
 
-function buildLeadEmails() {
-  return [
+function sourceIconMap() {
+  return { globe: Globe, user: User, megaphone: Megaphone };
+}
+
+function resolveSourceIcon(icon) {
+  const map = sourceIconMap();
+  if (typeof icon === 'string') return map[icon] || Globe;
+  if (typeof icon === 'function') return icon;
+  if (icon && icon.$$typeof) return icon;
+  return Globe;
+}
+
+function sourceIconName(icon) {
+  if (typeof icon === 'string') return icon;
+  if (icon === User) return 'user';
+  if (icon === Megaphone) return 'megaphone';
+  return 'globe';
+}
+
+function buildLeadEmails() {  return [
     {
       id: 1,
       subject: 'Product Inquiry',
@@ -308,6 +345,141 @@ function buildSentFiles(lead) {
   return limitItems(defaults, lead?.filesCount);
 }
 
+function buildLeadTasks() {
+  return [
+    { id: 'lt-1', title: 'Final Meeting', stage: 'Negotiation', status: 'Due', priority: 'High', dueAt: '27/08/2026, 01:42 PM', process: 'Not Started', assignee: 'Utsav Faldu', description: 'Meet the client and finalize negotiation points.', proposalId: '', deliveryChallanId: '' },
+    { id: 'lt-2', title: 'Formal meeting', stage: 'Negotiation', status: 'Due', priority: 'Medium', dueAt: '27/08/2026, 01:42 PM', process: 'Not Started', assignee: 'Priya Patel', description: 'Formal client discussion for pricing alignment.', proposalId: '', deliveryChallanId: '' },
+    { id: 'lt-3', title: 'Demo pending', stage: 'Demo pending', status: 'Completed', priority: 'High', dueAt: '03/09/2026, 01:41 PM', process: 'Not Started', assignee: 'Utsav Faldu', description: '', proposalId: '', deliveryChallanId: '' },
+    { id: 'lt-4', title: 'Call', stage: 'New Lead', status: 'Completed', priority: 'Medium', dueAt: '27/08/2026, 01:16 PM', process: 'Not Started', assignee: 'David Patel', description: 'Initial qualification call.', proposalId: '', deliveryChallanId: '' },
+    { id: 'lt-5', title: 'Call', stage: 'Details collected', status: 'Completed', priority: 'Medium', dueAt: '27/08/2026, 01:20 PM', process: 'Not Started', assignee: 'Priya Patel', description: 'Follow-up call after collecting details.', proposalId: '', deliveryChallanId: '' },
+    { id: 'lt-6', title: 'Quotation', stage: 'Quotation shared', status: 'Completed', priority: 'Medium', dueAt: '30/08/2026, 01:20 PM', process: 'Not Started', assignee: 'David Patel', description: 'Share quotation and answer client questions.', proposalId: '', deliveryChallanId: '' },
+    { id: 'lt-7', title: 'Demo completed', stage: 'Demo Done', status: 'Completed', priority: 'Medium', dueAt: '30/08/2026, 01:41 PM', process: 'Not Started', assignee: 'Utsav Faldu', description: 'Demo completed successfully.', proposalId: '', deliveryChallanId: '' },
+  ];
+}
+
+const LEAD_TASK_STAGE_OPTIONS = ['New Lead', 'Details collected', 'Quotation shared', 'Demo pending', 'Demo Done', 'Negotiation', 'Won', 'Lost'];
+const LEAD_TASK_PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
+const LEAD_TASK_STATUS_OPTIONS = [
+  { value: 'Due', label: 'Pending' },
+  { value: 'Completed', label: 'Completed' },
+];
+
+function padTaskValue(value) {
+  return String(value).padStart(2, '0');
+}
+
+function parseLeadTaskDueAt(value) {
+  const text = String(value || '').trim();
+  if (!text) return { taskDate: '', taskTime: '' };
+
+  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+  if (isoMatch) {
+    return {
+      taskDate: `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`,
+      taskTime: `${isoMatch[4] || '09'}:${isoMatch[5] || '00'}`,
+    };
+  }
+
+  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:,\s*|\s+)(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
+  if (!match) return { taskDate: '', taskTime: '' };
+
+  const day = match[1];
+  const month = match[2];
+  const year = match[3];
+  let hour = Number(match[4]);
+  const minute = match[5];
+  const meridiem = String(match[6] || '').toUpperCase();
+
+  if (meridiem === 'PM' && hour < 12) hour += 12;
+  if (meridiem === 'AM' && hour === 12) hour = 0;
+
+  return {
+    taskDate: `${year}-${month}-${day}`,
+    taskTime: `${padTaskValue(hour)}:${minute}`,
+  };
+}
+
+function formatLeadTaskDueAt(taskDate, taskTime) {
+  if (!taskDate) return '';
+  const [year, month, day] = taskDate.split('-').map(Number);
+  const [hour = 9, minute = 0] = String(taskTime || '09:00').split(':').map(Number);
+  const date = new Date(year, (month || 1) - 1, day || 1, hour || 0, minute || 0);
+
+  if (Number.isNaN(date.getTime())) {
+    return `${padTaskValue(day || 1)}/${padTaskValue(month || 1)}/${year || new Date().getFullYear()}, ${taskTime || '09:00'}`;
+  }
+
+  return date.toLocaleString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function createLeadTaskForm(defaultAssignee = '') {
+  const now = new Date();
+  return {
+    defaultTask: 'custom',
+    title: '',
+    stage: 'New Lead',
+    priority: 'Low',
+    status: 'Due',
+    assignee: defaultAssignee,
+    description: '',
+    proposalId: '',
+    deliveryChallanId: '',
+    taskFormId: '',
+    customValues: {},
+    taskDate: `${now.getFullYear()}-${padTaskValue(now.getMonth() + 1)}-${padTaskValue(now.getDate())}`,
+    taskTime: `${padTaskValue(now.getHours())}:${padTaskValue(now.getMinutes())}`,
+  };
+}
+
+const TASK_FORM_STORAGE_KEY = 'leadTaskFormsV1';
+const TASK_FORM_FIELD_TYPES = ['Text', 'Single Line', 'Multi Line', 'Number', 'Email', 'Phone', 'Date', 'Dropdown', 'Multi Select', 'Checkbox', 'Radio', 'File Upload', 'Currency', 'User', 'Lookup'];
+
+function getLeadTaskForms() {
+  try {
+    const raw = localStorage.getItem(TASK_FORM_STORAGE_KEY);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch { }
+  return [
+    { id: 'task-form-calling', title: 'Calling', description: 'No description provided', fields: ['Call', '2nd Call', '3rd Call'], sections: [{ id: 'task-information', title: 'Task Information', fields: [{ id: 'cf-call-1', type: 'Single Line', label: 'Call Outcome', placeholder: 'Enter call outcome', required: false }] }], lastUpdated: '07/08/2026', status: 'ACTIVE', iconName: 'call' },
+    { id: 'task-form-visit', title: 'Visit Data', description: 'No description provided', fields: ['Quotation', 'Demo', 'pending'], sections: [{ id: 'task-information', title: 'Task Information', fields: [{ id: 'vf-visit-1', type: 'Single Line', label: 'Visit Purpose', placeholder: 'Enter visit purpose', required: true }] }], lastUpdated: '16/04/2026', status: 'ACTIVE', iconName: 'visit' },
+  ];
+}
+
+function getTaskFormFields(form) {
+  if (form?.sections && Array.isArray(form.sections) && form.sections.length > 0) {
+    return form.sections.flatMap((s) => s.fields || []);
+  }
+  return (Array.isArray(form?.fields) ? form.fields : []).map((name, i) => ({ id: `${form?.id || 'form'}-field-${i}`, type: 'Text', label: String(name), placeholder: `Enter ${String(name).toLowerCase()}`, required: false }));
+}
+
+function saveLeadTaskForms(forms) {
+  try {
+    localStorage.setItem(TASK_FORM_STORAGE_KEY, JSON.stringify(forms));
+    return true;
+  } catch { return false; }
+}
+
+function getMasterTaskOptions() {
+  try {
+    const raw = localStorage.getItem('leadMasterTasksV1');
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch { }
+  return [];
+}
+
 function loadLeadDetailState(lead) {
   const stored = loadStoredLeadDetails()[String(lead?.id || '')] || {};
   return {
@@ -317,6 +489,9 @@ function loadLeadDetailState(lead) {
     emails: Array.isArray(stored.emails) ? stored.emails : buildLeadEmails(),
     timeline: Array.isArray(stored.timeline) ? stored.timeline : buildLeadTimeline(),
     files: Array.isArray(stored.files) ? stored.files : buildSentFiles(lead),
+    calls: Array.isArray(stored.calls) ? stored.calls : [],
+    tasks: Array.isArray(stored.tasks) ? stored.tasks : buildLeadTasks(),
+    activities: Array.isArray(stored.activities) ? stored.activities : null,
   };
 }
 
@@ -469,6 +644,18 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
   const [newSource, setNewSource] = useState({ source: 'Website', details: '' });
   const [newEmail, setNewEmail] = useState({ subject: '', message: '' });
   const [recipients, setRecipients] = useState([lead.email].filter(Boolean));
+  const [mailTo, setMailTo] = useState(lead.email || '');
+  const [mailError, setMailError] = useState('');
+  const editorRef = React.useRef(null);
+  const [editorEmpty, setEditorEmpty] = useState(true);
+
+  React.useEffect(() => {
+    updateStoredLeadDetail(lead?.id, { sources: sources.map((s) => ({ ...s, icon: sourceIconName(s.icon) })), emails, timeline });
+  }, [lead?.id, sources, emails, timeline]);
+
+  React.useEffect(() => {
+    onCountsChange?.({ sources: sources.length });
+  }, [sources.length, onCountsChange]);
 
   React.useEffect(() => {
     updateStoredLeadDetail(lead?.id, { sources, emails, timeline });
@@ -490,9 +677,46 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
     handleSendEmail(event);
   }
 
+  function syncEditor() {
+    const el = editorRef.current;
+    if (!el) return;
+    const text = el.innerText || '';
+    setNewEmail((prev) => ({ ...prev, message: text }));
+    setEditorEmpty(text.trim() === '');
+  }
+
+  function formatDoc(command, value = null) {
+    try {
+      if (editorRef.current) editorRef.current.focus();
+      document.execCommand(command, false, value);
+    } catch {
+      return;
+    }
+    syncEditor();
+  }
+
+  function runLink() {
+    const url = window.prompt('Enter link URL', 'https://');
+    if (url) formatDoc('createLink', url);
+  }
+
+  function openEmailModal() {
+    setMailTo(lead.email || '');
+    setMailError('');
+    setNewEmail({ subject: '', message: '' });
+    setEditorEmpty(true);
+    if (editorRef.current) editorRef.current.innerHTML = '';
+    setShowSendEmail(true);
+  }
+
+  function closeEmailModal() {
+    setShowSendEmail(false);
+  }
+
   const handleAddSource = (e) => {
     e.preventDefault();
     if (!newSource.details) return;
+    const iconName = newSource.source === 'Referral' ? 'user' : newSource.source === 'Advertisement' ? 'megaphone' : 'globe';
     const added = {
       id: Date.now(),
       source: newSource.source,
@@ -502,7 +726,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
       createdBy: 'David Patel',
       avatar: 'https://i.pravatar.cc/160?img=68',
       color: '#1f6bff',
-      icon: Globe,
+      icon: iconName,
     };
     setSources((current) => [added, ...current]);
     setNewSource({ source: 'Website', details: '' });
@@ -512,7 +736,13 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
   const handleSendEmail = (e) => {
     e.preventDefault();
-    if (!newEmail.subject) return;
+    const toOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mailTo.trim());
+    if (!toOk) {
+      setMailError('Enter a valid email address');
+      return;
+    }
+    if (!newEmail.subject.trim()) return;
+    const bodyText = (editorRef.current?.innerText || newEmail.message || '').trim();
     const now = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const addedEmail = {
       id: Date.now(),
@@ -527,7 +757,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
       id: Date.now(),
       type: 'sent',
       title: newEmail.subject,
-      preview: newEmail.message || 'Direct email communication with client representative.',
+      preview: bodyText || 'Direct email communication with client representative.',
       date: now,
       author: 'David Patel',
       dotColor: '#10b981',
@@ -535,6 +765,8 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
     setEmails((current) => [addedEmail, ...current]);
     setTimeline((current) => [addedTimeline, ...current]);
     setNewEmail({ subject: '', message: '' });
+    setEditorEmpty(true);
+    if (editorRef.current) editorRef.current.innerHTML = '';
     setShowSendEmail(false);
     onActivity?.(`Email "${addedEmail.subject}" sent`, '#3b82f6');
   };
@@ -627,10 +859,10 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
               </thead>
               <tbody>
                 {sources.map((s, idx) => {
-                  const Icon = s.icon || Globe;
+                  const Icon = resolveSourceIcon(s.icon);
                   return (
                     <tr key={s.id}>
-                      <td className="text-slate-400 font-mono">{idx + 1}</td>
+                      <td className="text-slate-500 font-mono">{idx + 1}</td>
                       <td>
                         <div className="inline-flex items-center gap-2">
                           <div
@@ -642,8 +874,8 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
                           <span className="font-semibold">{s.source}</span>
                         </div>
                       </td>
-                      <td className="text-slate-600 dark:text-slate-300 font-medium">{s.details}</td>
-                      <td className="text-slate-400 font-mono text-[11px] whitespace-nowrap">{s.date}</td>
+                      <td className="font-semibold">{s.details}</td>
+                      <td className="text-slate-500 font-mono text-xs whitespace-nowrap">{s.date}</td>
                       <td>
                         <div className="flex items-center gap-1.5">
                           <img src={s.avatar} alt={s.createdBy} className="w-5 h-5 rounded-full object-cover" />
@@ -683,7 +915,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
             <h3 className="font-bold text-sm">Emails ({emails.length})</h3>
             <button
               type="button"
-              onClick={() => setShowSendEmail(!showSendEmail)}
+              onClick={openEmailModal}
               className="btn-primary btn-sm flex items-center gap-1.5"
             >
               <Plus size={13} strokeWidth={2.4} /> Send Email
@@ -691,37 +923,68 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
           </div>
 
           {showSendEmail && (
-            <form onSubmit={handleSendEmail} className="p-4 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700 space-y-3">
-              <div>
-                <label className="form-label text-xs">Email Subject *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Proposal Discussion & Quotation"
-                  value={newEmail.subject}
-                  onChange={(e) => setNewEmail({ ...newEmail, subject: e.target.value })}
-                  className="form-input text-xs"
-                />
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50" onClick={closeEmailModal}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[560px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+                  <h2 className="text-[15px] font-bold text-slate-800">Create Email</h2>
+                  <button type="button" onClick={closeEmailModal} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Close">
+                    <X size={18} />
+                  </button>
+                </div>
+                <form onSubmit={handleSendEmail}>
+                  <div className="px-5 py-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[13px] font-semibold text-slate-600">Mail To<span className="text-rose-500">*</span></label>
+                        <input
+                          type="text"
+                          value={mailTo}
+                          onChange={(e) => { setMailTo(e.target.value); setMailError(''); }}
+                          placeholder="Enter email"
+                          className="mt-1.5 h-11 w-full border border-slate-300 rounded-lg px-3.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
+                        />
+                        {mailError && <p className="text-[11px] text-rose-500 mt-1 font-medium">{mailError}</p>}
+                      </div>
+                      <div>
+                        <label className="text-[13px] font-semibold text-slate-600">Subject<span className="text-rose-500">*</span></label>
+                        <input
+                          type="text"
+                          value={newEmail.subject}
+                          onChange={(e) => setNewEmail({ ...newEmail, subject: e.target.value })}
+                          placeholder="Enter subject"
+                          className="mt-1.5 h-11 w-full border border-slate-300 rounded-lg px-3.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[13px] font-semibold text-slate-600">Description<span className="text-rose-500">*</span></label>
+                      <div className="mt-1.5 border border-slate-300 rounded-xl overflow-hidden focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
+                        <div className="flex items-center gap-0.5 px-2 py-1.5 border-b border-slate-200 bg-white flex-wrap">
+                          <button type="button" title="Bold" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('bold')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><Bold size={15} /></button>
+                          <button type="button" title="Italic" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('italic')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><Italic size={15} /></button>
+                          <button type="button" title="Underline" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('underline')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><Underline size={15} /></button>
+                          <button type="button" title="Strikethrough" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('strikeThrough')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><Strikethrough size={15} /></button>
+                          <button type="button" title="Bullet list" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('insertUnorderedList')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><List size={15} /></button>
+                          <button type="button" title="Numbered list" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('insertOrderedList')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><ListOrdered size={15} /></button>
+                          <button type="button" title="Align left" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('justifyLeft')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><AlignLeft size={15} /></button>
+                          <button type="button" title="Align center" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('justifyCenter')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><AlignCenter size={15} /></button>
+                          <button type="button" title="Align right" onMouseDown={(e) => e.preventDefault()} onClick={() => formatDoc('justifyRight')} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><AlignRight size={15} /></button>
+                          <button type="button" title="Insert link" onMouseDown={(e) => e.preventDefault()} onClick={runLink} className="w-8 h-8 rounded-md hover:bg-slate-100 flex items-center justify-center text-slate-700"><Link2 size={15} /></button>
+                        </div>
+                        <div className="relative">
+                          {editorEmpty && <span className="absolute left-3.5 top-3 text-sm text-slate-400 pointer-events-none">Write Here...</span>}
+                          <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={syncEditor} className="min-h-[170px] max-h-[260px] overflow-y-auto px-3.5 py-3 text-sm text-slate-800 outline-none" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
+                    <button type="button" onClick={closeEmailModal} className="h-10 px-6 rounded-lg bg-slate-500 hover:bg-slate-600 text-white text-sm font-semibold">Cancel</button>
+                    <button type="submit" className="h-10 px-6 rounded-lg bg-[#1f6bff] hover:bg-blue-700 text-white text-sm font-semibold">Create</button>
+                  </div>
+                </form>
               </div>
-              <div>
-                <label className="form-label text-xs">Message Body</label>
-                <textarea
-                  rows={2}
-                  placeholder="Enter message content..."
-                  value={newEmail.message}
-                  onChange={(e) => setNewEmail({ ...newEmail, message: e.target.value })}
-                  className="form-textarea text-xs resize-none"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setShowSendEmail(false)} className="btn-ghost btn-sm">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary btn-sm flex items-center gap-1">
-                  <Send size={12} /> Send Email
-                </button>
-              </div>
-            </form>
+            </div>
           )}
 
           <div className="table-scroll">
@@ -739,14 +1002,14 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
               <tbody>
                 {emails.map((e, idx) => (
                   <tr key={e.id}>
-                    <td className="text-slate-400 font-mono">{idx + 1}</td>
+                    <td className="text-slate-500 font-mono">{idx + 1}</td>
                     <td>
                       <div className="inline-flex items-center gap-2">
                         <Mail size={13} className="text-blue-500 shrink-0" />
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">{e.subject}</span>
+                        <span className="font-bold">{e.subject}</span>
                       </div>
                     </td>
-                    <td className="text-slate-400 font-mono text-[11px] whitespace-nowrap">{e.date}</td>
+                    <td className="text-slate-500 font-mono text-xs whitespace-nowrap">{e.date}</td>
                     <td>
                       <div className="flex items-center gap-1.5">
                         <img src={e.avatar} alt={e.person} className="w-5 h-5 rounded-full object-cover" />
@@ -793,7 +1056,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
       {/* Bottom Card: Email Activity Timeline */}
       <div className="card p-5 space-y-4">
-        <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Email Activity Timeline</h3>
+        <h3 className="font-bold text-sm" style={{ color: 'var(--text)' }}>Email Activity Timeline</h3>
         <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
           {timeline.map((item) => (
             <div key={item.id} className="relative flex items-start justify-between gap-4">
@@ -810,13 +1073,13 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
                   >
                     Email {item.type}
                   </span>
-                  <strong className="text-xs text-slate-800 dark:text-slate-200 font-bold">{item.title}</strong>
+                  <strong className="text-xs font-bold" style={{ color: 'var(--text)' }}>{item.title}</strong>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{item.preview}</p>
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--muted)' }}>{item.preview}</p>
               </div>
               <div className="text-right shrink-0">
-                <time className="text-[11px] text-slate-400 font-mono block">{item.date}</time>
-                <span className="text-[11px] text-slate-500 font-medium">by {item.author}</span>
+                <time className="text-[11px] font-mono block" style={{ color: 'var(--muted)' }}>{item.date}</time>
+                <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>by {item.author}</span>
               </div>
             </div>
           ))}
@@ -946,13 +1209,1548 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
   );
 }
 
-function ActivityTab({ items }) {
+function CallsTab({ lead, onCountsChange, onActivity }) {
+  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const [calls, setCalls] = useState(() => initialState.calls);
+  const [isLogOpen, setIsLogOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [subject, setSubject] = useState('');
+  const [callType, setCallType] = useState('Outbound');
+  const [assignee, setAssignee] = useState(() => lead?.owner || 'Priya Patel');
+  const [description, setDescription] = useState('');
+  const [outcome, setOutcome] = useState('Connected');
+  const [duration, setDuration] = useState('');
+  const [notes, setNotes] = useState('');
+  const assigneeOptions = useMemo(() => {
+    const names = [lead?.owner, ...employeesMock.map((e) => e.name)].map((n) => String(n || '').trim()).filter(Boolean);
+    return [...new Set(names)];
+  }, [lead?.owner]);
+
+  React.useEffect(() => {
+    updateStoredLeadDetail(lead?.id, { calls });
+    onCountsChange?.({ calls: calls.length });
+  }, [lead?.id, calls, calls.length, onCountsChange]);
+
+  function dialNumber() {
+    const digits = String(lead?.phone || '').replace(/[^0-9]/g, '');
+    if (!digits) return;
+    const target = digits.length === 10 ? `+91${digits}` : `+${digits}`;
+    try {
+      window.location.href = `tel:${target}`;
+    } catch {
+      return;
+    }
+  }
+
+  function addCallLog(entry) {
+    const item = {
+      id: `call-${Date.now()}`,
+      date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      by: lead?.owner || 'David Patel',
+      phone: lead?.phone || '',
+      direction: 'Outgoing',
+      ...entry,
+    };
+    setCalls((current) => [item, ...current]);
+    onActivity?.(`Call ${entry.outcome || 'logged'} with ${lead?.name || 'lead'}`, '#10b981');
+  }
+
+  function callNow() {
+    addCallLog({ outcome: 'Dialled', duration: '-', notes: 'Dialled from Calls tab.' });
+    dialNumber();
+  }
+
+  function saveAddCall(event) {
+    event?.preventDefault();
+    if (!String(subject || '').trim()) return;
+    if (!assignee) return;
+    addCallLog({ subject: subject.trim(), direction: callType, outcome: 'Connected', duration: '-', notes: description.trim() || subject.trim(), by: assignee, callType });
+    setSubject('');
+    setCallType('Outbound');
+    setDescription('');
+    setIsAddOpen(false);
+  }
+
+  function saveManualLog(event) {
+    event?.preventDefault();
+    addCallLog({ outcome, duration: duration ? `${duration} min` : '-', notes: notes.trim() || '-' });
+    setOutcome('Connected');
+    setDuration('');
+    setNotes('');
+    setIsLogOpen(false);
+  }
+
+  function removeCall(id) {
+    const target = calls.find((c) => c.id === id);
+    setCalls((current) => current.filter((c) => c.id !== id));
+    onActivity?.(`Call log with ${target?.by ?? 'lead'} removed`, '#f59e0b');
+  }
+
+  function outcomeStyle(value) {
+    if (value === 'Connected') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (value === 'Dialled') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (value === 'Busy') return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (value === 'Call Back') return 'bg-purple-50 text-purple-700 border-purple-200';
+    if (value === 'Wrong Number') return 'bg-rose-50 text-rose-700 border-rose-200';
+    return 'bg-slate-100 text-slate-600 border-slate-200';
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header flex items-center justify-between">
+        <h3 className="font-bold text-sm">Calls ({calls.length})</h3>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => setIsLogOpen(true)} className="btn-outline btn-sm">
+            Log Call
+          </button>
+          <button type="button" onClick={callNow} className="btn-primary btn-sm flex items-center gap-1.5 !bg-emerald-600 hover:!bg-emerald-700">
+            <Phone size={13} /> Call Lead
+          </button>
+          <button type="button" onClick={() => { setSubject(''); setCallType('Outbound'); setAssignee(lead?.owner || assigneeOptions[0] || 'Priya Patel'); setDescription(''); setIsAddOpen(true); }} title="Add Call" aria-label="Add Call" className="w-8 h-8 grid place-items-center rounded-md bg-[#1d3f6e] hover:bg-[#16325a] text-white transition">
+            <Plus size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="table-scroll">
+        <table className="data-table text-xs">
+          <thead>
+            <tr>
+              <th style={{ width: 36 }}>#</th>
+              <th>Lead</th>
+              <th>Phone</th>
+              <th>Date & Time</th>
+              <th>Duration</th>
+              <th>Outcome</th>
+              <th>Called By</th>
+              <th style={{ width: 80, textAlign: 'center' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {calls.map((c, idx) => (
+              <React.Fragment key={c.id}>
+                <tr>
+                  <td className="text-slate-500 font-mono">{idx + 1}</td>
+                  <td className="font-semibold">{lead?.name}</td>
+                  <td>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="font-medium">{c.phone || lead?.phone}</span>
+                      <button type="button" onClick={callNow} title="Call now" className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition cursor-pointer">
+                        <Phone size={13} />
+                      </button>
+                    </span>
+                  </td>
+                  <td className="text-slate-500 text-xs whitespace-nowrap">{c.date}</td>
+                  <td className="text-slate-600">{c.duration}</td>
+                  <td>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${outcomeStyle(c.outcome)}`}>
+                      {c.outcome}
+                    </span>
+                  </td>
+                  <td className="text-xs font-medium">{c.by}</td>
+                  <td>
+                    <div className="flex items-center justify-center gap-1">
+                      <button type="button" onClick={() => removeCall(c.id)} className="p-1 rounded text-rose-500 hover:bg-rose-50 transition cursor-pointer" title="Delete">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {(c.subject || c.callType || c.direction || c.notes) && (
+                  <tr>
+                    <td />
+                    <td colSpan={7} className="!py-1.5">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
+                        {c.subject && <span><span className="font-semibold text-slate-600">Subject:</span> {c.subject}</span>}
+                        {(c.callType || c.direction) && <span><span className="font-semibold text-slate-600">Call Type:</span> {c.callType || c.direction}</span>}
+                        {c.notes && c.notes !== '-' && c.notes !== c.subject && <span className="min-w-0"><span className="font-semibold text-slate-600">Description:</span> {c.notes}</span>}
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+            {calls.length === 0 && (
+              <tr>
+                <td colSpan={8} className="empty-row">No calls logged yet. Click Call Lead to dial {lead?.name || 'this lead'}.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isLogOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setIsLogOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Log Call</h4>
+                <p className="text-xs text-slate-500 mt-1">Record a call with {lead?.name} ({lead?.phone}).</p>
+              </div>
+              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsLogOpen(false)} aria-label="Close log call dialog">×</button>
+            </div>
+            <form onSubmit={saveManualLog} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label text-xs">Outcome *</label>
+                  <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="form-select text-xs">
+                    <option value="Connected">Connected</option>
+                    <option value="Not Answered">Not Answered</option>
+                    <option value="Busy">Busy</option>
+                    <option value="Call Back">Call Back</option>
+                    <option value="Wrong Number">Wrong Number</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label text-xs">Duration (min)</label>
+                  <input type="number" min="0" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="e.g. 5" className="form-input text-xs" />
+                </div>
+              </div>
+              <div>
+                <label className="form-label text-xs">Notes</label>
+                <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="What was discussed..." className="form-textarea text-xs resize-none" />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setIsLogOpen(false)} className="btn-ghost btn-sm">Cancel</button>
+                <button type="submit" className="btn-primary btn-sm">Save Log</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {isAddOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setIsAddOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Add Call">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h4 className="text-[15px] font-semibold text-slate-900">Add Call</h4>
+              <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600 transition" aria-label="Close add call dialog"><X size={20} /></button>
+            </div>
+            <form onSubmit={saveAddCall} className="px-6 py-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Subject<span className="text-rose-500">*</span></label>
+                  <input autoFocus value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter Subject" className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div>
+                  <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Call Type<span className="text-rose-500">*</span></label>
+                  <select value={callType} onChange={(e) => setCallType(e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                    <option value="Outbound">Outbound</option>
+                    <option value="Inbound">Inbound</option>
+                    <option value="Missed">Missed</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Assignee<span className="text-rose-500">*</span></label>
+                <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                  <option value="">Select User</option>
+                  {assigneeOptions.map((n) => (<option key={n} value={n}>{n}</option>))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Description</label>
+                <textarea rows={7} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter Description" className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 resize-y focus:outline-none focus:border-blue-500" />
+              </div>
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setIsAddOpen(false)} className="h-10 px-5 rounded-lg bg-slate-500 hover:bg-slate-600 text-white text-[13px] font-semibold transition">Cancel</button>
+                <button type="submit" disabled={!String(subject || '').trim() || !assignee} className="h-10 px-6 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] disabled:opacity-50 text-white text-[13px] font-semibold transition">Add</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LeadTasksTab({ lead, onCountsChange, onActivity }) {
+  const { quotations, deliveryChallans } = useERP() || {};
+  const navigate = useNavigate();
+  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const [tasks, setTasks] = useState(() => initialState.tasks);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+  const [taskForms, setTaskForms] = useState(() => getLeadTaskForms());
+  const [showFormEditor, setShowFormEditor] = useState(false);
+  const [taskFormName, setTaskFormName] = useState('');
+  const [builderSections, setBuilderSections] = useState([]);
+  const [builderSelectedFieldId, setBuilderSelectedFieldId] = useState(null);
+  const [builderSaveSuccess, setBuilderSaveSuccess] = useState(false);
+  const [taskFormDraftError, setTaskFormDraftError] = useState('');
+  const assigneeOptions = useMemo(() => {
+    const names = [
+      lead?.owner,
+      ...(initialState.users || []).map((user) => user.name),
+      ...employeesMock.map((employee) => employee.name),
+      ...tasks.map((task) => task.assignee),
+    ]
+      .map((name) => String(name || '').trim())
+      .filter(Boolean);
+
+    return [...new Set(names)];
+  }, [initialState.users, lead?.owner, tasks]);
+  const defaultAssignee = assigneeOptions.includes('Utsav Faldu') ? 'Utsav Faldu' : (assigneeOptions[0] || '');
+  const [masterTaskOptions, setMasterTaskOptions] = useState(() => getMasterTaskOptions());
+  React.useEffect(() => {
+    setMasterTaskOptions(getMasterTaskOptions());
+  }, [isModalOpen]);
+  const linkedQuotations = useMemo(
+    () => (quotations || []).filter((quotation) => quotationMatchesLead(quotation, lead)),
+    [lead, quotations]
+  );
+  const linkedChallans = useMemo(() => {
+    const customerName = String(lead?.company || lead?.name || '').trim().toLowerCase();
+    const leadName = String(lead?.name || '').trim().toLowerCase();
+
+    return (deliveryChallans || []).filter((challan) => {
+      const customer = String(challan.customer || '').trim().toLowerCase();
+      if (!customerName) return true;
+      return customer.includes(customerName) || (leadName && customer.includes(leadName));
+    });
+  }, [deliveryChallans, lead]);
+  const [form, setForm] = useState(() => createLeadTaskForm(defaultAssignee));
+  const [formError, setFormError] = useState('');
+  const [completeId, setCompleteId] = useState(null);
+  const [outcome, setOutcome] = useState('');
+  const [nextAction, setNextAction] = useState('retry');
+  const [moveToStage, setMoveToStage] = useState('Won');
+  const selectedTaskForm = useMemo(() => taskForms.find((f) => String(f.id) === String(form.taskFormId)) || null, [taskForms, form.taskFormId]);
+  const selectedTaskFormFields = useMemo(() => (selectedTaskForm ? getTaskFormFields(selectedTaskForm) : []), [selectedTaskForm]);
+
+  React.useEffect(() => {
+    updateStoredLeadDetail(lead?.id, { tasks });
+    onCountsChange?.({ openTasks: tasks.filter((t) => t.status !== 'Completed').length });
+  }, [lead?.id, tasks, onCountsChange]);
+
+  React.useEffect(() => {
+    function refreshTaskForms() {
+      setTaskForms(getLeadTaskForms());
+    }
+    refreshTaskForms();
+    window.addEventListener('focus', refreshTaskForms);
+    window.addEventListener('storage', refreshTaskForms);
+    return () => {
+      window.removeEventListener('focus', refreshTaskForms);
+      window.removeEventListener('storage', refreshTaskForms);
+    };
+  }, [isModalOpen]);
+
+  const dueTasks = useMemo(() => tasks.filter((t) => t.status === 'Due'), [tasks]);
+  const doneTasks = useMemo(() => tasks.filter((t) => t.status !== 'Due'), [tasks]);
+
+  function openCreate() {
+    setEditingId(null);
+    setForm(createLeadTaskForm(defaultAssignee));
+    setFormError('');
+    setTaskForms(getLeadTaskForms());
+    setShowFormEditor(false);
+    setTaskFormName('');
+    setBuilderSections([]);
+    setBuilderSelectedFieldId(null);
+    setTaskFormDraftError('');
+    setIsModalOpen(true);
+  }
+
+  function openEdit(task) {
+    const due = parseLeadTaskDueAt(task.dueAt);
+    setEditingId(task.id);
+    setForm({
+      defaultTask: task.defaultTask || 'custom',
+      title: task.title || '',
+      stage: task.stage || 'New Lead',
+      priority: task.priority || 'Low',
+      status: task.status || 'Due',
+      assignee: task.assignee || defaultAssignee,
+      description: task.description || '',
+      proposalId: task.proposalId || '',
+      deliveryChallanId: task.deliveryChallanId || '',
+      taskFormId: task.taskFormId || '',
+      customValues: task.customValues || {},
+      taskDate: due.taskDate,
+      taskTime: due.taskTime,
+    });
+    setFormError('');
+    setTaskForms(getLeadTaskForms());
+    setShowFormEditor(false);
+    setTaskFormDraftError('');
+    setIsModalOpen(true);
+  }
+
+  function updateTaskForm(key, value) {
+    setForm((current) => {
+      if (key === 'defaultTask' && value && value !== 'custom') {
+        const preset = masterTaskOptions.find((t) => String(t.id) === String(value));
+        if (preset) {
+          return { ...current, defaultTask: value, title: current.title || preset.name || '', priority: preset.priority || current.priority, assignee: current.assignee || preset.role || defaultAssignee };
+        }
+      }
+      if (key === 'taskFormId') {
+        return { ...current, taskFormId: value, customValues: {} };
+      }
+      return { ...current, [key]: value };
+    });
+  }
+
+  function updateCustomValue(fieldId, value) {
+    setForm((current) => ({ ...current, customValues: { ...(current.customValues || {}), [fieldId]: value } }));
+  }
+
+  function openFormBuilderEditor() {
+    setTaskForms(getLeadTaskForms());
+    setTaskFormName('');
+    setBuilderSections([{ id: `task-section-${Date.now()}`, title: 'New Section 2', fields: [] }]);
+    setBuilderSelectedFieldId(null);
+    setBuilderSaveSuccess(false);
+    setTaskFormDraftError('');
+    setShowFormEditor(true);
+  }
+
+  function updateBuilderField(fieldId, updates) {
+    setBuilderSections((cur) => cur.map((s) => ({ ...s, fields: s.fields.map((f) => (f.id === fieldId ? { ...f, ...updates } : f)) })));
+  }
+
+  function addBuilderField(sectionId, type, index) {
+    const targetId = sectionId || builderSections[0]?.id;
+    const nextField = createFieldFromType(type, Date.now());
+    setBuilderSections((cur) => cur.map((s) => {
+      if (s.id !== targetId) return s;
+      const arr = [...s.fields];
+      arr.splice(typeof index === 'number' ? index : arr.length, 0, nextField);
+      return { ...s, fields: arr };
+    }));
+    setBuilderSelectedFieldId(nextField.id);
+  }
+
+  function removeBuilderField(fieldId) {
+    setBuilderSections((cur) => cur.map((s) => ({ ...s, fields: s.fields.filter((f) => f.id !== fieldId) })));
+  }
+
+  function moveBuilderField(fieldId, targetSectionId, targetIndex) {
+    setBuilderSections((cur) => {
+      let moving = null;
+      const stripped = cur.map((s) => ({ ...s, fields: s.fields.filter((f) => { if (f.id === fieldId) { moving = f; return false; } return true; }) }));
+      if (!moving) return cur;
+      return stripped.map((s) => {
+        if (s.id !== targetSectionId) return s;
+        const arr = [...s.fields];
+        arr.splice(typeof targetIndex === 'number' ? targetIndex : arr.length, 0, moving);
+        return { ...s, fields: arr };
+      });
+    });
+    setBuilderSelectedFieldId(fieldId);
+  }
+
+  function addBuilderSection() {
+    const id = `task-section-${Date.now()}`;
+    setBuilderSections((cur) => [...cur, { id, title: `New Section ${cur.length + 1}`, fields: [] }]);
+  }
+
+  function removeBuilderSection(sectionId) {
+    setBuilderSections((cur) => (cur.length <= 1 ? cur : cur.filter((s) => s.id !== sectionId)));
+  }
+
+  function saveTaskFormDraft() {
+    const name = String(taskFormName || '').trim();
+    if (!name) {
+      setTaskFormDraftError('Form name is required.');
+      return;
+    }
+    const allFields = builderSections.flatMap((s) => s.fields || []);
+    if (allFields.length === 0) {
+      setTaskFormDraftError('Add at least one field from the left panel.');
+      return;
+    }
+    const newForm = { id: `task-form-${Date.now()}`, title: name, description: 'No description provided', fields: allFields.map((f) => f.label), sections: builderSections, lastUpdated: new Date().toLocaleDateString('en-GB'), status: 'ACTIVE', iconName: 'call' };
+    const next = [...getLeadTaskForms(), newForm];
+    saveLeadTaskForms(next);
+    setTaskForms(next);
+    setForm((current) => ({ ...current, taskFormId: newForm.id, customValues: {} }));
+    setShowFormEditor(false);
+    setTaskFormName('');
+    setBuilderSections([]);
+    setBuilderSelectedFieldId(null);
+    setTaskFormDraftError('');
+    setBuilderSaveSuccess(true);
+    setTimeout(() => setBuilderSaveSuccess(false), 1200);
+    onActivity?.(`Task form "${name}" created`, '#1d6bff');
+  }
+
+  function openSelectedFormBuilder() {
+    if (!selectedTaskForm) return;
+    try { localStorage.setItem('activeTaskFormId', selectedTaskForm.id); } catch { }
+    navigate(`/crm/leads/task-form/builder?formId=${selectedTaskForm.id}`);
+  }
+
+  function submitTask(e) {
+    e.preventDefault();
+    if (!form.title.trim()) {
+      setFormError('Task name is required.');
+      return;
+    }
+    if (!form.taskDate) {
+      setFormError('Task date is required.');
+      return;
+    }
+    if (!form.taskTime) {
+      setFormError('Task time is required.');
+      return;
+    }
+    if (!form.assignee) {
+      setFormError('Please select an assignee.');
+      return;
+    }
+    for (const field of selectedTaskFormFields) {
+      if (field.required && !String(form.customValues?.[field.id] ?? '').trim()) {
+        setFormError(`"${field.label}" is required.`);
+        return;
+      }
+    }
+    const nextTask = {
+      defaultTask: form.defaultTask,
+      title: form.title.trim(),
+      stage: form.stage,
+      status: form.status,
+      priority: form.priority,
+      dueAt: formatLeadTaskDueAt(form.taskDate, form.taskTime),
+      process: form.status === 'Completed' ? 'Done' : 'Not Started',
+      assignee: form.assignee,
+      description: form.description.trim(),
+      proposalId: form.proposalId,
+      deliveryChallanId: form.deliveryChallanId,
+      taskFormId: form.taskFormId,
+      taskFormName: selectedTaskForm?.title || '',
+      customValues: form.customValues || {},
+    };
+    if (editingId) {
+      setTasks((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...nextTask } : t)));
+      onActivity?.(`Task "${form.title.trim()}" updated`, '#1d6bff');
+    } else {
+      setTasks((prev) => [
+        { id: `lt-${Date.now()}`, ...nextTask },
+        ...prev,
+      ]);
+      onActivity?.(`Task "${form.title.trim()}" added`, '#16a34a');
+    }
+    setIsModalOpen(false);
+  }
+
+  function toggleStatus(task) {
+    if (task.status === 'Due') {
+      setCompleteId(task.id);
+      setOutcome('');
+      setNextAction('retry');
+      setMoveToStage('Won');
+      return;
+    }
+    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: 'Due' } : t)));
+  }
+
+  function submitCompleteTask(e) {
+    e.preventDefault();
+    const task = tasks.find((t) => t.id === completeId);
+    if (!task) {
+      setCompleteId(null);
+      return;
+    }
+    const attempt = (task.attempt || 1) + (nextAction === 'retry' ? 1 : 0);
+    const stampedOutcome = outcome.trim();
+    if (nextAction === 'finish') {
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: 'Completed', attempt: task.attempt || 1, outcome: stampedOutcome } : (t.status === 'Due' ? { ...t, status: 'Completed' } : t))));
+      onActivity?.(`Task "${task.title}" completed, lead parked in ${moveToStage}`, '#1d4a79');
+    } else if (nextAction === 'move') {
+      setTasks((prev) => [
+        ...prev.map((t) => (t.id === task.id ? { ...t, status: 'Completed', attempt: task.attempt || 1, outcome: stampedOutcome } : t)),
+        { id: `lt-${Date.now()}`, title: task.title, stage: moveToStage, status: 'Due', priority: task.priority, dueAt: new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), process: 'Not Started', attempt: 1, assignee: task.assignee || defaultAssignee, description: task.description || '', proposalId: task.proposalId || '', deliveryChallanId: task.deliveryChallanId || '', taskFormId: task.taskFormId || '', taskFormName: task.taskFormName || '', customValues: task.customValues || {}, defaultTask: task.defaultTask || 'custom' },
+      ]);
+      onActivity?.(`Task "${task.title}" completed, lead moved to ${moveToStage}`, '#16a34a');
+    } else {
+      setTasks((prev) => [
+        ...prev.map((t) => (t.id === task.id ? { ...t, status: 'Completed', attempt: task.attempt || 1, outcome: stampedOutcome } : t)),
+        { id: `lt-${Date.now()}`, title: task.title, stage: task.stage, status: 'Due', priority: task.priority, dueAt: new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), process: 'Not Started', attempt, assignee: task.assignee || defaultAssignee, description: task.description || '', proposalId: task.proposalId || '', deliveryChallanId: task.deliveryChallanId || '', taskFormId: task.taskFormId || '', taskFormName: task.taskFormName || '', customValues: task.customValues || {}, defaultTask: task.defaultTask || 'custom' },
+      ]);
+      onActivity?.(`Task "${task.title}" completed, attempt ${attempt} created`, '#1d6bff');
+    }
+    setCompleteId(null);
+  }
+
+  function confirmDelete() {
+    if (!deleteId) return;
+    const target = tasks.find((t) => t.id === deleteId);
+    setTasks((prev) => prev.filter((t) => t.id !== deleteId));
+    onActivity?.(`Task "${target?.title ?? 'entry'}" removed`, '#f59e0b');
+    setDeleteId(null);
+  }
+
+  function priorityCls(priority) {
+    if (priority === 'High') return 'bg-rose-50 text-rose-600 border border-rose-100';
+    if (priority === 'Low') return 'bg-emerald-50 text-emerald-600 border border-emerald-100';
+    return 'bg-orange-50 text-orange-500 border border-orange-100';
+  }
+
+  function renderRow(task, showNote) {
+    const done = task.status !== 'Due';
+    return (
+      <div key={task.id} className="flex items-start justify-between gap-3 px-4 sm:px-5 py-4 hover:bg-slate-50/60 transition">
+        <div className="flex items-start gap-3 min-w-0">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={done}
+            aria-label={done ? 'Mark as due' : 'Mark as completed'}
+            onClick={() => toggleStatus(task)}
+            className={`relative mt-0.5 w-9 h-5 rounded-full transition shrink-0 ${done ? 'bg-[#1d4a79]' : 'bg-slate-200'}`}
+          >
+            <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${done ? 'left-[18px]' : 'left-0.5'}`} />
+          </button>
+          <div className="min-w-0">
+            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px]">
+              <span className="font-bold text-slate-900">{task.title}</span>
+              <span className="text-slate-400 font-normal">· {task.stage}</span>
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white ${done ? 'bg-lime-500' : 'bg-rose-600'}`}>{done ? 'Completed' : 'Due'}</span>
+            </p>
+            <p className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+              <span className={`px-2 py-0.5 rounded font-bold ${priorityCls(task.priority)}`}>{task.priority}</span>
+              <span className="text-slate-400">·</span>
+              <span className="text-[#1d4a79] font-medium">{task.dueAt}</span>
+              {task.assignee && (
+                <>
+                  <span className="text-slate-400">Â·</span>
+                  <span className="text-slate-500">{task.assignee}</span>
+                </>
+              )}
+            </p>
+            {task.description && <p className="text-[11px] text-slate-500 mt-1">{task.description}</p>}
+            <p className="text-[11px] text-slate-400 mt-1">Process: {task.process || 'Not Started'}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {!done && showNote && (
+            <button type="button" title="Note" className="w-8 h-8 grid place-items-center rounded-md bg-lime-500 hover:bg-lime-600 text-white transition">
+              <ClipboardList size={14} />
+            </button>
+          )}
+          <button type="button" onClick={() => openEdit(task)} title="Edit" className="w-8 h-8 grid place-items-center rounded-md bg-[#3a9ab5] hover:bg-[#2f8299] text-white transition">
+            <Pencil size={14} />
+          </button>
+          <button type="button" onClick={() => setDeleteId(task.id)} title="Delete" className="w-8 h-8 grid place-items-center rounded-md bg-rose-600 hover:bg-rose-700 text-white transition">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between px-4 sm:px-5 py-3">
+        <h3 className="text-[15px] font-bold text-slate-900">Tasks</h3>
+        <button
+          type="button"
+          onClick={openCreate}
+          title="Add Lead Task"
+          aria-label="Add Lead Task"
+          className="w-8 h-8 grid place-items-center rounded-md bg-[#1d3f6e] hover:bg-[#16325a] text-white transition"
+        >
+          <Plus size={16} />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-rose-100/80 border-y border-rose-100">
+        <h4 className="text-[13px] font-bold text-slate-800">Due Tasks</h4>
+        <span className="min-w-5 h-5 px-1.5 grid place-items-center rounded bg-slate-500/80 text-white text-[11px] font-bold">{dueTasks.length}</span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {dueTasks.length === 0 && (
+          <p className="px-4 sm:px-5 py-6 text-center text-xs text-slate-400">No due tasks. Click + to add one.</p>
+        )}
+        {dueTasks.map((t) => renderRow(t, true))}
+      </div>
+
+      <div className="flex items-center gap-2 px-4 sm:px-5 py-2.5 bg-slate-100/80 border-y border-slate-100">
+        <h4 className="text-[13px] font-bold text-slate-800">Tasks</h4>
+        <span className="min-w-5 h-5 px-1.5 grid place-items-center rounded bg-slate-500/80 text-white text-[11px] font-bold">{doneTasks.length}</span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {doneTasks.length === 0 && (
+          <p className="px-4 sm:px-5 py-6 text-center text-xs text-slate-400">No completed tasks yet.</p>
+        )}
+        {doneTasks.map((t) => renderRow(t, false))}
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-start justify-center p-4 bg-slate-950/50 overflow-y-auto" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-[#f1f5f9] rounded-xl shadow-2xl w-full max-w-5xl my-6 overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={editingId ? 'Edit lead task' : 'Create lead task'}>
+            <div className="bg-white px-6 pt-5 pb-4 border-b border-slate-100">
+              <h2 className="text-[15px] font-bold text-slate-900">Create Lead Task</h2>
+              <p className="text-[11px] text-slate-500 mt-1">Dashboard <span className="mx-1">&gt;</span> Lead Task <span className="mx-1">&gt;</span> Create Lead Task</p>
+            </div>
+
+            <form onSubmit={submitTask} className="px-6 py-5">
+              <div className="bg-white rounded-xl border border-slate-100 p-5 space-y-4">
+                <div>
+                  <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Default Task</label>
+                  <select value={form.defaultTask} onChange={(e) => updateTaskForm('defaultTask', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                    <option value="custom">Create custom task</option>
+                    {masterTaskOptions.map((t) => (<option key={t.id} value={t.id}>{t.name}</option>))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Name <span className="text-rose-500">*</span></label>
+                  <input autoFocus value={form.title} onChange={(e) => updateTaskForm('title', e.target.value)} placeholder="Enter Name" className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Date <span className="text-rose-500">*</span></label>
+                    <input type="date" value={form.taskDate} onChange={(e) => updateTaskForm('taskDate', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Time <span className="text-rose-500">*</span></label>
+                    <input type="time" value={form.taskTime} onChange={(e) => updateTaskForm('taskTime', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Description</label>
+                  <textarea rows={4} value={form.description} onChange={(e) => updateTaskForm('description', e.target.value)} placeholder="Enter task related description or notes" className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 resize-y focus:outline-none focus:border-blue-500" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Priority <span className="text-rose-500">*</span></label>
+                    <select value={form.priority} onChange={(e) => updateTaskForm('priority', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                      {LEAD_TASK_PRIORITY_OPTIONS.map((priority) => (<option key={priority} value={priority}>{priority}</option>))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Status</label>
+                    <select value={form.status} onChange={(e) => updateTaskForm('status', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                      {LEAD_TASK_STATUS_OPTIONS.map((status) => (<option key={status.value} value={status.value}>{status.label}</option>))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Assign To</label>
+                  <select value={form.assignee} onChange={(e) => updateTaskForm('assignee', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                    <option value="">Select Staff</option>
+                    {assigneeOptions.map((name) => (<option key={name} value={name}>{name}</option>))}
+                  </select>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Proposal</label>
+                    <select value={form.proposalId} onChange={(e) => updateTaskForm('proposalId', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                      <option value="">Select Proposal</option>
+                      {linkedQuotations.map((quotation) => (<option key={quotation.id} value={quotation.id}>{quotation.quoteNumber || quotation.quotationNumber || quotation.customer || 'Proposal'}</option>))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Delivery Challan</label>
+                    <select value={form.deliveryChallanId} onChange={(e) => updateTaskForm('deliveryChallanId', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                      <option value="">Select Delivery Challan</option>
+                      {linkedChallans.map((challan) => (<option key={challan.id} value={challan.id}>{challan.challanNumber || challan.linkedSo || challan.customer || 'Delivery Challan'}</option>))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Task Form</label>
+                  <select value={form.taskFormId} onChange={(e) => updateTaskForm('taskFormId', e.target.value)} className="w-full h-11 px-4 bg-white border-2 border-[#1d4a79] rounded-lg text-[13px] text-slate-800 focus:outline-none">
+                    <option value="">Select Form</option>
+                    {taskForms.map((tf) => (<option key={tf.id} value={tf.id}>{tf.title}</option>))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1.5">Please create Task Form first. <button type="button" onClick={() => { if (showFormEditor) { setShowFormEditor(false); } else { openFormBuilderEditor(); } }} className="text-[#1d4a79] font-bold hover:underline">Create Task Form</button></p>
+                </div>
+                {selectedTaskForm && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[13px] font-bold text-slate-800">{selectedTaskForm.title} Fields</p>
+                      <button type="button" onClick={openSelectedFormBuilder} className="px-3 py-1.5 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] text-white text-[11px] font-bold transition">Open Form Builder</button>
+                    </div>
+                    {selectedTaskFormFields.length === 0 && (<p className="text-[11px] text-slate-400">No fields defined in this form yet.</p>)}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {selectedTaskFormFields.map((field) => (
+                        <label key={field.id} className="block">
+                          <span className="block text-[12px] font-semibold text-slate-700 mb-1">{field.label} {field.required && <span className="text-rose-500">*</span>}</span>
+                          {String(field.type).toLowerCase() === 'multi line' ? (
+                            <textarea rows={3} value={form.customValues?.[field.id] || ''} onChange={(e) => updateCustomValue(field.id, e.target.value)} placeholder={field.placeholder || `Enter ${String(field.label).toLowerCase()}`} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
+                          ) : String(field.type).toLowerCase() === 'dropdown' || String(field.type).toLowerCase() === 'multi select' ? (
+                            <select value={form.customValues?.[field.id] || ''} onChange={(e) => updateCustomValue(field.id, e.target.value)} className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
+                              <option value="">{field.placeholder || 'Select option'}</option>
+                              {String(field.options || field.placeholder || '').split(',').map((o) => o.trim()).filter(Boolean).map((o) => (<option key={o} value={o}>{o}</option>))}
+                            </select>
+                          ) : (
+                            <input type={String(field.type).toLowerCase() === 'number' ? 'number' : String(field.type).toLowerCase() === 'date' ? 'date' : String(field.type).toLowerCase() === 'email' ? 'email' : String(field.type).toLowerCase() === 'phone' ? 'tel' : 'text'} value={form.customValues?.[field.id] || ''} onChange={(e) => updateCustomValue(field.id, e.target.value)} placeholder={field.placeholder || `Enter ${String(field.label).toLowerCase()}`} className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {showFormEditor && (
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="mt-1">
+                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">Form Name</label>
+                      <input value={taskFormName} onChange={(e) => setTaskFormName(e.target.value)} placeholder="Enter form name" className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
+                    </div>
+                    <div className="mt-3 rounded-xl border border-slate-100 overflow-hidden">
+                      <LeadFormBuilder hideHeader sections={builderSections} selectedFieldId={builderSelectedFieldId} selectedField={builderSections.flatMap((s) => s.fields).find((f) => f.id === builderSelectedFieldId) ?? null} onSelectField={setBuilderSelectedFieldId} onUpdateField={updateBuilderField} onAddField={addBuilderField} onRemoveField={removeBuilderField} onMoveField={moveBuilderField} onAddSection={addBuilderSection} onRemoveSection={removeBuilderSection} onPreview={() => {}} onSaveAndOpen={saveTaskFormDraft} saveSuccess={builderSaveSuccess} formTitle={taskFormName || 'New Task Form'} />
+                    </div>
+                    {taskFormDraftError && <p className="text-[11px] font-semibold text-rose-600 mt-2">{taskFormDraftError}</p>}
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <button type="button" onClick={saveTaskFormDraft} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[#1d4a79] hover:bg-[#163a61] text-white text-[12px] font-semibold transition">Save Form</button>
+                      <button type="button" onClick={() => { setShowFormEditor(false); setTaskFormDraftError(''); }} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-500 hover:bg-slate-600 text-white text-[12px] font-semibold transition"><X size={13} /> Cancel</button>
+                    </div>
+                  </div>
+                )}
+                {formError && <p className="text-xs font-semibold text-rose-600">{formError}</p>}
+              </div>
+              <div className="flex items-center justify-end gap-2.5 mt-4">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="h-10 px-5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-[13px] font-semibold border border-slate-200 transition">Cancel</button>
+                <button type="submit" className="h-10 px-6 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] text-white text-[13px] font-semibold transition">{editingId ? 'Update' : 'Create'}</button>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-4">© 2026 IMT Endoscopy</p>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {deleteId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50" onClick={() => setDeleteId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-sm font-bold text-slate-900">Delete this task?</h2>
+            <p className="text-xs text-slate-500 mt-1">This action cannot be undone.</p>
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button type="button" onClick={() => setDeleteId(null)} className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">Cancel</button>
+              <button type="button" onClick={confirmDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg">Delete</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {completeId && (() => {
+        const task = tasks.find((t) => t.id === completeId);
+        if (!task) return null;
+        const otherDue = tasks.filter((t) => t.id !== completeId && t.status === 'Due');
+        return (
+          <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-slate-950/50" onClick={() => setCompleteId(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Complete task">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h2 className="text-[15px] font-semibold text-slate-900">Complete Task</h2>
+                <button type="button" onClick={() => setCompleteId(null)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Close">
+                  <X size={18} />
+                </button>
+              </div>
+              <form onSubmit={submitCompleteTask} className="overflow-y-auto">
+                <div className="px-5 py-4 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">{task.title}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Attempt {task.attempt || 1} · Stage: {task.stage}</p>
+                  </div>
+                  <div>
+                    <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">What happened?</label>
+                    <textarea
+                      rows={3}
+                      value={outcome}
+                      onChange={(e) => setOutcome(e.target.value)}
+                      placeholder="Outcome of the call, visit or demo"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-y"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-semibold text-slate-700 mb-2">What next?</p>
+                    <div className="space-y-3.5">
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input type="radio" name="next-action" checked={nextAction === 'retry'} onChange={() => setNextAction('retry')} className="mt-1 w-4 h-4 accent-[#1d4a79] cursor-pointer" />
+                        <span>
+                          <span className="block text-[13px] font-semibold text-slate-800">Needs another attempt</span>
+                          <span className="block text-xs text-slate-500 mt-0.5">Creates attempt {(task.attempt || 1) + 1} in this same stage.</span>
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input type="radio" name="next-action" checked={nextAction === 'move'} onChange={() => setNextAction('move')} className="mt-1 w-4 h-4 accent-[#1d4a79] cursor-pointer" />
+                        <span>
+                          <span className="block text-[13px] font-semibold text-slate-800">Ready to move on</span>
+                          <span className="block text-xs text-slate-500 mt-0.5">Moves the lead to {moveToStage} and creates that stage's task.</span>
+                          {otherDue.length > 0 && (
+                            <span className="block text-xs font-medium text-rose-500 mt-1">Blocked until these are completed: {otherDue.map((t) => t.title).join(', ')}</span>
+                          )}
+                        </span>
+                      </label>
+                      <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input type="radio" name="next-action" checked={nextAction === 'finish'} onChange={() => setNextAction('finish')} className="mt-1 w-4 h-4 accent-[#1d4a79] cursor-pointer" />
+                        <span>
+                          <span className="block text-[13px] font-semibold text-slate-800">Finished with this lead</span>
+                          <span className="block text-xs text-slate-500 mt-0.5">Parks the lead in the stage you choose and closes every open task on it.</span>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                  {nextAction !== 'retry' && (
+                    <div>
+                      <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">Move to stage</label>
+                      <select value={moveToStage} onChange={(e) => setMoveToStage(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border-2 border-[#1d4a79] rounded-xl text-[13px] text-slate-700 focus:outline-none">
+                        {['New Lead', 'Details collected', 'Quotation shared', 'Demo pending', 'Demo Done', 'Negotiation', 'Won', 'Lost', 'Future'].map((s) => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                      </select>
+                      <p className="text-[11px] text-slate-400 mt-1.5">Leave as suggested unless the lead skipped ahead or was lost.</p>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center justify-end gap-2.5 px-5 py-4 border-t border-slate-100">
+                  <button type="button" onClick={() => setCompleteId(null)} className="h-10 px-5 rounded-lg bg-slate-500 hover:bg-slate-600 text-white text-[13px] font-semibold transition">
+                    Cancel
+                  </button>
+                  <button type="submit" className="h-10 px-5 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] text-white text-[13px] font-semibold transition">
+                    Complete Task
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+function EstimatesTab({ lead, onCountsChange }) {
+  const all = useEstimates();
+  const { customers } = useERP() || {};
+  const linked = useMemo(() => all.filter((e) => estimateMatchesLead(e, lead)), [all, lead]);
+  const storedProducts = useMemo(() => loadLeadDetailState(lead).products, [lead]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [validUntil, setValidUntil] = useState('15 Days');
+  const [lineItems, setLineItems] = useState([]);
+
+  React.useEffect(() => {
+    onCountsChange?.({ estimates: linked.length });
+  }, [linked.length, onCountsChange]);
+
+  function openCreateModal() {
+    const preferredCustomer = (customers || []).find((c) => c.name === (lead?.company || lead?.name)) || (customers || [])[0];
+    setSelectedCustomerId(preferredCustomer?.id || '');
+    setValidUntil('15 Days');
+    setLineItems((storedProducts || []).map((p, index) => ({
+      id: `li-${Date.now()}-${index}`,
+      description: p.name,
+      qty: Number(p.qty) || 1,
+      rate: Number(String(p.price || '').replace(/[^0-9]/g, '')) || 0,
+      amount: (Number(String(p.price || '').replace(/[^0-9]/g, '')) || 0) * (Number(p.qty) || 1),
+    })));
+    setIsCreateOpen(true);
+  }
+
+  function handleCreateEstimate(event) {
+    event.preventDefault();
+    const cust = (customers || []).find((c) => c.id === selectedCustomerId) || (customers || [])[0];
+    const total = (lineItems || []).reduce((sum, item) => sum + ((item.amount) || (Number(item.qty || 1) * Number(item.rate || 0))), 0);
+    const created = {
+      id: `est-${Date.now()}`,
+      estimateNumber: `EST-2026-${String((all.length || 0) + 3).padStart(3, '0')}`,
+      customerId: cust?.id || '',
+      customer: cust?.name || lead?.company || lead?.name || 'Acme Corp',
+      leadId: String(lead?.id || ''),
+      leadName: lead?.name || '',
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      validUntil: validUntil || '15 Days',
+      amount: total > 0 ? total : 1500,
+      status: 'Draft',
+      items: lineItems,
+    };
+
+    addEstimate(created);
+    setIsCreateOpen(false);
+    setLineItems([]);
+  }
+
+  function estimateTone(status) {
+    if (status === 'Converted') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (status === 'Sent') return 'bg-blue-50 text-blue-700 border-blue-200';
+    return 'bg-slate-100 text-slate-600 border-slate-200';
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header flex items-center justify-between">
+        <h3 className="font-bold text-sm">Estimates ({linked.length})</h3>
+        <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
+          <Plus size={13} strokeWidth={2.4} /> New Estimate
+        </button>
+      </div>
+      <div className="table-scroll">
+        <table className="data-table text-xs">
+          <thead>
+            <tr>
+              <th style={{ width: 36 }}>#</th>
+              <th>Estimate Number</th>
+              <th>Customer</th>
+              <th>Date</th>
+              <th>Valid Until</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th style={{ textAlign: 'center' }}>Status</th>
+              <th style={{ width: 80, textAlign: 'center' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linked.map((e, idx) => (
+              <tr key={e.id}>
+                <td className="text-slate-500 font-mono">{idx + 1}</td>
+                <td>
+                  <button type="button" onClick={openCreateModal} className="font-mono font-bold text-blue-600 hover:underline">
+                    {e.estimateNumber}
+                  </button>
+                </td>
+                <td className="font-semibold">{e.customer}</td>
+                <td className="text-slate-500 text-xs whitespace-nowrap">{e.date}</td>
+                <td className="text-slate-500 text-xs">{e.validUntil}</td>
+                <td style={{ textAlign: 'right' }} className="font-bold font-mono">
+                  ${(e.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${estimateTone(e.status)}`}>
+                    {e.status}
+                  </span>
+                </td>
+                <td>
+                  <div className="flex items-center justify-center gap-1">
+                    <button type="button" onClick={openCreateModal} className="p-1 rounded text-blue-600 hover:bg-blue-50 transition cursor-pointer" title="Open estimate details">
+                      <Eye size={13} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {linked.length === 0 && (
+              <tr>
+                <td colSpan={8} className="empty-row">No estimates for {lead?.name || 'this lead'} yet. Click New Estimate to create one.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsCreateOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-[#1F2E4A]">Create Sales Estimate</h3>
+              <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateEstimate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
+                  <select
+                    required
+                    value={selectedCustomerId}
+                    onChange={(event) => setSelectedCustomerId(event.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium"
+                  >
+                    {(customers || []).map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name} ({customer.code}) - Balance: ${customer.balance.toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
+                  <input
+                    type="text"
+                    value={validUntil}
+                    onChange={(event) => setValidUntil(event.target.value)}
+                    placeholder="e.g. 15 Days"
+                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-2">Estimate Line Items</label>
+                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
+                <button type="button" onClick={() => setIsCreateOpen(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-medium cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 cursor-pointer">
+                  Generate Estimate
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function quotationMatchesLead(q, lead) {
+  if (!q || !lead) return false;
+  if (q.leadId && String(q.leadId) === String(lead.id)) return true;
+  const company = String(lead.company || '').trim().toLowerCase();
+  const customer = String(q.customer || '').trim().toLowerCase();
+  if (company && customer && (customer === company || customer.includes(company) || company.includes(customer))) return true;
+  const leadName = String(lead.name || '').trim().toLowerCase();
+  const qLead = String(q.leadName || '').trim().toLowerCase();
+  if (leadName && qLead && qLead === leadName) return true;
+  return false;
+}
+
+function QuotationsTab({ lead, onActivity }) {
+  const { quotations, customers, updateQuotationStatus, addQuotation } = useERP() || {};
+  const linked = useMemo(() => (quotations || []).filter((q) => quotationMatchesLead(q, lead)), [quotations, lead]);
+  const storedProducts = useMemo(() => loadLeadDetailState(lead).products, [lead]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedCustomerId, setSelectedCustomerId] = useState((customers || [])[0]?.id || '');
+  const [validUntil, setValidUntil] = useState('30 Days');
+  const [lineItems, setLineItems] = useState([]);
+
+  useEffect(() => {
+    if (!customers || customers.length === 0) return;
+    const match = (customers || []).find((customer) => customer.name === (lead?.company || lead?.name)) || (customers || [])[0];
+    if (match) setSelectedCustomerId(match.id);
+  }, [customers, lead]);
+
+  function openCreateModal() {
+    const match = (customers || []).find((customer) => customer.name === (lead?.company || lead?.name)) || (customers || [])[0];
+    const nextItems = (storedProducts || []).map((product, index) => ({
+      id: `quote-item-${product.id ?? index}`,
+      description: product.name,
+      qty: 1,
+      rate: Number(String(product.price || '').replace(/[^0-9.]/g, '')) || 0,
+      amount: Number(String(product.price || '').replace(/[^0-9.]/g, '')) || 0,
+    }));
+
+    setSelectedCustomerId(match?.id || '');
+    setValidUntil('30 Days');
+    setLineItems(nextItems.length > 0 ? nextItems : [{
+      id: `quote-item-${Date.now()}`,
+      description: 'Commercial pricing proposal',
+      qty: 1,
+      rate: 0,
+      amount: 0,
+    }]);
+    setIsCreateOpen(true);
+  }
+
+  function handleCreateQuotation(event) {
+    event.preventDefault();
+    const customer = (customers || []).find((entry) => entry.id === selectedCustomerId) || (customers || [])[0];
+    const computedTotal = (lineItems || []).reduce((sum, item) => {
+      const qty = Number(item.qty || 1);
+      const rate = Number(item.rate || 0);
+      const amount = Number(item.amount || (qty * rate));
+      return sum + amount;
+    }, 0);
+
+    const created = addQuotation?.({
+      customerId: customer?.id,
+      customer: customer?.name || lead?.company || lead?.name || 'Acme Corp',
+      leadId: String(lead?.id || ''),
+      leadName: lead?.name || '',
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      validUntil: validUntil || '30 Days',
+      amount: computedTotal > 0 ? computedTotal : 1500,
+      status: 'Draft',
+      items: lineItems,
+    });
+
+    setIsCreateOpen(false);
+    setLineItems([]);
+    setValidUntil('30 Days');
+    onActivity?.(`Quotation ${created?.quoteNumber || 'created'} generated for ${lead?.name || customer?.name || 'lead'}`, '#3b82f6');
+  }
+
+  function sendQuotation(q) {
+    updateQuotationStatus?.(q.id, 'Sent');
+    onActivity?.(`Quotation ${q.quoteNumber} sent to ${lead?.name || 'lead'}`, '#3b82f6');
+  }
+
+  function quotationTone(status) {
+    if (status === 'Sent') return 'bg-blue-50 text-blue-700 border-blue-200';
+    if (status === 'Confirmed' || status === 'Accepted' || status === 'Converted') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    return 'bg-slate-100 text-slate-600 border-slate-200';
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header flex items-center justify-between">
+        <h3 className="font-bold text-sm">Quotations ({linked.length})</h3>
+        <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
+          <Plus size={13} strokeWidth={2.4} /> New Quotation
+        </button>
+      </div>
+      <div className="table-scroll">
+        <table className="data-table text-xs">
+          <thead>
+            <tr>
+              <th style={{ width: 36 }}>#</th>
+              <th>Quotation No.</th>
+              <th>Customer</th>
+              <th>Date</th>
+              <th>Valid Until</th>
+              <th style={{ textAlign: 'right' }}>Total</th>
+              <th style={{ textAlign: 'center' }}>Status</th>
+              <th style={{ width: 110, textAlign: 'center' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linked.map((q, idx) => (
+              <tr key={q.id}>
+                <td className="text-slate-500 font-mono">{idx + 1}</td>
+                <td>
+                  <button type="button" onClick={openCreateModal} className="font-mono font-bold text-blue-600 hover:underline">
+                    {q.quoteNumber}
+                  </button>
+                </td>
+                <td className="font-semibold">{q.customer}</td>
+                <td className="text-slate-500 text-xs whitespace-nowrap">{q.date}</td>
+                <td className="text-slate-500 text-xs">{q.validUntil}</td>
+                <td style={{ textAlign: 'right' }} className="font-bold font-mono">
+                  ${(q.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </td>
+                <td style={{ textAlign: 'center' }}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${quotationTone(q.status)}`}>
+                    {q.status}
+                  </span>
+                </td>
+                <td>
+                  <div className="flex items-center justify-center gap-1">
+                    <button type="button" onClick={openCreateModal} className="p-1 rounded text-blue-600 hover:bg-blue-50 transition cursor-pointer" title="Open quotation details">
+                      <Eye size={13} />
+                    </button>
+                    {q.status !== 'Sent' && (
+                      <button type="button" onClick={() => sendQuotation(q)} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold hover:bg-emerald-100 transition cursor-pointer" title="Send quotation to lead">
+                        <Send size={11} /> Send
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {linked.length === 0 && (
+              <tr>
+                <td colSpan={8} className="empty-row">No quotations for {lead?.name || 'this lead'} yet. Convert an estimate to create one automatically.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsCreateOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-[#1F2E4A]">Create Quotation Estimate</h3>
+              <button type="button" onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer" aria-label="Close quotation dialog">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateQuotation} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
+                  <select
+                    required
+                    value={selectedCustomerId}
+                    onChange={(event) => setSelectedCustomerId(event.target.value)}
+                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium"
+                  >
+                    {(customers || []).map((customer) => (
+                      <option key={customer.id} value={customer.id}>
+                        {customer.name} ({customer.code}) - Balance: ${customer.balance.toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
+                  <input
+                    type="text"
+                    value={validUntil}
+                    onChange={(event) => setValidUntil(event.target.value)}
+                    placeholder="e.g. 30 Days"
+                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-2">Quotation Line Items</label>
+                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
+                <button type="button" onClick={() => setIsCreateOpen(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-medium cursor-pointer">
+                  Cancel
+                </button>
+                <button type="submit" className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 cursor-pointer">
+                  Generate Quotation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
+  const { deliveryChallans, salesOrders, addDeliveryChallan } = useERP() || {};
+  const [showIssueModal, setShowIssueModal] = useState(false);
+  const [selectedSoId, setSelectedSoId] = useState('');
+  const [transporter, setTransporter] = useState('FedEx Freight Direct');
+  const [vehicleNo, setVehicleNo] = useState('TRK-9041-WA');
+  const [driverContact, setDriverContact] = useState('+1 (555) 349-2810');
+  const [totalPackages, setTotalPackages] = useState(4);
+  const [dispatchNote, setDispatchNote] = useState('Fragile electronic components. Handle with pallet forklift.');
+  const [lineItems, setLineItems] = useState([]);
+
+  const linked = useMemo(() => {
+    const allChallans = deliveryChallans || [];
+    const customerName = String(lead?.company || lead?.name || '').trim().toLowerCase();
+    const leadName = String(lead?.name || '').trim().toLowerCase();
+
+    return allChallans.filter((challan) => {
+      const customerMatch = challan.customer && (
+        String(challan.customer).trim().toLowerCase().includes(customerName) ||
+        (leadName && String(challan.customer).trim().toLowerCase().includes(leadName)) ||
+        (customerName && String(challan.customer).trim().toLowerCase().includes(customerName))
+      );
+      const orderMatch = (salesOrders || []).some((order) => {
+        const orderMatchesLead = order.customer && (
+          String(order.customer).trim().toLowerCase().includes(customerName) ||
+          (leadName && String(order.customer).trim().toLowerCase().includes(leadName))
+        );
+        return orderMatchesLead && (
+          order.id === challan.salesOrderId ||
+          order.orderNumber === challan.salesOrderNumber ||
+          order.orderNumber === challan.linkedSo
+        );
+      });
+      return customerMatch || orderMatch || !customerName;
+    });
+  }, [deliveryChallans, lead, salesOrders]);
+
+  useEffect(() => {
+    onCountsChange?.({ challans: linked.length });
+  }, [linked.length, onCountsChange]);
+
+  function openIssueModal() {
+    const relatedOrders = (salesOrders || []).filter((order) => {
+      const customerName = String(lead?.company || lead?.name || '').trim().toLowerCase();
+      const customerValue = String(order.customer || '').trim().toLowerCase();
+      return !customerName || customerValue.includes(customerName) || customerName.includes(customerValue);
+    });
+
+    const order = relatedOrders[0] || (salesOrders || [])[0];
+    setSelectedSoId(order?.id || '');
+    setLineItems(order?.items ? order.items.map((item) => ({ ...item })) : []);
+    setShowIssueModal(true);
+  }
+
+  function handleCreate(event) {
+    event.preventDefault();
+    const order = (salesOrders || []).find((entry) => entry.id === selectedSoId) || (salesOrders || [])[0];
+    if (!order) return;
+
+    const created = addDeliveryChallan?.({
+      salesOrderId: order.id,
+      salesOrderNumber: order.orderNumber,
+      linkedSo: order.orderNumber,
+      customerId: order.customerId,
+      customer: order.customer || lead?.company || lead?.name,
+      date: new Date().toISOString().split('T')[0],
+      dispatchDate: new Date().toISOString().split('T')[0],
+      transporter,
+      vehicleNo,
+      status: 'In Transit',
+      items: lineItems.length > 0 ? lineItems : (order.items || []),
+    });
+
+    setShowIssueModal(false);
+    onCountsChange?.({ challans: (linked.length || 0) + 1 });
+    onActivity?.(`Delivery challan ${created?.challanNumber || 'issued'} created for ${lead?.name || order.customer}`, '#f97316');
+  }
+
+  return (
+    <div className="card">
+      <div className="card-header flex items-center justify-between">
+        <h3 className="font-bold text-sm">Delivery Challans ({linked.length})</h3>
+        <button type="button" onClick={openIssueModal} className="btn-primary btn-sm flex items-center gap-1.5">
+          <Plus size={13} strokeWidth={2.4} /> New Challan
+        </button>
+      </div>
+      <div className="table-scroll">
+        <table className="data-table text-xs">
+          <thead>
+            <tr>
+              <th style={{ width: 36 }}>#</th>
+              <th>Challan No.</th>
+              <th>Linked SO</th>
+              <th>Customer</th>
+              <th>Dispatch Date</th>
+              <th>Carrier</th>
+              <th style={{ textAlign: 'center' }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {linked.map((challan, idx) => (
+              <tr key={challan.id}>
+                <td className="text-slate-500 font-mono">{idx + 1}</td>
+                <td className="font-mono font-bold text-blue-600">{challan.challanNumber}</td>
+                <td className="font-mono text-slate-600">{challan.salesOrderNumber || challan.linkedSo}</td>
+                <td className="font-semibold">{challan.customer}</td>
+                <td className="text-slate-500 text-xs whitespace-nowrap">{challan.dispatchDate || challan.date}</td>
+                <td className="text-slate-600">{challan.transporter}</td>
+                <td style={{ textAlign: 'center' }}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${challan.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : challan.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
+                    {challan.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {linked.length === 0 && (
+              <tr>
+                <td colSpan={7} className="empty-row">No delivery challans for {lead?.name || 'this lead'} yet. Click New Challan to create one.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {showIssueModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setShowIssueModal(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-3xl p-5" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Issue Delivery Challan</h4>
+                <p className="text-xs text-slate-500 mt-1">Create a dispatch manifest for {lead?.name || 'this lead'}.</p>
+              </div>
+              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setShowIssueModal(false)} aria-label="Close delivery challan dialog">×</button>
+            </div>
+
+            <form onSubmit={handleCreate} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="form-label text-xs">Source Sales Order *</label>
+                  <select
+                    value={selectedSoId}
+                    onChange={(event) => {
+                      const nextOrder = (salesOrders || []).find((order) => order.id === event.target.value);
+                      setSelectedSoId(event.target.value);
+                      setLineItems(nextOrder?.items ? nextOrder.items.map((item) => ({ ...item })) : []);
+                    }}
+                    className="form-select text-xs"
+                  >
+                    {(salesOrders || []).map((order) => (
+                      <option key={order.id} value={order.id}>
+                        {order.orderNumber} - {order.customer}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label text-xs">Carrier / Transporter</label>
+                  <input type="text" value={transporter} onChange={(event) => setTransporter(event.target.value)} className="form-input text-xs" />
+                </div>
+                <div>
+                  <label className="form-label text-xs">Vehicle / Truck Plate #</label>
+                  <input type="text" value={vehicleNo} onChange={(event) => setVehicleNo(event.target.value)} className="form-input text-xs" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="form-label text-xs">Driver Contact / Phone</label>
+                  <input type="text" value={driverContact} onChange={(event) => setDriverContact(event.target.value)} className="form-input text-xs" />
+                </div>
+                <div>
+                  <label className="form-label text-xs">Total Packages / Cartons</label>
+                  <input type="number" min="1" value={totalPackages} onChange={(event) => setTotalPackages(Number(event.target.value))} className="form-input text-xs" />
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label text-xs">Handling / Gate Pass Instructions</label>
+                <input type="text" value={dispatchNote} onChange={(event) => setDispatchNote(event.target.value)} className="form-input text-xs" />
+              </div>
+
+              <div className="rounded-lg border border-slate-200 overflow-hidden">
+                <table className="w-full text-left text-[11px]">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
+                      <th className="px-2 py-2 font-bold">SKU</th>
+                      <th className="px-2 py-2 font-bold">Description</th>
+                      <th className="px-2 py-2 font-bold text-right">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(lineItems || []).map((item, index) => (
+                      <tr key={`${item.id || item.itemId || index}`} className="border-b border-slate-100 last:border-b-0">
+                        <td className="px-2 py-2 font-mono text-slate-600">{item.sku || item.itemSku || 'GEN-SKU'}</td>
+                        <td className="px-2 py-2 text-slate-700">{item.name || item.description}</td>
+                        <td className="px-2 py-2 text-right">
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.qty || 1}
+                            onChange={(event) => {
+                              const next = [...lineItems];
+                              next[index] = { ...next[index], qty: Number(event.target.value) || 1 };
+                              setLineItems(next);
+                            }}
+                            className="w-20 ml-auto rounded border border-slate-200 bg-white px-2 py-1 text-right text-slate-700 focus:outline-none focus:border-blue-500"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowIssueModal(false)} className="btn-ghost btn-sm">Cancel</button>
+                <button type="submit" className="btn-primary btn-sm">Create Challan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function buildSeedActivities(lead) {
+  return [
+    { id: 'act-created', title: `Lead created from ${lead?.source || 'Website'}`, time: lead?.createdOn || 'Just now', color: '#3b82f6' },
+    { id: 'act-status', title: `Stage set to ${lead?.status || 'New'}`, time: lead?.createdOn || 'Just now', color: '#8b5cf6' },
+    { id: 'act-owner', title: `Assigned to ${lead?.owner || 'David Patel'}`, time: lead?.createdOn || 'Just now', color: '#10b981' },
+  ];
+}
+
+function ActivityTab({ lead, items }) {
   const entries = items ?? [];
+  const allEstimates = useEstimates();
+  const { quotations } = useERP() || {};
+  const linkedEstimates = (allEstimates || []).filter((e) => estimateMatchesLead(e, lead));
+  const linkedQuotations = (quotations || []).filter((q) => quotationMatchesLead(q, lead));
+  const systemEntries = [
+    ...linkedEstimates.map((e) => ({ id: `sys-est-${e.id}`, title: `Estimate ${e.estimateNumber} • ${e.status}`, time: e.date || '', color: '#f59e0b' })),
+    ...linkedQuotations.map((q) => ({ id: `sys-q-${q.id}`, title: `Quotation ${q.quoteNumber} • ${q.status}`, time: q.date || '', color: '#10b981' })),
+  ];
+  const total = entries.length + systemEntries.length;
   return (
     <div className="card p-5 space-y-4">
-      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Activity Log ({entries.length})</h3>
-      {entries.length === 0 && (
-        <p className="text-xs text-slate-400">No activity recorded for this lead yet.</p>
+      <h3 className="font-bold text-sm" style={{ color: 'var(--text)' }}>Activity Log ({total})</h3>
+      {total === 0 && (
+        <p className="text-xs" style={{ color: 'var(--muted)' }}>No activity recorded for this lead yet.</p>
       )}
       <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
         {entries.map((item) => (
@@ -962,10 +2760,24 @@ function ActivityTab({ items }) {
               style={{ background: item.color || '#3b82f6' }}
             />
             <div className="space-y-1">
-              <strong className="text-xs text-slate-800 dark:text-slate-200 font-bold block">{item.title}</strong>
+              <strong className="text-xs font-bold block" style={{ color: 'var(--text)' }}>{item.title}</strong>
             </div>
             <div className="text-right shrink-0">
-              <time className="text-[11px] text-slate-400 font-mono block">{item.time}</time>
+              <time className="text-[11px] font-mono block" style={{ color: 'var(--muted)' }}>{item.time}</time>
+            </div>
+          </div>
+        ))}
+        {systemEntries.map((item) => (
+          <div key={item.id} className="relative flex items-start justify-between gap-4">
+            <span
+              className="absolute -left-6 top-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center"
+              style={{ background: item.color || '#3b82f6' }}
+            />
+            <div className="space-y-1">
+              <strong className="text-xs font-bold block" style={{ color: 'var(--text)' }}>{item.title}</strong>
+            </div>
+            <div className="text-right shrink-0">
+              <time className="text-[11px] font-mono block" style={{ color: 'var(--muted)' }}>{item.time}</time>
             </div>
           </div>
         ))}
@@ -982,6 +2794,7 @@ function DiscussionNotesTab({ lead, onActivity }) {
   const [messageDraft, setMessageDraft] = useState('');
   const [noteDraft, setNoteDraft] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState([]);
+  const [notesList, setNotesList] = useState([]);
 
   const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? threads[0];
 
@@ -1021,8 +2834,12 @@ function DiscussionNotesTab({ lead, onActivity }) {
 
   function handleSaveNote(event) {
     event?.preventDefault();
-    if (!noteDraft.trim() || !selectedThread) return;
-    appendSystemMessage(selectedThread.id, `Note: ${noteDraft.trim()}`);
+    const text = noteDraft.trim();
+    if ((!text && pendingAttachments.length === 0) || !selectedThread) return;
+    const entry = { id: `note-${Date.now()}`, body: text, attachments: [...pendingAttachments], time: new Date().toLocaleString([], { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), author: 'You' };
+    setNotesList((current) => [entry, ...current]);
+    if (text) appendSystemMessage(selectedThread.id, `Note: ${text}`);
+    else appendSystemMessage(selectedThread.id, `Note with ${pendingAttachments.length} attachment(s) added.`);
     setNoteDraft('');
     setPendingAttachments([]);
     onActivity?.('Note saved in discussion', '#8b5cf6');
@@ -1052,36 +2869,34 @@ function DiscussionNotesTab({ lead, onActivity }) {
   if (!selectedThread) return null;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div className="card p-3 space-y-2">
-        {threads.map((thread) => (
-          <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full text-left p-2 rounded-lg flex items-center gap-2 ${thread.id === selectedThread.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-            <DiscussionAvatar thread={thread} lead={lead} />
-            <span className="min-w-0"><strong className="block text-xs truncate">{thread.name}</strong><span className="block text-[11px] text-slate-400 truncate">{thread.note}</span></span>
-          </button>
-        ))}
-      </div>
-      <div className="card p-4 space-y-3 lg:col-span-2">
-        <div className="space-y-2">
-          {selectedThread.messages.map((m) => (
-            <div key={m.id} className={`text-xs p-2 rounded-lg ${m.side === 'out' ? 'bg-blue-50 ml-8' : 'bg-slate-100 mr-8'}`}>
-              <strong>{m.sender}</strong><p>{m.body}</p><span className="text-[10px] text-slate-400">{m.time}</span>
-            </div>
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="card p-3 space-y-2">
+          {threads.map((thread) => (
+            <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full text-left p-2 rounded-lg flex items-center gap-2 ${thread.id === selectedThread.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+              <DiscussionAvatar thread={thread} lead={lead} />
+              <span className="min-w-0"><strong className="block text-xs truncate">{thread.name}</strong><span className="block text-[11px] text-slate-400 truncate">{thread.note}</span></span>
+            </button>
           ))}
         </div>
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <input type="text" value={messageDraft} onChange={(e) => setMessageDraft(e.target.value)} placeholder="Write a message..." className="form-input text-xs flex-1" />
-          <button type="submit" className="btn-primary btn-sm flex items-center gap-1"><Send size={12} /> Send</button>
-        </form>
-        <div className="flex gap-1 flex-wrap">
-          <button type="button" onClick={handleCallAction} className="btn-ghost btn-sm">Log Call</button>
-          <button type="button" onClick={handleMailAction} className="btn-ghost btn-sm">Log Email</button>
-          <button type="button" onClick={handleUserAction} className="btn-ghost btn-sm">Mention</button>
-          <button type="button" onClick={() => applyNoteCommand('bold')} className="btn-ghost btn-sm">Bold</button>
-          <button type="button" onClick={() => applyNoteCommand('italic')} className="btn-ghost btn-sm">Italic</button>
+        <div className="card p-4 space-y-3 lg:col-span-2">
+          <div className="space-y-2">
+            {selectedThread.messages.map((m) => (
+              <div key={m.id} className={`text-xs p-2 rounded-lg ${m.side === 'out' ? 'bg-blue-50 ml-8' : 'bg-slate-100 mr-8'}`}>
+                <strong>{m.sender}</strong><p>{m.body}</p><span className="text-[10px] text-slate-400">{m.time}</span>
+              </div>
+            ))}
+          </div>
+          <form onSubmit={handleSendMessage} className="flex gap-2">
+            <input type="text" value={messageDraft} onChange={(e) => setMessageDraft(e.target.value)} placeholder="Write a message..." className="form-input text-xs flex-1" />
+            <button type="submit" className="btn-primary btn-sm flex items-center gap-1"><Send size={12} /> Send</button>
+          </form>
         </div>
+      </div>
+      <div className="card p-4">
+        <h3 className="font-bold text-sm text-slate-900 mb-3">Notes</h3>
         <form onSubmit={handleSaveNote} className="space-y-2">
-          <textarea rows={2} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveNote(e); }} placeholder="Write a note..." className="form-textarea text-xs w-full" />
+          <textarea rows={3} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveNote(e); }} placeholder="Write a note..." className="form-textarea text-xs w-full" />
           {pendingAttachments.length > 0 && (
             <div className="flex gap-1 flex-wrap">
               {pendingAttachments.map((a) => (
@@ -1094,9 +2909,28 @@ function DiscussionNotesTab({ lead, onActivity }) {
           )}
           <div className="flex justify-between items-center">
             <label className="btn-ghost btn-sm cursor-pointer flex items-center gap-1"><Paperclip size={12} /> Attach<input type="file" multiple hidden onChange={handleAttachmentSelect} /></label>
-            <button type="submit" className="btn-outline btn-sm">Save Note</button>
+            <button type="submit" disabled={!noteDraft.trim() && pendingAttachments.length === 0} className="btn-outline btn-sm disabled:opacity-50">Save Note</button>
           </div>
         </form>
+        {notesList.length > 0 && (
+          <div className="mt-4 space-y-2">
+            {notesList.map((n) => (
+              <div key={n.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
+                {n.body && <p className="text-slate-800 whitespace-pre-wrap">{n.body}</p>}
+                {n.attachments.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-2">
+                    {n.attachments.map((a) => (
+                      <span key={a.name} className="text-[11px] bg-white border border-slate-200 rounded-full px-2 py-0.5 flex items-center gap-1 text-slate-600">
+                        <Paperclip size={11} /> {a.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-[10px] text-slate-400 mt-1.5">{n.author} · {n.time}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1234,6 +3068,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
   const [productDraft, setProductDraft] = useState({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+  const [editingProduct, setEditingProduct] = useState(null);
   const [userSearch, setUserSearch] = useState('');
   const [userFilter, setUserFilter] = useState('All Users');
   const [productSearch, setProductSearch] = useState('');
@@ -1281,12 +3116,6 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
     onActivity?.(`${employee.name} assigned to lead`, '#10b981');
   }
 
-  function editUser(user) {
-    const name = window.prompt('Enter user name', user.name);
-    if (!name?.trim()) return;
-    setUsers((current) => current.map((u) => (u.id === user.id ? { ...u, name: name.trim() } : u)));
-  }
-
   function deleteUser(id) {
     const target = users.find((u) => u.id === id);
     setUsers((current) => current.filter((u) => u.id !== id));
@@ -1312,10 +3141,32 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
     onActivity?.(`Product "${productDraft.name.trim()}" added`, '#ec4899');
   }
 
-  function editProduct(product) {
-    const name = window.prompt('Enter product name', product.name);
-    if (!name?.trim()) return;
-    setProducts((current) => current.map((p) => (p.id === product.id ? { ...p, name: name.trim() } : p)));
+  function openEditProduct(product) {
+    setEditingProduct({
+      id: product.id,
+      name: product.name || '',
+      sku: product.sku || '',
+      price: String(product.price || '').replace(/[^0-9]/g, '') || '',
+      qty: product.qty || 1,
+      status: product.status || 'Active',
+      image: product.image || '',
+    });
+  }
+
+  function saveEditProduct() {
+    if (!editingProduct) return;
+    if (!editingProduct.name.trim() || !editingProduct.sku.trim() || !editingProduct.price || Number(editingProduct.qty) < 1) return;
+    setProducts((current) => current.map((p) => (p.id === editingProduct.id ? {
+      ...p,
+      name: editingProduct.name.trim(),
+      sku: editingProduct.sku.trim().toUpperCase(),
+      price: `Rs. ${Number(editingProduct.price).toLocaleString('en-IN')}`,
+      qty: Number(editingProduct.qty),
+      status: editingProduct.status,
+      image: editingProduct.image,
+    } : p)));
+    setEditingProduct(null);
+    onActivity?.(`Product "${editingProduct.name.trim()}" updated`, '#3b82f6');
   }
 
   function deleteProduct(id) {
@@ -1329,6 +3180,13 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
     if (!file) return;
     const image = await readFileAsDataUrl(file);
     setProductDraft((current) => ({ ...current, image }));
+  }
+
+  async function handleEditProductImageChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const image = await readFileAsDataUrl(file);
+    setEditingProduct((current) => (current ? { ...current, image } : current));
   }
 
   return (
@@ -1460,14 +3318,6 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                     <div className="inline-flex items-center justify-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => editUser(u)}
-                        className="w-7 h-7 rounded-lg border border-blue-200 text-blue-500 bg-white flex items-center justify-center hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-2xs"
-                        title="Edit User"
-                      >
-                        <Pencil size={12} />
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => deleteUser(u.id)}
                         className="w-7 h-7 rounded-lg border border-rose-200 text-rose-400 bg-white flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 hover:border-rose-300 transition cursor-pointer shadow-2xs"
                         title="Delete User"
@@ -1592,6 +3442,98 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
           </div>
         )}
 
+        {editingProduct && (
+          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setEditingProduct(null)}>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-5" onClick={(event) => event.stopPropagation()}>
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h4 className="text-sm font-bold text-slate-900">Edit Product</h4>
+                  <p className="text-xs text-slate-500 mt-1">Update the product details for this lead.</p>
+                </div>
+                <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setEditingProduct(null)} aria-label="Close edit product dialog">×</button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
+                  Product Name
+                  <input
+                    type="text"
+                    value={editingProduct.name}
+                    onChange={(event) => setEditingProduct((current) => (current ? { ...current, name: event.target.value } : current))}
+                    placeholder="Enter product name"
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                    autoFocus
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700 sm:col-span-2">
+                  Product Image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleEditProductImageChange}
+                    className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700"
+                  />
+                  {editingProduct.image && <img src={editingProduct.image} alt="Product preview" className="mt-3 h-16 w-16 rounded-lg border border-slate-200 object-cover" />}
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  SKU
+                  <input
+                    type="text"
+                    value={editingProduct.sku}
+                    onChange={(event) => setEditingProduct((current) => (current ? { ...current, sku: event.target.value } : current))}
+                    placeholder="e.g. PRD-001"
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Price
+                  <input
+                    type="number"
+                    min="0"
+                    value={editingProduct.price}
+                    onChange={(event) => setEditingProduct((current) => (current ? { ...current, price: event.target.value } : current))}
+                    placeholder="Enter price"
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Quantity
+                  <input
+                    type="number"
+                    min="1"
+                    value={editingProduct.qty}
+                    onChange={(event) => setEditingProduct((current) => (current ? { ...current, qty: event.target.value } : current))}
+                    className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+                <label className="text-xs font-semibold text-slate-700">
+                  Status
+                  <select
+                    value={editingProduct.status}
+                    onChange={(event) => setEditingProduct((current) => (current ? { ...current, status: event.target.value } : current))}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Draft">Draft</option>
+                  </select>
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <button type="button" className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setEditingProduct(null)}>
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  onClick={saveEditProduct}
+                  disabled={!editingProduct.name.trim() || !editingProduct.sku.trim() || !editingProduct.price || Number(editingProduct.qty) < 1}
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filter Controls */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative flex-1">
@@ -1662,7 +3604,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                     <div className="inline-flex items-center justify-center gap-1.5">
                       <button
                         type="button"
-                        onClick={() => editProduct(p)}
+                        onClick={() => openEditProduct(p)}
                         className="w-7 h-7 rounded-lg border border-blue-200 text-blue-500 bg-white flex items-center justify-center hover:bg-blue-50 hover:border-blue-300 transition cursor-pointer shadow-2xs"
                         title="Edit Product"
                       >
@@ -1694,39 +3636,48 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
 
 export default function LeadDetailView({ lead, onBackToLeads }) {
   const navigate = useNavigate();
+  const [viewLead, setViewLead] = useState(lead);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState(null);
   const storedDetailState = useMemo(() => loadLeadDetailState(lead), [lead]);
   const [activeTab, setActiveTab] = useState('Users & Products');
   const { addCustomer, showToast } = useERP() || {};
   const [isConverted, setIsConverted] = useState(lead?.status === 'Converted');
   const [isExportOpen, setIsExportOpen] = useState(false);
+
+  useEffect(() => {
+    setViewLead(lead);
+    setIsConverted(lead?.status === 'Converted');
+  }, [lead]);
   const [detailCounts, setDetailCounts] = useState(() => ({
     users: storedDetailState.users.length,
     products: storedDetailState.products.length,
     sources: storedDetailState.sources.length,
     files: storedDetailState.files.length,
-    openTasks: lead?.openTasksCount ?? 0,
-    calls: lead?.callsCount ?? 0,
+    openTasks: (storedDetailState.tasks || []).filter((t) => t.status !== 'Completed').length || lead?.openTasksCount || 0,
+    calls: (storedDetailState.calls || []).length,
     estimates: lead?.estimatesCount ?? 0,
     challans: lead?.deliveryChallansCount ?? 0,
   }));
-  const [activities, setActivities] = useState(() => ([
-    { id: 'act-created', title: `Lead created from ${lead?.source || 'Website'}`, time: lead?.createdOn || 'Just now', color: '#3b82f6' },
-    { id: 'act-status', title: `Stage set to ${lead?.status || 'New'}`, time: lead?.createdOn || 'Just now', color: '#8b5cf6' },
-    { id: 'act-owner', title: `Assigned to ${lead?.owner || 'David Patel'}`, time: lead?.createdOn || 'Just now', color: '#10b981' },
-  ]));
+  const [activities, setActivities] = useState(() => (storedDetailState.activities || buildSeedActivities(lead)));
 
-  function logActivity(title, color) {
+  const logActivity = React.useCallback((title, color) => {
     if (!title) return;
-    setActivities((current) => [{ id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' }, ...current]);
-  }
+    const entry = { id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' };
+    setActivities((current) => {
+      const next = [entry, ...current];
+      updateStoredLeadDetail(viewLead?.id ?? lead?.id, { activities: next });
+      return next;
+    });
+  }, [viewLead?.id, lead?.id]);
 
-  function updateDetailCounts(counts) {
+  const updateDetailCounts = React.useCallback((counts) => {
     setDetailCounts((current) => ({ ...current, ...counts }));
-  }
+  }, []);
 
   React.useEffect(() => {
-    updateStoredLead(lead?.id, {
-      status: isConverted ? 'Converted' : lead?.status,
+    updateStoredLead(viewLead?.id ?? lead?.id, {
+      status: isConverted ? 'Converted' : (viewLead?.status ?? lead?.status),
       productsCount: detailCounts.products,
       sourcesCount: detailCounts.sources,
       filesCount: detailCounts.files,
@@ -1735,23 +3686,93 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       estimatesCount: detailCounts.estimates,
       deliveryChallansCount: detailCounts.challans,
     });
-  }, [lead?.id, lead?.status, isConverted, detailCounts]);
+  }, [viewLead?.id, lead?.id, viewLead?.status, lead?.status, isConverted, detailCounts]);
+
+  function openEditLead() {
+    const source = viewLead ?? lead;
+    if (!source) return;
+    setEditForm({
+      name: source.name ?? '',
+      company: source.company ?? '',
+      email: source.email ?? '',
+      phone: source.phone ?? '',
+      source: source.source ?? '',
+      status: isConverted ? 'Converted' : (source.status ?? ''),
+      owner: source.owner ?? '',
+      jobTitle: source.jobTitle ?? '',
+      industry: source.industry ?? '',
+      city: source.city ?? '',
+      state: source.state ?? '',
+      country: source.country ?? '',
+      zipCode: source.zipCode ?? '',
+      amount: source.amount ?? '',
+      leadNumber: source.leadNumber ?? '',
+      createdOn: source.createdOn ?? '',
+    });
+    setIsEditOpen(true);
+  }
+
+  function updateEditField(field, value) {
+    setEditForm((current) => (current ? { ...current, [field]: value } : current));
+  }
+
+  function saveEditedLead() {
+    if (!editForm) return;
+    const targetId = viewLead?.id ?? lead?.id;
+    if (!targetId) return;
+    const trimmedName = String(editForm.name ?? '').trim();
+    if (!trimmedName) {
+      showToast?.('Lead name is required.');
+      return;
+    }
+    const updates = {
+      name: trimmedName,
+      company: String(editForm.company ?? '').trim(),
+      email: String(editForm.email ?? '').trim(),
+      phone: String(editForm.phone ?? '').trim(),
+      source: String(editForm.source ?? '').trim(),
+      status: String(editForm.status ?? '').trim() || viewLead?.status,
+      owner: String(editForm.owner ?? '').trim(),
+      jobTitle: String(editForm.jobTitle ?? '').trim(),
+      industry: String(editForm.industry ?? '').trim(),
+      city: String(editForm.city ?? '').trim(),
+      state: String(editForm.state ?? '').trim(),
+      country: String(editForm.country ?? '').trim(),
+      zipCode: String(editForm.zipCode ?? '').trim(),
+      amount: editForm.amount === '' ? 0 : Number(editForm.amount) || 0,
+      leadNumber: String(editForm.leadNumber ?? '').trim(),
+      createdOn: String(editForm.createdOn ?? '').trim(),
+    };
+    updateStoredLead(targetId, updates);
+    setViewLead((current) => ({ ...(current ?? lead), ...updates }));
+    if (updates.status === 'Converted') {
+      setIsConverted(true);
+    } else if (isConverted && updates.status !== 'Converted') {
+      setIsConverted(false);
+    }
+    setIsEditOpen(false);
+    setEditForm(null);
+    logActivity(`Lead information updated`, '#10b981');
+    showToast?.(`Lead "${updates.name}" updated.`);
+  }
 
   function exportLead(format) {
-    const filename = `${String(lead.name || 'lead').replace(/\s+/g, '_')}_details`;
+    const effectiveLead = viewLead ?? lead;
+    const filename = `${String(effectiveLead.name || 'lead').replace(/\s+/g, '_')}_details`;
     if (format === 'CSV') {
-      exportToCSV(filename, ['Field', 'Value'], leadExportRows(lead));
+      exportToCSV(filename, ['Field', 'Value'], leadExportRows(effectiveLead));
     }
     if (format === 'Excel') {
-      downloadLeadAsExcel(lead);
+      downloadLeadAsExcel(effectiveLead);
     }
     if (format === 'PDF') {
-      printLeadAsPdf(lead);
+      printLeadAsPdf(effectiveLead);
     }
     setIsExportOpen(false);
   }
 
-  if (!lead) return null;
+  if (!viewLead && !lead) return null;
+  const activeLeadData = viewLead ?? lead;
 
   const metrics = [
     { label: 'Products', value: detailCounts.products, icon: ShoppingBag, color: '#ec4899', bg: '#fdf2f8' },
@@ -1769,18 +3790,18 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       return;
     }
     addCustomer?.({
-      name: lead.company || lead.name,
-      contactPerson: lead.name,
-      email: lead.email,
-      phone: `+91 ${lead.phone}`,
+      name: activeLeadData.company || activeLeadData.name,
+      contactPerson: activeLeadData.name,
+      email: activeLeadData.email,
+      phone: `+91 ${activeLeadData.phone}`,
       balance: 0,
       status: 'Active',
     });
     setIsConverted(true);
-    showToast?.(`Lead "${lead.name}" converted to Customer.`);
+    showToast?.(`Lead "${activeLeadData.name}" converted to Customer.`);
   };
 
-  const displayName = lead.name?.replace(/\s*\(Sample\)/i, '') || 'Christopher Maclead';
+  const displayName = activeLeadData.name?.replace(/\s*\(Sample\)/i, '') || 'Christopher Maclead';
 
   return (
     <div className="space-y-4">
@@ -1803,6 +3824,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
           </button>
           <button
             type="button"
+            onClick={openEditLead}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
           >
             <Pencil size={13} className="text-slate-500" /> Edit
@@ -1854,7 +3876,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-xs border border-slate-100 ring-2 ring-slate-50">
               <img
-                src={lead.photo || 'https://i.pravatar.cc/160?img=60'}
+                src={activeLeadData.photo || 'https://i.pravatar.cc/160?img=60'}
                 alt={displayName}
                 className="w-full h-full object-cover"
               />
@@ -1863,14 +3885,14 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               <div className="flex items-center gap-2.5">
                 <h1 className="text-xl font-bold text-slate-900 tracking-tight">{displayName}</h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  {lead.status || 'Qualified'}
+                  {isConverted ? 'Converted' : (activeLeadData.status || 'Qualified')}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">{lead.company || 'Hirapara Industries'}</p>
+              <p className="text-xs text-slate-500 font-medium">{activeLeadData.company || 'Hirapara Industries'}</p>
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-0.5">
-                <span className="flex items-center gap-1.5"><Phone size={13} className="text-slate-400" /> +91 {lead.phone || '98765 43210'}</span>
-                <span className="flex items-center gap-1.5"><Mail size={13} className="text-slate-400" /> {lead.email || 'chirag@hirapara.com'}</span>
-                <span className="flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" /> {lead.city || 'Surat'}, {lead.state || 'Gujarat'}, {lead.country || 'India'}</span>
+                <span className="flex items-center gap-1.5"><Phone size={13} className="text-slate-400" /> +91 {activeLeadData.phone || '98765 43210'}</span>
+                <span className="flex items-center gap-1.5"><Mail size={13} className="text-slate-400" /> {activeLeadData.email || 'chirag@hirapara.com'}</span>
+                <span className="flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" /> {activeLeadData.city || 'Surat'}, {activeLeadData.state || 'Gujarat'}, {activeLeadData.country || 'India'}</span>
               </div>
             </div>
           </div>
@@ -1878,15 +3900,15 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-xs border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-8">
             <div>
               <span className="text-[11px] text-slate-400 block font-normal mb-1">Lead Number</span>
-              <strong className="text-xs font-bold text-slate-900 font-mono">{lead.leadNumber || 'L00000185'}</strong>
+              <strong className="text-xs font-bold text-slate-900 font-mono">{activeLeadData.leadNumber || 'L00000185'}</strong>
             </div>
             <div>
               <span className="text-[11px] text-slate-400 block font-normal mb-1">Source</span>
-              <strong className="text-xs font-bold text-slate-900">{lead.source || 'Website'}</strong>
+              <strong className="text-xs font-bold text-slate-900">{activeLeadData.source || 'Website'}</strong>
             </div>
             <div>
               <span className="text-[11px] text-slate-400 block font-normal mb-1">Created On</span>
-              <strong className="text-xs font-bold text-slate-900">{lead.createdOn || '27/08/2026'}</strong>
+              <strong className="text-xs font-bold text-slate-900">{activeLeadData.createdOn || '27/08/2026'}</strong>
             </div>
           </div>
         </div>
@@ -1938,19 +3960,130 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       </div>
 
       {/* Tab Content Display */}
-      {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={lead} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
-      {activeTab === 'General' && <GeneralTab lead={lead} />}
-      {activeTab === 'Users & Products' && <UsersProductsTab lead={lead} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
-      {activeTab === 'Discussion & Notes' && <DiscussionNotesTab lead={lead} onActivity={logActivity} />}
-      {activeTab === 'Files' && <FilesTab lead={lead} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
-      {activeTab === 'Activity' && <ActivityTab items={activities} />}
-      {!['Sources & Emails', 'General', 'Users & Products', 'Discussion & Notes', 'Files', 'Activity'].includes(activeTab) && (
+      {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'General' && <GeneralTab lead={activeLeadData} />}
+      {activeTab === 'Users & Products' && <UsersProductsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'Discussion & Notes' && <DiscussionNotesTab lead={activeLeadData} onActivity={logActivity} />}
+      {activeTab === 'Files' && <FilesTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'Tasks' && <LeadTasksTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'Calls' && <CallsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'Estimates' && <EstimatesTab lead={activeLeadData} onCountsChange={updateDetailCounts} />}
+      {activeTab === 'Quotations' && <QuotationsTab lead={activeLeadData} onActivity={logActivity} />}
+      {activeTab === 'Delivery Challans' && <DeliveryChallansTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'Activity' && <ActivityTab lead={activeLeadData} items={activities} />}
+      {!['Sources & Emails', 'General', 'Users & Products', 'Discussion & Notes', 'Files', 'Tasks', 'Calls', 'Estimates', 'Quotations', 'Delivery Challans', 'Activity'].includes(activeTab) && (
         <div className="card p-8 text-center space-y-2">
           <Info size={28} className="text-blue-500 mx-auto" />
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{activeTab} Details</h4>
           <p className="text-xs text-slate-400">
-            Real-time synchronization for {activeTab.toLowerCase()} associated with {lead.name}.
+            Real-time synchronization for {activeTab.toLowerCase()} associated with {activeLeadData.name}.
           </p>
+        </div>
+      )}
+
+      {isEditOpen && editForm && (
+        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => { setIsEditOpen(false); setEditForm(null); }}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Edit lead information">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-xl">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">Edit Lead Information</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Update the lead details below</p>
+              </div>
+              <button type="button" className="text-slate-400 hover:text-slate-700 text-xl leading-none" onClick={() => { setIsEditOpen(false); setEditForm(null); }} aria-label="Close edit lead dialog">×</button>
+            </div>
+            <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Lead Name *
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.name} onChange={(e) => updateEditField('name', e.target.value)} placeholder="Enter lead name" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Company
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.company} onChange={(e) => updateEditField('company', e.target.value)} placeholder="Enter company name" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Email
+                <input type="email" className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.email} onChange={(e) => updateEditField('email', e.target.value)} placeholder="Enter email address" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Phone
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.phone} onChange={(e) => updateEditField('phone', e.target.value)} placeholder="Enter phone number" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Lead Source
+                <select className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white" value={editForm.source} onChange={(e) => updateEditField('source', e.target.value)}>
+                  <option value="">Select source</option>
+                  <option value="Website">Website</option>
+                  <option value="Cold Call">Cold Call</option>
+                  <option value="Advertisement">Advertisement</option>
+                  <option value="Partner">Partner</option>
+                  <option value="Web Download">Web Download</option>
+                  <option value="Online Store">Online Store</option>
+                  <option value="External Referral">External Referral</option>
+                  <option value="Seminar Partner">Seminar Partner</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Lead Status
+                <select className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white" value={editForm.status} onChange={(e) => updateEditField('status', e.target.value)}>
+                  <option value="New">New</option>
+                  <option value="Contacted">Contacted</option>
+                  <option value="Qualified">Qualified</option>
+                  <option value="Proposal">Proposal</option>
+                  <option value="Converted">Converted</option>
+                  <option value="Lost">Lost</option>
+                  <option value="Lost Lead">Lost Lead</option>
+                </select>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Lead Owner
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.owner} onChange={(e) => updateEditField('owner', e.target.value)} placeholder="Select User" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Title
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.jobTitle} onChange={(e) => updateEditField('jobTitle', e.target.value)} placeholder="Enter title" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Industry
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.industry} onChange={(e) => updateEditField('industry', e.target.value)} placeholder="Enter industry" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Lead Number
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.leadNumber} onChange={(e) => updateEditField('leadNumber', e.target.value)} placeholder="L00000185" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                City
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.city} onChange={(e) => updateEditField('city', e.target.value)} placeholder="Enter city" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                State
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.state} onChange={(e) => updateEditField('state', e.target.value)} placeholder="Enter state" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Country
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.country} onChange={(e) => updateEditField('country', e.target.value)} placeholder="Enter country" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Zip Code
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.zipCode} onChange={(e) => updateEditField('zipCode', e.target.value)} placeholder="Enter zip code" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                Annual Revenue / Amount
+                <input type="number" className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.amount} onChange={(e) => updateEditField('amount', e.target.value)} placeholder="Enter amount" />
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600 sm:col-span-2">
+                Created On
+                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.createdOn} onChange={(e) => updateEditField('createdOn', e.target.value)} placeholder="27/08/2026" />
+              </label>
+            </div>
+            <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-xl">
+              <button type="button" className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200" onClick={() => { setIsEditOpen(false); setEditForm(null); }}>
+                Cancel
+              </button>
+              <button type="button" className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700" onClick={saveEditedLead}>
+                Save Changes
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

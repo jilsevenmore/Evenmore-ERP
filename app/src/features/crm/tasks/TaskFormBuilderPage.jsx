@@ -137,11 +137,20 @@ export default function TaskFormBuilderPage() {
   }
 
   function handleSave() {
+    if (currentForm?.id) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const forms = raw !== null ? JSON.parse(raw) : [];
+        if (Array.isArray(forms)) {
+          const fieldNames = sections.flatMap((s) => (s.fields || []).map((f) => f.label));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(forms.map((f) => f.id === currentForm.id ? { ...f, sections, fields: fieldNames, lastUpdated: new Date().toLocaleDateString('en-GB') } : f)));
+        }
+      } catch { }
+    }
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
-      navigate('/crm/leads/task-form');
-    }, 600);
+    }, 1200);
   }
 
   if (!currentForm) {

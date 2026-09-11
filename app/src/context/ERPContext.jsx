@@ -211,6 +211,7 @@ export const ERPProvider = ({ children, }) => {
         bankAccounts,
         journalEntries,
         inventoryMovements,
+        currency,
     ]);
     const showToast = (msg) => {
         setToastMessage(msg);
@@ -1122,7 +1123,9 @@ export const ERPProvider = ({ children, }) => {
             quoteNumber: quote.quoteNumber || `EST-2026-${String(quotations.length + 91).padStart(3, '0')}`,
             customerId: quote.customerId,
             customer: quote.customer || 'Acme Corp',
-            date: formatDateDDMMYYYY(quote.date || 'Today'),
+            leadId: quote.leadId || '',
+            leadName: quote.leadName || '',
+            date: quote.date || 'Today',
             validUntil: quote.validUntil || 'In 30 days',
             amount: totalAmount,
             status: quote.status || 'Draft',

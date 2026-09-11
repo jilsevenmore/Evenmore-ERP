@@ -9,6 +9,8 @@ import LeadFormBuilderPage from '../features/crm/leads/LeadFormBuilderPage';
 import LeadFormsPage from '../features/crm/leads/LeadFormsPage';
 import DynamicLeadFormPage from '../features/crm/leads/DynamicLeadFormPage';
 import TasksPage from '../features/crm/tasks/TasksPage';
+import TaskAllocationPage from '../features/crm/tasks/allocation/TaskAllocationPage';
+import TaskAllocationDetailPage from '../features/crm/tasks/allocation/TaskAllocationDetailPage';
 import MasterTasksPage from '../features/crm/tasks/MasterTasksPage';
 import StageTasksPage from '../features/crm/tasks/StageTasksPage';
 import TaskFormPage from '../features/crm/tasks/TaskFormPage';
@@ -180,7 +182,8 @@ const router = createBrowserRouter([
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
-      { path: 'crm/tasks/allocation', element: <Page component={UserAllocationPage} /> },
+      { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
+      { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
       { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> },
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
