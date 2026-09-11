@@ -116,6 +116,40 @@ export const useAppStore = create((set) => ({
       );
       return { employees: ns };
     }),
+  updateEmployee: (id, updates) =>
+    set((s) => {
+      const ns = s.employees.map((x) => (x.id === id || x.name === id ? { ...x, ...updates } : x));
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          employees: ns,
+          leaves: s.leaves,
+          attendance: s.attendance,
+          candidates: s.candidates,
+          showBanner: s.showBanner,
+        })
+      );
+      return { employees: ns };
+    }),
+  updateEmployeeStatus: (idOrName, status) =>
+    set((s) => {
+      const ns = s.employees.map((x) =>
+        x.id === idOrName || x.name?.toLowerCase() === idOrName?.toLowerCase()
+          ? { ...x, status }
+          : x
+      );
+      localStorage.setItem(
+        LS_KEY,
+        JSON.stringify({
+          employees: ns,
+          leaves: s.leaves,
+          attendance: s.attendance,
+          candidates: s.candidates,
+          showBanner: s.showBanner,
+        })
+      );
+      return { employees: ns };
+    }),
   addLeave: (l) =>
     set((s) => {
       const ns = [l, ...s.leaves];

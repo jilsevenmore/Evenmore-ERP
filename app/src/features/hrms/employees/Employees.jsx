@@ -104,14 +104,24 @@ const statusStyles = {
 };
 
 export default function Employees() {
-  const setToast = useAppStore((s) => s.setToast);
+  const storeEmployees = useAppStore((s) => s.employees || []);
+  const addStoreEmployee = useAppStore((s) => s.addEmployee);
+  const deleteStoreEmployee = useAppStore((s) => s.deleteEmployee);
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
   const [dept, setDept] = useState("All");
   const [status, setStatus] = useState("All");
   const [viewMode, setViewMode] = useState("Table");
   const [showForm, setShowForm] = useState(false);
-  const [employees, setEmployees] = useState(MOCK_EMPLOYEES);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
+
+  // Use store employees, normalized with img/avatar
+  const employees = useMemo(() => {
+    return storeEmployees.map((e) => ({
+      ...e,
+      img: e.img || e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
+    }));
+  }, [storeEmployees]);
 
   const [form, setForm] = useState({
     name: "",
@@ -146,16 +156,17 @@ export default function Employees() {
       location: form.location,
       joining: new Date().toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" }),
       status: "Active",
+      avatar: `https://randomuser.me/api/portraits/${employees.length % 2 === 0 ? "women" : "men"}/${(employees.length * 7) % 90}.jpg`,
       img: `https://randomuser.me/api/portraits/${employees.length % 2 === 0 ? "women" : "men"}/${(employees.length * 7) % 90}.jpg`,
     };
-    setEmployees((prev) => [...prev, next]);
+    addStoreEmployee(next);
     setToast("Employee added successfully.");
     setShowForm(false);
     setForm({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai" });
   }
 
   function handleDelete(id, name) {
-    setEmployees((prev) => prev.filter((e) => e.id !== id));
+    deleteStoreEmployee(id);
     setToast(`Employee ${name} removed.`);
   }
 

@@ -3,7 +3,7 @@ import { careerJobsMock } from "../../../data/hrms/data/recruitmentData";
 import { Button } from "../../../components/hrms/Button";
 import { useAppStore } from "../../../stores/appStore";
 import { useNavigate } from "react-router-dom";
-import { MapPin, Clock } from "lucide-react";
+import { MapPin, Clock, ArrowLeft } from "lucide-react";
 
 export default function Career() {
   const showToast = useAppStore((s) => s.showToast);
@@ -22,7 +22,16 @@ export default function Career() {
   }), [search, dept, loc, type]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate("/hrms/recruitment")}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Recruitment Setup</span>
+      </button>
+
       <div className="bg-white border border-bdr rounded-xl p-8 shadow-sm text-center">
         <h1 className="text-[24px] font-bold">Join Our Team</h1><p className="text-[13px] text-muted mt-1">Candidate-facing career portal — explore open roles and apply.</p>
         <div className="mt-4 flex flex-wrap gap-2 justify-center">

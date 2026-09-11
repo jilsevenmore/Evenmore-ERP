@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useAppStore } from "../../../stores/appStore";
+import { useCalendarStore } from "../../../stores/calendarStore";
 import { Badge } from "../../../components/hrms/Badge";
 import { Calendar, Search, AlertTriangle, Info, Check, UserCheck } from "lucide-react";
 
 export default function Leave() {
   const { leaves, approveLeave, addLeave, showToast, employees } = useAppStore();
+  const calendarEvents = useCalendarStore((s) => s.events || []);
   const [tab, setTab] = useState("assigned");
   const [form, setForm] = useState({
     type: "Annual Leave",
@@ -21,9 +23,22 @@ export default function Leave() {
     .filter((e) => e.name.toLowerCase().includes(form.delegateSearch.toLowerCase()))
     .slice(0, 4);
 
+  // Check if requested leave interval overlaps with official holidays
+  const holidayOverlap = useMemo(() => {
+    if (!form.from || !form.to) return [];
+    return calendarEvents.filter((ev) => {
+      if (ev.type !== "Holiday") return false;
+      const hDate = ev.startDate || ev.date;
+      return hDate >= form.from && hDate <= form.to;
+    });
+  }, [calendarEvents, form.from, form.to]);
+
   function submitLeave() {
     if (!form.reason.trim()) return showToast("Reason required");
-    const days = 4;
+    const diffTime = Math.abs(new Date(form.to) - new Date(form.from));
+    const rawDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1 || 1;
+    const netDeductedDays = Math.max(1, rawDays - holidayOverlap.length);
+
     addLeave({
       id: "LV-" + Date.now(),
       employee: "Ayesha Khan",
@@ -31,13 +46,20 @@ export default function Leave() {
       type: form.type,
       from: form.from,
       to: form.to,
-      days,
+      days: netDeductedDays,
       reason: form.reason,
       delegate: form.delegate,
       delegateAvatar: "https://i.pravatar.cc/100?img=15",
       status: "Pending Review",
     });
-    showToast("Leave applied — manager notified");
+
+    if (holidayOverlap.length > 0) {
+      showToast(
+        `Leave applied (${netDeductedDays} days deducted). ${holidayOverlap.length} holiday(s) excluded: ${holidayOverlap.map(h => h.title).join(", ")}`
+      );
+    } else {
+      showToast("Leave applied — manager notified");
+    }
     setForm({ ...form, reason: "", handover: "" });
   }
 

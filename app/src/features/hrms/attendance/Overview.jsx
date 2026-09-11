@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { Download, ChevronRight, Search, Calendar as CalendarIcon, MoreHorizontal, X } from "lucide-react";
+import { Download, ChevronRight, Search, Calendar as CalendarIcon, MoreHorizontal, X, Check, Clock } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
 
 const MOCK_ATTENDANCE = [
   {
@@ -94,15 +95,6 @@ const MOCK_ATTENDANCE = [
   },
 ];
 
-const STATS = [
-  { label: "PRESENT", val: "1,102", sub: "94.2% today", dotColor: "#22c55e" },
-  { label: "ABSENT", val: "18", sub: "1.4%", dotColor: "#ef4444" },
-  { label: "LATE", val: "24", sub: "Grace 10 min", dotColor: "#f59e0b" },
-  { label: "ON LEAVE", val: "34", sub: "Planned", dotColor: "#3b82f6" },
-  { label: "WFH", val: "70", sub: "Remote", dotColor: null },
-  { label: "OVERTIME", val: "18h", sub: "Today", dotColor: "#22c55e" },
-];
-
 const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations"];
 const STATUSES = ["All", "Present", "Late", "Absent", "WFH", "Half Day", "On Leave"];
 const SHIFTS = ["All", "General", "Flexible", "Night"];
@@ -117,7 +109,11 @@ const statusStyles = {
 };
 
 export default function AttendanceOverview() {
-  const setToast = useAppStore((s) => s.setToast);
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const storeEmployees = useAppStore((s) => s.employees || []);
+  const storeRecords = useAttendanceStore((s) => s.records);
+  const addAttendanceRequest = useAttendanceStore((s) => s.addRequest);
+  const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
 
   const [search, setSearch] = useState("");
   const [dateVal, setDateVal] = useState("2024-10-11");
@@ -131,18 +127,53 @@ export default function AttendanceOverview() {
   const [regEmp, setRegEmp] = useState("Priya Patel");
   const [regDate, setRegDate] = useState("2024-10-11");
   const [regReason, setRegReason] = useState("");
+  const [regIn, setRegIn] = useState("09:00");
+  const [regOut, setRegOut] = useState("18:00");
+
+  // Normalize attendance records for table display
+  const combinedAttendance = useMemo(() => {
+    if (storeRecords && storeRecords.length > 0) {
+      return storeRecords.map((r) => ({
+        ...r,
+        img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+        workHours: r.workHours || (r.checkIn && r.checkOut && r.checkIn !== "—" ? "08:30" : "—"),
+        shift: r.shift || "General",
+      }));
+    }
+    return MOCK_ATTENDANCE;
+  }, [storeRecords]);
 
   const filtered = useMemo(() => {
-    return MOCK_ATTENDANCE.filter((item) => {
+    return combinedAttendance.filter((item) => {
       const matchSearch =
         item.name.toLowerCase().includes(search.toLowerCase()) ||
-        item.id.toLowerCase().includes(search.toLowerCase());
+        (item.id && item.id.toLowerCase().includes(search.toLowerCase()));
       const matchDept = deptFilter === "All" || item.dept === deptFilter;
       const matchStatus = statusFilter === "All" || item.status === statusFilter;
       const matchShift = shiftFilter === "All" || item.shift === shiftFilter;
       return matchSearch && matchDept && matchStatus && matchShift;
     });
-  }, [search, deptFilter, statusFilter, shiftFilter]);
+  }, [combinedAttendance, search, deptFilter, statusFilter, shiftFilter]);
+
+  // Dynamic live STATS
+  const statsData = useMemo(() => {
+    const total = combinedAttendance.length || 1;
+    const presentCount = combinedAttendance.filter((r) => r.status === "Present").length;
+    const absentCount = combinedAttendance.filter((r) => r.status === "Absent").length;
+    const lateCount = combinedAttendance.filter((r) => r.status === "Late").length;
+    const leaveCount = combinedAttendance.filter((r) => r.status === "On Leave").length;
+    const wfhCount = combinedAttendance.filter((r) => r.status === "WFH").length;
+    const percent = Math.round((presentCount / total) * 100);
+
+    return [
+      { label: "PRESENT", val: String(presentCount), sub: `${percent}% of staff`, dotColor: "#22c55e" },
+      { label: "ABSENT", val: String(absentCount), sub: "Needs review", dotColor: "#ef4444" },
+      { label: "LATE", val: String(lateCount), sub: "Grace 10 min", dotColor: "#f59e0b" },
+      { label: "ON LEAVE", val: String(leaveCount), sub: "Approved leave", dotColor: "#3b82f6" },
+      { label: "WFH", val: String(wfhCount), sub: "Remote active", dotColor: null },
+      { label: "OVERTIME", val: "18h", sub: "Today", dotColor: "#22c55e" },
+    ];
+  }, [combinedAttendance]);
 
   const handleClearFilters = () => {
     setSearch("");
@@ -169,10 +200,31 @@ export default function AttendanceOverview() {
   };
 
   const handleRegularizeSubmit = () => {
-    if (!regReason) return setToast("Please provide a reason for regularization.", "error");
-    setToast(`Attendance regularization request for ${regEmp} submitted.`);
+    if (!regReason.trim()) return setToast("Please provide a reason for regularization.", "error");
+    addAttendanceRequest({
+      employee: regEmp,
+      type: "Regularization",
+      date: regDate,
+      requestedIn: regIn,
+      requestedOut: regOut,
+      reason: regReason,
+      requestedBy: regEmp,
+    });
+    setToast(`Attendance regularization request for ${regEmp} submitted successfully.`);
     setShowRegModal(false);
     setRegReason("");
+  };
+
+  const handleQuickStatus = (row) => {
+    const cycle = ["Present", "Late", "Half Day", "WFH", "On Leave", "Absent"];
+    const currIdx = cycle.indexOf(row.status);
+    const nextStatus = cycle[(currIdx + 1) % cycle.length];
+    updateStoreRecord(row.id, {
+      status: nextStatus,
+      checkIn: nextStatus === "Absent" || nextStatus === "On Leave" ? "—" : row.checkIn === "—" ? "09:00" : row.checkIn,
+      checkOut: nextStatus === "Absent" || nextStatus === "On Leave" ? "—" : row.checkOut === "—" ? "18:00" : row.checkOut,
+    });
+    setToast(`${row.name}'s status updated to ${nextStatus}.`);
   };
 
   return (
@@ -202,7 +254,7 @@ export default function AttendanceOverview() {
 
       {/* Stat Cards Row */}
       <div className="att-stats-grid">
-        {STATS.map((s) => (
+        {statsData.map((s) => (
           <div key={s.label} className="att-stat-card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span className="att-stat-label">{s.label}</span>
@@ -233,39 +285,32 @@ export default function AttendanceOverview() {
 
           {/* Date Picker */}
           <div className="att-date-wrap">
-            <span>{dateVal.split("-").reverse().join("-")}</span>
-            <CalendarIcon size={14} style={{ color: "#475569" }} />
+            <span>{dateVal}</span>
+            <CalendarIcon size={14} style={{ color: "#64748b" }} />
             <input
               type="date"
               value={dateVal}
-              onChange={(e) => e.target.value && setDateVal(e.target.value)}
+              onChange={(e) => setDateVal(e.target.value)}
               className="att-date-native"
-              aria-label="Select date"
             />
           </div>
 
           {/* Dropdowns */}
           <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="att-select">
             {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
+              <option key={d}>{d}</option>
             ))}
           </select>
 
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="att-select">
             {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
+              <option key={s}>{s}</option>
             ))}
           </select>
 
           <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)} className="att-select">
             {SHIFTS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
+              <option key={s}>{s}</option>
             ))}
           </select>
 
@@ -335,8 +380,8 @@ export default function AttendanceOverview() {
                     <button
                       type="button"
                       className="att-dots-btn"
-                      onClick={() => setToast(`Actions for ${row.name}`)}
-                      title="More actions"
+                      onClick={() => handleQuickStatus(row)}
+                      title="Toggle / update attendance status"
                     >
                       <MoreHorizontal size={17} />
                     </button>
@@ -379,7 +424,7 @@ export default function AttendanceOverview() {
               value={regEmp}
               onChange={(e) => setRegEmp(e.target.value)}
             >
-              {MOCK_ATTENDANCE.map((e) => (
+              {combinedAttendance.map((e) => (
                 <option key={e.id} value={e.name}>
                   {e.name} ({e.id})
                 </option>
@@ -394,6 +439,26 @@ export default function AttendanceOverview() {
               value={regDate}
               onChange={(e) => setRegDate(e.target.value)}
             />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="form-group">
+              <label className="form-label">Check In Time</label>
+              <input
+                type="time"
+                className="form-input"
+                value={regIn}
+                onChange={(e) => setRegIn(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Check Out Time</label>
+              <input
+                type="time"
+                className="form-input"
+                value={regOut}
+                onChange={(e) => setRegOut(e.target.value)}
+              />
+            </div>
           </div>
           <div className="form-group">
             <label className="form-label">Reason / Context</label>

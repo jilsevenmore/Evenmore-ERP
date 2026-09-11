@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Lock,
   Download,
@@ -12,7 +12,9 @@ import {
   Users,
   ShieldCheck,
   Building2,
+  Calendar,
 } from "lucide-react";
+import { useAppStore } from "../../../stores/appStore";
 
 const WORKFLOW_STEPS = [
   { id: "Draft", label: "Draft" },
@@ -104,6 +106,7 @@ const PAYSLIPS_DATA = [
 ];
 
 export default function Payroll() {
+  const storeLeaves = useAppStore((s) => s.leaves || []);
   const [activeStep, setActiveStep] = useState("Draft");
   const [structures, setStructures] = useState(INITIAL_STRUCTURES);
   const [selectedPayslip, setSelectedPayslip] = useState(null);
@@ -112,6 +115,33 @@ export default function Payroll() {
   const [newStructureName, setNewStructureName] = useState("");
   const [newStructureEmployees, setNewStructureEmployees] = useState("");
   const [runSuccess, setRunSuccess] = useState(false);
+
+  // Compute dynamic payslips with connected leaves and LOP
+  const payslips = useMemo(() => {
+    return PAYSLIPS_DATA.map((p) => {
+      const empLeaves = storeLeaves.filter(
+        (l) => l.employee?.toLowerCase() === p.name.toLowerCase() && l.status?.includes("Approved")
+      );
+      const leaveDays = empLeaves.reduce((sum, l) => sum + (Number(l.days) || 1), 0);
+      const baseDeductionsNum = parseInt(p.deductions.replace(/[^0-9]/g, ""), 10) || 380;
+      const lopDeduction = leaveDays > 2 ? (leaveDays - 2) * 120 : 0; // Unpaid leave penalty
+      const totalDeductions = baseDeductionsNum + lopDeduction;
+
+      const basicNum = parseInt(p.basic.replace(/[^0-9]/g, ""), 10) || 4000;
+      const hraNum = parseInt(p.hra.replace(/[^0-9]/g, ""), 10) || 1000;
+      const allowancesNum = parseInt(p.allowances.replace(/[^0-9]/g, ""), 10) || 400;
+      const taxNum = parseInt(p.tax.replace(/[^0-9]/g, ""), 10) || 400;
+      const computedNet = basicNum + hraNum + allowancesNum - totalDeductions - taxNum;
+
+      return {
+        ...p,
+        leaveDays,
+        lopDeduction: lopDeduction > 0 ? `$${lopDeduction}` : null,
+        deductions: `$${totalDeductions}`,
+        netPay: `$${computedNet.toLocaleString()}`,
+      };
+    });
+  }, [storeLeaves]);
 
   const handleAddStructure = (e) => {
     e.preventDefault();
@@ -336,7 +366,7 @@ export default function Payroll() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {PAYSLIPS_DATA.map((p) => (
+                  {payslips.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-50/50 transition">
                       <td className="py-3">
                         <div className="flex items-center gap-3">
@@ -346,7 +376,14 @@ export default function Payroll() {
                             className="w-8 h-8 rounded-full object-cover border border-slate-200"
                           />
                           <div>
-                            <div className="font-semibold text-slate-800">{p.name}</div>
+                            <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                              <span>{p.name}</span>
+                              {p.leaveDays > 0 && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.2 bg-amber-50 text-amber-700 border border-amber-200 rounded-full">
+                                  {p.leaveDays}d leave
+                                </span>
+                              )}
+                            </div>
                             <div className="text-[11px] text-slate-400">{p.role}</div>
                           </div>
                         </div>
@@ -412,6 +449,12 @@ export default function Payroll() {
                 <span className="text-slate-500">Deductions (PF/Insurance)</span>
                 <span className="font-medium text-red-600">-{selectedPayslip.deductions}</span>
               </div>
+              {selectedPayslip.lopDeduction && (
+                <div className="flex justify-between py-1 border-b border-amber-100 bg-amber-50/60 px-2 rounded-lg text-amber-800 text-[12px]">
+                  <span>Loss of Pay ({selectedPayslip.leaveDays} approved leave days)</span>
+                  <span className="font-bold text-red-600">-{selectedPayslip.lopDeduction}</span>
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Tax Withholding</span>
                 <span className="font-medium text-red-600">-{selectedPayslip.tax}</span>

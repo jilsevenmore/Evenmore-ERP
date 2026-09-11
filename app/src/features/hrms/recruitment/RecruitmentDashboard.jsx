@@ -23,7 +23,7 @@ export default function RecruitmentDashboard() {
   return <div className="flex flex-col gap-6">
       <div className="flex flex-wrap justify-between gap-3">
         <div><h1 className="text-[22px] font-bold">Recruitment Setup</h1><p className="text-[13px] text-muted">Pipeline, interviews and hiring overview.</p></div>
-        <Button onClick={() => navigate("/hrms/recruitment/jobs")}>+ Create Job Opening</Button>
+        <Button onClick={() => navigate("/hrms/recruitment/jobs", { state: { openCreate: true } })}>+ Create Job Opening</Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -35,10 +35,10 @@ export default function RecruitmentDashboard() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={() => navigate("/hrms/recruitment/jobs")}>+ Create Job Opening</Button>
-        <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/candidates")}>+ Add Candidate</Button>
-        <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/interviews")}>+ Schedule Interview</Button>
-        <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/offers")}>+ Create Offer</Button>
+        <Button size="sm" onClick={() => navigate("/hrms/recruitment/jobs", { state: { openCreate: true } })}>+ Create Job Opening</Button>
+        <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/candidates", { state: { openAdd: true } })}>+ Add Candidate</Button>
+        <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/interviews", { state: { openSchedule: true } })}>+ Schedule Interview</Button>
+        <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/offers", { state: { openCreate: true } })}>+ Create Offer</Button>
         <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/candidates")}>View Candidates</Button>
         <Button size="sm" variant="secondary" onClick={() => navigate("/hrms/recruitment/interviews")}>View Interviews</Button>
       </div>

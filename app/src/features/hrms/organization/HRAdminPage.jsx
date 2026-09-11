@@ -26,8 +26,18 @@ import {
   X,
   FileText,
   AlertTriangle,
+  Printer,
+  Sparkles,
+  Briefcase,
+  Award,
+  FileCheck2,
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import { useRecruitmentStore } from "../../../stores/recruitmentStore";
+import { useCalendarStore } from "../../../stores/calendarStore";
+import TerminationLetterModal from "./TerminationLetterModal";
+import OfferLetterModal from "./OfferLetterModal";
+import GenerateOfferModal from "./GenerateOfferModal";
 
 // ── Initial Mock Data ──────────────────────────────────────────
 
@@ -84,6 +94,63 @@ const INITIAL_TERMINATIONS = [
     severance: "None (Cause)",
     status: "Completed",
     reason: "Gross violation of data confidentiality and NDA policy.",
+  },
+];
+
+const INITIAL_OFFERS = [
+  {
+    id: "OFF-101",
+    candidateId: "CAND-008",
+    candidateName: "Liam Cooper",
+    email: "liam.cooper@email.com",
+    position: "Senior Backend Developer",
+    jobType: "Full-time",
+    dept: "Engineering",
+    salary: "$105,000 / annum",
+    location: "New York HQ",
+    workMode: "Hybrid",
+    sentDate: "2024-09-20",
+    joiningDate: "2024-10-15",
+    expiryDate: "2024-10-01",
+    reportingManager: "David Park (CTO)",
+    probationPeriod: "3 Months",
+    status: "Accepted",
+  },
+  {
+    id: "OFF-102",
+    candidateId: "CAND-005",
+    candidateName: "Tariq Al-Mansoor",
+    email: "tariq@email.com",
+    position: "HR Operations Lead",
+    jobType: "Full-time",
+    dept: "HR",
+    salary: "$95,000 / annum",
+    location: "Dubai Office",
+    workMode: "On-site",
+    sentDate: "2024-09-25",
+    joiningDate: "2024-11-01",
+    expiryDate: "2024-10-15",
+    reportingManager: "Sarah Mitchell (CEO)",
+    probationPeriod: "3 Months",
+    status: "Pending",
+  },
+  {
+    id: "OFF-103",
+    candidateId: "CAND-003",
+    candidateName: "Chen Li",
+    email: "chen.li@email.com",
+    position: "Software Engineer Intern",
+    jobType: "Internship",
+    dept: "Engineering",
+    salary: "₹50,000 / month",
+    location: "Mumbai Hub",
+    workMode: "Hybrid",
+    sentDate: "2024-09-28",
+    joiningDate: "2024-10-25",
+    expiryDate: "2024-10-12",
+    reportingManager: "David Park (CTO)",
+    probationPeriod: "None",
+    status: "Pending",
   },
 ];
 
@@ -179,18 +246,29 @@ const INITIAL_HOLIDAYS = [
 
 export default function HRAdminPage({ defaultTab }) {
   const showToast = useAppStore((s) => s.showToast);
+  const employees = useAppStore((s) => s.employees || []);
+  const { candidates, addOffer } = useRecruitmentStore();
   const [activeTab, setActiveTab] = useState(defaultTab || "teams");
 
   // Core Data Lists
   const [teams, setTeams] = useState(INITIAL_TEAMS);
   const [approvalChains, setApprovalChains] = useState(INITIAL_APPROVAL_CHAINS);
   const [terminations, setTerminations] = useState(INITIAL_TERMINATIONS);
+  const [offersList, setOffersList] = useState(INITIAL_OFFERS);
   const [resignations, setResignations] = useState(INITIAL_RESIGNATIONS);
   const [complaints, setComplaints] = useState(INITIAL_COMPLAINTS);
   const [holidays, setHolidays] = useState(INITIAL_HOLIDAYS);
 
   // Search & Filter
   const [search, setSearch] = useState("");
+  const [offerStatusFilter, setOfferStatusFilter] = useState("all");
+
+  // Letter & Offer Modals State
+  const [activeTerminationLetter, setActiveTerminationLetter] = useState(null);
+  const [isTerminationLetterModalOpen, setIsTerminationLetterModalOpen] = useState(false);
+  const [activeOfferLetter, setActiveOfferLetter] = useState(null);
+  const [isOfferLetterModalOpen, setIsOfferLetterModalOpen] = useState(false);
+  const [isGenerateOfferModalOpen, setIsGenerateOfferModalOpen] = useState(false);
 
   // Modals
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
@@ -277,6 +355,9 @@ export default function HRAdminPage({ defaultTab }) {
     showToast(`Approval Chain for ${created.module} configured`);
   };
 
+  const updateEmployeeStatus = useAppStore((s) => s.updateEmployeeStatus);
+  const addCalendarEvent = useCalendarStore((s) => s.addEvent);
+
   const handleCreateTermination = (e) => {
     e.preventDefault();
     if (!newTermination.employee) return;
@@ -284,21 +365,70 @@ export default function HRAdminPage({ defaultTab }) {
       id: `TRM-${100 + terminations.length + 1}`,
       ...newTermination,
       status: "In Exit Clearance",
+      createdAt: new Date().toISOString().split("T")[0],
     };
     setTerminations([created, ...terminations]);
     setIsTerminationModalOpen(false);
+    setActiveTerminationLetter(created);
+    setIsTerminationLetterModalOpen(true);
+
+    // Sync to Employee Directory
+    updateEmployeeStatus?.(created.employee, "Terminated");
+
     setNewTermination({
       employee: "",
       employeeId: "",
       dept: "Engineering",
       role: "",
       terminationType: "Involuntary (Performance)",
-      noticeDate: "2024-10-11",
-      exitDate: "2024-11-11",
+      noticeDate: new Date().toISOString().split("T")[0],
+      exitDate: new Date(Date.now() + 30 * 86400000).toISOString().split("T")[0],
       severance: "1 Month Gross",
       reason: "",
     });
-    showToast(`Termination order logged for ${created.employee}`);
+    showToast(`Termination order logged, letter generated & employee status updated for ${created.employee}`);
+  };
+
+  const handleUpdateTermination = (updated) => {
+    setTerminations((prev) =>
+      prev.map((t) => (t.id === updated.id ? updated : t))
+    );
+    setActiveTerminationLetter(updated);
+    showToast(`Termination letter & record updated`);
+  };
+
+  const handleCreateOffer = (newOffer) => {
+    setOffersList([newOffer, ...offersList]);
+    addOffer?.(newOffer);
+    setActiveOfferLetter(newOffer);
+    setIsOfferLetterModalOpen(true);
+    showToast(`Offer letter generated for ${newOffer.candidateName}`);
+  };
+
+  const handleUpdateOffer = (updated) => {
+    setOffersList((prev) =>
+      prev.map((o) => (o.id === updated.id ? updated : o))
+    );
+    setActiveOfferLetter(updated);
+    showToast(`Offer letter updated`);
+  };
+
+  const toggleTerminationStatus = (id) => {
+    setTerminations((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const nextStatus = t.status === "Completed" ? "In Exit Clearance" : "Completed";
+        showToast(`Termination status set to ${nextStatus}`);
+        return { ...t, status: nextStatus };
+      })
+    );
+  };
+
+  const toggleOfferStatus = (id, newStatus) => {
+    setOffersList((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
+    );
+    showToast(`Offer status updated to ${newStatus}`);
   };
 
   const handleCreateResignation = (e) => {
@@ -311,6 +441,10 @@ export default function HRAdminPage({ defaultTab }) {
     };
     setResignations([created, ...resignations]);
     setIsResignationModalOpen(false);
+
+    // Sync to Employee Directory
+    updateEmployeeStatus?.(created.employee, "Notice Period");
+
     setNewResignation({
       employee: "",
       employeeId: "",
@@ -322,7 +456,7 @@ export default function HRAdminPage({ defaultTab }) {
       handoverTo: "",
       reason: "",
     });
-    showToast(`Resignation recorded for ${created.employee}`);
+    showToast(`Resignation recorded & status updated to Notice Period for ${created.employee}`);
   };
 
   const handleCreateComplaint = (e) => {
@@ -358,8 +492,25 @@ export default function HRAdminPage({ defaultTab }) {
     };
     setHolidays([...holidays, created]);
     setIsHolidayModalOpen(false);
+
+    // Sync to Calendar Store
+    addCalendarEvent?.({
+      id: `EV-HOL-${Date.now()}`,
+      title: created.name,
+      date: created.date,
+      startDate: created.date,
+      endDate: created.date,
+      type: "Holiday",
+      category: "Company Holiday",
+      time: "All Day",
+      location: created.appliesTo,
+      dept: "All Staff",
+      organizer: "HR Governance",
+      description: `${created.type} holiday applying to ${created.appliesTo}.`,
+    });
+
     setNewHoliday({ name: "", date: "2024-11-01", day: "Friday", type: "National Gazetted", appliesTo: "All Locations" });
-    showToast(`Holiday "${created.name}" added to calendar`);
+    showToast(`Holiday "${created.name}" added to HR governance & synced to company calendar!`);
   };
 
   const handleSaveOrgSettings = (e) => {
@@ -394,6 +545,15 @@ export default function HRAdminPage({ defaultTab }) {
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
             >
               <Plus size={16} /> New Approval Chain
+            </button>
+          )}
+          {activeTab === "offers" && (
+            <button
+              type="button"
+              onClick={() => setIsGenerateOfferModalOpen(true)}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+            >
+              <Plus size={16} /> Generate Offer Letter
             </button>
           )}
           {activeTab === "terminations" && (
@@ -445,7 +605,7 @@ export default function HRAdminPage({ defaultTab }) {
       </div>
 
       {/* ── KPI Stat Cards ── */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
           <div className="text-[11.5px] text-muted flex items-center justify-between">
             <span>Teams</span>
@@ -461,6 +621,14 @@ export default function HRAdminPage({ defaultTab }) {
           </div>
           <div className="text-[20px] font-bold mt-1 text-slate-900">{approvalChains.length}</div>
           <div className="text-[10.5px] text-muted">Multi-tier active</div>
+        </div>
+        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
+          <div className="text-[11.5px] text-muted flex items-center justify-between">
+            <span>Offer Letters</span>
+            <FileCheck2 size={15} className="text-emerald-600" />
+          </div>
+          <div className="text-[20px] font-bold mt-1 text-emerald-700">{offersList.length}</div>
+          <div className="text-[10.5px] text-muted">Hired &amp; issued</div>
         </div>
         <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
           <div className="text-[11.5px] text-muted flex items-center justify-between">
@@ -501,6 +669,7 @@ export default function HRAdminPage({ defaultTab }) {
         {[
           { id: "teams", label: "Teams & Squads" },
           { id: "approvals", label: "Approval Chains" },
+          { id: "offers", label: `Offer Letters (${offersList.length})` },
           { id: "terminations", label: `Termination List (${terminations.length})` },
           { id: "resignations", label: `Resignation List (${resignations.length})` },
           { id: "complaints", label: `Complaint & Grievance List (${complaints.length})` },
@@ -617,14 +786,219 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
+      {/* ── TAB: OFFER LETTERS (HR ADMIN & HIRED RECRUITS) ── */}
+      {activeTab === "offers" && (
+        <div className="flex flex-col gap-4">
+          {/* Hired Candidates Banner */}
+          {candidates.some((c) => c.stage === "Hired") && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold">
+                  <Sparkles size={18} />
+                </div>
+                <div>
+                  <div className="text-[13px] font-bold text-emerald-950">
+                    Recruitment Integration: Hired Candidates Ready for Official Offer Letters
+                  </div>
+                  <div className="text-[12px] text-emerald-700">
+                    Candidates from recruitment pipeline in "Hired" stage:{" "}
+                    <b>
+                      {candidates
+                        .filter((c) => c.stage === "Hired")
+                        .map((c) => c.name)
+                        .join(", ")}
+                    </b>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGenerateOfferModalOpen(true)}
+                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 shadow-xs transition"
+              >
+                <Plus size={14} />
+                <span>Issue New Offer Letter</span>
+              </button>
+            </div>
+          )}
+
+          {/* Filter / Search Bar */}
+          <div className="bg-white border border-bdr rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <div className="relative w-full max-w-sm">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search offer letters by candidate, position, or ID..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-[12.5px] rounded-lg border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-muted font-medium">Status:</span>
+              {["all", "Accepted", "Pending", "Declined"].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setOfferStatusFilter(st)}
+                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition ${
+                    offerStatusFilter === st
+                      ? "bg-navy text-white"
+                      : "bg-off text-muted hover:text-slate-800"
+                  }`}
+                >
+                  {st === "all" ? "All Offers" : st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Offer Letters Table */}
+          <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
+              <span className="text-[13px] font-semibold text-slate-800">
+                Issued Employment Offer Letters &amp; Compensation Terms
+              </span>
+              <span className="text-[12px] text-muted">
+                Showing {offersList.length} total generated offers
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
+                  <tr>
+                    <th className="py-3 px-5">Candidate &amp; ID</th>
+                    <th className="py-3 px-5">Role &amp; Department</th>
+                    <th className="py-3 px-5">Job Type</th>
+                    <th className="py-3 px-5">Stipend / Salary</th>
+                    <th className="py-3 px-5">Location &amp; Mode</th>
+                    <th className="py-3 px-5">Joining Date</th>
+                    <th className="py-3 px-5">Status</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-bdr/40">
+                  {offersList
+                    .filter((o) => {
+                      const matchSearch =
+                        !search ||
+                        o.candidateName?.toLowerCase().includes(search.toLowerCase()) ||
+                        o.position?.toLowerCase().includes(search.toLowerCase()) ||
+                        o.id?.toLowerCase().includes(search.toLowerCase());
+                      const matchStatus =
+                        offerStatusFilter === "all" || o.status === offerStatusFilter;
+                      return matchSearch && matchStatus;
+                    })
+                    .map((o) => (
+                      <tr key={o.id} className="hover:bg-off/60 transition">
+                        <td className="py-4 px-5">
+                          <div className="font-bold text-slate-900">{o.candidateName}</div>
+                          <div className="text-[11px] font-mono text-muted">
+                            {o.id} • {o.email || "No email"}
+                          </div>
+                        </td>
+                        <td className="py-4 px-5">
+                          <div className="text-slate-800 font-medium">{o.position}</div>
+                          <div className="text-[11px] text-muted">{o.dept}</div>
+                        </td>
+                        <td className="py-4 px-5">
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            o.jobType === "Internship"
+                              ? "bg-purple-50 text-purple-700 border-purple-200"
+                              : o.jobType === "Contract"
+                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : "bg-blue-50 text-blue-700 border-blue-200"
+                          }`}>
+                            {o.jobType || "Full-time"}
+                          </span>
+                        </td>
+                        <td className="py-4 px-5">
+                          <div className="font-bold text-emerald-800">{o.salary}</div>
+                        </td>
+                        <td className="py-4 px-5">
+                          <div className="text-slate-800">{o.location || "New York HQ"}</div>
+                          <div className="text-[11px] text-muted">{o.workMode || "Hybrid"}</div>
+                        </td>
+                        <td className="py-4 px-5">
+                          <div className="text-slate-800 font-medium">{o.joiningDate}</div>
+                        </td>
+                        <td className="py-4 px-5">
+                          <select
+                            value={o.status}
+                            onChange={(e) => toggleOfferStatus(o.id, e.target.value)}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border cursor-pointer focus:outline-none ${
+                              o.status === "Accepted"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : o.status === "Declined"
+                                ? "bg-red-50 text-red-800 border-red-200"
+                                : "bg-amber-50 text-amber-800 border-amber-200"
+                            }`}
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="Accepted">Accepted</option>
+                            <option value="Declined">Declined</option>
+                          </select>
+                        </td>
+                        <td className="py-4 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveOfferLetter(o);
+                                setIsOfferLetterModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition cursor-pointer"
+                              title="View / Edit Offer Letter & Print PDF"
+                            >
+                              <FileCheck2 size={13} />
+                              <span>Letter &amp; PDF</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveOfferLetter(o);
+                                setIsOfferLetterModalOpen(true);
+                                setTimeout(() => window.print(), 350);
+                              }}
+                              className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                              title="Direct Print / Save PDF"
+                            >
+                              <Printer size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── TAB 3: TERMINATION LIST ── */}
       {activeTab === "terminations" && (
         <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
           <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
-            <span className="text-[13px] font-semibold text-slate-800">
-              Involuntary Exits &amp; Disciplinary Records
-            </span>
-            <span className="text-[12px] text-muted">Legal compliance and exit clearance status</span>
+            <div>
+              <span className="text-[13px] font-semibold text-slate-800">
+                Involuntary Exits, Disciplinary Records &amp; Termination Letters
+              </span>
+              <p className="text-[11.5px] text-muted">
+                Formal legal notices, exit clearance status, and changeable PDF termination documents
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsTerminationModalOpen(true)}
+              className="px-3.5 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 shadow-xs transition"
+            >
+              <Plus size={14} />
+              <span>Record Termination</span>
+            </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
@@ -640,49 +1014,88 @@ export default function HRAdminPage({ defaultTab }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40">
-                {terminations.map((t) => (
-                  <tr key={t.id} className="hover:bg-off/60 transition">
-                    <td className="py-4 px-5">
-                      <div className="font-bold text-slate-900">{t.employee}</div>
-                      <div className="text-[11px] font-mono text-muted">{t.employeeId} • {t.id}</div>
-                    </td>
-                    <td className="py-4 px-5">
-                      <div className="text-slate-800 font-medium">{t.role}</div>
-                      <div className="text-[11px] text-muted">{t.dept}</div>
-                    </td>
-                    <td className="py-4 px-5">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
-                        {t.terminationType}
-                      </span>
-                    </td>
-                    <td className="py-4 px-5">
-                      <div className="text-slate-800">Exit: <b>{t.exitDate}</b></div>
-                      <div className="text-[11px] text-muted">Notice: {t.noticeDate}</div>
-                    </td>
-                    <td className="py-4 px-5 text-slate-700">{t.severance}</td>
-                    <td className="py-4 px-5">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                          t.status === "Completed"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
-                        }`}
-                      >
-                        {t.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => showToast(`Reason: ${t.reason}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900"
-                        title="View Reason"
-                      >
-                        <Eye size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {terminations
+                  .filter((t) => {
+                    if (!search) return true;
+                    return (
+                      t.employee?.toLowerCase().includes(search.toLowerCase()) ||
+                      t.employeeId?.toLowerCase().includes(search.toLowerCase()) ||
+                      t.role?.toLowerCase().includes(search.toLowerCase()) ||
+                      t.id?.toLowerCase().includes(search.toLowerCase())
+                    );
+                  })
+                  .map((t) => (
+                    <tr key={t.id} className="hover:bg-off/60 transition">
+                      <td className="py-4 px-5">
+                        <div className="font-bold text-slate-900">{t.employee}</div>
+                        <div className="text-[11px] font-mono text-muted">{t.employeeId} • {t.id}</div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="text-slate-800 font-medium">{t.role}</div>
+                        <div className="text-[11px] text-muted">{t.dept}</div>
+                      </td>
+                      <td className="py-4 px-5">
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-red-50 text-red-700 border border-red-200">
+                          {t.terminationType}
+                        </span>
+                      </td>
+                      <td className="py-4 px-5">
+                        <div className="text-slate-800">Exit: <b>{t.exitDate}</b></div>
+                        <div className="text-[11px] text-muted">Notice: {t.noticeDate}</div>
+                      </td>
+                      <td className="py-4 px-5 text-slate-700">{t.severance}</td>
+                      <td className="py-4 px-5">
+                        <button
+                          type="button"
+                          onClick={() => toggleTerminationStatus(t.id)}
+                          title="Click to toggle clearance status"
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition cursor-pointer ${
+                            t.status === "Completed"
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                              : "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100"
+                          }`}
+                        >
+                          {t.status}
+                        </button>
+                      </td>
+                      <td className="py-4 px-5 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTerminationLetter(t);
+                              setIsTerminationLetterModalOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold bg-red-50 text-red-700 hover:bg-red-100 rounded-lg border border-red-200 transition cursor-pointer"
+                            title="View / Edit Termination Letter & Print PDF"
+                          >
+                            <FileText size={13} />
+                            <span>Letter &amp; PDF</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveTerminationLetter(t);
+                              setIsTerminationLetterModalOpen(true);
+                              setTimeout(() => window.print(), 350);
+                            }}
+                            className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                            title="Direct Print / Save PDF"
+                          >
+                            <Printer size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => showToast(`Reason: ${t.reason}`)}
+                            className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                            title="View Reason"
+                          >
+                            <Eye size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -1203,7 +1616,10 @@ export default function HRAdminPage({ defaultTab }) {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-6">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
-              <h3 className="font-bold text-[16px] text-slate-900">Record Employee Termination</h3>
+              <div>
+                <h3 className="font-bold text-[16px] text-slate-900">Record Employee Termination</h3>
+                <p className="text-[11.5px] text-muted">Auto-generates official separation letter upon submission</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsTerminationModalOpen(false)}
@@ -1213,6 +1629,36 @@ export default function HRAdminPage({ defaultTab }) {
               </button>
             </div>
             <form onSubmit={handleCreateTermination} className="flex flex-col gap-4">
+              {/* Quick Select Employee from Directory */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                <label className="block text-[11.5px] font-bold text-slate-700">
+                  Select Employee (Auto-fills from Staff Directory)
+                </label>
+                <select
+                  value={newTermination.employeeId || ""}
+                  onChange={(e) => {
+                    const emp = employees.find((x) => x.id === e.target.value);
+                    if (emp) {
+                      setNewTermination({
+                        ...newTermination,
+                        employee: emp.name,
+                        employeeId: emp.id,
+                        dept: emp.department || newTermination.dept,
+                        role: emp.designation || newTermination.role,
+                      });
+                    }
+                  }}
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy"
+                >
+                  <option value="">-- Choose active staff member (or enter below) --</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.id}) — {emp.designation} ({emp.department})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Employee Name</label>
@@ -1332,9 +1778,10 @@ export default function HRAdminPage({ defaultTab }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-red-700 text-white rounded-xl text-[13px] font-medium hover:bg-red-800"
+                  className="px-5 py-2 bg-red-700 text-white rounded-xl text-[13px] font-medium hover:bg-red-800 flex items-center gap-1.5 shadow-xs"
                 >
-                  Confirm Termination
+                  <FileText size={14} />
+                  <span>Confirm &amp; Generate Letter</span>
                 </button>
               </div>
             </form>
@@ -1357,6 +1804,36 @@ export default function HRAdminPage({ defaultTab }) {
               </button>
             </div>
             <form onSubmit={handleCreateResignation} className="flex flex-col gap-4">
+              {/* Quick Select Employee from Directory */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
+                <label className="block text-[11.5px] font-bold text-slate-700">
+                  Select Employee (Auto-fills from Staff Directory)
+                </label>
+                <select
+                  value={newResignation.employeeId || ""}
+                  onChange={(e) => {
+                    const emp = employees.find((x) => x.id === e.target.value);
+                    if (emp) {
+                      setNewResignation({
+                        ...newResignation,
+                        employee: emp.name,
+                        employeeId: emp.id,
+                        dept: emp.department || newResignation.dept,
+                        role: emp.designation || newResignation.role,
+                      });
+                    }
+                  }}
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy"
+                >
+                  <option value="">-- Choose active staff member (or enter below) --</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.id}) — {emp.designation} ({emp.department})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Employee Name</label>
@@ -1550,13 +2027,19 @@ export default function HRAdminPage({ defaultTab }) {
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Assign Lead Investigator</label>
-                <input
-                  type="text"
-                  required
+                <select
                   value={newComplaint.assignedInvestigator}
                   onChange={(e) => setNewComplaint({ ...newComplaint, assignedInvestigator: e.target.value })}
                   className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
-                />
+                >
+                  <option value="Ayesha Khan (HR Director)">Ayesha Khan (HR Director)</option>
+                  <option value="Sarah Mitchell (CEO)">Sarah Mitchell (CEO)</option>
+                  {employees.map((e) => (
+                    <option key={e.id || e.name} value={`${e.name} (${e.designation})`}>
+                      {e.name} ({e.designation})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Summary of Grievance</label>
@@ -1679,6 +2162,29 @@ export default function HRAdminPage({ defaultTab }) {
           </div>
         </div>
       )}
+
+      {/* ── Modal: Termination Letter Live Editor & PDF ── */}
+      <TerminationLetterModal
+        isOpen={isTerminationLetterModalOpen}
+        onClose={() => setIsTerminationLetterModalOpen(false)}
+        termination={activeTerminationLetter}
+        onUpdateTermination={handleUpdateTermination}
+      />
+
+      {/* ── Modal: Offer Letter Live Editor & PDF ── */}
+      <OfferLetterModal
+        isOpen={isOfferLetterModalOpen}
+        onClose={() => setIsOfferLetterModalOpen(false)}
+        offer={activeOfferLetter}
+        onUpdateOffer={handleUpdateOffer}
+      />
+
+      {/* ── Modal: Generate Offer Letter (Connected to Recruits) ── */}
+      <GenerateOfferModal
+        isOpen={isGenerateOfferModalOpen}
+        onClose={() => setIsGenerateOfferModalOpen(false)}
+        onSubmit={handleCreateOffer}
+      />
     </div>
   );
 }

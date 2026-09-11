@@ -1,17 +1,18 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
-import { Search, Eye, Pencil, Trash2, Copy, Users } from "lucide-react";
+import { Search, Eye, Pencil, Trash2, Copy, Users, ArrowLeft } from "lucide-react";
 
 export default function Jobs() {
   const { jobs, addJob, updateJob, deleteJob } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [search, setSearch] = useState("");
   const [dept, setDept] = useState("All");
@@ -22,6 +23,12 @@ export default function Jobs() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
+
+  useEffect(() => {
+    if (location.state?.openCreate) {
+      openCreate();
+    }
+  }, [location.state]);
   const [form, setForm] = useState({
     title: "",
     code: "",
@@ -223,7 +230,16 @@ export default function Jobs() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Header & Breadcrumb */}
+      {/* Back Button & Header */}
+      <button
+        type="button"
+        onClick={() => navigate("/hrms/recruitment")}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Recruitment Setup</span>
+      </button>
+
       <div className="flex flex-col gap-0.5">
         <div className="text-[12px] font-medium text-slate-400 flex items-center gap-1">
           <span>Home</span>

@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 
 const INITIAL_EMPLOYEES = [
@@ -144,15 +145,46 @@ const SHIFTS = ["All", "General", "Flexible", "Night"];
 const STATUSES = ["Present", "Late", "Absent", "WFH", "Half Day", "On Leave"];
 
 export default function MarkAttendance() {
-  const setToast = useAppStore((s) => s.setToast);
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const storeRecords = useAttendanceStore((s) => s.records);
+  const saveDailyAttendance = useAttendanceStore((s) => s.saveDailyAttendance);
+  const bulkUpdateStore = useAttendanceStore((s) => s.bulkUpdate);
 
   const [date, setDate] = useState("2024-10-11");
   const [dept, setDept] = useState("All");
   const [location, setLocation] = useState("All");
   const [shift, setShift] = useState("All");
 
-  const [rows, setRows] = useState(INITIAL_EMPLOYEES);
+  const [rows, setRows] = useState(() => {
+    if (storeRecords && storeRecords.length > 0) {
+      return storeRecords.map((r) => ({
+        ...r,
+        avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+        remarks: r.remarks || "",
+        checked: false,
+      }));
+    }
+    return INITIAL_EMPLOYEES;
+  });
+
   const [confirmOpen, setConfirmOpen] = useState(false);
+
+  // Sync rows if store records change externally
+  useEffect(() => {
+    if (storeRecords && storeRecords.length > 0) {
+      setRows((prev) => {
+        return storeRecords.map((r) => {
+          const existing = prev.find((p) => p.id === r.id);
+          return {
+            ...r,
+            avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+            remarks: existing ? existing.remarks : r.remarks || "",
+            checked: existing ? existing.checked : false,
+          };
+        });
+      });
+    }
+  }, [storeRecords]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -172,7 +204,8 @@ export default function MarkAttendance() {
   }
 
   function handleSave() {
-    setToast(`Attendance saved for ${filtered.length} employees on ${date}`);
+    saveDailyAttendance(date, rows);
+    setToast(`Attendance saved for ${rows.length} employees on ${date}`);
   }
 
   return (
@@ -351,8 +384,10 @@ export default function MarkAttendance() {
         confirmLabel="Confirm Update"
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {
+          const selectedIds = rows.filter((r) => r.checked).map((r) => r.id);
+          saveDailyAttendance(date, rows);
           setConfirmOpen(false);
-          setToast(`Attendance saved for ${selectedCount} employees`);
+          setToast(`Attendance saved for ${selectedIds.length || rows.length} employees`);
         }}
       />
 

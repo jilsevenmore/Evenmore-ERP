@@ -1,6 +1,7 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 
 const INITIAL_EMPLOYEES = [
@@ -30,7 +31,9 @@ const statusStyles = {
 };
 
 export default function BulkAttendance() {
-  const setToast = useAppStore((s) => s.setToast);
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const storeRecords = useAttendanceStore((s) => s.records);
+  const bulkUpdateStore = useAttendanceStore((s) => s.bulkUpdate);
 
   const [date, setDate] = useState("2024-10-11");
   const [dept, setDept] = useState("All");
@@ -38,7 +41,33 @@ export default function BulkAttendance() {
   const [shift, setShift] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
-  const [employees, setEmployees] = useState(INITIAL_EMPLOYEES);
+  const [employees, setEmployees] = useState(() => {
+    if (storeRecords && storeRecords.length > 0) {
+      return storeRecords.map((r) => ({
+        id: r.id,
+        name: r.name,
+        dept: r.dept,
+        status: r.status || "Present",
+        avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+      }));
+    }
+    return INITIAL_EMPLOYEES;
+  });
+
+  useEffect(() => {
+    if (storeRecords && storeRecords.length > 0) {
+      setEmployees(
+        storeRecords.map((r) => ({
+          id: r.id,
+          name: r.name,
+          dept: r.dept,
+          status: r.status || "Present",
+          avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+        }))
+      );
+    }
+  }, [storeRecords]);
+
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState("Present");
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -69,12 +98,14 @@ export default function BulkAttendance() {
   function handlePillClick(st) {
     setBulkStatus(st);
     if (selectedIds.size > 0) {
+      const idsArray = Array.from(selectedIds);
       setEmployees((prev) =>
         prev.map((e) => (selectedIds.has(e.id) ? { ...e, status: st } : e))
       );
-      setToast(`Updated ${selectedIds.size} selected employee(s) status to "${st}"`);
+      bulkUpdateStore(idsArray, st);
+      setToast(`Updated ${idsArray.length} employee(s) status to "${st}" in store.`);
     } else {
-      setToast(`Selected "${st}" status. Check employees to apply or click Save.`);
+      setToast(`Status "${st}" selected. Select employees and click "Save Attendance" to apply.`);
     }
   }
 
@@ -86,10 +117,12 @@ export default function BulkAttendance() {
   }
 
   function handleConfirmSave() {
+    const idsArray = Array.from(selectedIds);
     setEmployees((prev) =>
       prev.map((e) => (selectedIds.has(e.id) ? { ...e, status: bulkStatus } : e))
     );
-    setToast(`Bulk attendance saved as "${bulkStatus}" for ${selectedIds.size} employees on ${date}`);
+    bulkUpdateStore(idsArray, bulkStatus);
+    setToast(`Bulk attendance saved as "${bulkStatus}" for ${idsArray.length} employees on ${date}`);
     setConfirmOpen(false);
     setSelectedIds(new Set());
   }

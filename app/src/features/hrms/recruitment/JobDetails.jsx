@@ -1,6 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { Button } from "../../../components/hrms/Button";
+import { ArrowLeft } from "lucide-react";
 export default function JobDetails() {
   const { id } = useParams();
   const jobs = useRecruitmentStore((s) => s.jobs);
@@ -9,7 +10,16 @@ export default function JobDetails() {
   const job = jobs.find((j) => j.id === id);
   if (!job) return <div className="py-10 text-center">Job not found <Button variant="secondary" onClick={() => navigate("/hrms/recruitment/jobs")}>Back</Button></div>;
   const applicants = candidates.filter((c) => c.jobId === job.id);
-  return <div className="flex flex-col gap-6">
+  return <div className="flex flex-col gap-4">
+      <button
+        type="button"
+        onClick={() => navigate(-1)}
+        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+      >
+        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <span>Back to Jobs</span>
+      </button>
+
       <div className="flex flex-wrap justify-between gap-3">
         <div><h1 className="text-[22px] font-bold">{job.title}</h1><p className="text-[13px] text-muted">{job.department} • {job.branch} • {job.employmentType} • {job.workMode} • {job.experience} • {job.openings} openings • Recruiter: {job.recruiter} • Hiring Manager: {job.hiringManager}</p><span className={`mt-2 inline-flex px-2 py-1 rounded-full text-[11px] border ${job.status === "Open" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-gray-50 border-bdr"}`}>{job.status}</span></div>
         <Button onClick={() => navigate("/hrms/recruitment/applications")}>View Applicants</Button>

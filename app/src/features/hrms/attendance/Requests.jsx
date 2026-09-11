@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { ChevronRight, Search, Calendar as CalendarIcon, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 
@@ -124,9 +125,25 @@ const statusStyles = {
 };
 
 export default function Requests() {
-  const setToast = useAppStore((s) => s.setToast);
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const storeEmployees = useAppStore((s) => s.employees || []);
+  const storeRequests = useAttendanceStore((s) => s.requests || []);
+  const setStoreRequestStatus = useAttendanceStore((s) => s.setRequestStatus);
+  const addStoreRequest = useAttendanceStore((s) => s.addRequest);
 
-  const [requestsList, setRequestsList] = useState(SAMPLE_REQUESTS);
+  // Normalize requests
+  const requestsList = useMemo(() => {
+    if (storeRequests && storeRequests.length > 0) {
+      return storeRequests.map((r) => ({
+        ...r,
+        avatar: r.avatar || `https://i.pravatar.cc/100?u=${r.id || r.employee}`,
+        dept: r.dept || "General",
+        submitted: r.submitted || "Recent",
+      }));
+    }
+    return SAMPLE_REQUESTS;
+  }, [storeRequests]);
+
   const [tab, setTab] = useState("All");
 
   const [search, setSearch] = useState("");
@@ -194,11 +211,7 @@ export default function Requests() {
   };
 
   const handleApprove = (id) => {
-    setRequestsList((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, status: "Approved", reviewer: "Ayesha Khan" } : r
-      )
-    );
+    setStoreRequestStatus(id, "Approved", { reviewer: "Ayesha Khan" });
     setToast("Attendance request approved.");
     setApproveId(null);
     if (selectedReq?.id === id) {
@@ -208,13 +221,7 @@ export default function Requests() {
 
   const handleReject = () => {
     if (!rejectId) return;
-    setRequestsList((prev) =>
-      prev.map((r) =>
-        r.id === rejectId
-          ? { ...r, status: "Rejected", reviewer: "Ayesha Khan", rejectReason }
-          : r
-      )
-    );
+    setStoreRequestStatus(rejectId, "Rejected", { reviewer: "Ayesha Khan", rejectReason });
     setToast("Attendance request rejected.");
     setRejectId(null);
     setRejectReason("");
@@ -225,23 +232,19 @@ export default function Requests() {
 
   const handleRegSubmit = () => {
     if (!regForm.reason) return setToast("Please enter reason for regularization.", "error");
-    const newReq = {
-      id: `REQ-${1007 + requestsList.length}`,
+    addStoreRequest({
       employee: regForm.employee,
       dept: "Engineering",
       type: "Regularization",
-      date: "12 Oct 2024",
+      date: regForm.date || "12 Oct 2024",
       currentIn: regForm.curIn,
       currentOut: regForm.curOut,
       requestedIn: regForm.reqIn,
       requestedOut: regForm.reqOut,
       reason: regForm.reason,
       requestedBy: regForm.employee,
-      submitted: "Today",
       status: "Pending",
-      avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-    };
-    setRequestsList((prev) => [newReq, ...prev]);
+    });
     setToast("Regularization request submitted successfully.");
     setShowRegModal(false);
     setRegForm({
@@ -257,23 +260,19 @@ export default function Requests() {
 
   const handleEarlySubmit = () => {
     if (!earlyForm.reason) return setToast("Please enter reason for early clock-out.", "error");
-    const newReq = {
-      id: `REQ-${1007 + requestsList.length}`,
+    addStoreRequest({
       employee: earlyForm.employee,
       dept: "Design",
       type: "Early Clock-Out",
-      date: "12 Oct 2024",
+      date: earlyForm.date || "12 Oct 2024",
       currentIn: earlyForm.curIn,
       currentOut: earlyForm.curOut,
       requestedIn: earlyForm.curIn,
       requestedOut: earlyForm.reqOut,
       reason: earlyForm.reason,
       requestedBy: earlyForm.employee,
-      submitted: "Today",
       status: "Pending",
-      avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-    };
-    setRequestsList((prev) => [newReq, ...prev]);
+    });
     setToast("Early clock-out request submitted successfully.");
     setShowEarlyModal(false);
     setEarlyForm({
@@ -594,12 +593,9 @@ export default function Requests() {
               value={regForm.employee}
               onChange={(e) => setRegForm({ ...regForm, employee: e.target.value })}
             >
-              <option>Priya Patel</option>
-              <option>Marcus Chen</option>
-              <option>Liam Cooper</option>
-              <option>Sarah Wilson</option>
-              <option>Chen Li</option>
-              <option>Rahul Verma</option>
+              {(storeEmployees.length > 0 ? storeEmployees.map((e) => e.name) : ["Priya Patel", "Marcus Chen", "Liam Cooper", "Sarah Wilson", "Chen Li", "Rahul Verma"]).map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
           <div className="form-row">
@@ -675,9 +671,9 @@ export default function Requests() {
               value={earlyForm.employee}
               onChange={(e) => setEarlyForm({ ...earlyForm, employee: e.target.value })}
             >
-              <option>Marcus Chen</option>
-              <option>Priya Patel</option>
-              <option>Sarah Wilson</option>
+              {(storeEmployees.length > 0 ? storeEmployees.map((e) => e.name) : ["Marcus Chen", "Priya Patel", "Sarah Wilson", "Liam Cooper"]).map((name) => (
+                <option key={name} value={name}>{name}</option>
+              ))}
             </select>
           </div>
           <div className="form-row">

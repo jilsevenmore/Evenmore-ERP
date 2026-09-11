@@ -1,9 +1,10 @@
 import { useState, useMemo } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
 
-const EMPLOYEES_LIST = [
+const DEFAULT_EMPLOYEES = [
   {
     id: "EMP1024",
     name: "Priya Patel",
@@ -68,9 +69,27 @@ const statusStyles = {
 };
 
 export default function IndividualAttendance() {
-  const setToast = useAppStore((s) => s.setToast);
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const storeEmployees = useAppStore((s) => s.employees || []);
+  const storeRecords = useAttendanceStore((s) => s.records || []);
+  const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
 
-  const [selectedEmpId, setSelectedEmpId] = useState("EMP1024");
+  const employeesList = useMemo(() => {
+    if (storeEmployees && storeEmployees.length > 0) {
+      return storeEmployees.map((e) => ({
+        id: e.id || `EMP${e.employeeId || "1024"}`,
+        name: e.name,
+        designation: e.designation || e.role || "Employee",
+        dept: e.department || e.dept || "General",
+        manager: e.manager || "HR Manager",
+        status: e.status || "Active",
+        avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
+      }));
+    }
+    return DEFAULT_EMPLOYEES;
+  }, [storeEmployees]);
+
+  const [selectedEmpId, setSelectedEmpId] = useState(() => employeesList[0]?.id || "EMP1024");
   const [selectedMonth, setSelectedMonth] = useState("October");
   const [selectedYear, setSelectedYear] = useState("2024");
   const [viewMode, setViewMode] = useState("Table");
@@ -80,8 +99,8 @@ export default function IndividualAttendance() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const currentEmp = useMemo(
-    () => EMPLOYEES_LIST.find((e) => e.id === selectedEmpId) || EMPLOYEES_LIST[0],
-    [selectedEmpId]
+    () => employeesList.find((e) => e.id === selectedEmpId) || employeesList[0] || DEFAULT_EMPLOYEES[0],
+    [employeesList, selectedEmpId]
   );
 
   const stats = useMemo(() => {
@@ -100,6 +119,14 @@ export default function IndividualAttendance() {
     setRecords((prev) =>
       prev.map((r) => (r.date === editItem.date ? { ...r, ...editItem } : r))
     );
+    // If this date corresponds to the active record in store, sync it
+    if (updateStoreRecord) {
+      updateStoreRecord(selectedEmpId, {
+        checkIn: editItem.checkIn,
+        checkOut: editItem.checkOut,
+        status: editItem.status,
+      });
+    }
     setToast(`Attendance record for ${editItem.date} updated.`);
     setEditItem(null);
   };
@@ -129,7 +156,7 @@ export default function IndividualAttendance() {
             onChange={(e) => setSelectedEmpId(e.target.value)}
             className="ind-select ind-select-emp"
           >
-            {EMPLOYEES_LIST.map((e) => (
+            {employeesList.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.name} — {e.id}
               </option>
