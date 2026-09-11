@@ -552,6 +552,9 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
   // Graph compatibility alias: old codebase exposed SourcesEmailsTab; current UI uses SourcesAndEmailsTab.
   // Both names resolve to the same implementation so graph queries keep working.
 
+  // Graph compatibility alias: old codebase exposed SourcesEmailsTab; current UI uses SourcesAndEmailsTab.
+  // Both names resolve to the same implementation so graph queries keep working.
+
   return (
     <div className="space-y-4">
       {/* 2-Column Grid for Lead Sources & Emails */}
