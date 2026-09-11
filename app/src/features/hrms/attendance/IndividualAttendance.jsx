@@ -425,14 +425,14 @@ export default function IndividualAttendance() {
       </Modal>
 
       <style>{`
-        .ind-att-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
-        .ind-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
-        .ind-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .ind-att-page { width: 100%; display: flex; flex-direction: column; gap: 20px; }
+        .ind-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 2px; }
+        .ind-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
         .ind-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
         .ind-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
 
         .ind-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
-        .ind-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .ind-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
 
         .ind-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 100px; }
         .ind-select:focus { border-color: #94a3b8; background-color: #fff; }
@@ -442,13 +442,13 @@ export default function IndividualAttendance() {
         .ind-tab { border: 1.5px solid transparent; border-radius: 999px; padding: 4px 16px; font-size: 13px; font-weight: 500; color: #8e9baa; background: transparent; cursor: pointer; transition: all 0.15s ease; }
         .ind-tab.active { font-weight: 600; color: #000000; background: #ffffff; border-color: #000000; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
 
-        .ind-hero-card { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .ind-hero-card { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
         .ind-hero-avatar { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; }
         .ind-status-pill { display: inline-block; font-size: 11px; font-weight: 600; color: #15803d; background: #e6f4ea; border: 1px solid #a7f3d0; border-radius: 999px; padding: 2px 9px; }
         .ind-btn-view-emp { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 7px 16px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; }
         .ind-btn-view-emp:hover { background: #f9fafb; }
 
-        .ind-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
+        .ind-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 4px; }
         .ind-stat-card { background: #fff; border: 1px solid #e8edf3; border-radius: 14px; padding: 16px 14px; text-align: center; box-shadow: 0 1px 2px rgba(16,24,40,0.03); }
         .ind-stat-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #6b7280; text-transform: uppercase; }
         .ind-stat-val { display: block; font-size: 22px; font-weight: 800; color: #111827; letter-spacing: -0.02em; margin-top: 6px; }
@@ -478,7 +478,6 @@ export default function IndividualAttendance() {
         }
         @media (max-width: 640px) {
           .ind-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .ind-att-page { padding: 14px 14px 22px; }
         }
       `}</style>
     </div>
