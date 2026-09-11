@@ -45,7 +45,15 @@ import { useERP } from '../../context/ERPContext';
 
 // ── Navigation Structure ──────────────────────────────────────
 const NAV = [
-  { label: 'Dashboard', icon: Home, to: '/dashboard' },
+  {
+    label: 'Dashboard',
+    icon: Home,
+    defaultOpen: false,
+    children: [
+      { label: 'Main Dashboard', icon: Home, to: '/dashboard' },
+      { label: 'CRM Dashboard', icon: Home, to: '/crm/dashboard' },
+    ],
+  },
 
   {
     label: 'CRM',
@@ -286,6 +294,25 @@ function SubItem({ item, badges = {} }) {
           currentPath === '/crm/leads/create-form')));
   const isActive = isFormBuilderAlias || isExact || (isPrefix && !hasBetterMatch);
   const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
+  const Icon = item.icon;
+
+  // Icon leaves (e.g. CRM > Dashboard) render like screenshot: nav-row pill with icon
+  if (Icon && item.to) {
+    return (
+      <NavLink
+        to={item.to}
+        className={() => `nav-row${isActive ? ' section-active' : ''}`}
+      >
+        <Icon size={17} strokeWidth={1.9} className="nav-ico" />
+        <span className="nav-txt">{item.label}</span>
+        {count > 0 && (
+          <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+            {count}
+          </span>
+        )}
+      </NavLink>
+    );
+  }
 
   return (
     <NavLink
@@ -322,7 +349,7 @@ function SubList({ items, depth, badges }) {
 // ── Expandable group row ────────────────────────────────────
 function ExpandableRow({ item, depth = 0, badges = {} }) {
   const location = useLocation();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(item.defaultOpen));
   const Icon = item.icon;
 
   function handleClick() {

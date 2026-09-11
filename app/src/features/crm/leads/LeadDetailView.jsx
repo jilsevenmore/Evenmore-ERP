@@ -40,9 +40,11 @@ import {
   Megaphone,
   User,
   ChevronDown,
+  ArrowLeft,
 } from 'lucide-react';
 import LeadAvatar from './LeadAvatar';
 import { exportToCSV } from '../../../services/exportUtils';
+import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { employeesMock } from '../../../data/hrms/mocks/data';
 
 const DETAIL_TABS = [
@@ -70,6 +72,72 @@ const DETAIL_TAB_ICONS = {
   'Delivery Challans': Truck,
   Activity: Sparkles,
 };
+
+const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
+const LEAD_DETAIL_STORAGE_KEY = 'evenmore-crm-lead-details-v1';
+
+function readStoredJson(key, fallback) {
+  try {
+    if (typeof localStorage === 'undefined') return fallback;
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredJson(key, value) {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function loadStoredLeadRows() {
+  const stored = readStoredJson(LEADS_STORAGE_KEY, null);
+  return Array.isArray(stored) && stored.length > 0 ? stored : seedLeads;
+}
+
+function loadStoredLeadDetails() {
+  const stored = readStoredJson(LEAD_DETAIL_STORAGE_KEY, {});
+  return stored && typeof stored === 'object' ? stored : {};
+}
+
+function updateStoredLead(leadId, updates) {
+  if (!leadId || !updates || Object.keys(updates).length === 0) return false;
+  const nextRows = loadStoredLeadRows().map((row) => (
+    String(row.id) === String(leadId) ? { ...row, ...updates } : row
+  ));
+  return writeStoredJson(LEADS_STORAGE_KEY, nextRows);
+}
+
+function updateStoredLeadDetail(leadId, updates) {
+  if (!leadId || !updates || Object.keys(updates).length === 0) return false;
+  const current = loadStoredLeadDetails();
+  const key = String(leadId);
+  current[key] = { ...(current[key] || {}), ...updates };
+  return writeStoredJson(LEAD_DETAIL_STORAGE_KEY, current);
+}
+
+function limitItems(items, count) {
+  if (!Array.isArray(items)) return [];
+  const normalizedCount = Number(count);
+  if (!Number.isFinite(normalizedCount)) return items;
+  if (normalizedCount <= 0) return [];
+  return items.slice(0, normalizedCount);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file.'));
+    reader.readAsDataURL(file);
+  });
+}
 
 function formatAmount(value) {
   return `Rs. ${(value || 0).toLocaleString('en-IN')}`;
@@ -99,21 +167,156 @@ function buildUsers() {
   ];
 }
 
-function buildProducts() {
-  return [
+function buildProducts(lead) {
+  const defaults = [
     { id: 1, name: 'Endoscopy Machine', sku: 'END-001', price: 'Rs. 1,20,000', qty: 1, status: 'Active', image: '' },
     { id: 2, name: 'Monitor 4K', sku: 'MON-004', price: 'Rs. 45,000', qty: 2, status: 'Active', image: '' },
     { id: 3, name: 'Surgical Kit', sku: 'SK-010', price: 'Rs. 25,000', qty: 1, status: 'Draft', image: '' },
+  ];
+  return limitItems(defaults, lead?.productsCount);
+}
+
+function buildLeadSources(lead) {
+  const defaults = [
+    {
+      id: 1,
+      source: lead?.source || 'Website',
+      sourceType: String(lead?.source || 'Website').toLowerCase(),
+      details: 'Contact Form (Homepage)',
+      date: '27/08/2026 01:42 PM',
+      createdBy: 'David Patel',
+      avatar: 'https://i.pravatar.cc/160?img=68',
+      color: '#10b981',
+      icon: Globe,
+    },
+    {
+      id: 2,
+      source: 'Referral',
+      sourceType: 'referral',
+      details: 'Recommended by Priya Mehta',
+      date: '25/08/2026 11:20 AM',
+      createdBy: 'Priya Mehta',
+      avatar: 'https://i.pravatar.cc/160?img=47',
+      color: '#f59e0b',
+      icon: User,
+    },
+    {
+      id: 3,
+      source: 'Advertisement',
+      sourceType: 'ad',
+      details: 'Instagram Ads',
+      date: '20/08/2026 05:30 PM',
+      createdBy: 'Rohit Sharma',
+      avatar: 'https://i.pravatar.cc/160?img=15',
+      color: '#ec4899',
+      icon: Megaphone,
+    },
+  ];
+  return limitItems(defaults, lead?.sourcesCount);
+}
+
+function buildLeadEmails() {
+  return [
+    {
+      id: 1,
+      subject: 'Product Inquiry',
+      date: '27/08/2026 01:45 PM',
+      person: 'Chirag Hirapara',
+      avatar: 'https://i.pravatar.cc/160?img=60',
+      status: 'Received',
+      statusColor: 'slate',
+    },
+    {
+      id: 2,
+      subject: 'Follow Up - Call Scheduled',
+      date: '27/08/2026 03:20 PM',
+      person: 'David Patel',
+      avatar: 'https://i.pravatar.cc/160?img=68',
+      status: 'Sent',
+      statusColor: 'green',
+    },
+    {
+      id: 3,
+      subject: 'Quotation Shared',
+      date: '26/08/2026 11:10 AM',
+      person: 'Priya Mehta',
+      avatar: 'https://i.pravatar.cc/160?img=47',
+      status: 'Sent',
+      statusColor: 'green',
+    },
+    {
+      id: 4,
+      subject: 'Re: Quotation',
+      date: '26/08/2026 02:35 PM',
+      person: 'Chirag Hirapara',
+      avatar: 'https://i.pravatar.cc/160?img=60',
+      status: 'Received',
+      statusColor: 'slate',
+    },
+    {
+      id: 5,
+      subject: 'Final Discussion',
+      date: '25/08/2026 04:12 PM',
+      person: 'Rohit Sharma',
+      avatar: 'https://i.pravatar.cc/160?img=15',
+      status: 'Sent',
+      statusColor: 'green',
+    },
+  ];
+}
+
+function buildLeadTimeline() {
+  return [
+    {
+      id: 1,
+      type: 'sent',
+      title: 'Quotation Shared',
+      preview: 'Hi Chirag, Please find the attached quotation for the Endoscopy Machine. Let me know if you have any questions.',
+      date: '26/08/2026 11:10 AM',
+      author: 'Priya Mehta',
+      dotColor: '#10b981',
+    },
+    {
+      id: 2,
+      type: 'received',
+      title: 'Re: Quotation',
+      preview: 'Thanks for the quotation. Looks good. I would like to discuss the payment terms.',
+      date: '26/08/2026 02:35 PM',
+      author: 'Chirag Hirapara',
+      dotColor: '#64748b',
+    },
+    {
+      id: 3,
+      type: 'sent',
+      title: 'Follow Up - Call Scheduled',
+      preview: 'Hi Chirag, As discussed, we have scheduled a call tomorrow at 11 AM to finalize the order.',
+      date: '27/08/2026 03:20 PM',
+      author: 'David Patel',
+      dotColor: '#10b981',
+    },
   ];
 }
 
 function buildSentFiles(lead) {
   const company = lead?.company || 'Hirapara Industries';
   const owner = lead?.owner || 'David Patel';
-  return [
+  const defaults = [
     { id: `file-${lead?.id || 0}-1`, type: 'image', name: `${company} Front Desk.jpg`, size: '2.4 MB', sentOn: 'Aug 26, 2026', sentBy: owner, preview: 'https://images.unsplash.com/photo-1519494080410-f9aa8f52f12e?auto=format&fit=crop&w=900&q=80', downloadUrl: 'https://images.unsplash.com/photo-1519494080410-f9aa8f52f12e?auto=format&fit=crop&w=1600&q=90', description: 'Shared for location confirmation.' },
     { id: `file-${lead?.id || 0}-2`, type: 'document', name: `${company} Product Quotation.pdf`, size: '860 KB', sentOn: 'Aug 28, 2026', sentBy: owner, preview: '', downloadUrl: '', description: 'Final quotation document.' },
   ];
+  return limitItems(defaults, lead?.filesCount);
+}
+
+function loadLeadDetailState(lead) {
+  const stored = loadStoredLeadDetails()[String(lead?.id || '')] || {};
+  return {
+    users: Array.isArray(stored.users) ? stored.users : buildUsers(lead),
+    products: Array.isArray(stored.products) ? stored.products : buildProducts(lead),
+    sources: Array.isArray(stored.sources) ? stored.sources : buildLeadSources(lead),
+    emails: Array.isArray(stored.emails) ? stored.emails : buildLeadEmails(),
+    timeline: Array.isArray(stored.timeline) ? stored.timeline : buildLeadTimeline(),
+    files: Array.isArray(stored.files) ? stored.files : buildSentFiles(lead),
+  };
 }
 
 function buildDiscussionThreads(lead) {
@@ -254,126 +457,25 @@ function metricCards(counts) {
 }
 
 // ── 1. Sources & Emails Tab (Screenshot Focus) ────────────────
-function SourcesAndEmailsTab({ lead, sourceEntries, onSourcesChange, onCountsChange }) {
-  const [sources, setSources] = useState([
-    {
-      id: 1,
-      source: 'Website',
-      sourceType: 'website',
-      details: 'Contact Form (Homepage)',
-      date: '27/08/2026 01:42 PM',
-      createdBy: 'David Patel',
-      avatar: 'https://i.pravatar.cc/160?img=68',
-      color: '#10b981',
-      icon: Globe,
-    },
-    {
-      id: 2,
-      source: 'Referral',
-      sourceType: 'referral',
-      details: 'Recommended by Priya Mehta',
-      date: '25/08/2026 11:20 AM',
-      createdBy: 'Priya Mehta',
-      avatar: 'https://i.pravatar.cc/160?img=47',
-      color: '#f59e0b',
-      icon: User,
-    },
-    {
-      id: 3,
-      source: 'Advertisement',
-      sourceType: 'ad',
-      details: 'Instagram Ads',
-      date: '20/08/2026 05:30 PM',
-      createdBy: 'Rohit Sharma',
-      avatar: 'https://i.pravatar.cc/160?img=15',
-      color: '#ec4899',
-      icon: Megaphone,
-    },
-  ]);
-
-  const [emails, setEmails] = useState([
-    {
-      id: 1,
-      subject: 'Product Inquiry',
-      date: '27/08/2026 01:45 PM',
-      person: 'Chirag Hirapara',
-      avatar: 'https://i.pravatar.cc/160?img=60',
-      status: 'Received',
-      statusColor: 'slate',
-    },
-    {
-      id: 2,
-      subject: 'Follow Up - Call Scheduled',
-      date: '27/08/2026 03:20 PM',
-      person: 'David Patel',
-      avatar: 'https://i.pravatar.cc/160?img=68',
-      status: 'Sent',
-      statusColor: 'green',
-    },
-    {
-      id: 3,
-      subject: 'Quotation Shared',
-      date: '26/08/2026 11:10 AM',
-      person: 'Priya Mehta',
-      avatar: 'https://i.pravatar.cc/160?img=47',
-      status: 'Sent',
-      statusColor: 'green',
-    },
-    {
-      id: 4,
-      subject: 'Re: Quotation',
-      date: '26/08/2026 02:35 PM',
-      person: 'Chirag Hirapara',
-      avatar: 'https://i.pravatar.cc/160?img=60',
-      status: 'Received',
-      statusColor: 'slate',
-    },
-    {
-      id: 5,
-      subject: 'Final Discussion',
-      date: '25/08/2026 04:12 PM',
-      person: 'Rohit Sharma',
-      avatar: 'https://i.pravatar.cc/160?img=15',
-      status: 'Sent',
-      statusColor: 'green',
-    },
-  ]);
-
-  const [timeline, setTimeline] = useState([
-    {
-      id: 1,
-      type: 'sent',
-      title: 'Quotation Shared',
-      preview: 'Hi Chirag, Please find the attached quotation for the Endoscopy Machine. Let me know if you have any questions.',
-      date: '26/08/2026 11:10 AM',
-      author: 'Priya Mehta',
-      dotColor: '#10b981',
-    },
-    {
-      id: 2,
-      type: 'received',
-      title: 'Re: Quotation',
-      preview: 'Thanks for the quotation. Looks good. I would like to discuss the payment terms.',
-      date: '26/08/2026 02:35 PM',
-      author: 'Chirag Hirapara',
-      dotColor: '#64748b',
-    },
-    {
-      id: 3,
-      type: 'sent',
-      title: 'Follow Up - Call Scheduled',
-      preview: 'Hi Chirag, As discussed, we have scheduled a call tomorrow at 11 AM to finalize the order.',
-      date: '27/08/2026 03:20 PM',
-      author: 'David Patel',
-      dotColor: '#10b981',
-    },
-  ]);
+function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
+  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const [sources, setSources] = useState(() => initialState.sources);
+  const [emails, setEmails] = useState(() => initialState.emails);
+  const [timeline, setTimeline] = useState(() => initialState.timeline);
 
   const [showAddSource, setShowAddSource] = useState(false);
   const [showSendEmail, setShowSendEmail] = useState(false);
   const [newSource, setNewSource] = useState({ source: 'Website', details: '' });
   const [newEmail, setNewEmail] = useState({ subject: '', message: '' });
   const [recipients, setRecipients] = useState([lead.email].filter(Boolean));
+
+  React.useEffect(() => {
+    updateStoredLeadDetail(lead?.id, { sources, emails, timeline });
+  }, [lead?.id, sources, emails, timeline]);
+
+  React.useEffect(() => {
+    onCountsChange?.({ sources: sources.length });
+  }, [sources.length, onCountsChange]);
 
   function toggleRecipient(email) {
     setRecipients((current) => (current.includes(email) ? current.filter((r) => r !== email) : [...current, email]));
@@ -401,9 +503,10 @@ function SourcesAndEmailsTab({ lead, sourceEntries, onSourcesChange, onCountsCha
       color: '#1f6bff',
       icon: Globe,
     };
-    setSources([added, ...sources]);
+    setSources((current) => [added, ...current]);
     setNewSource({ source: 'Website', details: '' });
     setShowAddSource(false);
+    onActivity?.(`Source "${added.source}" added`, '#10b981');
   };
 
   const handleSendEmail = (e) => {
@@ -428,16 +531,23 @@ function SourcesAndEmailsTab({ lead, sourceEntries, onSourcesChange, onCountsCha
       author: 'David Patel',
       dotColor: '#10b981',
     };
-    setEmails([addedEmail, ...emails]);
-    setTimeline([addedTimeline, ...timeline]);
+    setEmails((current) => [addedEmail, ...current]);
+    setTimeline((current) => [addedTimeline, ...current]);
     setNewEmail({ subject: '', message: '' });
     setShowSendEmail(false);
-    onSourcesChange?.(sources.length + (addedEmail ? 0 : 0));
-    onCountsChange?.({ sources: sources.length, emails: emails.length + 1 });
+    onActivity?.(`Email "${addedEmail.subject}" sent`, '#3b82f6');
   };
 
-  const deleteSource = (id) => setSources(sources.filter((s) => s.id !== id));
-  const deleteEmail = (id) => setEmails(emails.filter((e) => e.id !== id));
+  const deleteSource = (id) => {
+    const target = sources.find((s) => s.id === id);
+    setSources((current) => current.filter((source) => source.id !== id));
+    onActivity?.(`Source "${target?.source ?? 'entry'}" removed`, '#f59e0b');
+  };
+  const deleteEmail = (id) => {
+    const target = emails.find((e) => e.id === id);
+    setEmails((current) => current.filter((email) => email.id !== id));
+    onActivity?.(`Email "${target?.subject ?? 'entry'}" deleted`, '#f59e0b');
+  };
 
   // Graph compatibility alias: old codebase exposed SourcesEmailsTab; current UI uses SourcesAndEmailsTab.
   // Both names resolve to the same implementation so graph queries keep working.
@@ -713,8 +823,9 @@ function SourcesAndEmailsTab({ lead, sourceEntries, onSourcesChange, onCountsCha
 }
 
 // ── Files Tab ───────────────────────────────────────────────
-function FilesTab({ lead, onCountsChange }) {
-  const [files, setFiles] = useState(() => buildSentFiles(lead));
+function FilesTab({ lead, onCountsChange, onActivity }) {
+  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const [files, setFiles] = useState(() => initialState.files);
   const [fileSearch, setFileSearch] = useState('');
   const [fileType, setFileType] = useState('All');
   const [viewFile, setViewFile] = useState(null);
@@ -726,26 +837,31 @@ function FilesTab({ lead, onCountsChange }) {
   }), [files, fileSearch, fileType]);
 
   React.useEffect(() => {
+    updateStoredLeadDetail(lead?.id, { files });
     onCountsChange?.({ files: files.length });
-  }, [files.length, onCountsChange]);
+  }, [lead?.id, files, files.length, onCountsChange]);
 
-  function handleUploadFiles(event) {
+  async function handleUploadFiles(event) {
     const selected = Array.from(event.target.files || []);
     if (selected.length === 0) return;
     const now = new Date().toLocaleDateString('en-GB');
-    const uploaded = selected.map((file) => ({
-      id: `file-upload-${Date.now()}-${file.name}`,
-      type: file.type.startsWith('image/') ? 'image' : 'document',
-      name: file.name,
-      size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
-      sentOn: now,
-      sentBy: lead?.owner || 'David Patel',
-      preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : '',
-      downloadUrl: '',
-      description: 'Uploaded from Files tab.',
+    const uploaded = await Promise.all(selected.map(async (file) => {
+      const imagePreview = file.type.startsWith('image/') ? await readFileAsDataUrl(file) : '';
+      return {
+        id: `file-upload-${Date.now()}-${file.name}`,
+        type: file.type.startsWith('image/') ? 'image' : 'document',
+        name: file.name,
+        size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
+        sentOn: now,
+        sentBy: lead?.owner || 'David Patel',
+        preview: imagePreview,
+        downloadUrl: imagePreview,
+        description: 'Uploaded from Files tab.',
+      };
     }));
     setFiles((current) => [...uploaded, ...current]);
     event.target.value = '';
+    onActivity?.(`${uploaded.length} file${uploaded.length > 1 ? 's' : ''} uploaded`, '#8b5cf6');
   }
 
   function handleViewFile(file) {
@@ -765,7 +881,9 @@ function FilesTab({ lead, onCountsChange }) {
   }
 
   function handleRemoveFile(id) {
+    const target = files.find((f) => f.id === id);
     setFiles((current) => current.filter((f) => f.id !== id));
+    onActivity?.(`File "${target?.name ?? 'entry'}" removed`, '#f59e0b');
   }
 
   return (
@@ -824,8 +942,36 @@ function FilesTab({ lead, onCountsChange }) {
   );
 }
 
+function ActivityTab({ items }) {
+  const entries = items ?? [];
+  return (
+    <div className="card p-5 space-y-4">
+      <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">Activity Log ({entries.length})</h3>
+      {entries.length === 0 && (
+        <p className="text-xs text-slate-400">No activity recorded for this lead yet.</p>
+      )}
+      <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-slate-700">
+        {entries.map((item) => (
+          <div key={item.id} className="relative flex items-start justify-between gap-4">
+            <span
+              className="absolute -left-6 top-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 flex items-center justify-center"
+              style={{ background: item.color || '#3b82f6' }}
+            />
+            <div className="space-y-1">
+              <strong className="text-xs text-slate-800 dark:text-slate-200 font-bold block">{item.title}</strong>
+            </div>
+            <div className="text-right shrink-0">
+              <time className="text-[11px] text-slate-400 font-mono block">{item.time}</time>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Discussion & Notes Tab ────────────────────────────────────
-function DiscussionNotesTab({ lead }) {
+function DiscussionNotesTab({ lead, onActivity }) {
   const initialThreads = useMemo(() => buildDiscussionThreads(lead), [lead]);
   const [threads, setThreads] = useState(initialThreads);
   const [selectedThreadId, setSelectedThreadId] = useState(initialThreads[0]?.id ?? null);
@@ -849,16 +995,19 @@ function DiscussionNotesTab({ lead }) {
     const body = messageDraft.trim();
     updateThreadMessages(selectedThread.id, (messages) => [...messages, { id: `msg-${Date.now()}`, side: 'out', sender: 'You', body, time: 'Now' }]);
     setMessageDraft('');
+    onActivity?.('Message sent in discussion', '#3b82f6');
   }
 
   function handleCallAction() {
     if (!selectedThread) return;
     appendSystemMessage(selectedThread.id, `Call logged with ${selectedThread.name}.`);
+    onActivity?.(`Call logged with ${selectedThread.name}`, '#3b82f6');
   }
 
   function handleMailAction() {
     if (!selectedThread) return;
     appendSystemMessage(selectedThread.id, `Email sent to ${selectedThread.name}.`);
+    onActivity?.(`Email sent to ${selectedThread.name}`, '#3b82f6');
   }
 
   function handleUserAction() {
@@ -872,6 +1021,7 @@ function DiscussionNotesTab({ lead }) {
     appendSystemMessage(selectedThread.id, `Note: ${noteDraft.trim()}`);
     setNoteDraft('');
     setPendingAttachments([]);
+    onActivity?.('Note saved in discussion', '#8b5cf6');
   }
 
   function handleAttachmentSelect(event) {
@@ -1072,9 +1222,10 @@ function GeneralTab({ lead }) {
 }
 
 // ── 3. Users | Products Tab ──────────────────────────────────
-function UsersProductsTab({ onCountsChange }) {
-  const [users, setUsers] = useState(() => buildUsers());
-  const [products, setProducts] = useState(() => buildProducts());
+function UsersProductsTab({ lead, onCountsChange, onActivity }) {
+  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const [users, setUsers] = useState(() => initialState.users);
+  const [products, setProducts] = useState(() => initialState.products);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -1102,8 +1253,9 @@ function UsersProductsTab({ onCountsChange }) {
   );
 
   React.useEffect(() => {
+    updateStoredLeadDetail(lead?.id, { users, products });
     onCountsChange?.({ users: users.length, products: products.length });
-  }, [users.length, products.length, onCountsChange]);
+  }, [lead?.id, users, products, users.length, products.length, onCountsChange]);
 
   function addUser() {
     const employee = employeesMock.find((item) => item.id === selectedEmployeeId);
@@ -1122,6 +1274,7 @@ function UsersProductsTab({ onCountsChange }) {
     ]);
     setSelectedEmployeeId('');
     setIsAddUserOpen(false);
+    onActivity?.(`${employee.name} assigned to lead`, '#10b981');
   }
 
   function editUser(user) {
@@ -1131,7 +1284,9 @@ function UsersProductsTab({ onCountsChange }) {
   }
 
   function deleteUser(id) {
+    const target = users.find((u) => u.id === id);
     setUsers((current) => current.filter((u) => u.id !== id));
+    onActivity?.(`User "${target?.name ?? 'entry'}" removed`, '#f59e0b');
   }
 
   function addProduct() {
@@ -1150,6 +1305,7 @@ function UsersProductsTab({ onCountsChange }) {
     ]);
     setProductDraft({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
     setIsAddProductOpen(false);
+    onActivity?.(`Product "${productDraft.name.trim()}" added`, '#ec4899');
   }
 
   function editProduct(product) {
@@ -1159,7 +1315,16 @@ function UsersProductsTab({ onCountsChange }) {
   }
 
   function deleteProduct(id) {
+    const target = products.find((p) => p.id === id);
     setProducts((current) => current.filter((p) => p.id !== id));
+    onActivity?.(`Product "${target?.name ?? 'entry'}" removed`, '#f59e0b');
+  }
+
+  async function handleProductImageChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const image = await readFileAsDataUrl(file);
+    setProductDraft((current) => ({ ...current, image }));
   }
 
   return (
@@ -1358,10 +1523,7 @@ function UsersProductsTab({ onCountsChange }) {
                   <input
                     type="file"
                     accept="image/*"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) setProductDraft((current) => ({ ...current, image: URL.createObjectURL(file) }));
-                    }}
+                    onChange={handleProductImageChange}
                     className="mt-2 block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-normal text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-blue-50 file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-blue-700"
                   />
                   {productDraft.image && <img src={productDraft.image} alt="Product preview" className="mt-3 h-16 w-16 rounded-lg border border-slate-200 object-cover" />}
@@ -1526,24 +1688,50 @@ function UsersProductsTab({ onCountsChange }) {
   );
 }
 
-// ── 4. Main Lead Detail View ─────────────────────────────────
 export default function LeadDetailView({ lead, onBackToLeads }) {
   const navigate = useNavigate();
+  const storedDetailState = useMemo(() => loadLeadDetailState(lead), [lead]);
   const [activeTab, setActiveTab] = useState('Users & Products');
   const { addCustomer, showToast } = useERP() || {};
   const [isConverted, setIsConverted] = useState(lead?.status === 'Converted');
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [detailCounts, setDetailCounts] = useState({ users: 3, products: 2, sources: 3, files: 2 });
-  const [sourceEntries, setSourceEntries] = useState([]);
+  const [detailCounts, setDetailCounts] = useState(() => ({
+    users: storedDetailState.users.length,
+    products: storedDetailState.products.length,
+    sources: storedDetailState.sources.length,
+    files: storedDetailState.files.length,
+    openTasks: lead?.openTasksCount ?? 0,
+    calls: lead?.callsCount ?? 0,
+    estimates: lead?.estimatesCount ?? 0,
+    challans: lead?.deliveryChallansCount ?? 0,
+  }));
+  const [activities, setActivities] = useState(() => ([
+    { id: 'act-created', title: `Lead created from ${lead?.source || 'Website'}`, time: lead?.createdOn || 'Just now', color: '#3b82f6' },
+    { id: 'act-status', title: `Stage set to ${lead?.status || 'New'}`, time: lead?.createdOn || 'Just now', color: '#8b5cf6' },
+    { id: 'act-owner', title: `Assigned to ${lead?.owner || 'David Patel'}`, time: lead?.createdOn || 'Just now', color: '#10b981' },
+  ]));
+
+  function logActivity(title, color) {
+    if (!title) return;
+    setActivities((current) => [{ id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' }, ...current]);
+  }
 
   function updateDetailCounts(counts) {
     setDetailCounts((current) => ({ ...current, ...counts }));
   }
 
-  function updateSourceEntries(entries) {
-    setSourceEntries(entries);
-    setDetailCounts((current) => ({ ...current, sources: entries.length || current.sources }));
-  }
+  React.useEffect(() => {
+    updateStoredLead(lead?.id, {
+      status: isConverted ? 'Converted' : lead?.status,
+      productsCount: detailCounts.products,
+      sourcesCount: detailCounts.sources,
+      filesCount: detailCounts.files,
+      openTasksCount: detailCounts.openTasks,
+      callsCount: detailCounts.calls,
+      estimatesCount: detailCounts.estimates,
+      deliveryChallansCount: detailCounts.challans,
+    });
+  }, [lead?.id, lead?.status, isConverted, detailCounts]);
 
   function exportLead(format) {
     const filename = `${String(lead.name || 'lead').replace(/\s+/g, '_')}_details`;
@@ -1562,13 +1750,13 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
   if (!lead) return null;
 
   const metrics = [
-    { label: 'Products', value: lead.productsCount ?? 1, icon: ShoppingBag, color: '#ec4899', bg: '#fdf2f8' },
-    { label: 'Source', value: lead.sourcesCount ?? 3, icon: Globe, color: '#10b981', bg: '#f0fdf4' },
-    { label: 'Files', value: lead.filesCount ?? 0, icon: FileStack, color: '#8b5cf6', bg: '#f5f3ff' },
-    { label: 'Open Tasks', value: lead.openTasksCount ?? 2, icon: ListChecks, color: '#f59e0b', bg: '#fffbeb' },
-    { label: 'Calls', value: lead.callsCount ?? 0, icon: Phone, color: '#3b82f6', bg: '#eff6ff' },
-    { label: 'Estimates', value: lead.estimatesCount ?? 0, icon: Receipt, color: '#06b6d4', bg: '#ecfeff' },
-    { label: 'Delivery Challans', value: lead.deliveryChallansCount ?? 0, icon: Truck, color: '#f97316', bg: '#fff7ed' },
+    { label: 'Products', value: detailCounts.products, icon: ShoppingBag, color: '#ec4899', bg: '#fdf2f8' },
+    { label: 'Source', value: detailCounts.sources, icon: Globe, color: '#10b981', bg: '#f0fdf4' },
+    { label: 'Files', value: detailCounts.files, icon: FileStack, color: '#8b5cf6', bg: '#f5f3ff' },
+    { label: 'Open Tasks', value: detailCounts.openTasks, icon: ListChecks, color: '#f59e0b', bg: '#fffbeb' },
+    { label: 'Calls', value: detailCounts.calls, icon: Phone, color: '#3b82f6', bg: '#eff6ff' },
+    { label: 'Estimates', value: detailCounts.estimates, icon: Receipt, color: '#06b6d4', bg: '#ecfeff' },
+    { label: 'Delivery Challans', value: detailCounts.challans, icon: Truck, color: '#f97316', bg: '#fff7ed' },
   ];
 
   const handleConvert = () => {
@@ -1602,6 +1790,13 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onBackToLeads}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+          >
+            <ArrowLeft size={13} className="text-slate-500" /> Back
+          </button>
           <button
             type="button"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
@@ -1739,12 +1934,13 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       </div>
 
       {/* Tab Content Display */}
-      {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={lead} sourceEntries={sourceEntries} onSourcesChange={updateSourceEntries} onCountsChange={updateDetailCounts} />}
+      {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={lead} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'General' && <GeneralTab lead={lead} />}
-      {activeTab === 'Users & Products' && <UsersProductsTab lead={lead} onCountsChange={updateDetailCounts} />}
-      {activeTab === 'Discussion & Notes' && <DiscussionNotesTab lead={lead} />}
-      {activeTab === 'Files' && <FilesTab lead={lead} onCountsChange={updateDetailCounts} />}
-      {!['Sources & Emails', 'General', 'Users & Products', 'Discussion & Notes', 'Files'].includes(activeTab) && (
+      {activeTab === 'Users & Products' && <UsersProductsTab lead={lead} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'Discussion & Notes' && <DiscussionNotesTab lead={lead} onActivity={logActivity} />}
+      {activeTab === 'Files' && <FilesTab lead={lead} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
+      {activeTab === 'Activity' && <ActivityTab items={activities} />}
+      {!['Sources & Emails', 'General', 'Users & Products', 'Discussion & Notes', 'Files', 'Activity'].includes(activeTab) && (
         <div className="card p-8 text-center space-y-2">
           <Info size={28} className="text-blue-500 mx-auto" />
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{activeTab} Details</h4>
@@ -1756,3 +1952,5 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     </div>
   );
 }
+
+

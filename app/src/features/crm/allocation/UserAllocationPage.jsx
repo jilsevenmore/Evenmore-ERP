@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone } from 'lucide-react';
+import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone, MapPin, ListChecks } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import UserLocationTracking from './UserLocationTracking';
 
 export default function UserAllocationPage() {
   const [teamMembers, setTeamMembers] = useState([
@@ -59,6 +60,7 @@ export default function UserAllocationPage() {
   ]);
 
   const [search, setSearch] = useState('');
+  const [view, setView] = useState('tracking');
 
   const filtered = teamMembers.filter(
     (m) => m.name.toLowerCase().includes(search.toLowerCase()) || m.role.toLowerCase().includes(search.toLowerCase())
@@ -70,12 +72,28 @@ export default function UserAllocationPage() {
         title="User Allocation & Tracking"
         subtitle="Sales representative capacity, lead assignment rules, and workload metrics"
         actions={
-          <button type="button" className="btn-primary btn-sm flex items-center gap-1.5">
-            <UserPlus size={14} /> Allocate Representative
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs font-bold">
+              <button type="button" onClick={() => setView('allocation')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'allocation' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}>
+                <ListChecks size={13} /> Allocation
+              </button>
+              <button type="button" onClick={() => setView('tracking')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'tracking' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-500'}`}>
+                <MapPin size={13} /> Live Tracking
+              </button>
+            </div>
+            {view === 'allocation' && (
+              <button type="button" className="btn-primary btn-sm flex items-center gap-1.5">
+                <UserPlus size={14} /> Allocate Representative
+              </button>
+            )}
+          </div>
         }
       />
 
+      {view === 'tracking' ? (
+        <UserLocationTracking />
+      ) : (
+      <>
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="stat-card">
@@ -187,6 +205,8 @@ export default function UserAllocationPage() {
           </table>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }
