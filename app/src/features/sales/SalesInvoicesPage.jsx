@@ -20,9 +20,5 @@ const invoiceGuide = {
 };
 export const SalesInvoicesPage = () => {
     const { invoices, createInvoice } = useERP();
-    return (<div className="space-y-6">
-      <PageHeader title="Sales Invoices & Billing" subtitle="Manage accounts receivable, issue tax invoices, compute line items, and generate printable invoice documentation." guide={invoiceGuide}/>
-
-      <SalesInvoicesView invoices={invoices} onCreateInvoice={createInvoice}/>
-    </div>);
+    return <SalesInvoicesView invoices={invoices} onCreateInvoice={createInvoice}/>;
 };

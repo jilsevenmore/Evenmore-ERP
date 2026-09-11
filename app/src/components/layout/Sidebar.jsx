@@ -369,13 +369,16 @@ function SubItem({ item, depth = 1, badges = {} }) {
   const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
   const Icon = item.icon;
 
-  // Icon leaves (e.g. CRM > Dashboard) render like nav row with icon
+  // Icon leaves (e.g. CRM > Dashboard, Sales > Proforma Invoices, etc.) render like nav row with icon
   if (Icon && item.to) {
     return (
       <NavLink
         to={item.to}
+        end
         title={item.label}
-        className={() => `sub-group-row${isActive ? ' section-active' : ''}`}
+        className={({ isActive: navActive }) =>
+          `sub-group-row${isActive || navActive ? ' active section-active' : ''}`
+        }
       >
         <Icon size={16} strokeWidth={2} className="nav-ico" />
         <span className="nav-txt">{item.label}</span>
@@ -394,7 +397,7 @@ function SubItem({ item, depth = 1, badges = {} }) {
       end
       title={item.label}
       className={({ isActive: navActive }) =>
-        `sub-item${isActive || navActive ? ' active' : ''}`
+        `sub-item${isActive || navActive ? ' active section-active' : ''}`
       }
     >
       <span className="sub-dot" />

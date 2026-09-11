@@ -373,7 +373,7 @@ export const ProformaInvoicesPage = () => {
     {
       key: 'proformaNumber',
       header: 'Proforma #',
-      width: '13%',
+      width: '12%',
       render: (pi) => (
         <button
           onClick={() => setSelectedPi(pi)}
@@ -387,30 +387,30 @@ export const ProformaInvoicesPage = () => {
     {
       key: 'customer',
       header: 'Customer Account',
-      width: '20%',
+      width: '16%',
       render: (pi) => (
-        <div>
-          <span className="font-bold text-text block">{pi.customer}</span>
-          {pi.customerContact && <span className="text-[11px] text-muted">{pi.customerContact}</span>}
+        <div className="min-w-0">
+          <span className="font-bold text-text block truncate">{pi.customer}</span>
+          {pi.customerContact && <span className="text-[11px] text-muted block truncate">{pi.customerContact}</span>}
         </div>
       ),
     },
     {
       key: 'date',
       header: 'PI Date',
-      width: '10%',
+      width: '9%',
       render: (pi) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(pi.date)}</span>,
     },
     {
       key: 'validUntil',
       header: 'Valid Until',
-      width: '10%',
+      width: '9%',
       render: (pi) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(pi.validUntil)}</span>,
     },
     {
       key: 'paymentTerms',
       header: 'Proposed Payment Terms',
-      width: '17%',
+      width: '20%',
       render: (pi) => {
         let termsText = 'Standard Terms';
         if (typeof pi.paymentTerms === 'string' && pi.paymentTerms.trim()) {
@@ -427,7 +427,7 @@ export const ProformaInvoicesPage = () => {
           termsText = pi.paymentSchedule.map((s) => `${s.pct ?? s.percentage ?? 0}% ${s.milestone || ''}`).join(' • ');
         }
         return (
-          <span className="text-[11px] font-medium text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 block truncate" title={termsText}>
+          <span className="text-[11px] font-medium text-slate-700 bg-slate-100 dark:bg-slate-800 dark:text-slate-300 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700 block truncate max-w-[210px]" title={termsText}>
             {termsText}
           </span>
         );
@@ -437,7 +437,7 @@ export const ProformaInvoicesPage = () => {
       key: 'amount',
       header: 'Grand Total',
       align: 'right',
-      width: '12%',
+      width: '10%',
       render: (pi) => (
         <span className="font-mono font-bold text-text whitespace-nowrap">
           {formatCurrency(pi.grandTotal ?? pi.total ?? 0)}
@@ -448,13 +448,13 @@ export const ProformaInvoicesPage = () => {
       key: 'status',
       header: 'Status',
       align: 'center',
-      width: '14%',
+      width: '12%',
       render: (pi) => {
         if (pi.status === 'Converted') {
           return (
             <div className="flex flex-col items-center">
               <span className="text-[10px] font-bold text-purple-700 bg-purple-50 border border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1 whitespace-nowrap">
-                <CheckCircle2 size={11} /> Converted to Final Invoice
+                <CheckCircle2 size={11} /> Converted
               </span>
               {pi.convertedInvoiceNumber && (
                 <button
@@ -474,7 +474,7 @@ export const ProformaInvoicesPage = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '14%',
+      width: '12%',
       render: (pi) => (
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           <button
@@ -497,14 +497,14 @@ export const ProformaInvoicesPage = () => {
               className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
               title="Create Final Tax Invoice"
             >
-              <Receipt size={12} /> Convert to Invoice
+              <Receipt size={12} /> Convert
             </button>
           ) : pi.status === 'Converted' ? (
             <button
               onClick={() => navigate('/sales/invoices')}
               className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
             >
-              <CheckCircle2 size={12} /> View Invoice
+              <CheckCircle2 size={12} /> View
             </button>
           ) : null}
         </div>

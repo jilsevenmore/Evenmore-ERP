@@ -403,7 +403,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         return true;
     });
 
-    const pageSize = 8;
+    const pageSize = 6;
     const totalPages = Math.ceil(filteredInvoices.length / pageSize) || 1;
     const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
@@ -662,26 +662,36 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 </div>
 
                 {/* Pagination Footer */}
-                <div className="p-4 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 bg-white">
+                <div className="p-3.5 border-t border-slate-200 flex justify-between items-center text-xs text-slate-500 bg-white pr-20 sm:pr-24">
                     <span>
-                        Showing {Math.min(1, filteredInvoices.length)} to {Math.min(filteredInvoices.length, currentPage * pageSize)} of {filteredInvoices.length} entries
+                        Showing {filteredInvoices.length > 0 ? (currentPage - 1) * pageSize + 1 : 0} to {Math.min(filteredInvoices.length, currentPage * pageSize)} of {filteredInvoices.length} entries
                     </span>
-                    <div className="flex gap-1">
-                        <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 text-xs font-medium">
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage === 1}
+                            className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium cursor-pointer transition-colors"
+                        >
                             Prev
                         </button>
                         {Array.from({ length: totalPages }).map((_, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => setCurrentPage(idx + 1)}
-                                className={`px-3 py-1 border rounded text-xs font-medium ${
-                                    currentPage === idx + 1 ? 'bg-[#1F2E4A] text-white border-[#1F2E4A]' : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                                className={`px-2.5 py-1 border rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                                    currentPage === idx + 1
+                                        ? 'bg-[#1F2E4A] text-white border-[#1F2E4A] shadow-2xs'
+                                        : 'border-slate-200 hover:bg-slate-100 text-slate-700'
                                 }`}
                             >
                                 {idx + 1}
                             </button>
                         ))}
-                        <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100 disabled:opacity-50 text-xs font-medium">
+                        <button
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={currentPage >= totalPages}
+                            className="px-2.5 py-1 border border-slate-200 rounded-lg hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-medium cursor-pointer transition-colors"
+                        >
                             Next
                         </button>
                     </div>

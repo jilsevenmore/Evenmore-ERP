@@ -296,7 +296,7 @@ export function DataTable({
 
       {/* Pagination Footer */}
       {sorted.length > pageSize && (
-        <div className="border-t border-border bg-card-alt">
+        <div className="border-t border-border bg-card-alt pr-16 sm:pr-20">
           <Pagination total={sorted.length} page={page} pageSize={pageSize} onChange={setPage} />
         </div>
       )}
