@@ -323,7 +323,7 @@ const router = createBrowserRouter([
       { path: 'company-policy/acknowledgements', element: <Page component={() => <CompanyPolicy forcedSection="acknowledgements" />} /> },
       { path: 'company-policy/archive', element: <Page component={() => <CompanyPolicy forcedSection="archive" />} /> },
       { path: 'hrms/calendar', element: <Page component={CalendarPage} /> },
-      { path: 'hrms/hrms-setup', element: <Page component={HrmsSetup} /> },
+      // { path: 'hrms/hrms-setup', element: <Page component={HrmsSetup} /> }, // Hidden: HRMS Setup feature commented out
       { path: 'hrms/hr-admin', element: <Page component={HRAdminPage} /> },
       { path: 'hrms/hr-admin/terminations', element: <Page component={() => <HRAdminPage defaultTab="terminations" />} /> },
       { path: 'hrms/hr-admin/resignations', element: <Page component={() => <HRAdminPage defaultTab="resignations" />} /> },

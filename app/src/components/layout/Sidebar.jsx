@@ -256,8 +256,8 @@ const NAV = [
         ],
       },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
-      { label: 'Personal Calendar', icon: Calendar, to: '/hrms/calendar' },
-      { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' },
+      { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
+      // { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' }, // Hidden: HRMS Setup commented out
     ],
   },
 
