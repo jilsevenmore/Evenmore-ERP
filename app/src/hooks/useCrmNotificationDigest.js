@@ -5,6 +5,7 @@ const CRM_EVENT = 'crm:data-updated';
 const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
 const LEAD_DETAIL_STORAGE_KEY = 'evenmore-crm-lead-details-v1';
 const TASK_ALLOCATION_STORAGE_KEY = 'crm-task-allocation-v1';
+const CRM_TASKS_STORAGE_KEY = 'evenmore-crm-tasks-v1';
 
 function readStoredValue(key, fallback) {
   try {
@@ -201,6 +202,28 @@ function buildWorkflowNotifications({ leadRows, quotations, deliveryChallans }) 
       unread: true,
       path: '/crm/leads',
       bucket: 'lead-follow-up',
+    });
+  }
+
+  // Unassigned automation tasks — warn admin to assign an employee
+  const crmTasks = readStoredValue(CRM_TASKS_STORAGE_KEY, []);
+  const unassignedAutoTasks = (crmTasks || []).filter(
+    (t) =>
+      t &&
+      t.source === 'Created by Lead Stage Automation' &&
+      (t.owner === 'Unassigned' || !t.owner) &&
+      t.status !== 'Completed'
+  );
+  if (unassignedAutoTasks.length > 0) {
+    notifications.push({
+      id: 'unassigned-auto-tasks',
+      title: `${unassignedAutoTasks.length} automated task${unassignedAutoTasks.length > 1 ? 's' : ''} need employee assignment`,
+      desc: `"${unassignedAutoTasks[0]?.title || 'Task'}" for ${unassignedAutoTasks[0]?.lead || 'a lead'} is unassigned.`,
+      time: 'Action needed',
+      tone: 'warning',
+      unread: true,
+      path: '/crm/tasks',
+      bucket: 'auto-task-unassigned',
     });
   }
 

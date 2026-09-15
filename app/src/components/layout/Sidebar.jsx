@@ -80,6 +80,7 @@ const NAV = [
     defaultOpen: false,
     children: [
       { label: 'CRM Dashboard', icon: Home, to: '/crm/dashboard' },
+      { label: 'CRM Reports', icon: PieChart, to: '/crm/reports' },
       {
         label: 'Leads',
         icon: Target,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -71,7 +71,7 @@ const TASK_ROLE_MAP = {
   "Negotiate pricing": "BDE",
 };
 
-const TASK_OPTIONS = [
+const DEFAULT_TASK_OPTIONS = [
   "Call",
   "Send email",
   "Send quotation",
@@ -79,6 +79,20 @@ const TASK_OPTIONS = [
   "Client meeting",
   "Negotiate pricing",
 ];
+
+function getDynamicTaskOptions() {
+  try {
+    const raw = localStorage.getItem('leadMasterTasksV1');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const names = parsed.map((m) => m.name).filter(Boolean);
+        return [...new Set([...DEFAULT_TASK_OPTIONS, ...names])];
+      }
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_TASK_OPTIONS;
+}
 
 const INITIAL_STAGES = [
   {
@@ -243,6 +257,8 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [stageDrafts, setStageDrafts] = useState({});
+  const taskOptions = useMemo(() => getDynamicTaskOptions(), []);
+
 
   useEffect(() => {
     try {
@@ -676,7 +692,10 @@ export default function LeadStageTasks({ leadForms = [] }) {
                           <th className="px-3 py-3">ROLE</th>
                           <th className="px-3 py-3 w-28">ORDER</th>
                           <th className="px-3 py-3 w-24 text-center">REQUIRED</th>
-                          <th className="px-3 py-3 w-28 text-center">AUTO CREATE</th>
+                          <th className="px-3 py-3 w-28 text-center">
+                            <div>AUTO CREATE</div>
+                            <div className="text-[9px] font-normal text-slate-400 normal-case tracking-normal mt-0.5">Auto-created when lead enters stage</div>
+                          </th>
                           <th className="px-3 py-3 w-32">MAX REPEATS</th>
                           <th className="px-3 py-3 w-32">DUE IN (DAYS)</th>
                           <th className="px-3 py-3 w-40 text-right"></th>
@@ -698,7 +717,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                                   }}
                                   className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                                 >
-                                  {TASK_OPTIONS.map((opt) => (
+                                  {taskOptions.map((opt) => (
                                     <option key={opt} value={opt}>
                                       {opt}
                                     </option>
@@ -789,7 +808,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                               onChange={(e) => updateDraft(stage.id, "name", e.target.value)}
                               className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                             >
-                              {TASK_OPTIONS.map((opt) => (
+                              {taskOptions.map((opt) => (
                                 <option key={opt} value={opt}>
                                   {opt}
                                 </option>

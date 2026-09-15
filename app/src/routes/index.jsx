@@ -19,6 +19,7 @@ import CRMDashboard from '../features/crm/dashboard/CRMDashboard';
 import DealsPage from '../features/crm/deals/DealsPage';
 import UserAllocationPage from '../features/crm/allocation/UserAllocationPage';
 import CRMSystemSetupPage from '../features/crm/setup/CRMSystemSetupPage';
+import CRMReportsPage from '../features/crm/reports/CRMReportsPage';
 
 // ── HRMS ─────────────────────────────────────────────────────
 import HRMSDashboard from '../features/hrms/dashboard/Dashboard';
@@ -188,6 +189,7 @@ const router = createBrowserRouter([
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
+      { path: 'crm/reports', element: <Page component={CRMReportsPage} /> },
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
 
       // ── Sales ─────────────────────────────────────────────

@@ -1,60 +1,335 @@
-import { useState, useMemo } from 'react';
-import { Calendar, User, Search } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { Calendar, User, Search, CheckCircle2, Pencil, X, AlertTriangle, ArrowUpDown, Clock } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import DataTable from '../../../components/ui/DataTable';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import StatCard from '../../../components/ui/StatCard';
+import {
+  loadCrmTasks,
+  saveCrmTasks,
+  CRM_EVENT,
+  TASK_SOURCE_AUTOMATION,
+  CRM_TEAM_MEMBERS,
+} from '../../../services/leadStageAutomation';
+import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from '../../../services/taskCompletionService';
+import CompleteTaskModal from './CompleteTaskModal';
+import { useAppStore } from '../../../stores/appStore';
 
-const INITIAL_TASKS = [
-  { id: 'TSK-001', title: 'Follow up on Enterprise Quote', lead: 'Sarah Jenkins (Acme Corp)', owner: 'Alex Rivera', dueDate: '2026-09-12', priority: 'High', status: 'In Progress' },
-  { id: 'TSK-002', title: 'Schedule product demo call', lead: 'Michael Chang (TechFlow)', owner: 'Elena Rostova', dueDate: '2026-09-10', priority: 'Urgent', status: 'Open' },
-  { id: 'TSK-003', title: 'Send revised contract terms', lead: 'David Ross (Global Logistics)', owner: 'Alex Rivera', dueDate: '2026-09-15', priority: 'Medium', status: 'Waiting' },
-  { id: 'TSK-004', title: 'Prepare onboarding requirements', lead: 'Amanda Lee (Apex Innovations)', owner: 'Sarah Chen', dueDate: '2026-09-08', priority: 'High', status: 'Completed' },
-  { id: 'TSK-005', title: 'Review custom billing setup', lead: 'Robert Miller (Vanguard Systems)', owner: 'Elena Rostova', dueDate: '2026-09-18', priority: 'Low', status: 'Open' },
+const ASSIGNEE_OPTIONS = [
+  'Unassigned',
+  ...CRM_TEAM_MEMBERS.map((m) => m.name),
+  'Elena Rostova',
+  'Jayesh Nair',
 ];
 
+const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'];
+const STATUS_OPTIONS = ['Open', 'In Progress', 'Waiting', 'Completed'];
+
 export default function TasksPage() {
-  const [tasks] = useState(INITIAL_TASKS);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const [tasks, setTasks] = useState(loadCrmTasks);
   const [activeStatus, setActiveStatus] = useState('All');
   const [search, setSearch] = useState('');
+  const [sortField, setSortField] = useState('dueDate');
+  const [sortDirection, setSortDirection] = useState('asc');
+
+  // Edit / Reassign Modal state
+  const [editingTask, setEditingTask] = useState(null);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    owner: '',
+    dueDate: '',
+    priority: 'Medium',
+    status: 'Open',
+  });
+
+  // Complete Task Modal state
+  const [completeTarget, setCompleteTarget] = useState(null);
+  const [successToast, setSuccessToast] = useState('');
+
+  // Keep synced across events
+  useEffect(() => {
+    function handleSync() {
+      setTasks(loadCrmTasks());
+    }
+    window.addEventListener(CRM_EVENT, handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener(CRM_EVENT, handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
 
   const stats = [
     { label: 'Total Tasks', value: tasks.length.toString(), icon: 'file', tone: 'blue' },
-    { label: 'Pending', value: tasks.filter(t => t.status !== 'Completed').length.toString(), icon: 'clock', tone: 'amber' },
-    { label: 'Urgent/High', value: tasks.filter(t => t.priority === 'High' || t.priority === 'Urgent').length.toString(), icon: 'filter', tone: 'pink' },
-    { label: 'Completed', value: tasks.filter(t => t.status === 'Completed').length.toString(), icon: 'chart', tone: 'green' },
+    { label: 'Pending', value: tasks.filter((t) => t.status !== 'Completed').length.toString(), icon: 'clock', tone: 'amber' },
+    { label: 'Urgent/High', value: tasks.filter((t) => t.priority === 'High' || t.priority === 'Urgent').length.toString(), icon: 'filter', tone: 'pink' },
+    { label: 'Completed', value: tasks.filter((t) => t.status === 'Completed').length.toString(), icon: 'chart', tone: 'green' },
   ];
 
+  function toggleComplete(task) {
+    if (task.status === 'Completed') {
+      const updated = tasks.map((t) =>
+        t.id === task.id ? { ...t, status: 'Open', completionOutcome: undefined, nextAction: undefined, completedAt: undefined, completedBy: undefined } : t
+      );
+      setTasks(updated);
+      saveCrmTasks(updated);
+      return;
+    }
+    const lead = resolveLeadForTask(task);
+    setCompleteTarget({ task, lead });
+  }
+
+  async function handleComplete(outcome, nextAction) {
+    if (!completeTarget?.task) return { ok: false, message: 'No task selected.' };
+    const result = completeTaskWithOutcome({
+      task: completeTarget.task,
+      lead: completeTarget.lead,
+      outcome,
+      nextAction,
+      completedBy: currentUser?.name || CRM_TEAM_MEMBERS[0]?.name || 'CRM User',
+    });
+    setTasks(loadCrmTasks());
+    if (result.ok !== false) {
+      setSuccessToast(result.message || 'Task completed successfully.');
+      window.setTimeout(() => setSuccessToast(''), 2500);
+    }
+    return result;
+  }
+
+  function handleCompleteSuccess() {
+    setCompleteTarget(null);
+  }
+
+  function openEditModal(task) {
+    setEditingTask(task);
+    setEditForm({
+      title: task.title || '',
+      owner: task.owner || 'Unassigned',
+      dueDate: task.dueDate || '',
+      priority: task.priority || 'Medium',
+      status: task.status || 'Open',
+    });
+  }
+
+  function closeEditModal() {
+    setEditingTask(null);
+  }
+
+  function handleSaveEdit(e) {
+    e.preventDefault();
+    if (!editingTask) return;
+
+    const nextOwner = editForm.owner || 'Unassigned';
+    const updated = tasks.map((t) => {
+      if (t.id !== editingTask.id) return t;
+      return {
+        ...t,
+        title: editForm.title.trim() || t.title,
+        owner: nextOwner,
+        dueDate: editForm.dueDate || t.dueDate,
+        priority: editForm.priority,
+        status: editForm.status,
+        warning: nextOwner !== 'Unassigned' ? null : t.warning,
+      };
+    });
+
+    setTasks(updated);
+    saveCrmTasks(updated);
+    closeEditModal();
+  }
+
+  function handleSort(field) {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  }
+
   const filteredTasks = useMemo(() => {
-    return tasks.filter(t => {
+    const filtered = tasks.filter((t) => {
       const matchesStatus = activeStatus === 'All' || t.status === activeStatus;
-      const matchesSearch = !search.trim() || t.title.toLowerCase().includes(search.toLowerCase()) || t.lead.toLowerCase().includes(search.toLowerCase());
+      const q = search.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        (t.title && t.title.toLowerCase().includes(q)) ||
+        (t.lead && t.lead.toLowerCase().includes(q)) ||
+        (t.owner && t.owner.toLowerCase().includes(q)) ||
+        (t.source && t.source.toLowerCase().includes(q));
       return matchesStatus && matchesSearch;
     });
-  }, [tasks, activeStatus, search]);
+
+    return [...filtered].sort((a, b) => {
+      const dir = sortDirection === 'asc' ? 1 : -1;
+      if (sortField === 'dueDate') {
+        const da = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+        const db = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+        return (da - db) * dir;
+      }
+      if (sortField === 'priority') {
+        const weight = { Urgent: 4, High: 3, Medium: 2, Low: 1 };
+        return ((weight[a.priority] || 0) - (weight[b.priority] || 0)) * dir;
+      }
+      const valA = String(a[sortField] || '').toLowerCase();
+      const valB = String(b[sortField] || '').toLowerCase();
+      if (valA < valB) return -1 * dir;
+      if (valA > valB) return 1 * dir;
+      return 0;
+    });
+  }, [tasks, activeStatus, search, sortField, sortDirection]);
 
   const columns = [
-    { key: 'title', label: 'Task Title', render: (val, row) => (
-      <div>
-        <strong style={{ display: 'block', color: '#0f172a' }}>{val}</strong>
-        <span style={{ fontSize: 12, color: '#64748b' }}>{row.lead}</span>
-      </div>
-    )},
-    { key: 'owner', label: 'Assigned To', render: (val) => (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <User size={14} color="#64748b" /> {val}
-      </span>
-    )},
-    { key: 'dueDate', label: 'Due Date', render: (val) => (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}>
-        <Calendar size={13} /> {val}
-      </span>
-    )},
-    { key: 'priority', label: 'Priority', render: (val) => {
-      const color = val === 'Urgent' ? 'badge-red' : val === 'High' ? 'badge-orange' : val === 'Medium' ? 'badge-blue' : 'badge-gray';
-      return <span className={`badge ${color}`}>{val}</span>;
-    }},
-    { key: 'status', label: 'Status', render: (val) => <StatusBadge status={val} /> },
+    {
+      key: 'title',
+      label: (
+        <span
+          onClick={() => handleSort('title')}
+          className="inline-flex items-center gap-1 cursor-pointer hover:text-blue-600"
+        >
+          Task Title <ArrowUpDown size={12} />
+        </span>
+      ),
+      render: (val, row) => {
+        const isAuto = row.source === TASK_SOURCE_AUTOMATION || row.source === 'Created by Lead Stage Automation';
+        const isUnassigned = row.owner === 'Unassigned' || !row.owner;
+
+        return (
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <strong style={{ color: '#0f172a', fontSize: '13px' }}>{val}</strong>
+              {isAuto && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                  Created by Lead Stage Automation
+                </span>
+              )}
+              {isUnassigned && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                  <AlertTriangle size={11} /> Unassigned
+                </span>
+              )}
+            </div>
+            {row.lead && (
+              <span style={{ fontSize: 12, color: '#64748b', display: 'block' }}>
+                Related Lead: <span className="font-medium text-slate-700">{row.lead}</span>
+              </span>
+            )}
+            {row.completionOutcome && (
+              <span style={{ fontSize: 11, color: '#059669', display: 'block' }}>
+                Outcome: <strong>{row.completionOutcome}</strong>
+                {row.nextAction && <> · Next: <strong>{NEXT_ACTION_LABELS[row.nextAction] || row.nextAction}</strong></>}
+                {row.completedBy && <> · By <strong>{row.completedBy}</strong></>}
+              </span>
+            )}
+            {row.warning && (
+              <span style={{ fontSize: 11, color: '#b45309', display: 'block' }}>
+                ⚠️ {row.warning}
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'owner',
+      label: (
+        <span
+          onClick={() => handleSort('owner')}
+          className="inline-flex items-center gap-1 cursor-pointer hover:text-blue-600"
+        >
+          Assigned To <ArrowUpDown size={12} />
+        </span>
+      ),
+      render: (val) => {
+        const isUnassigned = val === 'Unassigned' || !val;
+        return (
+          <span
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              color: isUnassigned ? '#d97706' : '#334155',
+              fontWeight: isUnassigned ? 600 : 400,
+            }}
+          >
+            <User size={14} color={isUnassigned ? '#d97706' : '#64748b'} />
+            {val || 'Unassigned'}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'dueDate',
+      label: (
+        <span
+          onClick={() => handleSort('dueDate')}
+          className="inline-flex items-center gap-1 cursor-pointer hover:text-blue-600"
+        >
+          Due Date <ArrowUpDown size={12} />
+        </span>
+      ),
+      render: (val) => (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#64748b' }}>
+          <Calendar size={13} /> {val || 'Today'}
+        </span>
+      ),
+    },
+    {
+      key: 'priority',
+      label: (
+        <span
+          onClick={() => handleSort('priority')}
+          className="inline-flex items-center gap-1 cursor-pointer hover:text-blue-600"
+        >
+          Priority <ArrowUpDown size={12} />
+        </span>
+      ),
+      render: (val) => {
+        const color =
+          val === 'Urgent'
+            ? 'badge-red'
+            : val === 'High'
+            ? 'badge-orange'
+            : val === 'Medium'
+            ? 'badge-blue'
+            : 'badge-gray';
+        return <span className={`badge ${color}`}>{val}</span>;
+      },
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (val) => <StatusBadge status={val} />,
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => toggleComplete(row)}
+            title={row.status === 'Completed' ? 'Reopen task' : 'Complete task'}
+            className={`p-1.5 rounded-lg border transition ${
+              row.status === 'Completed'
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-emerald-600'
+            }`}
+          >
+            <CheckCircle2 size={15} />
+          </button>
+          <button
+            type="button"
+            onClick={() => openEditModal(row)}
+            title="Edit / Reassign Task"
+            className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition"
+          >
+            <Pencil size={15} />
+          </button>
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -65,14 +340,36 @@ export default function TasksPage() {
         breadcrumb={[{ label: 'CRM', to: '/crm/leads' }, { label: 'Tasks' }]}
       />
 
-      <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, margin: '20px 0 24px' }}>
-        {stats.map(s => <StatCard key={s.label} stat={s} />)}
+      <div
+        className="stats-grid"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          gap: 16,
+          margin: '20px 0 24px',
+        }}
+      >
+        {stats.map((s) => (
+          <StatCard key={s.label} stat={s} />
+        ))}
       </div>
 
-      <div className="card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {['All', 'Open', 'In Progress', 'Waiting', 'Completed'].map(status => (
+      <div
+        className="card"
+        style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {['All', 'Open', 'In Progress', 'Waiting', 'Completed'].map((status) => (
               <button
                 key={status}
                 type="button"
@@ -95,21 +392,23 @@ export default function TasksPage() {
             ))}
           </div>
 
-          <div style={{ position: 'relative', width: 260 }}>
-            <Search size={15} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
-            <input
-              type="text"
-              placeholder="Search tasks or leads..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '7px 12px 7px 32px',
-                borderRadius: 8,
-                border: '1px solid #cbd5e1',
-                fontSize: 13,
-              }}
-            />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <div style={{ position: 'relative', width: 260 }}>
+              <Search size={15} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
+              <input
+                type="text"
+                placeholder="Search tasks, leads, assignee..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '7px 12px 7px 32px',
+                  borderRadius: 8,
+                  border: '1px solid #cbd5e1',
+                  fontSize: 13,
+                }}
+              />
+            </div>
           </div>
         </div>
 
@@ -120,6 +419,155 @@ export default function TasksPage() {
           emptyMessage="No tasks found matching your filters."
         />
       </div>
+
+      {/* Edit / Reassign Task Modal */}
+      {editingTask && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Edit / Reassign Task</h3>
+                <span className="text-[11px] text-slate-400">{editingTask.id}</span>
+              </div>
+              <button
+                type="button"
+                onClick={closeEditModal}
+                className="text-slate-400 hover:text-slate-600 p-1"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Task Title</label>
+                <input
+                  type="text"
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:border-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Employee</label>
+                <select
+                  value={editForm.owner}
+                  onChange={(e) => setEditForm({ ...editForm, owner: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs bg-white focus:outline-none focus:border-blue-500"
+                >
+                  {ASSIGNEE_OPTIONS.map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                {editForm.owner === 'Unassigned' && (
+                  <p className="text-[11px] text-amber-600 mt-1">
+                    ⚠️ Task will remain unassigned until an eligible employee is chosen.
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Due Date</label>
+                  <input
+                    type="date"
+                    value={editForm.dueDate}
+                    onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Priority</label>
+                  <select
+                    value={editForm.priority}
+                    onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs bg-white focus:outline-none focus:border-blue-500"
+                  >
+                    {PRIORITY_OPTIONS.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                <select
+                  value={editForm.status}
+                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs bg-white focus:outline-none focus:border-blue-500"
+                >
+                  {STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                <span>
+                  Source:{' '}
+                  <strong className="text-slate-700">
+                    {editingTask.source || TASK_SOURCE_AUTOMATION}
+                  </strong>
+                </span>
+                {editingTask.stage && (
+                  <span>
+                    Stage: <strong className="text-slate-700">{editingTask.stage}</strong>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  className="px-3.5 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Task Modal */}
+      <CompleteTaskModal
+        open={Boolean(completeTarget)}
+        task={completeTarget?.task || null}
+        lead={completeTarget?.lead || null}
+        onCancel={() => setCompleteTarget(null)}
+        onComplete={handleComplete}
+        onSuccess={handleCompleteSuccess}
+      />
+
+      {/* Success Toast */}
+      {successToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg text-[13px] font-semibold animate-in fade-in slide-in-from-bottom-4 duration-200">
+          <CheckCircle2 size={16} />
+          {successToast}
+        </div>
+      )}
     </div>
   );
 }
