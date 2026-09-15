@@ -10,6 +10,7 @@ import { formatDateDDMMYYYY } from '../../utils/dateUtils';
 import { CreateWarrantyCardModal } from '../../components/common/CreateWarrantyCardModal';
 import { WarrantyCardModal } from '../../components/common/WarrantyCardModal';
 import { SendChallanModal } from '../../components/common/SendChallanModal';
+import { PrintDeliveryChallanModal } from '../../components/common/PrintDeliveryChallanModal';
 const challanGuide = {
     title: 'Delivery Challans & Waybills',
     subtitle: 'Warehouse logistics dispatch, non-commercial shipping waybills, and proof of delivery (POD).',
@@ -30,6 +31,7 @@ export const DeliveryChallansPage = () => {
     const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedChallan, setSelectedChallan] = useState(null);
+    const [printChallanTarget, setPrintChallanTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [createWarrantyChallan, setCreateWarrantyChallan] = useState(null);
     const [selectedWarrantyCard, setSelectedWarrantyCard] = useState(null);
@@ -367,6 +369,13 @@ export const DeliveryChallansPage = () => {
                 >
                   <Eye size={13}/>
                 </button>
+                <button
+                  onClick={() => setPrintChallanTarget(c)}
+                  className="p-1 text-slate-500 hover:text-primary hover:bg-slate-100 rounded text-xs flex items-center gap-1 cursor-pointer"
+                  title="Print Official Delivery Challan & Waybill"
+                >
+                  <Printer size={13}/>
+                </button>
                 {c.status !== 'Cancelled' && (
                   <button
                     onClick={() => setSendModalChallan(c)}
@@ -624,7 +633,7 @@ export const DeliveryChallansPage = () => {
 
       {/* Printable Logistics Waybill & POD Modal */}
       {selectedChallan && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden printable-document">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#1F2E4A] text-white font-bold flex items-center justify-center">
@@ -645,7 +654,7 @@ export const DeliveryChallansPage = () => {
                     <Send size={13}/> Send Waybill & Card
                   </button>
                 )}
-                <button onClick={() => window.print()} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold cursor-pointer flex items-center gap-1.5">
+                <button onClick={() => setPrintChallanTarget(selectedChallan)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold cursor-pointer flex items-center gap-1.5">
                   <Printer size={13}/> Print Waybill
                 </button>
                 <button onClick={() => setSelectedChallan(null)} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg">
@@ -968,14 +977,17 @@ export const DeliveryChallansPage = () => {
           onClose={() => setSendModalChallan(null)}
           challan={sendModalChallan}
           warrantyCard={(getWarrantyByChallanId && getWarrantyByChallanId(sendModalChallan.id)) || warranties.find((w) => w.deliveryChallanId === sendModalChallan.id || w.challanNumber === sendModalChallan.challanNumber)}
-          onPreviewWarranty={() => {
-            const wc = (getWarrantyByChallanId && getWarrantyByChallanId(sendModalChallan.id)) || warranties.find((w) => w.deliveryChallanId === sendModalChallan.id || w.challanNumber === sendModalChallan.challanNumber);
-            if (wc) setSelectedWarrantyCard(wc);
-          }}
           onPreviewChallan={() => {
             setSelectedChallan(sendModalChallan);
           }}
         />
       )}
+
+      {/* Official Logistics Delivery Challan & Waybill Print Voucher */}
+      <PrintDeliveryChallanModal
+        isOpen={Boolean(printChallanTarget)}
+        onClose={() => setPrintChallanTarget(null)}
+        challan={printChallanTarget}
+      />
     </div>);
 };

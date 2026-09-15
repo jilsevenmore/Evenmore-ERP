@@ -5,6 +5,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Plus, RotateCcw, CheckCircle2, X, Ban, AlertCircle, Eye, Printer, MapPin } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { PrintDebitNoteModal } from '../../components/common/PrintDebitNoteModal';
 const purchaseReturnGuide = {
     title: 'Purchase Returns & Debit Notes',
     subtitle: 'Supplier RMA, debit memo issuance, selective item returns, and payables write-down',
@@ -40,6 +41,7 @@ export const PurchaseReturnsPage = () => {
     const [reason, setReason] = useState('Damaged casing detected on intake inspection');
     const [returnItems, setReturnItems] = useState([]);
     const [selectedReturn, setSelectedReturn] = useState(null);
+    const [printReturnTarget, setPrintReturnTarget] = useState(null);
 
     const handleBillSelect = (billId) => {
         setSelectedBillId(billId);
@@ -202,6 +204,13 @@ export const PurchaseReturnsPage = () => {
                       title="View Return Details"
                     >
                       <Eye size={13}/>
+                    </button>
+                    <button
+                      onClick={() => setPrintReturnTarget(r)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="Print Official Debit Note Voucher"
+                    >
+                      <Printer size={13}/>
                     </button>
                     {isCancelled ? (
                       <span className="text-xs font-semibold text-rose-600 inline-flex items-center gap-1">
@@ -380,7 +389,7 @@ export const PurchaseReturnsPage = () => {
       {/* Return Detail Modal */}
       {selectedReturn && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden printable-document">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <RotateCcw className="w-5 h-5 text-rose-600" />
@@ -393,7 +402,7 @@ export const PurchaseReturnsPage = () => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => setPrintReturnTarget(selectedReturn)}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Printer size={13} /> Print Debit Note
@@ -494,5 +503,12 @@ export const PurchaseReturnsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Official Executive Debit Note Print Voucher */}
+      <PrintDebitNoteModal
+        isOpen={Boolean(printReturnTarget)}
+        onClose={() => setPrintReturnTarget(null)}
+        debitNote={printReturnTarget}
+      />
     </div>);
 };

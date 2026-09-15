@@ -11,6 +11,7 @@ import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
+import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderModal';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -36,6 +37,7 @@ export const SalesOrdersPage = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [printSalesOrderTarget, setPrintSalesOrderTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [deliveryDate, setDeliveryDate] = useState('In 10 days');
@@ -352,6 +354,9 @@ export const SalesOrdersPage = () => {
             render: (o) => {
                 const isCancelled = o.stage === 'Cancelled' || o.status === 'Cancelled';
                 return (<div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <button onClick={() => setPrintSalesOrderTarget(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Print Official Sales Order Confirmation">
+              <Printer size={13}/>
+            </button>
             <button onClick={() => handleCloneOrder(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
               <Copy size={13}/>
             </button>
@@ -517,7 +522,7 @@ export const SalesOrdersPage = () => {
 
       {/* Sales Order Detail & Lifecycle Stepper Modal */}
       {selectedOrder && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden printable-document">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedOrder.orderNumber}</h3>
@@ -527,9 +532,13 @@ export const SalesOrdersPage = () => {
                 <StatusBadge status={selectedOrder.stage || 'Draft'}/>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => window.print()} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setPrintSalesOrderTarget(selectedOrder)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
                   <Printer size={13}/>
-                  Print Order
+                  Print Official Order
                 </button>
                 <button onClick={() => setSelectedOrder(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
                   <X size={18}/>
@@ -696,5 +705,12 @@ export const SalesOrdersPage = () => {
           </div>
         </div>
       )}
+
+      {/* Official Commercial Sales Order Confirmation PDF Voucher */}
+      <PrintSalesOrderModal
+        isOpen={Boolean(printSalesOrderTarget)}
+        onClose={() => setPrintSalesOrderTarget(null)}
+        order={printSalesOrderTarget}
+      />
     </div>);
 };

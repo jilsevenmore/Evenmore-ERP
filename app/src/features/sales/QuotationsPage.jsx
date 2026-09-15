@@ -9,6 +9,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
+import { PrintQuotationModal } from '../../components/common/PrintQuotationModal';
 const quotationGuide = {
     title: 'Quotations & Estimates',
     subtitle: 'Commercial price proposals and direct 1-click conversion to Sales Orders.',
@@ -34,6 +35,7 @@ export const QuotationsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedQuote, setSelectedQuote] = useState(null);
+    const [printQuotationTarget, setPrintQuotationTarget] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [validUntil, setValidUntil] = useState('In 30 days');
     const [lineItems, setLineItems] = useState([]);
@@ -93,64 +95,73 @@ export const QuotationsPage = () => {
         {
             header: 'Quote #',
             accessor: 'quoteNumber',
-            width: '14%',
+            width: '18%',
             render: (q) => (
-              <button
-                onClick={() => setSelectedQuote(q)}
-                className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap"
-              >
-                <FileText size={13} className="text-muted shrink-0"/>
-                <span>{q.quoteNumber}</span>
-              </button>
+              <div>
+                <button onClick={() => setSelectedQuote(q)} className="font-bold font-mono text-primary hover:underline block text-left cursor-pointer">
+                  {q.quoteNumber}
+                </button>
+                <span className="text-[11px] text-muted">{formatDateDDMMYYYY(q.date)}</span>
+              </div>
             ),
         },
         {
             header: 'Customer',
             accessor: 'customer',
-            width: '26%',
-            render: (q) => <span className="font-bold text-text block">{q.customer}</span>,
+            width: '24%',
+            render: (q) => (
+              <div>
+                <strong className="text-slate-900 dark:text-slate-100 block">{q.customer}</strong>
+                <span className="text-[11px] text-muted">Validity: {q.validUntil || '30 Days'}</span>
+              </div>
+            ),
         },
         {
-            header: 'Quote Date',
-            accessor: 'date',
-            width: '13%',
-            render: (q) => <span className="font-mono text-[11px] text-muted whitespace-nowrap">{formatDateDDMMYYYY(q.date)}</span>,
-        },
-        {
-            header: 'Valid Until',
-            accessor: 'validUntil',
-            width: '13%',
-            render: (q) => <span className="text-muted text-[11px] whitespace-nowrap">{q.validUntil ? formatDateDDMMYYYY(q.validUntil) : '—'}</span>,
-        },
-        {
-            header: 'Estimated Total',
-            accessor: 'amount',
-            align: 'right',
+            header: 'Items',
             width: '14%',
             render: (q) => (
-              <span className="font-bold font-mono text-text whitespace-nowrap">
-                {formatCurrency(q.amount)}
+              <span className="text-xs text-muted">
+                {q.items && q.items.length > 0 ? `${q.items.length} Line Items` : '1 Item'}
               </span>
             ),
         },
         {
-            header: 'Lifecycle Status',
+            header: 'Total Value',
+            accessor: 'amount',
+            align: 'right',
+            width: '16%',
+            render: (q) => (
+              <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                {formatCurrency(q.amount || 0)}
+              </span>
+            ),
+        },
+        {
+            header: 'Status',
+            accessor: 'status',
             align: 'center',
-            width: '10%',
+            width: '14%',
             render: (q) => <StatusBadge status={q.status}/>,
         },
         {
             header: 'Actions',
             align: 'right',
-            width: '10%',
+            width: '14%',
             render: (q) => (
               <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                 <button
                   onClick={() => setSelectedQuote(q)}
                   className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
-                  title="View & Print Quote"
+                  title="View Details"
                 >
                   <Eye size={13}/>
+                </button>
+                <button
+                  onClick={() => setPrintQuotationTarget(q)}
+                  className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                  title="Print Official Commercial Quotation"
+                >
+                  <Printer size={13}/>
                 </button>
                 <button
                   onClick={() => handleCloneQuote(q)}
@@ -307,9 +318,9 @@ export const QuotationsPage = () => {
       {/* Auto-PO Requisition Modal */}
       <AutoPOModal isOpen={autoPOState.isOpen} onClose={() => setAutoPOState({ isOpen: false })} shortageItem={autoPOState.item} requiredDeficitQty={autoPOState.deficitQty} sourceRef={`Quotation Requisition`}/>
 
-      {/* Quotation Detail & Printable Voucher Modal */}
+      {/* Quotation Detail Modal */}
       {selectedQuote && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden printable-document">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedQuote.quoteNumber}</h3>
@@ -319,9 +330,13 @@ export const QuotationsPage = () => {
                 <StatusBadge status={selectedQuote.status}/>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => window.print()} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setPrintQuotationTarget(selectedQuote)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
                   <Printer size={13}/>
-                  Print Quote
+                  Print Official Quote
                 </button>
                 <button onClick={() => setSelectedQuote(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
                   <X size={18}/>
@@ -364,5 +379,12 @@ export const QuotationsPage = () => {
             </div>
           </div>
         </div>)}
+
+      {/* Official Commercial Quotation PDF Voucher */}
+      <PrintQuotationModal
+        isOpen={Boolean(printQuotationTarget)}
+        onClose={() => setPrintQuotationTarget(null)}
+        quotation={printQuotationTarget}
+      />
     </div>);
 };
