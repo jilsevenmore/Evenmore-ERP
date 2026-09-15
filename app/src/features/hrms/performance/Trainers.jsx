@@ -10,7 +10,7 @@ import { useTrainingStore } from "../../../stores/trainingStore";
 import { useNavigate } from "react-router-dom";
 import { Eye, Pencil, Trash2, ArrowLeft } from "lucide-react";
 
-export default function Trainers() {
+export default function Trainers({ embedded = false, onBack }) {
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const { trainers, addTrainer, updateTrainer, deleteTrainer, trainings } = useTrainingStore();
@@ -81,14 +81,16 @@ export default function Trainers() {
   return (
     <div className="flex flex-col gap-5">
       {/* Back button to Training Setup */}
-      <button
-        type="button"
-        onClick={() => navigate("/hrms/training")}
-        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
-      >
-        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-        <span>Back to Training Setup</span>
-      </button>
+      {!embedded && (
+        <button
+          type="button"
+          onClick={() => (onBack ? onBack() : navigate("/hrms/training"))}
+          className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+        >
+          <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+          <span>Back to Training Setup</span>
+        </button>
+      )}
 
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>

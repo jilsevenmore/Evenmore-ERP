@@ -44,14 +44,14 @@ import Offers from '../features/hrms/recruitment/Offers';
 import Onboarding from '../features/hrms/recruitment/Onboarding';
 import Career from '../features/hrms/recruitment/Career';
 import CustomQuestions from '../features/hrms/recruitment/CustomQuestions';
-import RecruitmentFunnel from '../features/hrms/recruitment/RecruitmentFunnel';
+// import RecruitmentFunnel from '../features/hrms/recruitment/RecruitmentFunnel'; // Hidden: Recruitment Funnel feature commented out
 import PerformanceDashboard from '../features/hrms/performance/Dashboard';
 import Indicators from '../features/hrms/performance/Indicators';
 import KpiData from '../features/hrms/performance/KpiData';
 import Appraisal from '../features/hrms/performance/Appraisal';
 import AppraisalFunnel from '../features/hrms/performance/AppraisalFunnel';
-import GoalTracking from '../features/hrms/performance/GoalTracking';
-import GoalFunnel from '../features/hrms/performance/GoalFunnel';
+// import GoalTracking from '../features/hrms/performance/GoalTracking'; // Hidden: Goal Tracking feature commented out
+// import GoalFunnel from '../features/hrms/performance/GoalFunnel'; // Hidden: Goal Funnel feature commented out
 import TrainingList from '../features/hrms/performance/TrainingList';
 import TrainingFunnel from '../features/hrms/performance/TrainingFunnel';
 import Trainers from '../features/hrms/performance/Trainers';
@@ -286,26 +286,42 @@ const router = createBrowserRouter([
       { path: 'hrms/recruitment/onboarding', element: <Page component={Onboarding} /> },
       { path: 'hrms/recruitment/career', element: <Page component={Career} /> },
       { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> },
-      { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> },
+      // { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> }, // Hidden: Recruitment Funnel feature commented out
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },
       { path: 'hrms/performance/kpi-data', element: <Page component={KpiData} /> },
       { path: 'hrms/performance/appraisal', element: <Page component={Appraisal} /> },
       { path: 'hrms/performance/appraisal-funnel', element: <Page component={AppraisalFunnel} /> },
-      { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> },
-      { path: 'hrms/performance/goal-funnel', element: <Page component={GoalFunnel} /> },
+      // { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> }, // Hidden: Goal Tracking feature commented out
+      // { path: 'hrms/performance/goal-funnel', element: <Page component={GoalFunnel} /> }, // Hidden: Goal Funnel feature commented out
       { path: 'hrms/training', element: <Page component={TrainingDashboard} /> },
-      { path: 'hrms/training/list', element: <Page component={TrainingList} /> },
-      { path: 'hrms/training/training-funnel', element: <Page component={TrainingFunnel} /> },
-      { path: 'hrms/training/trainers', element: <Page component={Trainers} /> },
-      { path: 'hrms/training/funnel', element: <Page component={TrainingFunnel} /> },
+      { path: 'hrms/training/list', element: <Page component={() => <TrainingDashboard initialTab="list" />} /> },
+      { path: 'hrms/training/training-funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
+      { path: 'hrms/training/trainers', element: <Page component={() => <TrainingDashboard initialTab="trainers" />} /> },
+      { path: 'hrms/training/funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
       { path: 'hrms/org-chart', element: <Page component={OrgChartPage} /> },
       { path: 'hrms/departments', element: <Page component={DepartmentsPage} /> },
       { path: 'hrms/designations', element: <Page component={DesignationsPage} /> },
       { path: 'hrms/locations', element: <Page component={LocationsPage} /> },
       { path: 'hrms/assets', element: <Page component={AssetsPage} /> },
+      { path: 'hrms/asset', element: <Page component={AssetsPage} /> },
+      { path: 'hrms/asset-setup', element: <Page component={AssetsPage} /> },
+      { path: 'hrms/asset-requests', element: <Page component={AssetsPage} /> },
       { path: 'hrms/documents', element: <Page component={DocumentsPage} /> },
       { path: 'hrms/company-policy', element: <Page component={CompanyPolicy} /> },
+      { path: 'hrms/company-policy/policies', element: <Page component={() => <CompanyPolicy forcedSection="policies" />} /> },
+      { path: 'hrms/company-policy/categories', element: <Page component={() => <CompanyPolicy forcedSection="categories" />} /> },
+      { path: 'hrms/company-policy/pending-approval', element: <Page component={() => <CompanyPolicy forcedSection="pending-approval" />} /> },
+      { path: 'hrms/company-policy/acknowledgements', element: <Page component={() => <CompanyPolicy forcedSection="acknowledgements" />} /> },
+      { path: 'hrms/company-policy/archive', element: <Page component={() => <CompanyPolicy forcedSection="archive" />} /> },
+
+      // ── Company Policy Module Root Routes ─────────────────
+      { path: 'company-policy', element: <Page component={CompanyPolicy} /> },
+      { path: 'company-policy/policies', element: <Page component={() => <CompanyPolicy forcedSection="policies" />} /> },
+      { path: 'company-policy/categories', element: <Page component={() => <CompanyPolicy forcedSection="categories" />} /> },
+      { path: 'company-policy/pending-approval', element: <Page component={() => <CompanyPolicy forcedSection="pending-approval" />} /> },
+      { path: 'company-policy/acknowledgements', element: <Page component={() => <CompanyPolicy forcedSection="acknowledgements" />} /> },
+      { path: 'company-policy/archive', element: <Page component={() => <CompanyPolicy forcedSection="archive" />} /> },
       { path: 'hrms/calendar', element: <Page component={CalendarPage} /> },
       { path: 'hrms/hrms-setup', element: <Page component={HrmsSetup} /> },
       { path: 'hrms/hr-admin', element: <Page component={HRAdminPage} /> },
