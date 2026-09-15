@@ -1782,7 +1782,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     }
   }
 
-  async function submitCompleteTask(outcome, nextAction) {
+  async function submitCompleteTask(outcome, nextAction, note) {
     const detailTask = tasks.find((t) => t.id === completeId);
     if (!detailTask) {
       return { ok: false, message: 'Task could not be found.' };
@@ -1799,6 +1799,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       lead,
       outcome,
       nextAction,
+      note,
       completedBy: actor,
       leadDetailTask: detailTask,
     });
@@ -1902,7 +1903,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {!done && showNote && (
-            <button type="button" title="Note" className="w-8 h-8 grid place-items-center rounded-md bg-lime-500 hover:bg-lime-600 text-white transition">
+            <button type="button" onClick={() => setCompleteId(task.id)} title="Fill Task Form" className="w-8 h-8 grid place-items-center rounded-md bg-lime-500 hover:bg-lime-600 text-white transition">
               <ClipboardList size={14} />
             </button>
           )}

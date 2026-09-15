@@ -30,8 +30,8 @@ import {
   Inbox,
   AlertTriangle,
   MoveRight,
-  Download,
-  FileSpreadsheet,
+  SlidersHorizontal,
+  Printer,
 } from 'lucide-react';
 
 const STORAGE_KEY = 'evenmore_crm_deals_v2';
@@ -512,6 +512,15 @@ function formatPriceINR(value) {
   return `₹ ${n.toLocaleString('en-IN')}`;
 }
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatStageSummary(totalAmount, count) {
   const n = Number(totalAmount) || 0;
   let formatted = '';
@@ -596,56 +605,17 @@ export default function DealsPage() {
   const [dragOverStage, setDragOverStage] = useState(null);
   const [formState, setFormState] = useState(EMPTY_DEAL_FORM);
   const [formError, setFormError] = useState('');
-  const [isExportOpen, setIsExportOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
       if (!e.target.closest('.deal-action-menu-container')) {
         setOpenMenuDealId(null);
       }
-      if (!e.target.closest('.export-menu-container')) {
-        setIsExportOpen(false);
-      }
     };
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
-
-  const handleExportData = (format = 'csv') => {
-    setIsExportOpen(false);
-    if (format === 'csv') {
-      const headers = ['Deal Name', 'Client', 'Phone', 'Price', 'Stage', 'Product', 'Source', 'Assigned User', 'Date'];
-      const rows = filteredDeals.map((d) => [
-        `"${d.name}"`,
-        `"${d.client}"`,
-        `"${d.phone}"`,
-        d.price || 0,
-        `"${d.stage}"`,
-        `"${d.product}"`,
-        `"${d.source}"`,
-        `"${d.assignedUser}"`,
-        `"${d.date}"`,
-      ]);
-      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      link.setAttribute('download', `deals_export_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showNotification('Deals exported as CSV successfully!');
-    } else {
-      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(JSON.stringify(filteredDeals, null, 2))}`;
-      const link = document.createElement('a');
-      link.setAttribute('href', jsonString);
-      link.setAttribute('download', `deals_export_${new Date().toISOString().slice(0, 10)}.json`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      showNotification('Deals exported as JSON successfully!');
-    }
-  };
 
   const showNotification = (msg) => {
     setToastMessage(msg);
@@ -686,8 +656,19 @@ export default function DealsPage() {
     setSelectedStage('All Stages');
     setSelectedSource('All Sources');
     setSelectedUser('All Users');
+    setDateRange('01 Sep 2025 - 30 Sep 2025');
     showNotification('Filters reset.');
   };
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (selectedProduct !== 'All Products') count += 1;
+    if (selectedStage !== 'All Stages') count += 1;
+    if (selectedSource !== 'All Sources') count += 1;
+    if (selectedUser !== 'All Users') count += 1;
+    if (dateRange !== '01 Sep 2025 - 30 Sep 2025') count += 1;
+    return count;
+  }, [dateRange, selectedProduct, selectedSource, selectedStage, selectedUser]);
 
   const handleOpenCreateModal = (stageName = 'Draft') => {
     setEditingDeal(null);
@@ -698,6 +679,108 @@ export default function DealsPage() {
     });
     setFormError('');
     setIsCreateModalOpen(true);
+  };
+
+  const handlePrintDeals = () => {
+    const printWindow = window.open('', '_blank', 'width=1100,height=800');
+    if (!printWindow) {
+      showNotification('Please allow popups to print deals.');
+      return;
+    }
+
+    const rows = filteredDeals.map((deal, index) => `
+      <tr>
+        <td>${index + 1}</td>
+        <td>${escapeHtml(deal.name)}</td>
+        <td>${escapeHtml(deal.client)}</td>
+        <td>${escapeHtml(deal.phone)}</td>
+        <td>${escapeHtml(deal.stage)}</td>
+        <td>${escapeHtml(deal.product)}</td>
+        <td>${escapeHtml(deal.source)}</td>
+        <td>${escapeHtml(deal.assignedUser)}</td>
+        <td>${escapeHtml(deal.date)}</td>
+        <td>${escapeHtml(formatPriceINR(deal.price))}</td>
+      </tr>
+    `).join('');
+
+    const today = new Date().toLocaleDateString('en-GB');
+    const activeFilters = [
+      selectedProduct !== 'All Products' ? `Product: ${selectedProduct}` : '',
+      selectedStage !== 'All Stages' ? `Stage: ${selectedStage}` : '',
+      selectedSource !== 'All Sources' ? `Source: ${selectedSource}` : '',
+      selectedUser !== 'All Users' ? `Assigned User: ${selectedUser}` : '',
+      dateRange !== '01 Sep 2025 - 30 Sep 2025' ? `Date Range: ${dateRange}` : '',
+      searchQuery.trim() ? `Search: ${searchQuery.trim()}` : '',
+    ].filter(Boolean);
+    const summaryValue = filteredDeals.reduce((sum, deal) => sum + (Number(deal.price) || 0), 0);
+
+    printWindow.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>Deals Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #0f172a; margin: 0; padding: 32px; }
+            h1 { margin: 0 0 6px; font-size: 28px; }
+            .sub { margin: 0; color: #64748b; font-size: 13px; }
+            .meta { margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap; }
+            .pill { background: #eff6ff; color: #1d4ed8; border-radius: 999px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+            .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+            .card { border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px 16px; }
+            .card small { color: #64748b; display: block; margin-bottom: 6px; font-size: 12px; font-weight: 700; }
+            .card strong { font-size: 24px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+            th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; font-size: 12px; }
+            th { background: #f8fafc; color: #475569; text-transform: uppercase; letter-spacing: .04em; }
+            .filters { margin-top: 12px; color: #475569; font-size: 12px; }
+            .empty { margin-top: 24px; padding: 18px; border: 1px dashed #cbd5e1; border-radius: 14px; color: #64748b; font-size: 13px; }
+            @media print { body { padding: 18px; } }
+          </style>
+        </head>
+        <body>
+          <h1>Deals Report</h1>
+          <p class="sub">Printed on ${escapeHtml(today)}</p>
+          <div class="meta">
+            <span class="pill">${escapeHtml(`${filteredDeals.length} deals`)}</span>
+            <span class="pill">${escapeHtml(dateRange)}</span>
+          </div>
+          ${activeFilters.length > 0 ? `<p class="filters"><strong>Active Filters:</strong> ${escapeHtml(activeFilters.join(' | '))}</p>` : ''}
+          <div class="grid">
+            <div class="card"><small>Total Deals</small><strong>${escapeHtml(String(filteredDeals.length))}</strong></div>
+            <div class="card"><small>Total Value</small><strong>${escapeHtml(formatPriceINR(summaryValue))}</strong></div>
+            <div class="card"><small>View</small><strong>${escapeHtml(viewMode === 'kanban' ? 'Kanban' : 'List')}</strong></div>
+          </div>
+          ${filteredDeals.length === 0 ? `
+            <div class="empty">No deals match the current filters.</div>
+          ` : `
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Deal Name</th>
+                  <th>Client</th>
+                  <th>Phone</th>
+                  <th>Stage</th>
+                  <th>Product</th>
+                  <th>Source</th>
+                  <th>Assigned User</th>
+                  <th>Date</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `}
+          <script>
+            window.onload = function () {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    showNotification('Print report opened.');
   };
 
   const handleOpenEditModal = (deal) => {
@@ -843,35 +926,14 @@ export default function DealsPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          <div className="relative export-menu-container">
-            <button
-              onClick={() => setIsExportOpen(!isExportOpen)}
-              className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-colors cursor-pointer"
-            >
-              <Download size={16} />
-              <span>Export</span>
-              <ChevronDown size={14} className="text-slate-400" />
-            </button>
-
-            {isExportOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 animate-in fade-in zoom-in-95 duration-150">
-                <button
-                  onClick={() => handleExportData('csv')}
-                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Download size={14} className="text-slate-500" />
-                  <span>Export as CSV</span>
-                </button>
-                <button
-                  onClick={() => handleExportData('json')}
-                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 border-t border-slate-100 cursor-pointer"
-                >
-                  <FileSpreadsheet size={14} className="text-slate-500" />
-                  <span>Export as JSON</span>
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            type="button"
+            onClick={handlePrintDeals}
+            className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-colors cursor-pointer"
+          >
+            <Printer size={16} />
+            <span>Print</span>
+          </button>
 
           <button
             onClick={() => handleOpenCreateModal()}
@@ -956,113 +1018,31 @@ export default function DealsPage() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Product</label>
-            <div className="relative">
-              <Package size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <select
-                value={selectedProduct}
-                onChange={(e) => setSelectedProduct(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {PRODUCTS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowFilters((current) => !current)}
+              className={`inline-flex h-9 items-center gap-2 rounded-xl border px-3.5 text-xs font-semibold transition-colors ${
+                showFilters || activeFilterCount > 0
+                  ? 'border-blue-200 bg-blue-50 text-[#1f6bff]'
+                  : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <SlidersHorizontal size={14} />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-[#1f6bff]">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
 
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Stage</label>
-            <div className="relative">
-              <Flag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <select
-                value={selectedStage}
-                onChange={(e) => setSelectedStage(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="All Stages">All Stages</option>
-                {STAGES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Source</label>
-            <div className="relative">
-              <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <select
-                value={selectedSource}
-                onChange={(e) => setSelectedSource(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {SOURCES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Assigned User</label>
-            <div className="relative">
-              <UserRound size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <select
-                value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {USERS.map((u) => (
-                  <option key={u} value={u}>
-                    {u}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Date Range</label>
-            <div className="relative">
-              <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <select
-                value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="01 Sep 2025 - 30 Sep 2025">01 Sep 2025 - 30 Sep 2025</option>
-                <option value="Last 30 Days">Last 30 Days</option>
-                <option value="This Quarter">This Quarter</option>
-                <option value="This Year">This Year</option>
-              </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
-          <div className="relative flex-1 w-full">
-            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search by deal name, client, phone, notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            {activeFilterCount > 0 && (
+              <div className="text-[11px] font-medium text-slate-500">
+                {activeFilterCount} active filter{activeFilterCount > 1 ? 's' : ''}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
@@ -1102,15 +1082,118 @@ export default function DealsPage() {
                 <span>List</span>
               </button>
             </div>
+          </div>
+        </div>
 
-            <button
-              type="button"
-              onClick={() => handleOpenCreateModal('Draft')}
-              className="w-9 h-9 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"
-              title="More Actions"
-            >
-              <MoreVertical size={15} />
-            </button>
+        {showFilters && (
+          <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Product</label>
+              <div className="relative">
+                <Package size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <select
+                  value={selectedProduct}
+                  onChange={(e) => setSelectedProduct(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {PRODUCTS.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Stage</label>
+              <div className="relative">
+                <Flag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <select
+                  value={selectedStage}
+                  onChange={(e) => setSelectedStage(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="All Stages">All Stages</option>
+                  {STAGES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Source</label>
+              <div className="relative">
+                <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <select
+                  value={selectedSource}
+                  onChange={(e) => setSelectedSource(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {SOURCES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Assigned User</label>
+              <div className="relative">
+                <UserRound size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <select
+                  value={selectedUser}
+                  onChange={(e) => setSelectedUser(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {USERS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Date Range</label>
+              <div className="relative">
+                <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <select
+                  value={dateRange}
+                  onChange={(e) => setDateRange(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="01 Sep 2025 - 30 Sep 2025">01 Sep 2025 - 30 Sep 2025</option>
+                  <option value="Last 30 Days">Last 30 Days</option>
+                  <option value="This Quarter">This Quarter</option>
+                  <option value="This Year">This Year</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+          <div className="relative flex-1 w-full">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by deal name, client, phone, notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
         </div>
       </div>

@@ -80,13 +80,14 @@ export default function TasksPage() {
     setCompleteTarget({ task, lead });
   }
 
-  async function handleComplete(outcome, nextAction) {
+  async function handleComplete(outcome, nextAction, note) {
     if (!completeTarget?.task) return { ok: false, message: 'No task selected.' };
     const result = completeTaskWithOutcome({
       task: completeTarget.task,
       lead: completeTarget.lead,
       outcome,
       nextAction,
+      note,
       completedBy: currentUser?.name || CRM_TEAM_MEMBERS[0]?.name || 'CRM User',
     });
     setTasks(loadCrmTasks());
