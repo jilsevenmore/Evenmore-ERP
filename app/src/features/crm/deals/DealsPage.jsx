@@ -32,6 +32,7 @@ import {
   MoveRight,
   SlidersHorizontal,
   Printer,
+  Info,
 } from 'lucide-react';
 
 const STORAGE_KEY = 'evenmore_crm_deals_v2';
@@ -606,6 +607,7 @@ export default function DealsPage() {
   const [formState, setFormState] = useState(EMPTY_DEAL_FORM);
   const [formError, setFormError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
+  const [showLearnMoreBanner, setShowLearnMoreBanner] = useState(true);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -714,7 +716,7 @@ export default function DealsPage() {
     ].filter(Boolean);
     const summaryValue = filteredDeals.reduce((sum, deal) => sum + (Number(deal.price) || 0), 0);
 
-    printWindow.document.write(`
+    const reportHtml = `
       <!doctype html>
       <html>
         <head>
@@ -771,15 +773,17 @@ export default function DealsPage() {
               <tbody>${rows}</tbody>
             </table>
           `}
-          <script>
-            window.onload = function () {
-              window.print();
-            };
-          </script>
         </body>
       </html>
-    `);
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(reportHtml);
     printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => {
+      printWindow.print();
+    }, 300);
     showNotification('Print report opened.');
   };
 
@@ -944,6 +948,38 @@ export default function DealsPage() {
           </button>
         </div>
       </div>
+
+      {showLearnMoreBanner && (
+        <div className="rounded-2xl border border-blue-100 bg-[#eef5ff] px-4 py-3 shadow-2xs">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-white text-[#2f6fed]">
+                <Info size={16} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-[#1d3f6e]">Understand the Difference</p>
+                <p className="mt-1 text-[12px] text-slate-600">
+                  Lead Stages are used to track and nurture potential leads. Deal Stages are used to track confirmed deals in the sales pipeline.
+                </p>
+                <button
+                  type="button"
+                  className="mt-3 text-[14px] font-medium text-[#2457ff] transition hover:text-[#1d4ed8]"
+                >
+                  Learn More -&gt;
+                </button>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowLearnMoreBanner(false)}
+              className="shrink-0 p-1 text-slate-400 hover:text-slate-600"
+              aria-label="Close information banner"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">

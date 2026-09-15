@@ -121,6 +121,7 @@ export default function CRMSystemSetupPage() {
   const [leadModal, setLeadModal] = useState(null);
   const [dealModal, setDealModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
+  const [showDifferenceModal, setShowDifferenceModal] = useState(false);
   const [dragLead, setDragLead] = useState(null);
   const [dragDeal, setDragDeal] = useState(null);
 
@@ -294,7 +295,7 @@ export default function CRMSystemSetupPage() {
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-bold text-blue-900">Understand the Difference</p>
             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">Lead Stages are used to track and nurture potential leads. Deal Stages are used to track confirmed deals in the sales pipeline.</p>
-            <button type="button" className="text-xs font-semibold text-blue-600 mt-1 hover:underline">Learn More →</button>
+            <button type="button" onClick={() => setShowDifferenceModal(true)} className="text-xs font-semibold text-blue-600 mt-1 hover:underline">Learn More</button>
           </div>
           <button type="button" onClick={hideBanner} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Dismiss">
             <X size={15} />
@@ -493,24 +494,53 @@ export default function CRMSystemSetupPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-[#ecfdf5] border border-green-100 rounded-xl p-5 flex items-start gap-3">
-          <span className="w-9 h-9 rounded-full bg-white text-green-600 flex items-center justify-center shrink-0 shadow-sm"><Users size={17} /></span>
-          <div>
-            <p className="text-[13px] font-bold text-slate-800">What are Lead Stages?</p>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">Lead stages help you track the journey of a potential customer from initial contact to conversion. You can create, edit, reorder or delete lead stages as per your business process.</p>
-            <button type="button" onClick={() => scrollToPanel('lead-panel')} className="mt-3 h-8 px-3.5 rounded-lg border border-blue-400 text-blue-600 text-xs font-semibold bg-white hover:bg-blue-50">Manage Lead Stages</button>
+      {showDifferenceModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setShowDifferenceModal(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Lead stages and deal stages difference">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800">Lead Stages vs Deal Stages</h2>
+              <button type="button" onClick={() => setShowDifferenceModal(false)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Close">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+                <p className="text-sm font-bold text-slate-800">Lead Stages</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  Lead stages are used before a customer is confirmed. They track the journey from first contact, follow-up, qualification, demo, and negotiation until the lead is ready to convert.
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Example: New Lead, Details Collected, Demo Pending, Negotiation
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-purple-100 bg-purple-50/60 p-4">
+                <p className="text-sm font-bold text-slate-800">Deal Stages</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  Deal stages are used after the opportunity becomes a real sales deal. They track quotation progress, proposal movement, revision, approval, win, or loss.
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Example: Draft, Sent, Open, Revised, Won, Lost
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-sm font-bold text-slate-800">Simple Difference</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  Lead stages help manage possible customers. Deal stages help manage the actual business transaction after the opportunity is confirmed.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button type="button" onClick={() => setShowDifferenceModal(false)} className="h-9 px-4 rounded-lg bg-[#1f6bff] text-white text-xs font-semibold hover:bg-blue-700">
+                Close
+              </button>
+            </div>
           </div>
         </div>
-        <div className="bg-[#f5f0ff] border border-purple-100 rounded-xl p-5 flex items-start gap-3">
-          <span className="w-9 h-9 rounded-full bg-white text-purple-600 flex items-center justify-center shrink-0 shadow-sm"><DollarSign size={17} /></span>
-          <div>
-            <p className="text-[13px] font-bold text-slate-800">What are Deal Stages?</p>
-            <p className="text-xs text-slate-500 mt-1 leading-relaxed">Deal stages represent the different steps in your sales process. Each stage belongs to a pipeline (e.g., Sales, B2B, etc.). You can create, edit, reorder or delete deal stages.</p>
-            <button type="button" onClick={() => scrollToPanel('deal-panel')} className="mt-3 h-8 px-3.5 rounded-lg border border-blue-400 text-blue-600 text-xs font-semibold bg-white hover:bg-blue-50">Manage Deal Stages</button>
-          </div>
-        </div>
-      </div>
+      )}
 
       {leadModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setLeadModal(null)}>
@@ -590,3 +620,4 @@ export default function CRMSystemSetupPage() {
     </div>
   );
 }
+
