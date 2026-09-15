@@ -239,17 +239,7 @@ const NAV = [
           // { label: 'Goal Funnel', to: '/hrms/performance/goal-funnel' }, // Hidden: Goal Funnel feature commented out
         ],
       },
-      {
-        label: 'Training',
-        icon: GraduationCap,
-        defaultOpen: false,
-        children: [
-          { label: 'Dashboard', to: '/hrms/training', dot: true },
-          { label: 'Training List', to: '/hrms/training/list' },
-          { label: 'Training Funnel', to: '/hrms/training/training-funnel' },
-          { label: 'Trainers', to: '/hrms/training/trainers' },
-        ],
-      },
+      { label: 'Training', icon: GraduationCap, to: '/hrms/training' },
       { label: 'HR Admin', icon: ShieldCheck, to: '/hrms/hr-admin' },
       { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },

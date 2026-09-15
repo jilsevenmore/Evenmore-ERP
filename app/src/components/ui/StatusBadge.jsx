@@ -56,6 +56,17 @@ const STATUS_MAP = {
   'Processing': 'badge-yellow',
   'Failed': 'badge-red',
 
+  // HRMS Performance
+  'In Progress': 'badge-blue',
+  'In Review': 'badge-yellow',
+  'Submitted': 'badge-purple',
+  'Approved': 'badge-green',
+  'Archived': 'badge-gray',
+  'Self Review': 'badge-blue',
+  'Manager Review': 'badge-yellow',
+  'HR Review': 'badge-purple',
+  'Finalization': 'badge-green',
+
   // Valuation
   'Posted': 'badge-green',
   'Voided': 'badge-red',

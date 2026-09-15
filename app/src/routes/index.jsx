@@ -292,10 +292,10 @@ const router = createBrowserRouter([
       // { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> }, // Hidden: Goal Tracking feature commented out
       // { path: 'hrms/performance/goal-funnel', element: <Page component={GoalFunnel} /> }, // Hidden: Goal Funnel feature commented out
       { path: 'hrms/training', element: <Page component={TrainingDashboard} /> },
-      { path: 'hrms/training/list', element: <Page component={TrainingList} /> },
-      { path: 'hrms/training/training-funnel', element: <Page component={TrainingFunnel} /> },
-      { path: 'hrms/training/trainers', element: <Page component={Trainers} /> },
-      { path: 'hrms/training/funnel', element: <Page component={TrainingFunnel} /> },
+      { path: 'hrms/training/list', element: <Page component={() => <TrainingDashboard initialTab="list" />} /> },
+      { path: 'hrms/training/training-funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
+      { path: 'hrms/training/trainers', element: <Page component={() => <TrainingDashboard initialTab="trainers" />} /> },
+      { path: 'hrms/training/funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
       { path: 'hrms/org-chart', element: <Page component={OrgChartPage} /> },
       { path: 'hrms/departments', element: <Page component={DepartmentsPage} /> },
       { path: 'hrms/designations', element: <Page component={DesignationsPage} /> },
