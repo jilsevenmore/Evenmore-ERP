@@ -708,6 +708,126 @@ export const DeliveryChallansPage = () => {
                 </div>
               </div>
 
+              {/* Interactive Live Vehicle Transit Route Tracker */}
+              {(() => {
+                const currentStatus = selectedChallan.status || 'Dispatched';
+                const isCancelled = currentStatus === 'Cancelled';
+                
+                let progressPct = 15;
+                if (currentStatus === 'In Transit' || currentStatus === 'Shipped') progressPct = 50;
+                if (currentStatus === 'Out for Delivery') progressPct = 80;
+                if (currentStatus === 'Delivered') progressPct = 100;
+                if (isCancelled) progressPct = 0;
+
+                const advanceStage = (nextStatus) => {
+                  updateDeliveryChallanStatus(selectedChallan.id, nextStatus);
+                  setSelectedChallan({ ...selectedChallan, status: nextStatus });
+                };
+
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
+                          <Truck size={16} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                            Live Fleet Route & Vehicle Tracking
+                          </h4>
+                          <p className="text-[10px] text-slate-500">
+                            Vehicle: <strong className="font-mono text-slate-800">{selectedChallan.vehicleNo || 'TRK-9041-WA'}</strong> • Carrier: {selectedChallan.transporter || 'FedEx Freight Direct'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Interactive Move Vehicle Actions */}
+                      {!isCancelled && currentStatus !== 'Delivered' && (
+                        <div className="flex items-center gap-1.5">
+                          {currentStatus === 'Dispatched' && (
+                            <button
+                              onClick={() => advanceStage('In Transit')}
+                              className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              title="Advance vehicle to In Transit highway route"
+                            >
+                              <Truck size={12} /> Move Vehicle to Transit
+                            </button>
+                          )}
+                          {currentStatus === 'In Transit' && (
+                            <button
+                              onClick={() => advanceStage('Out for Delivery')}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              title="Advance vehicle to local distribution hub"
+                            >
+                              <Truck size={12} /> Move to Out for Delivery
+                            </button>
+                          )}
+                          {(currentStatus === 'Out for Delivery' || currentStatus === 'In Transit') && (
+                            <button
+                              onClick={() => advanceStage('Delivered')}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-all"
+                              title="Complete delivery and sign POD"
+                            >
+                              <CheckCircle2 size={12} /> Complete Delivery
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Animated Highway Road & Moving Vehicle Track */}
+                    <div className="relative pt-6 pb-2 px-3">
+                      {/* Road Base Track */}
+                      <div className="relative h-2.5 bg-slate-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-emerald-500 transition-all duration-700 ease-out"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+
+                      {/* Moving Vehicle Marker */}
+                      {!isCancelled && (
+                        <div
+                          className="absolute -top-1.5 -translate-x-1/2 transition-all duration-700 ease-out flex flex-col items-center group pointer-events-none"
+                          style={{ left: `${Math.max(5, Math.min(95, progressPct))}%` }}
+                        >
+                          <div className="w-8 h-8 rounded-full bg-blue-600 text-white shadow-lg border-2 border-white flex items-center justify-center animate-bounce">
+                            <Truck size={15} />
+                          </div>
+                          <span className="mt-1 font-mono text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                            {selectedChallan.vehicleNo || 'TRK-9041'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Waypoint Checkpoints */}
+                      <div className="grid grid-cols-4 text-center mt-5 text-[10px]">
+                        <div className="space-y-0.5">
+                          <div className={`w-3 h-3 rounded-full mx-auto border-2 ${progressPct >= 15 ? 'bg-blue-600 border-blue-600' : 'bg-slate-300 border-slate-300'}`} />
+                          <p className="font-bold text-slate-800">Origin Warehouse</p>
+                          <p className="text-slate-400 text-[9px]">Hub Staging Dock</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className={`w-3 h-3 rounded-full mx-auto border-2 ${progressPct >= 50 ? 'bg-indigo-600 border-indigo-600' : 'bg-slate-300 border-slate-300'}`} />
+                          <p className="font-bold text-slate-800">Highway Transit</p>
+                          <p className="text-slate-400 text-[9px]">En Route Transit</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className={`w-3 h-3 rounded-full mx-auto border-2 ${progressPct >= 80 ? 'bg-amber-600 border-amber-600' : 'bg-slate-300 border-slate-300'}`} />
+                          <p className="font-bold text-slate-800">Local Delivery Hub</p>
+                          <p className="text-slate-400 text-[9px]">Out for Delivery</p>
+                        </div>
+                        <div className="space-y-0.5">
+                          <div className={`w-3 h-3 rounded-full mx-auto border-2 ${progressPct >= 100 ? 'bg-emerald-600 border-emerald-600' : 'bg-slate-300 border-slate-300'}`} />
+                          <p className="font-bold text-slate-800">Consignee Dock</p>
+                          <p className="text-slate-400 text-[9px]">Delivered & POD</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Related Transaction Chain */}
               <RelatedDocumentsCard documents={getChallanRelatedDocs(selectedChallan)}/>
 

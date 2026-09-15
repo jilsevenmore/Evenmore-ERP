@@ -1,127 +1,133 @@
+import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
+import { PageLoadingSkeleton } from '../components/common/PageLoadingSkeleton';
 
-// ── CRM ─────────────────────────────────────────────────────
-import LeadsPage from '../features/crm/leads/LeadsPage';
-import LeadDetailPage from '../features/crm/leads/LeadDetailPage';
-import LeadFormBuilderPage from '../features/crm/leads/LeadFormBuilderPage';
-import LeadFormsPage from '../features/crm/leads/LeadFormsPage';
-import DynamicLeadFormPage from '../features/crm/leads/DynamicLeadFormPage';
-import TasksPage from '../features/crm/tasks/TasksPage';
-import TaskAllocationPage from '../features/crm/tasks/allocation/TaskAllocationPage';
-import TaskAllocationDetailPage from '../features/crm/tasks/allocation/TaskAllocationDetailPage';
-import MasterTasksPage from '../features/crm/tasks/MasterTasksPage';
-import StageTasksPage from '../features/crm/tasks/StageTasksPage';
-import TaskFormPage from '../features/crm/tasks/TaskFormPage';
-import TaskFormBuilderPage from '../features/crm/tasks/TaskFormBuilderPage';
-import CRMDashboard from '../features/crm/dashboard/CRMDashboard';
-import DealsPage from '../features/crm/deals/DealsPage';
-import UserAllocationPage from '../features/crm/allocation/UserAllocationPage';
-import CRMSystemSetupPage from '../features/crm/setup/CRMSystemSetupPage';
-import CRMReportsPage from '../features/crm/reports/CRMReportsPage';
+// ── CRM (Lazy Loaded) ───────────────────────────────────────
+const LeadsPage = lazy(() => import('../features/crm/leads/LeadsPage'));
+const LeadDetailPage = lazy(() => import('../features/crm/leads/LeadDetailPage'));
+const LeadFormBuilderPage = lazy(() => import('../features/crm/leads/LeadFormBuilderPage'));
+const LeadFormsPage = lazy(() => import('../features/crm/leads/LeadFormsPage'));
+const DynamicLeadFormPage = lazy(() => import('../features/crm/leads/DynamicLeadFormPage'));
+const TasksPage = lazy(() => import('../features/crm/tasks/TasksPage'));
+const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationPage'));
+const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
+const MasterTasksPage = lazy(() => import('../features/crm/tasks/MasterTasksPage'));
+const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage'));
+const TaskFormPage = lazy(() => import('../features/crm/tasks/TaskFormPage'));
+const TaskFormBuilderPage = lazy(() => import('../features/crm/tasks/TaskFormBuilderPage'));
+const CRMDashboard = lazy(() => import('../features/crm/dashboard/CRMDashboard'));
+const DealsPage = lazy(() => import('../features/crm/deals/DealsPage'));
+const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAllocationPage'));
+const CRMSystemSetupPage = lazy(() => import('../features/crm/setup/CRMSystemSetupPage'));
+const CRMReportsPage = lazy(() => import('../features/crm/reports/CRMReportsPage'));
 
-// ── HRMS ─────────────────────────────────────────────────────
-import HRMSDashboard from '../features/hrms/dashboard/Dashboard';
-import Employees from '../features/hrms/employees/Employees';
-import AttendanceOverview from '../features/hrms/attendance/Overview';
-import MarkAttendance from '../features/hrms/attendance/MarkAttendance';
-import IndividualAttendance from '../features/hrms/attendance/IndividualAttendance';
-import BulkAttendance from '../features/hrms/attendance/BulkAttendance';
-import Requests from '../features/hrms/attendance/Requests';
-import Flexibility from '../features/hrms/attendance/Flexibility';
-import Leave from '../features/hrms/leave/Leave';
-import Payroll from '../features/hrms/payroll/Payroll';
-import RecruitmentDashboard from '../features/hrms/recruitment/RecruitmentDashboard';
-import Jobs from '../features/hrms/recruitment/Jobs';
-import JobDetails from '../features/hrms/recruitment/JobDetails';
-import Candidates from '../features/hrms/recruitment/Candidates';
-import CandidateDetails from '../features/hrms/recruitment/CandidateDetails';
-import Interviews from '../features/hrms/recruitment/Interviews';
-import InterviewDetails from '../features/hrms/recruitment/InterviewDetails';
-import Applications from '../features/hrms/recruitment/Applications';
-import Offers from '../features/hrms/recruitment/Offers';
-import Onboarding from '../features/hrms/recruitment/Onboarding';
-import Career from '../features/hrms/recruitment/Career';
-import CustomQuestions from '../features/hrms/recruitment/CustomQuestions';
-import RecruitmentFunnel from '../features/hrms/recruitment/RecruitmentFunnel';
-import PerformanceDashboard from '../features/hrms/performance/Dashboard';
-import Indicators from '../features/hrms/performance/Indicators';
-import KpiData from '../features/hrms/performance/KpiData';
-import Appraisal from '../features/hrms/performance/Appraisal';
-import AppraisalFunnel from '../features/hrms/performance/AppraisalFunnel';
-import GoalTracking from '../features/hrms/performance/GoalTracking';
-import GoalFunnel from '../features/hrms/performance/GoalFunnel';
-import TrainingList from '../features/hrms/performance/TrainingList';
-import TrainingFunnel from '../features/hrms/performance/TrainingFunnel';
-import Trainers from '../features/hrms/performance/Trainers';
-import TrainingDashboard from '../features/hrms/performance/TrainingDashboard';
-import OrgChartPage from '../features/hrms/organization/OrgChartPage';
-import DepartmentsPage from '../features/hrms/organization/DepartmentsPage';
-import DesignationsPage from '../features/hrms/organization/DesignationsPage';
-import LocationsPage from '../features/hrms/organization/LocationsPage';
-import AssetsPage from '../features/hrms/organization/AssetsPage';
-import DocumentsPage from '../features/hrms/organization/DocumentsPage';
-import { CompanyPolicy, CalendarPage, HrmsSetup, HRAdminPage } from '../features/hrms/organization/SimplePages';
-import { Generic } from '../features/hrms/Generic';
+// ── HRMS (Lazy Loaded) ───────────────────────────────────────
+const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
+const Employees = lazy(() => import('../features/hrms/employees/Employees'));
+const AttendanceOverview = lazy(() => import('../features/hrms/attendance/Overview'));
+const MarkAttendance = lazy(() => import('../features/hrms/attendance/MarkAttendance'));
+const IndividualAttendance = lazy(() => import('../features/hrms/attendance/IndividualAttendance'));
+const BulkAttendance = lazy(() => import('../features/hrms/attendance/BulkAttendance'));
+const Requests = lazy(() => import('../features/hrms/attendance/Requests'));
+const Flexibility = lazy(() => import('../features/hrms/attendance/Flexibility'));
+const Leave = lazy(() => import('../features/hrms/leave/Leave'));
+const Payroll = lazy(() => import('../features/hrms/payroll/Payroll'));
+const RecruitmentDashboard = lazy(() => import('../features/hrms/recruitment/RecruitmentDashboard'));
+const Jobs = lazy(() => import('../features/hrms/recruitment/Jobs'));
+const JobDetails = lazy(() => import('../features/hrms/recruitment/JobDetails'));
+const Candidates = lazy(() => import('../features/hrms/recruitment/Candidates'));
+const CandidateDetails = lazy(() => import('../features/hrms/recruitment/CandidateDetails'));
+const Interviews = lazy(() => import('../features/hrms/recruitment/Interviews'));
+const InterviewDetails = lazy(() => import('../features/hrms/recruitment/InterviewDetails'));
+const Applications = lazy(() => import('../features/hrms/recruitment/Applications'));
+const Offers = lazy(() => import('../features/hrms/recruitment/Offers'));
+const Onboarding = lazy(() => import('../features/hrms/recruitment/Onboarding'));
+const Career = lazy(() => import('../features/hrms/recruitment/Career'));
+const CustomQuestions = lazy(() => import('../features/hrms/recruitment/CustomQuestions'));
+const RecruitmentFunnel = lazy(() => import('../features/hrms/recruitment/RecruitmentFunnel'));
+const PerformanceDashboard = lazy(() => import('../features/hrms/performance/Dashboard'));
+const Indicators = lazy(() => import('../features/hrms/performance/Indicators'));
+const KpiData = lazy(() => import('../features/hrms/performance/KpiData'));
+const Appraisal = lazy(() => import('../features/hrms/performance/Appraisal'));
+const AppraisalFunnel = lazy(() => import('../features/hrms/performance/AppraisalFunnel'));
+const GoalTracking = lazy(() => import('../features/hrms/performance/GoalTracking'));
+const GoalFunnel = lazy(() => import('../features/hrms/performance/GoalFunnel'));
+const TrainingList = lazy(() => import('../features/hrms/performance/TrainingList'));
+const TrainingFunnel = lazy(() => import('../features/hrms/performance/TrainingFunnel'));
+const Trainers = lazy(() => import('../features/hrms/performance/Trainers'));
+const TrainingDashboard = lazy(() => import('../features/hrms/performance/TrainingDashboard'));
+const OrgChartPage = lazy(() => import('../features/hrms/organization/OrgChartPage'));
+const DepartmentsPage = lazy(() => import('../features/hrms/organization/DepartmentsPage'));
+const DesignationsPage = lazy(() => import('../features/hrms/organization/DesignationsPage'));
+const LocationsPage = lazy(() => import('../features/hrms/organization/LocationsPage'));
+const AssetsPage = lazy(() => import('../features/hrms/organization/AssetsPage'));
+const DocumentsPage = lazy(() => import('../features/hrms/organization/DocumentsPage'));
+const CompanyPolicy = lazy(() => import('../features/hrms/organization/SimplePages').then(m => ({ default: m.CompanyPolicy })));
+const CalendarPage = lazy(() => import('../features/hrms/organization/SimplePages').then(m => ({ default: m.CalendarPage })));
+const HrmsSetup = lazy(() => import('../features/hrms/organization/SimplePages').then(m => ({ default: m.HrmsSetup })));
+const HRAdminPage = lazy(() => import('../features/hrms/organization/SimplePages').then(m => ({ default: m.HRAdminPage })));
 
-// ── ERP — Sales ───────────────────────────────────────────────
-import { EstimatesPage } from '../features/sales/EstimatesPage';
-import { QuotationsPage } from '../features/sales/QuotationsPage';
-import { SalesOrdersPage } from '../features/sales/SalesOrdersPage';
-import { ProformaInvoicesPage } from '../features/sales/ProformaInvoicesPage';
-import { SalesInvoicesPage } from '../features/sales/SalesInvoicesPage';
-import { SalesReturnsPage } from '../features/sales/SalesReturnsPage';
-import { PaymentInPage } from '../features/sales/PaymentInPage';
-import { DeliveryChallansPage } from '../features/sales/DeliveryChallansPage';
-import { WarrantyListPage } from '../features/sales/WarrantyListPage';
+// ── ERP — Sales (Lazy Loaded) ─────────────────────────────────
+const EstimatesPage = lazy(() => import('../features/sales/EstimatesPage').then(m => ({ default: m.EstimatesPage })));
+const QuotationsPage = lazy(() => import('../features/sales/QuotationsPage').then(m => ({ default: m.QuotationsPage })));
+const SalesOrdersPage = lazy(() => import('../features/sales/SalesOrdersPage').then(m => ({ default: m.SalesOrdersPage })));
+const ProformaInvoicesPage = lazy(() => import('../features/sales/ProformaInvoicesPage').then(m => ({ default: m.ProformaInvoicesPage })));
+const SalesInvoicesPage = lazy(() => import('../features/sales/SalesInvoicesPage').then(m => ({ default: m.SalesInvoicesPage })));
+const SalesReturnsPage = lazy(() => import('../features/sales/SalesReturnsPage').then(m => ({ default: m.SalesReturnsPage })));
+const PaymentInPage = lazy(() => import('../features/sales/PaymentInPage').then(m => ({ default: m.PaymentInPage })));
+const DeliveryChallansPage = lazy(() => import('../features/sales/DeliveryChallansPage').then(m => ({ default: m.DeliveryChallansPage })));
+const WarrantyListPage = lazy(() => import('../features/sales/WarrantyListPage').then(m => ({ default: m.WarrantyListPage })));
 
-// ── ERP — Purchase ────────────────────────────────────────────
-import { PurchaseOrdersPage } from '../features/purchase/PurchaseOrdersPage';
-import { PurchaseBillsPage } from '../features/purchase/PurchaseBillsPage';
-import { PurchaseReturnsPage } from '../features/purchase/PurchaseReturnsPage';
-import { PaymentOutPage } from '../features/purchase/PaymentOutPage';
-import { ExpensesPage } from '../features/purchase/ExpensesPage';
+// ── ERP — Purchase (Lazy Loaded) ──────────────────────────────
+const PurchaseOrdersPage = lazy(() => import('../features/purchase/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+const PurchaseBillsPage = lazy(() => import('../features/purchase/PurchaseBillsPage').then(m => ({ default: m.PurchaseBillsPage })));
+const PurchaseReturnsPage = lazy(() => import('../features/purchase/PurchaseReturnsPage').then(m => ({ default: m.PurchaseReturnsPage })));
+const PaymentOutPage = lazy(() => import('../features/purchase/PaymentOutPage').then(m => ({ default: m.PaymentOutPage })));
+const ExpensesPage = lazy(() => import('../features/purchase/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 
-// ── ERP — Inventory ───────────────────────────────────────────
-import { ItemsMasterPage } from '../features/inventory/ItemsMasterPage';
-import { AddEditItemPage } from '../features/inventory/AddEditItemPage';
-import { CategoriesPage } from '../features/inventory/CategoriesPage';
-import { StockPositionPage } from '../features/inventory/StockPositionPage';
-import { TransfersPage } from '../features/inventory/TransfersPage';
-import { LocationsPage as ERPLocationsPage } from '../features/inventory/LocationsPage';
-import { FaultyPartsPage } from '../features/inventory/FaultyPartsPage';
-import { ServiceUsagePage } from '../features/inventory/ServiceUsagePage';
-import { ZoneRequestsPage } from '../features/inventory/ZoneRequestsPage';
-import { ValuationAgeingPage } from '../features/inventory/ValuationAgeingPage';
-import { MonthEndAuditPage } from '../features/inventory/MonthEndAuditPage';
+// ── ERP — Inventory (Lazy Loaded) ─────────────────────────────
+const ItemsMasterPage = lazy(() => import('../features/inventory/ItemsMasterPage').then(m => ({ default: m.ItemsMasterPage })));
+const AddEditItemPage = lazy(() => import('../features/inventory/AddEditItemPage').then(m => ({ default: m.AddEditItemPage })));
+const CategoriesPage = lazy(() => import('../features/inventory/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
+const StockPositionPage = lazy(() => import('../features/inventory/StockPositionPage').then(m => ({ default: m.StockPositionPage })));
+const TransfersPage = lazy(() => import('../features/inventory/TransfersPage').then(m => ({ default: m.TransfersPage })));
+const ERPLocationsPage = lazy(() => import('../features/inventory/LocationsPage').then(m => ({ default: m.LocationsPage })));
+const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage').then(m => ({ default: m.FaultyPartsPage })));
+const ServiceUsagePage = lazy(() => import('../features/inventory/ServiceUsagePage').then(m => ({ default: m.ServiceUsagePage })));
+const ZoneRequestsPage = lazy(() => import('../features/inventory/ZoneRequestsPage').then(m => ({ default: m.ZoneRequestsPage })));
+const ValuationAgeingPage = lazy(() => import('../features/inventory/ValuationAgeingPage').then(m => ({ default: m.ValuationAgeingPage })));
+const MonthEndAuditPage = lazy(() => import('../features/inventory/MonthEndAuditPage').then(m => ({ default: m.MonthEndAuditPage })));
 
-// ── ERP — Parties ─────────────────────────────────────────────
-import PartiesPage from '../features/parties/PartiesPage';
-import { CustomersPage } from '../features/parties/CustomersPage';
-import { VendorsPage } from '../features/parties/VendorsPage';
+// ── ERP — Parties (Lazy Loaded) ───────────────────────────────
+const PartiesPage = lazy(() => import('../features/parties/PartiesPage'));
+const CustomersPage = lazy(() => import('../features/parties/CustomersPage').then(m => ({ default: m.CustomersPage })));
+const VendorsPage = lazy(() => import('../features/parties/VendorsPage').then(m => ({ default: m.VendorsPage })));
 
-// ── ERP — Accounts ───────────────────────────────────────────
-import { CashBankPage } from '../features/accounts/CashBankPage';
-import { GeneralLedgerPage } from '../features/accounts/GeneralLedgerPage';
-import FinancialReportsPage from '../features/accounts/FinancialReportsPage';
+// ── ERP — Accounts (Lazy Loaded) ──────────────────────────────
+const CashBankPage = lazy(() => import('../features/accounts/CashBankPage').then(m => ({ default: m.CashBankPage })));
+const GeneralLedgerPage = lazy(() => import('../features/accounts/GeneralLedgerPage').then(m => ({ default: m.GeneralLedgerPage })));
+const FinancialReportsPage = lazy(() => import('../features/accounts/FinancialReportsPage'));
 
-// ── ERP — Reports & Settings ──────────────────────────────────
-import { ReportsPage } from '../features/reports/ReportsPage';
-import { SettingsPage } from '../features/settings/SettingsPage';
+// ── ERP — Reports & Settings (Lazy Loaded) ────────────────────
+const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
 
-// ── Administration ────────────────────────────────────────────
-import UsersPage from '../features/administration/UsersPage';
-import RolesPage from '../features/administration/RolesPage';
-import ClientsPage from '../features/administration/ClientsPage';
+// ── Administration (Lazy Loaded) ──────────────────────────────
+const UsersPage = lazy(() => import('../features/administration/UsersPage'));
+const RolesPage = lazy(() => import('../features/administration/RolesPage'));
+const ClientsPage = lazy(() => import('../features/administration/ClientsPage'));
 
-// ── Main Dashboard ────────────────────────────────────────────
-import { DashboardPage } from '../features/sales/DashboardPage';
+// ── Main Dashboard (Lazy Loaded) ──────────────────────────────
+const DashboardPage = lazy(() => import('../features/sales/DashboardPage').then(m => ({ default: m.DashboardPage })));
 
-function Page({ component: Component }) {
+function Page({ component: Component, ...rest }) {
   return (
     <ErrorBoundary>
-      <Component />
+      <Suspense fallback={<PageLoadingSkeleton />}>
+        <Component {...rest} />
+      </Suspense>
     </ErrorBoundary>
   );
 }
@@ -309,10 +315,10 @@ const router = createBrowserRouter([
       { path: 'hrms/calendar', element: <Page component={CalendarPage} /> },
       { path: 'hrms/hrms-setup', element: <Page component={HrmsSetup} /> },
       { path: 'hrms/hr-admin', element: <Page component={HRAdminPage} /> },
-      { path: 'hrms/hr-admin/terminations', element: <Page component={() => <HRAdminPage defaultTab="terminations" />} /> },
-      { path: 'hrms/hr-admin/resignations', element: <Page component={() => <HRAdminPage defaultTab="resignations" />} /> },
-      { path: 'hrms/hr-admin/complaints', element: <Page component={() => <HRAdminPage defaultTab="complaints" />} /> },
-      { path: 'hrms/hr-admin/holidays', element: <Page component={() => <HRAdminPage defaultTab="holidays" />} /> },
+      { path: 'hrms/hr-admin/terminations', element: <Page component={HRAdminPage} defaultTab="terminations" /> },
+      { path: 'hrms/hr-admin/resignations', element: <Page component={HRAdminPage} defaultTab="resignations" /> },
+      { path: 'hrms/hr-admin/complaints', element: <Page component={HRAdminPage} defaultTab="complaints" /> },
+      { path: 'hrms/hr-admin/holidays', element: <Page component={HRAdminPage} defaultTab="holidays" /> },
 
       // ── Reports ───────────────────────────────────────────
       { path: 'reports', element: <Page component={ReportsPage} /> },

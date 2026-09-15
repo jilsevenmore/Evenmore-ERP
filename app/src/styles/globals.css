@@ -188,59 +188,123 @@
   --shadow-popover: 0 16px 40px rgba(0, 0, 0, 0.6);
   --body-bg: radial-gradient(circle at top left, rgba(16, 185, 129, 0.12), transparent 35%), linear-gradient(180deg, #051611 0%, #030e0b 100%);
 }
+}
 
-/* ── Theme Adaptations for Dark / Midnight / Emerald Modes ── */
+/* ── Theme Adaptations for Dark / Midnight / Emerald Modes (Global Specificity) ── */
 [data-theme="dark"],
 [data-theme="midnight"],
 [data-theme="emerald"],
+html.dark,
 .dark {
   color-scheme: dark;
 
-  /* Card and panel containers */
-  .bg-white {
+  /* Card, modal, drawer and panel containers */
+  .bg-white,
+  .bg-\[\#ffffff\],
+  .bg-\[\#fff\],
+  .bg-\[\#FFF\] {
     background-color: var(--card) !important;
   }
-  .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100, .bg-\[\#F8F9FA\], .bg-\[\#f8fafc\] {
+
+  .bg-slate-50,
+  .bg-slate-100,
+  .bg-gray-50,
+  .bg-gray-100,
+  .bg-zinc-50,
+  .bg-zinc-100,
+  .bg-\[\#F8F9FA\],
+  .bg-\[\#f8fafc\],
+  .bg-\[\#f1f5f9\] {
     background-color: var(--soft) !important;
   }
-  .bg-slate-200, .bg-gray-200, .bg-slate-300 {
+
+  .bg-slate-200,
+  .bg-gray-200,
+  .bg-zinc-200,
+  .bg-slate-300 {
     background-color: var(--card-alt) !important;
   }
-  
+
   /* Text colors */
-  .text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800, .text-\[\#1F2E4A\], .text-\[\#183153\] {
+  .text-slate-900,
+  .text-slate-800,
+  .text-gray-900,
+  .text-gray-800,
+  .text-zinc-900,
+  .text-zinc-800,
+  .text-\[\#1F2E4A\],
+  .text-\[\#183153\],
+  .text-\[\#0f172a\] {
     color: var(--text) !important;
   }
-  .text-slate-700, .text-slate-600, .text-gray-700, .text-gray-600 {
+
+  .text-slate-700,
+  .text-slate-600,
+  .text-gray-700,
+  .text-gray-600,
+  .text-zinc-700,
+  .text-zinc-600 {
     color: var(--text-secondary) !important;
   }
-  .text-slate-500, .text-slate-400, .text-gray-500, .text-gray-400 {
+
+  .text-slate-500,
+  .text-slate-400,
+  .text-gray-500,
+  .text-gray-400,
+  .text-zinc-500,
+  .text-zinc-400 {
     color: var(--muted) !important;
   }
 
-  /* Borders */
-  .border-slate-200, .border-slate-300, .border-slate-100, .border-gray-200, .border-gray-300, .border-\[\#CED4DA\], .border-\[\#e2e8f0\] {
+  /* Borders & Dividers */
+  .border-slate-200,
+  .border-slate-300,
+  .border-slate-100,
+  .border-gray-200,
+  .border-gray-300,
+  .border-zinc-200,
+  .border-\[\#CED4DA\],
+  .border-\[\#E2E8F0\],
+  .border-\[\#e2e8f0\],
+  .border-\[\#dce5f4\] {
+    border-color: var(--border) !important;
+  }
+
+  .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  .divide-slate-200 > :not([hidden]) ~ :not([hidden]),
+  .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+  .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
     border-color: var(--border) !important;
   }
 
   /* Hover states */
-  .hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover {
+  .hover\:bg-slate-50:hover,
+  .hover\:bg-slate-100:hover,
+  .hover\:bg-gray-50:hover,
+  .hover\:bg-gray-100:hover,
+  .hover\:bg-zinc-50:hover {
     background-color: var(--card-hover) !important;
   }
 
   /* Inputs, selects, and textareas */
-  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
     background-color: var(--soft) !important;
     color: var(--text) !important;
     border-color: var(--border) !important;
   }
-  input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
+  input:not([type="checkbox"]):not([type="radio"]):focus,
+  select:focus,
+  textarea:focus {
     background-color: var(--card) !important;
     border-color: var(--primary) !important;
   }
 
   /* Tables & DataTables */
-  table thead, table thead tr, table thead th {
+  table thead,
+  table thead tr,
+  table thead th {
     background-color: var(--table-head-bg) !important;
     color: var(--text-secondary) !important;
     border-color: var(--border) !important;
@@ -255,8 +319,30 @@
     color: var(--text) !important;
     border-color: var(--border) !important;
   }
+
+  /* Tinted Status Badges in Dark Modes */
+  .bg-blue-50, .bg-blue-100 {
+    background-color: rgba(59, 130, 246, 0.15) !important;
+    color: #93c5fd !important;
+  }
+  .bg-emerald-50, .bg-emerald-100, .bg-green-50, .bg-green-100 {
+    background-color: rgba(16, 185, 129, 0.15) !important;
+    color: #6ee7b7 !important;
+  }
+  .bg-amber-50, .bg-amber-100, .bg-yellow-50, .bg-yellow-100 {
+    background-color: rgba(245, 158, 11, 0.15) !important;
+    color: #fde047 !important;
+  }
+  .bg-rose-50, .bg-rose-100, .bg-red-50, .bg-red-100 {
+    background-color: rgba(244, 63, 94, 0.15) !important;
+    color: #fda4af !important;
+  }
+  .bg-purple-50, .bg-purple-100, .bg-indigo-50, .bg-indigo-100 {
+    background-color: rgba(129, 140, 248, 0.15) !important;
+    color: #c7d2fe !important;
+  }
 }
-}
+
 
 /* ── Reset ──────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
