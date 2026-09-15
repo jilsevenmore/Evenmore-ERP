@@ -5,7 +5,6 @@ import {
   Printer,
   LayoutGrid,
   SquareChartGantt,
-  MoreHorizontal,
 } from "lucide-react";
 import { tabs } from '../../../data/crm/mockLeads';
 import SortPopover from "./SortPopover";
@@ -66,9 +65,6 @@ export default function LeadsTabs({
               <ChevronDown size={16} />
             </button>
           ))}
-          <button type="button" className="toolbar-ghost" aria-label="More lead views">
-            <MoreHorizontal size={20} />
-          </button>
           <button
             type="button"
             onClick={onOpenGuide}
@@ -77,11 +73,6 @@ export default function LeadsTabs({
           >
             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
             <span>How to create a lead?</span>
-          </button>
-        </div>
-        <div className="tabs-actions">
-          <button type="button" className="toolbar-more" aria-label="More options">
-            <MoreHorizontal size={18} />
           </button>
         </div>
       </div>

@@ -111,6 +111,7 @@ import { SettingsPage } from '../features/settings/SettingsPage';
 // ── Administration ────────────────────────────────────────────
 import UsersPage from '../features/administration/UsersPage';
 import RolesPage from '../features/administration/RolesPage';
+import ClientsPage from '../features/administration/ClientsPage';
 
 // ── Main Dashboard ────────────────────────────────────────────
 import { DashboardPage } from '../features/sales/DashboardPage';
@@ -315,6 +316,8 @@ const router = createBrowserRouter([
       { path: 'administration', element: <Navigate to="/administration/settings" replace /> },
       { path: 'administration/users', element: <Page component={UsersPage} /> },
       { path: 'administration/roles', element: <Page component={RolesPage} /> },
+      { path: 'administration/clients', element: <Page component={ClientsPage} /> },
+      { path: 'administration/client', element: <Navigate to="/administration/clients" replace /> },
       { path: 'administration/settings', element: <Page component={SettingsPage} /> },
 
       // ── Catch-all ─────────────────────────────────────────

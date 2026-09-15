@@ -279,9 +279,9 @@ const NAV = [
     label: 'Administration',
     icon: Shield,
     children: [
-      { label: 'Users', icon: Users, to: '/administration/users' },
-      { label: 'Roles', icon: Shield, to: '/administration/roles' },
-      { label: 'Settings', icon: Settings, to: '/administration/settings' },
+      { label: 'Users', to: '/administration/users' },
+      { label: 'Roles', to: '/administration/roles' },
+      { label: 'Clients', to: '/administration/clients' },
     ],
   },
 ];
