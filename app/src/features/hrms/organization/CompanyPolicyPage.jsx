@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CompanyPolicyModule } from "../policy/CompanyPolicyModule";
 import {
   FileText,
   CheckCircle2,
@@ -83,7 +84,7 @@ const INITIAL_POLICIES = [
   },
 ];
 
-export function CompanyPolicyPage() {
+export function LegacyCompanyPolicyPage() {
   const showToast = useAppStore((s) => s.showToast);
   const [policies, setPolicies] = useState(INITIAL_POLICIES);
   const [search, setSearch] = useState("");
@@ -414,5 +415,6 @@ export function CompanyPolicyPage() {
   );
 }
 
-export const CompanyPolicy = CompanyPolicyPage;
-export default CompanyPolicyPage;
+export const CompanyPolicy = CompanyPolicyModule;
+export const CompanyPolicyPage = CompanyPolicyModule;
+export default CompanyPolicyModule;

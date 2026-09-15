@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { FileSpreadsheet, Download, FileText, ChevronDown } from "lucide-react";
+import { useState, useMemo } from "react";
+import { FileSpreadsheet, Download, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 
 const TABS = [
@@ -14,28 +14,69 @@ const TABS = [
   "Department",
 ];
 
-const MONTHS = [
-  { key: "Jan", label: "Jan" },
-  { key: "Feb", label: "Feb" },
-  { key: "Mar", label: "Mar" },
-  { key: "Apr", label: "Apr" },
-  { key: "May", label: "May" },
-  { key: "Jun", label: "Jun" },
-  { key: "Jul", label: "Jul" },
-  { key: "Aug", label: "Aug" },
-  { key: "Sep", label: "Sep" },
-  { key: "Oct", label: "Oct", isCurrent: true },
-  { key: "Nov", label: "Nov", isFuture: true },
-  { key: "Dec", label: "Dec", isFuture: true },
+const DATE_RANGE_OPTIONS = [
+  "Jan 2024 - Dec 2024 (Annual)",
+  "H1 2024 (Jan - Jun)",
+  "H2 2024 (Jul - Dec)",
+  "Q1 2024 (Jan - Mar)",
+  "Q2 2024 (Apr - Jun)",
+  "Q3 2024 (Jul - Sep)",
+  "Q4 2024 (Oct - Dec)",
+  "Q3 - Q4 2024",
 ];
 
-// Data datasets by tab
-const TAB_DATA = {
+const DATE_RANGE_MAP = {
+  "Jan 2024 - Dec 2024 (Annual)": [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ],
+  "H1 2024 (Jan - Jun)": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
+  "H2 2024 (Jul - Dec)": ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  "Q1 2024 (Jan - Mar)": ["Jan", "Feb", "Mar"],
+  "Q2 2024 (Apr - Jun)": ["Apr", "May", "Jun"],
+  "Q3 2024 (Jul - Sep)": ["Jul", "Aug", "Sep"],
+  "Q4 2024 (Oct - Dec)": ["Oct", "Nov", "Dec"],
+  "Q3 - Q4 2024": ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+};
+
+const DEPARTMENT_PROFILES = {
+  "All Departments": {
+    ratio: 1.0,
+    DepartmentSeries: ["Engineering", "Sales & Ops", "Product & Design"],
+  },
+  Engineering: {
+    ratio: 0.42,
+    DepartmentSeries: ["Backend & Infra", "Frontend & Mobile", "QA & DevOps"],
+  },
+  Design: {
+    ratio: 0.12,
+    DepartmentSeries: ["UI / UX Design", "Brand & Motion", "Design Systems"],
+  },
+  Product: {
+    ratio: 0.15,
+    DepartmentSeries: ["Product Strategy", "Technical PM", "UX Research"],
+  },
+  Operations: {
+    ratio: 0.18,
+    DepartmentSeries: ["People Ops", "IT & Workplace", "Compliance"],
+  },
+  "HR & People": {
+    ratio: 0.08,
+    DepartmentSeries: ["Talent Acquisition", "HR Admin", "L&D & Culture"],
+  },
+  "Sales & Marketing": {
+    ratio: 0.16,
+    DepartmentSeries: ["Inbound Sales", "Digital Marketing", "Content & Growth"],
+  },
+};
+
+// Base data templates across all 12 months
+const TAB_DATA_TEMPLATES = {
   Employee: {
-    yAxis: "Y-Axis: Total Workforce Volume (scale: 0 - 1,400)",
-    growth: "+14.6% YTD",
+    yAxisPrefix: "Y-Axis: Total Workforce Volume",
+    defaultGrowth: "+14.6% YTD",
     seriesNames: ["Full Time", "Contract", "Interns"],
-    scaleMax: 1400,
+    baseScaleMax: 1400,
     months: [
       { month: "Jan", s1: 680, s2: 380, s3: 160 },
       { month: "Feb", s1: 720, s2: 410, s3: 190 },
@@ -52,30 +93,30 @@ const TAB_DATA = {
     ],
   },
   Attendance: {
-    yAxis: "Y-Axis: Average Attendance % (scale: 0 - 100%)",
-    growth: "+3.8% MoM",
+    yAxisPrefix: "Y-Axis: Daily Attendance Headcount",
+    defaultGrowth: "+3.8% MoM",
     seriesNames: ["On-Site", "Remote", "Half Day"],
-    scaleMax: 100,
+    baseScaleMax: 1200,
     months: [
-      { month: "Jan", s1: 78, s2: 16, s3: 4 },
-      { month: "Feb", s1: 80, s2: 15, s3: 3 },
-      { month: "Mar", s1: 82, s2: 14, s3: 3 },
-      { month: "Apr", s1: 85, s2: 12, s3: 2 },
-      { month: "May", s1: 84, s2: 13, s3: 3 },
-      { month: "Jun", s1: 88, s2: 10, s3: 2 },
-      { month: "Jul", s1: 89, s2: 9, s3: 2 },
-      { month: "Aug", s1: 91, s2: 8, s3: 1 },
-      { month: "Sep", s1: 93, s2: 6, s3: 1 },
-      { month: "Oct", s1: 94, s2: 5, s3: 1 },
-      { month: "Nov", s1: 90, s2: 8, s3: 2 },
-      { month: "Dec", s1: 92, s2: 7, s3: 1 },
+      { month: "Jan", s1: 620, s2: 180, s3: 45 },
+      { month: "Feb", s1: 650, s2: 190, s3: 40 },
+      { month: "Mar", s1: 710, s2: 210, s3: 35 },
+      { month: "Apr", s1: 780, s2: 230, s3: 30 },
+      { month: "May", s1: 760, s2: 240, s3: 35 },
+      { month: "Jun", s1: 820, s2: 250, s3: 28 },
+      { month: "Jul", s1: 890, s2: 260, s3: 25 },
+      { month: "Aug", s1: 920, s2: 270, s3: 22 },
+      { month: "Sep", s1: 960, s2: 280, s3: 20 },
+      { month: "Oct", s1: 990, s2: 290, s3: 18 },
+      { month: "Nov", s1: 880, s2: 260, s3: 24 },
+      { month: "Dec", s1: 910, s2: 270, s3: 22 },
     ],
   },
   Leave: {
-    yAxis: "Y-Axis: Total Leave Applications (scale: 0 - 250)",
-    growth: "-5.2% MoM",
+    yAxisPrefix: "Y-Axis: Total Leave Applications",
+    defaultGrowth: "-5.2% MoM",
     seriesNames: ["Paid / Annual", "Casual / Sick", "Unpaid"],
-    scaleMax: 250,
+    baseScaleMax: 250,
     months: [
       { month: "Jan", s1: 120, s2: 60, s3: 15 },
       { month: "Feb", s1: 95, s2: 45, s3: 10 },
@@ -92,10 +133,10 @@ const TAB_DATA = {
     ],
   },
   Payroll: {
-    yAxis: "Y-Axis: Gross Disbursement (in ₹ Lakhs, scale: 0 - 600)",
-    growth: "+18.2% YTD",
+    yAxisPrefix: "Y-Axis: Gross Disbursement (in ₹ Lakhs)",
+    defaultGrowth: "+18.2% YTD",
     seriesNames: ["Salaries", "Allowances", "Overtime & Bonus"],
-    scaleMax: 600,
+    baseScaleMax: 600,
     months: [
       { month: "Jan", s1: 320, s2: 120, s3: 40 },
       { month: "Feb", s1: 330, s2: 125, s3: 45 },
@@ -112,10 +153,10 @@ const TAB_DATA = {
     ],
   },
   Performance: {
-    yAxis: "Y-Axis: Completed Review Cycles (scale: 0 - 300)",
-    growth: "+22.4% vs Q3",
+    yAxisPrefix: "Y-Axis: Completed Review Cycles",
+    defaultGrowth: "+22.4% vs Q3",
     seriesNames: ["Exceeds", "Meets Expectations", "Needs Improvement"],
-    scaleMax: 300,
+    baseScaleMax: 300,
     months: [
       { month: "Jan", s1: 45, s2: 140, s3: 20 },
       { month: "Feb", s1: 50, s2: 150, s3: 18 },
@@ -132,10 +173,10 @@ const TAB_DATA = {
     ],
   },
   Recruitment: {
-    yAxis: "Y-Axis: Candidate Pipeline (scale: 0 - 500)",
-    growth: "+31.0% YTD",
+    yAxisPrefix: "Y-Axis: Candidate Pipeline",
+    defaultGrowth: "+31.0% YTD",
     seriesNames: ["Sourced", "Interviewed", "Offers Accepted"],
-    scaleMax: 500,
+    baseScaleMax: 500,
     months: [
       { month: "Jan", s1: 220, s2: 90, s3: 24 },
       { month: "Feb", s1: 240, s2: 110, s3: 28 },
@@ -152,10 +193,10 @@ const TAB_DATA = {
     ],
   },
   Training: {
-    yAxis: "Y-Axis: Total Enrollments & Badges (scale: 0 - 400)",
-    growth: "+19.5% YTD",
+    yAxisPrefix: "Y-Axis: Total Enrollments & Badges",
+    defaultGrowth: "+19.5% YTD",
     seriesNames: ["Technical", "Leadership", "Compliance"],
-    scaleMax: 400,
+    baseScaleMax: 400,
     months: [
       { month: "Jan", s1: 140, s2: 60, s3: 90 },
       { month: "Feb", s1: 160, s2: 70, s3: 95 },
@@ -172,10 +213,10 @@ const TAB_DATA = {
     ],
   },
   Asset: {
-    yAxis: "Y-Axis: Total Active Assets Allocated (scale: 0 - 1,200)",
-    growth: "+12.1% YTD",
+    yAxisPrefix: "Y-Axis: Total Active Assets Allocated",
+    defaultGrowth: "+12.1% YTD",
     seriesNames: ["Laptops", "Monitors & Accessories", "Mobile / Test Devices"],
-    scaleMax: 1200,
+    baseScaleMax: 1200,
     months: [
       { month: "Jan", s1: 450, s2: 320, s3: 120 },
       { month: "Feb", s1: 480, s2: 340, s3: 130 },
@@ -192,10 +233,10 @@ const TAB_DATA = {
     ],
   },
   Department: {
-    yAxis: "Y-Axis: Headcount by Division (scale: 0 - 800)",
-    growth: "+8.4% YTD",
+    yAxisPrefix: "Y-Axis: Headcount by Division",
+    defaultGrowth: "+8.4% YTD",
     seriesNames: ["Engineering", "Sales & Ops", "Product & Design"],
-    scaleMax: 800,
+    baseScaleMax: 800,
     months: [
       { month: "Jan", s1: 380, s2: 240, s3: 140 },
       { month: "Feb", s1: 400, s2: 255, s3: 150 },
@@ -214,34 +255,149 @@ const TAB_DATA = {
 };
 
 export default function AnalyticsVolumeChart() {
-  const showToast = useAppStore((s) => s.showToast);
+  const showToast = useAppStore((s) => s.showToast || s.setToast);
+  const employees = useAppStore((s) => s.employees || []);
+  const leaves = useAppStore((s) => s.leaves || []);
+  const attendance = useAppStore((s) => s.attendance || []);
+  const candidates = useAppStore((s) => s.candidates || []);
+
   const [activeTab, setActiveTab] = useState("Employee");
   const [department, setDepartment] = useState("All Departments");
   const [dateRange, setDateRange] = useState("Jan 2024 - Dec 2024 (Annual)");
+  const [selectedMonth, setSelectedMonth] = useState("Oct");
   const [hoveredData, setHoveredData] = useState(null);
 
-  const currentDataset = TAB_DATA[activeTab] || TAB_DATA.Employee;
+  // Profile and ratio for current department
+  const deptProfile = DEPARTMENT_PROFILES[department] || DEPARTMENT_PROFILES["All Departments"];
+  const baseTemplate = TAB_DATA_TEMPLATES[activeTab] || TAB_DATA_TEMPLATES.Employee;
+
+  // Series names (customized if on Department tab for specific department)
+  const seriesNames = useMemo(() => {
+    if (activeTab === "Department" && deptProfile.DepartmentSeries) {
+      return deptProfile.DepartmentSeries;
+    }
+    return baseTemplate.seriesNames;
+  }, [activeTab, deptProfile, baseTemplate]);
+
+  // Live store boosts for October (the active current month)
+  const storeBoosts = useMemo(() => {
+    const empBonus = Math.max(0, employees.length - 8) * 12;
+    const leaveBonus = Math.max(0, leaves.length - 2) * 6;
+    const attBonus = Math.max(0, attendance.length - 4) * 8;
+    const candBonus = Math.max(0, candidates.length - 3) * 10;
+    return { empBonus, leaveBonus, attBonus, candBonus };
+  }, [employees, leaves, attendance, candidates]);
+
+  // Generate processed months data scaled by department and live store values
+  const processedMonths = useMemo(() => {
+    const ratio = deptProfile.ratio;
+    return baseTemplate.months.map((m) => {
+      let boost1 = 0;
+      let boost2 = 0;
+      let boost3 = 0;
+
+      // Apply live store data to current month (Oct)
+      if (m.month === "Oct") {
+        if (activeTab === "Employee") {
+          boost1 = storeBoosts.empBonus;
+        } else if (activeTab === "Leave") {
+          boost1 = storeBoosts.leaveBonus;
+        } else if (activeTab === "Attendance") {
+          boost1 = storeBoosts.attBonus;
+        } else if (activeTab === "Recruitment") {
+          boost1 = storeBoosts.candBonus;
+        }
+      }
+
+      const s1 = Math.max(1, Math.round((m.s1 + boost1) * ratio));
+      const s2 = Math.max(1, Math.round((m.s2 + boost2) * ratio));
+      const s3 = Math.max(1, Math.round((m.s3 + boost3) * ratio));
+
+      return {
+        month: m.month,
+        s1,
+        s2,
+        s3,
+        total: s1 + s2 + s3,
+      };
+    });
+  }, [baseTemplate, deptProfile, activeTab, storeBoosts]);
+
+  // Filter months according to selected Date Range
+  const visibleMonthsData = useMemo(() => {
+    const allowed = DATE_RANGE_MAP[dateRange] || DATE_RANGE_MAP["Jan 2024 - Dec 2024 (Annual)"];
+    return processedMonths.filter((m) => allowed.includes(m.month));
+  }, [processedMonths, dateRange]);
+
+  // Ensure selectedMonth stays valid when date range changes
+  const activeSelectedMonth = useMemo(() => {
+    const hasMonth = visibleMonthsData.some((m) => m.month === selectedMonth);
+    if (hasMonth) return selectedMonth;
+    return visibleMonthsData[visibleMonthsData.length - 1]?.month || "Oct";
+  }, [visibleMonthsData, selectedMonth]);
+
+  // Dynamic ScaleMax based on the maximum value in visible range
+  const dynamicScaleMax = useMemo(() => {
+    const maxVal = Math.max(
+      ...visibleMonthsData.map((m) => Math.max(m.s1, m.s2, m.s3, 1))
+    );
+    if (maxVal <= 50) return 50;
+    if (maxVal <= 100) return 100;
+    if (maxVal <= 250) return 250;
+    if (maxVal <= 500) return 500;
+    if (maxVal <= 800) return 800;
+    if (maxVal <= 1200) return 1200;
+    return Math.ceil((maxVal * 1.2) / 100) * 100;
+  }, [visibleMonthsData]);
+
+  // Calculate Net Growth dynamically for the visible range
+  const growthInfo = useMemo(() => {
+    if (visibleMonthsData.length < 2) return "+0.0%";
+    const first = visibleMonthsData[0].total;
+    // Compare with the last non-future month (or last available month)
+    const validMonths = visibleMonthsData.filter((m) => m.month !== "Nov" && m.month !== "Dec");
+    const lastTarget = validMonths.length > 0 ? validMonths[validMonths.length - 1].total : visibleMonthsData[visibleMonthsData.length - 1].total;
+    if (!first) return "+0.0%";
+    const diff = ((lastTarget - first) / first) * 100;
+    const sign = diff >= 0 ? "+" : "";
+    return `${sign}${diff.toFixed(1)}%`;
+  }, [visibleMonthsData]);
+
+  // Data for the currently selected/active month
+  const selectedMonthData = useMemo(() => {
+    return visibleMonthsData.find((m) => m.month === activeSelectedMonth) || visibleMonthsData[0];
+  }, [visibleMonthsData, activeSelectedMonth]);
 
   // Export CSV
   const handleExportCSV = () => {
-    const headers = `Month,${currentDataset.seriesNames.join(",")}\n`;
-    const rows = currentDataset.months
-      .map((m) => `${m.month},${m.s1},${m.s2},${m.s3}`)
+    const headers = `Month,${seriesNames.join(",")},Total\n`;
+    const rows = visibleMonthsData
+      .map((m) => `${m.month},${m.s1},${m.s2},${m.s3},${m.total}`)
       .join("\n");
-    const blob = new Blob([headers + rows], { type: "text/csv" });
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `HRMS_${activeTab}_Volume_${department.replace(/\s+/g, "_")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    if (showToast) showToast(`Exported ${activeTab} CSV data`);
+    if (showToast) showToast(`Exported ${activeTab} CSV data for ${department}`);
   };
 
-  // Export Excel mockup
+  // Export Excel
   const handleExportExcel = () => {
-    handleExportCSV();
-    if (showToast) showToast(`Exported ${activeTab} Excel file`);
+    const headers = `Month\t${seriesNames.join("\t")}\tTotal\n`;
+    const rows = visibleMonthsData
+      .map((m) => `${m.month}\t${m.s1}\t${m.s2}\t${m.s3}\t${m.total}`)
+      .join("\n");
+    const blob = new Blob([headers + rows], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `HRMS_${activeTab}_Volume_${department.replace(/\s+/g, "_")}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
+    if (showToast) showToast(`Exported ${activeTab} Excel file for ${department}`);
   };
 
   return (
@@ -280,7 +436,7 @@ export default function AnalyticsVolumeChart() {
           <button
             type="button"
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-[#334155] bg-white border border-[#cbd5e1] rounded-lg hover:bg-[#f8fafc] hover:border-[#94a3b8] transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-[#334155] bg-white border border-[#cbd5e1] rounded-lg hover:bg-[#f8fafc] hover:border-[#94a3b8] transition cursor-pointer"
             title="Export CSV"
           >
             <Download size={13} className="text-[#64748b]" />
@@ -289,7 +445,7 @@ export default function AnalyticsVolumeChart() {
           <button
             type="button"
             onClick={handleExportExcel}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-[#334155] bg-white border border-[#cbd5e1] rounded-lg hover:bg-[#f8fafc] hover:border-[#94a3b8] transition"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-semibold text-[#334155] bg-white border border-[#cbd5e1] rounded-lg hover:bg-[#f8fafc] hover:border-[#94a3b8] transition cursor-pointer"
             title="Export Excel"
           >
             <FileSpreadsheet size={13} className="text-[#15803d]" />
@@ -310,7 +466,7 @@ export default function AnalyticsVolumeChart() {
                 value={department}
                 onChange={(e) => {
                   setDepartment(e.target.value);
-                  if (showToast) showToast(`Filter updated: ${e.target.value}`);
+                  if (showToast) showToast(`Filtered by ${e.target.value}`);
                 }}
                 className="appearance-none pl-3 pr-8 py-1.5 bg-white border border-[#cbd5e1] rounded-xl text-[12.5px] font-medium text-[#1e293b] focus:outline-none focus:border-[#1F2E4A] cursor-pointer hover:border-[#94a3b8]"
               >
@@ -337,14 +493,15 @@ export default function AnalyticsVolumeChart() {
                 value={dateRange}
                 onChange={(e) => {
                   setDateRange(e.target.value);
-                  if (showToast) showToast(`Period set: ${e.target.value}`);
+                  if (showToast) showToast(`Date range: ${e.target.value}`);
                 }}
                 className="appearance-none pl-3 pr-8 py-1.5 bg-white border border-[#cbd5e1] rounded-xl text-[12.5px] font-medium text-[#1e293b] focus:outline-none focus:border-[#1F2E4A] cursor-pointer hover:border-[#94a3b8]"
               >
-                <option value="Jan 2024 - Dec 2024 (Annual)">Jan 2024 - Dec 2024 (Annual)</option>
-                <option value="H1 2024 (Jan - Jun)">H1 2024 (Jan - Jun)</option>
-                <option value="H2 2024 (Jul - Dec)">H2 2024 (Jul - Dec)</option>
-                <option value="Q3 - Q4 2024">Q3 - Q4 2024</option>
+                {DATE_RANGE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
               </select>
               <ChevronDown
                 size={14}
@@ -358,15 +515,15 @@ export default function AnalyticsVolumeChart() {
         <div className="flex items-center gap-5 text-[12px] text-[#475569]">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-[#1F2E4A]" />
-            <span className="font-medium">{currentDataset.seriesNames[0]}</span>
+            <span className="font-medium">{seriesNames[0]}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-[#64748B]" />
-            <span className="font-medium">{currentDataset.seriesNames[1]}</span>
+            <span className="font-medium">{seriesNames[1]}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-[#CBD5E1]" />
-            <span className="font-medium">{currentDataset.seriesNames[2]}</span>
+            <span className="font-medium">{seriesNames[2]}</span>
           </div>
         </div>
       </div>
@@ -383,56 +540,75 @@ export default function AnalyticsVolumeChart() {
           </div>
 
           {/* Month Columns */}
-          {currentDataset.months.map((item, idx) => {
-            const isOct = item.month === "Oct";
+          {visibleMonthsData.map((item, idx) => {
+            const isSelected = activeSelectedMonth === item.month;
             const isFuture = item.month === "Nov" || item.month === "Dec";
 
-            // Relative heights based on scaleMax
-            const h1 = Math.min(100, Math.max(12, (item.s1 / currentDataset.scaleMax) * 100));
-            const h2 = Math.min(100, Math.max(8, (item.s2 / currentDataset.scaleMax) * 100));
-            const h3 = Math.min(100, Math.max(6, (item.s3 / currentDataset.scaleMax) * 100));
+            // Relative heights based on dynamicScaleMax
+            const h1 = Math.min(100, Math.max(10, (item.s1 / dynamicScaleMax) * 100));
+            const h2 = Math.min(100, Math.max(8, (item.s2 / dynamicScaleMax) * 100));
+            const h3 = Math.min(100, Math.max(6, (item.s3 / dynamicScaleMax) * 100));
 
             return (
               <div
                 key={item.month}
+                onClick={() => setSelectedMonth(item.month)}
                 onMouseEnter={() => setHoveredData({ ...item, idx })}
                 onMouseLeave={() => setHoveredData(null)}
-                className={`relative flex-1 flex flex-col items-center h-full justify-end cursor-pointer group px-0.5 rounded-lg transition-colors ${
-                  isOct ? "bg-[#f8fafc]/80" : "hover:bg-[#f8fafc]/60"
+                className={`relative flex-1 flex flex-col items-center h-full justify-end cursor-pointer group px-0.5 rounded-lg transition-all ${
+                  isSelected ? "bg-[#f8fafc]/90 ring-1 ring-[#e2e8f0]" : "hover:bg-[#f8fafc]/60"
                 }`}
+                title={`Click to focus ${item.month}`}
               >
                 {/* Hover Tooltip */}
                 {hoveredData && hoveredData.month === item.month && (
-                  <div className="absolute -top-14 z-20 bg-[#0f172a] text-white text-[11px] rounded-lg px-2.5 py-1.5 shadow-lg whitespace-nowrap flex flex-col pointer-events-none">
-                    <span className="font-bold border-b border-white/20 pb-0.5 mb-0.5">
-                      {item.month} • {department}
-                    </span>
-                    <span>
-                      {currentDataset.seriesNames[0]}: <b>{item.s1.toLocaleString()}</b>
-                    </span>
-                    <span>
-                      {currentDataset.seriesNames[1]}: <b>{item.s2.toLocaleString()}</b>
-                    </span>
-                    <span>
-                      {currentDataset.seriesNames[2]}: <b>{item.s3.toLocaleString()}</b>
-                    </span>
+                  <div className="absolute -top-20 z-30 bg-[#0f172a] text-white text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-nowrap flex flex-col pointer-events-none transition-all">
+                    <div className="flex items-center justify-between gap-4 font-bold border-b border-white/20 pb-1 mb-1">
+                      <span>{item.month} 2024</span>
+                      <span className="text-[#94a3b8] font-normal">{department}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-[#e2e8f0]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#38bdf8]" />
+                        {seriesNames[0]}:
+                      </span>
+                      <b>{item.s1.toLocaleString()}</b>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-[#cbd5e1]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#94a3b8]" />
+                        {seriesNames[1]}:
+                      </span>
+                      <b>{item.s2.toLocaleString()}</b>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 text-[#94a3b8]">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-[#e2e8f0]" />
+                        {seriesNames[2]}:
+                      </span>
+                      <b>{item.s3.toLocaleString()}</b>
+                    </div>
+                    <div className="mt-1 pt-1 border-t border-white/10 flex items-center justify-between font-semibold text-white">
+                      <span>Total:</span>
+                      <span>{item.total.toLocaleString()}</span>
+                    </div>
                   </div>
                 )}
 
                 {/* Grouped 3 Bars */}
                 <div className="w-full flex items-end justify-center gap-[2px] sm:gap-[3px] h-[190px]">
-                  {/* Bar 1: Full Time */}
+                  {/* Bar 1: Primary Series */}
                   <div
                     style={{ height: `${h1}%` }}
                     className={`w-[6px] sm:w-[9px] md:w-[11px] rounded-t-xs transition-all duration-300 ${
                       isFuture
                         ? "bg-[#64748B]/60 border border-dashed border-[#475569]"
-                        : isOct
+                        : isSelected
                         ? "bg-[#1F2E4A] ring-1 ring-[#1F2E4A]"
                         : "bg-[#1F2E4A] group-hover:brightness-110"
                     }`}
                   />
-                  {/* Bar 2: Contract */}
+                  {/* Bar 2: Secondary Series */}
                   <div
                     style={{ height: `${h2}%` }}
                     className={`w-[6px] sm:w-[9px] md:w-[11px] rounded-t-xs transition-all duration-300 ${
@@ -441,7 +617,7 @@ export default function AnalyticsVolumeChart() {
                         : "bg-[#64748B] group-hover:brightness-110"
                     }`}
                   />
-                  {/* Bar 3: Interns */}
+                  {/* Bar 3: Tertiary Series */}
                   <div
                     style={{ height: `${h3}%` }}
                     className={`w-[6px] sm:w-[9px] md:w-[11px] rounded-t-xs transition-all duration-300 ${
@@ -455,7 +631,7 @@ export default function AnalyticsVolumeChart() {
                 {/* Month Label */}
                 <span
                   className={`mt-2 text-[11.5px] tracking-tight ${
-                    isOct
+                    isSelected
                       ? "font-extrabold text-[#0f172a]"
                       : isFuture
                       ? "font-normal text-[#94a3b8]"
@@ -472,12 +648,21 @@ export default function AnalyticsVolumeChart() {
 
       {/* ── Footer Info ── */}
       <div className="px-5 py-3 border-t border-[#f1f5f9] flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#64748b]">
-        <div>{currentDataset.yAxis}</div>
-        <div className="font-semibold text-[#0f172a] flex items-center gap-1">
-          <span>Overall Net Growth:</span>
-          <span className="text-[#15803d] font-bold bg-[#dcfce7] px-2 py-0.5 rounded-full">
-            {currentDataset.growth}
-          </span>
+        <div>
+          {baseTemplate.yAxisPrefix} (scale: 0 - {dynamicScaleMax.toLocaleString()})
+        </div>
+        <div className="flex items-center gap-4 flex-wrap">
+          {selectedMonthData && (
+            <span className="text-[#334155]">
+              Focused: <strong className="text-[#0f172a]">{selectedMonthData.month}</strong> ({selectedMonthData.total.toLocaleString()} total)
+            </span>
+          )}
+          <div className="font-semibold text-[#0f172a] flex items-center gap-1">
+            <span>Overall Net Growth:</span>
+            <span className="text-[#15803d] font-bold bg-[#dcfce7] px-2 py-0.5 rounded-full">
+              {growthInfo} YTD
+            </span>
+          </div>
         </div>
       </div>
     </div>

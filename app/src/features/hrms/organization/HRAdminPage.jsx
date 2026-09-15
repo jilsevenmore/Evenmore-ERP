@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   ShieldCheck,
   Users,
@@ -31,6 +31,13 @@ import {
   Briefcase,
   Award,
   FileCheck2,
+  ChevronDown,
+  ArrowRight,
+  Shield,
+  Building2,
+  Layers,
+  CheckCircle,
+  HelpCircle,
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
@@ -248,6 +255,9 @@ export default function HRAdminPage({ defaultTab }) {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees || []);
   const { candidates, addOffer } = useRecruitmentStore();
+  const updateEmployeeStatus = useAppStore((s) => s.updateEmployeeStatus);
+  const addCalendarEvent = useCalendarStore((s) => s.addEvent);
+
   const [activeTab, setActiveTab] = useState(defaultTab || "teams");
 
   // Core Data Lists
@@ -259,9 +269,29 @@ export default function HRAdminPage({ defaultTab }) {
   const [complaints, setComplaints] = useState(INITIAL_COMPLAINTS);
   const [holidays, setHolidays] = useState(INITIAL_HOLIDAYS);
 
-  // Search & Filter
+  // Search & Filters for each tab
   const [search, setSearch] = useState("");
+  const [teamDeptFilter, setTeamDeptFilter] = useState("all");
+  const [chainStatusFilter, setChainStatusFilter] = useState("all");
   const [offerStatusFilter, setOfferStatusFilter] = useState("all");
+  const [terminationFilter, setTerminationFilter] = useState("all");
+  const [resignationFilter, setResignationFilter] = useState("all");
+  const [complaintPriorityFilter, setComplaintPriorityFilter] = useState("all");
+  const [holidayFilter, setHolidayFilter] = useState("all");
+
+  // Quick Action Dropdown State
+  const [isQuickActionOpen, setIsQuickActionOpen] = useState(false);
+  const quickActionRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (quickActionRef.current && !quickActionRef.current.contains(e.target)) {
+        setIsQuickActionOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Letter & Offer Modals State
   const [activeTerminationLetter, setActiveTerminationLetter] = useState(null);
@@ -270,12 +300,14 @@ export default function HRAdminPage({ defaultTab }) {
   const [isOfferLetterModalOpen, setIsOfferLetterModalOpen] = useState(false);
   const [isGenerateOfferModalOpen, setIsGenerateOfferModalOpen] = useState(false);
 
-  // Modals
+  // Modals (Add / Edit)
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
   const [newTeam, setNewTeam] = useState({ name: "", lead: "", members: 1, approver: "", dept: "Engineering" });
 
   const [isChainModalOpen, setIsChainModalOpen] = useState(false);
-  const [newChain, setNewChain] = useState({ module: "Leave Management", tier1: "", tier2: "", tier3: "—", autoEscalateDays: 3 });
+  const [editingChain, setEditingChain] = useState(null);
+  const [newChain, setNewChain] = useState({ module: "Leave Management", tier1: "", tier2: "", tier3: "—", autoEscalateDays: 3, status: "Active" });
 
   const [isTerminationModalOpen, setIsTerminationModalOpen] = useState(false);
   const [newTermination, setNewTermination] = useState({
@@ -314,6 +346,7 @@ export default function HRAdminPage({ defaultTab }) {
   });
 
   const [isHolidayModalOpen, setIsHolidayModalOpen] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState(null);
   const [newHoliday, setNewHoliday] = useState({
     name: "",
     date: "2024-11-01",
@@ -334,30 +367,119 @@ export default function HRAdminPage({ defaultTab }) {
     requireTwoFactorForAdmin: true,
   });
 
-  // Handlers
-  const handleCreateTeam = (e) => {
+  // ── Team Handlers ──────────────────────────────────────────
+  const handleOpenAddTeam = () => {
+    setEditingTeam(null);
+    setNewTeam({ name: "", lead: "", members: 1, approver: "", dept: "Engineering" });
+    setIsTeamModalOpen(true);
+  };
+
+  const handleOpenEditTeam = (team) => {
+    setEditingTeam(team);
+    setNewTeam({
+      name: team.name,
+      lead: team.lead,
+      members: team.members,
+      approver: team.approver,
+      dept: team.dept,
+    });
+    setIsTeamModalOpen(true);
+  };
+
+  const handleSaveTeam = (e) => {
     e.preventDefault();
     if (!newTeam.name) return;
-    const created = { id: `T-0${teams.length + 1}`, ...newTeam, members: Number(newTeam.members) || 1 };
-    setTeams([...teams, created]);
+
+    if (editingTeam) {
+      setTeams((prev) =>
+        prev.map((t) =>
+          t.id === editingTeam.id
+            ? { ...t, ...newTeam, members: Number(newTeam.members) || 1 }
+            : t
+        )
+      );
+      showToast(`Team "${newTeam.name}" updated successfully`);
+    } else {
+      const created = {
+        id: `T-0${teams.length + 1}`,
+        ...newTeam,
+        members: Number(newTeam.members) || 1,
+      };
+      setTeams([...teams, created]);
+      showToast(`Team "${created.name}" created successfully`);
+    }
     setIsTeamModalOpen(false);
-    setNewTeam({ name: "", lead: "", members: 1, approver: "", dept: "Engineering" });
-    showToast(`Team "${created.name}" created`);
+    setEditingTeam(null);
   };
 
-  const handleCreateChain = (e) => {
+  const handleDeleteTeam = (id, name) => {
+    if (window.confirm(`Are you sure you want to remove team "${name}"?`)) {
+      setTeams((prev) => prev.filter((t) => t.id !== id));
+      showToast(`Team "${name}" removed`);
+    }
+  };
+
+  // ── Approval Chain Handlers ─────────────────────────────────
+  const handleOpenAddChain = () => {
+    setEditingChain(null);
+    setNewChain({ module: "Leave Management", tier1: "", tier2: "", tier3: "—", autoEscalateDays: 3, status: "Active" });
+    setIsChainModalOpen(true);
+  };
+
+  const handleOpenEditChain = (chain) => {
+    setEditingChain(chain);
+    setNewChain({
+      module: chain.module,
+      tier1: chain.tier1,
+      tier2: chain.tier2,
+      tier3: chain.tier3,
+      autoEscalateDays: chain.autoEscalateDays,
+      status: chain.status,
+    });
+    setIsChainModalOpen(true);
+  };
+
+  const handleSaveChain = (e) => {
     e.preventDefault();
     if (!newChain.tier1) return;
-    const created = { id: `AC-0${approvalChains.length + 1}`, ...newChain, status: "Active" };
-    setApprovalChains([...approvalChains, created]);
+
+    if (editingChain) {
+      setApprovalChains((prev) =>
+        prev.map((c) => (c.id === editingChain.id ? { ...c, ...newChain } : c))
+      );
+      showToast(`Approval chain for "${newChain.module}" updated`);
+    } else {
+      const created = {
+        id: `AC-0${approvalChains.length + 1}`,
+        ...newChain,
+        status: newChain.status || "Active",
+      };
+      setApprovalChains([...approvalChains, created]);
+      showToast(`Approval chain for "${created.module}" configured`);
+    }
     setIsChainModalOpen(false);
-    setNewChain({ module: "Leave Management", tier1: "", tier2: "", tier3: "—", autoEscalateDays: 3 });
-    showToast(`Approval Chain for ${created.module} configured`);
+    setEditingChain(null);
   };
 
-  const updateEmployeeStatus = useAppStore((s) => s.updateEmployeeStatus);
-  const addCalendarEvent = useCalendarStore((s) => s.addEvent);
+  const toggleChainStatus = (id) => {
+    setApprovalChains((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c;
+        const next = c.status === "Active" ? "Inactive" : "Active";
+        showToast(`Workflow status for ${c.module} set to ${next}`);
+        return { ...c, status: next };
+      })
+    );
+  };
 
+  const handleDeleteChain = (id, module) => {
+    if (window.confirm(`Remove approval workflow for "${module}"?`)) {
+      setApprovalChains((prev) => prev.filter((c) => c.id !== id));
+      showToast(`Approval chain for "${module}" removed`);
+    }
+  };
+
+  // ── Termination Handlers ────────────────────────────────────
   const handleCreateTermination = (e) => {
     e.preventDefault();
     if (!newTermination.employee) return;
@@ -372,7 +494,6 @@ export default function HRAdminPage({ defaultTab }) {
     setActiveTerminationLetter(created);
     setIsTerminationLetterModalOpen(true);
 
-    // Sync to Employee Directory
     updateEmployeeStatus?.(created.employee, "Terminated");
 
     setNewTermination({
@@ -386,7 +507,7 @@ export default function HRAdminPage({ defaultTab }) {
       severance: "1 Month Gross",
       reason: "",
     });
-    showToast(`Termination order logged, letter generated & employee status updated for ${created.employee}`);
+    showToast(`Termination order logged & letter generated for ${created.employee}`);
   };
 
   const handleUpdateTermination = (updated) => {
@@ -397,6 +518,18 @@ export default function HRAdminPage({ defaultTab }) {
     showToast(`Termination letter & record updated`);
   };
 
+  const toggleTerminationStatus = (id) => {
+    setTerminations((prev) =>
+      prev.map((t) => {
+        if (t.id !== id) return t;
+        const nextStatus = t.status === "Completed" ? "In Exit Clearance" : "Completed";
+        showToast(`Termination status set to ${nextStatus}`);
+        return { ...t, status: nextStatus };
+      })
+    );
+  };
+
+  // ── Offer Letters Handlers ──────────────────────────────────
   const handleCreateOffer = (newOffer) => {
     setOffersList([newOffer, ...offersList]);
     addOffer?.(newOffer);
@@ -413,17 +546,6 @@ export default function HRAdminPage({ defaultTab }) {
     showToast(`Offer letter updated`);
   };
 
-  const toggleTerminationStatus = (id) => {
-    setTerminations((prev) =>
-      prev.map((t) => {
-        if (t.id !== id) return t;
-        const nextStatus = t.status === "Completed" ? "In Exit Clearance" : "Completed";
-        showToast(`Termination status set to ${nextStatus}`);
-        return { ...t, status: nextStatus };
-      })
-    );
-  };
-
   const toggleOfferStatus = (id, newStatus) => {
     setOffersList((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
@@ -431,6 +553,7 @@ export default function HRAdminPage({ defaultTab }) {
     showToast(`Offer status updated to ${newStatus}`);
   };
 
+  // ── Resignation Handlers ───────────────────────────────────
   const handleCreateResignation = (e) => {
     e.preventDefault();
     if (!newResignation.employee) return;
@@ -442,7 +565,6 @@ export default function HRAdminPage({ defaultTab }) {
     setResignations([created, ...resignations]);
     setIsResignationModalOpen(false);
 
-    // Sync to Employee Directory
     updateEmployeeStatus?.(created.employee, "Notice Period");
 
     setNewResignation({
@@ -459,6 +581,23 @@ export default function HRAdminPage({ defaultTab }) {
     showToast(`Resignation recorded & status updated to Notice Period for ${created.employee}`);
   };
 
+  const toggleResignationStatus = (id) => {
+    setResignations((prev) =>
+      prev.map((r) => {
+        if (r.id !== id) return r;
+        const next =
+          r.status.includes("Pending")
+            ? "Approved & Serving Notice"
+            : r.status.includes("Approved")
+            ? "Clearance in Progress"
+            : "Approved & Serving Notice";
+        showToast(`Resignation status updated to ${next}`);
+        return { ...r, status: next };
+      })
+    );
+  };
+
+  // ── Complaint / Grievance Handlers ─────────────────────────
   const handleCreateComplaint = (e) => {
     e.preventDefault();
     if (!newComplaint.summary) return;
@@ -482,58 +621,295 @@ export default function HRAdminPage({ defaultTab }) {
     showToast(`Grievance ticket ${created.id} registered`);
   };
 
-  const handleCreateHoliday = (e) => {
-    e.preventDefault();
-    if (!newHoliday.name) return;
-    const created = {
-      id: `HOL-0${holidays.length + 1}`,
-      ...newHoliday,
-      status: "Upcoming",
-    };
-    setHolidays([...holidays, created]);
-    setIsHolidayModalOpen(false);
-
-    // Sync to Calendar Store
-    addCalendarEvent?.({
-      id: `EV-HOL-${Date.now()}`,
-      title: created.name,
-      date: created.date,
-      startDate: created.date,
-      endDate: created.date,
-      type: "Holiday",
-      category: "Company Holiday",
-      time: "All Day",
-      location: created.appliesTo,
-      dept: "All Staff",
-      organizer: "HR Governance",
-      description: `${created.type} holiday applying to ${created.appliesTo}.`,
-    });
-
-    setNewHoliday({ name: "", date: "2024-11-01", day: "Friday", type: "National Gazetted", appliesTo: "All Locations" });
-    showToast(`Holiday "${created.name}" added to HR governance & synced to company calendar!`);
+  const toggleComplaintStatus = (id) => {
+    setComplaints((prev) =>
+      prev.map((c) => {
+        if (c.id !== id) return c;
+        const next =
+          c.status === "Open"
+            ? "Under Investigation"
+            : c.status === "Under Investigation"
+            ? "Resolved"
+            : "Open";
+        showToast(`Grievance ${c.id} marked as ${next}`);
+        return { ...c, status: next };
+      })
+    );
   };
 
+  // ── Holiday Handlers ───────────────────────────────────────
+  const handleOpenAddHoliday = () => {
+    setEditingHoliday(null);
+    setNewHoliday({ name: "", date: "2024-11-01", day: "Friday", type: "National Gazetted", appliesTo: "All Locations" });
+    setIsHolidayModalOpen(true);
+  };
+
+  const handleOpenEditHoliday = (h) => {
+    setEditingHoliday(h);
+    setNewHoliday({
+      name: h.name,
+      date: h.date,
+      day: h.day,
+      type: h.type,
+      appliesTo: h.appliesTo,
+    });
+    setIsHolidayModalOpen(true);
+  };
+
+  const handleSaveHoliday = (e) => {
+    e.preventDefault();
+    if (!newHoliday.name) return;
+
+    if (editingHoliday) {
+      setHolidays((prev) =>
+        prev.map((h) => (h.id === editingHoliday.id ? { ...h, ...newHoliday } : h))
+      );
+      showToast(`Holiday "${newHoliday.name}" updated`);
+    } else {
+      const created = {
+        id: `HOL-0${holidays.length + 1}`,
+        ...newHoliday,
+        status: "Upcoming",
+      };
+      setHolidays([...holidays, created]);
+
+      addCalendarEvent?.({
+        id: `EV-HOL-${Date.now()}`,
+        title: created.name,
+        date: created.date,
+        startDate: created.date,
+        endDate: created.date,
+        type: "Holiday",
+        category: "Company Holiday",
+        time: "All Day",
+        location: created.appliesTo,
+        dept: "All Staff",
+        organizer: "HR Governance",
+        description: `${created.type} holiday applying to ${created.appliesTo}.`,
+      });
+
+      showToast(`Holiday "${created.name}" added and synced to calendar`);
+    }
+    setIsHolidayModalOpen(false);
+    setEditingHoliday(null);
+  };
+
+  const handleDeleteHoliday = (id, name) => {
+    if (window.confirm(`Remove holiday "${name}"?`)) {
+      setHolidays((prev) => prev.filter((h) => h.id !== id));
+      showToast(`Holiday "${name}" removed`);
+    }
+  };
+
+  // ── Org Settings ───────────────────────────────────────────
   const handleSaveOrgSettings = (e) => {
     e.preventDefault();
     showToast("Organization configuration updated successfully");
   };
+
+  // Unique departments for filter
+  const departmentsList = Array.from(new Set(teams.map((t) => t.dept))).filter(Boolean);
+  const totalTeamMembers = teams.reduce((acc, t) => acc + (Number(t.members) || 0), 0);
+
+  // ── 7 Top KPI Button Cards Configuration ──
+  const TOP_KPI_BUTTONS = [
+    {
+      id: "teams",
+      label: "Teams",
+      count: teams.length,
+      subtext: `Across ${departmentsList.length} depts`,
+      icon: Users,
+      iconColor: "text-blue-700",
+      accentBg: "bg-blue-50 text-blue-700 border-blue-200",
+    },
+    {
+      id: "approvals",
+      label: "Workflows",
+      count: approvalChains.length,
+      subtext: "Multi-tier active",
+      icon: ShieldCheck,
+      iconColor: "text-emerald-700",
+      accentBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    },
+    {
+      id: "offers",
+      label: "Offer Letters",
+      count: offersList.length,
+      subtext: "Hired & issued",
+      icon: FileCheck2,
+      iconColor: "text-teal-700",
+      accentBg: "bg-teal-50 text-teal-700 border-teal-200",
+    },
+    {
+      id: "terminations",
+      label: "Terminations",
+      count: terminations.length,
+      subtext: "Exits recorded",
+      icon: UserX,
+      iconColor: "text-red-700",
+      accentBg: "bg-red-50 text-red-700 border-red-200",
+    },
+    {
+      id: "resignations",
+      label: "Resignations",
+      count: resignations.length,
+      subtext: "Serving notice",
+      icon: UserMinus,
+      iconColor: "text-amber-700",
+      accentBg: "bg-amber-50 text-amber-700 border-amber-200",
+    },
+    {
+      id: "complaints",
+      label: "Grievances",
+      count: complaints.length,
+      subtext: "Active tickets",
+      icon: MessageSquareWarning,
+      iconColor: "text-purple-700",
+      accentBg: "bg-purple-50 text-purple-700 border-purple-200",
+    },
+    {
+      id: "holidays",
+      label: "Holidays (2024)",
+      count: holidays.length,
+      subtext: "Gazetted & opt",
+      icon: Calendar,
+      iconColor: "text-indigo-700",
+      accentBg: "bg-indigo-50 text-indigo-700 border-indigo-200",
+    },
+    {
+      id: "settings",
+      label: "Org Settings",
+      count: "8 Rules",
+      subtext: "Governance active",
+      icon: Settings,
+      iconColor: "text-slate-700",
+      accentBg: "bg-slate-50 text-slate-700 border-slate-200",
+    },
+  ];
 
   return (
     <div className="flex flex-col gap-6 w-full pb-12">
       {/* ── Top Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold text-slate-900">HR Admin Setup &amp; Governance</h1>
-          <p className="text-[13px] text-muted">
-            Configure organization settings, exits &amp; resignations, grievances, and holiday calendars.
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold text-slate-900">HR Admin Setup &amp; Governance</h1>
+            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
+              Live Governance Hub
+            </span>
+          </div>
+          <p className="text-[13px] text-muted mt-0.5">
+            Configure organization settings, approval chains, offer letters, exits, grievances, and holiday calendars.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+
+        {/* Top Action Buttons */}
+        <div className="flex items-center gap-2.5">
+          {/* Quick Action Dropdown */}
+          <div className="relative" ref={quickActionRef}>
+            <button
+              type="button"
+              onClick={() => setIsQuickActionOpen(!isQuickActionOpen)}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white border border-bdr rounded-xl text-[13px] font-semibold text-slate-800 hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+            >
+              <Plus size={15} className="text-primary" />
+              <span>Quick Action</span>
+              <ChevronDown size={14} className="text-muted" />
+            </button>
+
+            {isQuickActionOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-60 bg-white border border-bdr rounded-2xl shadow-xl z-50 py-2 divide-y divide-bdr/40 animate-in fade-in zoom-in-95 duration-100">
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickActionOpen(false);
+                      handleOpenAddTeam();
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <Users size={14} className="text-blue-600" />
+                    <span>Add New Team</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickActionOpen(false);
+                      handleOpenAddChain();
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <ShieldCheck size={14} className="text-emerald-600" />
+                    <span>Create Approval Chain</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickActionOpen(false);
+                      setIsGenerateOfferModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <FileCheck2 size={14} className="text-teal-600" />
+                    <span>Generate Offer Letter</span>
+                  </button>
+                </div>
+                <div className="py-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickActionOpen(false);
+                      setIsTerminationModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-red-700 hover:bg-red-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <UserX size={14} className="text-red-600" />
+                    <span>Record Termination</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickActionOpen(false);
+                      setIsResignationModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <UserMinus size={14} className="text-amber-600" />
+                    <span>Submit Resignation</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickActionOpen(false);
+                      setIsComplaintModalOpen(true);
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <MessageSquareWarning size={14} className="text-purple-600" />
+                    <span>File Grievance Ticket</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsQuickActionOpen(false);
+                      handleOpenAddHoliday();
+                    }}
+                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  >
+                    <Calendar size={14} className="text-indigo-600" />
+                    <span>Add Calendar Holiday</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Contextual Primary Action Button */}
           {activeTab === "teams" && (
             <button
               type="button"
-              onClick={() => setIsTeamModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+              onClick={handleOpenAddTeam}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Plus size={16} /> Add Team
             </button>
@@ -541,8 +917,8 @@ export default function HRAdminPage({ defaultTab }) {
           {activeTab === "approvals" && (
             <button
               type="button"
-              onClick={() => setIsChainModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+              onClick={handleOpenAddChain}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Plus size={16} /> New Approval Chain
             </button>
@@ -551,7 +927,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={() => setIsGenerateOfferModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Plus size={16} /> Generate Offer Letter
             </button>
@@ -560,7 +936,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={() => setIsTerminationModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-700 text-white rounded-xl text-[13.5px] font-medium hover:bg-red-800 transition shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-700 text-white rounded-xl text-[13.5px] font-medium hover:bg-red-800 transition shadow-xs cursor-pointer"
             >
               <UserX size={16} /> Record Termination
             </button>
@@ -569,7 +945,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={() => setIsResignationModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <UserMinus size={16} /> Submit Resignation
             </button>
@@ -578,7 +954,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={() => setIsComplaintModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-700 text-white rounded-xl text-[13.5px] font-medium hover:bg-amber-800 transition shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-700 text-white rounded-xl text-[13.5px] font-medium hover:bg-amber-800 transition shadow-xs cursor-pointer"
             >
               <MessageSquareWarning size={16} /> File Grievance / Complaint
             </button>
@@ -586,8 +962,8 @@ export default function HRAdminPage({ defaultTab }) {
           {activeTab === "holidays" && (
             <button
               type="button"
-              onClick={() => setIsHolidayModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+              onClick={handleOpenAddHoliday}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Calendar size={16} /> Add Holiday
             </button>
@@ -596,7 +972,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={handleSaveOrgSettings}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <CheckCircle2 size={16} /> Save Configuration
             </button>
@@ -604,191 +980,424 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       </div>
 
-      {/* ── KPI Stat Cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
-        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11.5px] text-muted flex items-center justify-between">
-            <span>Teams</span>
-            <Users size={15} className="text-[#1e3a8a]" />
-          </div>
-          <div className="text-[20px] font-bold mt-1 text-slate-900">{teams.length}</div>
-          <div className="text-[10.5px] text-muted">Across 4 depts</div>
-        </div>
-        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11.5px] text-muted flex items-center justify-between">
-            <span>Workflows</span>
-            <ShieldCheck size={15} className="text-emerald-600" />
-          </div>
-          <div className="text-[20px] font-bold mt-1 text-slate-900">{approvalChains.length}</div>
-          <div className="text-[10.5px] text-muted">Multi-tier active</div>
-        </div>
-        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11.5px] text-muted flex items-center justify-between">
-            <span>Offer Letters</span>
-            <FileCheck2 size={15} className="text-emerald-600" />
-          </div>
-          <div className="text-[20px] font-bold mt-1 text-emerald-700">{offersList.length}</div>
-          <div className="text-[10.5px] text-muted">Hired &amp; issued</div>
-        </div>
-        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11.5px] text-muted flex items-center justify-between">
-            <span>Terminations</span>
-            <UserX size={15} className="text-red-600" />
-          </div>
-          <div className="text-[20px] font-bold mt-1 text-red-600">{terminations.length}</div>
-          <div className="text-[10.5px] text-muted">Exits recorded</div>
-        </div>
-        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11.5px] text-muted flex items-center justify-between">
-            <span>Resignations</span>
-            <UserMinus size={15} className="text-amber-600" />
-          </div>
-          <div className="text-[20px] font-bold mt-1 text-slate-900">{resignations.length}</div>
-          <div className="text-[10.5px] text-muted">Serving notice</div>
-        </div>
-        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11.5px] text-muted flex items-center justify-between">
-            <span>Grievances</span>
-            <MessageSquareWarning size={15} className="text-purple-600" />
-          </div>
-          <div className="text-[20px] font-bold mt-1 text-slate-900">{complaints.length}</div>
-          <div className="text-[10.5px] text-muted">Active tickets</div>
-        </div>
-        <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs">
-          <div className="text-[11.5px] text-muted flex items-center justify-between">
-            <span>Holidays (2024)</span>
-            <Calendar size={15} className="text-blue-600" />
-          </div>
-          <div className="text-[20px] font-bold mt-1 text-slate-900">{holidays.length}</div>
-          <div className="text-[10.5px] text-muted">Gazetted &amp; opt</div>
-        </div>
+      {/* ── TOP BUTTONS: Interactive 8 KPI Buttons ── */}
+      {/* Clicking any button immediately switches the view */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+        {TOP_KPI_BUTTONS.map((btn) => {
+          const isActive = activeTab === btn.id;
+          const Icon = btn.icon;
+          return (
+            <button
+              key={btn.id}
+              type="button"
+              onClick={() => {
+                setActiveTab(btn.id);
+                setSearch("");
+              }}
+              title={`Switch to ${btn.label} view`}
+              className={`text-left p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden group ${
+                isActive
+                  ? "bg-white border-navy ring-2 ring-navy/20 shadow-xs"
+                  : "bg-white border-bdr hover:border-slate-300 hover:shadow-xs hover:-translate-y-0.5"
+              }`}
+            >
+              {isActive && <span className="absolute top-0 left-0 right-0 h-1 bg-navy" />}
+              <div className="text-[11.5px] text-muted flex items-center justify-between font-medium">
+                <span className={isActive ? "font-bold text-slate-900" : ""}>{btn.label}</span>
+                <Icon size={15} className={btn.iconColor} />
+              </div>
+              <div className={`text-[20px] font-bold mt-1 ${isActive ? "text-navy" : "text-slate-900"}`}>
+                {btn.count}
+              </div>
+              <div className="text-[10.5px] text-muted flex items-center justify-between mt-0.5">
+                <span>{btn.subtext}</span>
+                {isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-navy animate-pulse" title="Active View" />
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      {/* ── Navigation Tabs ── */}
-      <div className="flex border-b border-bdr gap-2 sm:gap-6 text-[13.5px] font-semibold overflow-x-auto no-scrollbar">
-        {[
-          { id: "teams", label: "Teams & Squads" },
-          { id: "approvals", label: "Approval Chains" },
-          { id: "offers", label: `Offer Letters (${offersList.length})` },
-          { id: "terminations", label: `Termination List (${terminations.length})` },
-          { id: "resignations", label: `Resignation List (${resignations.length})` },
-          { id: "complaints", label: `Complaint & Grievance List (${complaints.length})` },
-          { id: "holidays", label: `Holidays Calendar Setup (${holidays.length})` },
-          { id: "settings", label: "Org Settings" },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => {
-              setActiveTab(tab.id);
-              setSearch("");
-            }}
-            className={`pb-3 whitespace-nowrap relative transition ${
-              activeTab === tab.id ? "text-slate-900 font-bold" : "text-muted hover:text-slate-900"
-            }`}
-          >
-            {tab.label}
-            {activeTab === tab.id && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-navy" />}
-          </button>
-        ))}
-      </div>
-
-      {/* ── TAB 1: TEAMS & SQUADS ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 1: TEAMS & SQUADS DIRECTORY (THE TABLE)
+          Separated dedicated container with search, department filters,
+          and interactive management table
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "teams" && (
-        <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
-                <tr>
-                  <th className="py-3 px-5">Team Name</th>
-                  <th className="py-3 px-5">ID</th>
-                  <th className="py-3 px-5">Department</th>
-                  <th className="py-3 px-5">Team Lead</th>
-                  <th className="py-3 px-5">Headcount</th>
-                  <th className="py-3 px-5">Default Approver</th>
-                  <th className="py-3 px-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-bdr/40">
-                {teams.map((t) => (
-                  <tr key={t.id} className="hover:bg-off/60 transition">
-                    <td className="py-4 px-5 font-semibold text-slate-900">{t.name}</td>
-                    <td className="py-4 px-5 text-muted font-mono text-[12px]">{t.id}</td>
-                    <td className="py-4 px-5">
-                      <span className="px-2.5 py-1 bg-off border border-bdr rounded-full text-[11px]">
-                        {t.dept}
-                      </span>
-                    </td>
-                    <td className="py-4 px-5 text-slate-800">{t.lead}</td>
-                    <td className="py-4 px-5 text-slate-700">{t.members} members</td>
-                    <td className="py-4 px-5 text-slate-700">{t.approver}</td>
-                    <td className="py-4 px-5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => showToast(`Edit ${t.name}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900"
-                        title="Edit Team"
-                      >
-                        <Edit size={16} />
-                      </button>
-                    </td>
+        <div className="flex flex-col gap-4">
+          {/* Dedicated View Header */}
+          <div className="bg-white border border-bdr rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 flex items-center justify-center font-bold">
+                <Users size={20} />
+              </div>
+              <div>
+                <h2 className="text-[15px] font-bold text-slate-900">Teams &amp; Squads Directory</h2>
+                <p className="text-[12px] text-muted">
+                  Organizational squads, department structures, team leaders, and designated leave approvers.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                {teams.length} Squads • {totalTeamMembers} Total Staff
+              </span>
+            </div>
+          </div>
+
+          {/* Search & Department Filters Toolbar */}
+          <div className="bg-white border border-bdr rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <div className="relative w-full max-w-sm">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search teams by name, ID, lead, approver..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-[12.5px] rounded-lg border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+              </div>
+            </div>
+
+            {/* Department Pills */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[12px] text-muted font-medium mr-1">Dept:</span>
+              <button
+                type="button"
+                onClick={() => setTeamDeptFilter("all")}
+                className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
+                  teamDeptFilter === "all" ? "bg-navy text-white font-semibold" : "bg-off text-muted hover:text-slate-800"
+                }`}
+              >
+                All
+              </button>
+              {departmentsList.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setTeamDeptFilter(d)}
+                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
+                    teamDeptFilter === d ? "bg-navy text-white font-semibold" : "bg-off text-muted hover:text-slate-800"
+                  }`}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Teams Table Container */}
+          <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+            <div className="p-3.5 border-b border-bdr flex items-center justify-between bg-off/50">
+              <span className="text-[12.5px] font-bold text-slate-800">Departmental Squad List</span>
+              <span className="text-[11.5px] text-muted">
+                Showing {teams.filter((t) => {
+                  const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.lead.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase()) || t.dept.toLowerCase().includes(search.toLowerCase());
+                  const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
+                  return matchSearch && matchDept;
+                }).length} of {teams.length} teams
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
+                  <tr>
+                    <th className="py-3 px-5">Team Name</th>
+                    <th className="py-3 px-5">ID</th>
+                    <th className="py-3 px-5">Department</th>
+                    <th className="py-3 px-5">Team Lead</th>
+                    <th className="py-3 px-5">Headcount</th>
+                    <th className="py-3 px-5">Default Approver</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-bdr/40">
+                  {teams
+                    .filter((t) => {
+                      const matchSearch =
+                        !search ||
+                        t.name.toLowerCase().includes(search.toLowerCase()) ||
+                        t.lead.toLowerCase().includes(search.toLowerCase()) ||
+                        t.id.toLowerCase().includes(search.toLowerCase()) ||
+                        t.dept.toLowerCase().includes(search.toLowerCase());
+                      const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
+                      return matchSearch && matchDept;
+                    })
+                    .map((t) => (
+                      <tr key={t.id} className="hover:bg-off/60 transition">
+                        <td className="py-4 px-5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center font-bold text-[12px]">
+                              {t.name.substring(0, 2).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900">{t.name}</div>
+                              <div className="text-[11px] text-muted">Designated Operational Squad</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-4 px-5 text-muted font-mono text-[12px]">{t.id}</td>
+                        <td className="py-4 px-5">
+                          <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 text-slate-800 rounded-full text-[11.5px] font-medium">
+                            {t.dept}
+                          </span>
+                        </td>
+                        <td className="py-4 px-5 text-slate-800 font-medium">{t.lead}</td>
+                        <td className="py-4 px-5 text-slate-700">
+                          <span className="inline-flex items-center gap-1 font-semibold text-slate-800">
+                            <Users size={13} className="text-muted" />
+                            {t.members} members
+                          </span>
+                        </td>
+                        <td className="py-4 px-5 text-slate-700">
+                          <span className="inline-flex items-center gap-1">
+                            <CheckCircle2 size={13} className="text-emerald-600" />
+                            {t.approver}
+                          </span>
+                        </td>
+                        <td className="py-4 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditTeam(t)}
+                              className="p-1.5 hover:bg-slate-100 rounded-lg text-muted hover:text-slate-900 transition cursor-pointer"
+                              title="Edit Team Details"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteTeam(t.id, t.name)}
+                              className="p-1.5 hover:bg-red-50 rounded-lg text-muted hover:text-red-600 transition cursor-pointer"
+                              title="Remove Team"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+
+              {teams.filter((t) => {
+                const matchSearch =
+                  !search ||
+                  t.name.toLowerCase().includes(search.toLowerCase()) ||
+                  t.lead.toLowerCase().includes(search.toLowerCase()) ||
+                  t.id.toLowerCase().includes(search.toLowerCase()) ||
+                  t.dept.toLowerCase().includes(search.toLowerCase());
+                const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
+                return matchSearch && matchDept;
+              }).length === 0 && (
+                <div className="py-12 text-center text-muted">
+                  <Users size={32} className="mx-auto mb-2 opacity-40" />
+                  <p className="font-semibold text-slate-700">No teams matching criteria</p>
+                  <p className="text-[12px] mt-0.5">Try adjusting your search query or department filter</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── TAB 2: APPROVAL CHAINS ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 2: APPROVAL CHAINS (ROUTING WORKFLOWS)
+          Separated dedicated container for approval tiers & SLA rules
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "approvals" && (
-        <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
-              <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
-                <tr>
-                  <th className="py-3 px-5">Module</th>
-                  <th className="py-3 px-5">Tier 1 (First Line)</th>
-                  <th className="py-3 px-5">Tier 2 (Managerial)</th>
-                  <th className="py-3 px-5">Tier 3 (Final Authority)</th>
-                  <th className="py-3 px-5">SLA Escalation</th>
-                  <th className="py-3 px-5">Status</th>
-                  <th className="py-3 px-5 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-bdr/40">
-                {approvalChains.map((c) => (
-                  <tr key={c.id} className="hover:bg-off/60 transition">
-                    <td className="py-4 px-5 font-semibold text-slate-900">{c.module}</td>
-                    <td className="py-4 px-5 text-slate-800">{c.tier1}</td>
-                    <td className="py-4 px-5 text-slate-800">{c.tier2}</td>
-                    <td className="py-4 px-5 text-slate-600">{c.tier3}</td>
-                    <td className="py-4 px-5 text-slate-700">{c.autoEscalateDays} days</td>
-                    <td className="py-4 px-5">
-                      <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px]">
-                        {c.status}
-                      </span>
-                    </td>
-                    <td className="py-4 px-5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => showToast(`Edit chain ${c.module}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900"
-                      >
-                        <Edit size={16} />
-                      </button>
-                    </td>
+        <div className="flex flex-col gap-4">
+          {/* View Header */}
+          <div className="bg-white border border-bdr rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold">
+                <ShieldCheck size={20} />
+              </div>
+              <div>
+                <h2 className="text-[15px] font-bold text-slate-900">Multi-Tier Approval Chains</h2>
+                <p className="text-[12px] text-muted">
+                  Define automated approval hierarchies, multi-level sign-offs, and SLA auto-escalations.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-emerald-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                {approvalChains.filter((c) => c.status === "Active").length} Active Workflows
+              </span>
+            </div>
+          </div>
+
+          {/* Search & Filter Toolbar */}
+          <div className="bg-white border border-bdr rounded-xl p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-2 flex-1 min-w-[240px]">
+              <div className="relative w-full max-w-sm">
+                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+                <input
+                  type="text"
+                  placeholder="Search workflows by module name or approver..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-1.5 text-[12.5px] rounded-lg border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px] text-muted font-medium mr-1">Status:</span>
+              {["all", "Active", "Inactive"].map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setChainStatusFilter(st)}
+                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
+                    chainStatusFilter === st
+                      ? "bg-navy text-white font-semibold"
+                      : "bg-off text-muted hover:text-slate-800"
+                  }`}
+                >
+                  {st === "all" ? "All Workflows" : st}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Approval Chains Table */}
+          <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[13px]">
+                <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
+                  <tr>
+                    <th className="py-3 px-5">Target Module</th>
+                    <th className="py-3 px-5">Tier 1 (First Line)</th>
+                    <th className="py-3 px-5">Tier 2 (Managerial)</th>
+                    <th className="py-3 px-5">Tier 3 (Final Authority)</th>
+                    <th className="py-3 px-5">SLA Escalation</th>
+                    <th className="py-3 px-5">Status</th>
+                    <th className="py-3 px-5 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-bdr/40">
+                  {approvalChains
+                    .filter((c) => {
+                      const matchSearch =
+                        !search ||
+                        c.module.toLowerCase().includes(search.toLowerCase()) ||
+                        c.tier1.toLowerCase().includes(search.toLowerCase()) ||
+                        c.tier2.toLowerCase().includes(search.toLowerCase()) ||
+                        c.tier3.toLowerCase().includes(search.toLowerCase());
+                      const matchStatus =
+                        chainStatusFilter === "all" || c.status === chainStatusFilter;
+                      return matchSearch && matchStatus;
+                    })
+                    .map((c) => (
+                      <tr key={c.id} className="hover:bg-off/60 transition">
+                        <td className="py-4 px-5 font-bold text-slate-900">
+                          <div className="flex items-center gap-2">
+                            <Layers size={15} className="text-navy" />
+                            <span>{c.module}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-5">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-medium text-slate-800">
+                            <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px] flex items-center justify-center">1</span>
+                            {c.tier1}
+                          </span>
+                        </td>
+                        <td className="py-4 px-5">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-medium text-slate-800">
+                            <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] flex items-center justify-center">2</span>
+                            {c.tier2}
+                          </span>
+                        </td>
+                        <td className="py-4 px-5">
+                          {c.tier3 && c.tier3 !== "—" ? (
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-medium text-slate-800">
+                              <span className="w-4 h-4 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px] flex items-center justify-center">3</span>
+                              {c.tier3}
+                            </span>
+                          ) : (
+                            <span className="text-muted text-[12px]">—</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-5">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
+                            <Clock size={12} />
+                            {c.autoEscalateDays} days
+                          </span>
+                        </td>
+                        <td className="py-4 px-5">
+                          <button
+                            type="button"
+                            onClick={() => toggleChainStatus(c.id)}
+                            title="Click to toggle active status"
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border transition cursor-pointer ${
+                              c.status === "Active"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100"
+                                : "bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200"
+                            }`}
+                          >
+                            {c.status}
+                          </button>
+                        </td>
+                        <td className="py-4 px-5 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEditChain(c)}
+                              className="p-1.5 hover:bg-slate-100 rounded-lg text-muted hover:text-slate-900 transition cursor-pointer"
+                              title="Edit Approval Chain"
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteChain(c.id, c.module)}
+                              className="p-1.5 hover:bg-red-50 rounded-lg text-muted hover:text-red-600 transition cursor-pointer"
+                              title="Delete Approval Chain"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
 
-      {/* ── TAB: OFFER LETTERS (HR ADMIN & HIRED RECRUITS) ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 3: EMPLOYMENT OFFER LETTERS (OPTION LIST)
+          Separated dedicated container with recruitment integration
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "offers" && (
         <div className="flex flex-col gap-4">
+          {/* View Header */}
+          <div className="bg-white border border-bdr rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 flex items-center justify-center font-bold">
+                <FileCheck2 size={20} />
+              </div>
+              <div>
+                <h2 className="text-[15px] font-bold text-slate-900">Employment Offer Letters &amp; Terms</h2>
+                <p className="text-[12px] text-muted">
+                  Track issued offer letters, compensation terms, candidate responses, and printable formal PDFs.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-teal-800 bg-teal-50 px-3 py-1.5 rounded-lg border border-teal-200">
+                {offersList.length} Generated Offers
+              </span>
+            </div>
+          </div>
+
           {/* Hired Candidates Banner */}
           {candidates.some((c) => c.stage === "Hired") && (
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
@@ -801,7 +1410,7 @@ export default function HRAdminPage({ defaultTab }) {
                     Recruitment Integration: Hired Candidates Ready for Official Offer Letters
                   </div>
                   <div className="text-[12px] text-emerald-700">
-                    Candidates from recruitment pipeline in "Hired" stage:{" "}
+                    Candidates in pipeline currently in &ldquo;Hired&rdquo; stage:{" "}
                     <b>
                       {candidates
                         .filter((c) => c.stage === "Hired")
@@ -811,14 +1420,9 @@ export default function HRAdminPage({ defaultTab }) {
                   </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsGenerateOfferModalOpen(true)}
-                className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 shadow-xs transition"
-              >
-                <Plus size={14} />
-                <span>Issue New Offer Letter</span>
-              </button>
+              <span className="px-2.5 py-1 rounded-full text-[11.5px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                Ready for Offer
+              </span>
             </div>
           )}
 
@@ -837,16 +1441,16 @@ export default function HRAdminPage({ defaultTab }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] text-muted font-medium">Status:</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[12px] text-muted font-medium mr-1">Status:</span>
               {["all", "Accepted", "Pending", "Declined"].map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setOfferStatusFilter(st)}
-                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition ${
+                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
                     offerStatusFilter === st
-                      ? "bg-navy text-white"
+                      ? "bg-navy text-white font-semibold"
                       : "bg-off text-muted hover:text-slate-800"
                   }`}
                 >
@@ -905,13 +1509,15 @@ export default function HRAdminPage({ defaultTab }) {
                           <div className="text-[11px] text-muted">{o.dept}</div>
                         </td>
                         <td className="py-4 px-5">
-                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
-                            o.jobType === "Internship"
-                              ? "bg-purple-50 text-purple-700 border-purple-200"
-                              : o.jobType === "Contract"
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-blue-50 text-blue-700 border-blue-200"
-                          }`}>
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                              o.jobType === "Internship"
+                                ? "bg-purple-50 text-purple-700 border-purple-200"
+                                : o.jobType === "Contract"
+                                ? "bg-amber-50 text-amber-700 border-amber-200"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}
+                          >
                             {o.jobType || "Full-time"}
                           </span>
                         </td>
@@ -979,7 +1585,9 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── TAB 3: TERMINATION LIST ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 4: TERMINATION LIST
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "terminations" && (
         <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
           <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
@@ -991,14 +1599,11 @@ export default function HRAdminPage({ defaultTab }) {
                 Formal legal notices, exit clearance status, and changeable PDF termination documents
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsTerminationModalOpen(true)}
-              className="px-3.5 py-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg text-[12.5px] font-semibold flex items-center gap-1.5 shadow-xs transition"
-            >
-              <Plus size={14} />
-              <span>Record Termination</span>
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-red-800 bg-red-50 px-3 py-1.5 rounded-lg border border-red-200">
+                {terminations.length} Exit Records
+              </span>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
@@ -1102,14 +1707,23 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── TAB 4: RESIGNATION LIST ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 5: RESIGNATION LIST
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "resignations" && (
         <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
           <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
-            <span className="text-[13px] font-semibold text-slate-800">
-              Voluntary Resignations &amp; Notice Period Tracker
-            </span>
-            <span className="text-[12px] text-muted">Knowledge transfer and handover coordination</span>
+            <div>
+              <span className="text-[13px] font-semibold text-slate-800">
+                Voluntary Resignations &amp; Notice Period Tracker
+              </span>
+              <p className="text-[11.5px] text-muted">Knowledge transfer and handover coordination</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
+                {resignations.length} Active Notice Periods
+              </span>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
@@ -1142,8 +1756,10 @@ export default function HRAdminPage({ defaultTab }) {
                     </td>
                     <td className="py-4 px-5 text-slate-800">{r.handoverTo}</td>
                     <td className="py-4 px-5">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                      <button
+                        type="button"
+                        onClick={() => toggleResignationStatus(r.id)}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border cursor-pointer ${
                           r.status.includes("Approved")
                             ? "bg-blue-50 text-blue-700 border-blue-200"
                             : r.status.includes("Clearance")
@@ -1152,13 +1768,13 @@ export default function HRAdminPage({ defaultTab }) {
                         }`}
                       >
                         {r.status}
-                      </span>
+                      </button>
                     </td>
                     <td className="py-4 px-5 text-right">
                       <button
                         type="button"
                         onClick={() => showToast(`Resignation Reason: ${r.reason}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900"
+                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
                         title="View Reason"
                       >
                         <Eye size={16} />
@@ -1172,14 +1788,23 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── TAB 5: COMPLAINT & GRIEVANCE LIST ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 6: COMPLAINT & GRIEVANCE LIST
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "complaints" && (
         <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
           <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
-            <span className="text-[13px] font-semibold text-slate-800">
-              Employee Grievances, POSH &amp; Compliance Inquiries
-            </span>
-            <span className="text-[12px] text-muted">Confidential investigation and resolution records</span>
+            <div>
+              <span className="text-[13px] font-semibold text-slate-800">
+                Employee Grievances, POSH &amp; Compliance Inquiries
+              </span>
+              <p className="text-[11.5px] text-muted">Confidential investigation and resolution records</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-purple-800 bg-purple-50 px-3 py-1.5 rounded-lg border border-purple-200">
+                {complaints.length} Registered Tickets
+              </span>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
@@ -1221,8 +1846,10 @@ export default function HRAdminPage({ defaultTab }) {
                     </td>
                     <td className="py-4 px-5 text-slate-800">{c.assignedInvestigator}</td>
                     <td className="py-4 px-5">
-                      <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
+                      <button
+                        type="button"
+                        onClick={() => toggleComplaintStatus(c.id)}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border cursor-pointer ${
                           c.status === "Resolved"
                             ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                             : c.status === "Under Investigation"
@@ -1231,13 +1858,13 @@ export default function HRAdminPage({ defaultTab }) {
                         }`}
                       >
                         {c.status}
-                      </span>
+                      </button>
                     </td>
                     <td className="py-4 px-5 text-right">
                       <button
                         type="button"
                         onClick={() => showToast(`Grievance: ${c.summary}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900"
+                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
                         title="View Summary"
                       >
                         <Eye size={16} />
@@ -1251,14 +1878,23 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── TAB 6: HOLIDAYS SETUP CALENDAR ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 7: HOLIDAYS SETUP CALENDAR
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "holidays" && (
         <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
           <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
-            <span className="text-[13px] font-semibold text-slate-800">
-              Annual Enterprise Holiday Schedule (2024–2025)
-            </span>
-            <span className="text-[12px] text-muted">Synchronized across Personal Calendar &amp; Attendance modules</span>
+            <div>
+              <span className="text-[13px] font-semibold text-slate-800">
+                Annual Enterprise Holiday Schedule (2024–2025)
+              </span>
+              <p className="text-[11.5px] text-muted">Synchronized across Personal Calendar &amp; Attendance modules</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="text-[12px] font-medium text-blue-800 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-200">
+                {holidays.length} Annual Holidays
+              </span>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-[13px]">
@@ -1301,13 +1937,24 @@ export default function HRAdminPage({ defaultTab }) {
                       </span>
                     </td>
                     <td className="py-4 px-5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => showToast(`Edit holiday ${h.name}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900"
-                      >
-                        <Edit size={16} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditHoliday(h)}
+                          className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                          title="Edit Holiday"
+                        >
+                          <Edit size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteHoliday(h.id, h.name)}
+                          className="p-1.5 hover:bg-red-50 rounded-lg text-muted hover:text-red-600 cursor-pointer"
+                          title="Remove Holiday"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1317,7 +1964,9 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── TAB 7: GENERAL ORGANIZATION SETTINGS ── */}
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 8: GENERAL ORGANIZATION SETTINGS
+         ════════════════════════════════════════════════════════════════ */}
       {activeTab === "settings" && (
         <form onSubmit={handleSaveOrgSettings} className="bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col gap-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1416,7 +2065,7 @@ export default function HRAdminPage({ defaultTab }) {
           <div className="flex justify-end gap-3 pt-3">
             <button
               type="submit"
-              className="px-6 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+              className="px-6 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               Save Organization Settings
             </button>
@@ -1424,21 +2073,23 @@ export default function HRAdminPage({ defaultTab }) {
         </form>
       )}
 
-      {/* ── Modal: Add Team ── */}
+      {/* ── Modal: Add / Edit Team ── */}
       {isTeamModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
-              <h3 className="font-bold text-[16px] text-slate-900">Create New Team</h3>
+              <h3 className="font-bold text-[16px] text-slate-900">
+                {editingTeam ? `Edit Team (${editingTeam.id})` : "Create New Team"}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsTeamModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleCreateTeam} className="flex flex-col gap-4">
+            <form onSubmit={handleSaveTeam} className="flex flex-col gap-4">
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Team Name</label>
                 <input
@@ -1456,7 +2107,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newTeam.dept}
                     onChange={(e) => setNewTeam({ ...newTeam, dept: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                   >
                     <option>Engineering</option>
                     <option>HR</option>
@@ -1502,15 +2153,15 @@ export default function HRAdminPage({ defaultTab }) {
                 <button
                   type="button"
                   onClick={() => setIsTeamModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90"
+                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 cursor-pointer shadow-xs"
                 >
-                  Create Team
+                  {editingTeam ? "Save Changes" : "Create Team"}
                 </button>
               </div>
             </form>
@@ -1518,27 +2169,29 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── Modal: Add Approval Chain ── */}
+      {/* ── Modal: Add / Edit Approval Chain ── */}
       {isChainModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
-              <h3 className="font-bold text-[16px] text-slate-900">New Approval Chain</h3>
+              <h3 className="font-bold text-[16px] text-slate-900">
+                {editingChain ? `Edit Chain (${editingChain.module})` : "New Approval Chain"}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsChainModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleCreateChain} className="flex flex-col gap-4">
+            <form onSubmit={handleSaveChain} className="flex flex-col gap-4">
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Target Module</label>
                 <select
                   value={newChain.module}
                   onChange={(e) => setNewChain({ ...newChain, module: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                 >
                   <option>Leave Management</option>
                   <option>Attendance Regularization</option>
@@ -1595,15 +2248,15 @@ export default function HRAdminPage({ defaultTab }) {
                 <button
                   type="button"
                   onClick={() => setIsChainModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90"
+                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 cursor-pointer shadow-xs"
                 >
-                  Save Chain
+                  {editingChain ? "Save Workflow" : "Save Chain"}
                 </button>
               </div>
             </form>
@@ -1623,7 +2276,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsTerminationModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -1648,7 +2301,7 @@ export default function HRAdminPage({ defaultTab }) {
                       });
                     }
                   }}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
                 >
                   <option value="">-- Choose active staff member (or enter below) --</option>
                   {employees.map((emp) => (
@@ -1689,10 +2342,10 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newTermination.dept}
                     onChange={(e) => setNewTermination({ ...newTermination, dept: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                   >
                     <option>Engineering</option>
-                    <option>Sales & Marketing</option>
+                    <option>Sales &amp; Marketing</option>
                     <option>Operations</option>
                     <option>HR</option>
                     <option>Finance</option>
@@ -1717,7 +2370,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newTermination.terminationType}
                     onChange={(e) => setNewTermination({ ...newTermination, terminationType: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                   >
                     <option>Involuntary (Performance)</option>
                     <option>Disciplinary / Breach</option>
@@ -1772,13 +2425,13 @@ export default function HRAdminPage({ defaultTab }) {
                 <button
                   type="button"
                   onClick={() => setIsTerminationModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-red-700 text-white rounded-xl text-[13px] font-medium hover:bg-red-800 flex items-center gap-1.5 shadow-xs"
+                  className="px-5 py-2 bg-red-700 text-white rounded-xl text-[13px] font-medium hover:bg-red-800 flex items-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <FileText size={14} />
                   <span>Confirm &amp; Generate Letter</span>
@@ -1798,13 +2451,12 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsResignationModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
             </div>
             <form onSubmit={handleCreateResignation} className="flex flex-col gap-4">
-              {/* Quick Select Employee from Directory */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1.5">
                 <label className="block text-[11.5px] font-bold text-slate-700">
                   Select Employee (Auto-fills from Staff Directory)
@@ -1823,7 +2475,7 @@ export default function HRAdminPage({ defaultTab }) {
                       });
                     }
                   }}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy"
+                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
                 >
                   <option value="">-- Choose active staff member (or enter below) --</option>
                   {employees.map((emp) => (
@@ -1840,7 +2492,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Shalini Roy"
+                    placeholder="e.g. Rohan Varma"
                     value={newResignation.employee}
                     onChange={(e) => setNewResignation({ ...newResignation, employee: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
@@ -1851,7 +2503,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. EMP-1045"
+                    placeholder="e.g. EMP-1044"
                     value={newResignation.employeeId}
                     onChange={(e) => setNewResignation({ ...newResignation, employeeId: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
@@ -1864,22 +2516,22 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newResignation.dept}
                     onChange={(e) => setNewResignation({ ...newResignation, dept: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                   >
                     <option>Engineering</option>
                     <option>Design</option>
-                    <option>Product</option>
                     <option>HR</option>
                     <option>Finance</option>
-                    <option>Sales & Marketing</option>
+                    <option>Marketing</option>
+                    <option>Operations</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Designation / Role</label>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Role / Designation</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Product Analyst"
+                    placeholder="e.g. Senior UI Designer"
                     value={newResignation.role}
                     onChange={(e) => setNewResignation({ ...newResignation, role: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
@@ -1911,17 +2563,16 @@ export default function HRAdminPage({ defaultTab }) {
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Notice Period</label>
                   <input
                     type="text"
-                    placeholder="e.g. 60 Days (Full)"
                     value={newResignation.noticePeriod}
                     onChange={(e) => setNewResignation({ ...newResignation, noticePeriod: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
                   />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Handover Assigned To</label>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Handover To (Assignee)</label>
                   <input
                     type="text"
-                    placeholder="e.g. David Park"
+                    placeholder="e.g. Marcus Chen"
                     value={newResignation.handoverTo}
                     onChange={(e) => setNewResignation({ ...newResignation, handoverTo: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
@@ -1929,11 +2580,11 @@ export default function HRAdminPage({ defaultTab }) {
                 </div>
               </div>
               <div>
-                <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Stated Reason for Leaving</label>
+                <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Reason for Resignation</label>
                 <textarea
                   rows={3}
                   required
-                  placeholder="e.g. Career growth, higher education, personal relocation..."
+                  placeholder="Employee reasons, transition plan notes..."
                   value={newResignation.reason}
                   onChange={(e) => setNewResignation({ ...newResignation, reason: e.target.value })}
                   className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
@@ -1943,15 +2594,15 @@ export default function HRAdminPage({ defaultTab }) {
                 <button
                   type="button"
                   onClick={() => setIsResignationModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90"
+                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 cursor-pointer shadow-xs"
                 >
-                  Record Resignation
+                  Submit Resignation
                 </button>
               </div>
             </form>
@@ -1959,16 +2610,19 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── Modal: File Complaint / Grievance ── */}
+      {/* ── Modal: File Grievance / Complaint ── */}
       {isComplaintModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-6">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
-              <h3 className="font-bold text-[16px] text-slate-900">Register Grievance / Complaint</h3>
+              <div>
+                <h3 className="font-bold text-[16px] text-slate-900">File Grievance / Compliance Ticket</h3>
+                <p className="text-[11.5px] text-muted">Confidential intake with assigned legal/HR investigator</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setIsComplaintModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -1976,7 +2630,7 @@ export default function HRAdminPage({ defaultTab }) {
             <form onSubmit={handleCreateComplaint} className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Complainant (or Anonymous)</label>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Complainant Name</label>
                   <input
                     type="text"
                     placeholder="Leave blank for Anonymous"
@@ -1986,11 +2640,11 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Target Individual / Department</label>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Against / Target</label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. IT Helpdesk or Team Lead"
+                    placeholder="e.g. Operations Manager"
                     value={newComplaint.against}
                     onChange={(e) => setNewComplaint({ ...newComplaint, against: e.target.value })}
                     className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
@@ -2003,13 +2657,13 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newComplaint.category}
                     onChange={(e) => setNewComplaint({ ...newComplaint, category: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                   >
                     <option>Workplace Harassment / POSH</option>
-                    <option>Reimbursement & Payroll Delay</option>
+                    <option>Reimbursement &amp; Payroll Delay</option>
                     <option>Physical Workplace Environment</option>
                     <option>Management / Discrimination</option>
-                    <option>Ethics & Compliance Violation</option>
+                    <option>Ethics &amp; Compliance Violation</option>
                   </select>
                 </div>
                 <div>
@@ -2017,7 +2671,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newComplaint.priority}
                     onChange={(e) => setNewComplaint({ ...newComplaint, priority: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                   >
                     <option>High</option>
                     <option>Medium</option>
@@ -2030,7 +2684,7 @@ export default function HRAdminPage({ defaultTab }) {
                 <select
                   value={newComplaint.assignedInvestigator}
                   onChange={(e) => setNewComplaint({ ...newComplaint, assignedInvestigator: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                 >
                   <option value="Ayesha Khan (HR Director)">Ayesha Khan (HR Director)</option>
                   <option value="Sarah Mitchell (CEO)">Sarah Mitchell (CEO)</option>
@@ -2056,13 +2710,13 @@ export default function HRAdminPage({ defaultTab }) {
                 <button
                   type="button"
                   onClick={() => setIsComplaintModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-amber-700 text-white rounded-xl text-[13px] font-medium hover:bg-amber-800"
+                  className="px-5 py-2 bg-amber-700 text-white rounded-xl text-[13px] font-medium hover:bg-amber-800 cursor-pointer shadow-xs"
                 >
                   File Ticket
                 </button>
@@ -2072,21 +2726,23 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
-      {/* ── Modal: Add Holiday ── */}
+      {/* ── Modal: Add / Edit Holiday ── */}
       {isHolidayModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
-              <h3 className="font-bold text-[16px] text-slate-900">Add Holiday to Calendar</h3>
+              <h3 className="font-bold text-[16px] text-slate-900">
+                {editingHoliday ? "Edit Holiday" : "Add Holiday to Calendar"}
+              </h3>
               <button
                 type="button"
                 onClick={() => setIsHolidayModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
             </div>
-            <form onSubmit={handleCreateHoliday} className="flex flex-col gap-4">
+            <form onSubmit={handleSaveHoliday} className="flex flex-col gap-4">
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Holiday Name</label>
                 <input
@@ -2125,7 +2781,7 @@ export default function HRAdminPage({ defaultTab }) {
                   <select
                     value={newHoliday.type}
                     onChange={(e) => setNewHoliday({ ...newHoliday, type: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                   >
                     <option>National Gazetted</option>
                     <option>Regional Holiday</option>
@@ -2147,15 +2803,15 @@ export default function HRAdminPage({ defaultTab }) {
                 <button
                   type="button"
                   onClick={() => setIsHolidayModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90"
+                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 cursor-pointer shadow-xs"
                 >
-                  Add Holiday
+                  {editingHoliday ? "Save Holiday" : "Add Holiday"}
                 </button>
               </div>
             </form>

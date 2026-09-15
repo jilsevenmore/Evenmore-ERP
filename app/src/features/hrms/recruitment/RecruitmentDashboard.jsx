@@ -14,7 +14,7 @@ export default function RecruitmentDashboard() {
     { label: "Interviews", value: "38", sub: "Today: 6", to: "/hrms/recruitment/interviews", icon: Calendar },
     { label: "Offers", value: String(offers.filter((o) => o.status === "Pending").length), sub: "Pending: 4", to: "/hrms/recruitment/offers", icon: Award },
     { label: "Hired", value: String(candidates.filter((c) => c.stage === "Hired").length), sub: "This Month", to: "/hrms/recruitment/onboarding", icon: UserCheck },
-    { label: "Time to Hire", value: "22 days", sub: "-3 days", to: "/hrms/recruitment/funnel", icon: Clock }
+    // { label: "Time to Hire", value: "22 days", sub: "-3 days", to: "/hrms/recruitment/funnel", icon: Clock } // Hidden: Recruitment Funnel feature commented out
   ];
   const todays = interviews.filter((i) => i.date === "09 Sep 2026").slice(0, 1);
   const upcoming = interviews.filter((i) => i.status === "Scheduled").slice(0, 3);
@@ -26,7 +26,7 @@ export default function RecruitmentDashboard() {
         <Button onClick={() => navigate("/hrms/recruitment/jobs", { state: { openCreate: true } })}>+ Create Job Opening</Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {kpis.map((k) => <button key={k.label} onClick={() => navigate(k.to)} className="bg-white border border-[#e8edf3] rounded-2xl p-4 shadow-sm text-left hover:shadow-subtle transition">
             <div className="flex justify-between items-start"><span className="text-[11px] font-semibold tracking-widest uppercase text-muted">{k.label}</span><k.icon size={14} className="text-muted" /></div>
             <div className="text-[22px] font-bold mt-2">{k.value}</div>
