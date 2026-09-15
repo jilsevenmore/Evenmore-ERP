@@ -27,6 +27,10 @@ import {
   ChevronRight,
   Radio,
   CalendarDays,
+  CheckCircle2,
+  Send,
+  Download,
+  PhoneCall,
 } from 'lucide-react';
 
 const DEPTS = ['Sales & Marketing', 'Operations', 'Support'];
@@ -48,6 +52,14 @@ const ACTIVITY = [
   { time: '01:02 AM', title: 'Travel', sub: 'Moving (28 km/h)', tone: '#7c3aed' },
   { time: '02:42 AM', title: 'Office', sub: 'Checked in at office', tone: '#0d9488' },
   { time: '01:45 PM', title: 'Idle', sub: 'No movement for 12 minutes', tone: '#f59e0b' },
+];
+
+const FULL_LOGS = [
+  { time: '09:00 AM', status: 'Checked In', loc: 'Headquarters • Office Premises', battery: '100%', speed: '0 km/h', duration: '45m' },
+  { time: '09:45 AM', status: 'In Transit', loc: 'Market St to 4th Mission St', battery: '96%', speed: '34 km/h', duration: '20m' },
+  { time: '10:05 AM', status: 'At Client Location', loc: '4th Mission St, San Francisco', battery: '91%', speed: '0 km/h', duration: '2h 15m' },
+  { time: '12:20 PM', status: 'Lunch / Break', loc: 'Union Square Cafe Area', battery: '84%', speed: '0 km/h', duration: '40m' },
+  { time: '01:00 PM', status: 'Site Visit Phase 2', loc: 'Bernal Heights Tech Hub', battery: '78%', speed: '24 km/h', duration: '1h 30m' },
 ];
 
 function initials(name) {
@@ -78,11 +90,17 @@ export default function UserLocationTracking() {
   const [tab, setTab] = useState('live');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
-  const [checked, setChecked] = useState([]);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [date, setDate] = useState('2026-09-11');
   const [updatedAt, setUpdatedAt] = useState('11 Sep 2026, 10:30 AM');
   const [ping, setPing] = useState(0);
+
+  const [toastMessage, setToastMessage] = useState(null);
+  const [activeCallStaff, setActiveCallStaff] = useState(null);
+  const [activeMessageStaff, setActiveMessageStaff] = useState(null);
+  const [messageText, setMessageText] = useState('');
+  const [historyModalStaff, setHistoryModalStaff] = useState(null);
+  const [historyDate, setHistoryDate] = useState('2026-09-11');
 
   useEffect(() => {
     if (!live) return;
@@ -92,6 +110,11 @@ export default function UserLocationTracking() {
     }, 10000);
     return () => clearInterval(t);
   }, [live]);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -115,8 +138,37 @@ export default function UserLocationTracking() {
     setPage(1);
   }, [search, dept, status, perPage]);
 
-  function toggleCheck(id) {
-    setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
+  function handleLocateStaff(staff) {
+    setSelectedId(staff.id);
+    setZoom(1.4);
+    showToast(`Focused map location for ${staff.name}`);
+  }
+
+  function handleOpenCall(staff) {
+    setActiveCallStaff(staff);
+  }
+
+  function handleStartCall() {
+    if (!activeCallStaff) return;
+    showToast(`Dialing call to ${activeCallStaff.name} (${activeCallStaff.phone})...`);
+    window.open(`tel:${activeCallStaff.phone.replace(/\s+/g, '')}`);
+    setActiveCallStaff(null);
+  }
+
+  function handleOpenMessage(staff) {
+    setActiveMessageStaff(staff);
+    setMessageText('');
+  }
+
+  function handleSendMessage() {
+    if (!activeMessageStaff) return;
+    showToast(`Instant message sent to ${activeMessageStaff.name}!`);
+    setActiveMessageStaff(null);
+    setMessageText('');
+  }
+
+  function handleOpenHistory(staff) {
+    setHistoryModalStaff(staff || selected);
   }
 
   function exportExcel() {
@@ -124,6 +176,7 @@ export default function UserLocationTracking() {
       ['ID', 'Name', 'Department', 'Role', 'Phone', 'Status', 'Last Seen', 'Location'],
       ...filtered.map((s) => [s.id, s.name, s.dept, s.role, s.phone, s.status, s.lastSeen, s.loc]),
     ]);
+    showToast('User locations exported to CSV.');
   }
 
   function exportPdf() {
@@ -133,12 +186,20 @@ export default function UserLocationTracking() {
     w.document.write(`<!doctype html><html><head><title>User Locations</title><style>body{font-family:Arial;color:#172033;padding:24px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}</style></head><body><h1>User Location Tracking</h1><table><thead><tr><th>ID</th><th>Name</th><th>Department</th><th>Status</th><th>Last Seen</th></tr></thead><tbody>${rows}</tbody></table></body></html>`);
     w.document.close();
     w.focus();
+    showToast('PDF print preview generated.');
   }
 
   const dark = mapType === 'sat';
 
   return (
     <div className="space-y-4">
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
+          <CheckCircle2 size={18} className="text-emerald-400 flex-shrink-0" />
+          <span className="text-sm font-medium">{toastMessage}</span>
+        </div>
+      )}
+
       <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">User Location Tracking</h1>
@@ -152,14 +213,14 @@ export default function UserLocationTracking() {
           <button
             type="button"
             onClick={() => setLive((v) => !v)}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition ${live ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
+            className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${live ? 'bg-blue-600 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
           >
             <Radio size={14} /> {live ? 'Live Tracking' : 'Start Live'}
           </button>
           <button
             type="button"
             onClick={() => setReportsOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
           >
             <FileText size={14} /> Reports
           </button>
@@ -203,14 +264,14 @@ export default function UserLocationTracking() {
           <option value="Online">Online</option>
           <option value="Offline">Offline</option>
         </select>
-        <button type="button" onClick={() => { setSearch(''); setDept('All'); setStatus('All'); }} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Reset</button>
-        <button type="button" onClick={() => setPing((p) => p + 1)} className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">
+        <button type="button" onClick={() => { setSearch(''); setDept('All'); setStatus('All'); showToast('Filters reset'); }} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">Reset</button>
+        <button type="button" onClick={() => { setPing((p) => p + 1); showToast('Live location data refreshed!'); }} className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer">
           <RefreshCw size={13} /> Auto Refresh
         </button>
-        <button type="button" onClick={exportExcel} className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition">
+        <button type="button" onClick={exportExcel} className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition cursor-pointer">
           <FileSpreadsheet size={13} /> Excel
         </button>
-        <button type="button" onClick={exportPdf} className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition">
+        <button type="button" onClick={exportPdf} className="inline-flex items-center gap-1.5 px-3 py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition cursor-pointer">
           <FileText size={13} /> PDF
         </button>
       </div>
@@ -224,8 +285,8 @@ export default function UserLocationTracking() {
                 <p className="text-[11px] text-slate-400 mt-0.5">Real-time tracking. Last updated: {updatedAt}</p>
               </div>
               <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-[11px] font-bold">
-                <button type="button" onClick={() => setMapType('map')} className={`px-3 py-1 rounded-md transition ${mapType === 'map' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>Map</button>
-                <button type="button" onClick={() => setMapType('sat')} className={`px-3 py-1 rounded-md transition ${mapType === 'sat' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>Satellite</button>
+                <button type="button" onClick={() => setMapType('map')} className={`px-3 py-1 rounded-md transition cursor-pointer ${mapType === 'map' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>Map</button>
+                <button type="button" onClick={() => setMapType('sat')} className={`px-3 py-1 rounded-md transition cursor-pointer ${mapType === 'sat' ? 'bg-blue-600 text-white' : 'text-slate-500'}`}>Satellite</button>
               </div>
             </div>
             <div className={`relative overflow-hidden ${dark ? 'bg-[#1e293b]' : 'bg-[#dcebf7]'}`} style={{ height: 380 }}>
@@ -246,8 +307,8 @@ export default function UserLocationTracking() {
                   <button
                     key={s.id + ping}
                     type="button"
-                    onClick={() => setSelectedId(s.id)}
-                    className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-full group"
+                    onClick={() => handleLocateStaff(s)}
+                    className="absolute flex flex-col items-center -translate-x-1/2 -translate-y-full group cursor-pointer"
                     style={{ left: `${s.x}%`, top: `${s.y}%` }}
                   >
                     <span className={`flex items-center gap-1.5 pl-1 pr-2 py-0.5 rounded-full border text-[10px] font-bold shadow-sm whitespace-nowrap ${selectedId === s.id ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}>
@@ -260,22 +321,23 @@ export default function UserLocationTracking() {
                 ))}
               </div>
               <div className="absolute left-3 top-3 flex flex-col gap-1">
-                <button type="button" onClick={() => setZoom((z) => Math.min(2, +(z + 0.2).toFixed(1)))} className="w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50" aria-label="Zoom in"><Plus size={15} /></button>
-                <button type="button" onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(1)))} className="w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50" aria-label="Zoom out"><Minus size={15} /></button>
+                <button type="button" onClick={() => setZoom((z) => Math.min(2, +(z + 0.2).toFixed(1)))} className="w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50 cursor-pointer" aria-label="Zoom in"><Plus size={15} /></button>
+                <button type="button" onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(1)))} className="w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50 cursor-pointer" aria-label="Zoom out"><Minus size={15} /></button>
               </div>
-              <button type="button" onClick={() => setZoom(1)} className="absolute left-3 bottom-3 w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50" aria-label="Reset view"><Crosshair size={15} /></button>
+              <button type="button" onClick={() => setZoom(1)} className="absolute left-3 bottom-3 w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50 cursor-pointer" aria-label="Reset view"><Crosshair size={15} /></button>
               <span className="absolute right-3 bottom-3 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-white/85 rounded-md px-2 py-1 border border-slate-200"><Layers size={11} /> {filtered.length} markers</span>
             </div>
           </div>
 
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 text-sm font-bold text-slate-900">All Users ({filtered.length})</div>
+            <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
+              <div className="text-sm font-bold text-slate-900">All Users ({filtered.length})</div>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse min-w-[760px]">
                 <thead>
                   <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    <th className="px-4 py-2.5 w-8"><input type="checkbox" checked={pageItems.length > 0 && pageItems.every((t) => checked.includes(t.id))} onChange={() => { const ids = pageItems.map((t) => t.id); setChecked((c) => pageItems.every((t) => c.includes(t.id)) ? c.filter((x) => !ids.includes(x)) : [...new Set([...c, ...ids])]); }} className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer" /></th>
-                    <th className="px-2 py-2.5">#</th>
+                    <th className="px-4 py-2.5">#</th>
                     <th className="px-2 py-2.5">Employee</th>
                     <th className="px-2 py-2.5">Department</th>
                     <th className="px-2 py-2.5">Contact</th>
@@ -287,8 +349,7 @@ export default function UserLocationTracking() {
                 <tbody className="divide-y divide-slate-100">
                   {pageItems.map((s, i) => (
                     <tr key={s.id} onClick={() => setSelectedId(s.id)} className={`cursor-pointer transition ${selectedId === s.id ? 'bg-blue-50/60' : 'hover:bg-slate-50/60'}`}>
-                      <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={checked.includes(s.id)} onChange={() => toggleCheck(s.id)} className="w-3.5 h-3.5 rounded border-slate-300 cursor-pointer" /></td>
-                      <td className="px-2 py-2.5 text-slate-400">{(safePage - 1) * perPage + i + 1}</td>
+                      <td className="px-4 py-2.5 text-slate-400">{(safePage - 1) * perPage + i + 1}</td>
                       <td className="px-2 py-2.5">
                         <span className="flex items-center gap-2">
                           <span className="w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold text-white shrink-0" style={{ background: s.color }}>{initials(s.name)}</span>
@@ -305,15 +366,15 @@ export default function UserLocationTracking() {
                       <td className="px-2 py-2.5 text-slate-400 text-[11px]">{s.lastSeen}</td>
                       <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                         <span className="flex items-center justify-end gap-1">
-                          <button type="button" onClick={() => setSelectedId(s.id)} title="Locate" className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg"><LocateFixed size={14} /></button>
-                          <button type="button" title="Call" className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><Phone size={14} /></button>
-                          <button type="button" title="Message" className="p-1.5 text-slate-400 hover:bg-slate-100 rounded-lg"><MessageCircle size={14} /></button>
+                          <button type="button" onClick={() => handleLocateStaff(s)} title="Locate on Map" className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg cursor-pointer"><LocateFixed size={14} /></button>
+                          <button type="button" onClick={() => handleOpenCall(s)} title="Call Employee" className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"><Phone size={14} /></button>
+                          <button type="button" onClick={() => handleOpenMessage(s)} title="Send Message" className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer"><MessageCircle size={14} /></button>
                         </span>
                       </td>
                     </tr>
                   ))}
                   {pageItems.length === 0 && (
-                    <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No employees match the filters.</td></tr>
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No employees match the filters.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -342,11 +403,11 @@ export default function UserLocationTracking() {
               <span className="block text-[10px] text-slate-400 truncate">{selected.dept} | {selected.role}</span>
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${selected.status === 'Online' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{selected.status}</span>
-            <button type="button" onClick={() => setSelectedId(filtered[0]?.id || 'EMP-01')} className="text-slate-300 hover:text-slate-500"><X size={15} /></button>
+            <button type="button" onClick={() => setSelectedId(filtered[0]?.id || 'EMP-01')} className="text-slate-300 hover:text-slate-500 cursor-pointer"><X size={15} /></button>
           </div>
           <div className="flex gap-1 px-4 pt-3 text-[11px] font-bold">
             {[['live', 'Live Info'], ['history', 'Activity History'], ['timeline', 'Timeline']].map(([k, label]) => (
-              <button key={k} type="button" onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-lg transition ${tab === k ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>{label}</button>
+              <button key={k} type="button" onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${tab === k ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>{label}</button>
             ))}
           </div>
           <div className="p-4">
@@ -355,7 +416,7 @@ export default function UserLocationTracking() {
                 <div className="rounded-xl border border-slate-200 p-3">
                   <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5"><MapPin size={13} className="text-blue-500" /> Current Location</p>
                   <p className="text-[11px] text-slate-500 mt-1">{selected.loc}</p>
-                  <button type="button" className="text-[11px] font-bold text-blue-600 mt-1">View on Map</button>
+                  <button type="button" onClick={() => handleLocateStaff(selected)} className="text-[11px] font-bold text-blue-600 mt-1 cursor-pointer">View on Map</button>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 text-center">
                   <div className="rounded-xl bg-slate-50 border border-slate-100 p-2.5"><Footprints size={15} className="mx-auto text-slate-400" /><p className="text-[10px] text-slate-400 mt-1">Distance</p><strong className="text-xs text-slate-800">{selected.dist}</strong></div>
@@ -386,17 +447,177 @@ export default function UserLocationTracking() {
                 ))}
               </div>
             )}
-            <button type="button" onClick={() => setTab('history')} className="w-full mt-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition">View Full History</button>
+            <button type="button" onClick={() => handleOpenHistory(selected)} className="w-full mt-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition cursor-pointer">View Full History</button>
           </div>
         </div>
       </div>
+
+      {activeCallStaff && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setActiveCallStaff(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 p-6 text-center animate-in zoom-in-95 duration-150">
+            <div className="w-16 h-16 rounded-full mx-auto grid place-items-center text-xl font-bold text-white mb-3 shadow-md" style={{ background: activeCallStaff.color }}>
+              {initials(activeCallStaff.name)}
+            </div>
+            <h3 className="text-base font-bold text-slate-900">{activeCallStaff.name}</h3>
+            <p className="text-xs text-slate-500 mt-0.5">{activeCallStaff.dept} • {activeCallStaff.role}</p>
+            <div className="my-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs font-mono font-bold text-blue-700 flex items-center justify-center gap-2">
+              <PhoneCall size={15} className="animate-bounce" /> {activeCallStaff.phone}
+            </div>
+            <div className="flex gap-2.5 pt-2">
+              <button type="button" onClick={() => setActiveCallStaff(null)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer">
+                Cancel
+              </button>
+              <button type="button" onClick={handleStartCall} className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition cursor-pointer flex items-center justify-center gap-1.5">
+                <Phone size={14} /> Dial Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeMessageStaff && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setActiveMessageStaff(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <span className="w-8 h-8 rounded-full grid place-items-center text-xs font-bold text-white" style={{ background: activeMessageStaff.color }}>
+                  {initials(activeMessageStaff.name)}
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Message {activeMessageStaff.name}</h3>
+                  <span className="text-[10px] text-slate-400 font-mono">{activeMessageStaff.phone}</span>
+                </div>
+              </div>
+              <button type="button" onClick={() => setActiveMessageStaff(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1.5">Quick Templates</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Where are you currently?', 'Please check-in at office', 'Client update requested', 'Call manager ASAP'].map((tmpl) => (
+                    <button type="button" key={tmpl} onClick={() => setMessageText(tmpl)} className="px-2.5 py-1 bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-600 rounded-lg text-[11px] font-medium transition cursor-pointer">
+                      {tmpl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1.5">Custom Message</label>
+                <textarea
+                  rows={4}
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  placeholder="Type message or broadcast instruction here..."
+                  className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-3.5 bg-slate-50/80 border-t border-slate-100">
+              <button type="button" onClick={() => setActiveMessageStaff(null)} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer">
+                Cancel
+              </button>
+              <button type="button" onClick={handleSendMessage} className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer">
+                <Send size={13} /> Send Message
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {historyModalStaff && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setHistoryModalStaff(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 rounded-full grid place-items-center text-xs font-bold text-white shadow-sm" style={{ background: historyModalStaff.color }}>
+                  {initials(historyModalStaff.name)}
+                </span>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">{historyModalStaff.name} — Full Location History</h3>
+                  <p className="text-[11px] text-slate-500">{historyModalStaff.dept} • {historyModalStaff.role} • {historyModalStaff.phone}</p>
+                </div>
+              </div>
+              <button type="button" onClick={() => setHistoryModalStaff(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={18} /></button>
+            </div>
+            <div className="p-5 overflow-y-auto space-y-4">
+              <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-xs text-blue-900 font-semibold">
+                  <CalendarDays size={16} className="text-blue-600" />
+                  <span>Log Date:</span>
+                  <input type="date" value={historyDate} onChange={(e) => setHistoryDate(e.target.value)} className="bg-white border border-blue-200 rounded-lg px-2 py-1 text-xs text-slate-700 outline-none" />
+                </div>
+                <span className="text-[11px] font-bold text-blue-700 bg-blue-100 px-2.5 py-1 rounded-full">
+                  Status: {historyModalStaff.atSite}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2.5 text-center">
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <Footprints size={16} className="mx-auto text-blue-600 mb-1" />
+                  <span className="block text-[10px] text-slate-400">Total Distance</span>
+                  <strong className="text-xs font-bold text-slate-800">14.8 km</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <Timer size={16} className="mx-auto text-purple-600 mb-1" />
+                  <span className="block text-[10px] text-slate-400 font-medium">Worked Hours</span>
+                  <strong className="text-xs font-bold text-slate-800">{historyModalStaff.worked}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <Clock size={16} className="mx-auto text-amber-600 mb-1" />
+                  <span className="block text-[10px] text-slate-400 font-medium">Idle Duration</span>
+                  <strong className="text-xs font-bold text-slate-800">{historyModalStaff.idle}</strong>
+                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                  <Battery size={16} className="mx-auto text-emerald-600 mb-1" />
+                  <span className="block text-[10px] text-slate-400 font-medium">Battery Level</span>
+                  <strong className="text-xs font-bold text-slate-800">{historyModalStaff.battery}%</strong>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 mb-2.5">Chronological Movement & GPS Timeline</h4>
+                <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
+                  <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
+                      <tr>
+                        <th className="px-3 py-2">Timestamp</th>
+                        <th className="px-3 py-2">Activity Stage</th>
+                        <th className="px-3 py-2">Location Point</th>
+                        <th className="px-3 py-2 text-right">Battery</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-[11px]">
+                      {FULL_LOGS.map((log, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50/70">
+                          <td className="px-3 py-2.5 font-mono text-slate-500 font-semibold">{log.time}</td>
+                          <td className="px-3 py-2.5 font-bold text-slate-800">{log.status}</td>
+                          <td className="px-3 py-2.5 text-slate-600">{log.loc}</td>
+                          <td className="px-3 py-2.5 text-right font-mono font-semibold text-emerald-600">{log.battery}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-between items-center px-5 py-3.5 bg-slate-50 border-t border-slate-100">
+              <button type="button" onClick={() => downloadCsv(`location_history_${historyModalStaff.id}.csv`, [['Time', 'Status', 'Location', 'Battery'], ...FULL_LOGS.map((l) => [l.time, l.status, l.loc, l.battery])])} className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+                <Download size={13} /> Export Route Log
+              </button>
+              <button type="button" onClick={() => setHistoryModalStaff(null)} className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {reportsOpen && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" role="presentation" onMouseDown={() => setReportsOpen(false)}>
           <div onMouseDown={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h2 className="text-sm font-bold text-slate-900">Tracking Report — {date}</h2>
-              <button type="button" onClick={() => setReportsOpen(false)} className="text-slate-400 hover:text-slate-600 p-1"><X size={18} /></button>
+              <button type="button" onClick={() => setReportsOpen(false)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-2.5 text-xs">
               <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2"><span className="text-slate-500">Total employees</span><strong>{STAFF.length}</strong></div>
@@ -407,8 +628,8 @@ export default function UserLocationTracking() {
               ))}
             </div>
             <div className="flex justify-end gap-2 px-5 py-3.5 bg-slate-50/70 border-t border-slate-100">
-              <button type="button" onClick={exportExcel} className="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg">Excel</button>
-              <button type="button" onClick={() => setReportsOpen(false)} className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg">Close</button>
+              <button type="button" onClick={exportExcel} className="px-4 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg cursor-pointer">Excel</button>
+              <button type="button" onClick={() => setReportsOpen(false)} className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg cursor-pointer">Close</button>
             </div>
           </div>
         </div>

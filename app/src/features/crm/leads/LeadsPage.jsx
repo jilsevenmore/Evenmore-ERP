@@ -15,6 +15,7 @@ import InfoBanner from '../common/InfoBanner';
 import { useNavigate } from 'react-router-dom';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { exportToCSV } from '../../../services/exportUtils';
+import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
 
 const INITIAL_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const INITIAL_SORT = { field: '', direction: 'ascending' };
@@ -193,7 +194,18 @@ export default function LeadsPage() {
   }
 
   function updateLead(id, updates) {
-    setLeadRows((current) => current.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead)));
+    setLeadRows((current) => {
+      const oldLead = current.find((l) => l.id === id);
+      const updatedLead = oldLead ? { ...oldLead, ...updates } : null;
+      if (oldLead && updates?.status && updates.status !== oldLead.status) {
+        try {
+          runLeadStageAutomation(updatedLead, updates.status, { previousStage: oldLead.status });
+        } catch (e) {
+          console.error('[CRM Automation] Error in updateLead automation:', e);
+        }
+      }
+      return current.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead));
+    });
   }
 
   const toggleOne = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
@@ -304,6 +316,7 @@ export default function LeadsPage() {
 
   function handleCreateLead(formData) {
     const data = formData ?? {};
+    let createdLead = null;
     setLeadRows((current) => {
       const nextId = current.reduce((max, lead) => Math.max(max, lead.id), 0) + 1;
       const count = String(nextId + 184).padStart(8, '0');
@@ -338,8 +351,18 @@ export default function LeadsPage() {
         deliveryChallansCount: 0,
         salesInvoicesCount: 0,
       };
+      createdLead = nextLead;
       return [nextLead, ...current];
     });
+
+    if (createdLead) {
+      try {
+        runLeadStageAutomation(createdLead, 'New Lead');
+      } catch (err) {
+        console.error('[CRM Automation] Error generating stage tasks for new lead:', err);
+      }
+    }
+
     setIsCreateLeadOpen(false);
     setShowLeadTour(false);
     setActiveTab('All Leads');

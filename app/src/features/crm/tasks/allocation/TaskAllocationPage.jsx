@@ -1,20 +1,39 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Plus, Search, RotateCcw, Eye, Trash2, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, RotateCcw, Eye, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, CalendarClock, ListFilter, AlertTriangle } from 'lucide-react';
 import AssignTaskModal from './AssignTaskModal';
 import { loadAllocationTasks, saveAllocationTasks, formatDeadline, EMPLOYEES, DEPARTMENTS, STATUSES } from './taskAllocationStore';
 
-function priorityPill(priority) {
-  if (priority === 'High') return 'bg-rose-500 text-white';
-  if (priority === 'Low') return 'bg-emerald-500 text-white';
-  return 'bg-orange-400 text-white';
+function initials(name) {
+  if (!name) return '?';
+  return name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 }
 
-function statusPill(status) {
-  if (status === 'Completed') return 'bg-lime-500 text-white';
-  if (status === 'In Progress') return 'bg-cyan-500/80 text-white';
-  return 'bg-slate-500 text-white';
+function priorityStyle(priority) {
+  if (priority === 'High') return 'bg-rose-50 text-rose-600 border-rose-200';
+  if (priority === 'Low') return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+  return 'bg-amber-50 text-amber-600 border-amber-200';
 }
+
+function priorityDot(priority) {
+  if (priority === 'High') return 'bg-rose-500';
+  if (priority === 'Low') return 'bg-emerald-500';
+  return 'bg-amber-500';
+}
+
+function statusStyle(status) {
+  if (status === 'Completed') return 'bg-emerald-50 text-emerald-600 border-emerald-200';
+  if (status === 'In Progress') return 'bg-sky-50 text-sky-600 border-sky-200';
+  return 'bg-slate-100 text-slate-500 border-slate-200';
+}
+
+function statusDot(status) {
+  if (status === 'Completed') return 'bg-emerald-500';
+  if (status === 'In Progress') return 'bg-sky-500';
+  return 'bg-slate-400';
+}
+
+const selectCls = 'w-full h-11 px-3.5 bg-slate-50/60 border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition cursor-pointer';
 
 export default function TaskAllocationPage() {
   const navigate = useNavigate();
@@ -32,6 +51,7 @@ export default function TaskAllocationPage() {
   const [sortDir, setSortDir] = useState('asc');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     saveAllocationTasks(tasks);
@@ -66,6 +86,8 @@ export default function TaskAllocationPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, totalPages);
   const pageItems = filtered.slice((safePage - 1) * perPage, safePage * perPage);
+  const startRow = filtered.length === 0 ? 0 : (safePage - 1) * perPage + 1;
+  const endRow = (safePage - 1) * perPage + pageItems.length;
 
   function toggleSort(key) {
     if (sortKey !== key) {
@@ -77,8 +99,8 @@ export default function TaskAllocationPage() {
   }
 
   function sortIcon(key) {
-    if (sortKey !== key) return <ChevronsUpDown size={12} className="text-slate-300" />;
-    return sortDir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />;
+    if (sortKey !== key) return <ChevronsUpDown size={13} className="text-slate-300" />;
+    return sortDir === 'asc' ? <ChevronUp size={13} className="text-blue-600" /> : <ChevronDown size={13} className="text-blue-600" />;
   }
 
   function applyFilters() {
@@ -124,155 +146,218 @@ export default function TaskAllocationPage() {
     navigate(`/crm/tasks/allocation/${id}`);
   }
 
+  const hasActiveFilters = statusFilter !== 'Any' || assigneeFilter !== 'Anyone' || deptFilter !== 'Any' || search.trim() !== '';
+  const activeFilterCount = (statusFilter !== 'Any' ? 1 : 0) + (assigneeFilter !== 'Anyone' ? 1 : 0) + (deptFilter !== 'Any' ? 1 : 0);
+
   return (
-    <section className="w-full max-w-7xl mx-auto py-4 px-1 sm:px-2">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Task Allocation</h1>
-          <div className="text-xs mt-1 flex items-center gap-1.5">
-            <Link to="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
-            <span className="text-slate-400">&gt;</span>
+    <section className="w-full max-w-[80rem] mx-auto py-6 px-1 sm:px-3">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="min-w-0">
+          <h1 className="text-[22px] leading-tight font-extrabold text-slate-900 tracking-tight">Task Allocation</h1>
+          <div className="text-xs mt-1.5 flex items-center gap-1.5">
+            <Link to="/dashboard" className="text-blue-600 font-medium hover:underline">Dashboard</Link>
+            <span className="text-slate-300">/</span>
             <span className="text-slate-500">Task Allocation</span>
+            <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-500">{filtered.length} tasks</span>
           </div>
         </div>
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          aria-label="Assign task"
-          className="w-9 h-9 grid place-items-center bg-[#1d3f6e] hover:bg-[#16325a] text-white rounded-md shadow-xs transition"
+          className="shrink-0 h-10 px-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-[13px] font-semibold rounded-xl shadow-sm shadow-blue-600/25 transition"
         >
-          <Plus size={17} />
+          <Plus size={16} strokeWidth={2.5} />
+          Assign Task
         </button>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200/70 shadow-sm p-5 mb-5">
-        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto_auto] gap-4 items-end">
+      {showFilters && (
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.05)] p-5 mb-5">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-3.5 items-end">
           <div>
-            <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Status</label>
-            <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-700 focus:outline-none focus:border-blue-400">
-              <option value="Any">Any</option>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Status</label>
+            <select value={draftStatus} onChange={(e) => setDraftStatus(e.target.value)} className={selectCls}>
+              <option value="Any">All statuses</option>
               {STATUSES.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Assignee</label>
-            <select value={draftAssignee} onChange={(e) => setDraftAssignee(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-700 focus:outline-none focus:border-blue-400">
-              <option value="Anyone">Anyone</option>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Assignee</label>
+            <select value={draftAssignee} onChange={(e) => setDraftAssignee(e.target.value)} className={selectCls}>
+              <option value="Anyone">All members</option>
               {assigneeOptions.map((a) => (
                 <option key={a} value={a}>{a}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-[13px] font-medium text-slate-600 mb-1.5">Department</label>
-            <select value={draftDept} onChange={(e) => setDraftDept(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-700 focus:outline-none focus:border-blue-400">
-              <option value="Any">Any</option>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5">Department</label>
+            <select value={draftDept} onChange={(e) => setDraftDept(e.target.value)} className={selectCls}>
+              <option value="Any">All departments</option>
               {DEPARTMENTS.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>
           </div>
-          <button type="button" onClick={applyFilters} aria-label="Search" className="h-[42px] px-5 grid place-items-center bg-[#1d4a79] hover:bg-[#163a61] text-white rounded-lg transition">
-            <Search size={16} />
-          </button>
-          <button type="button" onClick={resetFilters} aria-label="Reset" className="h-[42px] px-4 grid place-items-center bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-lg transition">
-            <RotateCcw size={16} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={applyFilters} className="h-11 px-5 inline-flex items-center gap-2 bg-[#1d3f6e] hover:bg-[#16325a] active:scale-[0.98] text-white text-[13px] font-semibold rounded-xl shadow-sm transition">
+              <Search size={15} strokeWidth={2.5} />
+              Search
+            </button>
+            <button type="button" onClick={resetFilters} title="Reset filters" className="h-11 w-11 grid place-items-center bg-white hover:bg-slate-50 text-slate-400 hover:text-slate-600 border border-slate-200 rounded-xl transition">
+              <RotateCcw size={15} />
+            </button>
+          </div>
         </div>
       </div>
+      )}
 
-      <div className="bg-white rounded-xl border border-slate-200/70 shadow-sm overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4">
-          <div className="flex items-center gap-2 text-[13px] text-slate-600">
-            <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-[13px] focus:outline-none">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.05)] overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowFilters((v) => !v)}
+              aria-expanded={showFilters}
+              className={`h-10 px-4 inline-flex items-center gap-2 text-[13px] font-semibold rounded-xl border transition active:scale-[0.98] ${showFilters || hasActiveFilters ? 'bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-600/25' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-white'}`}
+            >
+              <ListFilter size={15} />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className={`min-w-5 h-5 px-1 grid place-items-center rounded-full text-[11px] font-bold ${showFilters ? 'bg-white/25 text-white' : 'bg-blue-600 text-white'}`}>{activeFilterCount}</span>
+              )}
+              <ChevronDown size={14} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+            </button>
+            <div className="flex items-center gap-2 text-[13px] text-slate-500 font-medium ml-1">
+            <span className="font-semibold text-slate-700">Show</span>
+            <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="h-9 px-2.5 bg-white border border-slate-200 rounded-lg text-[13px] font-semibold text-slate-700 focus:outline-none focus:border-blue-500 cursor-pointer">
               {[10, 25, 50].map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
-            <span>entries per page</span>
+            <span>entries</span>
+            </div>
           </div>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..."
-            className="w-full sm:w-56 px-3.5 py-2 bg-white border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400"
-          />
+          <div className="relative w-full sm:w-64">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tasks, people..."
+              className="w-full h-10 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-[13px] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+            />
+          </div>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px] border-collapse min-w-[960px]">
+          <table className="w-full text-left text-[13px] border-collapse min-w-[980px]">
             <thead>
-              <tr className="bg-slate-50/80 border-y border-slate-100 text-[11px] font-bold text-slate-700 uppercase tracking-wide">
-                <th className="px-5 py-3">
-                  <button type="button" onClick={() => toggleSort('title')} className="inline-flex items-center gap-1.5 hover:text-slate-900">Task {sortIcon('title')}</button>
+              <tr className="bg-[#f8fafc] border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="px-5 py-3.5">
+                  <button type="button" onClick={() => toggleSort('title')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Task {sortIcon('title')}</button>
                 </th>
-                <th className="px-4 py-3">
-                  <button type="button" onClick={() => toggleSort('assignee')} className="inline-flex items-center gap-1.5 hover:text-slate-900">Assignee {sortIcon('assignee')}</button>
+                <th className="px-4 py-3.5">
+                  <button type="button" onClick={() => toggleSort('assignee')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Assignee {sortIcon('assignee')}</button>
                 </th>
-                <th className="px-4 py-3">
-                  <button type="button" onClick={() => toggleSort('assignedBy')} className="inline-flex items-center gap-1.5 hover:text-slate-900">Assigned By {sortIcon('assignedBy')}</button>
+                <th className="px-4 py-3.5">
+                  <button type="button" onClick={() => toggleSort('assignedBy')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Assigned By {sortIcon('assignedBy')}</button>
                 </th>
-                <th className="px-4 py-3">
-                  <button type="button" onClick={() => toggleSort('priority')} className="inline-flex items-center gap-1.5 hover:text-slate-900">Priority {sortIcon('priority')}</button>
+                <th className="px-4 py-3.5">
+                  <button type="button" onClick={() => toggleSort('priority')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Priority {sortIcon('priority')}</button>
                 </th>
-                <th className="px-4 py-3">
-                  <button type="button" onClick={() => toggleSort('deadline')} className="inline-flex items-center gap-1.5 hover:text-slate-900">Deadline {sortIcon('deadline')}</button>
+                <th className="px-4 py-3.5">
+                  <button type="button" onClick={() => toggleSort('deadline')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Deadline {sortIcon('deadline')}</button>
                 </th>
-                <th className="px-4 py-3">
-                  <button type="button" onClick={() => toggleSort('status')} className="inline-flex items-center gap-1.5 hover:text-slate-900">Status {sortIcon('status')}</button>
+                <th className="px-4 py-3.5">
+                  <button type="button" onClick={() => toggleSort('status')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Status {sortIcon('status')}</button>
                 </th>
-                <th className="px-4 py-3 text-right">Action</th>
+                <th className="px-5 py-3.5 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {pageItems.map((t) => (
-                <tr key={t.id} className="hover:bg-slate-50/60 transition">
-                  <td className="px-5 py-3.5">
-                    <button type="button" onClick={() => openDetail(t.id)} className="text-left">
-                      <span className="block font-bold text-slate-800 hover:text-blue-700 text-[13px]">{t.title}</span>
-                      <span className="block text-xs text-slate-400 mt-0.5">{t.department}</span>
-                    </button>
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-600">{t.assignee}</td>
-                  <td className="px-4 py-3.5 text-slate-600">{t.assignedBy}</td>
-                  <td className="px-4 py-3.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold ${priorityPill(t.priority)}`}>{t.priority}</span>
-                  </td>
-                  <td className={`px-4 py-3.5 whitespace-nowrap ${t.status === 'Pending' && t.deadline ? 'text-rose-600 font-medium' : t.deadline ? 'text-slate-600' : 'text-slate-400 italic'}`}>
-                    {t.deadline ? formatDeadline(t.deadline) : 'No deadline'}
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium ${statusPill(t.status)}`}>{t.status}</span>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button type="button" onClick={() => openDetail(t.id)} title="View" className="w-8 h-8 grid place-items-center bg-[#3a9ab5] hover:bg-[#2f8299] text-white rounded-md transition">
-                        <Eye size={14} />
+              {pageItems.map((t) => {
+                const overdue = t.status === 'Pending' && t.deadline;
+                return (
+                  <tr key={t.id} className="hover:bg-blue-50/40 transition-colors group">
+                    <td className="px-5 py-4">
+                      <button type="button" onClick={() => openDetail(t.id)} className="flex items-start gap-3 text-left w-full">
+                        <span className="w-9 h-9 shrink-0 grid place-items-center rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200 text-[12px] font-extrabold text-slate-600">
+                          {initials(t.title)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-bold text-slate-800 group-hover:text-blue-700 text-[13px] leading-snug truncate transition">{t.title}</span>
+                          <span className="block text-xs text-slate-400 mt-1 font-medium">{t.department}</span>
+                        </span>
                       </button>
-                      <button type="button" onClick={() => setDeleteId(t.id)} title="Delete" className="w-8 h-8 grid place-items-center bg-rose-600 hover:bg-rose-700 text-white rounded-md transition">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className="inline-flex items-center gap-2 min-w-0">
+                        <span className="w-7 h-7 shrink-0 grid place-items-center rounded-full bg-blue-50 border border-blue-100 text-[10px] font-extrabold text-blue-700">{initials(t.assignee)}</span>
+                        <span className="text-slate-600 font-medium truncate">{t.assignee}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-slate-500 font-medium">{t.assignedBy}</td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${priorityStyle(t.priority)}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${priorityDot(t.priority)}`} />
+                        {t.priority}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      {t.deadline ? (
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${overdue ? 'text-rose-600' : 'text-slate-500'}`}>
+                          <CalendarClock size={14} className={overdue ? 'text-rose-400' : 'text-slate-300'} />
+                          {formatDeadline(t.deadline)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300 italic font-medium">No deadline</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${statusStyle(t.status)}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusDot(t.status)}`} />
+                        {t.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button type="button" onClick={() => openDetail(t.id)} title="View details" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 border border-slate-200 rounded-lg transition">
+                          <Eye size={15} />
+                        </button>
+                        <button type="button" onClick={() => setDeleteId(t.id)} title="Delete task" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 border border-slate-200 rounded-lg transition">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {pageItems.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-slate-500 text-[13px]">No tasks found.</td>
+                  <td colSpan={7} className="px-5 py-14 text-center">
+                    <div className="mx-auto w-11 h-11 grid place-items-center rounded-2xl bg-slate-50 border border-slate-100 text-slate-300 mb-3">
+                      <Search size={18} />
+                    </div>
+                    <p className="text-[13px] font-semibold text-slate-600">No tasks found</p>
+                    <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or search.</p>
+                    {hasActiveFilters && (
+                      <button type="button" onClick={resetFilters} className="mt-3 text-xs font-semibold text-blue-600 hover:underline">Clear all filters</button>
+                    )}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
 
-        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-100 text-xs text-slate-500">
-          <span>Showing {pageItems.length} of {filtered.length} tasks</span>
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-3.5 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
+          <span className="font-medium">Showing <b className="text-slate-700">{startRow}–{endRow}</b> of <b className="text-slate-700">{filtered.length}</b> tasks</span>
           <div className="flex items-center gap-1.5">
-            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Prev</button>
-            <span className="font-bold text-slate-700">{safePage} / {totalPages}</span>
-            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="px-3 py-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50">Next</button>
+            <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="h-8 px-3.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 hover:border-slate-300 hover:bg-white transition">Prev</button>
+            <span className="h-8 min-w-14 px-2 grid place-items-center rounded-lg bg-slate-900 text-white font-bold text-[11px]">{safePage} / {totalPages}</span>
+            <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="h-8 px-3.5 rounded-lg border border-slate-200 bg-white font-semibold disabled:opacity-40 hover:border-slate-300 hover:bg-white transition">Next</button>
           </div>
         </div>
       </div>
@@ -280,13 +365,16 @@ export default function TaskAllocationPage() {
       <AssignTaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
 
       {deleteId && (
-        <div className="fixed inset-0 bg-slate-900/40 flex items-center justify-center z-[70] p-4" onClick={() => setDeleteId(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 p-5">
-            <h2 className="text-sm font-bold text-slate-900">Delete this task?</h2>
-            <p className="text-xs text-slate-500 mt-1">This action cannot be undone.</p>
-            <div className="flex items-center justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setDeleteId(null)} className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">Cancel</button>
-              <button type="button" onClick={confirmDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg">Delete</button>
+        <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => setDeleteId(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 p-6">
+            <div className="w-10 h-10 grid place-items-center rounded-xl bg-rose-50 border border-rose-100 text-rose-500 mb-3">
+              <AlertTriangle size={18} />
+            </div>
+            <h2 className="text-[15px] font-extrabold text-slate-900">Delete this task?</h2>
+            <p className="text-[13px] text-slate-500 mt-1 leading-relaxed">This action cannot be undone. The task will be permanently removed.</p>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setDeleteId(null)} className="h-9 px-4 bg-white hover:bg-slate-50 text-slate-600 text-[13px] font-semibold rounded-xl border border-slate-200 transition">Cancel</button>
+              <button type="button" onClick={confirmDelete} className="h-9 px-4 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-[13px] font-semibold rounded-xl shadow-sm shadow-rose-600/25 transition">Delete</button>
             </div>
           </div>
         </div>

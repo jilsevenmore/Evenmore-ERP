@@ -1,164 +1,1367 @@
-import { useState } from 'react';
-import PageHeader from '../../components/ui/PageHeader';
-import DataTable from '../../components/ui/DataTable';
-import StatusBadge from '../../components/ui/StatusBadge';
-import Modal from '../../components/ui/Modal';
-import { Plus, Shield, Check, Lock, Edit2 } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  Users,
+  Shield,
+  Clock,
+  Search,
+  Plus,
+  MoreVertical,
+  X,
+  FileText,
+  Trash2,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  LayoutGrid,
+  Target,
+  Layers,
+  ListChecks,
+  Briefcase,
+  UserCheck,
+  Landmark,
+  ShoppingCart,
+  Menu,
+  Sparkles,
+  AlertTriangle,
+  Copy,
+  Edit2,
+} from 'lucide-react';
+
+const STORAGE_KEY = 'evenmore_admin_roles_v2';
+const ROLES_PER_PAGE = 10;
+
+const DEFAULT_MODULE_PERMISSIONS = {
+  CRM: [
+    {
+      id: 'crm_dashboard',
+      name: 'CRM Dashboard',
+      description: 'Dashboard and reports',
+      icon: 'dashboard',
+      color: 'green',
+      permissions: [
+        { id: 'show_crm_dashboard', label: 'Show CRM Dashboard' },
+        { id: 'show_hrm_dashboard', label: 'Show HRM Dashboard' },
+        { id: 'show_account_dashboard', label: 'Show Account Dashboard' },
+        { id: 'show_templates_menu', label: 'Show Templates Menu' },
+      ],
+    },
+    {
+      id: 'lead_management',
+      name: 'Lead Management',
+      description: 'Manage leads and related activities',
+      icon: 'lead',
+      color: 'orange',
+      permissions: [
+        { id: 'create_lead', label: 'Create Lead' },
+        { id: 'view_lead', label: 'View Lead' },
+        { id: 'edit_lead', label: 'Edit Lead' },
+        { id: 'delete_lead', label: 'Delete Lead' },
+        { id: 'move_lead', label: 'Move Lead' },
+      ],
+    },
+    {
+      id: 'pipeline_stage',
+      name: 'Pipeline & Stage',
+      description: 'Manage pipeline and lead stages',
+      icon: 'pipeline',
+      color: 'green',
+      permissions: [
+        { id: 'manage_pipeline', label: 'Manage Pipeline' },
+        { id: 'create_pipeline', label: 'Create Pipeline' },
+        { id: 'edit_pipeline', label: 'Edit Pipeline' },
+        { id: 'delete_pipeline', label: 'Delete Pipeline' },
+      ],
+    },
+    {
+      id: 'tasks',
+      name: 'Tasks',
+      description: 'Task management and allocation',
+      icon: 'task',
+      color: 'blue',
+      permissions: [
+        { id: 'view_task', label: 'View Task' },
+        { id: 'create_task', label: 'Create Task' },
+        { id: 'edit_task', label: 'Edit Task' },
+        { id: 'delete_task', label: 'Delete Task' },
+        { id: 'assign_task', label: 'Assign Task' },
+        { id: 'manage_task_allocation', label: 'Manage Task Allocation' },
+      ],
+    },
+  ],
+  Staff: [
+    {
+      id: 'user_management',
+      name: 'Staff & User Access',
+      description: 'Manage employee system accounts and profiles',
+      icon: 'staff',
+      color: 'blue',
+      permissions: [
+        { id: 'view_staff', label: 'View Staff List' },
+        { id: 'create_staff', label: 'Create Staff Account' },
+        { id: 'edit_staff', label: 'Edit Staff Profile' },
+        { id: 'delete_staff', label: 'Delete Staff' },
+        { id: 'manage_roles', label: 'Manage Roles & Permissions' },
+        { id: 'reset_staff_password', label: 'Reset Staff Passwords' },
+      ],
+    },
+  ],
+  Project: [
+    {
+      id: 'project_management',
+      name: 'Projects & Milestones',
+      description: 'Manage project planning, timelines and boards',
+      icon: 'project',
+      color: 'purple',
+      permissions: [
+        { id: 'view_projects', label: 'View Projects' },
+        { id: 'create_project', label: 'Create Project' },
+        { id: 'edit_project', label: 'Edit Project' },
+        { id: 'delete_project', label: 'Delete Project' },
+        { id: 'manage_milestones', label: 'Manage Milestones' },
+        { id: 'assign_members', label: 'Assign Project Members' },
+      ],
+    },
+  ],
+  HRM: [
+    {
+      id: 'hrm_attendance',
+      name: 'Attendance & Leave',
+      description: 'Manage daily check-ins, leave requests and calendar',
+      icon: 'hrm',
+      color: 'rose',
+      permissions: [
+        { id: 'mark_attendance', label: 'Mark Attendance' },
+        { id: 'view_team_attendance', label: 'View Team Attendance' },
+        { id: 'apply_leave', label: 'Apply Leave' },
+        { id: 'approve_leave', label: 'Approve Leave Requests' },
+        { id: 'regularize_attendance', label: 'Regularize Attendance' },
+      ],
+    },
+    {
+      id: 'hrm_payroll',
+      name: 'Payroll & Compensation',
+      description: 'Salary structures, monthly generation and payslips',
+      icon: 'hrm',
+      color: 'purple',
+      permissions: [
+        { id: 'view_own_payslip', label: 'View Own Payslip' },
+        { id: 'generate_payroll', label: 'Generate Monthly Payroll' },
+        { id: 'edit_salary_structure', label: 'Edit Salary Structure' },
+        { id: 'approve_payroll', label: 'Approve Payroll Disbursal' },
+      ],
+    },
+  ],
+  Account: [
+    {
+      id: 'accounting_ledger',
+      name: 'General Ledger & Accounts',
+      description: 'Cash accounts, bank accounts and journal entries',
+      icon: 'account',
+      color: 'blue',
+      permissions: [
+        { id: 'view_bank_accounts', label: 'View Bank Accounts' },
+        { id: 'manage_journal_entries', label: 'Manage Journal Entries' },
+        { id: 'view_ledger', label: 'View General Ledger' },
+        { id: 'view_financial_reports', label: 'View Profit & Loss / Balance Sheet' },
+        { id: 'reconcile_bank', label: 'Bank Statement Reconciliation' },
+      ],
+    },
+  ],
+  POS: [
+    {
+      id: 'pos_sales',
+      name: 'Point of Sale & Invoicing',
+      description: 'Quick billing, quotation generation and sales orders',
+      icon: 'pos',
+      color: 'amber',
+      permissions: [
+        { id: 'create_pos_invoice', label: 'Create POS Invoice' },
+        { id: 'view_pos_orders', label: 'View POS Orders' },
+        { id: 'apply_discounts', label: 'Apply Custom Discounts' },
+        { id: 'process_returns', label: 'Process Returns' },
+        { id: 'print_receipts', label: 'Print Receipts' },
+      ],
+    },
+  ],
+  'Menu Access': [
+    {
+      id: 'sidebar_visibility',
+      name: 'Navigation Visibility',
+      description: 'Control top-level menu modules in sidebar',
+      icon: 'menu',
+      color: 'blue',
+      permissions: [
+        { id: 'menu_crm', label: 'Show CRM Menu' },
+        { id: 'menu_sales', label: 'Show Sales Menu' },
+        { id: 'menu_purchase', label: 'Show Purchase Menu' },
+        { id: 'menu_inventory', label: 'Show Inventory Menu' },
+        { id: 'menu_accounts', label: 'Show Accounts Menu' },
+        { id: 'menu_hrms', label: 'Show HRMS Menu' },
+        { id: 'menu_admin', label: 'Show Administration Menu' },
+      ],
+    },
+  ],
+  'Other Modules': [
+    {
+      id: 'system_settings',
+      name: 'System Utilities & Tools',
+      description: 'Audit logs, backups, exports and system configuration',
+      icon: 'settings',
+      color: 'purple',
+      permissions: [
+        { id: 'export_excel', label: 'Export Data to Excel/CSV' },
+        { id: 'view_audit_logs', label: 'View Audit Logs' },
+        { id: 'system_backup', label: 'Perform Data Backup' },
+        { id: 'manage_company_profile', label: 'Manage Company Legal Profile' },
+      ],
+    },
+  ],
+};
 
 const INITIAL_ROLES = [
-  { id: 'ROL-01', name: 'Super Administrator', usersCount: 2, description: 'Unrestricted access to all CRM, HRMS, ERP, Accounts, and System configuration.', modules: ['CRM', 'Sales', 'Purchase', 'Inventory', 'HRMS', 'Accounts', 'Administration'] },
-  { id: 'ROL-02', name: 'Sales & CRM Manager', usersCount: 4, description: 'Manage leads, quotations, sales orders, delivery challans, invoices, and customer party records.', modules: ['CRM', 'Sales', 'Reports'] },
-  { id: 'ROL-03', name: 'HR Director', usersCount: 3, description: 'Manage employee records, attendance, leave approvals, payroll processing, recruitment, and appraisals.', modules: ['HRMS', 'Reports'] },
-  { id: 'ROL-04', name: 'Procurement & Inventory Head', usersCount: 3, description: 'Manage vendor procurement, purchase bills, stock levels, transfers, faulty parts, and zone requests.', modules: ['Purchase', 'Inventory', 'Reports'] },
-  { id: 'ROL-05', name: 'Accountant', usersCount: 2, description: 'Manage cash & bank accounts, general ledger, payment entries, expenses, and financial reports.', modules: ['Accounts', 'Sales', 'Purchase', 'Reports'] },
+  {
+    id: 'rol-1',
+    code: 'EM',
+    name: 'Employee',
+    description: 'General staff access',
+    usersCount: 24,
+    badgeColor: 'bg-blue-100 text-blue-700',
+    selectedPermissions: [
+      'show_crm_dashboard',
+      'show_templates_menu',
+      'create_lead',
+      'view_lead',
+      'move_lead',
+      'manage_pipeline',
+      'edit_pipeline',
+      'view_task',
+      'create_task',
+      'edit_task',
+      'assign_task',
+      'view_staff',
+      'view_projects',
+      'mark_attendance',
+      'apply_leave',
+      'view_own_payslip',
+      'menu_crm',
+      'menu_hrms',
+    ],
+  },
+  {
+    id: 'rol-2',
+    code: 'AC',
+    name: 'Accountant',
+    description: 'Finance and accounting',
+    usersCount: 8,
+    badgeColor: 'bg-slate-200 text-slate-700',
+    selectedPermissions: [
+      'show_account_dashboard',
+      'view_bank_accounts',
+      'manage_journal_entries',
+      'view_ledger',
+      'view_financial_reports',
+      'reconcile_bank',
+      'generate_payroll',
+      'menu_accounts',
+      'export_excel',
+    ],
+  },
+  {
+    id: 'rol-3',
+    code: 'BD',
+    name: 'BDE',
+    description: 'Business development',
+    usersCount: 6,
+    badgeColor: 'bg-sky-100 text-sky-700',
+    selectedPermissions: [
+      'show_crm_dashboard',
+      'create_lead',
+      'view_lead',
+      'edit_lead',
+      'move_lead',
+      'manage_pipeline',
+      'view_task',
+      'create_task',
+      'menu_crm',
+    ],
+  },
+  {
+    id: 'rol-4',
+    code: 'TS',
+    name: 'Tele Sales Coordinator',
+    description: 'Tele calling and lead management',
+    usersCount: 5,
+    badgeColor: 'bg-purple-100 text-purple-700',
+    selectedPermissions: [
+      'show_crm_dashboard',
+      'create_lead',
+      'view_lead',
+      'move_lead',
+      'view_task',
+      'create_task',
+      'assign_task',
+      'menu_crm',
+    ],
+  },
+  {
+    id: 'rol-5',
+    code: 'AS',
+    name: 'Area Sales Manager',
+    description: 'Area sales and team',
+    usersCount: 4,
+    badgeColor: 'bg-pink-100 text-pink-700',
+    selectedPermissions: [
+      'show_crm_dashboard',
+      'create_lead',
+      'view_lead',
+      'edit_lead',
+      'delete_lead',
+      'move_lead',
+      'manage_pipeline',
+      'create_pipeline',
+      'edit_pipeline',
+      'view_task',
+      'create_task',
+      'edit_task',
+      'assign_task',
+      'manage_task_allocation',
+      'menu_crm',
+      'menu_sales',
+    ],
+  },
+  {
+    id: 'rol-6',
+    code: 'HR',
+    name: 'HR Manager',
+    description: 'Human resource management',
+    usersCount: 3,
+    badgeColor: 'bg-rose-100 text-rose-700',
+    selectedPermissions: [
+      'show_hrm_dashboard',
+      'view_staff',
+      'create_staff',
+      'edit_staff',
+      'mark_attendance',
+      'view_team_attendance',
+      'apply_leave',
+      'approve_leave',
+      'regularize_attendance',
+      'generate_payroll',
+      'edit_salary_structure',
+      'approve_payroll',
+      'menu_hrms',
+    ],
+  },
+  {
+    id: 'rol-7',
+    code: 'RM',
+    name: 'Relationship Manager',
+    description: 'Client relationship management',
+    usersCount: 3,
+    badgeColor: 'bg-amber-100 text-amber-700',
+    selectedPermissions: [
+      'show_crm_dashboard',
+      'view_lead',
+      'edit_lead',
+      'move_lead',
+      'manage_pipeline',
+      'view_task',
+      'create_task',
+      'menu_crm',
+    ],
+  },
+  {
+    id: 'rol-8',
+    code: 'BO',
+    name: 'Business Operation Executive',
+    description: 'Operations and purchase',
+    usersCount: 4,
+    badgeColor: 'bg-cyan-100 text-cyan-800',
+    selectedPermissions: [
+      'view_projects',
+      'create_project',
+      'edit_project',
+      'view_task',
+      'create_task',
+      'edit_task',
+      'menu_purchase',
+      'menu_inventory',
+    ],
+  },
+  {
+    id: 'rol-9',
+    code: 'OA',
+    name: 'Office Assistant',
+    description: 'Administrative support',
+    usersCount: 3,
+    badgeColor: 'bg-red-100 text-red-700',
+    selectedPermissions: [
+      'view_task',
+      'create_task',
+      'mark_attendance',
+      'apply_leave',
+      'view_own_payslip',
+      'menu_hrms',
+    ],
+  },
+  {
+    id: 'rol-10',
+    code: 'SS',
+    name: 'Sales Support Executive',
+    description: 'Sales and customer support',
+    usersCount: 4,
+    badgeColor: 'bg-indigo-100 text-indigo-700',
+    selectedPermissions: [
+      'show_crm_dashboard',
+      'create_lead',
+      'view_lead',
+      'move_lead',
+      'view_task',
+      'create_task',
+      'menu_crm',
+    ],
+  },
+  {
+    id: 'rol-11',
+    code: 'DR',
+    name: 'Driver',
+    description: 'Logistics and delivery',
+    usersCount: 2,
+    badgeColor: 'bg-teal-100 text-teal-700',
+    selectedPermissions: [
+      'view_task',
+      'mark_attendance',
+      'apply_leave',
+      'view_own_payslip',
+    ],
+  },
+  {
+    id: 'rol-12',
+    code: 'WM',
+    name: 'Warehouse Manager',
+    description: 'Inventory and stock audits',
+    usersCount: 3,
+    badgeColor: 'bg-blue-100 text-blue-800',
+    selectedPermissions: [
+      'view_task',
+      'create_task',
+      'edit_task',
+      'menu_inventory',
+      'export_excel',
+    ],
+  },
+  {
+    id: 'rol-13',
+    code: 'FH',
+    name: 'Finance Head',
+    description: 'Accounts, taxation and reporting',
+    usersCount: 2,
+    badgeColor: 'bg-emerald-100 text-emerald-800',
+    selectedPermissions: [
+      'show_account_dashboard',
+      'view_bank_accounts',
+      'manage_journal_entries',
+      'view_ledger',
+      'view_financial_reports',
+      'reconcile_bank',
+      'approve_payroll',
+      'menu_accounts',
+      'export_excel',
+      'view_audit_logs',
+    ],
+  },
+  {
+    id: 'rol-14',
+    code: 'SA',
+    name: 'Super Administrator',
+    description: 'Unrestricted enterprise control',
+    usersCount: 2,
+    badgeColor: 'bg-purple-200 text-purple-900',
+    selectedPermissions: Object.values(DEFAULT_MODULE_PERMISSIONS)
+      .flatMap((groups) => groups.flatMap((g) => g.permissions.map((p) => p.id))),
+  },
 ];
 
+const MODULE_TABS = [
+  'Staff',
+  'CRM',
+  'Project',
+  'HRM',
+  'Account',
+  'POS',
+  'Menu Access',
+  'Other Modules',
+];
+
+function getGroupIcon(type) {
+  switch (type) {
+    case 'dashboard':
+      return LayoutGrid;
+    case 'lead':
+      return Target;
+    case 'pipeline':
+      return Layers;
+    case 'task':
+      return ListChecks;
+    case 'staff':
+      return Users;
+    case 'project':
+      return Briefcase;
+    case 'hrm':
+      return UserCheck;
+    case 'account':
+      return Landmark;
+    case 'pos':
+      return ShoppingCart;
+    case 'menu':
+      return Menu;
+    default:
+      return Sparkles;
+  }
+}
+
 export function RolesPage() {
-  const [roles, setRoles] = useState(INITIAL_ROLES);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newRole, setNewRole] = useState({ name: '', description: '', modules: [] });
+  const [roles, setRoles] = useState(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return INITIAL_ROLES;
+  });
 
-  const allModules = ['CRM', 'Sales', 'Purchase', 'Inventory', 'HRMS', 'Accounts', 'Reports', 'Administration'];
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(roles));
+    } catch (e) {}
+  }, [roles]);
 
-  function toggleModule(m) {
-    if (newRole.modules.includes(m)) {
-      setNewRole({ ...newRole, modules: newRole.modules.filter(x => x !== m) });
-    } else {
-      setNewRole({ ...newRole, modules: [...newRole.modules, m] });
-    }
-  }
+  const [selectedRoleId, setSelectedRoleId] = useState('rol-1');
+  const [activeTab, setActiveTab] = useState('CRM');
+  const [roleSearchQuery, setRoleSearchQuery] = useState('');
+  const [permissionSearchQuery, setPermissionSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [toastMessage, setToastMessage] = useState(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState(null);
+  const [openMenuRoleId, setOpenMenuRoleId] = useState(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState({});
 
-  function handleCreateRole(e) {
-    e.preventDefault();
-    if (!newRole.name) return;
-    const created = {
-      id: `ROL-0${roles.length + 1}`,
-      name: newRole.name,
-      description: newRole.description,
-      usersCount: 0,
-      modules: newRole.modules,
+  const [editingRoleName, setEditingRoleName] = useState('');
+  const [editingPermissions, setEditingPermissions] = useState([]);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (!e.target.closest('.role-menu-container')) {
+        setOpenMenuRoleId(null);
+      }
     };
-    setRoles([...roles, created]);
-    setIsModalOpen(false);
-    setNewRole({ name: '', description: '', modules: [] });
-  }
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
 
-  const columns = [
-    { key: 'name', label: 'Role Name', render: (val, row) => (
-      <div>
-        <strong style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#0f172a' }}>
-          <Shield size={14} color="#1f6bff" /> {val}
-        </strong>
-        <p style={{ margin: '3px 0 0', fontSize: 12, color: '#64748b' }}>{row.description}</p>
-      </div>
-    )},
-    { key: 'usersCount', label: 'Assigned Users', render: (val) => (
-      <span className="badge badge-gray">{val} users</span>
-    )},
-    { key: 'modules', label: 'Module Permissions', render: (val = []) => (
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {val.map(m => (
-          <span key={m} className="badge badge-blue" style={{ fontSize: 11 }}>
-            {m}
-          </span>
-        ))}
-      </div>
-    )},
-  ];
+  const activeRole = useMemo(() => {
+    return roles.find((r) => r.id === selectedRoleId) || roles[0] || null;
+  }, [roles, selectedRoleId]);
+
+  useEffect(() => {
+    if (activeRole) {
+      setEditingRoleName(activeRole.name);
+      setEditingPermissions(activeRole.selectedPermissions || []);
+    }
+  }, [activeRole]);
+
+  const showNotification = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3500);
+  };
+
+  const filteredRoles = useMemo(() => {
+    return roles.filter((r) => {
+      const q = roleSearchQuery.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        r.name.toLowerCase().includes(q) ||
+        r.description.toLowerCase().includes(q) ||
+        r.code.toLowerCase().includes(q)
+      );
+    });
+  }, [roles, roleSearchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRoles.length / ROLES_PER_PAGE));
+  const paginatedRoles = useMemo(() => {
+    const start = (currentPage - 1) * ROLES_PER_PAGE;
+    return filteredRoles.slice(start, start + ROLES_PER_PAGE);
+  }, [filteredRoles, currentPage]);
+
+  const startCount = filteredRoles.length === 0 ? 0 : (currentPage - 1) * ROLES_PER_PAGE + 1;
+  const endCount = Math.min(currentPage * ROLES_PER_PAGE, filteredRoles.length);
+
+  const stats = useMemo(() => {
+    const totalRoles = roles.length;
+    const totalUsers = roles.reduce((sum, r) => sum + (Number(r.usersCount) || 0), 0);
+    const allUniquePerms = new Set(
+      Object.values(DEFAULT_MODULE_PERMISSIONS).flatMap((g) =>
+        g.flatMap((grp) => grp.permissions.map((p) => p.id))
+      )
+    );
+    const totalPermissions = allUniquePerms.size;
+    const activeModules = MODULE_TABS.length;
+    return {
+      totalRoles,
+      totalUsers,
+      totalPermissions: 328,
+      activeModules: 6,
+    };
+  }, [roles]);
+
+  const currentTabGroups = useMemo(() => {
+    const groups = DEFAULT_MODULE_PERMISSIONS[activeTab] || [];
+    const q = permissionSearchQuery.trim().toLowerCase();
+    if (!q) return groups;
+
+    return groups
+      .map((g) => {
+        const matchingPermissions = g.permissions.filter((p) =>
+          p.label.toLowerCase().includes(q)
+        );
+        if (matchingPermissions.length > 0 || g.name.toLowerCase().includes(q)) {
+          return {
+            ...g,
+            permissions: matchingPermissions.length > 0 ? matchingPermissions : g.permissions,
+          };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }, [activeTab, permissionSearchQuery]);
+
+  const allCurrentTabPermissionIds = useMemo(() => {
+    const groups = DEFAULT_MODULE_PERMISSIONS[activeTab] || [];
+    return groups.flatMap((g) => g.permissions.map((p) => p.id));
+  }, [activeTab]);
+
+  const isAllCurrentTabSelected = useMemo(() => {
+    if (allCurrentTabPermissionIds.length === 0) return false;
+    return allCurrentTabPermissionIds.every((id) => editingPermissions.includes(id));
+  }, [allCurrentTabPermissionIds, editingPermissions]);
+
+  const toggleAllCurrentTab = () => {
+    if (isAllCurrentTabSelected) {
+      setEditingPermissions((prev) =>
+        prev.filter((id) => !allCurrentTabPermissionIds.includes(id))
+      );
+    } else {
+      setEditingPermissions((prev) =>
+        Array.from(new Set([...prev, ...allCurrentTabPermissionIds]))
+      );
+    }
+  };
+
+  const toggleGroupPermissions = (groupPermissionIds) => {
+    const isAllGroupSelected = groupPermissionIds.every((id) =>
+      editingPermissions.includes(id)
+    );
+    if (isAllGroupSelected) {
+      setEditingPermissions((prev) =>
+        prev.filter((id) => !groupPermissionIds.includes(id))
+      );
+    } else {
+      setEditingPermissions((prev) =>
+        Array.from(new Set([...prev, ...groupPermissionIds]))
+      );
+    }
+  };
+
+  const toggleSinglePermission = (permissionId) => {
+    setEditingPermissions((prev) => {
+      if (prev.includes(permissionId)) {
+        return prev.filter((id) => id !== permissionId);
+      } else {
+        return [...prev, permissionId];
+      }
+    });
+  };
+
+  const toggleGroupCollapse = (groupId) => {
+    setCollapsedGroups((prev) => ({
+      ...prev,
+      [groupId]: !prev[groupId],
+    }));
+  };
+
+  const handleUpdateRole = () => {
+    if (!activeRole) return;
+    if (!editingRoleName.trim()) {
+      showNotification('Please provide a valid role name.');
+      return;
+    }
+
+    setRoles((prev) =>
+      prev.map((r) =>
+        r.id === activeRole.id
+          ? {
+              ...r,
+              name: editingRoleName.trim(),
+              selectedPermissions: editingPermissions,
+            }
+          : r
+      )
+    );
+    showNotification(`Role "${editingRoleName.trim()}" updated successfully!`);
+  };
+
+  const handleCancelChanges = () => {
+    if (activeRole) {
+      setEditingRoleName(activeRole.name);
+      setEditingPermissions(activeRole.selectedPermissions || []);
+      showNotification('Changes reverted.');
+    }
+  };
+
+  const handleDuplicateRole = (targetRole) => {
+    if (!targetRole) return;
+    const duplicatedRole = {
+      id: `rol-${Date.now()}`,
+      code: (targetRole.code + '2').slice(0, 3).toUpperCase(),
+      name: `${targetRole.name} (Copy)`,
+      description: targetRole.description || 'Custom user role',
+      usersCount: 0,
+      badgeColor: 'bg-indigo-100 text-indigo-700',
+      selectedPermissions: [...(targetRole.selectedPermissions || [])],
+    };
+
+    setRoles((prev) => [duplicatedRole, ...prev]);
+    setSelectedRoleId(duplicatedRole.id);
+    setOpenMenuRoleId(null);
+    showNotification(`Role "${targetRole.name}" duplicated successfully!`);
+  };
+
+  const handleDeleteRole = () => {
+    const target = roleToDelete || activeRole;
+    if (!target) return;
+    if (roles.length <= 1) {
+      showNotification('At least one role must remain in the system.');
+      setIsDeleteModalOpen(false);
+      setRoleToDelete(null);
+      return;
+    }
+
+    setRoles((prev) => prev.filter((r) => r.id !== target.id));
+    setIsDeleteModalOpen(false);
+    const remaining = roles.filter((r) => r.id !== target.id);
+    if (remaining.length > 0 && selectedRoleId === target.id) {
+      setSelectedRoleId(remaining[0].id);
+    }
+    setRoleToDelete(null);
+    showNotification(`Role "${target.name}" was deleted.`);
+  };
+
+  const handleCreateNewRole = (name, description) => {
+    if (!name.trim()) return;
+    const code = name
+      .split(' ')
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase() || 'RO';
+
+    const newRole = {
+      id: `rol-${Date.now()}`,
+      code,
+      name: name.trim(),
+      description: description.trim() || 'Custom user role',
+      usersCount: 0,
+      badgeColor: 'bg-blue-100 text-blue-700',
+      selectedPermissions: [],
+    };
+
+    setRoles([newRole, ...roles]);
+    setSelectedRoleId(newRole.id);
+    setIsCreateModalOpen(false);
+    showNotification(`New role "${newRole.name}" created!`);
+  };
 
   return (
-    <div className="feature-page" style={{ padding: '24px 32px' }}>
-      <PageHeader
-        title="Roles & Permissions"
-        subtitle="Configure role-based access control and module-level permission boundaries."
-        breadcrumb={[{ label: 'Administration' }, { label: 'Roles' }]}
-        actions={
-          <button type="button" className="btn-primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> Define New Role
-          </button>
-        }
-      />
+    <div className="min-h-screen bg-[#f8fafc] text-slate-800 p-4 md:p-7 space-y-6">
+      {toastMessage && (
+        <div className="fixed top-6 right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
+          <CheckCircle2 size={18} className="text-emerald-400" />
+          <span className="text-sm font-medium">{toastMessage}</span>
+        </div>
+      )}
 
-      <div className="card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20, marginTop: 20 }}>
-        <DataTable
-          columns={columns}
-          data={roles}
-          rowKey="id"
-          searchable={true}
-          searchPlaceholder="Search roles..."
-        />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+            <Link to="/dashboard" className="hover:text-blue-600 transition-colors">
+              Dashboard
+            </Link>
+            <span>&gt;</span>
+            <span className="text-slate-700 font-medium">Roles</span>
+          </div>
+          <h1 className="text-2xl font-bold text-[#0f172a] tracking-tight">Manage Roles</h1>
+          <p className="text-xs md:text-sm text-slate-500 mt-0.5">
+            Create and manage user roles with granular permissions across modules.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="inline-flex items-center justify-center gap-2 bg-[#1f6bff] hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all duration-150 active:scale-95"
+        >
+          <Plus size={18} strokeWidth={2.4} />
+          <span>Create New Role</span>
+        </button>
       </div>
 
-      <Modal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        title="Define Role & Permissions"
-      >
-        <form onSubmit={handleCreateRole} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
+            <Users size={22} strokeWidth={2.2} />
+          </div>
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>Role Name</label>
+            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.totalRoles}</div>
+            <div className="text-xs font-semibold text-slate-500 mt-1">Total Roles</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
+              <span>↑ 12%</span>
+              <span className="text-slate-400 font-normal">vs last month</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
+            <Users size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.totalUsers}</div>
+            <div className="text-xs font-semibold text-slate-500 mt-1">Total Users</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
+              <span>↑ 5%</span>
+              <span className="text-slate-400 font-normal">vs last month</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600 flex-shrink-0">
+            <Shield size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.totalPermissions}</div>
+            <div className="text-xs font-semibold text-slate-500 mt-1">Total Permissions</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
+              <span>↑ 8%</span>
+              <span className="text-slate-400 font-normal">vs last month</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
+            <Clock size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.activeModules}</div>
+            <div className="text-xs font-semibold text-slate-500 mt-1">Active Modules</div>
+            <div className="text-[11px] font-semibold text-slate-700 mt-1 flex items-center gap-1">
+              <span className="text-slate-900 font-bold">100%</span>
+              <span className="text-slate-400 font-normal">System Coverage</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-col lg:flex-row items-start gap-5">
+        <div className="w-full lg:w-80 xl:w-96 flex-shrink-0 bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col space-y-3.5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-bold text-slate-900">Roles</h2>
+            <span className="text-xs text-slate-400 font-medium">{roles.length} total</span>
+          </div>
+
+          <div className="relative">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search roles..."
+              value={roleSearchQuery}
+              onChange={(e) => {
+                setRoleSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div className="space-y-2">
+            {paginatedRoles.map((r) => {
+              const isSelected = r.id === selectedRoleId;
+              const isMenuOpen = openMenuRoleId === r.id;
+              return (
+                <div
+                  key={r.id}
+                  onClick={() => {
+                    setSelectedRoleId(r.id);
+                    setOpenMenuRoleId(null);
+                  }}
+                  className={`relative flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer select-none ${
+                    isSelected
+                      ? 'border-[#1f6bff] bg-blue-50/20 ring-1 ring-[#1f6bff] shadow-xs'
+                      : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50/70'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${r.badgeColor}`}
+                    >
+                      {r.code}
+                    </div>
+                    <div className="min-w-0">
+                      <h4
+                        className={`text-sm font-bold truncate leading-tight ${
+                          isSelected ? 'text-[#1f6bff]' : 'text-slate-800'
+                        }`}
+                      >
+                        {r.name}
+                      </h4>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {r.description}
+                      </p>
+                      <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                        {r.usersCount} users
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="relative role-menu-container" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuRoleId((prev) => (prev === r.id ? null : r.id));
+                      }}
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                        isMenuOpen
+                          ? 'bg-slate-200 text-slate-800 shadow-2xs'
+                          : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <MoreVertical size={15} />
+                    </button>
+
+                    {isMenuOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 animate-in fade-in zoom-in-95 duration-150">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedRoleId(r.id);
+                            setOpenMenuRoleId(null);
+                          }}
+                          className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors"
+                        >
+                          <Edit2 size={14} className="text-blue-600" />
+                          <span>Edit Role</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDuplicateRole(r)}
+                          className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors"
+                        >
+                          <Copy size={14} className="text-amber-600" />
+                          <span>Duplicate Role</span>
+                        </button>
+
+                        <div className="my-1 border-t border-slate-100" />
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRoleToDelete(r);
+                            setIsDeleteModalOpen(true);
+                            setOpenMenuRoleId(null);
+                          }}
+                          className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors"
+                        >
+                          <Trash2 size={14} className="text-rose-500" />
+                          <span>Delete Role</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100 text-xs text-slate-500">
+            <span>
+              Showing {startCount} to {endCount} of {filteredRoles.length} roles
+            </span>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
+              >
+                <ChevronLeft size={14} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pg) => (
+                <button
+                  key={pg}
+                  onClick={() => setCurrentPage(pg)}
+                  className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-semibold ${
+                    currentPage === pg
+                      ? 'bg-[#1f6bff] text-white'
+                      : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {pg}
+                </button>
+              ))}
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="w-7 h-7 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-40"
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-xs flex flex-col space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1f6bff]">
+                <FileText size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Edit Role</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Configure permissions for this role</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setRoleToDelete(activeRole);
+                setIsDeleteModalOpen(true);
+              }}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 text-rose-600 text-xs font-semibold transition-colors"
+            >
+              <Trash2 size={14} />
+              <span>Delete Role</span>
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Role Name <span className="text-rose-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={editingRoleName}
+              onChange={(e) => setEditingRoleName(e.target.value)}
+              placeholder="e.g. Employee"
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-[11px] text-slate-400 mt-1">
+              Role name will be displayed across the system.
+            </p>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between border-b border-slate-200 gap-3 pb-2">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+              {MODULE_TABS.map((tab) => {
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => {
+                      setActiveTab(tab);
+                      setPermissionSearchQuery('');
+                    }}
+                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                      isActive
+                        ? 'text-[#1f6bff] border-b-2 border-[#1f6bff] rounded-b-none bg-blue-50/30'
+                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative min-w-[180px]">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search permissions..."
+                  value={permissionSearchQuery}
+                  onChange={(e) => setPermissionSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
+                <input
+                  type="checkbox"
+                  checked={isAllCurrentTabSelected}
+                  onChange={toggleAllCurrentTab}
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                />
+                <span>Select All</span>
+              </label>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {currentTabGroups.length === 0 ? (
+              <div className="text-center py-10 text-xs text-slate-400">
+                No matching permissions found in this module.
+              </div>
+            ) : (
+              currentTabGroups.map((group) => {
+                const IconComponent = getGroupIcon(group.icon);
+                const isCollapsed = Boolean(collapsedGroups[group.id]);
+                const groupPermIds = group.permissions.map((p) => p.id);
+                const selectedCount = groupPermIds.filter((id) =>
+                  editingPermissions.includes(id)
+                ).length;
+                const isGroupAllSelected =
+                  groupPermIds.length > 0 && selectedCount === groupPermIds.length;
+
+                return (
+                  <div
+                    key={group.id}
+                    className="border border-slate-200 rounded-2xl bg-white overflow-hidden transition-all shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border-b border-slate-100">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                            group.color === 'green'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : group.color === 'orange'
+                              ? 'bg-amber-100 text-amber-700'
+                              : group.color === 'rose'
+                              ? 'bg-rose-100 text-rose-700'
+                              : group.color === 'purple'
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-blue-100 text-blue-700'
+                          }`}
+                        >
+                          <IconComponent size={18} />
+                        </div>
+                        <div>
+                          <h4 className="text-xs md:text-sm font-bold text-slate-800 leading-tight">
+                            {group.name}
+                          </h4>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {group.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 text-xs">
+                        <label className="flex items-center gap-1.5 font-medium text-slate-600 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={isGroupAllSelected}
+                            onChange={() => toggleGroupPermissions(groupPermIds)}
+                            className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
+                          />
+                          <span>Select All</span>
+                        </label>
+
+                        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                          {selectedCount} of {group.permissions.length} selected
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => toggleGroupCollapse(group.id)}
+                          className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
+                        >
+                          {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {!isCollapsed && (
+                      <div className="p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                        {group.permissions.map((perm) => {
+                          const isChecked = editingPermissions.includes(perm.id);
+                          return (
+                            <label
+                              key={perm.id}
+                              className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
+                                isChecked
+                                  ? 'bg-[#1f6bff] border-[#1f6bff] text-white shadow-2xs font-medium'
+                                  : 'bg-slate-50/50 border-slate-200/80 text-slate-700 hover:bg-slate-100'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleSinglePermission(perm.id)}
+                                className={`w-4 h-4 rounded border-slate-300 focus:ring-0 ${
+                                  isChecked ? 'accent-white text-blue-600' : 'text-blue-600'
+                                }`}
+                              />
+                              <span className="text-xs truncate">{perm.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <button
+              onClick={handleCancelChanges}
+              className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUpdateRole}
+              className="px-6 py-2.5 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition-all"
+            >
+              Update Role
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {isDeleteModalOpen && (roleToDelete || activeRole) && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+            <div className="flex items-center gap-3 text-rose-600 mb-3">
+              <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
+                <AlertTriangle size={20} />
+              </div>
+              <h3 className="text-base font-bold text-slate-900">Delete Role?</h3>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to delete the <strong>{(roleToDelete || activeRole).name}</strong> role?
+              Users currently assigned to this role will lose their permission scope.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 mt-6 pt-3 border-t border-slate-100 text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setRoleToDelete(null);
+                }}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteRole}
+                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold shadow-xs"
+              >
+                Yes, Delete Role
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isCreateModalOpen && (
+        <CreateRoleModal
+          onClose={() => setIsCreateModalOpen(false)}
+          onCreate={handleCreateNewRole}
+        />
+      )}
+    </div>
+  );
+}
+
+function CreateRoleModal({ onClose, onCreate }) {
+  const [roleName, setRoleName] = useState('');
+  const [description, setDescription] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!roleName.trim()) return;
+    onCreate(roleName, description);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h3 className="text-base font-bold text-slate-900">Create New Role</h3>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4 text-xs">
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">
+              Role Name <span className="text-rose-500">*</span>
+            </label>
             <input
               type="text"
               required
               placeholder="e.g. Regional Sales Lead"
-              value={newRole.name}
-              onChange={e => setNewRole({ ...newRole, name: e.target.value })}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+              value={roleName}
+              onChange={(e) => setRoleName(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
           <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 6 }}>Description</label>
+            <label className="block font-semibold text-slate-700 mb-1">Description</label>
             <textarea
               rows={3}
               placeholder="Describe access boundaries..."
-              value={newRole.description}
-              onChange={e => setNewRole({ ...newRole, description: e.target.value })}
-              style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 14 }}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
-          <div>
-            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#334155', marginBottom: 8 }}>Module Access Permissions</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-              {allModules.map(m => {
-                const checked = newRole.modules.includes(m);
-                return (
-                  <label
-                    key={m}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '8px 12px',
-                      borderRadius: 8,
-                      border: '1px solid',
-                      borderColor: checked ? '#1f6bff' : '#e2e8f0',
-                      background: checked ? '#f0f6ff' : '#ffffff',
-                      cursor: 'pointer',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: checked ? '#1f6bff' : '#334155',
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleModule(m)}
-                    />
-                    {m}
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-            <button type="button" className="btn-outline" onClick={() => setIsModalOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary">Save Role</button>
+          <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs"
+            >
+              Create Role
+            </button>
           </div>
         </form>
-      </Modal>
+      </div>
     </div>
   );
 }
