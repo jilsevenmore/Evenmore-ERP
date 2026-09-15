@@ -47,11 +47,16 @@ const partiesGuide = {
 
 export default function PartiesPage() {
   const location = useLocation();
-  const isCustomerContext = location.pathname.includes('/crm/customers');
-  const isVendorContext = location.pathname.includes('/purchase/vendors');
+  const searchParams = new URLSearchParams(location.search);
+  const typeParam = searchParams.get('type') || searchParams.get('tab');
+  const isCustomerContext = location.pathname.includes('/crm/customers') || typeParam?.toLowerCase() === 'customer';
+  const isVendorContext = location.pathname.includes('/purchase/vendors') || typeParam?.toLowerCase() === 'vendor';
 
   const { parties = [], addParty, updateParty, formatCurrency } = useERP();
   const [selectedType, setSelectedType] = useState(() => {
+    if (typeParam && ['customer', 'vendor', 'both'].includes(typeParam.toLowerCase())) {
+      return typeParam.charAt(0).toUpperCase() + typeParam.slice(1).toLowerCase();
+    }
     if (isCustomerContext) return 'Customer';
     if (isVendorContext) return 'Vendor';
     return 'All';
@@ -61,9 +66,14 @@ export default function PartiesPage() {
   const [viewingParty, setViewingParty] = useState(null);
 
   useEffect(() => {
-    if (isCustomerContext) setSelectedType('Customer');
-    else if (isVendorContext) setSelectedType('Vendor');
-  }, [location.pathname, isCustomerContext, isVendorContext]);
+    if (typeParam && ['customer', 'vendor', 'both'].includes(typeParam.toLowerCase())) {
+      setSelectedType(typeParam.charAt(0).toUpperCase() + typeParam.slice(1).toLowerCase());
+    } else if (isCustomerContext) {
+      setSelectedType('Customer');
+    } else if (isVendorContext) {
+      setSelectedType('Vendor');
+    }
+  }, [location.pathname, location.search, isCustomerContext, isVendorContext, typeParam]);
 
   // Filter parties by type
   const filteredParties = useMemo(() => {

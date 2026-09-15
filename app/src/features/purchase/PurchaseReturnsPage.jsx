@@ -3,56 +3,117 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, RotateCcw, CheckCircle2, X } from 'lucide-react';
-import { LineItemEditor } from '../../components/common/LineItemEditor';
+import { Plus, RotateCcw, CheckCircle2, X, Ban, AlertCircle, Eye, Printer, MapPin } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 const purchaseReturnGuide = {
     title: 'Purchase Returns & Debit Notes',
-    subtitle: 'Supplier RMA, debit memo issuance, and payables write-down',
-    purpose: 'Use this page when purchased items arrive damaged, defective, or incorrect. Issuing a Debit Note reduces your stock quantity and deducts the amount from your vendor Accounts Payable balance.',
-    workflow: ['Inspect Intake Goods', 'Detect Defect / Issue', 'Issue Debit Note', 'AP Balance Reduced'],
+    subtitle: 'Supplier RMA, debit memo issuance, selective item returns, and payables write-down',
+    purpose: 'Use this page when purchased items arrive damaged, defective, or incorrect. Issuing a Debit Note reduces your stock quantity (or flags damaged quarantine) and deducts the amount from your vendor Accounts Payable balance.',
+    workflow: ['Inspect Intake Goods', 'Detect Defect / Issue', 'Select Items & Quantities', 'Issue Debit Note', 'AP Balance Reduced'],
     keyTerms: [
         {
             term: 'Debit Note / Debit Memo',
             definition: 'A commercial document issued by a buyer to notify a supplier that their payable balance is being debited/reduced.',
         },
         {
-            term: 'RMA (Return Merchandise Authorization)',
-            definition: 'Supplier approval code allowing defective or surplus components to be returned for credit.',
+            term: 'Selective Return',
+            definition: 'Return specific line items and quantities rather than an entire purchase bill.',
+        },
+        {
+            term: 'Return Condition',
+            definition: 'Good items reduce regular available stock; Damaged or Scrap items are recorded without reducing sellable on-hand inventory.',
         },
         {
             term: 'Stock Reversal',
             definition: 'Automatically decreasing on-hand inventory when components are shipped back to the vendor.',
         },
-        {
-            term: 'Settled Status',
-            definition: 'Acknowledges that the vendor has credited the debit note against future or current invoices.',
-        },
     ],
     tips: [
+        'Select the target purchase bill to inspect line items and specify the exact return quantities and condition.',
         'Once a debit note is settled, it automatically reconciles in the Vendor 360° Statement.',
     ],
 };
 export const PurchaseReturnsPage = () => {
-    const { purchaseReturns, vendors, purchaseBills, addPurchaseReturn, updatePurchaseReturnStatus, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { purchaseReturns, vendors, purchaseBills, addPurchaseReturn, cancelPurchaseReturn, updatePurchaseReturnStatus, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState(purchaseBills[0]?.id || '');
     const [reason, setReason] = useState('Damaged casing detected on intake inspection');
-    const [lineItems, setLineItems] = useState([]);
+    const [returnItems, setReturnItems] = useState([]);
+    const [selectedReturn, setSelectedReturn] = useState(null);
+
     const handleBillSelect = (billId) => {
         setSelectedBillId(billId);
         const bill = purchaseBills.find((b) => b.id === billId);
-        if (bill && bill.items && bill.items.length > 0) {
-            setLineItems(bill.items);
+        if (!bill) {
+            setReturnItems([]);
+            return;
         }
+
+        const prevReturns = purchaseReturns.filter((pr) => (pr.billId === bill.id || pr.billRef === bill.billNumber) && pr.status !== 'Cancelled');
+
+        const initialLines = (bill.items || []).map((line, idx) => {
+            const billedQty = Number(line.qty || 1);
+            const prevReturned = prevReturns.reduce((sum, pr) => {
+                const match = (pr.items || []).find((it) => (it.itemId && it.itemId === line.itemId) || (it.sku && it.sku === line.sku) || (it.description === line.description));
+                return sum + Number(match?.qty || 0);
+            }, 0);
+            const returnableQty = Math.max(0, billedQty - prevReturned);
+            const isSerial = Boolean(line.selectedSerials?.length || line.serialNumbers?.length || line.serialNumber);
+            const availableSerials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
+            return {
+                id: line.id || `prt-line-${idx}`,
+                itemId: line.itemId,
+                sku: line.sku || line.itemSku || 'SKU-HW',
+                description: line.name || line.description || 'Hardware Item',
+                billedQty,
+                previouslyReturnedQty: prevReturned,
+                returnableQty,
+                qty: returnableQty > 0 ? 1 : 0,
+                rate: Number(line.rate || line.unitCost || 0),
+                condition: 'Good',
+                isSerial,
+                availableSerials,
+                selectedSerials: availableSerials.slice(0, returnableQty > 0 ? 1 : 0),
+            };
+        });
+
+        setReturnItems(initialLines);
     };
+
+    const handleItemChange = (idx, field, value) => {
+        setReturnItems((prev) => prev.map((item, i) => {
+            if (i !== idx) return item;
+            const updated = { ...item, [field]: value };
+            if (field === 'qty') {
+                const num = Math.max(0, Math.min(Number(value) || 0, item.returnableQty));
+                updated.qty = num;
+                if (updated.isSerial) {
+                    updated.selectedSerials = (updated.availableSerials || []).slice(0, num);
+                }
+            }
+            return updated;
+        }));
+    };
+
     const handleCreate = (e) => {
         e.preventDefault();
         const bill = purchaseBills.find((b) => b.id === selectedBillId) || purchaseBills[0];
         const vend = vendors.find((v) => v.name === bill?.vendor || v.id === bill?.vendorId);
-        const totalAmt = lineItems.reduce((sum, item) => sum + (item.amount || item.qty * item.rate), 0);
+        
+        const activeLines = returnItems.filter((it) => it.qty > 0).map((it) => ({
+            ...it,
+            amount: it.qty * it.rate,
+        }));
+
+        if (activeLines.length === 0) {
+            alert('Please specify at least 1 item with return quantity > 0.');
+            return;
+        }
+
+        const totalAmt = activeLines.reduce((sum, item) => sum + (item.amount || item.qty * item.rate), 0);
+
         addPurchaseReturn({
-            vendorId: vend?.id,
+            vendorId: vend?.id || bill?.vendorId,
             vendor: bill?.vendor || vend?.name || 'Delta Controls & Hydraulics',
             billId: bill?.id,
             billRef: bill?.billNumber || 'PB-2026-015',
@@ -60,30 +121,34 @@ export const PurchaseReturnsPage = () => {
             amount: totalAmt > 0 ? totalAmt : 500,
             reason,
             status: 'Pending Credit',
-            items: lineItems,
+            items: activeLines,
         });
         setShowAddModal(false);
-        setLineItems([]);
+        setReturnItems([]);
     };
+
     const markSettled = (id) => {
         updatePurchaseReturnStatus(id, 'Settled');
     };
+
+    const activeTotalAmount = returnItems.filter(it => it.qty > 0).reduce((sum, it) => sum + (it.qty * it.rate), 0);
+
     const columns = [
         {
             key: 'debitNoteNumber',
             header: 'Debit Note #',
             width: '15%',
             render: (r) => (
-              <span className="font-mono font-bold text-text flex items-center gap-1.5 whitespace-nowrap">
+              <button onClick={() => setSelectedReturn(r)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 whitespace-nowrap cursor-pointer text-left">
                 <RotateCcw size={13} className="text-rose-600 dark:text-rose-400 shrink-0"/>
                 <span>{r.debitNoteNumber}</span>
-              </span>
+              </button>
             ),
         },
         {
             key: 'vendor',
             header: 'Vendor Supplier',
-            width: '22%',
+            width: '20%',
             render: (r) => <span className="font-bold text-text block">{r.vendor}</span>,
         },
         {
@@ -108,9 +173,9 @@ export const PurchaseReturnsPage = () => {
             key: 'amount',
             header: 'Debit Amount',
             align: 'right',
-            width: '11%',
+            width: '12%',
             render: (r) => (
-              <span className="font-mono font-bold text-text whitespace-nowrap">
+              <span className="font-mono font-bold text-rose-600 dark:text-rose-400 whitespace-nowrap">
                 {formatCurrency(r.amount ?? 0)}
               </span>
             ),
@@ -126,23 +191,51 @@ export const PurchaseReturnsPage = () => {
             key: 'actions',
             header: 'Reconciliation',
             align: 'right',
-            width: '13%',
-            render: (r) => r.status !== 'Settled' ? (
-              <button
-                onClick={() => markSettled(r.id)}
-                className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer flex items-center gap-1 ml-auto shadow-2xs whitespace-nowrap transition-colors"
-              >
-                <CheckCircle2 size={11}/> Mark Credit
-              </button>
-            ) : (
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end whitespace-nowrap">
-                <CheckCircle2 size={12}/> Settled
-              </span>
-            ),
+            width: '15%',
+            render: (r) => {
+                const isCancelled = r.status === 'Cancelled';
+                return (
+                  <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <button
+                      onClick={() => setSelectedReturn(r)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="View Return Details"
+                    >
+                      <Eye size={13}/>
+                    </button>
+                    {isCancelled ? (
+                      <span className="text-xs font-semibold text-rose-600 inline-flex items-center gap-1">
+                        <Ban size={11} /> Cancelled
+                      </span>
+                    ) : r.status !== 'Settled' ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => cancelPurchaseReturn(r.id)}
+                          className="p-1 text-muted hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                          title="Cancel Debit Note & Restore Stock"
+                        >
+                          <Ban size={13} />
+                        </button>
+                        <button
+                          onClick={() => markSettled(r.id)}
+                          className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer flex items-center gap-1 shadow-2xs whitespace-nowrap transition-colors"
+                        >
+                          <CheckCircle2 size={11}/> Mark Credit
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end whitespace-nowrap">
+                        <CheckCircle2 size={12}/> Settled
+                      </span>
+                    )}
+                  </div>
+                );
+            },
         },
     ];
+
     return (<div className="space-y-6">
-      <PageHeader title="Purchase Returns & Debit Notes" subtitle="Supplier debit memos, vendor return documentation, inventory reductions, and Accounts Payable ledger write-downs." guide={purchaseReturnGuide} actions={<Button icon={Plus} onClick={() => {
+      <PageHeader title="Purchase Returns & Debit Notes" subtitle="Supplier debit memos, selective line-item returns, condition tracking, inventory reductions, and Accounts Payable ledger write-downs." guide={purchaseReturnGuide} actions={<Button icon={Plus} onClick={() => {
                 if (purchaseBills.length > 0) {
                     handleBillSelect(purchaseBills[0].id);
                 }
@@ -156,12 +249,16 @@ export const PurchaseReturnsPage = () => {
             (r.billRef && r.billRef.toLowerCase().includes(term)) ||
             r.reason.toLowerCase().includes(term)}/>
 
+      {/* Create Debit Note Modal */}
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <h3 className="font-bold text-base text-[#1F2E4A]">
-                Issue Vendor Debit Note
-              </h3>
+              <div className="flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-rose-600" />
+                <h3 className="font-bold text-base text-[#1F2E4A]">
+                  Issue Selective Vendor Debit Note
+                </h3>
+              </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition cursor-pointer">
                 <X size={18}/>
               </button>
@@ -173,7 +270,7 @@ export const PurchaseReturnsPage = () => {
                   <label className="block font-semibold text-slate-700 mb-1">Target Vendor Bill *</label>
                   <select value={selectedBillId} onChange={(e) => handleBillSelect(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                     {purchaseBills.map((b) => (<option key={b.id} value={b.id}>
-                        {b.billNumber} - {b.vendor} (${(b.total || b.amount).toFixed(2)})
+                        {b.billNumber} - {b.vendor} ({formatCurrency(b.total || b.amount)})
                       </option>))}
                   </select>
                 </div>
@@ -185,20 +282,208 @@ export const PurchaseReturnsPage = () => {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-2">Returned Component Line Items (Reduces Stock)</label>
-                <LineItemEditor items={lineItems} onChange={setLineItems} type="purchase"/>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="font-semibold text-slate-700 block">
+                    Selective Item Quantities & Conditions
+                  </label>
+                  <span className="text-[11px] text-slate-500">
+                    Specify return quantity for each item (Max = Returnable Qty)
+                  </span>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                        <th className="py-2.5 px-3">Item Description / SKU</th>
+                        <th className="py-2.5 px-2 text-center w-20">Billed</th>
+                        <th className="py-2.5 px-2 text-center w-24">Prev. Ret</th>
+                        <th className="py-2.5 px-2 text-center w-24">Returnable</th>
+                        <th className="py-2.5 px-2 text-center w-28">Return Qty</th>
+                        <th className="py-2.5 px-2 text-center w-36">Condition</th>
+                        <th className="py-2.5 px-3 text-right w-28">Line Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {returnItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center text-slate-400">
+                            No line items found on selected bill.
+                          </td>
+                        </tr>
+                      ) : (
+                        returnItems.map((line, idx) => (
+                          <tr key={idx} className={line.qty > 0 ? 'bg-rose-50/30' : ''}>
+                            <td className="py-2.5 px-3">
+                              <p className="font-bold text-slate-800">{line.description}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{line.sku}</p>
+                            </td>
+                            <td className="py-2.5 px-2 text-center font-mono font-semibold text-slate-700">
+                              {line.billedQty}
+                            </td>
+                            <td className="py-2.5 px-2 text-center font-mono text-slate-500">
+                              {line.previouslyReturnedQty}
+                            </td>
+                            <td className="py-2.5 px-2 text-center font-mono font-bold text-emerald-700">
+                              {line.returnableQty}
+                            </td>
+                            <td className="py-2.5 px-2 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max={line.returnableQty}
+                                value={line.qty}
+                                disabled={line.returnableQty <= 0}
+                                onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
+                                className="w-20 p-1 text-center font-mono font-bold border border-slate-300 rounded-lg bg-white text-slate-900 disabled:bg-slate-100"
+                              />
+                            </td>
+                            <td className="py-2.5 px-2 text-center">
+                              <select
+                                value={line.condition}
+                                onChange={(e) => handleItemChange(idx, 'condition', e.target.value)}
+                                className="w-full p-1 text-xs border border-slate-300 rounded-lg bg-white text-slate-800"
+                              >
+                                <option value="Good">Good (Restock)</option>
+                                <option value="Damaged">Damaged (Quarantine)</option>
+                                <option value="Scrap">Scrap / Dispose</option>
+                              </select>
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
+                              {formatCurrency(line.qty * line.rate)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
-                  Cancel
-                </button>
-                <button type="submit" className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-sm">
-                  Issue Debit Note & Post AP Reduction
-                </button>
+              <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+                <div className="font-mono text-xs">
+                  Total Debit Amount: <strong className="text-rose-600 text-sm">{formatCurrency(activeTotalAmount)}</strong>
+                </div>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={activeTotalAmount <= 0} className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg font-bold shadow-sm cursor-pointer">
+                    Issue Debit Note & Post AP Reduction
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>)}
+
+      {/* Return Detail Modal */}
+      {selectedReturn && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <RotateCcw className="w-5 h-5 text-rose-600" />
+                <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedReturn.debitNoteNumber}</h3>
+                <span className="font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded">
+                  {selectedReturn.vendor}
+                </span>
+                <StatusBadge status={selectedReturn.status}/>
+              </div>
+              <button onClick={() => setSelectedReturn(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+                <X size={18}/>
+              </button>
+            </div>
+
+            <div className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">Vendor & Matched Bill</span>
+                    <strong className="text-slate-900 text-sm block">{selectedReturn.vendor}</strong>
+                    <p className="text-slate-600 text-xs mt-1">Matched Bill: <strong>{selectedReturn.billRef}</strong></p>
+                    <p className="text-slate-600 text-xs">Return Date: <strong>{formatDateDDMMYYYY(selectedReturn.date)}</strong></p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">Defect Reason</span>
+                    <p className="text-slate-800 bg-white p-2 rounded-lg border border-slate-200">{selectedReturn.reason}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs mb-2">
+                  Returned Line Items ({selectedReturn.items?.length || 0})
+                </h4>
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                        <th className="py-2 px-3">Item Description</th>
+                        <th className="py-2 px-2 text-center">Condition</th>
+                        <th className="py-2 px-2 text-center">Returned Qty</th>
+                        <th className="py-2 px-3 text-right">Unit Rate</th>
+                        <th className="py-2 px-3 text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {(selectedReturn.items || []).map((it, idx) => (
+                        <tr key={idx}>
+                          <td className="py-2 px-3 font-semibold text-slate-800">
+                            {it.name || it.description || it.sku}
+                          </td>
+                          <td className="py-2 px-2 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              it.condition === 'Good' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            }`}>
+                              {it.condition || 'Good'}
+                            </span>
+                          </td>
+                          <td className="py-2 px-2 text-center font-mono font-bold text-slate-900">{it.qty}</td>
+                          <td className="py-2 px-3 text-right font-mono">{formatCurrency(it.rate || 0)}</td>
+                          <td className="py-2 px-3 text-right font-mono font-bold text-rose-600">
+                            {formatCurrency((it.qty || 1) * (it.rate || 0))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+              <div className="font-mono text-xs">
+                Total Credit Value: <strong className="text-rose-600 text-sm">{formatCurrency(selectedReturn.amount || 0)}</strong>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedReturn.status !== 'Cancelled' && selectedReturn.status !== 'Settled' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      cancelPurchaseReturn(selectedReturn.id);
+                      setSelectedReturn(null);
+                    }}
+                    className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Ban size={13} /> Cancel Debit Note
+                  </button>
+                )}
+                {selectedReturn.status !== 'Cancelled' && selectedReturn.status !== 'Settled' && (
+                  <Button onClick={() => {
+                    markSettled(selectedReturn.id);
+                    setSelectedReturn(null);
+                  }}>
+                    Acknowledge Supplier Credit
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => setSelectedReturn(null)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>);
 };

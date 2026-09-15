@@ -3,9 +3,13 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, Truck, CheckCircle2, X, AlertTriangle, Printer, Package, MapPin, UserCheck } from 'lucide-react';
+import { Plus, Truck, CheckCircle2, X, AlertTriangle, Printer, Package, MapPin, UserCheck, Ban, ShieldAlert, Eye, Award, Send, FileText, ShieldCheck } from 'lucide-react';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
+import { formatDateDDMMYYYY } from '../../utils/dateUtils';
+import { CreateWarrantyCardModal } from '../../components/common/CreateWarrantyCardModal';
+import { WarrantyCardModal } from '../../components/common/WarrantyCardModal';
+import { SendChallanModal } from '../../components/common/SendChallanModal';
 const challanGuide = {
     title: 'Delivery Challans & Waybills',
     subtitle: 'Warehouse logistics dispatch, non-commercial shipping waybills, and proof of delivery (POD).',
@@ -23,9 +27,13 @@ const challanGuide = {
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
 export const DeliveryChallansPage = () => {
-    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, formatDateDDMMYYYY, } = useERP();
+    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedChallan, setSelectedChallan] = useState(null);
+    const [cancelModalTarget, setCancelModalTarget] = useState(null);
+    const [createWarrantyChallan, setCreateWarrantyChallan] = useState(null);
+    const [selectedWarrantyCard, setSelectedWarrantyCard] = useState(null);
+    const [sendModalChallan, setSendModalChallan] = useState(null);
     const [selectedSoId, setSelectedSoId] = useState(salesOrders[0]?.id || '');
     const [transporter, setTransporter] = useState('FedEx Freight Direct');
     const [vehicleNo, setVehicleNo] = useState('TRK-9041-WA');
@@ -33,33 +41,117 @@ export const DeliveryChallansPage = () => {
     const [totalPackages, setTotalPackages] = useState(4);
     const [dispatchNote, setDispatchNote] = useState('Fragile electronic components. Handle with pallet forklift.');
     const [lineItems, setLineItems] = useState([]);
+    const [validationError, setValidationError] = useState('');
+
+    const prepareOrderLines = (order) => {
+        if (!order || !order.items) return [];
+        return order.items.map((it) => {
+            const orderedQty = Number(it.orderedQty ?? it.qty ?? 1);
+            const deliveredQty = Number(it.deliveredQty ?? 0);
+            const remainingQty = Math.max(0, orderedQty - deliveredQty);
+            const defaultDispatchQty = remainingQty > 0 ? remainingQty : 0;
+            const mi = masterItems.find((m) => m.id === it.itemId || (it.itemSku && m.sku?.toLowerCase() === it.itemSku.toLowerCase()) || (it.sku && m.sku?.toLowerCase() === it.sku.toLowerCase()));
+            const isSerial = mi?.trackingMode === 'Serial';
+            const availableSerials = isSerial ? (mi.serialNumbers || []) : [];
+            return {
+                ...it,
+                orderedQty,
+                deliveredQty,
+                remainingQty,
+                qty: defaultDispatchQty,
+                isSerial,
+                availableSerials,
+                selectedSerials: availableSerials.slice(0, defaultDispatchQty),
+            };
+        });
+    };
+
     const handleSoChange = (soId) => {
         setSelectedSoId(soId);
+        setValidationError('');
         const order = salesOrders.find((o) => o.id === soId);
-        if (order && order.items && order.items.length > 0) {
-            setLineItems(order.items.map(it => ({ ...it })));
-        }
+        setLineItems(prepareOrderLines(order));
     };
+
     const openAddModal = () => {
-        const defaultSo = salesOrders[0];
+        const defaultSo = salesOrders.find((o) => o.stage !== 'Delivered' && o.stage !== 'Invoiced') || salesOrders[0];
         if (defaultSo) {
             setSelectedSoId(defaultSo.id);
-            setLineItems(defaultSo.items ? defaultSo.items.map(it => ({ ...it })) : []);
+            setLineItems(prepareOrderLines(defaultSo));
         }
+        setValidationError('');
         setShowAddModal(true);
     };
+
     const handleItemQtyChange = (index, newQty) => {
+        setValidationError('');
         const updated = [...lineItems];
-        updated[index] = { ...updated[index], qty: Math.max(1, newQty) };
+        const line = updated[index];
+        const qtyVal = Number(newQty);
+        const cappedQty = Math.max(0, qtyVal);
+        
+        let selectedSerials = line.selectedSerials || [];
+        if (line.isSerial && line.availableSerials) {
+            selectedSerials = line.availableSerials.slice(0, cappedQty);
+        }
+
+        updated[index] = {
+            ...line,
+            qty: cappedQty,
+            selectedSerials,
+        };
         setLineItems(updated);
     };
+
+    const handleSerialToggle = (index, serial) => {
+        const updated = [...lineItems];
+        const line = updated[index];
+        const current = line.selectedSerials || [];
+        let next;
+        if (current.includes(serial)) {
+            next = current.filter((s) => s !== serial);
+        } else {
+            if (current.length >= line.qty) {
+                next = [...current.slice(0, Math.max(0, line.qty - 1)), serial];
+            } else {
+                next = [...current, serial];
+            }
+        }
+        updated[index] = { ...line, selectedSerials: next };
+        setLineItems(updated);
+    };
+
     const handleCreate = (e) => {
         e.preventDefault();
         const order = salesOrders.find((o) => o.id === selectedSoId) || salesOrders[0];
+        
+        // Over-delivery validation
+        for (const item of lineItems) {
+            const rem = item.remainingQty !== undefined ? item.remainingQty : (Number(item.orderedQty ?? item.qty) - Number(item.deliveredQty ?? 0));
+            if (item.qty > rem) {
+                setValidationError(`Over-delivery prevented for "${item.description || item.name}": Available to deliver is ${rem}, but ${item.qty} was entered.`);
+                return;
+            }
+            if (item.isSerial && item.qty > 0) {
+                if (!item.selectedSerials || item.selectedSerials.length < item.qty) {
+                    setValidationError(`Please select ${item.qty} serial number(s) for "${item.description || item.name}".`);
+                    return;
+                }
+            }
+        }
+
+        const validLines = lineItems.filter((it) => it.qty > 0);
+        if (validLines.length === 0) {
+            setValidationError('Please specify at least 1 item with dispatch quantity > 0.');
+            return;
+        }
+
         addDeliveryChallan({
             challanNumber: `DC-2026-${String(deliveryChallans.length + 45).padStart(3, '0')}`,
             salesOrderId: order?.id,
+            sourceSalesOrderId: order?.id,
             salesOrderNumber: order?.orderNumber || 'SO-2026-0102',
+            sourceSalesOrderNumber: order?.orderNumber || 'SO-2026-0102',
             linkedSo: order?.orderNumber || 'SO-2026-0102',
             customerId: order?.customerId,
             customer: order?.customer || 'Acme Corp',
@@ -67,7 +159,8 @@ export const DeliveryChallansPage = () => {
             transporter,
             vehicleNo,
             status: 'In Transit',
-            items: lineItems.length > 0 ? lineItems : order?.items || [],
+            items: validLines,
+            lineItems: validLines,
         });
         setShowAddModal(false);
     };
@@ -185,25 +278,127 @@ export const DeliveryChallansPage = () => {
             key: 'status',
             header: 'Dispatch Status',
             align: 'center',
-            width: '12%',
+            width: '10%',
             render: (c) => <StatusBadge status={c.status}/>,
         },
         {
+            key: 'warranty',
+            header: 'Customer Warranty',
+            align: 'center',
+            width: '15%',
+            render: (c) => {
+                const wc = (getWarrantyByChallanId && getWarrantyByChallanId(c.id)) || warranties.find((w) => w.deliveryChallanId === c.id || w.challanNumber === c.challanNumber);
+                if (!wc) {
+                    if (c.status === 'Cancelled') {
+                        return <span className="text-[11px] text-slate-400 italic">No Warranty (Cancelled)</span>;
+                    }
+                    return (
+                        <button
+                            onClick={() => setCreateWarrantyChallan(c)}
+                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
+                        >
+                            <Plus size={11} /> Attach Warranty
+                        </button>
+                    );
+                }
+
+                if (wc.documentStatus === 'Cancelled') {
+                    return (
+                        <div className="inline-flex items-center gap-1">
+                            <button
+                                onClick={() => setSelectedWarrantyCard(wc)}
+                                className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200 cursor-pointer"
+                                title="View Cancelled Certificate"
+                            >
+                                Void ({wc.cardNumber})
+                            </button>
+                            {c.status !== 'Cancelled' && (
+                                <button
+                                    onClick={() => setCreateWarrantyChallan(c)}
+                                    className="text-[10px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+                                    title="Create Corrected Warranty"
+                                >
+                                    + Correct
+                                </button>
+                            )}
+                        </div>
+                    );
+                }
+
+                const isDraft = wc.documentStatus === 'Draft';
+                return (
+                    <div className="inline-flex items-center gap-1.5">
+                        <button
+                            onClick={() => setSelectedWarrantyCard(wc)}
+                            className={`font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 cursor-pointer hover:shadow-2xs transition-all ${
+                                isDraft
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100/70'
+                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70'
+                            }`}
+                            title={isDraft ? 'Draft Certificate — Click to Preview' : 'Issued Warranty — Click to View Preview'}
+                        >
+                            <Award size={12} className={isDraft ? 'text-amber-600' : 'text-emerald-600'} />
+                            <span>{wc.cardNumber}</span>
+                        </button>
+                        {isDraft && (
+                            <button
+                                onClick={() => setCreateWarrantyChallan(c)}
+                                className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-100/70 px-1.5 py-0.5 rounded cursor-pointer"
+                                title="Edit Draft"
+                            >
+                                Edit
+                            </button>
+                        )}
+                    </div>
+                );
+            },
+        },
+        {
             key: 'actions',
-            header: 'Proof of Delivery',
+            header: 'Actions / POD',
             align: 'right',
-            width: '12%',
-            render: (c) => c.status !== 'Delivered' ? (
-              <button
-                onClick={() => markDelivered(c.id)}
-                className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer flex items-center gap-1 ml-auto shadow-2xs whitespace-nowrap transition-colors"
-              >
-                <CheckCircle2 size={11}/> Confirm POD
-              </button>
-            ) : (
-              <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1 justify-end whitespace-nowrap">
-                <UserCheck size={12}/> POD Verified
-              </span>
+            width: '18%',
+            render: (c) => (
+              <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                <button
+                  onClick={() => setSelectedChallan(c)}
+                  className="p-1 text-slate-500 hover:text-primary hover:bg-slate-100 rounded text-xs flex items-center gap-1 cursor-pointer"
+                  title="View Manifest"
+                >
+                  <Eye size={13}/>
+                </button>
+                {c.status !== 'Cancelled' && (
+                  <button
+                    onClick={() => setSendModalChallan(c)}
+                    className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded text-xs flex items-center gap-1 cursor-pointer"
+                    title="Send Waybill & Warranty Card"
+                  >
+                    <Send size={13}/>
+                  </button>
+                )}
+                {c.status !== 'Delivered' && c.status !== 'Cancelled' && (
+                  <button
+                    onClick={() => markDelivered(c.id)}
+                    className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-colors"
+                  >
+                    <CheckCircle2 size={11}/> POD
+                  </button>
+                )}
+                {c.status === 'Delivered' && (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold text-[11px] flex items-center gap-1">
+                    <UserCheck size={12}/> Verified
+                  </span>
+                )}
+                {c.status !== 'Cancelled' && (
+                  <button
+                    onClick={() => setCancelModalTarget(c)}
+                    className="p-1 text-rose-500 hover:bg-rose-50 hover:text-rose-700 rounded text-xs flex items-center gap-1 cursor-pointer"
+                    title="Cancel Challan"
+                  >
+                    <Ban size={13}/>
+                  </button>
+                )}
+              </div>
             ),
         },
     ];
@@ -282,11 +477,18 @@ export const DeliveryChallansPage = () => {
                   <label className="font-semibold text-slate-700 block">
                     Dispatch Item Manifest (Physical Goods Only)
                   </label>
-                  <span className="text-[11px] text-slate-400">Commercial pricing excluded on shipping waybill</span>
+                  <span className="text-[11px] text-slate-400">Tracks partial fulfillment against Sales Order</span>
                 </div>
 
-                {hasShortages && (<div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-rose-800 text-xs">
+                {validationError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-rose-800 text-xs">
                     <AlertTriangle size={16} className="text-rose-600 shrink-0"/>
+                    <span className="font-semibold">{validationError}</span>
+                  </div>
+                )}
+
+                {hasShortages && (<div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-amber-800 text-xs">
+                    <AlertTriangle size={16} className="text-amber-600 shrink-0"/>
                     <span>
                       <strong>Stock Warning:</strong> One or more items have insufficient warehouse stock. Please verify before dispatching.
                     </span>
@@ -297,11 +499,11 @@ export const DeliveryChallansPage = () => {
                     <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                       <tr>
                         <th className="py-2.5 px-3">Item SKU & Description</th>
-                        <th className="py-2.5 px-3 w-28 text-center">Warehouse Bin</th>
+                        <th className="py-2.5 px-3 text-center">SO Fulfillment</th>
                         <th className="py-2.5 px-3 w-24 text-center">Avail Stock</th>
-                        <th className="py-2.5 px-3 w-24 text-center">Dispatch Qty</th>
-                        <th className="py-2.5 px-3 w-20 text-center">UOM</th>
-                        <th className="py-2.5 px-3 w-28 text-center">Status</th>
+                        <th className="py-2.5 px-3 w-36 text-center">Dispatch Qty</th>
+                        <th className="py-2.5 px-3">Serial Numbers / Details</th>
+                        <th className="py-2.5 px-3 w-24 text-center">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
@@ -310,41 +512,99 @@ export const DeliveryChallansPage = () => {
                             No items found in selected sales order.
                           </td>
                         </tr>) : (lineItems.map((item, idx) => {
-                const stock = item.itemId ? calculateItemStock(item.itemId) : { available: 10 };
-                const mi = masterItems.find((m) => m.id === item.itemId);
-                const isShort = stock.available < item.qty;
-                return (<tr key={item.id || idx} className={`hover:bg-slate-50/70 ${isShort ? 'bg-rose-50/30' : ''}`}>
-                              <td className="p-2.5">
-                                <p className="font-semibold text-slate-800">{item.description}</p>
-                                <span className="font-mono text-[10px] text-slate-400">SKU: {item.itemSku || mi?.sku || 'GEN-SKU'}</span>
-                              </td>
-                              <td className="p-2.5 text-center font-mono text-[11px] text-slate-600">
-                                {mi?.category === 'Electronics' ? 'BIN-E04-R2' : 'BIN-A12-R1'}
-                              </td>
-                              <td className="p-2.5 text-center">
-                                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${stock.available <= 0
-                        ? 'bg-rose-100 text-rose-800'
-                        : stock.available < item.qty
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-50 text-emerald-700'}`}>
-                                  {stock.available} in stock
+                        const stock = item.itemId ? calculateItemStock(item.itemId) : { available: 10 };
+                        const mi = masterItems.find((m) => m.id === item.itemId || (item.itemSku && m.sku?.toLowerCase() === item.itemSku.toLowerCase()) || (item.sku && m.sku?.toLowerCase() === item.sku.toLowerCase()));
+                        const isShort = stock.available < item.qty;
+                        const isOverLimit = item.qty > (item.remainingQty ?? 9999);
+                        return (
+                          <tr key={item.id || idx} className={`hover:bg-slate-50/70 ${isOverLimit ? 'bg-rose-50/50' : isShort ? 'bg-amber-50/30' : ''}`}>
+                            <td className="p-2.5">
+                              <p className="font-semibold text-slate-800">{item.description || item.name}</p>
+                              <span className="font-mono text-[10px] text-slate-400">SKU: {item.itemSku || mi?.sku || 'GEN-SKU'}</span>
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <div className="font-mono text-[11px] text-slate-700">
+                                <div>Ordered: <strong>{item.orderedQty ?? item.qty}</strong></div>
+                                <div className="text-slate-400 text-[10px]">Delivered: {item.deliveredQty ?? 0}</div>
+                                <div className="text-blue-600 font-bold text-[10px]">Available: {item.remainingQty ?? item.qty}</div>
+                              </div>
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${stock.available <= 0
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : stock.available < item.qty
+                                      ? 'bg-amber-100 text-amber-800'
+                                      : 'bg-emerald-50 text-emerald-700'}`}>
+                                {stock.available} in stock
+                              </span>
+                            </td>
+                            <td className="p-2.5 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={item.remainingQty ?? item.orderedQty ?? 100}
+                                  value={item.qty}
+                                  onChange={(e) => handleItemQtyChange(idx, Number(e.target.value))}
+                                  className={`w-20 text-center text-xs font-semibold text-slate-800 border rounded px-1.5 py-1 focus:ring-1 ${
+                                    isOverLimit ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:ring-blue-500'
+                                  }`}
+                                />
+                                <span className="text-[10px] text-slate-400">Max: {item.remainingQty ?? item.orderedQty}</span>
+                              </div>
+                            </td>
+                            <td className="p-2.5">
+                              {item.isSerial ? (
+                                <div className="space-y-1">
+                                  <span className="text-[10px] font-bold text-slate-500 block">Select Serials ({item.selectedSerials?.length || 0}/{item.qty}):</span>
+                                  {item.availableSerials && item.availableSerials.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1 max-w-[220px]">
+                                      {item.availableSerials.map((s) => {
+                                        const isSelected = item.selectedSerials?.includes(s);
+                                        return (
+                                          <button
+                                            type="button"
+                                            key={s}
+                                            onClick={() => handleSerialToggle(idx, s)}
+                                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono border cursor-pointer ${
+                                              isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                                            }`}
+                                          >
+                                            {s}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-rose-500 italic">No serials in stock</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-[10px] text-slate-400 font-mono">Standard Quantity Tracked</span>
+                              )}
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {isOverLimit ? (
+                                <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                                  Over-limit
                                 </span>
-                              </td>
-                              <td className="p-2.5 text-center">
-                                <input type="number" min="1" value={item.qty} onChange={(e) => handleItemQtyChange(idx, Number(e.target.value))} className="w-16 text-center text-xs font-semibold text-slate-800 border border-slate-200 rounded px-1.5 py-1 focus:ring-1 focus:ring-blue-500"/>
-                              </td>
-                              <td className="p-2.5 text-center font-semibold text-slate-500">
-                                PCS
-                              </td>
-                              <td className="p-2.5 text-center">
-                                {isShort ? (<span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
-                                    Deficit ({item.qty - stock.available})
-                                  </span>) : (<span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                                    Ready
-                                  </span>)}
-                              </td>
-                            </tr>);
-            }))}
+                              ) : isShort ? (
+                                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                                  Deficit ({item.qty - stock.available})
+                                </span>
+                              ) : item.qty === 0 ? (
+                                <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                                  Skip
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                                  Ready
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      }))}
                     </tbody>
                   </table>
                 </div>
@@ -377,6 +637,14 @@ export const DeliveryChallansPage = () => {
                 <StatusBadge status={selectedChallan.status}/>
               </div>
               <div className="flex items-center gap-2">
+                {selectedChallan.status !== 'Cancelled' && (
+                  <button
+                    onClick={() => setSendModalChallan(selectedChallan)}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold cursor-pointer flex items-center gap-1.5 shadow-2xs text-xs"
+                  >
+                    <Send size={13}/> Send Waybill & Card
+                  </button>
+                )}
                 <button onClick={() => window.print()} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold cursor-pointer flex items-center gap-1.5">
                   <Printer size={13}/> Print Waybill
                 </button>
@@ -396,10 +664,18 @@ export const DeliveryChallansPage = () => {
                   <p className="text-slate-600">Seattle, WA 98101 • United States</p>
                 </div>
                 <div className="space-y-1 sm:border-l sm:border-slate-200 sm:pl-4">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Consignee / Deliver To</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Consignee / Deliver To (Shipping Address)</span>
                   <p className="font-bold text-blue-900">{selectedChallan.customer}</p>
-                  <p className="text-slate-600">Customer Receiving Facility / Inbound Dock</p>
-                  <p className="text-slate-600">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo}</strong></p>
+                  {selectedChallan.shippingAddress ? (
+                    <div className="text-slate-600 text-[11px] leading-tight mt-1">
+                      <p>{selectedChallan.shippingAddress.line1}</p>
+                      {selectedChallan.shippingAddress.line2 && <p>{selectedChallan.shippingAddress.line2}</p>}
+                      <p>{selectedChallan.shippingAddress.city}, {selectedChallan.shippingAddress.state} {selectedChallan.shippingAddress.pincode}</p>
+                    </div>
+                  ) : (
+                    <p className="text-slate-600">Customer Receiving Facility / Inbound Dock</p>
+                  )}
+                  <p className="text-slate-600 mt-1">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo}</strong></p>
                 </div>
               </div>
 
@@ -407,7 +683,7 @@ export const DeliveryChallansPage = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-200">
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Transporter</span>
-                  <p className="font-semibold text-slate-800">{selectedChallan.transporter}</p>
+                  <p className="font-semibold text-slate-800">{selectedChallan.transporter || 'FedEx Freight'}</p>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Vehicle / Reg #</span>
@@ -415,7 +691,7 @@ export const DeliveryChallansPage = () => {
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Dispatch Date</span>
-                  <p className="font-semibold text-slate-800">{selectedChallan.dispatchDate || selectedChallan.date || 'Today'}</p>
+                  <p className="font-semibold text-slate-800">{formatDateDDMMYYYY(selectedChallan.dispatchDate || selectedChallan.date)}</p>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Dispatch Type</span>
@@ -425,6 +701,91 @@ export const DeliveryChallansPage = () => {
 
               {/* Related Transaction Chain */}
               <RelatedDocumentsCard documents={getChallanRelatedDocs(selectedChallan)}/>
+
+              {/* Customer Warranty & Asset Guarantee Section */}
+              {(() => {
+                const wc = (getWarrantyByChallanId && getWarrantyByChallanId(selectedChallan.id)) || warranties.find((w) => w.deliveryChallanId === selectedChallan.id || w.challanNumber === selectedChallan.challanNumber);
+                return (
+                  <div className="bg-gradient-to-r from-emerald-50/70 to-teal-50/70 border border-emerald-200 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Award className="w-5 h-5 text-emerald-600" />
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                            Customer Warranty Certificate
+                          </h4>
+                          <p className="text-[11px] text-slate-500">
+                            Linked customer equipment warranty record for this delivery consignment
+                          </p>
+                        </div>
+                      </div>
+
+                      {wc ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setSelectedWarrantyCard(wc)}
+                            className="px-3 py-1 bg-white hover:bg-slate-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
+                          >
+                            <Eye size={12} /> {wc.documentStatus === 'Draft' ? 'Preview Draft' : 'View Warranty Card'} ({wc.cardNumber})
+                          </button>
+                          {wc.documentStatus === 'Draft' && (
+                            <button
+                              onClick={() => setCreateWarrantyChallan(selectedChallan)}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                            >
+                              Edit Draft
+                            </button>
+                          )}
+                          {wc.documentStatus === 'Cancelled' && selectedChallan.status !== 'Cancelled' && (
+                            <button
+                              onClick={() => setCreateWarrantyChallan(selectedChallan)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                            >
+                              Create Corrected Warranty
+                            </button>
+                          )}
+                        </div>
+                      ) : selectedChallan.status !== 'Cancelled' ? (
+                        <button
+                          onClick={() => setCreateWarrantyChallan(selectedChallan)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          <Plus size={13} /> Attach Warranty Card
+                        </button>
+                      ) : (
+                        <span className="text-xs text-slate-400 font-mono italic">Challan Cancelled</span>
+                      )}
+                    </div>
+
+                    {wc ? (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 rounded-lg border border-emerald-100 text-xs">
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold">Certificate #</span>
+                          <p className="font-mono font-bold text-slate-800">{wc.cardNumber}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold">Duration</span>
+                          <p className="font-bold text-emerald-700">{wc.warrantyPeriod} {wc.warrantyUnit}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold">Expiry Date</span>
+                          <p className="font-mono font-bold text-slate-800">{formatDateDDMMYYYY(wc.expiryDate)}</p>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-slate-400 uppercase font-semibold">Status (Doc / Coverage)</span>
+                          <span className="inline-block font-semibold text-[11px] text-slate-700 capitalize">
+                            {wc.documentStatus} • {wc.coverageStatus}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-600">
+                        No warranty certificate has been generated for this delivery yet. Click <strong>&quot;Attach Warranty Card&quot;</strong> to auto-populate from delivery records and generate the customer certificate.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Clean Manifest Table (No Commercial Prices/Taxes) */}
               <div className="space-y-2">
@@ -443,19 +804,33 @@ export const DeliveryChallansPage = () => {
                         <th className="py-2.5 px-3">Item Description</th>
                         <th className="py-2.5 px-3 w-32">SKU / Code</th>
                         <th className="py-2.5 px-3 w-28 text-center">Dispatched Qty</th>
-                        <th className="py-2.5 px-3 w-20 text-center">UOM</th>
-                        <th className="py-2.5 px-3 w-32 text-center">Packaging</th>
+                        <th className="py-2.5 px-3">Serial Numbers</th>
+                        <th className="py-2.5 px-3 w-28 text-center">Packaging</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
-                      {(selectedChallan.items || []).map((it, idx) => (<tr key={it.id || idx} className="hover:bg-slate-50/60">
+                      {(selectedChallan.items || []).map((it, idx) => (
+                        <tr key={it.id || idx} className="hover:bg-slate-50/60">
                           <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
-                          <td className="p-2.5 font-semibold text-slate-800">{it.description}</td>
-                          <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || 'SKU-LOG-01'}</td>
+                          <td className="p-2.5 font-semibold text-slate-800">{it.description || it.name}</td>
+                          <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || 'SKU-LOG-01'}</td>
                           <td className="p-2.5 text-center font-bold text-slate-900">{it.qty}</td>
-                          <td className="p-2.5 text-center text-slate-500 font-medium">PCS</td>
+                          <td className="p-2.5">
+                            {it.selectedSerials && it.selectedSerials.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {it.selectedSerials.map((s) => (
+                                  <span key={s} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-mono text-[10px]">
+                                    {s}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 font-mono text-[10px]">Standard Tracked</span>
+                            )}
+                          </td>
                           <td className="p-2.5 text-center text-slate-500 text-[11px]">Carton / Sealed</td>
-                        </tr>))}
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -486,9 +861,22 @@ export const DeliveryChallansPage = () => {
                 Logistics Status: <strong className="text-slate-800">{selectedChallan.status}</strong>
               </span>
               <div className="flex items-center gap-2">
-                {selectedChallan.status !== 'Delivered' && (<Button onClick={() => markDelivered(selectedChallan.id)}>
+                {selectedChallan.status !== 'Delivered' && selectedChallan.status !== 'Cancelled' && (
+                  <Button onClick={() => markDelivered(selectedChallan.id)}>
                     Confirm Proof of Delivery (POD)
-                  </Button>)}
+                  </Button>
+                )}
+                {selectedChallan.status !== 'Cancelled' && (
+                  <Button
+                    variant="outline"
+                    className="text-rose-600 hover:bg-rose-50 border-rose-200"
+                    onClick={() => {
+                      setCancelModalTarget(selectedChallan);
+                    }}
+                  >
+                    Cancel Challan
+                  </Button>
+                )}
                 <Button variant="outline" onClick={() => setSelectedChallan(null)}>
                   Close
                 </Button>
@@ -496,5 +884,98 @@ export const DeliveryChallansPage = () => {
             </div>
           </div>
         </div>)}
+
+      {/* Cancel Challan Modal */}
+      {cancelModalTarget && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2 bg-rose-100 rounded-lg">
+                <ShieldAlert size={20}/>
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">Cancel Delivery Challan?</h3>
+                <p className="text-xs text-slate-500 font-mono">{cancelModalTarget.challanNumber}</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-1.5 text-slate-700">
+              <p className="font-semibold text-slate-900">This cancellation will:</p>
+              <ul className="list-disc pl-4 space-y-0.5 text-slate-600">
+                <li>Reverse the physical stock movement (<code className="text-rose-700 font-mono font-bold">SALE_REVERSAL</code>)</li>
+                <li>Restore any dispatched serial numbers back to available inventory</li>
+                <li>Rollback the delivered quantities on linked Sales Order</li>
+                <li>Mark this challan as <span className="font-bold text-rose-600">Cancelled</span></li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setCancelModalTarget(null)}>
+                Keep Challan
+              </Button>
+              <button
+                onClick={() => {
+                  cancelDeliveryChallan(cancelModalTarget.id);
+                  if (selectedChallan?.id === cancelModalTarget.id) {
+                    setSelectedChallan({ ...selectedChallan, status: 'Cancelled' });
+                  }
+                  setCancelModalTarget(null);
+                }}
+                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg text-xs transition-colors cursor-pointer"
+              >
+                Confirm Cancellation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create / Edit Warranty Card Modal */}
+      {createWarrantyChallan && (
+        <CreateWarrantyCardModal
+          isOpen={Boolean(createWarrantyChallan)}
+          onClose={() => setCreateWarrantyChallan(null)}
+          challan={createWarrantyChallan}
+          existingCard={(getWarrantyByChallanId && getWarrantyByChallanId(createWarrantyChallan.id)) || warranties.find((w) => w.deliveryChallanId === createWarrantyChallan.id || w.challanNumber === createWarrantyChallan.challanNumber)}
+          onSuccess={(newCard) => {
+            if (selectedChallan?.id === createWarrantyChallan.id) {
+              setSelectedWarrantyCard(newCard);
+            }
+          }}
+        />
+      )}
+
+      {/* Customer-facing Warranty Card Document Modal */}
+      {selectedWarrantyCard && (
+        <WarrantyCardModal
+          isOpen={Boolean(selectedWarrantyCard)}
+          onClose={() => setSelectedWarrantyCard(null)}
+          warrantyCard={selectedWarrantyCard}
+          onSend={(wc) => {
+            const linkedC = deliveryChallans.find((c) => c.id === wc.deliveryChallanId || c.challanNumber === wc.challanNumber);
+            if (linkedC) {
+              setSelectedWarrantyCard(null);
+              setSendModalChallan(linkedC);
+            }
+          }}
+        />
+      )}
+
+      {/* Send Delivery Challan Modal */}
+      {sendModalChallan && (
+        <SendChallanModal
+          isOpen={Boolean(sendModalChallan)}
+          onClose={() => setSendModalChallan(null)}
+          challan={sendModalChallan}
+          warrantyCard={(getWarrantyByChallanId && getWarrantyByChallanId(sendModalChallan.id)) || warranties.find((w) => w.deliveryChallanId === sendModalChallan.id || w.challanNumber === sendModalChallan.challanNumber)}
+          onPreviewWarranty={() => {
+            const wc = (getWarrantyByChallanId && getWarrantyByChallanId(sendModalChallan.id)) || warranties.find((w) => w.deliveryChallanId === sendModalChallan.id || w.challanNumber === sendModalChallan.challanNumber);
+            if (wc) setSelectedWarrantyCard(wc);
+          }}
+          onPreviewChallan={() => {
+            setSelectedChallan(sendModalChallan);
+          }}
+        />
+      )}
     </div>);
 };

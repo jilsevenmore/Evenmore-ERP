@@ -30,7 +30,8 @@ import {
   Wand2,
   RefreshCw,
   Eye,
-  Check
+  Check,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const AddEditItemPage = () => {
@@ -77,13 +78,26 @@ export const AddEditItemPage = () => {
     const [unitConversionFactor, setUnitConversionFactor] = useState(1);
     const [uom, setUom] = useState('Pcs');
 
-    // Tracking Mode & Serial numbers
-    const [trackingMode, setTrackingMode] = useState('Quantity'); // 'Quantity' | 'Serial'
+    // Tracking Mode & Serial / Batch numbers
+    const [trackingMode, setTrackingMode] = useState('Quantity'); // 'Quantity' | 'Serial' | 'Batch'
+    const [batchNumber, setBatchNumber] = useState('');
+    const [lotNumber, setLotNumber] = useState('');
+    const [manufactureDate, setManufactureDate] = useState('');
+    const [expiryDate, setExpiryDate] = useState('');
+    const [taxRate, setTaxRate] = useState('18');
     const [serialNumbersText, setSerialNumbersText] = useState('');
     const [serialViewMode, setSerialViewMode] = useState('chips'); // 'chips' | 'raw'
     const [singleSerialInput, setSingleSerialInput] = useState('');
     const [serialSearchFilter, setSerialSearchFilter] = useState('');
     const [duplicateSerialNotice, setDuplicateSerialNotice] = useState('');
+
+    // Warranty Policy & Default Configuration
+    const [warrantyApplicable, setWarrantyApplicable] = useState(false);
+    const [warrantyPeriod, setWarrantyPeriod] = useState(1);
+    const [warrantyUnit, setWarrantyUnit] = useState('Years');
+    const [warrantyStartEvent, setWarrantyStartEvent] = useState('Delivery');
+    const [manufacturerWarrantyPeriod, setManufacturerWarrantyPeriod] = useState('');
+    const [manufacturerWarrantyUnit, setManufacturerWarrantyUnit] = useState('Years');
 
     // Serial Batch Generator Modal
     const [showBatchModal, setShowBatchModal] = useState(false);
@@ -180,7 +194,12 @@ export const AddEditItemPage = () => {
             setPurchaseUnit(existingItem.purchaseUnit || 'Box');
             setSalesUnit(existingItem.salesUnit || existingItem.uom || 'Pcs');
             setUnitConversionFactor(existingItem.unitConversionFactor || 1);
-            setTrackingMode(existingItem.trackingMode || (existingItem.serialNumbers?.length ? 'Serial' : 'Quantity'));
+            setTrackingMode(existingItem.trackingMode || (existingItem.serialNumbers?.length ? 'Serial' : existingItem.batchNumber ? 'Batch' : 'Quantity'));
+            setBatchNumber(existingItem.batchNumber || '');
+            setLotNumber(existingItem.lotNumber || '');
+            setManufactureDate(existingItem.manufactureDate || '');
+            setExpiryDate(existingItem.expiryDate || '');
+            setTaxRate(existingItem.taxRate !== undefined ? String(existingItem.taxRate) : '18');
             setSerialNumbersText((existingItem.serialNumbers || []).join('\n'));
             setImagePreview(existingItem.image || existingItem.imageUrl || '');
             setCostPrice(String(existingItem.costPrice || existingItem.unitCost || '45.00'));
@@ -192,6 +211,12 @@ export const AddEditItemPage = () => {
             setItemLifecycle(existingItem.lifecycleStatus || 'Active');
             setStatus(existingItem.status || 'Optimal');
             setCustomFieldValues(existingItem.customFieldValues || {});
+            setWarrantyApplicable(Boolean(existingItem.warrantyApplicable));
+            setWarrantyPeriod(existingItem.warrantyPeriod !== undefined ? existingItem.warrantyPeriod : 1);
+            setWarrantyUnit(existingItem.warrantyUnit || 'Years');
+            setWarrantyStartEvent(existingItem.warrantyStartEvent || 'Delivery');
+            setManufacturerWarrantyPeriod(existingItem.manufacturerWarrantyPeriod !== undefined ? String(existingItem.manufacturerWarrantyPeriod) : '');
+            setManufacturerWarrantyUnit(existingItem.manufacturerWarrantyUnit || 'Years');
             if (existingItem.customFieldValues && Object.keys(existingItem.customFieldValues).length > 0) {
               setShowCustomParameters(true);
             }
@@ -496,19 +521,23 @@ export const AddEditItemPage = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        const isService = itemKind === 'Service';
         const parsedCost = parseFloat(costPrice) || 0;
         const parsedSelling = parseFloat(sellingPrice) || 0;
-        const parsedQty = trackingMode === 'Serial' ? parsedSerialNumbers.length : (parseInt(availableQty, 10) || 0);
+        const parsedQty = isService ? 0 : (trackingMode === 'Serial' ? parsedSerialNumbers.length : (parseInt(availableQty, 10) || 0));
         const parsedReorder = parseInt(reorderLevel, 10) || 0;
         const parsedConv = parseFloat(unitConversionFactor) || 1;
         
         let computedStatus = status;
-        if (parsedQty <= 0)
-            computedStatus = 'Critical';
-        else if (parsedQty <= parsedReorder)
-            computedStatus = 'Low Stock';
-        else
+        if (isService) {
             computedStatus = 'Optimal';
+        } else if (parsedQty <= 0) {
+            computedStatus = 'Critical';
+        } else if (parsedQty <= parsedReorder) {
+            computedStatus = 'Low Stock';
+        } else {
+            computedStatus = 'Optimal';
+        }
 
         const payload = {
             sku,
@@ -524,8 +553,19 @@ export const AddEditItemPage = () => {
             purchaseUnit,
             salesUnit,
             unitConversionFactor: parsedConv,
-            trackingMode,
+            trackingMode: isService ? 'None' : trackingMode,
             serialNumbers: trackingMode === 'Serial' ? parsedSerialNumbers : [],
+            batchNumber: trackingMode === 'Batch' ? batchNumber : undefined,
+            lotNumber: trackingMode === 'Batch' ? lotNumber : undefined,
+            manufactureDate: trackingMode === 'Batch' ? manufactureDate : undefined,
+            expiryDate: trackingMode === 'Batch' ? expiryDate : undefined,
+            taxRate: parseFloat(taxRate) || 18,
+            warrantyApplicable,
+            warrantyPeriod: Number(warrantyPeriod) || 1,
+            warrantyUnit,
+            warrantyStartEvent,
+            manufacturerWarrantyPeriod: manufacturerWarrantyPeriod ? Number(manufacturerWarrantyPeriod) : undefined,
+            manufacturerWarrantyUnit: manufacturerWarrantyPeriod ? manufacturerWarrantyUnit : undefined,
             costPrice: parsedCost,
             unitCost: parsedCost,
             sellingPrice: parsedSelling,
@@ -636,12 +676,12 @@ export const AddEditItemPage = () => {
               <div>
                 <span className="text-xs font-bold text-slate-800 block">Item Classification</span>
                 <span className="text-[11px] text-slate-500">
-                  Defines whether this product is an assembled Machine, component Part, or Standalone item.
+                  Select whether this item is an assembled Machine, Component Part, Finished Good, Consumable, Raw Material, or Service.
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-2">
                 <label
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
                     itemKind === 'Machine'
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -655,12 +695,12 @@ export const AddEditItemPage = () => {
                     onChange={() => handleItemKindChange('Machine')}
                     className="sr-only"
                   />
-                  ⚙️ Machine (Assembled System)
+                  ⚙️ Machine
                 </label>
 
                 <label
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
-                    itemKind === 'Part'
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
+                    itemKind === 'Part' || itemKind === 'Component'
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
@@ -669,16 +709,16 @@ export const AddEditItemPage = () => {
                     type="radio"
                     name="itemKind"
                     value="Part"
-                    checked={itemKind === 'Part'}
+                    checked={itemKind === 'Part' || itemKind === 'Component'}
                     onChange={() => handleItemKindChange('Part')}
                     className="sr-only"
                   />
-                  🧩 Component Part (Stock Item)
+                  🧩 Component Part
                 </label>
 
                 <label
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
-                    itemKind === 'Standalone'
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
+                    itemKind === 'Standalone' || itemKind === 'Finished Product'
                       ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
                       : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                   }`}
@@ -687,11 +727,65 @@ export const AddEditItemPage = () => {
                     type="radio"
                     name="itemKind"
                     value="Standalone"
-                    checked={itemKind === 'Standalone'}
+                    checked={itemKind === 'Standalone' || itemKind === 'Finished Product'}
                     onChange={() => handleItemKindChange('Standalone')}
                     className="sr-only"
                   />
-                  📦 Standalone Hardware
+                  📦 Finished Product
+                </label>
+
+                <label
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
+                    itemKind === 'Consumable'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="itemKind"
+                    value="Consumable"
+                    checked={itemKind === 'Consumable'}
+                    onChange={() => handleItemKindChange('Consumable')}
+                    className="sr-only"
+                  />
+                  🧪 Consumable
+                </label>
+
+                <label
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
+                    itemKind === 'Raw Material'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="itemKind"
+                    value="Raw Material"
+                    checked={itemKind === 'Raw Material'}
+                    onChange={() => handleItemKindChange('Raw Material')}
+                    className="sr-only"
+                  />
+                  🧱 Raw Material
+                </label>
+
+                <label
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${
+                    itemKind === 'Service'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-sm shadow-amber-500/20'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="itemKind"
+                    value="Service"
+                    checked={itemKind === 'Service'}
+                    onChange={() => handleItemKindChange('Service')}
+                    className="sr-only"
+                  />
+                  ⚡ Service
                 </label>
               </div>
             </div>
@@ -872,8 +966,8 @@ export const AddEditItemPage = () => {
                   )}
                 </div>
 
-                {/* Pricing */}
-                <div className="grid grid-cols-2 gap-4">
+                {/* Pricing & GST Tax Rate */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-slate-700 mb-1">
                       Cost Price (₹ per {salesUnit || 'Unit'})
@@ -900,11 +994,27 @@ export const AddEditItemPage = () => {
                       placeholder="129.99"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      GST Tax Rate (%)
+                    </label>
+                    <select
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(e.target.value)}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="0">0% (Exempt)</option>
+                      <option value="5">5% (Concessional)</option>
+                      <option value="12">12% (Standard Low)</option>
+                      <option value="18">18% (Standard High)</option>
+                      <option value="28">28% (Luxury / High)</option>
+                    </select>
+                  </div>
                 </div>
 
-                {/* Tracking Mode & Interactive Serial Suggestion / Generator */}
+                {/* Tracking Mode & Interactive Serial / Batch Generator */}
                 <div className="p-4 bg-amber-50/40 border border-amber-200/80 rounded-2xl space-y-3.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                       <Barcode size={15} className="text-amber-700" />
                       Inventory Tracking Mode
@@ -920,6 +1030,22 @@ export const AddEditItemPage = () => {
                           className="text-blue-600"
                         />
                         Quantity-only
+                      </label>
+                      <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
+                        <input
+                          type="radio"
+                          name="trackingMode"
+                          value="Batch"
+                          checked={trackingMode === 'Batch'}
+                          onChange={() => {
+                            setTrackingMode('Batch');
+                            if (!batchNumber) {
+                              setBatchNumber(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`);
+                            }
+                          }}
+                          className="text-blue-600"
+                        />
+                        Batch Tracked
                       </label>
                       <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
                         <input
@@ -1107,6 +1233,100 @@ export const AddEditItemPage = () => {
                         </span>
                       </div>
                     </div>
+                  ) : trackingMode === 'Batch' ? (
+                    <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200/80 shadow-2xs">
+                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                        <span className="text-xs font-bold text-slate-800">
+                          Batch / Lot Tracking Parameters
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setBatchNumber(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`)}
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1"
+                        >
+                          <Sparkles size={11} /> Auto-Gen Batch Code
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Batch / Lot Number *
+                          </label>
+                          <input
+                            type="text"
+                            value={batchNumber}
+                            onChange={(e) => setBatchNumber(e.target.value)}
+                            placeholder="e.g. LOT-202609-001"
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Sub-Lot / Release Code (Optional)
+                          </label>
+                          <input
+                            type="text"
+                            value={lotNumber}
+                            onChange={(e) => setLotNumber(e.target.value)}
+                            placeholder="e.g. SUB-A1"
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Manufacturing Date
+                          </label>
+                          <input
+                            type="date"
+                            value={manufactureDate}
+                            onChange={(e) => setManufactureDate(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Expiry / Recertification Date
+                          </label>
+                          <input
+                            type="date"
+                            value={expiryDate}
+                            onChange={(e) => setExpiryDate(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-1">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Initial Batch Quantity ({salesUnit || 'Unit'})
+                          </label>
+                          <input
+                            type="number"
+                            value={availableQty}
+                            onChange={(e) => setAvailableQty(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+                            placeholder="50"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Safety Reorder Level ({salesUnit || 'Unit'})
+                          </label>
+                          <input
+                            type="number"
+                            value={reorderLevel}
+                            onChange={(e) => setReorderLevel(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+                            placeholder="15"
+                          />
+                        </div>
+                      </div>
+                    </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -1134,6 +1354,116 @@ export const AddEditItemPage = () => {
                         />
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Default Warranty Policy Section */}
+                <div className="p-4 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl space-y-3.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800">Default Warranty Configuration</h4>
+                        <p className="text-[11px] text-slate-500">Default warranty policy applied to physical serials and auto-populated on customer cards</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={warrantyApplicable}
+                        onChange={(e) => setWarrantyApplicable(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                      <span className="ml-2 text-xs font-semibold text-slate-700">
+                        {warrantyApplicable ? 'Warranty Applicable' : 'No Warranty'}
+                      </span>
+                    </label>
+                  </div>
+
+                  {warrantyApplicable ? (
+                    <div className="space-y-3 pt-1">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Company Warranty Period *
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={warrantyPeriod}
+                            onChange={(e) => setWarrantyPeriod(Math.max(1, Number(e.target.value) || 1))}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-emerald-600"
+                            placeholder="e.g. 5"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Warranty Unit
+                          </label>
+                          <select
+                            value={warrantyUnit}
+                            onChange={(e) => setWarrantyUnit(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
+                          >
+                            <option value="Years">Years</option>
+                            <option value="Months">Months</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Warranty Start Event *
+                          </label>
+                          <select
+                            value={warrantyStartEvent}
+                            onChange={(e) => setWarrantyStartEvent(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
+                          >
+                            <option value="Delivery">Delivery (Default — Delivery Challan date)</option>
+                            <option value="Invoice">Invoice (Final Invoice date)</option>
+                            <option value="Manual Date">Manual Date (Custom specified)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-emerald-100">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Manufacturer Warranty Period (Optional)
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={manufacturerWarrantyPeriod}
+                            onChange={(e) => setManufacturerWarrantyPeriod(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-emerald-600"
+                            placeholder="e.g. 10 (OEM coverage)"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">
+                            Manufacturer Warranty Unit
+                          </label>
+                          <select
+                            value={manufacturerWarrantyUnit}
+                            onChange={(e) => setManufacturerWarrantyUnit(e.target.value)}
+                            className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
+                          >
+                            <option value="Years">Years</option>
+                            <option value="Months">Months</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-emerald-800 bg-emerald-100/50 p-2 rounded-lg border border-emerald-200">
+                        💡 <strong>Default Warranty Rule:</strong> When physical machines or components are dispatched via Delivery Challan, this rule automatically populates the Customer Warranty Card without requiring repetitive entry.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500 italic py-1">
+                      No warranty policy configured for this SKU. Toggle above if this item includes standard equipment warranty.
+                    </p>
                   )}
                 </div>
 

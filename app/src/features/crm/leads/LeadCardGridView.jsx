@@ -68,7 +68,7 @@ export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadI
 
           <div className="lead-grid-footer">
             <small>{row.source}</small>
-            <b>{formatCurrency(row.amount || 0, activeCurrency, { noDecimals: true })}</b>
+            <b>{formatCurrency(row.amount || 0, localStorage.getItem('evenmore_currency') || 'USD ($)', { noDecimals: true })}</b>
           </div>
         </article>
       ))}
