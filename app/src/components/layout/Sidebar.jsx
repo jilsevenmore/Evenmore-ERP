@@ -19,6 +19,7 @@ import {
   Infinity as InfinityIcon,
   Building2,
   FileText,
+  FileSpreadsheet,
   Receipt,
   ArrowDownLeft,
   RotateCcw,
@@ -115,8 +116,10 @@ const NAV = [
       { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
       { label: 'Quotations', icon: FileText, to: '/sales/quotations' },
       { label: 'Sales Orders', icon: ShoppingCart, to: '/sales/orders' },
+      { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
+      { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' },
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
     ],
@@ -126,7 +129,6 @@ const NAV = [
     label: 'Purchase',
     icon: Truck,
     children: [
-      { label: 'Vendors', icon: Building2, to: '/purchase/vendors' },
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
       { label: 'Purchase Bills', icon: Receipt, to: '/purchase/bills' },
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
@@ -378,13 +380,16 @@ function SubItem({ item, depth = 1, badges = {} }) {
   const count = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
   const Icon = item.icon;
 
-  // Icon leaves (e.g. CRM > Dashboard) render like nav row with icon
+  // Icon leaves (e.g. CRM > Dashboard, Sales > Proforma Invoices, etc.) render like nav row with icon
   if (Icon && item.to) {
     return (
       <NavLink
         to={item.to}
+        end
         title={item.label}
-        className={() => `sub-group-row${isActive ? ' section-active' : ''}`}
+        className={({ isActive: navActive }) =>
+          `sub-group-row${isActive || navActive ? ' active section-active' : ''}`
+        }
       >
         <Icon size={16} strokeWidth={2} className="nav-ico" />
         <span className="nav-txt">{item.label}</span>
@@ -403,7 +408,7 @@ function SubItem({ item, depth = 1, badges = {} }) {
       end
       title={item.label}
       className={({ isActive: navActive }) =>
-        `sub-item${isActive || navActive ? ' active' : ''}`
+        `sub-item${isActive || navActive ? ' active section-active' : ''}`
       }
     >
       <span className="sub-dot" />

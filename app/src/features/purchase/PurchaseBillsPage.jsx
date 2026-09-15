@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileSpreadsheet, CheckCircle2, DollarSign, X, Eye, Printer, Clock, AlertCircle, FileText } from 'lucide-react';
+import { Plus, FileSpreadsheet, CheckCircle2, DollarSign, X, Eye, Printer, Clock, AlertCircle, FileText, Ban, MapPin } from 'lucide-react';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
@@ -28,7 +28,7 @@ const purchaseBillGuide = {
     workflow: ['PO Issued', 'Physical Goods Intake', 'Vendor Bill Recorded', '3-Way Match Verified', 'Payment Disbursed'],
 };
 export const PurchaseBillsPage = () => {
-    const { purchaseBills, purchaseOrders, vendors, addPurchaseBill, addPaymentOut, getBillOutstanding, paymentOuts, purchaseReturns, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { purchaseBills, purchaseOrders, vendors, addPurchaseBill, cancelPurchaseBill, addPaymentOut, getBillOutstanding, getPoBilledStatus, paymentOuts, purchaseReturns, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
     const [showPayModal, setShowPayModal] = useState(null);
@@ -49,9 +49,15 @@ export const PurchaseBillsPage = () => {
             if (matchedPo) {
                 if (matchedPo.vendorId)
                     setSelectedVendorId(matchedPo.vendorId);
-                if (matchedPo.items && matchedPo.items.length > 0) {
-                    setLineItems(matchedPo.items);
-                }
+                const poInfo = getPoBilledStatus(matchedPo.id);
+                const remainingLines = poInfo.lines
+                    .filter((l) => l.remainingQty > 0)
+                    .map((l) => ({
+                        ...l,
+                        qty: l.remainingQty,
+                        amount: Math.round(l.remainingQty * (l.rate || 0) * 100) / 100,
+                    }));
+                setLineItems(remainingLines.length > 0 ? remainingLines : (matchedPo.items || []));
             }
         }
     };
@@ -77,6 +83,7 @@ export const PurchaseBillsPage = () => {
         });
         setShowAddModal(false);
         setLineItems([]);
+        setSelectedPoId('manual');
     };
     const handleDisbursementSubmit = (e) => {
         e.preventDefault();
@@ -269,9 +276,10 @@ export const PurchaseBillsPage = () => {
             key: 'actions',
             header: 'Disbursement',
             align: 'right',
-            width: '13%',
+            width: '15%',
             render: (b) => {
                 const outstanding = getBillOutstanding(b.id);
+                const isCancelled = b.status === 'Cancelled';
                 return (
                   <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                     <button
@@ -288,16 +296,31 @@ export const PurchaseBillsPage = () => {
                     >
                       <Printer size={13}/>
                     </button>
-                    {outstanding.balanceDue > 0.01 ? (
-                      <button
-                        onClick={() => {
-                          setShowPayModal(b);
-                          setPayAmount(outstanding.balanceDue);
-                        }}
-                        className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
-                      >
-                        <DollarSign size={11}/> Pay Bill
-                      </button>
+                    {isCancelled ? (
+                      <span className="text-xs font-semibold text-rose-600 inline-flex items-center gap-1">
+                        <Ban size={11} /> Cancelled
+                      </span>
+                    ) : outstanding.balanceDue > 0.01 ? (
+                      <div className="flex items-center gap-1">
+                        {outstanding.paid <= 0 && (
+                          <button
+                            onClick={() => cancelPurchaseBill(b.id)}
+                            className="p-1 text-muted hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                            title="Cancel Purchase Bill"
+                          >
+                            <Ban size={13}/>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setShowPayModal(b);
+                            setPayAmount(outstanding.balanceDue);
+                          }}
+                          className="px-2.5 py-1 bg-primary hover:bg-primary-hover text-white rounded-xl text-[11px] font-semibold cursor-pointer shadow-2xs transition-colors flex items-center gap-1"
+                        >
+                          <DollarSign size={11}/> Pay Bill
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
                         <CheckCircle2 size={12}/> Settled
@@ -348,9 +371,14 @@ export const PurchaseBillsPage = () => {
                   <label className="block font-semibold text-slate-700 mb-1">Pull From PO (Optional)</label>
                   <select value={selectedPoId} onChange={(e) => handleSelectPo(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                     <option value="manual">-- Manual Bill Entry --</option>
-                    {purchaseOrders.map((po) => (<option key={po.id} value={po.id}>
-                        {po.poNumber} ({po.vendor})
-                      </option>))}
+                    {purchaseOrders.filter((po) => po.status !== 'Cancelled').map((po) => {
+                      const poInfo = getPoBilledStatus(po.id);
+                      return (
+                        <option key={po.id} value={po.id} disabled={poInfo.status === 'Billed'}>
+                          {po.poNumber} ({po.vendor}) — {poInfo.status} {poInfo.totalRemainingQty > 0 ? `(${poInfo.totalRemainingQty} left)` : ''}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -430,6 +458,29 @@ export const PurchaseBillsPage = () => {
             </div>
 
             <div className="space-y-6 mt-4 overflow-y-auto pr-1 flex-1">
+              {/* Vendor & Address Banner */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">Supplier / Vendor</span>
+                    <strong className="text-slate-900 text-sm block">{selectedBill.vendor}</strong>
+                    <div className="text-slate-600 mt-1 flex items-start gap-1">
+                      <MapPin size={12} className="text-slate-400 shrink-0 mt-0.5" />
+                      <span>
+                        {selectedBill.billingAddress?.line1 || 'Corporate Headquarters'}<br />
+                        {selectedBill.billingAddress?.city || 'Mumbai'}, {selectedBill.billingAddress?.state || 'Maharashtra'} - {selectedBill.billingAddress?.pincode || '400001'}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">Billing Details</span>
+                    <p className="text-slate-700">Bill Date: <strong>{formatDateDDMMYYYY(selectedBill.billDate || selectedBill.date)}</strong></p>
+                    <p className="text-slate-700">Due Date: <strong>{selectedBill.dueDate ? formatDateDDMMYYYY(selectedBill.dueDate) : 'Net 30'}</strong></p>
+                    <p className="text-slate-700">Matched PO: <strong>{selectedBill.poRef || selectedBill.linkedPo || 'Direct Entry'}</strong></p>
+                  </div>
+                </div>
+              </div>
+
               {/* 3-Way Reconciliation Audit Banner */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
                 <div className="flex items-center justify-between">
@@ -479,13 +530,33 @@ export const PurchaseBillsPage = () => {
                 Total: <strong className="text-slate-900">${(selectedBill.total || selectedBill.amount).toFixed(2)}</strong> | Due: <strong className="text-amber-700">${getBillOutstanding(selectedBill.id).balanceDue.toFixed(2)}</strong>
               </div>
               <div className="flex items-center gap-2">
-                {getBillOutstanding(selectedBill.id).balanceDue > 0.01 && (<Button onClick={() => {
-                    setShowPayModal(selectedBill);
-                    setPayAmount(getBillOutstanding(selectedBill.id).balanceDue);
-                    setSelectedBill(null);
-                }}>
-                    Disburse Payment
-                  </Button>)}
+                {selectedBill.status === 'Cancelled' ? (
+                  <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 inline-flex items-center gap-1.5">
+                    <Ban size={13} /> Bill Cancelled
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const res = cancelPurchaseBill(selectedBill.id);
+                        if (res?.success) setSelectedBill(null);
+                      }}
+                      className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 rounded-lg font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Ban size={13} /> Cancel Bill
+                    </button>
+                    {getBillOutstanding(selectedBill.id).balanceDue > 0.01 && (
+                      <Button onClick={() => {
+                        setShowPayModal(selectedBill);
+                        setPayAmount(getBillOutstanding(selectedBill.id).balanceDue);
+                        setSelectedBill(null);
+                      }}>
+                        Disburse Payment
+                      </Button>
+                    )}
+                  </>
+                )}
                 <Button variant="outline" onClick={() => setSelectedBill(null)}>
                   Close
                 </Button>

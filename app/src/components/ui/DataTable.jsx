@@ -26,13 +26,15 @@ export function DataTable({
   emptyTitle = 'No records found',
   emptyDesc = 'There are no records matching your current filter criteria.',
   emptyAction,
-  pageSize = 20,
+  pageSize: initialPageSize = 5,
+  pageSizeOptions = [5, 10, 20],
   action,
 }) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(initialPageSize);
 
   const isSearchEnabled = searchable || !!searchFilter || searchPlaceholder !== 'Search…' || !!title;
 
@@ -149,7 +151,7 @@ export function DataTable({
     <div className="table-card bg-card rounded-xl border border-border shadow-xs overflow-hidden">
       {/* Optional Card Header with Title, Subtitle, and Search / Action */}
       {(title || isSearchEnabled || action) && (
-        <div className="p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card-alt">
+        <div className="p-3.5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card-alt">
           <div>
             {title && <h3 className="font-bold text-text text-sm tracking-tight">{title}</h3>}
             {subtitle && <p className="text-[11px] text-muted mt-0.5">{subtitle}</p>}
@@ -182,7 +184,7 @@ export function DataTable({
           <thead>
             <tr className="border-b border-border bg-table-head text-text-secondary font-semibold text-[11px] uppercase tracking-wider">
               {selectable && (
-                <th className="col-check py-3 px-3.5 w-10 text-center">
+                <th className="col-check py-2.5 px-3 w-10 text-center">
                   <input
                     type="checkbox"
                     className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"
@@ -202,7 +204,7 @@ export function DataTable({
                   <th
                     key={colKey}
                     style={col.width ? { width: col.width } : {}}
-                    className={`py-3 px-3.5 ${alignCls}`}
+                    className={`py-2.5 px-3 ${alignCls}`}
                   >
                     {col.sortable ? (
                       <button
@@ -226,7 +228,7 @@ export function DataTable({
                   </th>
                 );
               })}
-              {actions && <th className="col-more py-3 px-3.5 text-center w-12"><MoreVertical size={14} className="mx-auto text-muted" /></th>}
+              {actions && <th className="col-more py-2.5 px-3 text-center w-12"><MoreVertical size={14} className="mx-auto text-muted" /></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -243,7 +245,7 @@ export function DataTable({
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
                 >
                   {selectable && (
-                    <td className="py-3 px-3.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-2 px-3 text-center" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"
@@ -262,14 +264,14 @@ export function DataTable({
                       <td
                         key={colKey}
                         style={col.width ? { width: col.width } : {}}
-                        className={`py-3 px-3.5 text-text align-middle ${alignCls}`}
+                        className={`py-2 px-3 text-text align-middle ${alignCls}`}
                       >
                         {renderCell(col, row)}
                       </td>
                     );
                   })}
                   {actions && (
-                    <td className="py-3 px-3.5 text-center align-middle" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-2 px-3 text-center align-middle" onClick={(e) => e.stopPropagation()}>
                       {actions(row)}
                     </td>
                   )}
@@ -295,9 +297,14 @@ export function DataTable({
       </div>
 
       {/* Pagination Footer */}
-      {sorted.length > pageSize && (
-        <div className="border-t border-border bg-card-alt">
-          <Pagination total={sorted.length} page={page} pageSize={pageSize} onChange={setPage} />
+      {(sorted.length > pageSize || sorted.length > 5) && (
+        <div className="border-t border-border bg-card-alt pr-16 sm:pr-20">
+          <Pagination
+            total={sorted.length}
+            page={page}
+            pageSize={pageSize}
+            onChange={setPage}
+          />
         </div>
       )}
     </div>

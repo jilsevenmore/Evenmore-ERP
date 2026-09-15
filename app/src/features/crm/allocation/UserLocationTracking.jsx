@@ -379,14 +379,14 @@ export default function UserLocationTracking() {
                 </tbody>
               </table>
             </div>
-            <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 text-[11px] text-slate-500">
+            <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 text-[11px] text-slate-500 pr-20 sm:pr-24">
               <span>Showing {(safePage - 1) * perPage + 1} to {Math.min(safePage * perPage, filtered.length)} of {filtered.length} users</span>
               <span className="flex items-center gap-1.5">
-                <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer"><ChevronLeft size={13} /></button>
+                <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"><ChevronLeft size={13} /></button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-                  <button key={p} type="button" onClick={() => setPage(p)} className={`min-w-6 h-6 px-1.5 rounded-md border text-[11px] font-bold cursor-pointer ${p === safePage ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 text-slate-500'}`}>{p}</button>
+                  <button key={p} type="button" onClick={() => setPage(p)} className={`min-w-6 h-6 px-1.5 rounded-md border text-[11px] font-bold cursor-pointer ${p === safePage ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{p}</button>
                 ))}
-                <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 cursor-pointer"><ChevronRight size={13} /></button>
+                <button type="button" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"><ChevronRight size={13} /></button>
                 <select value={perPage} onChange={(e) => setPerPage(Number(e.target.value))} className="px-1.5 py-1 border border-slate-200 rounded-md text-[11px] cursor-pointer">
                   {PER_PAGE_OPTIONS.map((n) => <option key={n} value={n}>{n} per page</option>)}
                 </select>

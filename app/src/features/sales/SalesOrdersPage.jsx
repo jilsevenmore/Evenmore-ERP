@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2 } from 'lucide-react';
+import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -13,27 +13,30 @@ import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 const salesOrderGuide = {
     title: 'Sales Orders',
-    subtitle: 'Customer purchase agreements driving warehouse reservation and dispatch.',
-    purpose: 'A Sales Order (SO) represents a legally confirmed customer commitment to purchase goods or services. Once confirmed, it reserves inventory in the warehouse, triggers a Delivery Challan for dispatch, and subsequently issues a commercial Sales Invoice.',
+    subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
+    purpose: 'A Sales Order (SO) represents a legally confirmed customer commitment to purchase goods or services. Once confirmed, it can generate an optional Proforma Invoice for advance payment milestone collection, reserves inventory in the warehouse, triggers a Delivery Challan for dispatch, and subsequently issues a commercial Sales Invoice.',
     keyTerms: [
         { term: 'Sales Order (SO)', definition: 'A confirmed commercial agreement between your business and the customer before dispatch.' },
+        { term: 'Proforma Invoice (Optional)', definition: 'A preliminary commercial offer/demand for payment issued before final tax invoicing to secure advance milestones without affecting AR/GL.' },
         { term: 'Credit Limit Guard', definition: 'An enterprise safety check that ensures a customer\'s current debt plus new order does not exceed their approved threshold.' },
         { term: 'Inventory Reservation', definition: 'Stock committed to this order so it cannot be double-sold to another customer.' },
-        { term: 'SO Lifecycle', definition: 'The 4-stage progression: Draft → Confirmed → Delivered (Challan) → Invoiced (Settlement).' },
+        { term: 'SO Lifecycle', definition: 'The flexible progression: Draft → Confirmed → Proforma (Optional) → Delivered (Challan) → Invoiced (Settlement).' },
     ],
     tips: [
         'Use the 📋 Clone button on any past order to duplicate customer and line items in 1 click.',
+        'Click "Generate Proforma" to create a non-accounting preliminary invoice with custom payment milestones for advance deposit collection.',
         'If stock is 0 or low, click [+PO] directly on the line item to requisition missing units immediately.',
     ],
-    workflow: ['Quotation Approved', 'Sales Order Confirmed', 'Delivery Challan Dispatched', 'Sales Invoice Issued', 'Payment Receipt Settled'],
+    workflow: ['Quotation Approved', 'Sales Order Confirmed', 'Proforma Issued (Optional)', 'Delivery Challan Dispatched', 'Sales Invoice Issued', 'Payment Receipt Settled'],
 };
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, convertSalesOrderToInvoice, convertSalesOrderToChallan, deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY } = useERP();
     const [stageFilter, setStageFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState(null);
+    const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [deliveryDate, setDeliveryDate] = useState('In 10 days');
     const [lineItems, setLineItems] = useState([]);
@@ -89,7 +92,7 @@ export const SalesOrdersPage = () => {
         if (currentStage === 'Draft') {
             updateSalesOrderStage(orderId, 'Confirmed');
         }
-        else if (currentStage === 'Confirmed') {
+        else if (currentStage === 'Confirmed' || currentStage === 'Partially Dispatched') {
             convertSalesOrderToChallan(orderId);
             navigate('/sales/delivery');
         }
@@ -103,9 +106,89 @@ export const SalesOrdersPage = () => {
             return true;
         return o.stage === stageFilter;
     });
+    const handleGenerateProforma = (order) => {
+        const cust = customers.find((c) => c.id === order.customerId || c.name === order.customer) || customers[0];
+        const nextId = (proformaInvoices.length + 101);
+        const piNumber = `PI-2026-${String(nextId).padStart(3, '0')}`;
+        
+        const rawItems = (order.items && order.items.length > 0) ? order.items.map((it, idx) => ({
+            id: `pi-it-${Date.now()}-${idx}`,
+            itemId: it.id || it.itemId || `item-${idx}`,
+            productName: it.description || it.productName || it.name || 'Industrial Machine Equipment',
+            productCode: it.productCode || it.sku || `SKU-SO-${idx + 1}`,
+            description: it.description || 'Pre-dispatch proforma billing unit',
+            qty: it.qty || 1,
+            unit: it.unit || 'pcs',
+            unitPrice: it.rate || it.unitPrice || it.amount || 10000,
+            discountPercent: it.discountPercent || 0,
+            discountAmount: it.discountAmount || 0,
+            taxRate: it.taxRate || 18,
+            taxAmount: (it.qty || 1) * (it.rate || it.unitPrice || 10000) * ((it.taxRate || 18) / 100),
+            lineTotal: ((it.qty || 1) * (it.rate || it.unitPrice || 10000)) * (1 + ((it.taxRate || 18) / 100)),
+            isMachine: it.isMachine ?? true,
+            warrantyStatus: 'Pending Final Invoicing / Commissioning',
+        })) : [
+            {
+                id: `pi-it-${Date.now()}-1`,
+                itemId: 'item-mach-01',
+                productName: 'CNC High-Precision Milling Machine X500',
+                productCode: 'CNC-M-500',
+                description: 'Industrial 5-axis vertical machining center',
+                qty: 1,
+                unit: 'set',
+                unitPrice: order.amount || 450000,
+                discountPercent: 0,
+                discountAmount: 0,
+                taxRate: 18,
+                taxAmount: (order.amount || 450000) * 0.18,
+                lineTotal: (order.amount || 450000) * 1.18,
+                isMachine: true,
+                warrantyStatus: 'Pending Final Invoicing / Commissioning',
+            }
+        ];
+
+        const subtotal = rawItems.reduce((sum, it) => sum + (it.qty * (it.unitPrice || 0)), 0);
+        const taxTotal = rawItems.reduce((sum, it) => sum + (it.taxAmount || 0), 0);
+        const grandTotal = subtotal + taxTotal;
+
+        const newPi = {
+            id: `pi-${Date.now()}`,
+            piNumber,
+            piDate: new Date().toISOString().split('T')[0],
+            customerId: cust?.id || order.customerId,
+            customer: cust?.name || order.customer,
+            customerContact: cust?.contactPerson || 'Procurement Lead',
+            billingAddress: cust?.billingAddress || cust?.address || 'Industrial Area Phase 2, New Delhi, 110020',
+            shippingAddress: cust?.shippingAddress || cust?.address || 'Plant 4, Industrial Zone, Gurgaon, HR',
+            referenceSo: order.orderNumber,
+            salesOrderId: order.id,
+            paymentPreset: '50-40-10',
+            paymentTerms: '50% Advance • 40% Before Dispatch • 10% Post-Delivery',
+            paymentSchedule: [
+                { milestone: 'Advance Booking Deposit', pct: 50, amount: grandTotal * 0.5, due: 'Order Confirmation / Proforma Acceptance' },
+                { milestone: 'Before Warehouse Dispatch', pct: 40, amount: grandTotal * 0.4, due: 'Readiness Inspection' },
+                { milestone: 'Post-Delivery / Final Invoice', pct: 10, amount: grandTotal * 0.1, due: 'Final Tax Invoicing & Commissioning' },
+            ],
+            notes: `Commercial Proforma issued for Sales Order ${order.orderNumber}. Non-negotiable price validity 30 days.`,
+            termsAndConditions: '1. This Proforma Invoice is a commercial quotation and agreement document only. It does not constitute a legal Tax Invoice and creates no direct Accounting / AR liability.\n2. Machine warranties and service guarantees will commence strictly upon issuance of the Final Tax Invoice and successful site commissioning.',
+            status: 'Draft',
+            items: rawItems,
+            subtotal,
+            discountTotal: 0,
+            taxTotal,
+            grandTotal,
+            total: grandTotal,
+            createdAt: new Date().toISOString(),
+        };
+
+        addProformaInvoice(newPi);
+        navigate('/sales/proforma');
+    };
+
     const getOrderTimelineSteps = (order) => {
         const isQuoteLinked = !!order.quotationNumber;
         const isConfirmed = order.stage !== 'Draft';
+        const linkedPi = proformaInvoices.find((p) => p.referenceSo === order.orderNumber || p.salesOrderId === order.id);
         const isDispatched = order.stage === 'Delivered' || order.stage === 'Dispatched' || order.stage === 'Invoiced';
         const isInvoiced = order.stage === 'Invoiced';
         const linkedInvoice = invoices.find((i) => i.salesOrderId === order.id || i.linkedSo === order.orderNumber);
@@ -122,6 +205,11 @@ export const SalesOrdersPage = () => {
                 date: order.date,
                 amount: order.amount,
                 status: isConfirmed ? 'completed' : 'current',
+            },
+            {
+                label: 'Proforma (Optional)',
+                docNumber: linkedPi?.piNumber || 'Advance Milestone',
+                status: linkedPi ? 'completed' : isConfirmed ? 'current' : 'pending',
             },
             {
                 label: 'Delivery Challan',
@@ -150,6 +238,16 @@ export const SalesOrdersPage = () => {
                 status: 'Converted',
             });
         }
+        const relatedPis = proformaInvoices.filter((p) => p.referenceSo === order.orderNumber || p.salesOrderId === order.id);
+        relatedPis.forEach((pi) => {
+            docs.push({
+                type: 'Proforma Invoice',
+                number: pi.piNumber,
+                amount: pi.grandTotal || pi.total,
+                date: pi.piDate,
+                status: pi.status,
+            });
+        });
         const challans = deliveryChallans.filter((c) => c.salesOrderId === order.id || c.salesOrderNumber === order.orderNumber || c.linkedSo === order.orderNumber);
         challans.forEach((c) => {
             docs.push({
@@ -224,14 +322,19 @@ export const SalesOrdersPage = () => {
             width: '14%',
             render: (o) => {
                 const stageVal = o.stage || o.status || 'Draft';
-                const stages = ['Draft', 'Confirmed', 'Delivered', 'Invoiced'];
-                const currentIdx = stages.indexOf(stageVal);
-                return (<div className="flex items-center justify-center gap-1">
-            {stages.map((stg, i) => (<span key={stg} title={stg} className={`w-2.5 h-2.5 rounded-full ${i <= currentIdx ? 'bg-primary' : 'bg-border'}`}/>))}
-            <span className="ml-1.5 text-[11px] font-semibold text-text">
-              {stageVal}
-            </span>
-          </div>);
+                return (
+                  <div className="flex items-center justify-center">
+                    <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
+                      stageVal === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                      stageVal === 'Partially Dispatched' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      stageVal === 'Confirmed' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                      stageVal === 'Invoiced' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                      'bg-slate-50 text-slate-700 border-slate-200'
+                    }`}>
+                      {stageVal}
+                    </span>
+                  </div>
+                );
             },
         },
         {
@@ -247,10 +350,16 @@ export const SalesOrdersPage = () => {
             align: 'right',
             width: '18%',
             render: (o) => {
+                const isCancelled = o.stage === 'Cancelled' || o.status === 'Cancelled';
                 return (<div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
             <button onClick={() => handleCloneOrder(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Duplicate this Sales Order">
               <Copy size={13}/>
             </button>
+            {!isCancelled && (
+              <button onClick={() => handleGenerateProforma(o)} className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="Generate Proforma Invoice for advance payment milestone collection">
+                <FileSpreadsheet size={13}/>
+              </button>
+            )}
 
             {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
@@ -264,13 +373,25 @@ export const SalesOrdersPage = () => {
             {o.stage === 'Invoiced' && (<span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1 whitespace-nowrap">
                 <CheckCircle size={12}/> Fulfilled
               </span>)}
+            {isCancelled && (<span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400 inline-flex items-center gap-1 whitespace-nowrap">
+                <Ban size={12}/> Cancelled
+              </span>)}
+            {!isCancelled && o.stage !== 'Invoiced' && (
+              <button
+                onClick={() => setCancelModalTarget(o)}
+                className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded cursor-pointer transition-colors"
+                title="Cancel Sales Order"
+              >
+                <Ban size={13}/>
+              </button>
+            )}
           </div>);
             },
         },
     ];
-    const totalSoValue = salesOrders.reduce((acc, o) => acc + (o.amount ?? o.total ?? 0), 0);
+    const totalSoValue = salesOrders.filter(o => o.stage !== 'Cancelled').reduce((acc, o) => acc + (o.amount ?? o.total ?? 0), 0);
     const confirmedValue = salesOrders.filter(o => o.stage === 'Confirmed' || o.stage === 'Delivered').reduce((acc, o) => acc + (o.amount ?? o.total ?? 0), 0);
-    const openOrdersCount = salesOrders.filter(o => o.stage !== 'Invoiced').length;
+    const openOrdersCount = salesOrders.filter(o => o.stage !== 'Invoiced' && o.stage !== 'Cancelled').length;
     const fulfilledOrdersCount = salesOrders.filter(o => o.stage === 'Invoiced').length;
 
     return (<div className="space-y-6">
@@ -288,7 +409,7 @@ export const SalesOrdersPage = () => {
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs">
-        {['All', 'Draft', 'Confirmed', 'Delivered', 'Invoiced'].map((stg) => (<button key={stg} onClick={() => setStageFilter(stg)} className={`px-3 py-1.5 rounded-t font-semibold transition-colors ${stageFilter === stg
+        {['All', 'Draft', 'Confirmed', 'Delivered', 'Invoiced', 'Cancelled'].map((stg) => (<button key={stg} onClick={() => setStageFilter(stg)} className={`px-3 py-1.5 rounded-t font-semibold transition-colors ${stageFilter === stg
                 ? 'bg-white border-t-2 border-[#1F2E4A] text-[#1F2E4A] shadow-sm'
                 : 'text-slate-500 hover:text-slate-800'}`}>
             {stg}
@@ -424,11 +545,78 @@ export const SalesOrdersPage = () => {
               <RelatedDocumentsCard documents={getOrderRelatedDocs(selectedOrder)}/>
 
               {/* Order Line Items Table */}
-              <div className="space-y-2">
-                <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
-                  Committed Line Items ({selectedOrder.items?.length || 0})
-                </h4>
-                <LineItemEditor items={selectedOrder.items || []} onChange={() => { }} readOnly={true}/>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
+                    Committed Line Items & Fulfillment Status ({selectedOrder.items?.length || 0})
+                  </h4>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    Stage: <strong className="text-slate-800">{selectedOrder.stage || 'Draft'}</strong>
+                  </span>
+                </div>
+
+                {/* Line Fulfillment Progress Summary Table */}
+                {selectedOrder.items && selectedOrder.items.length > 0 && (
+                  <div className="overflow-x-auto rounded-lg border border-slate-200">
+                    <table className="w-full text-left text-xs text-slate-600">
+                      <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[10px]">
+                        <tr>
+                          <th className="py-2 px-3">Item / Description</th>
+                          <th className="py-2 px-3 text-center">Ordered</th>
+                          <th className="py-2 px-3 text-center">Delivered</th>
+                          <th className="py-2 px-3 text-center">Invoiced</th>
+                          <th className="py-2 px-3 text-center">Remaining to Deliver</th>
+                          <th className="py-2 px-3 text-right">Line Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 bg-white">
+                        {selectedOrder.items.map((it, idx) => {
+                          const ordered = Number(it.orderedQty ?? it.qty ?? 1);
+                          const delivered = Number(it.deliveredQty ?? 0);
+                          const invoiced = Number(it.invoicedQty ?? 0);
+                          const remaining = Math.max(0, ordered - delivered);
+                          return (
+                            <tr key={it.id || idx}>
+                              <td className="py-2 px-3 font-semibold text-slate-800">
+                                {it.description || it.name}
+                                {it.sku && <span className="text-[10px] text-slate-400 font-mono block">SKU: {it.sku}</span>}
+                              </td>
+                              <td className="py-2 px-3 text-center font-mono font-bold">{ordered}</td>
+                              <td className="py-2 px-3 text-center font-mono text-blue-600 font-bold">{delivered}</td>
+                              <td className="py-2 px-3 text-center font-mono text-purple-600 font-bold">{invoiced}</td>
+                              <td className="py-2 px-3 text-center font-mono">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  remaining === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'
+                                }`}>
+                                  {remaining}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">
+                                {formatCurrency(it.amount ?? (ordered * Number(it.rate || 0)))}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Address Snapshot Details */}
+                <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Billed To (Snapshot)</span>
+                    <p className="font-semibold text-slate-800">{selectedOrder.customer}</p>
+                    <p className="text-slate-600">{selectedOrder.billingAddress?.line1 || 'Main Facility'}</p>
+                    <p className="text-slate-600">{selectedOrder.billingAddress?.city || 'Mumbai'}, {selectedOrder.billingAddress?.state || 'Maharashtra'} {selectedOrder.billingAddress?.pincode}</p>
+                  </div>
+                  <div>
+                    <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Shipped To (Snapshot)</span>
+                    <p className="font-semibold text-slate-800">{selectedOrder.customer}</p>
+                    <p className="text-slate-600">{selectedOrder.shippingAddress?.line1 || selectedOrder.billingAddress?.line1 || 'Destination Facility'}</p>
+                    <p className="text-slate-600">{selectedOrder.shippingAddress?.city || selectedOrder.billingAddress?.city || 'Mumbai'}, {selectedOrder.shippingAddress?.state || selectedOrder.billingAddress?.state || 'Maharashtra'} {selectedOrder.shippingAddress?.pincode}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -437,15 +625,32 @@ export const SalesOrdersPage = () => {
                 Total Value: <span className="font-bold text-slate-900">{formatCurrency(selectedOrder.amount || 0)}</span>
               </div>
               <div className="flex items-center gap-2">
-                {selectedOrder.stage === 'Draft' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Draft'); setSelectedOrder(null); }}>
-                    Confirm Order
-                  </Button>)}
-                {selectedOrder.stage === 'Confirmed' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Confirmed'); setSelectedOrder(null); }}>
-                    Issue Delivery Challan
-                  </Button>)}
-                {selectedOrder.stage === 'Delivered' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Delivered'); setSelectedOrder(null); }}>
-                    Generate Sales Invoice
-                  </Button>)}
+                {selectedOrder.stage !== 'Cancelled' && (
+                  <>
+                    <Button variant="outline" onClick={() => { handleGenerateProforma(selectedOrder); setSelectedOrder(null); }}>
+                      <FileSpreadsheet size={13} className="mr-1 text-blue-600"/> Generate Proforma
+                    </Button>
+                    {selectedOrder.stage === 'Draft' && (<Button onClick={() => { advanceStage(selectedOrder.id, 'Draft'); setSelectedOrder(null); }}>
+                        Confirm Order
+                      </Button>)}
+                    {(selectedOrder.stage === 'Confirmed' || selectedOrder.stage === 'Partially Dispatched') && (<Button onClick={() => { advanceStage(selectedOrder.id, selectedOrder.stage); setSelectedOrder(null); }}>
+                        {selectedOrder.stage === 'Partially Dispatched' ? 'Dispatch Remaining' : 'Issue Delivery Challan'}
+                      </Button>)}
+                    {(selectedOrder.stage === 'Delivered' || selectedOrder.stage === 'Dispatched' || selectedOrder.stage === 'Partially Dispatched') && (<Button variant="outline" onClick={() => { convertSalesOrderToInvoice(selectedOrder.id); setSelectedOrder(null); navigate('/sales/invoices'); }}>
+                        Generate Sales Invoice
+                      </Button>)}
+                    <button
+                      onClick={() => {
+                        const target = selectedOrder;
+                        setSelectedOrder(null);
+                        setCancelModalTarget(target);
+                      }}
+                      className="px-3 py-1.5 border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                    >
+                      <Ban size={12}/> Cancel Order
+                    </button>
+                  </>
+                )}
                 <Button variant="outline" onClick={() => setSelectedOrder(null)}>
                   Close
                 </Button>
@@ -453,5 +658,43 @@ export const SalesOrdersPage = () => {
             </div>
           </div>
         </div>)}
+
+      {/* Cancel Confirmation Modal */}
+      {cancelModalTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
+              <ShieldAlert className="w-5 h-5 text-rose-600"/>
+              <h3 className="font-bold text-base text-[#1F2E4A]">Cancel Sales Order {cancelModalTarget.orderNumber}?</h3>
+            </div>
+
+            <div className="py-4 space-y-2 text-slate-600">
+              <p className="font-semibold text-slate-800">This action will:</p>
+              <ul className="list-disc list-inside space-y-1 text-slate-600">
+                <li>Release inventory reservation for this order</li>
+                <li>Prevent any new Delivery Challans or Invoices from being generated</li>
+                <li>Mark order as <strong className="text-rose-600">Cancelled</strong></li>
+                <li>Preserve previous document history</li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <Button variant="outline" onClick={() => setCancelModalTarget(null)}>
+                Keep Order
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  cancelSalesOrder(cancelModalTarget.id);
+                  setCancelModalTarget(null);
+                }}
+                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+              >
+                Cancel Order
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>);
 };

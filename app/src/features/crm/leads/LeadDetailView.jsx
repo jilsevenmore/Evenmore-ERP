@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useERP } from '../../../context/ERPContext';
+import { formatCurrency } from '../../../utils/currencyUtils';
 import {
   BriefcaseBusiness,
   CalendarDays,
@@ -57,7 +58,6 @@ import LeadAvatar from './LeadAvatar';
 import LeadFormBuilder from './LeadFormBuilder';
 import { createFieldFromType } from '../../../data/crm/leadFormSchema';
 import { exportToCSV } from '../../../services/exportUtils';
-import { formatCurrency } from '../../../utils/currencyUtils';
 import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { employeesMock } from '../../../data/hrms/mocks/data';

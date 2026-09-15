@@ -69,10 +69,12 @@ import { Generic } from '../features/hrms/Generic';
 import { EstimatesPage } from '../features/sales/EstimatesPage';
 import { QuotationsPage } from '../features/sales/QuotationsPage';
 import { SalesOrdersPage } from '../features/sales/SalesOrdersPage';
+import { ProformaInvoicesPage } from '../features/sales/ProformaInvoicesPage';
 import { SalesInvoicesPage } from '../features/sales/SalesInvoicesPage';
 import { SalesReturnsPage } from '../features/sales/SalesReturnsPage';
 import { PaymentInPage } from '../features/sales/PaymentInPage';
 import { DeliveryChallansPage } from '../features/sales/DeliveryChallansPage';
+import { WarrantyListPage } from '../features/sales/WarrantyListPage';
 
 // ── ERP — Purchase ────────────────────────────────────────────
 import { PurchaseOrdersPage } from '../features/purchase/PurchaseOrdersPage';
@@ -198,14 +200,17 @@ const router = createBrowserRouter([
       { path: 'sales/estimates', element: <Page component={EstimatesPage} /> },
       { path: 'sales/quotations', element: <Page component={QuotationsPage} /> },
       { path: 'sales/orders', element: <Page component={SalesOrdersPage} /> },
+      { path: 'sales/proforma', element: <Page component={ProformaInvoicesPage} /> },
       { path: 'sales/invoices', element: <Page component={SalesInvoicesPage} /> },
       { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
       { path: 'sales/payments', element: <Page component={PaymentInPage} /> },
       { path: 'sales/delivery', element: <Page component={DeliveryChallansPage} /> },
+      { path: 'sales/warranty', element: <Page component={WarrantyListPage} /> },
+      { path: 'warranty', element: <Navigate to="/sales/warranty" replace /> },
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },
-      { path: 'purchase/vendors', element: <Page component={VendorsPage} /> },
+      { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
       { path: 'purchase/returns', element: <Page component={PurchaseReturnsPage} /> },

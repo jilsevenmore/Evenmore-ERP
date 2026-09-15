@@ -99,20 +99,40 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                 SUPPLIER / VENDOR (BILLED BY)
               </span>
               <p className="text-sm font-bold text-slate-900">{bill.vendor}</p>
-              <p className="text-slate-600 text-[11px]">Authorized Enterprise Hardware Supplier</p>
-              <p className="text-slate-500 text-[11px]">Payment Terms: {bill.dueDate || 'Net 30'}</p>
-              <p className="text-slate-500 text-[11px]">Account ID: VEND-{String(bill.vendor || 'VEN').slice(0, 3).toUpperCase()}-901</p>
+              {bill.billingAddress && (bill.billingAddress.street || bill.billingAddress.city) ? (
+                <div className="text-slate-600 text-[11px] leading-tight space-y-0.5 pt-0.5">
+                  <p>{bill.billingAddress.street}</p>
+                  <p>{bill.billingAddress.city}{bill.billingAddress.state ? `, ${bill.billingAddress.state}` : ''}{bill.billingAddress.pincode ? ` - ${bill.billingAddress.pincode}` : ''}</p>
+                  <p>{bill.billingAddress.country || 'India'}</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-slate-600 text-[11px]">Authorized Enterprise Hardware Supplier</p>
+                  <p className="text-slate-500 text-[11px]">Payment Terms: {bill.dueDate || 'Net 30'}</p>
+                  <p className="text-slate-500 text-[11px]">Account ID: VEND-{String(bill.vendor || 'VEN').slice(0, 3).toUpperCase()}-901</p>
+                </>
+              )}
             </div>
 
             {/* Buyer / Receiving Dock */}
             <div className="space-y-1 border-l border-slate-200 pl-6">
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
-                CONSIGNEE / BILLED TO
+                CONSIGNEE / SHIP TO
               </span>
               <p className="text-sm font-bold text-slate-900">Horizon Enterprise Corp.</p>
-              <p className="text-slate-600 text-[11px]">Receiving Dock: Central Warehouse Bay A-1</p>
-              <p className="text-slate-500 text-[11px]">Intake Verification: GRN 3-Way Matched (100%)</p>
-              <p className="text-slate-500 text-[11px]">GL Account: 2010 - Accounts Payable Liability</p>
+              {bill.shippingAddress && (bill.shippingAddress.street || bill.shippingAddress.city) ? (
+                <div className="text-slate-600 text-[11px] leading-tight space-y-0.5 pt-0.5">
+                  <p>{bill.shippingAddress.street}</p>
+                  <p>{bill.shippingAddress.city}{bill.shippingAddress.state ? `, ${bill.shippingAddress.state}` : ''}{bill.shippingAddress.pincode ? ` - ${bill.shippingAddress.pincode}` : ''}</p>
+                  <p>{bill.shippingAddress.country || 'India'}</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-slate-600 text-[11px]">Receiving Dock: Central Warehouse Bay A-1</p>
+                  <p className="text-slate-500 text-[11px]">Intake Verification: GRN 3-Way Matched (100%)</p>
+                  <p className="text-slate-500 text-[11px]">GL Account: 2010 - Accounts Payable Liability</p>
+                </>
+              )}
             </div>
           </div>
 
