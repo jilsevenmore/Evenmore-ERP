@@ -944,7 +944,7 @@ export function ClientsPage() {
                       </div>
                     </div>
 
-                    <div className="relative client-menu-container" onClick={(e) => e.stopPropagation()}>
+                    <div className="relative client-menu-container flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
                         onClick={(e) => {
@@ -953,7 +953,7 @@ export function ClientsPage() {
                         }}
                         className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
                           isMenuOpen
-                            ? 'bg-slate-200 text-slate-800'
+                            ? 'bg-slate-200 text-slate-800 shadow-2xs'
                             : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
                         }`}
                       >
@@ -1089,10 +1089,10 @@ export function ClientsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-1.5 pt-3 mt-1">
+                <div className="flex items-center justify-between gap-2 pt-3 mt-1">
                   <button
                     onClick={() => setViewingClient(client)}
-                    className="flex-1 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-slate-200 transition-colors"
+                    className="flex-1 py-1.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-slate-200 transition-colors"
                   >
                     <Eye size={13} />
                     <span>View</span>
@@ -1103,20 +1103,10 @@ export function ClientsPage() {
                       setEditingClient(client);
                       setIsCreateModalOpen(true);
                     }}
-                    className="flex-1 py-1.5 px-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-slate-200 transition-colors"
+                    className="flex-1 py-1.5 px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 border border-slate-200 transition-colors"
                   >
                     <Edit2 size={13} />
                     <span>Edit</span>
-                  </button>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenMenuClientId((prev) => (prev === client.id ? null : client.id));
-                    }}
-                    className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl border border-slate-200 transition-colors"
-                  >
-                    <MoreVertical size={14} />
                   </button>
                 </div>
               </div>
