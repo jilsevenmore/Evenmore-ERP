@@ -150,7 +150,7 @@ export default function TaskAllocationPage() {
   const activeFilterCount = (statusFilter !== 'Any' ? 1 : 0) + (assigneeFilter !== 'Anyone' ? 1 : 0) + (deptFilter !== 'Any' ? 1 : 0);
 
   return (
-    <section className="w-full max-w-[80rem] mx-auto py-6 px-1 sm:px-3">
+    <section className="w-full space-y-4">
       <div className="flex items-start justify-between gap-4 mb-5">
         <div className="min-w-0">
           <h1 className="text-[22px] leading-tight font-extrabold text-slate-900 tracking-tight">Task Allocation</h1>

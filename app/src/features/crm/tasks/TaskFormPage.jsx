@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Pencil, Trash2, FileText, CalendarDays, PhoneCall, MapPinned, X, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, CalendarDays, PhoneCall, MapPinned, X, ChevronDown, LayoutGrid, Rows3 } from 'lucide-react';
 import InfoBanner from '../common/InfoBanner';
 
 const STORAGE_KEY = 'leadTaskFormsV1';
@@ -43,6 +43,13 @@ function iconFor(name) {
   return name === 'visit' ? MapPinned : PhoneCall;
 }
 
+function parseDateValue(dateString) {
+  if (!dateString || typeof dateString !== 'string') return 0;
+  const [day, month, year] = dateString.split('/').map(Number);
+  if (!day || !month || !year) return 0;
+  return new Date(year, month - 1, day).getTime();
+}
+
 export default function TaskFormPage() {
   const navigate = useNavigate();
   const [forms, setForms] = useState(getStoredForms);
@@ -50,8 +57,10 @@ export default function TaskFormPage() {
   const [editingId, setEditingId] = useState(null);
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [query, setQuery] = useState('');
   const [deleteId, setDeleteId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('All Status');
+  const [sortOrder, setSortOrder] = useState('Newest First');
+  const [viewMode, setViewMode] = useState('grid');
 
   useEffect(() => {
     try {
@@ -117,19 +126,6 @@ export default function TaskFormPage() {
     setDeleteId(null);
   }
 
-  const q = query.trim().toLowerCase();
-  const visible = forms.filter((f) => {
-    if (!q) return true;
-    const names = f.sections
-      ? f.sections.flatMap((s) => s.fields.map((fl) => fl.label)).join(' ')
-      : (f.fields || []).join(' ');
-    return (
-      f.title.toLowerCase().includes(q) ||
-      (f.description || '').toLowerCase().includes(q) ||
-      names.toLowerCase().includes(q)
-    );
-  });
-
   function fieldInfo(form) {
     if (form.sections && Array.isArray(form.sections)) {
       const labels = form.sections.flatMap((s) => s.fields.map((fl) => fl.label));
@@ -142,106 +138,302 @@ export default function TaskFormPage() {
     return { count: arr.length, text: arr.length > 0 ? arr.join(', ') : 'No fields defined' };
   }
 
+  const visible = useMemo(() => {
+    const nextForms = forms.filter((form) => (
+      statusFilter === 'All Status' ||
+      (statusFilter === 'Active' && (form.status || 'ACTIVE') === 'ACTIVE')
+    ));
+
+    nextForms.sort((a, b) => {
+      const aDate = parseDateValue(a.lastUpdated);
+      const bDate = parseDateValue(b.lastUpdated);
+      return sortOrder === 'Oldest First' ? aDate - bDate : bDate - aDate;
+    });
+
+    return nextForms;
+  }, [forms, sortOrder, statusFilter]);
+
   return (
-    <section className="w-full max-w-6xl mx-auto py-4">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Lead Task Forms</h1>
-          <div className="text-xs font-medium text-slate-500 mt-1 flex items-center gap-1.5">
+    <section className="w-full max-w-none px-3 sm:px-4 lg:px-5 py-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-[22px] sm:text-[24px] leading-tight font-bold text-slate-900 tracking-tight">Manage Lead Task Forms</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500">
             <span>Dashboard</span>
             <span>&gt;</span>
             <span className="text-slate-700">Lead Task Form</span>
           </div>
         </div>
+
         <button
           type="button"
-          className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition cursor-pointer"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] bg-[#2f6fed] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] cursor-pointer"
           onClick={openCreateModal}
           aria-label="Create new task form"
         >
           <Plus size={18} />
+          <span>Create Form</span>
         </button>
       </div>
 
-      <InfoBanner
-        storageKey="infoBannerLeadTaskFormV1"
-        title="Why use Lead Task Forms?"
-        text="These define the fields collected while doing a task. You design the form once, then every call, visit or follow-up follows the same checklist."
-      />
-
-      <div className="flex items-center justify-between mb-5">
-        <span className="text-xs text-slate-500 font-medium">{visible.length} Forms</span>
+      <div className="mt-5">
+        <InfoBanner
+          storageKey="infoBannerLeadTaskFormV1"
+          title="Why use Lead Task Forms?"
+          text="These define the fields collected while doing a task. You design the form once, then every call, visit or follow-up follows the same checklist."
+        />
       </div>
 
-      {visible.length === 0 ? (
-        <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-10 text-center">
-          <p className="text-sm font-semibold text-slate-700">No forms found</p>
-          <p className="text-xs text-slate-500 mt-1">Try a different search or create a new form.</p>
-          <button
-            type="button"
-            onClick={openCreateModal}
-            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition"
-          >
-            Create Form
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {visible.map((form) => {
-            const Icon = iconFor(form.iconName);
-            const { count, text: fieldText } = fieldInfo(form);
-            return (
-              <article
-                key={form.id}
-                className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-slate-300 hover:shadow-sm transition flex flex-col justify-between"
+      <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 sm:p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-3 xl:justify-end">
+            <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">
+              {visible.length} {visible.length === 1 ? 'Form' : 'Forms'}
+            </div>
+
+            <div className="relative shrink-0">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-11 min-w-[150px] appearance-none rounded-[14px] border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2f6fed]"
               >
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 grid place-items-center shrink-0">
-                      <Icon size={16} />
-                    </span>
-                    <h2 className="text-sm font-bold text-slate-900 truncate">{form.title}</h2>
+                <option>All Status</option>
+                <option>Active</option>
+              </select>
+              <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
+
+            <div className="relative shrink-0">
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="h-11 min-w-[160px] appearance-none rounded-[14px] border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2f6fed]"
+              >
+                <option>Newest First</option>
+                <option>Oldest First</option>
+              </select>
+              <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
+
+            <div className="inline-flex shrink-0 rounded-[16px] border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
+                  viewMode === 'grid' ? 'bg-[#2f6fed] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Rows3 size={15} />
+                <span>Grid View</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('tile')}
+                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
+                  viewMode === 'tile' ? 'bg-[#2f6fed] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <LayoutGrid size={15} />
+                <span>Tile View</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[18px] border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
+          Create a task form using the top-right button, then open it in the builder to add sections and fields.
+        </div>
+
+        {visible.length === 0 ? (
+          <div className="mt-5 rounded-[20px] border border-dashed border-slate-300 p-10 text-center">
+            <p className="text-sm font-semibold text-slate-700">No forms found</p>
+            <p className="mt-1 text-xs text-slate-500">Create a new form to get started.</p>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-[12px] bg-[#2f6fed] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+            >
+              Create Form
+            </button>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="mt-5 overflow-hidden rounded-[20px] border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-slate-50/95">
+                  <tr className="text-left text-[12px] font-bold uppercase tracking-[0.04em] text-slate-500">
+                    <th className="px-5 py-4 whitespace-nowrap">#</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Form Name</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Description</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Fields</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Created On</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Status</th>
+                    <th className="px-5 py-4 text-right whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {visible.map((form, index) => {
+                    const Icon = iconFor(form.iconName);
+                    const { count } = fieldInfo(form);
+
+                    return (
+                      <tr key={form.id} className="text-sm text-slate-700 transition hover:bg-slate-50/60">
+                        <td className="px-5 py-4 font-medium text-slate-500 whitespace-nowrap">{index + 1}</td>
+                        <td className="px-5 py-4 min-w-[210px]">
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shrink-0">
+                              <Icon size={16} />
+                            </span>
+                            <span className="font-bold text-slate-900 whitespace-nowrap">{form.title}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-slate-500 whitespace-nowrap">
+                          {form.description || 'No description provided'}
+                        </td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700">
+                            {count} Fields
+                          </span>
+                        </td>
+                        <td className="px-5 py-4 text-slate-700 whitespace-nowrap">{form.lastUpdated}</td>
+                        <td className="px-5 py-4 whitespace-nowrap">
+                          <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                            {form.status || 'ACTIVE'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-4">
+                          <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(form)}
+                              className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+                            >
+                              <Pencil size={13} />
+                              <span>Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteId(form.id)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
+                              aria-label={`Delete ${form.title}`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {visible.map((form) => {
+              const Icon = iconFor(form.iconName);
+              const { count, text: fieldText } = fieldInfo(form);
+
+              return (
+                <article
+                  key={form.id}
+                  className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                          <Icon size={16} />
+                        </span>
+                        <div className="min-w-0">
+                          <h2 className="truncate text-sm font-bold text-slate-900">{form.title}</h2>
+                          <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">
+                            {form.description || 'No description provided'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-xs text-slate-500 mb-3 line-clamp-2 min-h-[28px]">{form.description}</p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-2 mb-1" title={fieldText}>
+
+                  <p className="mt-3 line-clamp-2 text-[11px] leading-relaxed text-slate-500" title={fieldText}>
                     {fieldText}
                   </p>
-                </div>
 
-                <div>
-                  <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-100 mt-3 mb-4">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <FileText size={13} /> {count} Fields
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <CalendarDays size={13} /> {form.lastUpdated}
-                    </span>
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-full border border-emerald-200">
-                      {form.status || 'ACTIVE'}
-                    </span>
+                  <div className="mt-4 grid grid-cols-2 gap-2.5 rounded-[14px] bg-slate-50 p-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Fields</div>
+                      <div className="mt-0.5 text-sm font-bold text-slate-900">{count}</div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Status</div>
+                      <div className="mt-0.5 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                        {form.status || 'ACTIVE'}
+                      </div>
+                    </div>
+                    <div className="col-span-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Created On</div>
+                      <div className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                        <CalendarDays size={13} />
+                        <span>{form.lastUpdated}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div className="mt-4 flex items-center justify-between gap-2.5">
                     <button
                       type="button"
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3.5 bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+                      className="inline-flex h-9 items-center gap-1.5 rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] cursor-pointer"
                       onClick={() => openEditModal(form)}
                     >
-                      <Pencil size={12} /> Edit
+                      <Pencil size={13} />
+                      <span>Edit</span>
                     </button>
                     <button
                       type="button"
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 px-3.5 bg-white hover:bg-rose-50 text-rose-600 text-xs font-semibold rounded-lg border border-rose-200 transition cursor-pointer"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 cursor-pointer"
                       onClick={() => setDeleteId(form.id)}
+                      aria-label={`Delete ${form.title}`}
                     >
-                      <Trash2 size={12} /> Delete
+                      <Trash2 size={14} />
                     </button>
                   </div>
-                </div>
-              </article>
-            );
-          })}
+                </article>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            Showing {visible.length === 0 ? 0 : 1} to {visible.length} of {visible.length} forms
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400"
+              disabled
+              aria-label="Previous page"
+            >
+              <ChevronDown size={16} className="rotate-90" />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-10 min-w-10 items-center justify-center rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white"
+            >
+              1
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400"
+              disabled
+              aria-label="Next page"
+            >
+              <ChevronDown size={16} className="-rotate-90" />
+            </button>
+          </div>
         </div>
-      )}
+      </div>
 
       {isModalOpen && (
         <div
