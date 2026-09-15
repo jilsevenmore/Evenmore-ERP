@@ -19,6 +19,7 @@ import CRMDashboard from '../features/crm/dashboard/CRMDashboard';
 import DealsPage from '../features/crm/deals/DealsPage';
 import UserAllocationPage from '../features/crm/allocation/UserAllocationPage';
 import CRMSystemSetupPage from '../features/crm/setup/CRMSystemSetupPage';
+import CRMReportsPage from '../features/crm/reports/CRMReportsPage';
 
 // ── HRMS ─────────────────────────────────────────────────────
 import HRMSDashboard from '../features/hrms/dashboard/Dashboard';
@@ -112,6 +113,7 @@ import { SettingsPage } from '../features/settings/SettingsPage';
 // ── Administration ────────────────────────────────────────────
 import UsersPage from '../features/administration/UsersPage';
 import RolesPage from '../features/administration/RolesPage';
+import ClientsPage from '../features/administration/ClientsPage';
 
 // ── Main Dashboard ────────────────────────────────────────────
 import { DashboardPage } from '../features/sales/DashboardPage';
@@ -190,6 +192,7 @@ const router = createBrowserRouter([
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
+      { path: 'crm/reports', element: <Page component={CRMReportsPage} /> },
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
 
       // ── Sales ─────────────────────────────────────────────
@@ -318,6 +321,8 @@ const router = createBrowserRouter([
       { path: 'administration', element: <Navigate to="/administration/settings" replace /> },
       { path: 'administration/users', element: <Page component={UsersPage} /> },
       { path: 'administration/roles', element: <Page component={RolesPage} /> },
+      { path: 'administration/clients', element: <Page component={ClientsPage} /> },
+      { path: 'administration/client', element: <Navigate to="/administration/clients" replace /> },
       { path: 'administration/settings', element: <Page component={SettingsPage} /> },
 
       // ── Catch-all ─────────────────────────────────────────

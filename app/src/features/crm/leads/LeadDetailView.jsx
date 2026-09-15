@@ -62,6 +62,10 @@ import { useEstimates, estimateMatchesLead, addEstimate } from '../../../service
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { employeesMock } from '../../../data/hrms/mocks/data';
 import { LineItemEditor } from '../../../components/common/LineItemEditor';
+import { loadCrmTasks, saveCrmTasks, runLeadStageAutomation, TASK_SOURCE_AUTOMATION } from '../../../services/leadStageAutomation';
+import { useAppStore } from '../../../stores/appStore';
+import { completeTaskWithOutcome, NEXT_ACTION_LABELS } from '../../../services/taskCompletionService';
+import CompleteTaskModal from '../tasks/CompleteTaskModal';
 
 const DETAIL_TABS = [
   'General',
@@ -1515,9 +1519,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   const [form, setForm] = useState(() => createLeadTaskForm(defaultAssignee));
   const [formError, setFormError] = useState('');
   const [completeId, setCompleteId] = useState(null);
-  const [outcome, setOutcome] = useState('');
-  const [nextAction, setNextAction] = useState('retry');
-  const [moveToStage, setMoveToStage] = useState('Won');
+  const currentUser = useAppStore((s) => s.currentUser);
   const selectedTaskForm = useMemo(() => taskForms.find((f) => String(f.id) === String(form.taskFormId)) || null, [taskForms, form.taskFormId]);
   const selectedTaskFormFields = useMemo(() => (selectedTaskForm ? getTaskFormFields(selectedTaskForm) : []), [selectedTaskForm]);
 
@@ -1741,40 +1743,87 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   function toggleStatus(task) {
     if (task.status === 'Due') {
       setCompleteId(task.id);
-      setOutcome('');
-      setNextAction('retry');
-      setMoveToStage('Won');
       return;
     }
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: 'Due' } : t)));
+    // Reopen a completed task: clear completion metadata
+    const reopened = tasks.find((t) => t.id === task.id);
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === task.id
+          ? {
+              ...t,
+              status: 'Due',
+              process: 'Not Started',
+              completionOutcome: undefined,
+              nextAction: undefined,
+              completedAt: undefined,
+              completedBy: undefined,
+            }
+          : t
+      )
+    );
+    if (reopened?.crmTaskId) {
+      try {
+        const crmTasks = loadCrmTasks();
+        const nextCrmTasks = crmTasks.map((t) =>
+          String(t.id) === String(reopened.crmTaskId)
+            ? {
+                ...t,
+                status: 'Open',
+                completionOutcome: undefined,
+                nextAction: undefined,
+                completedAt: undefined,
+                completedBy: undefined,
+              }
+            : t
+        );
+        saveCrmTasks(nextCrmTasks);
+      } catch (err) {
+        console.error('[CRM Completion] Error reopening task in Task List:', err);
+      }
+    }
   }
 
-  function submitCompleteTask(e) {
-    e.preventDefault();
-    const task = tasks.find((t) => t.id === completeId);
-    if (!task) {
-      setCompleteId(null);
-      return;
+  async function submitCompleteTask(outcome, nextAction) {
+    const detailTask = tasks.find((t) => t.id === completeId);
+    if (!detailTask) {
+      return { ok: false, message: 'Task could not be found.' };
     }
-    const attempt = (task.attempt || 1) + (nextAction === 'retry' ? 1 : 0);
-    const stampedOutcome = outcome.trim();
-    if (nextAction === 'finish') {
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: 'Completed', attempt: task.attempt || 1, outcome: stampedOutcome } : (t.status === 'Due' ? { ...t, status: 'Completed' } : t))));
-      onActivity?.(`Task "${task.title}" completed, lead parked in ${moveToStage}`, '#1d4a79');
-    } else if (nextAction === 'move') {
-      setTasks((prev) => [
-        ...prev.map((t) => (t.id === task.id ? { ...t, status: 'Completed', attempt: task.attempt || 1, outcome: stampedOutcome } : t)),
-        { id: `lt-${Date.now()}`, title: task.title, stage: moveToStage, status: 'Due', priority: task.priority, dueAt: new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), process: 'Not Started', attempt: 1, assignee: task.assignee || defaultAssignee, description: task.description || '', proposalId: task.proposalId || '', deliveryChallanId: task.deliveryChallanId || '', taskFormId: task.taskFormId || '', taskFormName: task.taskFormName || '', customValues: task.customValues || {}, defaultTask: task.defaultTask || 'custom' },
-      ]);
-      onActivity?.(`Task "${task.title}" completed, lead moved to ${moveToStage}`, '#16a34a');
+    let crmTask = null;
+    try {
+      crmTask = loadCrmTasks().find((t) => String(t.id) === String(detailTask.crmTaskId)) || null;
+    } catch (err) {
+      console.error('[CRM Completion] Error loading Task List store:', err);
+    }
+    const actor = currentUser?.name || defaultAssignee || lead?.owner || 'CRM User';
+    const result = completeTaskWithOutcome({
+      task: crmTask,
+      lead,
+      outcome,
+      nextAction,
+      completedBy: actor,
+      leadDetailTask: detailTask,
+    });
+    if (Array.isArray(result.leadDetailTasks)) {
+      setTasks(result.leadDetailTasks);
     } else {
-      setTasks((prev) => [
-        ...prev.map((t) => (t.id === task.id ? { ...t, status: 'Completed', attempt: task.attempt || 1, outcome: stampedOutcome } : t)),
-        { id: `lt-${Date.now()}`, title: task.title, stage: task.stage, status: 'Due', priority: task.priority, dueAt: new Date().toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), process: 'Not Started', attempt, assignee: task.assignee || defaultAssignee, description: task.description || '', proposalId: task.proposalId || '', deliveryChallanId: task.deliveryChallanId || '', taskFormId: task.taskFormId || '', taskFormName: task.taskFormName || '', customValues: task.customValues || {}, defaultTask: task.defaultTask || 'custom' },
-      ]);
-      onActivity?.(`Task "${task.title}" completed, attempt ${attempt} created`, '#1d6bff');
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === detailTask.id
+            ? {
+                ...t,
+                status: 'Completed',
+                process: 'Done',
+                completionOutcome: outcome,
+                nextAction,
+                completedAt: new Date().toISOString(),
+                completedBy: actor,
+              }
+            : t
+        )
+      );
     }
-    setCompleteId(null);
+    return result;
   }
 
   function confirmDelete() {
@@ -1793,6 +1842,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
   function renderRow(task, showNote) {
     const done = task.status !== 'Due';
+    const isAuto = task.source === TASK_SOURCE_AUTOMATION || task.source === 'Created by Lead Stage Automation';
     return (
       <div key={task.id} className="flex items-start justify-between gap-3 px-4 sm:px-5 py-4 hover:bg-slate-50/60 transition">
         <div className="flex items-start gap-3 min-w-0">
@@ -1811,6 +1861,11 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
               <span className="font-bold text-slate-900">{task.title}</span>
               <span className="text-slate-400 font-normal">· {task.stage}</span>
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold text-white ${done ? 'bg-lime-500' : 'bg-rose-600'}`}>{done ? 'Completed' : 'Due'}</span>
+              {isAuto && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                  Created by Lead Stage Automation
+                </span>
+              )}
             </p>
             <p className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
               <span className={`px-2 py-0.5 rounded font-bold ${priorityCls(task.priority)}`}>{task.priority}</span>
@@ -1818,13 +1873,33 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
               <span className="text-[#1d4a79] font-medium">{task.dueAt}</span>
               {task.assignee && (
                 <>
-                  <span className="text-slate-400">Â·</span>
-                  <span className="text-slate-500">{task.assignee}</span>
+                  <span className="text-slate-400">·</span>
+                  <span className={`font-semibold ${task.assignee === 'Unassigned' ? 'text-amber-600' : 'text-slate-500'}`}>
+                    {task.assignee}
+                  </span>
                 </>
               )}
             </p>
+            {task.warning && (
+              <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-1 rounded mt-1.5 font-medium">
+                ⚠️ {task.warning}
+              </p>
+            )}
             {task.description && <p className="text-[11px] text-slate-500 mt-1">{task.description}</p>}
             <p className="text-[11px] text-slate-400 mt-1">Process: {task.process || 'Not Started'}</p>
+            {task.completionOutcome && (
+              <p className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100 font-semibold">
+                  Outcome: {task.completionOutcome}
+                </span>
+                {task.nextAction && (
+                  <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100 font-semibold">
+                    Next: {NEXT_ACTION_LABELS[task.nextAction] || task.nextAction}
+                  </span>
+                )}
+                {task.completedBy && <span className="text-slate-400">by {task.completedBy}</span>}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -2028,89 +2103,16 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
         </div>
       )}
 
-      {completeId && (() => {
-        const task = tasks.find((t) => t.id === completeId);
-        if (!task) return null;
-        const otherDue = tasks.filter((t) => t.id !== completeId && t.status === 'Due');
-        return (
-          <div className="fixed inset-0 z-[75] flex items-center justify-center p-4 bg-slate-950/50" onClick={() => setCompleteId(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Complete task">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                <h2 className="text-[15px] font-semibold text-slate-900">Complete Task</h2>
-                <button type="button" onClick={() => setCompleteId(null)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Close">
-                  <X size={18} />
-                </button>
-              </div>
-              <form onSubmit={submitCompleteTask} className="overflow-y-auto">
-                <div className="px-5 py-4 space-y-4">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{task.title}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">Attempt {task.attempt || 1} · Stage: {task.stage}</p>
-                  </div>
-                  <div>
-                    <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">What happened?</label>
-                    <textarea
-                      rows={3}
-                      value={outcome}
-                      onChange={(e) => setOutcome(e.target.value)}
-                      placeholder="Outcome of the call, visit or demo"
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-[13px] text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-y"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-[13px] font-semibold text-slate-700 mb-2">What next?</p>
-                    <div className="space-y-3.5">
-                      <label className="flex items-start gap-2.5 cursor-pointer">
-                        <input type="radio" name="next-action" checked={nextAction === 'retry'} onChange={() => setNextAction('retry')} className="mt-1 w-4 h-4 accent-[#1d4a79] cursor-pointer" />
-                        <span>
-                          <span className="block text-[13px] font-semibold text-slate-800">Needs another attempt</span>
-                          <span className="block text-xs text-slate-500 mt-0.5">Creates attempt {(task.attempt || 1) + 1} in this same stage.</span>
-                        </span>
-                      </label>
-                      <label className="flex items-start gap-2.5 cursor-pointer">
-                        <input type="radio" name="next-action" checked={nextAction === 'move'} onChange={() => setNextAction('move')} className="mt-1 w-4 h-4 accent-[#1d4a79] cursor-pointer" />
-                        <span>
-                          <span className="block text-[13px] font-semibold text-slate-800">Ready to move on</span>
-                          <span className="block text-xs text-slate-500 mt-0.5">Moves the lead to {moveToStage} and creates that stage's task.</span>
-                          {otherDue.length > 0 && (
-                            <span className="block text-xs font-medium text-rose-500 mt-1">Blocked until these are completed: {otherDue.map((t) => t.title).join(', ')}</span>
-                          )}
-                        </span>
-                      </label>
-                      <label className="flex items-start gap-2.5 cursor-pointer">
-                        <input type="radio" name="next-action" checked={nextAction === 'finish'} onChange={() => setNextAction('finish')} className="mt-1 w-4 h-4 accent-[#1d4a79] cursor-pointer" />
-                        <span>
-                          <span className="block text-[13px] font-semibold text-slate-800">Finished with this lead</span>
-                          <span className="block text-xs text-slate-500 mt-0.5">Parks the lead in the stage you choose and closes every open task on it.</span>
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-                  {nextAction !== 'retry' && (
-                    <div>
-                      <label className="block text-[13px] font-semibold text-slate-700 mb-1.5">Move to stage</label>
-                      <select value={moveToStage} onChange={(e) => setMoveToStage(e.target.value)} className="w-full px-3.5 py-2.5 bg-white border-2 border-[#1d4a79] rounded-xl text-[13px] text-slate-700 focus:outline-none">
-                        {['New Lead', 'Details collected', 'Quotation shared', 'Demo pending', 'Demo Done', 'Negotiation', 'Won', 'Lost', 'Future'].map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
-                      <p className="text-[11px] text-slate-400 mt-1.5">Leave as suggested unless the lead skipped ahead or was lost.</p>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-end gap-2.5 px-5 py-4 border-t border-slate-100">
-                  <button type="button" onClick={() => setCompleteId(null)} className="h-10 px-5 rounded-lg bg-slate-500 hover:bg-slate-600 text-white text-[13px] font-semibold transition">
-                    Cancel
-                  </button>
-                  <button type="submit" className="h-10 px-5 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] text-white text-[13px] font-semibold transition">
-                    Complete Task
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        );
-      })()}
+      {completeId && (
+        <CompleteTaskModal
+          open={Boolean(completeId)}
+          task={tasks.find((t) => t.id === completeId) || null}
+          lead={lead}
+          onCancel={() => setCompleteId(null)}
+          onComplete={submitCompleteTask}
+          onSuccess={() => setCompleteId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -2763,6 +2765,19 @@ function ActivityTab({ lead, items }) {
             />
             <div className="space-y-1">
               <strong className="text-xs font-bold block" style={{ color: 'var(--text)' }}>{item.title}</strong>
+              {item.outcome && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    Outcome: {item.outcome}
+                  </span>
+                  {item.nextAction && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                      Next: {item.nextAction}
+                    </span>
+                  )}
+                  {item.employee && <span className="text-[10px] font-medium text-slate-500">by {item.employee}</span>}
+                </div>
+              )}
             </div>
             <div className="text-right shrink-0">
               <time className="text-[11px] font-mono block" style={{ color: 'var(--muted)' }}>{item.time}</time>
@@ -3690,6 +3705,30 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     });
   }, [viewLead?.id, lead?.id, viewLead?.status, lead?.status, isConverted, detailCounts]);
 
+  React.useEffect(() => {
+    function syncFromStore() {
+      const target = viewLead ?? lead;
+      if (!target?.id) return;
+      const fresh = loadLeadDetailState(target);
+      setActivities((current) => {
+        const incoming = fresh.activities || buildSeedActivities(target);
+        if (JSON.stringify(incoming) === JSON.stringify(current)) return current;
+        const seen = new Map(current.map((a) => [a.id, a]));
+        incoming.forEach((a) => seen.set(a.id, a));
+        return Array.from(seen.values());
+      });
+      const freshTasks = Array.isArray(fresh.tasks) ? fresh.tasks : [];
+      const openTasks = freshTasks.filter((t) => t.status !== 'Completed').length;
+      setDetailCounts((current) => (current.openTasks === openTasks ? current : { ...current, openTasks }));
+    }
+    window.addEventListener('crm:data-updated', syncFromStore);
+    window.addEventListener('storage', syncFromStore);
+    return () => {
+      window.removeEventListener('crm:data-updated', syncFromStore);
+      window.removeEventListener('storage', syncFromStore);
+    };
+  }, [viewLead, lead]);
+
   function openEditLead() {
     const source = viewLead ?? lead;
     if (!source) return;
@@ -3745,8 +3784,16 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       leadNumber: String(editForm.leadNumber ?? '').trim(),
       createdOn: String(editForm.createdOn ?? '').trim(),
     };
+    const prevStatus = viewLead?.status ?? lead?.status;
     updateStoredLead(targetId, updates);
     setViewLead((current) => ({ ...(current ?? lead), ...updates }));
+    if (updates.status && updates.status !== prevStatus) {
+      try {
+        runLeadStageAutomation({ ...(viewLead ?? lead), ...updates }, updates.status, { previousStage: prevStatus });
+      } catch (e) {
+        console.error('[CRM Automation] Error in stage change automation:', e);
+      }
+    }
     if (updates.status === 'Converted') {
       setIsConverted(true);
     } else if (isConverted && updates.status !== 'Converted') {

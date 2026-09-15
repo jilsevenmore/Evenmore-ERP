@@ -1,37 +1,88 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, UserPlus, Clock, TrendingUp, TrendingDown, DollarSign, Search, Filter, Plus, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
 import { leads, initials } from "../../../data/crm/mockLeads";
 import { useERP } from "../../../context/ERPContext";
 import { useAppStore } from "../../../stores/appStore";
-
-// ── System tasks (dashboard scope; full CRUD lives in /crm/tasks) ──
-const TASKS_SEED = [
-  { id: "TSK-001", title: "Call customer", lead: "Chirag Hirapara", company: "Hirapara Industries", due: "12 Sep 2026, 10:30 AM", dueDate: "2026-09-12", priority: "High", status: "In Progress", owner: "Priya Mehta" },
-  { id: "TSK-002", title: "Send quotation", lead: "Christopher Maclead", company: "Rangoni Of Florence", due: "10 Sep 2026, 11:00 AM", dueDate: "2026-09-10", priority: "Medium", status: "Open", owner: "David Patel" },
-  { id: "TSK-003", title: "Schedule demo", lead: "Carissa Kidman", company: "Oh My Goodknits Inc", due: "15 Sep 2026, 02:00 PM", dueDate: "2026-09-15", priority: "Medium", status: "Waiting", owner: "David Patel" },
-  { id: "TSK-004", title: "Follow up call", lead: "Tresa Sweely", company: "Morlong Associates", due: "08 Sep 2026, 10:00 AM", dueDate: "2026-09-08", priority: "High", status: "Completed", owner: "Rahul Sharma" },
-  { id: "TSK-005", title: "Final meeting", lead: "Felix Hirpara", company: "Chapman", due: "18 Sep 2026, 12:00 PM", dueDate: "2026-09-18", priority: "Low", status: "Open", owner: "Jessica Brown" },
-];
-
-// ── System deals (pipeline scope; full board lives in /crm/deals) ──
-const DEALS_SEED = [
-  { id: "d-1", title: "Endoscopy Vision System Upgrade", company: "Hirapara Industries", amount: 185000, stage: "proposal" },
-  { id: "d-2", title: "Hospital Biometric Suite", company: "Apollo Apex Healthcare", amount: 420000, stage: "negotiation" },
-  { id: "d-3", title: "Server Rack Expansion", company: "Rangoni Of Florence", amount: 95000, stage: "qualification" },
-  { id: "d-4", title: "POS Terminal Deployment", company: "Kwik Kopy Printing", amount: 68000, stage: "prospect" },
-  { id: "d-5", title: "Network Cabling Phase 2", company: "Morlong Associates", amount: 145000, stage: "won" },
-];
-
+import { CRM_TEAM_MEMBERS } from "../../../services/leadStageAutomation";
+import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from "../../../services/taskCompletionService";
+import CompleteTaskModal from "../tasks/CompleteTaskModal";
+const DEAL_STORAGE_KEY = "crm-deals-v1";
+const TASK_STORAGE_KEY = "crm-tasks-v1";
+const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
 const SOURCE_COLORS = ["#2f6fed", "#7c3aed", "#f59e0b", "#10b981", "#ec4899", "#06b6d4", "#64748b"];
 const AVATAR_COLORS = ["#2f6fed", "#7c3aed", "#059669", "#ea580c", "#db2777", "#0891b2", "#4f46e5"];
-
+const PIPELINE_BG = ["#eef4ff", "#f5f0ff", "#fff7e8", "#eef4ff", "#ecfdf5"];
+const PIPELINE_FG = ["#2f6fed", "#7c3aed", "#b45309", "#2f6fed", "#059669"];
+function seedDeals() {
+  return [
+    { id: "dl-1", name: "amitbhai_001", phone: "+919876543210", price: 100000, client: "Amit Bhai", product: "Product A", stage: "Draft", source: "Website", assignedUser: "Mr. Kamlesh Dhumadiya", pipeline: "Sales", labels: [], notes: "", tasks: "0/0", items: 0, users: 0, createdAt: "2026-05-10T10:00:00" },
+    { id: "dl-2", name: "Rohit", phone: "+919876543211", price: 500000, client: "Rohit Sharma", product: "Product B", stage: "Draft", source: "Referral", assignedUser: "Jayesh Nair", pipeline: "Sales", labels: [], notes: "", tasks: "0/0", items: 0, users: 0, createdAt: "2026-05-12T10:00:00" },
+    { id: "dl-3", name: "Deal Alpha", phone: "+919876543212", price: 750000, client: "Alpha Corp", product: "Product A", stage: "Draft", source: "Cold Call", assignedUser: "Anuska", pipeline: "Sales", labels: [], notes: "", tasks: "1/3", items: 2, users: 1, createdAt: "2026-04-08T10:00:00" },
+    { id: "dl-4", name: "Deal Beta", phone: "+919876543213", price: 1200000, client: "Beta Ltd", product: "Service C", stage: "Draft", source: "Website", assignedUser: "Mr. Kamlesh Dhumadiya", pipeline: "Sales", labels: [], notes: "", tasks: "2/5", items: 1, users: 2, createdAt: "2026-03-15T10:00:00" },
+    { id: "dl-5", name: "Deal Gamma", phone: "+919876543214", price: 1500000, client: "Gamma Inc", product: "Product B", stage: "Draft", source: "Referral", assignedUser: "Jayesh Nair", pipeline: "Sales", labels: [], notes: "", tasks: "0/2", items: 0, users: 0, createdAt: "2026-02-20T10:00:00" },
+    { id: "dl-6", name: "Deal Delta", phone: "+919876543215", price: 11123, client: "Delta Co", product: "Product A", stage: "Draft", source: "Website", assignedUser: "Anuska", pipeline: "Sales", labels: [], notes: "", tasks: "0/0", items: 0, users: 0, createdAt: "2026-01-11T10:00:00" }
+  ];
+}
+function loadDeals() {
+  try {
+    const raw = localStorage.getItem(DEAL_STORAGE_KEY);
+    if (!raw) return seedDeals();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) return seedDeals();
+    return parsed.map((d) => ({ labels: [], pipeline: "Sales", notes: "", ...d }));
+  } catch {
+    return seedDeals();
+  }
+}
+function splitLeadName(full) {
+  const text = full || "";
+  const open = text.indexOf("(");
+  const close = text.indexOf(")");
+  if (open > 0 && close > open) {
+    return { lead: text.slice(0, open).trim(), company: text.slice(open + 1, close).trim() };
+  }
+  return { lead: text, company: "" };
+}
+function normalizeTask(t) {
+  const parts = splitLeadName(t.lead);
+  return {
+    id: t.id,
+    title: t.title,
+    lead: parts.lead || t.lead,
+    company: parts.company,
+    due: t.dueDate,
+    dueDate: t.dueDate,
+    priority: t.priority,
+    status: t.status,
+    owner: t.owner
+  };
+}
+function baseTasks() {
+  return [
+    { id: "TSK-001", title: "Follow up on Enterprise Quote", lead: "Sarah Jenkins (Acme Corp)", owner: "Alex Rivera", dueDate: "2026-09-12", priority: "High", status: "In Progress" },
+    { id: "TSK-002", title: "Schedule product demo call", lead: "Michael Chang (TechFlow)", owner: "Elena Rostova", dueDate: "2026-09-10", priority: "Urgent", status: "Open" },
+    { id: "TSK-003", title: "Send revised contract terms", lead: "David Ross (Global Logistics)", owner: "Alex Rivera", dueDate: "2026-09-15", priority: "Medium", status: "Waiting" },
+    { id: "TSK-004", title: "Prepare onboarding requirements", lead: "Amanda Lee (Apex Innovations)", owner: "Sarah Chen", dueDate: "2026-09-08", priority: "High", status: "Completed" },
+    { id: "TSK-005", title: "Review custom billing setup", lead: "Robert Miller (Vanguard Systems)", owner: "Elena Rostova", dueDate: "2026-09-18", priority: "Low", status: "Open" }
+  ];
+}
+function loadTasks() {
+  try {
+    const raw = localStorage.getItem(TASK_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {
+  }
+  return baseTasks().map(normalizeTask);
+}
 function avatarColor(name) {
   let h = 0;
   for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) % 997;
   return AVATAR_COLORS[h % AVATAR_COLORS.length];
 }
-
 function polarToCartesian(cx, cy, r, angle) {
   const rad = ((angle - 90) * Math.PI) / 180;
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
@@ -42,7 +93,6 @@ function describeArc(cx, cy, r, a0, a1) {
   const f = a1 - a0 <= 180 ? "0" : "1";
   return ["M", s.x, s.y, "A", r, r, 0, f, 0, e.x, e.y].join(" ");
 }
-
 function statusPill(status) {
   const s = (status || "").toLowerCase();
   if (s.includes("new")) return { bg: "#eef4ff", fg: "#2f6fed" };
@@ -53,50 +103,72 @@ function statusPill(status) {
   if (s.includes("lost")) return { bg: "#fee2e2", fg: "#b91c1c" };
   return { bg: "#f1f5f9", fg: "#475569" };
 }
-
+function formatShortINR(value) {
+  const n = Number(value) || 0;
+  if (n >= 10000000) return "Rs " + (n / 10000000).toFixed(2) + " Cr";
+  if (n >= 100000) return "Rs " + (n / 100000).toFixed(2) + " L";
+  if (n >= 1000) return "Rs " + (n / 1000).toFixed(1) + "k";
+  return "Rs " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
+}
 export default function DashboardView() {
-  const { invoices } = useERP();
+  const { invoices, quotations, salesOrders, paymentIns, formatCurrency, getInvoiceOutstanding } = useERP();
   const currentUser = useAppStore((s) => s.currentUser);
-  const [tasks, setTasks] = useState(TASKS_SEED);
+  const [deals, setDeals] = useState(loadDeals);
+  const [tasks, setTasks] = useState(loadTasks);
   const [tab, setTab] = useState("All");
   const [query, setQuery] = useState("");
   const [checked, setChecked] = useState([]);
-
+  const [completeTarget, setCompleteTarget] = useState(null);
   const firstName = (currentUser?.name || "Hiti").split(" ")[0];
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
   const todayStr = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
   const todayISO = new Date().toISOString().slice(0, 10);
-
-  // ── KPIs — 100% system data ──
+  useEffect(() => {
+    const syncDeals = () => setDeals(loadDeals());
+    window.addEventListener("storage", syncDeals);
+    window.addEventListener("focus", syncDeals);
+    return () => {
+      window.removeEventListener("storage", syncDeals);
+      window.removeEventListener("focus", syncDeals);
+    };
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
+    } catch {
+    }
+  }, [tasks]);
   const totalLeads = leads.length;
   const activeLeads = leads.filter((l) => l.status !== "Lost Lead").length;
   const newLeads = leads.filter((l) => l.status === "New").length;
   const pendingTasks = tasks.filter((t) => t.status !== "Completed").length;
-  const pipelineDeals = DEALS_SEED.filter((d) => d.stage !== "won" && d.stage !== "lost").length;
-  const revenueExpected = DEALS_SEED.filter((d) => d.stage !== "lost").reduce((a, d) => a + (d.amount || 0), 0)
-    + invoices.reduce((a, i) => a + (i.total || 0), 0);
-
+  const activeDeals = deals.filter((d) => d.stage !== "Declined");
+  const pipelineDeals = activeDeals.length;
+  const dealsTotal = deals.reduce((a, d) => a + (Number(d.price) || 0), 0);
+  const invoicesTotal = invoices.reduce((a, i) => a + (i.total || 0), 0);
+  const quotationsTotal = quotations.reduce((a, q) => a + (q.amount || q.total || 0), 0);
+  const ordersTotal = salesOrders.reduce((a, o) => a + (o.total || o.amount || 0), 0);
+  const collectedTotal = paymentIns.reduce((a, p) => a + (p.amount || 0), 0);
+  const outstandingTotal = invoices.reduce((a, i) => {
+    const r = getInvoiceOutstanding(i.id || i.invoiceNumber);
+    return a + (r.balanceDue || 0);
+  }, 0);
+  const revenueExpected = dealsTotal + invoicesTotal + quotationsTotal;
   const kpis = [
     { label: "Total Active Leads", value: String(activeLeads), icon: Users, bg: "#eef4ff", fg: "#2f6fed", trend: "12%", up: true, note: "vs last week" },
     { label: "New Leads", value: String(newLeads), icon: UserPlus, bg: "#ecfdf5", fg: "#10b981", trend: "2%", up: true, note: "vs last week" },
     { label: "Pending Tasks", value: String(pendingTasks), icon: Clock, bg: "#fff7e8", fg: "#f59e0b", trend: "4%", up: false, note: "vs last week" },
-    { label: "Deals in Pipeline", value: String(pipelineDeals), icon: TrendingUp, bg: "#f5efff", fg: "#8b5cf6", trend: "15%", up: true, note: "vs last month" },
-    { label: "Total Revenue Expected", value: "$" + revenueExpected.toLocaleString("en-US", { maximumFractionDigits: 0 }), icon: DollarSign, bg: "#ffeef4", fg: "#f43f5e", trend: "22%", up: true, note: "vs last month" },
+    { label: "Deals in Pipeline", value: String(pipelineDeals), icon: TrendingUp, bg: "#f5efff", fg: "#8b5cf6", trend: "15%", up: true, note: formatShortINR(dealsTotal) },
+    { label: "Total Revenue Expected", value: formatCurrency(revenueExpected), icon: DollarSign, bg: "#ffeef4", fg: "#f43f5e", trend: "22%", up: true, note: formatCurrency(outstandingTotal) + " due" }
   ];
-
-  // ── Sales pipeline — 7 stages mapped from real lead fields ──
-  const pipeline = [
-    { label: "New Lead", value: leads.filter((l) => l.status === "New").length, bg: "#eef4ff", fg: "#2f6fed" },
-    { label: "Details Collected", value: leads.filter((l) => ["Contacted", "Attempted to Contact"].includes(l.status)).length, bg: "#eef4ff", fg: "#2f6fed" },
-    { label: "Quotation Shared", value: leads.filter((l) => (l.estimatesCount || 0) > 0).length, bg: "#fff7e8", fg: "#d97706" },
-    { label: "Demo Pending", value: leads.filter((l) => (l.callsCount || 0) > 0 && (l.estimatesCount || 0) === 0).length, bg: "#fff7e8", fg: "#d97706" },
-    { label: "Demo Done", value: leads.filter((l) => (l.callsCount || 0) >= 2).length, bg: "#ecfdf5", fg: "#059669" },
-    { label: "Negotiation", value: leads.filter((l) => l.status === "Proposal").length, bg: "#fff7e8", fg: "#b45309" },
-    { label: "Won", value: DEALS_SEED.filter((d) => d.stage === "won").length + leads.filter((l) => l.status === "Converted").length, bg: "#ecfdf5", fg: "#059669" },
-  ];
-
-  // ── Leads by source — real distribution ──
+  const pipeline = DEAL_STAGES.map((stage, i) => ({
+    label: stage,
+    value: deals.filter((d) => d.stage === stage).length,
+    total: deals.filter((d) => d.stage === stage).reduce((a, d) => a + (Number(d.price) || 0), 0),
+    bg: PIPELINE_BG[i % PIPELINE_BG.length],
+    fg: PIPELINE_FG[i % PIPELINE_FG.length]
+  }));
   const sourceGroups = useMemo(() => {
     const m = new Map();
     leads.forEach((l) => {
@@ -107,10 +179,9 @@ export default function DashboardView() {
       name,
       count,
       pct: Math.round((count / (totalLeads || 1)) * 100),
-      color: SOURCE_COLORS[i % SOURCE_COLORS.length],
+      color: SOURCE_COLORS[i % SOURCE_COLORS.length]
     }));
   }, [totalLeads]);
-
   let acc = 0;
   const donut = sourceGroups.map((s) => {
     const a0 = (acc / (totalLeads || 1)) * 360;
@@ -118,8 +189,6 @@ export default function DashboardView() {
     const a1 = (acc / (totalLeads || 1)) * 360;
     return { ...s, path: describeArc(90, 90, 62, a0, a1 >= 360 ? 359.9 : a1) };
   });
-
-  // ── Tasks ──
   const bucket = (t) => {
     if (t.status === "Completed") return "Upcoming";
     if (t.dueDate < todayISO) return "Overdue";
@@ -130,7 +199,7 @@ export default function DashboardView() {
     All: tasks.length,
     Overdue: tasks.filter((t) => bucket(t) === "Overdue").length,
     Today: tasks.filter((t) => bucket(t) === "Today").length,
-    Upcoming: tasks.filter((t) => bucket(t) === "Upcoming").length,
+    Upcoming: tasks.filter((t) => bucket(t) === "Upcoming").length
   };
   const filtered = tasks.filter((t) => {
     const okTab = tab === "All" || bucket(t) === tab;
@@ -139,35 +208,76 @@ export default function DashboardView() {
     return okTab && okQ;
   });
   const toggleCheck = (id) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
-  const completeTask = (id) => setTasks((p) => p.map((t) => (t.id === id ? { ...t, status: "Completed" } : t)));
-
+  const completeTask = (t) => {
+    if (t.status === "Completed") return;
+    setCompleteTarget(t);
+  };
+  async function handleComplete(outcome, nextAction) {
+    if (!completeTarget) return { ok: false, message: "No task selected." };
+    const lead = resolveLeadForTask(completeTarget);
+    const completedBy = currentUser?.name || CRM_TEAM_MEMBERS[0]?.name || "CRM User";
+    const result = completeTaskWithOutcome({
+      task: completeTarget,
+      lead,
+      outcome,
+      nextAction,
+      completedBy,
+    });
+    const targetId = completeTarget.id;
+    setTasks((p) => {
+      const updated = p.map((t) =>
+        t.id === targetId
+          ? {
+              ...t,
+              status: "Completed",
+              completionOutcome: outcome,
+              nextAction,
+              completedAt: new Date().toISOString().slice(0, 10),
+              completedBy,
+            }
+          : t
+      );
+      if (result.ok && result.createdTask && !updated.some((t) => String(t.id) === String(result.createdTask.id))) {
+        updated.unshift({
+          id: result.createdTask.id,
+          title: result.createdTask.title,
+          lead: result.createdTask.lead,
+          company: "",
+          due: result.createdTask.dueDate || result.createdTask.dueAt || "",
+          dueDate: result.createdTask.dueDate || result.createdTask.dueAt || "",
+          priority: result.createdTask.priority || "Medium",
+          status: result.createdTask.status || "Open",
+          owner: result.createdTask.owner,
+        });
+      }
+      return updated;
+    });
+    return result;
+  }
+  const handleCompleteSuccess = () => setCompleteTarget(null);
   const recent = leads.slice(0, 5);
+  const todayTasks = tasks.filter((t) => t.dueDate === todayISO).slice(0, 2);
+  const nextOrder = salesOrders[0];
+  const nextQuote = quotations[0];
   const calendar = [
-    ...tasks.filter((t) => t.dueDate === todayISO).slice(0, 2).map((t) => ({ time: t.due.split(",")[1]?.trim() || "10:00 AM", title: `${t.title} - ${t.lead}`, sub: t.company, color: "#2f6fed" })),
-    { time: "11:00 AM", title: "Team Meeting", sub: "Sales review", color: "#8b5cf6" },
-    { time: "02:00 PM", title: `Demo - ${leads[2]?.name || "Lead"}`, sub: leads[2]?.company || "", color: "#10b981" },
-    { time: "05:00 PM", title: "Send Quotations", sub: `${leads.filter((l) => (l.estimatesCount || 0) > 0).length} pending`, color: "#f59e0b" },
+    ...todayTasks.map((t) => ({ time: "10:00 AM", title: t.title + " - " + t.lead, sub: t.company || t.owner, color: "#2f6fed" })),
+    { time: "11:00 AM", title: "Team Meeting", sub: "Sales review " + collectedTotal.toLocaleString("en-IN") + " collected", color: "#8b5cf6" },
+    { time: "02:00 PM", title: "Demo - " + (leads[2]?.name || "Lead"), sub: (leads[2]?.company || "") + (nextOrder ? " | " + nextOrder.orderNumber : ""), color: "#10b981" },
+    { time: "05:00 PM", title: "Send Quotations", sub: (nextQuote ? nextQuote.quoteNumber + " " + formatCurrency(nextQuote.amount || 0) : quotationsTotal + " pipeline"), color: "#f59e0b" }
   ].slice(0, 4);
-
   return (
     <div style={{ display: "grid", gap: 14, padding: "16px 14px", background: "#f6f9ff", minHeight: "100%" }}>
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f1f3d" }}>{greet}, {firstName}!</h1>
-          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Here&apos;s what&apos;s happening with your CRM today.</p>
+          <p style={{ margin: "4px 0 0", fontSize: 12, color: "#64748b" }}>Here is what is happening with your CRM today. {ordersTotal > 0 ? formatCurrency(ordersTotal) + " orders" : ""} {paymentIns.length > 0 ? paymentIns.length + " payments" : ""}</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Link to="/crm/leads/forms" style={{ display: "flex", alignItems: "center", gap: 6, background: "#2f6fed", color: "#fff", borderRadius: 10, padding: "9px 16px", fontSize: 12, fontWeight: 800 }}>
-            <Plus size={15} /> Add
-          </Link>
           <div style={{ display: "flex", alignItems: "center", gap: 8, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 12px", fontSize: 12, fontWeight: 600, color: "#334155" }}>
             <CalendarDays size={15} color="#64748b" /> {todayStr}
           </div>
         </div>
       </div>
-
-      {/* KPI cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
         {kpis.map((k) => {
           const Icon = k.icon;
@@ -179,31 +289,30 @@ export default function DashboardView() {
               </span>
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontSize: 11, color: "#64748b", fontWeight: 600 }}>{k.label}</span>
-                <strong style={{ display: "block", fontSize: 20, fontWeight: 800, color: "#0f1f3d", lineHeight: 1.15 }}>{k.value}</strong>
+                <strong style={{ display: "block", fontSize: 18, fontWeight: 800, color: "#0f1f3d", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.value}</strong>
                 <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: k.up ? "#10b981" : "#ef4444", fontWeight: 700 }}>
-                  <Trend size={13} /> {k.trend} <em style={{ fontStyle: "normal", color: "#94a3b8", fontWeight: 500 }}>{k.note}</em>
+                  <Trend size={13} /> {k.trend} <em style={{ fontStyle: "normal", color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.note}</em>
                 </span>
               </span>
             </div>
           );
         })}
       </div>
-
-      {/* Pipeline + Sources */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(280px,1fr)", gap: 12 }}>
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
             <div>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Sales Pipeline</h3>
-              <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b" }}>View your leads at each stage</p>
+              <p style={{ margin: "2px 0 0", fontSize: 11, color: "#64748b" }}>Deals by stage from Manage Deals | {formatShortINR(dealsTotal)} total</p>
             </div>
             <Link to="/crm/deals" style={{ fontSize: 12, fontWeight: 700, color: "#2f6fed" }}>View Pipeline</Link>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7,minmax(0,1fr))", gap: 6, marginTop: 12 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,minmax(0,1fr))", gap: 6, marginTop: 12 }}>
             {pipeline.map((p, i) => (
-              <div key={p.label} title={`${p.label}: ${p.value} (system data)`} style={{ position: "relative", background: p.bg, color: p.fg, borderRadius: 8, padding: "10px 6px", textAlign: "center", clipPath: i === 0 ? "polygon(0 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,0 100%)" : i === pipeline.length - 1 ? "polygon(10px 0,100% 0,100% 100%,10px 100%,0 50%)" : "polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%)" }}>
+              <div key={p.label} title={p.label + ": " + p.value + " deals " + formatShortINR(p.total)} style={{ position: "relative", background: p.bg, color: p.fg, borderRadius: 8, padding: "10px 6px", textAlign: "center", clipPath: i === 0 ? "polygon(0 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,0 100%)" : i === pipeline.length - 1 ? "polygon(10px 0,100% 0,100% 100%,10px 100%,0 50%)" : "polygon(10px 0,calc(100% - 10px) 0,100% 50%,calc(100% - 10px) 100%,10px 100%,0 50%)" }}>
                 <div style={{ fontSize: 10, fontWeight: 600, opacity: 0.85, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{p.label}</div>
                 <div style={{ fontSize: 18, fontWeight: 800 }}>{p.value}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, opacity: 0.8, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{formatShortINR(p.total)}</div>
               </div>
             ))}
           </div>
@@ -239,8 +348,6 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
-
-      {/* My Tasks */}
       <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>My Tasks</h3>
@@ -270,7 +377,7 @@ export default function DashboardView() {
                 <th style={{ padding: "8px" }}></th>
                 <th style={{ padding: "8px" }}>Task</th>
                 <th style={{ padding: "8px" }}>Related Lead</th>
-                <th style={{ padding: "8px" }}>Due Date &amp; Time</th>
+                <th style={{ padding: "8px" }}>Due Date</th>
                 <th style={{ padding: "8px" }}>Priority</th>
                 <th style={{ padding: "8px" }}>Status</th>
                 <th style={{ padding: "8px" }}>Assigned To</th>
@@ -281,7 +388,7 @@ export default function DashboardView() {
               {filtered.map((t) => {
                 const b = bucket(t);
                 const overdue = b === "Overdue";
-                const pColor = t.priority === "High" ? "#ef4444" : t.priority === "Medium" ? "#f59e0b" : "#10b981";
+                const pColor = t.priority === "High" || t.priority === "Urgent" ? "#ef4444" : t.priority === "Medium" ? "#f59e0b" : "#10b981";
                 const sBg = t.status === "Completed" ? "#dcfce7" : overdue ? "#fee2e2" : b === "Today" ? "#fef3c7" : "#eef4ff";
                 const sFg = t.status === "Completed" ? "#15803d" : overdue ? "#b91c1c" : b === "Today" ? "#b45309" : "#2f6fed";
                 return (
@@ -295,6 +402,13 @@ export default function DashboardView() {
                           <Phone size={14} />
                         </span> {t.title}
                       </span>
+                      {t.status === "Completed" && (t.completionOutcome || t.nextAction || t.completedBy) && (
+                        <span style={{ display: "block", fontSize: 10, color: "#15803d", fontWeight: 700, marginTop: 3 }}>
+                          {t.completionOutcome ? "Outcome: " + t.completionOutcome : ""}
+                          {t.nextAction ? " · Next: " + (NEXT_ACTION_LABELS[t.nextAction] || t.nextAction) : ""}
+                          {t.completedBy ? " · by " + t.completedBy : ""}
+                        </span>
+                      )}
                     </td>
                     <td style={{ padding: "10px 8px", color: "#334155" }}>{t.lead}<br /><span style={{ color: "#94a3b8", fontSize: 11 }}>{t.company}</span></td>
                     <td style={{ padding: "10px 8px", color: overdue ? "#dc2626" : "#475569", fontWeight: overdue ? 700 : 400 }}>{t.due}</td>
@@ -313,7 +427,7 @@ export default function DashboardView() {
                       </span>
                     </td>
                     <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                      <button type="button" onClick={() => completeTask(t.id)} style={{ border: "1px solid #2f6fed", color: "#2f6fed", background: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 800 }}>
+                      <button type="button" onClick={() => completeTask(t)} style={{ border: "1px solid #2f6fed", color: "#2f6fed", background: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 800 }}>
                         {t.status === "Completed" ? "Done" : "Complete"}
                       </button>
                     </td>
@@ -324,8 +438,6 @@ export default function DashboardView() {
           </table>
         </div>
       </div>
-
-      {/* Recent + Calendar + Quick actions */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -344,7 +456,7 @@ export default function DashboardView() {
                     <strong style={{ display: "block", fontSize: 12, color: "#0f1f3d", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{l.name}</strong>
                     <span style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
                       <span style={{ background: pill.bg, color: pill.fg, borderRadius: 99, padding: "2px 8px", fontSize: 10, fontWeight: 800 }}>{l.status}</span>
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{l.createdOn}</span>
+                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{l.createdOn} | {l.source} | {formatCurrency(l.amount || 0)}</span>
                     </span>
                   </span>
                 </Link>
@@ -354,7 +466,7 @@ export default function DashboardView() {
         </div>
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Today&apos;s Calendar</h3>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Today Calendar</h3>
             <Link to="/crm/tasks" style={{ fontSize: 12, fontWeight: 700, color: "#2f6fed" }}>View Calendar</Link>
           </div>
           <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
@@ -372,7 +484,7 @@ export default function DashboardView() {
         </div>
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Quick Actions</h3>
-          <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click</p>
+          <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals {invoices.length} invoices</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
             <Link to="/crm/leads/forms" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
               <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><UserPlus size={17} /></span> Add Lead
@@ -403,6 +515,14 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
+      <CompleteTaskModal
+        open={Boolean(completeTarget)}
+        task={completeTarget ? { ...completeTarget, stage: completeTarget.stage || 'New Lead', dueAt: completeTarget.dueDate || completeTarget.due || '', assignee: completeTarget.owner || 'Unassigned' } : null}
+        lead={resolveLeadForTask(completeTarget)}
+        onCancel={handleCompleteSuccess}
+        onComplete={handleComplete}
+        onSuccess={handleCompleteSuccess}
+      />
     </div>
   );
 }
