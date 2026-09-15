@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Download, ChevronRight, Search, Calendar as CalendarIcon, MoreHorizontal, X, Check, Clock } from "lucide-react";
+import { Download, ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, MoreHorizontal, X, Check, Clock } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
@@ -138,9 +138,15 @@ export default function AttendanceOverview() {
         img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
         workHours: r.workHours || (r.checkIn && r.checkOut && r.checkIn !== "—" ? "08:30" : "—"),
         shift: r.shift || "General",
+        location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
+        role: r.role || r.jobType || "Full-Time",
       }));
     }
-    return MOCK_ATTENDANCE;
+    return MOCK_ATTENDANCE.map((r) => ({
+      ...r,
+      location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
+      role: r.role || r.jobType || "Full-Time",
+    }));
   }, [storeRecords]);
 
   const filtered = useMemo(() => {
@@ -151,9 +157,11 @@ export default function AttendanceOverview() {
       const matchDept = deptFilter === "All" || item.dept === deptFilter;
       const matchStatus = statusFilter === "All" || item.status === statusFilter;
       const matchShift = shiftFilter === "All" || item.shift === shiftFilter;
-      return matchSearch && matchDept && matchStatus && matchShift;
+      const matchLoc = locFilter === "All" || item.location === locFilter;
+      const matchRole = roleFilter === "All" || item.role === roleFilter;
+      return matchSearch && matchDept && matchStatus && matchShift && matchLoc && matchRole;
     });
-  }, [combinedAttendance, search, deptFilter, statusFilter, shiftFilter]);
+  }, [combinedAttendance, search, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
 
   // Dynamic live STATS
   const statsData = useMemo(() => {
@@ -295,36 +303,97 @@ export default function AttendanceOverview() {
             />
           </div>
 
-          {/* Dropdowns */}
-          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="att-select">
-            {DEPARTMENTS.map((d) => (
-              <option key={d}>{d}</option>
-            ))}
-          </select>
+          {/* Dropdown Filters */}
+          <div className={`att-filter-dropdown ${deptFilter !== "All" ? "active" : ""}`}>
+            <span className="att-filter-text">
+              {deptFilter === "All" ? "Department" : deptFilter}
+            </span>
+            <ChevronDown size={13} className="att-filter-arrow" />
+            <select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              className="att-filter-native-select"
+              aria-label="Department Filter"
+            >
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="att-select">
-            {STATUSES.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+          <div className={`att-filter-dropdown ${statusFilter !== "All" ? "active" : ""}`}>
+            <span className="att-filter-text">
+              {statusFilter === "All" ? "Status" : statusFilter}
+            </span>
+            <ChevronDown size={13} className="att-filter-arrow" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="att-filter-native-select"
+              aria-label="Status Filter"
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)} className="att-select">
-            {SHIFTS.map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
+          <div className={`att-filter-dropdown ${shiftFilter !== "All" ? "active" : ""}`}>
+            <span className="att-filter-text">
+              {shiftFilter === "All" ? "Shift" : shiftFilter}
+            </span>
+            <ChevronDown size={13} className="att-filter-arrow" />
+            <select
+              value={shiftFilter}
+              onChange={(e) => setShiftFilter(e.target.value)}
+              className="att-filter-native-select"
+              aria-label="Shift Filter"
+            >
+              {SHIFTS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select value={locFilter} onChange={(e) => setLocFilter(e.target.value)} className="att-select">
-            <option>All</option>
-            <option>On-Site</option>
-            <option>Remote</option>
-          </select>
+          <div className={`att-filter-dropdown ${locFilter !== "All" ? "active" : ""}`}>
+            <span className="att-filter-text">
+              {locFilter === "All" ? "Location" : locFilter}
+            </span>
+            <ChevronDown size={13} className="att-filter-arrow" />
+            <select
+              value={locFilter}
+              onChange={(e) => setLocFilter(e.target.value)}
+              className="att-filter-native-select"
+              aria-label="Location Filter"
+            >
+              <option value="All">All</option>
+              <option value="On-Site">On-Site</option>
+              <option value="Remote">Remote</option>
+            </select>
+          </div>
 
-          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="att-select">
-            <option>All</option>
-            <option>Full-Time</option>
-            <option>Contract</option>
-          </select>
+          <div className={`att-filter-dropdown ${roleFilter !== "All" ? "active" : ""}`}>
+            <span className="att-filter-text">
+              {roleFilter === "All" ? "Job Type" : roleFilter}
+            </span>
+            <ChevronDown size={13} className="att-filter-arrow" />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="att-filter-native-select"
+              aria-label="Job Type Filter"
+            >
+              <option value="All">All</option>
+              <option value="Full-Time">Full-Time</option>
+              <option value="Contract">Contract</option>
+            </select>
+          </div>
         </div>
 
         <div className="att-filter-right">
@@ -504,6 +573,16 @@ export default function AttendanceOverview() {
 
         .att-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 80px; }
         .att-select:focus { border-color: #94a3b8; background-color: #fff; }
+        .att-select-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; color: #1d4ed8 !important; font-weight: 600 !important; }
+
+        .att-filter-dropdown { position: relative; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 12px; height: 35px; cursor: pointer; transition: all 0.15s ease; box-sizing: border-box; }
+        .att-filter-dropdown:hover { border-color: #cbd5e1; background: #f1f5f9; }
+        .att-filter-dropdown.active { border-color: #3b82f6; background: #eff6ff; }
+        .att-filter-text { font-size: 13px; color: #374151; font-weight: 500; white-space: nowrap; user-select: none; }
+        .att-filter-dropdown.active .att-filter-text { color: #1d4ed8; font-weight: 600; }
+        .att-filter-arrow { color: #64748b; flex-shrink: 0; pointer-events: none; }
+        .att-filter-dropdown.active .att-filter-arrow { color: #2563eb; }
+        .att-filter-native-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
         .att-btn-outline { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
         .att-btn-outline:hover { background: #f8fafc; color: #111827; }
