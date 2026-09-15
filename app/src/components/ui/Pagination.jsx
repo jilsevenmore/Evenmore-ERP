@@ -6,7 +6,13 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
  * Props: total, page, pageSize, onChange
  * Opt-in (screenshot format): showTotalRecords, pageSizeOptions, onPageSizeChange
  */
-export function Pagination({ total = 0, page = 1, pageSize = 20, onChange, showTotalRecords = false, pageSizeOptions = null, onPageSizeChange }) {
+export function Pagination({
+  total = 0,
+  page = 1,
+  pageSize = 5,
+  onChange,
+  showTotalRecords = false,
+}) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = Math.min((page - 1) * pageSize + 1, total);
   const end = Math.min(page * pageSize, total);
@@ -37,12 +43,12 @@ export function Pagination({ total = 0, page = 1, pageSize = 20, onChange, showT
       <div className="pagination-pages">
         <button
           type="button"
-          className="pager-btn"
+          className="pager-btn pager-btn-nav"
           disabled={page <= 1}
           onClick={() => goTo(page - 1)}
           aria-label="Previous page"
         >
-          <ChevronLeft size={15} />
+          Prev
         </button>
 
         {pages[0] > 1 && (
@@ -76,28 +82,13 @@ export function Pagination({ total = 0, page = 1, pageSize = 20, onChange, showT
 
         <button
           type="button"
-          className="pager-btn"
+          className="pager-btn pager-btn-nav"
           disabled={page >= totalPages}
           onClick={() => goTo(page + 1)}
           aria-label="Next page"
         >
-          <ChevronRight size={15} />
+          Next
         </button>
-
-        {Array.isArray(pageSizeOptions) && pageSizeOptions.length > 0 && (
-          <select
-            className="page-size-select"
-            value={pageSize}
-            onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
-            aria-label="Records per page"
-          >
-            {pageSizeOptions.map((size) => (
-              <option key={size} value={size}>
-                {size} / page
-              </option>
-            ))}
-          </select>
-        )}
       </div>
     </div>
   );
