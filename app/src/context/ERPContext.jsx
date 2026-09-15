@@ -3486,6 +3486,165 @@ export const ERPProvider = ({ children, }) => {
         });
     };
 
+    const exportDatabaseSnapshot = () => {
+        try {
+            const snapshot = {
+                metadata: {
+                    appName: 'Evenmore ERP',
+                    version: '2.0.0',
+                    exportedAt: new Date().toISOString(),
+                    exportedDateFormatted: new Date().toLocaleString(),
+                },
+                data: {
+                    parties,
+                    customers,
+                    vendors,
+                    items,
+                    categories,
+                    units,
+                    categoryParts,
+                    itemParts,
+                    estimates,
+                    quotations,
+                    salesOrders,
+                    proformaInvoices,
+                    deliveryChallans,
+                    invoices,
+                    warranties,
+                    paymentIns,
+                    salesReturns,
+                    purchaseOrders,
+                    purchaseBills,
+                    purchaseReturns,
+                    paymentOuts,
+                    expenses,
+                    locations,
+                    transfers,
+                    serviceUsages,
+                    valuationItems,
+                    monthEndAudits,
+                    bankAccounts,
+                    journalEntries,
+                    inventoryMovements,
+                    faultyParts,
+                    zoneRequests,
+                },
+            };
+
+            const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(snapshot, null, 2));
+            const downloadAnchor = document.createElement('a');
+            const dateStr = new Date().toISOString().split('T')[0];
+            downloadAnchor.setAttribute('href', dataStr);
+            downloadAnchor.setAttribute('download', `evenmore-erp-backup-${dateStr}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+
+            showToast('ERP Database snapshot downloaded successfully.');
+            return true;
+        } catch (err) {
+            console.error('Failed to export database snapshot:', err);
+            showToast('Failed to export database snapshot.');
+            return false;
+        }
+    };
+
+    const importDatabaseSnapshot = (importedData) => {
+        try {
+            const payload = importedData?.data ? importedData.data : importedData;
+            if (!payload || typeof payload !== 'object') {
+                showToast('Invalid JSON backup file format.');
+                return false;
+            }
+
+            if (Array.isArray(payload.parties)) setParties(payload.parties);
+            if (Array.isArray(payload.customers)) setCustomers(payload.customers);
+            if (Array.isArray(payload.vendors)) setVendors(payload.vendors);
+            if (Array.isArray(payload.items)) setItems(payload.items);
+            if (Array.isArray(payload.categories)) setCategories(payload.categories);
+            if (Array.isArray(payload.units)) setUnits(payload.units);
+            if (Array.isArray(payload.categoryParts)) setCategoryParts(payload.categoryParts);
+            if (Array.isArray(payload.itemParts)) setItemParts(payload.itemParts);
+            if (Array.isArray(payload.estimates)) setEstimates(payload.estimates);
+            if (Array.isArray(payload.quotations)) setQuotations(payload.quotations);
+            if (Array.isArray(payload.salesOrders)) setSalesOrders(payload.salesOrders);
+            if (Array.isArray(payload.proformaInvoices)) setProformaInvoices(payload.proformaInvoices);
+            if (Array.isArray(payload.deliveryChallans)) setDeliveryChallans(payload.deliveryChallans);
+            if (Array.isArray(payload.invoices)) setInvoices(payload.invoices);
+            if (Array.isArray(payload.warranties)) setWarranties(payload.warranties);
+            if (Array.isArray(payload.paymentIns)) setPaymentIns(payload.paymentIns);
+            if (Array.isArray(payload.salesReturns)) setSalesReturns(payload.salesReturns);
+            if (Array.isArray(payload.purchaseOrders)) setPurchaseOrders(payload.purchaseOrders);
+            if (Array.isArray(payload.purchaseBills)) setPurchaseBills(payload.purchaseBills);
+            if (Array.isArray(payload.purchaseReturns)) setPurchaseReturns(payload.purchaseReturns);
+            if (Array.isArray(payload.paymentOuts)) setPaymentOuts(payload.paymentOuts);
+            if (Array.isArray(payload.expenses)) setExpenses(payload.expenses);
+            if (Array.isArray(payload.locations)) setLocations(payload.locations);
+            if (Array.isArray(payload.transfers)) setTransfers(payload.transfers);
+            if (Array.isArray(payload.serviceUsages)) setServiceUsages(payload.serviceUsages);
+            if (Array.isArray(payload.valuationItems)) setValuationItems(payload.valuationItems);
+            if (Array.isArray(payload.monthEndAudits)) setMonthEndAudits(payload.monthEndAudits);
+            if (Array.isArray(payload.bankAccounts)) setBankAccounts(payload.bankAccounts);
+            if (Array.isArray(payload.journalEntries)) setJournalEntries(payload.journalEntries);
+            if (Array.isArray(payload.inventoryMovements)) setInventoryMovements(payload.inventoryMovements);
+            if (Array.isArray(payload.faultyParts)) setFaultyParts(payload.faultyParts);
+            if (Array.isArray(payload.zoneRequests)) setZoneRequests(payload.zoneRequests);
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+            showToast('ERP Database restored successfully from backup.');
+            return true;
+        } catch (err) {
+            console.error('Failed to restore database snapshot:', err);
+            showToast('Error restoring database snapshot.');
+            return false;
+        }
+    };
+
+    const resetDatabaseToDefaults = () => {
+        try {
+            localStorage.removeItem(STORAGE_KEY);
+            setParties(mockParties);
+            setCustomers(mockCustomers);
+            setVendors(mockVendors);
+            setItems(mockInventoryItems);
+            setCategories(mockCategories);
+            setUnits(mockUnits);
+            setCategoryParts(mockCategoryParts);
+            setItemParts(mockItemParts);
+            setEstimates(mockEstimates);
+            setQuotations(mockQuotations);
+            setSalesOrders(mockSalesOrders);
+            setProformaInvoices(mockProformaInvoices);
+            setDeliveryChallans(mockDeliveryChallans);
+            setInvoices(initialSalesInvoices);
+            setWarranties(mockWarrantyCards);
+            setPaymentIns(mockPaymentIns);
+            setSalesReturns(mockSalesReturns);
+            setPurchaseOrders(mockPurchaseOrders);
+            setPurchaseBills(mockPurchaseBills);
+            setPurchaseReturns(mockPurchaseReturns);
+            setPaymentOuts(mockPaymentOuts);
+            setExpenses(mockExpenses);
+            setLocations(mockLocations);
+            setTransfers(mockTransfers);
+            setServiceUsages(mockServiceUsages);
+            setValuationItems(mockValuationItems);
+            setMonthEndAudits(mockMonthEndAudits);
+            setBankAccounts(mockBankAccounts);
+            setJournalEntries(initialJournalEntries);
+            setInventoryMovements(mockInventoryMovements);
+            setFaultyParts(initialFaultyParts);
+            setZoneRequests(initialZoneRequests);
+
+            showToast('ERP data reset to factory initial state.');
+            return true;
+        } catch (err) {
+            console.error('Failed to reset data:', err);
+            showToast('Failed to reset demo data.');
+            return false;
+        }
+    };
+
     return (<ERPContext.Provider value={{
             warranties,
             addWarrantyCard,
@@ -3619,7 +3778,10 @@ export const ERPProvider = ({ children, }) => {
             addServiceUsage,
             addBankAccount,
             addJournalEntry,
-            resetDemoData,
+            resetDemoData: resetDatabaseToDefaults,
+            exportDatabaseSnapshot,
+            importDatabaseSnapshot,
+            resetDatabaseToDefaults,
         }}>
       {children}
       {/* Global Toast Banner */}

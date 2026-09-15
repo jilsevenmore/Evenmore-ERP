@@ -11,7 +11,7 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
     if (!receipt)
         return null;
     return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label="Official payment receipt">
-      <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl text-xs flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl text-xs flex flex-col overflow-hidden printable-document" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
