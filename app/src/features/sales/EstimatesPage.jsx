@@ -9,6 +9,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
 import { useEstimates, addEstimate, updateEstimate } from '../../services/estimateStore';
+import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 
 function logLeadActivity(leadId, title, color) {
     if (!leadId || !title) return;
@@ -55,6 +56,7 @@ export const EstimatesPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedEstimate, setSelectedEstimate] = useState(null);
+    const [printEstimateTarget, setPrintEstimateTarget] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [validUntil, setValidUntil] = useState('15 Days');
     const [lineItems, setLineItems] = useState([]);
@@ -99,9 +101,12 @@ export const EstimatesPage = () => {
         const cust = customers.find((c) => c.id === estimate.customerId) ||
             customers.find((c) => c.name === estimate.customer) ||
             customers[0];
-        addQuotation({
-            customerId: cust?.id,
-            customer: estimate.customer,
+        const nextQuote = {
+            id: `quo-${Date.now()}`,
+            quoteNumber: `QUO-2026-${String(Date.now()).slice(-3)}`,
+            estimateRef: estimate.estimateNumber,
+            customerId: cust?.id || '',
+            customer: cust?.name || estimate.customer || 'Client Account',
             leadId: estimate.leadId || '',
             leadName: estimate.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -109,87 +114,97 @@ export const EstimatesPage = () => {
             amount: estimate.amount,
             status: 'Draft',
             items: estimate.items || [],
-            notes: `Converted from estimate ${estimate.estimateNumber}`,
-        });
-        updateEstimate(estimateId, { status: 'Converted' });
+        };
+        addQuotation(nextQuote);
+        updateEstimate(estimate.id, { status: 'Converted' });
         if (estimate.leadId) {
-            logLeadActivity(estimate.leadId, `Estimate ${estimate.estimateNumber} converted to quotation`, '#10b981');
+            logLeadActivity(estimate.leadId, `Estimate ${estimate.estimateNumber} converted to Quotation ${nextQuote.quoteNumber}`, '#10b981');
         }
         navigate('/sales/quotations');
     };
 
     const handleClone = (estimate) => {
-        setSelectedCustomerId(estimate.customerId || customers[0]?.id || '');
-        setValidUntil(estimate.validUntil || '15 Days');
-        setLineItems((estimate.items || []).map((it) => ({
-            ...it,
-            id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-        })));
-        setIsFullscreen(false);
-        setIsModalOpen(true);
+        const cloned = {
+            ...estimate,
+            id: `est-${Date.now()}`,
+            estimateNumber: `EST-2026-${String(estimates.length + 3).padStart(3, '0')}`,
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            status: 'Draft',
+        };
+        addEstimate(cloned);
     };
 
     const columns = [
         {
-            header: 'Estimate Number',
+            header: 'Estimate #',
             accessor: 'estimateNumber',
-            width: '15%',
+            width: '18%',
             render: (e) => (
-                <button
-                  onClick={() => setSelectedEstimate(e)}
-                  className="font-mono font-bold text-primary hover:underline text-left cursor-pointer whitespace-nowrap"
-                >
-                    {e.estimateNumber}
-                </button>
+                <div>
+                    <button
+                        onClick={() => setSelectedEstimate(e)}
+                        className="font-bold font-mono text-primary hover:underline block text-left cursor-pointer"
+                    >
+                        {e.estimateNumber}
+                    </button>
+                    <span className="text-[11px] text-muted">{formatDateDDMMYYYY(e.date)}</span>
+                </div>
             ),
         },
         {
             header: 'Customer',
             accessor: 'customer',
-            width: '25%',
-            render: (e) => <span className="font-bold text-text block">{e.customer}</span>,
+            width: '26%',
+            render: (e) => (
+                <div>
+                    <strong className="text-slate-900 dark:text-slate-100 block">{e.customer}</strong>
+                    <span className="text-[11px] text-muted">Validity: {e.validUntil || '15 Days'}</span>
+                </div>
+            ),
         },
         {
-            header: 'Estimate Date',
-            accessor: 'date',
-            width: '13%',
-            render: (e) => <span className="font-mono text-[11px] text-muted whitespace-nowrap">{formatDateDDMMYYYY(e.date)}</span>,
-        },
-        {
-            header: 'Valid Until',
-            accessor: 'validUntil',
-            width: '13%',
-            render: (e) => <span className="text-muted text-[11px] whitespace-nowrap">{e.validUntil ? formatDateDDMMYYYY(e.validUntil) : '—'}</span>,
+            header: 'Items',
+            width: '14%',
+            render: (e) => (
+                <span className="text-xs text-muted">
+                    {e.items && e.items.length > 0 ? `${e.items.length} Line Items` : '1 Item'}
+                </span>
+            ),
         },
         {
             header: 'Estimated Total',
             accessor: 'amount',
-            align: 'right',
-            width: '14%',
+            width: '18%',
             render: (e) => (
-                <span className="font-bold font-mono text-text whitespace-nowrap">
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
                     {formatCurrency(e.amount || 0)}
                 </span>
             ),
         },
         {
             header: 'Status',
-            align: 'center',
-            width: '10%',
+            accessor: 'status',
+            width: '14%',
             render: (e) => <StatusBadge status={e.status} />,
         },
         {
             header: 'Actions',
-            align: 'right',
             width: '10%',
             render: (e) => (
                 <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                     <button
                       onClick={() => setSelectedEstimate(e)}
                       className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
-                      title="View & Print Estimate"
+                      title="View Details"
                     >
                         <Eye size={13} />
+                    </button>
+                    <button
+                      onClick={() => setPrintEstimateTarget(e)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="Print Official Estimate Voucher"
+                    >
+                        <Printer size={13} />
                     </button>
                     <button
                       onClick={() => handleClone(e)}
@@ -391,11 +406,11 @@ export const EstimatesPage = () => {
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
-                                    onClick={() => window.print()}
-                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer"
+                                    onClick={() => setPrintEstimateTarget(selectedEstimate)}
+                                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                                 >
                                     <Printer size={13} />
-                                    Print Estimate
+                                    Print Official Estimate
                                 </button>
                                 <button onClick={() => setSelectedEstimate(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
                                     <X size={18} />
@@ -449,6 +464,13 @@ export const EstimatesPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Official Commercial Sales Estimate Voucher */}
+            <PrintEstimateModal
+                isOpen={Boolean(printEstimateTarget)}
+                onClose={() => setPrintEstimateTarget(null)}
+                estimate={printEstimateTarget}
+            />
         </div>
     );
 };

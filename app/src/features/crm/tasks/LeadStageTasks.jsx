@@ -439,7 +439,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
   );
 
   return (
-    <section className="w-full max-w-7xl mx-auto py-3 px-1 sm:px-2">
+    <section className="w-full space-y-4">
       <div className="mb-6">
         <h2 className="text-xl font-bold text-slate-900 tracking-tight">Leads</h2>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-2">

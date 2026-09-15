@@ -75,7 +75,9 @@ function downloadGuidePdf(lang) {
   );
   printWindow.document.close();
   printWindow.focus();
-  printWindow.print();
+  setTimeout(() => {
+    printWindow.print();
+  }, 350);
 }
 
 export default function MasterTasksGuideModal({ isOpen, onClose }) {

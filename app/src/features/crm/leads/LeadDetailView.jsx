@@ -625,7 +625,9 @@ function printLeadAsPdf(lead) {
   printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(lead.name)} - Lead Details</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:40px}h1{margin:0 0 8px;font-size:24px}p{color:#64748b;margin:0 0 24px}table{border-collapse:collapse;width:100%;max-width:700px}th,td{border:1px solid #dbe2ea;padding:10px;text-align:left;font-size:14px}th{background:#f1f5f9;width:35%}</style></head><body><h1>${escapeHtml(lead.name)}</h1><p>Lead Details</p><table>${rows}</table></body></html>`);
   printWindow.document.close();
   printWindow.focus();
-  printWindow.print();
+  setTimeout(() => {
+    printWindow.print();
+  }, 250);
 }
 
 function metricCards(counts) {

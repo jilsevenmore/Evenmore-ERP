@@ -16,7 +16,6 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
-import StatCard from '../../../components/ui/StatCard';
 import { exportToCSV } from '../../../services/exportUtils';
 import { getLeadStageOrder, DEFAULT_STAGE_ORDER, loadLeadRows } from '../../../services/taskCompletionService';
 import { loadCrmTasks, LEADS_STORAGE_KEY, CRM_EVENT } from '../../../services/leadStageAutomation';
@@ -90,6 +89,23 @@ function groupRows(list, keyFn, valueFn) {
   return Array.from(map.values());
 }
 
+function isRightAlignedHeader(header) {
+  if (!header) return false;
+  const h = String(header).trim().toLowerCase();
+  return ['value', 'lead count', 'leads', 'pipeline value', 'share %', 'deals', 'price', 'amount', 'days overdue', 'metric value'].some((k) => h.includes(k));
+}
+
+function isRightAlignedCell(cell, header) {
+  if (isRightAlignedHeader(header)) return true;
+  if (typeof cell === 'number') return true;
+  if (!cell) return false;
+  const str = String(cell).trim();
+  if (/^Rs\s?[\d,]+(\.\d+)?$/i.test(str)) return true;
+  if (/^\d+(\.\d+)?%$/.test(str)) return true;
+  if (/^\d+$/.test(str)) return true;
+  return false;
+}
+
 function DownloadButton({ onClick, label }) {
   return (
     <button
@@ -121,26 +137,39 @@ function ReportBlock({ title, subtitle, actions, columns, rows, empty }) {
           <table className="w-full text-left text-xs min-w-[480px]">
             <thead>
               <tr className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wide">
-                {columns.map((col, i) => (
-                  <th key={i} className="px-3 py-2.5 font-semibold whitespace-nowrap">{col}</th>
-                ))}
+                {columns.map((col, i) => {
+                  const isRight = i > 0 && isRightAlignedHeader(col);
+                  return (
+                    <th
+                      key={i}
+                      className={`px-3 py-2.5 font-semibold whitespace-nowrap ${
+                        isRight ? 'text-right' : 'text-left'
+                      }`}
+                    >
+                      {col}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               {rows.map((row, i) => (
                 <tr key={i} className="border-t border-slate-100">
-                  {row.map((cell, j) => (
-                    <td
-                      key={j}
-                      className={
-                        j === 0
-                          ? 'px-3 py-2.5 font-semibold text-slate-700 whitespace-nowrap'
-                          : `px-3 py-2.5 text-slate-600 ${typeof cell === 'number' ? 'text-right' : ''}`
-                      }
-                    >
-                      {cell}
-                    </td>
-                  ))}
+                  {row.map((cell, j) => {
+                    const isRight = j > 0 && isRightAlignedCell(cell, columns[j]);
+                    return (
+                      <td
+                        key={j}
+                        className={
+                          j === 0
+                            ? 'px-3 py-2.5 font-semibold text-slate-700 whitespace-nowrap text-left'
+                            : `px-3 py-2.5 text-slate-600 ${isRight ? 'text-right' : 'text-left'}`
+                        }
+                      >
+                        {cell}
+                      </td>
+                    );
+                  })}
                 </tr>
               ))}
             </tbody>
@@ -160,7 +189,6 @@ const TABS = [
   { id: 'conversion', label: 'Conversion %', icon: Percent },
   { id: 'pendingTasks', label: 'Pending Tasks', icon: Clock },
   { id: 'overdueTasks', label: 'Overdue Tasks', icon: AlertTriangle },
-  { id: 'followUps', label: 'Follow-ups', icon: RefreshCw },
   { id: 'dealValue', label: 'Deal Value', icon: DollarSign },
 ];
 
@@ -313,7 +341,6 @@ export default function CRMReportsPage() {
     { title: 'Conversion Rate', columns: ['Metric', 'Value'], rows: conversionTableRows },
     { title: 'Pending Tasks', columns: ['Task ID', 'Title', 'Lead', 'Assignee', 'Priority', 'Due Date', 'Stage'], rows: pendingTaskRows },
     { title: 'Overdue Tasks', columns: ['Task ID', 'Title', 'Lead', 'Assignee', 'Priority', 'Due Date', 'Days Overdue'], rows: overdueTaskRows },
-    { title: 'Follow-up Tasks', columns: ['Task ID', 'Title', 'Lead', 'Assignee', 'Priority', 'Due Date', 'Status', 'Follow-up From'], rows: followUpRows },
     { title: 'Deal Value by Stage', columns: ['Stage', 'Deals', 'Value', 'Share %'], rows: dealStageRows },
     { title: 'Deal Value by Employee', columns: ['Employee', 'Deals', 'Value', 'Share %'], rows: dealEmployeeRows },
     { title: 'Deal Register', columns: ['Deal', 'Client / Product', 'Stage', 'Employee', 'Price'], rows: dealDetailRows },
@@ -326,7 +353,6 @@ export default function CRMReportsPage() {
     ['Conversion %', formatPct(conversionPct)],
     ['Pending Tasks', String(pendingTasks.length)],
     ['Overdue Tasks', String(overdueTasks.length)],
-    ['Follow-ups', String(pendingFollowUps.length)],
     ['Deal Value', formatINR(dealValue)],
   ];
 
@@ -499,16 +525,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'overview' && (
         <div className="space-y-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Total Leads', value: String(totalLeads), icon: 'users', tone: 'blue', note: `${openLeads} open` }} />
-            <StatCard stat={{ label: 'Won Leads', value: String(wonLeads.length), icon: 'chart', tone: 'green', note: 'Won / Converted' }} />
-            <StatCard stat={{ label: 'Lost Leads', value: String(lostLeads.length), icon: 'chart', tone: 'pink', note: 'Lost / Declined' }} />
-            <StatCard stat={{ label: 'Conversion %', value: formatPct(conversionPct), icon: 'filter', tone: 'purple', note: `Win Rate ${formatPct(winRate)}` }} />
-            <StatCard stat={{ label: 'Pending Tasks', value: String(pendingTasks.length), icon: 'clock', tone: 'amber', note: `${tasks.length} total` }} />
-            <StatCard stat={{ label: 'Overdue Tasks', value: String(overdueTasks.length), icon: 'clock', tone: 'pink', note: 'Need attention' }} />
-            <StatCard stat={{ label: 'Follow-ups', value: String(pendingFollowUps.length), icon: 'filter', tone: 'blue', note: `${completedFollowUps} completed` }} />
-            <StatCard stat={{ label: 'Total Deal Value', value: formatINR(dealValue), icon: 'dollar', tone: 'green', note: `${deals.length} deals` }} />
-          </div>
           <ReportBlock
             title="Top Employees"
             subtitle="Leads assigned per employee"
@@ -530,12 +546,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'byEmployee' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Employees', value: String(byEmployee.length), icon: 'users', tone: 'blue' }} />
-            <StatCard stat={{ label: 'Total Leads', value: String(totalLeads), icon: 'users', tone: 'purple' }} />
-            <StatCard stat={{ label: 'Pipeline Value', value: formatINR(leadValue), icon: 'dollar', tone: 'green' }} />
-            <StatCard stat={{ label: 'Top Performer', value: byEmployee[0]?.name || '—', icon: 'chart', tone: 'amber', note: byEmployee[0] ? `${byEmployee[0].count} leads` : undefined }} />
-          </div>
           <ReportBlock
             title="Leads by Employee"
             subtitle="How many leads each sales person owns and their pipeline value"
@@ -549,12 +559,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'bySource' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Sources', value: String(bySource.length), icon: 'filter', tone: 'blue' }} />
-            <StatCard stat={{ label: 'Total Leads', value: String(totalLeads), icon: 'users', tone: 'purple' }} />
-            <StatCard stat={{ label: 'Bulk Source', value: bySource[0]?.name || '—', icon: 'chart', tone: 'amber', note: bySource[0] ? `${bySource[0].count} leads` : undefined }} />
-            <StatCard stat={{ label: 'Source Value', value: formatINR(leadValue), icon: 'dollar', tone: 'green' }} />
-          </div>
           <ReportBlock
             title="Leads by Source"
             subtitle="Website, Cold Call, Referral and other acquisition channels"
@@ -568,12 +572,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'byStage' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Stages', value: String(byStage.length), icon: 'filter', tone: 'blue' }} />
-            <StatCard stat={{ label: 'Total Leads', value: String(totalLeads), icon: 'users', tone: 'purple' }} />
-            <StatCard stat={{ label: 'Won', value: String(wonLeads.length), icon: 'chart', tone: 'green' }} />
-            <StatCard stat={{ label: 'Lost', value: String(lostLeads.length), icon: 'chart', tone: 'pink' }} />
-          </div>
           <ReportBlock
             title="Leads by Stage"
             subtitle="Current pipeline distribution across lead stages"
@@ -587,12 +585,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'wonLost' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Won', value: String(wonLeads.length), icon: 'chart', tone: 'green', note: 'Won / Converted' }} />
-            <StatCard stat={{ label: 'Lost', value: String(lostLeads.length), icon: 'chart', tone: 'pink', note: 'Lost / Declined' }} />
-            <StatCard stat={{ label: 'Open', value: String(openLeads), icon: 'clock', tone: 'amber', note: 'Still in pipeline' }} />
-            <StatCard stat={{ label: 'Win Rate', value: formatPct(winRate), icon: 'chart', tone: 'blue', note: 'Won vs Lost' }} />
-          </div>
           <ReportBlock
             title="Won / Lost Breakdown"
             subtitle="Every won and lost lead record"
@@ -606,12 +598,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'conversion' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Total Leads', value: String(totalLeads), icon: 'users', tone: 'blue' }} />
-            <StatCard stat={{ label: 'Conversion %', value: formatPct(conversionPct), icon: 'chart', tone: 'purple', note: 'Won / Total' }} />
-            <StatCard stat={{ label: 'Win Rate', value: formatPct(winRate), icon: 'chart', tone: 'green', note: 'Won vs Lost' }} />
-            <StatCard stat={{ label: 'Won', value: String(wonLeads.length), icon: 'chart', tone: 'amber', note: `${lostLeads.length} lost` }} />
-          </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4 space-y-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
@@ -643,12 +629,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'pendingTasks' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Total Tasks', value: String(tasks.length), icon: 'clock', tone: 'blue' }} />
-            <StatCard stat={{ label: 'Pending', value: String(pendingTasks.length), icon: 'clock', tone: 'amber', note: 'Open / In Progress' }} />
-            <StatCard stat={{ label: 'Completed', value: String(tasks.length - pendingTasks.length), icon: 'chart', tone: 'green' }} />
-            <StatCard stat={{ label: 'Overdue', value: String(overdueTasks.length), icon: 'clock', tone: 'pink' }} />
-          </div>
           <ReportBlock
             title="Pending Tasks"
             subtitle="All tasks that are not yet completed"
@@ -662,12 +642,6 @@ export default function CRMReportsPage() {
 
       {activeTab === 'overdueTasks' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Overdue Tasks', value: String(overdueTasks.length), icon: 'clock', tone: 'pink', note: 'Past due date' }} />
-            <StatCard stat={{ label: 'Pending', value: String(pendingTasks.length), icon: 'clock', tone: 'amber' }} />
-            <StatCard stat={{ label: 'Open Tasks', value: String(overdueTasks.filter((t) => t.priority === 'High' || t.priority === 'Urgent').length), icon: 'clock', tone: 'blue', note: 'High / Urgent' }} />
-            <StatCard stat={{ label: 'Unassigned Overdue', value: String(overdueTasks.filter((t) => !t.owner || t.owner === 'Unassigned').length), icon: 'users', tone: 'purple' }} />
-          </div>
           <ReportBlock
             title="Overdue Tasks"
             subtitle="Open tasks that have crossed their due date and need attention"
@@ -679,33 +653,8 @@ export default function CRMReportsPage() {
         </div>
       )}
 
-      {activeTab === 'followUps' && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Follow-ups', value: String(followUps.length), icon: 'clock', tone: 'blue' }} />
-            <StatCard stat={{ label: 'Pending', value: String(pendingFollowUps.length), icon: 'clock', tone: 'amber', note: 'Awaiting action' }} />
-            <StatCard stat={{ label: 'Completed', value: String(completedFollowUps), icon: 'chart', tone: 'green', note: 'Done' }} />
-            <StatCard stat={{ label: 'Due Today', value: String(pendingFollowUps.filter((t) => dueDay(t) === new Date().toISOString().slice(0, 10)).length), icon: 'filter', tone: 'purple' }} />
-          </div>
-          <ReportBlock
-            title="Follow-up Tasks"
-            subtitle="Auto-created next actions after previous tasks were completed"
-            actions={<DownloadButton onClick={exportFollowUps} />}
-            columns={['Task ID', 'Title', 'Lead', 'Assignee', 'Priority', 'Due Date', 'Status', 'Follow-up From']}
-            rows={followUpRows}
-            empty="No follow-up tasks recorded yet."
-          />
-        </div>
-      )}
-
       {activeTab === 'dealValue' && (
         <div className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCard stat={{ label: 'Total Deal Value', value: formatINR(dealValue), icon: 'dollar', tone: 'green' }} />
-            <StatCard stat={{ label: 'Deals', value: String(deals.length), icon: 'cart', tone: 'blue', note: 'In pipeline' }} />
-            <StatCard stat={{ label: 'Average Value', value: formatINR(avgDealValue), icon: 'dollar', tone: 'purple' }} />
-            <StatCard stat={{ label: 'Largest Deal', value: formatINR(maxDeal), icon: 'chart', tone: 'amber' }} />
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <ReportBlock
               title="Deal Value by Stage"

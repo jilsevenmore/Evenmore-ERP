@@ -273,7 +273,7 @@ export function OrgChartPage() {
   const rootMatches = matchesQuery(INITIAL_TREE);
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-[1600px] mx-auto w-full">
+    <div className="flex flex-col gap-6 p-6 max-w-[1600px] mx-auto w-full printable-document">
       {/* ── Page Header ─────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
@@ -330,7 +330,7 @@ export function OrgChartPage() {
       </div>
 
       {/* ── Control Bar ─────────────────────────────────────────── */}
-      <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 no-print">
         <div className="flex items-center gap-3">
           {/* Search Input */}
           <div className="relative">

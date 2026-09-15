@@ -292,7 +292,7 @@ export default function MasterTasksPage() {
   }
 
   return (
-    <section className="w-full max-w-7xl mx-auto py-3 px-1 sm:px-2">
+    <section className="w-full space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Manage Master Lead Tasks</h1>

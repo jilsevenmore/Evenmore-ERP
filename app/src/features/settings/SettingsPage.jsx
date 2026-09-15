@@ -3,7 +3,14 @@ import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import { Building, Bell, Database, Save, Check, RotateCcw, AlertTriangle } from 'lucide-react';
 export const SettingsPage = () => {
-    const { resetDemoData, currency: globalCurrency, setCurrency: setGlobalCurrency, showToast } = useERP();
+    const {
+        resetDemoData,
+        exportDatabaseSnapshot,
+        importDatabaseSnapshot,
+        currency: globalCurrency,
+        setCurrency: setGlobalCurrency,
+        showToast,
+    } = useERP();
     const [saved, setSaved] = useState(false);
     const [companyName, setCompanyName] = useState('Horizon Global Industrial Corp');
     const [currency, setCurrency] = useState(globalCurrency || 'USD ($)');
@@ -99,29 +106,100 @@ export const SettingsPage = () => {
         </div>
       </form>
 
-      {/* Demo State Reset Section */}
-      <div className="bg-white border border-rose-200 rounded-xl p-5 shadow-xs">
-        <div className="flex items-center gap-2 pb-3 border-b border-rose-100 mb-4 text-rose-800">
+      {/* ERP Snapshot Backup & Recovery Section */}
+      <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+        <div className="flex items-center gap-2 pb-3 border-b border-slate-200 text-[#1F2E4A]">
           <Database size={18}/>
-          <h3 className="font-bold text-sm">ERP Demo Data Management & Factory Reset</h3>
+          <h3 className="font-bold text-sm">ERP Database Backup & Portability</h3>
         </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs">
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          {/* Export / Backup */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+            <div>
+              <p className="font-bold text-slate-900">Export Complete Database Snapshot</p>
+              <p className="text-slate-500 text-[11px] mt-0.5">
+                Download a JSON snapshot containing all customers, vendors, inventory items, orders, invoices, and accounting journals.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={exportDatabaseSnapshot}
+              className="px-3.5 py-2 bg-primary hover:bg-primary-hover text-white font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+            >
+              <Database size={14} /> Download Backup (.json)
+            </button>
+          </div>
+
+          {/* Import / Restore */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+            <div>
+              <p className="font-bold text-slate-900">Restore Database from Backup</p>
+              <p className="text-slate-500 text-[11px] mt-0.5">
+                Upload a previously saved `.json` database snapshot to restore your full ERP state.
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold rounded-lg cursor-pointer shadow-xs transition-colors">
+              <RotateCcw size={14} /> Upload & Restore Snapshot
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                      try {
+                        const parsed = JSON.parse(event.target?.result);
+                        importDatabaseSnapshot(parsed);
+                      } catch (err) {
+                        showToast('Failed to parse uploaded JSON file.');
+                      }
+                    };
+                    reader.readAsText(file);
+                    e.target.value = '';
+                  }
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* Factory Reset */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div>
-            <p className="font-semibold text-slate-800">Restore Clean Demo Seed Data</p>
-            <p className="text-slate-500 text-[11px] mt-0.5">
-              Reset all inventory movements, customer balances, vendor bills, and journal entries back to the factory seed state.
+            <p className="font-semibold text-rose-800">Factory Reset & Re-Seed</p>
+            <p className="text-slate-500 text-[11px]">
+              Erase local modifications and restore clean factory demo records.
             </p>
           </div>
-          {!showConfirmReset ? (<button type="button" onClick={() => setShowConfirmReset(true)} className="px-4 py-2 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer">
-              <RotateCcw className="w-3.5 h-3.5"/> Reset Demo State
-            </button>) : (<div className="flex items-center gap-2">
-              <button type="button" onClick={() => setShowConfirmReset(false)} className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg">
+          {!showConfirmReset ? (
+            <button
+              type="button"
+              onClick={() => setShowConfirmReset(true)}
+              className="px-3.5 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5"/> Reset to Factory Seed
+            </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowConfirmReset(false)}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
                 Cancel
               </button>
-              <button type="button" onClick={handleResetData} className="px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer">
+              <button
+                type="button"
+                onClick={handleResetData}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
                 <AlertTriangle className="w-3.5 h-3.5"/> Confirm Factory Reset
               </button>
-            </div>)}
+            </div>
+          )}
         </div>
       </div>
     </div>);

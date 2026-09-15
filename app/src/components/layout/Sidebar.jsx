@@ -69,10 +69,7 @@ const NAV = [
   {
     label: 'Dashboard',
     icon: Home,
-    defaultOpen: false,
-    children: [
-      { label: 'Main Dashboard', icon: Home, to: '/dashboard' },
-    ],
+    to: '/dashboard',
   },
 
   {
