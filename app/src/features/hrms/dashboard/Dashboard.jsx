@@ -25,8 +25,10 @@ import {
   Settings,
   Laptop,
 } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
+import { useAssetStore } from "../../../stores/assetStore";
 import AnalyticsVolumeChart from "./AnalyticsVolumeChart";
 
 const TOP_STATS = [
@@ -368,22 +370,67 @@ export default function HRMSDashboard() {
     setLeaveType(val);
   };
 
+  const navigate = useNavigate();
+  const currentUser = useAppStore((s) => s.currentUser);
+  const [lastSubmittedAssetReqId, setLastSubmittedAssetReqId] = useState(null);
+
   const handleQuickRequest = () => {
     if (!leaveDate) return setToast("Please pick a date for your request.", "error");
     if (!leaveType) return setToast("Please select a request type.", "error");
     setSubmitted(true);
     const lower = leaveType.toLowerCase();
+    const isAsset =
+      lower.includes("asset") ||
+      lower.includes("software") ||
+      lower.includes("hardware") ||
+      lower.includes("laptop") ||
+      lower.includes("monitor") ||
+      lower.includes("equipment") ||
+      lower.includes("tool") ||
+      lower.includes("peripherals");
+
     const mod = lower.includes("leave") || lower.includes("wfh") || lower.includes("attendance")
       ? "Leave Management"
-      : lower.includes("asset") || lower.includes("software") || lower.includes("hardware") || lower.includes("equipment") || lower.includes("tool")
+      : isAsset
       ? "Asset & IT"
       : lower.includes("expense") || lower.includes("payroll") || lower.includes("reimburse")
       ? "Payroll Core"
       : "HR Admin";
+
+    // If it's an asset-related request, register it directly in useAssetStore
+    if (isAsset) {
+      const category =
+        lower.includes("laptop") ? "Laptop"
+        : lower.includes("monitor") ? "Monitor"
+        : lower.includes("software") || lower.includes("license") ? "Software / License"
+        : lower.includes("phone") || lower.includes("mobile") ? "Mobile"
+        : lower.includes("headphone") || lower.includes("peripheral") ? "Audio / Peripherals"
+        : "Workstation";
+
+      const newReq = useAssetStore.getState().addRequest({
+        employeeName: currentUser?.name || "Adarsh Gupta",
+        employeeId: "EMP-USR",
+        dept: "Operations",
+        category,
+        assetName: leaveType,
+        reason: leaveNote.trim() || `Submitted via HRMS Dashboard Quick Request for ${leaveDate}.`,
+        priority: "Medium",
+        requestedDate: leaveDate,
+        source: "HRMS Dashboard",
+        notes: `Quick Request submitted on ${leaveDate}`,
+      });
+      setLastSubmittedAssetReqId(newReq.id);
+    } else {
+      setLastSubmittedAssetReqId(null);
+    }
+
     pushActivity("You", `requested ${leaveType} for ${leaveDate.split("-").reverse().join("-")}.`, mod);
     setToast(`${leaveType} request submitted for approval!`);
     setLeaveNote("");
-    setTimeout(() => setSubmitted(false), 3000);
+    setTimeout(() => {
+      setSubmitted(false);
+      setLastSubmittedAssetReqId(null);
+    }, 5000);
   };
 
   const TABS = ["All", "Interviews", "Onboarding", "Reviews"];
@@ -620,8 +667,14 @@ export default function HRMSDashboard() {
                     <div
                       key={a.id}
                       className="hrms-arow"
-                      onClick={() => markOneRead(a.id)}
-                      title="Click to mark as read"
+                      onClick={() => {
+                        markOneRead(a.id);
+                        if (a.module === "Asset & IT") {
+                          navigate("/hrms/assets?tab=requests");
+                        }
+                      }}
+                      title={a.module === "Asset & IT" ? "Click to view Asset Requests" : "Click to mark as read"}
+                      style={{ cursor: "pointer" }}
                     >
                       <span className="hrms-aicon" style={{ background: meta.bg, color: meta.fg }}>
                         <MIcon size={14} />
@@ -633,6 +686,9 @@ export default function HRMSDashboard() {
                         <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "#7b8aa0", display: "flex", alignItems: "center", gap: 6 }}>
                           <span>{timeAgo(a.ts)} · {a.module}</span>
                           {!a.read && <span className="hrms-bluedot" />}
+                          {a.module === "Asset & IT" && (
+                            <span style={{ fontSize: 11, color: "#2563eb", fontWeight: 600 }}>→ View</span>
+                          )}
                         </p>
                       </div>
                       <button
@@ -709,9 +765,28 @@ export default function HRMSDashboard() {
               {submitted ? "Request Submitted ✓" : "Submit Request"}
             </button>
             {submitted && (
-              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#059669", textAlign: "center" }}>
-                {leaveType} for {leaveDate} sent for approval.
-              </p>
+              <div style={{ margin: "8px 0 0", textAlign: "center" }}>
+                <p style={{ margin: 0, fontSize: 12, color: "#059669", fontWeight: 500 }}>
+                  {leaveType} for {leaveDate} sent for approval.
+                </p>
+                {lastSubmittedAssetReqId && (
+                  <Link
+                    to="/hrms/assets?tab=requests"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      marginTop: 4,
+                      fontSize: 11.5,
+                      color: "#2563eb",
+                      fontWeight: 600,
+                      textDecoration: "underline",
+                    }}
+                  >
+                    View in Asset Setup & Requests ({lastSubmittedAssetReqId}) →
+                  </Link>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -984,7 +1059,19 @@ export default function HRMSDashboard() {
               const meta = MODULE_META[a.module] || MODULE_META.System;
               const MIcon = meta.Icon;
               return (
-                <div key={a.id} className="hrms-arow" style={{ background: a.read ? "#fff" : "#f8fafc" }} onClick={() => markOneRead(a.id)}>
+                <div
+                  key={a.id}
+                  className="hrms-arow"
+                  style={{ background: a.read ? "#fff" : "#f8fafc", cursor: "pointer" }}
+                  onClick={() => {
+                    markOneRead(a.id);
+                    if (a.module === "Asset & IT") {
+                      setShowAllActivity(false);
+                      navigate("/hrms/assets?tab=requests");
+                    }
+                  }}
+                  title={a.module === "Asset & IT" ? "Click to view Asset Requests" : "Click to mark as read"}
+                >
                   <span className="hrms-aicon" style={{ background: meta.bg, color: meta.fg }}>
                     <MIcon size={14} />
                   </span>
@@ -994,6 +1081,9 @@ export default function HRMSDashboard() {
                     </p>
                     <p style={{ margin: "3px 0 0", fontSize: 11.5, color: "#7b8aa0" }}>
                       {timeAgo(a.ts)} · {a.module} {!a.read && "· Unread"}
+                      {a.module === "Asset & IT" && (
+                        <span style={{ fontSize: 11, color: "#2563eb", fontWeight: 600, marginLeft: 6 }}>→ View</span>
+                      )}
                     </p>
                   </div>
                   <button

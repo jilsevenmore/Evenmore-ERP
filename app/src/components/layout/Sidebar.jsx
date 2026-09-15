@@ -222,7 +222,7 @@ const NAV = [
           { label: 'Onboarding', to: '/hrms/recruitment/onboarding' },
           { label: 'Career', to: '/hrms/recruitment/career' },
           { label: 'Custom Questions', to: '/hrms/recruitment/questions' },
-          { label: 'Funnel', to: '/hrms/recruitment/funnel' },
+          // { label: 'Funnel', to: '/hrms/recruitment/funnel' }, // Hidden: Recruitment Funnel feature commented out
         ],
       },
       {
@@ -235,8 +235,8 @@ const NAV = [
           { label: 'KPI Data', to: '/hrms/performance/kpi-data' },
           { label: 'Appraisal', to: '/hrms/performance/appraisal' },
           { label: 'Appraisal Funnel', to: '/hrms/performance/appraisal-funnel' },
-          { label: 'Goal Tracking', to: '/hrms/performance/goal-tracking' },
-          { label: 'Goal Funnel', to: '/hrms/performance/goal-funnel' },
+          // { label: 'Goal Tracking', to: '/hrms/performance/goal-tracking' }, // Hidden: Goal Tracking feature commented out
+          // { label: 'Goal Funnel', to: '/hrms/performance/goal-funnel' }, // Hidden: Goal Funnel feature commented out
         ],
       },
       {

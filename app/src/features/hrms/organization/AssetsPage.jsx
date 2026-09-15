@@ -1,4 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAppStore } from "../../../stores/appStore";
 import { useAssetStore } from "../../../stores/assetStore";
 import { Badge } from "../../../components/hrms/Badge";
@@ -37,14 +38,18 @@ import {
   Check,
   X,
   ClipboardList,
+  Sparkles,
 } from "lucide-react";
 
 export function AssetsPage() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees || []);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab");
+
   const {
-    assets,
+    assets = [],
     requests = [],
     addAsset,
     updateAsset,
@@ -59,8 +64,25 @@ export function AssetsPage() {
     resetDefaults,
   } = useAssetStore();
 
-  // Tab State: 'inventory' | 'requests'
-  const [activeTab, setActiveTab] = useState("inventory");
+  // Tab State: 'inventory' | 'requests' (with URL query synchronization)
+  const [activeTab, setActiveTab] = useState(tabParam === "requests" ? "requests" : "inventory");
+
+  useEffect(() => {
+    if (tabParam === "requests" && activeTab !== "requests") {
+      setActiveTab("requests");
+    } else if (tabParam === "inventory" && activeTab !== "inventory") {
+      setActiveTab("inventory");
+    }
+  }, [tabParam]);
+
+  const handleTabChange = (newTab) => {
+    setActiveTab(newTab);
+    if (newTab === "requests") {
+      setSearchParams({ tab: "requests" });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   // Search & Filters for Inventory
   const [search, setSearch] = useState("");
@@ -478,7 +500,7 @@ export function AssetsPage() {
       <div className="flex items-center gap-2 border-b border-bdr">
         <button
           type="button"
-          onClick={() => setActiveTab("inventory")}
+          onClick={() => handleTabChange("inventory")}
           className={`pb-3 px-3 text-[14px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer ${
             activeTab === "inventory" ? "text-navy" : "text-muted hover:text-slate-700"
           }`}
@@ -495,7 +517,7 @@ export function AssetsPage() {
 
         <button
           type="button"
-          onClick={() => setActiveTab("requests")}
+          onClick={() => handleTabChange("requests")}
           className={`pb-3 px-3 text-[14px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer ${
             activeTab === "requests" ? "text-navy" : "text-muted hover:text-slate-700"
           }`}
@@ -601,7 +623,7 @@ export function AssetsPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search asset, ID, serial, or employee..."
+              placeholder="Search assets by model, ID, serial or assignee..."
               className="pl-10 pr-4 h-9 w-full bg-off border border-bdr rounded-xl text-[13px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy"
             />
           </div>
@@ -632,15 +654,15 @@ export function AssetsPage() {
               className="h-9 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy"
             >
               <option value="All">All Statuses</option>
-              <option value="Available">Available</option>
               <option value="Assigned">Assigned</option>
+              <option value="Available">Available</option>
               <option value="Under Maintenance">Under Maintenance</option>
               <option value="Lost/Damaged">Lost/Damaged</option>
             </select>
           </div>
 
           <div className="flex items-center gap-1.5 text-[12.5px]">
-            <span className="text-muted font-medium">Dept:</span>
+            <span className="text-muted font-medium">Department:</span>
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
@@ -675,7 +697,7 @@ export function AssetsPage() {
         )}
       </div>
 
-      {/* Asset Table */}
+      {/* Assets Inventory Table */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px] border-collapse">
@@ -1011,13 +1033,18 @@ export function AssetsPage() {
                             </div>
                             <div>
                               <div className="font-semibold text-slate-900 text-[12.5px]">{req.employeeName}</div>
-                              <div className="text-[11px] text-muted flex items-center gap-1.5">
+                              <div className="text-[11px] text-muted flex items-center gap-1.5 flex-wrap">
                                 <span>{req.dept}</span>
                                 {req.employeeId && (
                                   <>
                                     <span>•</span>
                                     <span className="font-mono">{req.employeeId}</span>
                                   </>
+                                )}
+                                {req.source === "HRMS Dashboard" && (
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold">
+                                    <Send size={9} /> Dashboard
+                                  </span>
                                 )}
                               </div>
                             </div>
@@ -1164,102 +1191,6 @@ export function AssetsPage() {
                 className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy font-mono"
               />
             </div>
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Asset Description</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. MacBook Pro 14 (M3 Max)"
-                  value={newAsset.name}
-                  onChange={(e) => setNewAsset({ ...newAsset, name: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Category</label>
-                  <select
-                    value={newAsset.category}
-                    onChange={(e) => setNewAsset({ ...newAsset, category: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
-                  >
-                    <option value="Laptop">Laptop</option>
-                    <option value="Monitor">Monitor</option>
-                    <option value="Mobile">Mobile</option>
-                    <option value="Workstation">Workstation</option>
-                    <option value="Tablet">Tablet</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
-                  <select
-                    value={newAsset.dept}
-                    onChange={(e) => setNewAsset({ ...newAsset, dept: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
-                  >
-                    <option value="Engineering">Engineering</option>
-                    <option value="Design">Design</option>
-                    <option value="Product">Product</option>
-                    <option value="Operations">Operations</option>
-                    <option value="HR">HR</option>
-                    <option value="Finance">Finance</option>
-                  </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Assigned To</label>
-                  <select
-                    value={newAsset.assignedTo}
-                    onChange={(e) => {
-                      const selected = employees.find((emp) => emp.name === e.target.value);
-                      setNewAsset({
-                        ...newAsset,
-                        assignedTo: e.target.value,
-                        dept: selected?.department || newAsset.dept,
-                      });
-                    }}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
-                  >
-                    <option value="">Unassigned / Stock</option>
-                    {employees.map((emp) => (
-                      <option key={emp.id || emp.name} value={emp.name}>
-                        {emp.name} ({emp.department})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Status</label>
-                  <select
-                    value={newAsset.status}
-                    onChange={(e) => setNewAsset({ ...newAsset, status: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
-                  >
-                    <option value="Assigned">Assigned</option>
-                    <option value="Available">Available</option>
-                    <option value="Under Maintenance">Under Maintenance</option>
-                    <option value="Lost/Damaged">Lost/Damaged</option>
-                  </select>
-                </div>
-              </div>
-              <div className="flex justify-end gap-2.5 mt-3 pt-3 border-t border-bdr">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90"
-                >
-                  Register Asset
-                </button>
-              </div>
-            </form>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">

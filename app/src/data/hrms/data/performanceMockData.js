@@ -91,5 +91,5 @@ export const dashboardMetrics = [
   { label:'Reviews Pending', value:'42', sub:'Awaiting action' },
   { label:'Completed', value:'186', sub:'This cycle' },
   { label:'Avg Rating', value:'4.2 / 5', sub:'Across all' },
-  { label:'Goals Completed', value:'78%', sub:'+6% vs last quarter' },
+  // { label:'Goals Completed', value:'78%', sub:'+6% vs last quarter' }, // Hidden: Goal Tracking feature disconnected
 ];

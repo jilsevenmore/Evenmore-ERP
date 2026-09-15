@@ -416,9 +416,10 @@ export const useAssetStore = create((set, get) => ({
       assetName: reqData.assetName || "Requested Hardware",
       reason: reqData.reason || "",
       priority: reqData.priority || "Medium",
-      requestedDate: today,
+      requestedDate: reqData.requestedDate || today,
       status: "Pending",
       notes: reqData.notes || "",
+      source: reqData.source || "Asset Portal",
       allocatedAssetId: null,
     };
     const updated = [newReq, ...get().requests];
