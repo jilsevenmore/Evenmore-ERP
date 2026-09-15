@@ -1,3 +1,15 @@
+// ─────────────────────────────────────────────────────────────
+// HRMS Setup Page — Hidden from sidebar and commented out per user request
+// ─────────────────────────────────────────────────────────────
+
+export function HrmsSetupPage() {
+  return null;
+}
+
+export const HrmsSetup = HrmsSetupPage;
+export default HrmsSetupPage;
+
+/*
 import { useState } from "react";
 import {
   Sliders,
@@ -89,7 +101,7 @@ const INITIAL_AUDIT = [
   { id: "LOG-1088", user: "Adarsh Gupta", action: "Updated Flexibility Rules", target: "Grace Period 5m -> 10m", timestamp: "Oct 09, 11:30 AM", ip: "192.168.1.5" },
 ];
 
-export function HrmsSetupPage() {
+function HrmsSetupPageOriginal() {
   const showToast = useAppStore((s) => s.showToast);
   const [roles, setRoles] = useState(INITIAL_ROLES);
   const [auditLogs, setAuditLogs] = useState(INITIAL_AUDIT);
@@ -124,7 +136,6 @@ export function HrmsSetupPage() {
 
   return (
     <div className="flex flex-col gap-6 w-full pb-12">
-      {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[24px] font-bold text-slate-900">HRMS Setup &amp; Governance</h1>
@@ -144,7 +155,6 @@ export function HrmsSetupPage() {
         </div>
       </div>
 
-      {/* Permissions Matrix */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
         <div className="p-5 border-b border-bdr flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -202,7 +212,6 @@ export function HrmsSetupPage() {
         </div>
       </div>
 
-      {/* Security Audit Logs */}
       <div className="bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col gap-4">
         <div className="flex items-center justify-between pb-3 border-b border-bdr">
           <div className="flex items-center gap-2">
@@ -238,7 +247,6 @@ export function HrmsSetupPage() {
         </div>
       </div>
 
-      {/* Modal: Define Role */}
       {isRoleModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
@@ -313,6 +321,4 @@ export function HrmsSetupPage() {
     </div>
   );
 }
-
-export const HrmsSetup = HrmsSetupPage;
-export default HrmsSetupPage;
+*/
