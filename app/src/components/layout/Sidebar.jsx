@@ -69,10 +69,7 @@ const NAV = [
   {
     label: 'Dashboard',
     icon: Home,
-    defaultOpen: false,
-    children: [
-      { label: 'Main Dashboard', icon: Home, to: '/dashboard' },
-    ],
+    to: '/dashboard',
   },
 
   {
@@ -223,7 +220,7 @@ const NAV = [
           { label: 'Onboarding', to: '/hrms/recruitment/onboarding' },
           { label: 'Career', to: '/hrms/recruitment/career' },
           { label: 'Custom Questions', to: '/hrms/recruitment/questions' },
-          { label: 'Funnel', to: '/hrms/recruitment/funnel' },
+          // { label: 'Funnel', to: '/hrms/recruitment/funnel' }, // Hidden: Recruitment Funnel feature commented out
         ],
       },
       {
@@ -236,21 +233,11 @@ const NAV = [
           { label: 'KPI Data', to: '/hrms/performance/kpi-data' },
           { label: 'Appraisal', to: '/hrms/performance/appraisal' },
           { label: 'Appraisal Funnel', to: '/hrms/performance/appraisal-funnel' },
-          { label: 'Goal Tracking', to: '/hrms/performance/goal-tracking' },
-          { label: 'Goal Funnel', to: '/hrms/performance/goal-funnel' },
+          // { label: 'Goal Tracking', to: '/hrms/performance/goal-tracking' }, // Hidden: Goal Tracking feature commented out
+          // { label: 'Goal Funnel', to: '/hrms/performance/goal-funnel' }, // Hidden: Goal Funnel feature commented out
         ],
       },
-      {
-        label: 'Training',
-        icon: GraduationCap,
-        defaultOpen: false,
-        children: [
-          { label: 'Dashboard', to: '/hrms/training', dot: true },
-          { label: 'Training List', to: '/hrms/training/list' },
-          { label: 'Training Funnel', to: '/hrms/training/training-funnel' },
-          { label: 'Trainers', to: '/hrms/training/trainers' },
-        ],
-      },
+      { label: 'Training', icon: GraduationCap, to: '/hrms/training' },
       { label: 'HR Admin', icon: ShieldCheck, to: '/hrms/hr-admin' },
       { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },
@@ -266,8 +253,8 @@ const NAV = [
         ],
       },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
-      { label: 'Personal Calendar', icon: Calendar, to: '/hrms/calendar' },
-      { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' },
+      { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
+      // { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' }, // Hidden: HRMS Setup commented out
     ],
   },
 

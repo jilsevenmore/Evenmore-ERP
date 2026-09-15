@@ -132,6 +132,34 @@ export default function TaskFormBuilderPage() {
     setSections((cur) => (cur.length <= 1 ? cur : cur.filter((s) => s.id !== sectionId)));
   }
 
+  function updateSectionTitle(sectionId, newTitle) {
+    setSections((cur) =>
+      cur.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s))
+    );
+  }
+
+  function duplicateSection(sectionId) {
+    setSections((cur) => {
+      const targetSec = cur.find((s) => s.id === sectionId);
+      if (!targetSec) return cur;
+      const newSecId = `task-section-${Date.now()}`;
+      const clonedFields = (targetSec.fields || []).map((f, i) => ({
+        ...f,
+        id: Date.now() + i,
+      }));
+      const newSec = {
+        ...targetSec,
+        id: newSecId,
+        title: `${targetSec.title} (Copy)`,
+        fields: clonedFields,
+      };
+      const idx = cur.findIndex((s) => s.id === sectionId);
+      const next = [...cur];
+      next.splice(idx + 1, 0, newSec);
+      return next;
+    });
+  }
+
   function handlePreview() {
     setPreviewOpen(true);
   }
@@ -150,7 +178,8 @@ export default function TaskFormBuilderPage() {
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
-    }, 1200);
+      navigate('/crm/leads/task-form');
+    }, 600);
   }
 
   if (!currentForm) {
@@ -181,6 +210,8 @@ export default function TaskFormBuilderPage() {
         onMoveField={moveField}
         onAddSection={addSection}
         onRemoveSection={removeSection}
+        onUpdateSectionTitle={updateSectionTitle}
+        onDuplicateSection={duplicateSection}
         onPreview={handlePreview}
         onSaveAndOpen={handleSave}
         saveSuccess={saveSuccess}

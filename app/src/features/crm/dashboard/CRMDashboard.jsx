@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, UserPlus, Clock, TrendingUp, TrendingDown, DollarSign, Search, Filter, Plus, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
+import { Users, UserPlus, Clock, TrendingUp, TrendingDown, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
 import { leads, initials } from "../../../data/crm/mockLeads";
 import { useERP } from "../../../context/ERPContext";
 import { useAppStore } from "../../../stores/appStore";
 import { CRM_TEAM_MEMBERS } from "../../../services/leadStageAutomation";
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from "../../../services/taskCompletionService";
 import CompleteTaskModal from "../tasks/CompleteTaskModal";
+import CreateLeadModal from "../leads/CreateLeadModal";
+import { runLeadStageAutomation, LEADS_STORAGE_KEY } from "../../../services/leadStageAutomation";
 const DEAL_STORAGE_KEY = "crm-deals-v1";
 const TASK_STORAGE_KEY = "crm-tasks-v1";
 const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
@@ -117,8 +119,44 @@ export default function DashboardView() {
   const [tasks, setTasks] = useState(loadTasks);
   const [tab, setTab] = useState("All");
   const [query, setQuery] = useState("");
-  const [checked, setChecked] = useState([]);
   const [completeTarget, setCompleteTarget] = useState(null);
+  const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+
+  function handleCreateLead(data) {
+    try {
+      const raw = localStorage.getItem(LEADS_STORAGE_KEY);
+      const current = raw ? JSON.parse(raw) : leads;
+      const nextId = current.reduce((max, l) => Math.max(max, Number(l.id) || 0), 0) + 1;
+      const count = String(nextId + 184).padStart(8, '0');
+      const newLead = {
+        id: nextId,
+        name: data.leadName || 'Untitled Lead',
+        company: data.company || '',
+        phone: data.phone || '',
+        email: data.email || '',
+        status: 'New',
+        source: data.source || 'Website',
+        owner: data.owner || 'Drashti Evenmore',
+        createdOn: data.createdOn ? new Date(data.createdOn).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
+        jobTitle: data.titleValue || '',
+        industry: data.industry || '',
+        products: data.products || [],
+        assignedUsers: data.leadUsers || [],
+        photo: data.photoPreview || '',
+        leadCode: `LD-${count}`,
+      };
+      const updated = [newLead, ...current];
+      localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(updated));
+      try {
+        runLeadStageAutomation(newLead, 'New');
+      } catch (err) {
+        console.error(err);
+      }
+    } catch (e) {
+      console.error('Error creating lead:', e);
+    }
+    setIsCreateLeadOpen(false);
+  }
   const firstName = (currentUser?.name || "Hiti").split(" ")[0];
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
@@ -207,7 +245,6 @@ export default function DashboardView() {
     const okQ = !q || t.title.toLowerCase().includes(q) || t.lead.toLowerCase().includes(q) || t.owner.toLowerCase().includes(q);
     return okTab && okQ;
   });
-  const toggleCheck = (id) => setChecked((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
   const completeTask = (t) => {
     if (t.status === "Completed") return;
     setCompleteTarget(t);
@@ -362,19 +399,12 @@ export default function DashboardView() {
             <span style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: "#64748b" }}>
               <Search size={14} /> <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tasks..." style={{ border: 0, outline: 0, fontSize: 12, width: 110 }} />
             </span>
-            <button type="button" style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid #e2e8f0", background: "#fff", borderRadius: 8, padding: "7px 10px", fontSize: 12, fontWeight: 700, color: "#475569" }}>
-              <Filter size={14} /> Filter
-            </button>
-            <Link to="/crm/tasks" style={{ display: "flex", alignItems: "center", gap: 6, background: "#2f6fed", color: "#fff", borderRadius: 8, padding: "7px 12px", fontSize: 12, fontWeight: 800 }}>
-              <Plus size={14} /> Add Task
-            </Link>
           </div>
         </div>
         <div style={{ overflowX: "auto", marginTop: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 900 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#94a3b8", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                <th style={{ padding: "8px" }}></th>
                 <th style={{ padding: "8px" }}>Task</th>
                 <th style={{ padding: "8px" }}>Related Lead</th>
                 <th style={{ padding: "8px" }}>Due Date</th>
@@ -393,9 +423,6 @@ export default function DashboardView() {
                 const sFg = t.status === "Completed" ? "#15803d" : overdue ? "#b91c1c" : b === "Today" ? "#b45309" : "#2f6fed";
                 return (
                   <tr key={t.id} style={{ borderTop: "1px solid #eef2f7" }}>
-                    <td style={{ padding: "10px 8px" }}>
-                      <input type="checkbox" checked={checked.includes(t.id)} onChange={() => toggleCheck(t.id)} />
-                    </td>
                     <td style={{ padding: "10px 8px", fontWeight: 700, color: "#0f1f3d" }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ width: 28, height: 28, borderRadius: 8, background: "#eef4ff", display: "grid", placeItems: "center", color: "#2f6fed" }}>
@@ -486,9 +513,9 @@ export default function DashboardView() {
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Quick Actions</h3>
           <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals {invoices.length} invoices</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
-            <Link to="/crm/leads/forms" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
+            <button type="button" onClick={() => setIsCreateLeadOpen(true)} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
               <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><UserPlus size={17} /></span> Add Lead
-            </Link>
+            </button>
             <Link to="/crm/tasks" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
               <span style={{ width: 34, height: 34, borderRadius: 10, background: "#ecfdf5", color: "#10b981", display: "grid", placeItems: "center" }}><ClipboardList size={17} /></span> Add Task
             </Link>

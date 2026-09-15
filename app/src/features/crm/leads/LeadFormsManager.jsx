@@ -1,98 +1,331 @@
-import { CalendarDays, FileText, Plus, Pencil, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  CalendarDays,
+  ChevronDown,
+  FileText,
+  LayoutGrid,
+  Pencil,
+  Plus,
+  Rows3,
+  Trash2,
+} from "lucide-react";
 import InfoBanner from "../common/InfoBanner";
 
+function parseDateValue(dateString) {
+  if (!dateString || typeof dateString !== "string") return 0;
+  const [day, month, year] = dateString.split("/").map(Number);
+  if (!day || !month || !year) return 0;
+  return new Date(year, month - 1, day).getTime();
+}
+
+function getFieldCount(form) {
+  if (typeof form.fieldsCount === "number") return form.fieldsCount;
+  if (!Array.isArray(form.sections)) return 0;
+  return form.sections.reduce((total, section) => total + (section.fields?.length || 0), 0);
+}
+
 export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDeleteForm, onOpenGuide }) {
+  const [statusFilter, setStatusFilter] = useState("All Status");
+  const [sortOrder, setSortOrder] = useState("Newest First");
+  const [viewMode, setViewMode] = useState("grid");
+
+  const filteredForms = useMemo(() => {
+    const nextForms = forms.filter((form) => {
+      const matchesStatus =
+        statusFilter === "All Status" ||
+        (statusFilter === "Active" && true);
+
+      return matchesStatus;
+    });
+
+    nextForms.sort((a, b) => {
+      const aDate = parseDateValue(a.createdOn);
+      const bDate = parseDateValue(b.createdOn);
+      return sortOrder === "Oldest First" ? aDate - bDate : bDate - aDate;
+    });
+
+    return nextForms;
+  }, [forms, sortOrder, statusFilter]);
+
   return (
-    <section className="w-full max-w-6xl mx-auto py-4">
-      <InfoBanner
-        storageKey="infoBannerLeadCreateFormV1"
-        title="Why use Lead Create Forms?"
-        text="These define which fields appear while creating a lead. You design the form once, then every new lead follows the same structure."
-      />
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Manage Lead Create Forms</h1>
-          <div className="text-xs font-medium text-slate-500 mt-1 flex items-center gap-1.5">
+    <section className="w-full max-w-none px-3 sm:px-4 lg:px-5 py-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <h1 className="text-[22px] sm:text-[24px] leading-tight font-bold text-slate-900 tracking-tight">
+            Manage Lead Create Forms
+          </h1>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs font-medium text-slate-500">
             <span>Dashboard</span>
             <span>&gt;</span>
             <span className="text-slate-700">Lead Create Form</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+
+        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
           {onOpenGuide && (
             <button
               type="button"
               onClick={onOpenGuide}
-              className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2 text-[13px] font-semibold text-[#1d6bff]"
-              aria-label="How to create a lead form"
+              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-4 text-sm font-semibold text-[#2f6fed] transition hover:bg-slate-50 cursor-pointer"
             >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
-              <span>How to create a lead form?</span>
+              How to create a form
             </button>
           )}
+
           <button
             type="button"
-            className="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-xs transition cursor-pointer"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] bg-[#2f6fed] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] cursor-pointer"
             onClick={onCreateForm}
             aria-label="Create new lead form"
           >
             <Plus size={18} />
+            <span>Create Form</span>
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {forms.map((form) => {
-          const fieldCount = form.fieldsCount ?? form.sections.reduce((total, section) => total + section.fields.length, 0);
-          return (
-            <article
-              key={form.id}
-              className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs hover:border-slate-300 transition flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText size={16} className="text-blue-600" />
-                  <h2 className="text-sm font-bold text-slate-900">{form.name}</h2>
-                </div>
-                <p className="text-xs text-slate-500 mb-4">{form.description}</p>
-              </div>
+      <div className="mt-5">
+        <InfoBanner
+          storageKey="infoBannerLeadCreateFormV1"
+          title="Why use Lead Create Forms?"
+          text="These define which fields appear while creating a lead. You design the form once, then every new lead follows the same structure."
+        />
+      </div>
 
-              <div>
-                <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-100 mb-4">
-                  <span className="flex items-center gap-1.5">
-                    <FileText size={13} /> {fieldCount} Fields
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <CalendarDays size={13} /> {form.createdOn}
-                  </span>
-                  <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-full border border-emerald-200">
-                    ACTIVE
-                  </span>
+      <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 sm:p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-wrap items-center gap-3 xl:justify-end">
+            <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">
+              {filteredForms.length} {filteredForms.length === 1 ? "Form" : "Forms"}
+            </div>
+
+            <div className="relative shrink-0">
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-11 min-w-[150px] appearance-none rounded-[14px] border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2f6fed]"
+              >
+                <option>All Status</option>
+                <option>Active</option>
+              </select>
+              <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
+
+            <div className="relative shrink-0">
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="h-11 min-w-[160px] appearance-none rounded-[14px] border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2f6fed]"
+              >
+                <option>Newest First</option>
+                <option>Oldest First</option>
+              </select>
+              <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            </div>
+
+            <div className="inline-flex shrink-0 rounded-[16px] border border-slate-200 bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
+                  viewMode === "grid" ? "bg-[#2f6fed] text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <Rows3 size={15} />
+                <span>Grid View</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("tile")}
+                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
+                  viewMode === "tile" ? "bg-[#2f6fed] text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <LayoutGrid size={15} />
+                <span>Tile View</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-[18px] border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
+          Create a form using the top-right button, then open it in the builder to add sections and fields.
+        </div>
+
+        {viewMode === "grid" ? (
+          <div className="mt-5 overflow-hidden rounded-[20px] border border-slate-200 bg-white">
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead className="bg-slate-50/95">
+                  <tr className="text-left text-[12px] font-bold uppercase tracking-[0.04em] text-slate-500">
+                    <th className="px-5 py-4 whitespace-nowrap">#</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Form Name</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Description</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Fields</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Created On</th>
+                    <th className="px-5 py-4 whitespace-nowrap">Status</th>
+                    <th className="px-5 py-4 text-right whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {filteredForms.map((form, index) => (
+                    <tr key={form.id} className="text-sm text-slate-700 transition hover:bg-slate-50/60">
+                      <td className="px-5 py-4 font-medium text-slate-500 whitespace-nowrap">{index + 1}</td>
+                      <td className="px-5 py-4 min-w-[210px]">
+                        <div className="flex items-center gap-3">
+                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 shrink-0">
+                            <FileText size={16} />
+                          </span>
+                          <span className="font-bold text-slate-900 whitespace-nowrap">{form.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-slate-500 whitespace-nowrap">
+                        {form.description || "No description provided"}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="inline-flex rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold text-blue-700">
+                          {getFieldCount(form)} Fields
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-slate-700 whitespace-nowrap">{form.createdOn}</td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+                          ACTIVE
+                        </span>
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => onEditForm(form.id)}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+                          >
+                            <Pencil size={13} />
+                            <span>Edit</span>
+                          </button>
+                          {onDeleteForm && (
+                            <button
+                              type="button"
+                              onClick={() => onDeleteForm(form.id)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
+                              aria-label={`Delete ${form.name}`}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {filteredForms.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-16 text-center text-sm text-slate-500">
+                        No forms found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+            {filteredForms.map((form) => (
+              <article
+                key={form.id}
+                className="rounded-[18px] border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                        <FileText size={16} />
+                      </span>
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-bold text-slate-900">{form.name}</h2>
+                        <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">
+                          {form.description || "No description provided"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
+
+                <div className="mt-4 grid grid-cols-2 gap-2.5 rounded-[14px] bg-slate-50 p-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Fields</div>
+                    <div className="mt-0.5 text-sm font-bold text-slate-900">{getFieldCount(form)}</div>
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Status</div>
+                    <div className="mt-0.5 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                      ACTIVE
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Created On</div>
+                    <div className="mt-0.5 inline-flex items-center gap-1.5 text-xs font-medium text-slate-700">
+                      <CalendarDays size={13} />
+                      <span>{form.createdOn}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between gap-2.5">
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 py-1.5 px-3.5 bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+                    className="inline-flex h-9 items-center gap-1.5 rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] cursor-pointer"
                     onClick={() => onEditForm(form.id)}
                   >
-                    <Pencil size={12} /> Edit
+                    <Pencil size={13} />
+                    <span>Edit</span>
                   </button>
                   {onDeleteForm && (
                     <button
                       type="button"
-                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 cursor-pointer"
                       onClick={() => onDeleteForm(form.id)}
-                      title={`Delete ${form.name}`}
                       aria-label={`Delete ${form.name}`}
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </button>
                   )}
                 </div>
-              </div>
-            </article>
-          );
-        })}
+              </article>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            Showing {filteredForms.length === 0 ? 0 : 1} to {filteredForms.length} of {filteredForms.length} forms
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400"
+              disabled
+              aria-label="Previous page"
+            >
+              <ChevronDown size={16} className="rotate-90" />
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-10 min-w-10 items-center justify-center rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white"
+            >
+              1
+            </button>
+            <button
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400"
+              disabled
+              aria-label="Next page"
+            >
+              <ChevronDown size={16} className="-rotate-90" />
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );

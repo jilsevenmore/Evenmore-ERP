@@ -23,7 +23,7 @@ import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
 
-export default function TrainingFunnel() {
+export default function TrainingFunnel({ embedded = false, onBack }) {
   const navigate = useNavigate();
   const showToast = useAppStore((s) => s.showToast);
 
@@ -168,14 +168,16 @@ export default function TrainingFunnel() {
       {/* Top Breadcrumb & Header matching screenshot */}
       <div className="flex flex-col gap-1">
         {/* Back button to Training Setup */}
-        <button
-          type="button"
-          onClick={() => navigate("/hrms/training")}
-          className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group mb-1"
-        >
-          <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-          <span>Back to Training Setup</span>
-        </button>
+        {!embedded && (
+          <button
+            type="button"
+            onClick={() => (onBack ? onBack() : navigate("/hrms/training"))}
+            className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group mb-1"
+          >
+            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+            <span>Back to Training Setup</span>
+          </button>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>

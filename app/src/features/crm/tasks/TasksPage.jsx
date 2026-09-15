@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Calendar, User, Search, CheckCircle2, Pencil, X, AlertTriangle, ArrowUpDown, Clock } from 'lucide-react';
+import { Calendar, User, Search, CheckCircle2, Pencil, X, AlertTriangle, ArrowUpDown, Clock, Users, UserPlus, TrendingUp } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import DataTable from '../../../components/ui/DataTable';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -340,18 +340,76 @@ export default function TasksPage() {
         breadcrumb={[{ label: 'CRM', to: '/crm/leads' }, { label: 'Tasks' }]}
       />
 
-      <div
-        className="stats-grid"
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 16,
-          margin: '20px 0 24px',
-        }}
-      >
-        {stats.map((s) => (
-          <StatCard key={s.label} stat={s} />
-        ))}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-5">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
+            <Users size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Total Active Leads</div>
+            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">6</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+              <span>↑ 12%</span>
+              <span className="text-slate-400 font-normal">vs last week</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
+            <UserPlus size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500">New Leads</div>
+            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">1</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+              <span>↑ 2%</span>
+              <span className="text-slate-400 font-normal">vs last week</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
+            <Clock size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Pending Tasks</div>
+            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{tasks.filter((t) => t.status !== 'Completed').length}</div>
+            <div className="text-[11px] font-semibold text-rose-500 mt-0.5 flex items-center gap-1">
+              <span>↓ 4%</span>
+              <span className="text-slate-400 font-normal">vs last week</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
+            <TrendingUp size={22} strokeWidth={2.2} />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Deals in Pipeline</div>
+            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">6</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+              <span>↑ 15%</span>
+              <span className="text-slate-400 font-normal">Rs 1.72 Cr</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 flex-shrink-0 font-bold text-xl">
+            $
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Total Revenue Expected</div>
+            <div className="text-xl font-bold text-slate-900 leading-tight mt-0.5">$17,355,083.00</div>
+            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+              <span>↑ 22%</span>
+              <span className="text-slate-400 font-normal">$5,884.00 due</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div
