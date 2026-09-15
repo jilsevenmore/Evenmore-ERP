@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ArrowUpDown, MoreVertical, Search } from 'lucide-react';
+import { ArrowUpDown, MoreVertical, Search, Download } from 'lucide-react';
 import Pagination from './Pagination';
 
 /**
@@ -29,6 +29,7 @@ export function DataTable({
   pageSize: initialPageSize = 5,
   pageSizeOptions = [5, 10, 20],
   action,
+  exportable = true,
 }) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState('');
@@ -122,6 +123,40 @@ export function DataTable({
     onSelectChange(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
   }
 
+  const handleExportCSV = () => {
+    try {
+      if (!safeData || safeData.length === 0) return;
+      
+      const exportCols = columns.filter((col) => col.key !== 'actions' && col.id !== 'actions');
+      const headers = exportCols.map((c) => `"${(c.header || c.label || c.title || c.key || '').replace(/"/g, '""')}"`);
+      
+      const rows = filtered.map((row) => {
+        return exportCols.map((col) => {
+          const k = col.key || col.accessor || col.id;
+          let cellVal = k != null && row ? row[k] : '';
+          if (typeof cellVal === 'object' && cellVal !== null) {
+            cellVal = JSON.stringify(cellVal);
+          }
+          return `"${String(cellVal ?? '').replace(/"/g, '""')}"`;
+        }).join(',');
+      });
+
+      const csvContent = [headers.join(','), ...rows].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const cleanTitle = (title || 'export').toLowerCase().replace(/[^a-z0-9]/g, '-');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${cleanTitle}-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export table CSV:', err);
+    }
+  };
+
   function renderCell(col, row) {
     const key = col.key || col.accessor || col.id;
     const val = key != null && row ? row[key] : undefined;
@@ -157,7 +192,7 @@ export function DataTable({
             {subtitle && <p className="text-[11px] text-muted mt-0.5">{subtitle}</p>}
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             {isSearchEnabled && (
               <div className="relative flex items-center w-full sm:w-64">
                 <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
@@ -173,18 +208,28 @@ export function DataTable({
                 />
               </div>
             )}
+            {exportable && safeData.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportCSV}
+                title="Export Table to CSV"
+                className="p-1.5 border border-border hover:bg-card-hover rounded-xl text-muted hover:text-text cursor-pointer transition shadow-2xs flex items-center gap-1 text-xs shrink-0"
+              >
+                <Download size={14} />
+              </button>
+            )}
             {action && <div>{action}</div>}
           </div>
         </div>
       )}
 
       {/* Table Content */}
-      <div className="table-scroll overflow-x-auto">
+      <div className="table-scroll overflow-x-auto max-h-[70vh]">
         <table className="data-table w-full border-collapse text-left text-xs">
-          <thead>
+          <thead className="sticky top-0 z-10 shadow-xs">
             <tr className="border-b border-border bg-table-head text-text-secondary font-semibold text-[11px] uppercase tracking-wider">
               {selectable && (
-                <th className="col-check py-2.5 px-3 w-10 text-center">
+                <th className="col-check py-2.5 px-3 w-10 text-center bg-table-head">
                   <input
                     type="checkbox"
                     className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"

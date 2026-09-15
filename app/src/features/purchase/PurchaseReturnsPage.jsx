@@ -5,6 +5,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { Plus, RotateCcw, CheckCircle2, X, Ban, AlertCircle, Eye, Printer, MapPin } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { PrintDebitNoteModal } from '../../components/common/PrintDebitNoteModal';
 const purchaseReturnGuide = {
     title: 'Purchase Returns & Debit Notes',
     subtitle: 'Supplier RMA, debit memo issuance, selective item returns, and payables write-down',
@@ -40,6 +41,7 @@ export const PurchaseReturnsPage = () => {
     const [reason, setReason] = useState('Damaged casing detected on intake inspection');
     const [returnItems, setReturnItems] = useState([]);
     const [selectedReturn, setSelectedReturn] = useState(null);
+    const [printReturnTarget, setPrintReturnTarget] = useState(null);
 
     const handleBillSelect = (billId) => {
         setSelectedBillId(billId);
@@ -202,6 +204,13 @@ export const PurchaseReturnsPage = () => {
                       title="View Return Details"
                     >
                       <Eye size={13}/>
+                    </button>
+                    <button
+                      onClick={() => setPrintReturnTarget(r)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="Print Official Debit Note Voucher"
+                    >
+                      <Printer size={13}/>
                     </button>
                     {isCancelled ? (
                       <span className="text-xs font-semibold text-rose-600 inline-flex items-center gap-1">
@@ -390,9 +399,18 @@ export const PurchaseReturnsPage = () => {
                 </span>
                 <StatusBadge status={selectedReturn.status}/>
               </div>
-              <button onClick={() => setSelectedReturn(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
-                <X size={18}/>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPrintReturnTarget(selectedReturn)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Printer size={13} /> Print Debit Note
+                </button>
+                <button onClick={() => setSelectedReturn(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+                  <X size={18}/>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
@@ -485,5 +503,12 @@ export const PurchaseReturnsPage = () => {
           </div>
         </div>
       )}
+
+      {/* Official Executive Debit Note Print Voucher */}
+      <PrintDebitNoteModal
+        isOpen={Boolean(printReturnTarget)}
+        onClose={() => setPrintReturnTarget(null)}
+        debitNote={printReturnTarget}
+      />
     </div>);
 };

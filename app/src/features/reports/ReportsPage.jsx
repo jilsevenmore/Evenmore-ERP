@@ -179,7 +179,7 @@ export const ReportsPage = () => {
 
     const categoryColors = ['bg-[#1F2E4A]', 'bg-blue-600', 'bg-emerald-600', 'bg-amber-600', 'bg-purple-600', 'bg-rose-600', 'bg-teal-600'];
 
-    return (<div className="space-y-6">
+    return (<div className="space-y-6 printable-document">
       <PageHeader title="Financial & Inventory Reports" subtitle="Generate executive compliance summaries, AR/AP aging schedules, valuation ledgers, and operational sales analyses." guide={reportsGuide} actions={<div className="flex items-center gap-2">
             <Button variant="outline" icon={Printer} onClick={() => window.print()}>
               Print Report
@@ -189,7 +189,7 @@ export const ReportsPage = () => {
             </Button>
           </div>}/>
 
-      <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+      <div className="flex flex-wrap gap-2 border-b border-border pb-3 no-print">
         <button onClick={() => setActiveReport('inventory')} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition ${activeReport === 'inventory'
             ? 'bg-primary text-white shadow-xs'
             : 'bg-card text-text-secondary hover:bg-soft border border-border'}`}>

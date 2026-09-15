@@ -10,6 +10,7 @@ import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
+import { PrintPurchaseOrderModal } from '../../components/common/PrintPurchaseOrderModal';
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
     subtitle: 'Supplier procurement contracts driving inventory replenishment and vendor billing.',
@@ -31,6 +32,7 @@ export const PurchaseOrdersPage = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedPo, setSelectedPo] = useState(null);
+    const [printPoTarget, setPrintPoTarget] = useState(null);
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
     const [expectedDate, setExpectedDate] = useState('In 10 days');
     const [lineItems, setLineItems] = useState([]);
@@ -201,6 +203,9 @@ export const PurchaseOrdersPage = () => {
                 const hasRemaining = poStatusInfo.totalRemainingQty > 0;
                 return (
                   <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <button onClick={() => setPrintPoTarget(p)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Print Official Purchase Order">
+                      <Printer size={13}/>
+                    </button>
                     <button onClick={() => handleClonePo(p)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Clone / Reorder this Purchase Order">
                       <Copy size={13}/>
                     </button>
@@ -362,9 +367,13 @@ export const PurchaseOrdersPage = () => {
                 <StatusBadge status={selectedPo.status}/>
               </div>
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => window.print()} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => setPrintPoTarget(selectedPo)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
                   <Printer size={13}/>
-                  Print PO
+                  Print Official PO
                 </button>
                 <button onClick={() => setSelectedPo(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
                   <X size={18}/>
@@ -477,5 +486,12 @@ export const PurchaseOrdersPage = () => {
             </div>
           </div>
         </div>)}
+
+      {/* Official Commercial Purchase Order PDF Voucher */}
+      <PrintPurchaseOrderModal
+        isOpen={Boolean(printPoTarget)}
+        onClose={() => setPrintPoTarget(null)}
+        po={printPoTarget}
+      />
     </div>);
 };

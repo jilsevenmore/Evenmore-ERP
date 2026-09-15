@@ -128,7 +128,9 @@ function downloadGuidePdf(lang, variant) {
   );
   printWindow.document.close();
   printWindow.focus();
-  printWindow.print();
+  setTimeout(() => {
+    printWindow.print();
+  }, 350);
 }
 
 export default function LeadGuideModal({ isOpen, onClose, variant = "lead" }) {

@@ -35,6 +35,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
+import { PrintProformaInvoiceModal } from '../../components/common/PrintProformaInvoiceModal';
 
 const proformaGuide = {
   title: 'Proforma Invoices',
@@ -114,6 +115,7 @@ export const ProformaInvoicesPage = () => {
   const [editingPi, setEditingPi] = useState(null);
   const [selectedPi, setSelectedPi] = useState(null);
   const [deleteTargetPi, setDeleteTargetPi] = useState(null);
+  const [printPiTarget, setPrintPiTarget] = useState(null);
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
@@ -482,9 +484,16 @@ export const ProformaInvoicesPage = () => {
           <button
             onClick={() => setSelectedPi(pi)}
             className="p-1.5 text-muted hover:text-primary hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
-            title="View & Print Proforma Voucher"
+            title="View Details"
           >
             <Eye size={13} />
+          </button>
+          <button
+            onClick={() => setPrintPiTarget(pi)}
+            className="p-1.5 text-muted hover:text-primary hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+            title="Print Official Proforma Invoice Voucher"
+          >
+            <Printer size={13} />
           </button>
           <button
             onClick={() => handleClonePi(pi)}
@@ -974,7 +983,7 @@ export const ProformaInvoicesPage = () => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => window.print()}
+                  onClick={() => setPrintPiTarget(selectedPi)}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
                   <Printer size={13} /> Print / PDF
@@ -1284,6 +1293,13 @@ export const ProformaInvoicesPage = () => {
           </div>
         </div>
       )}
+
+      {/* Official Executive Proforma Invoice Print Voucher */}
+      <PrintProformaInvoiceModal
+        isOpen={Boolean(printPiTarget)}
+        onClose={() => setPrintPiTarget(null)}
+        proforma={printPiTarget}
+      />
     </div>
   );
 };

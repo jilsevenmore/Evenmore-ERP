@@ -135,12 +135,12 @@ export default function Topbar() {
     return list.length > 0 ? list : NOTIFICATIONS;
   }, [lowStockItems, pendingZoneRequests, inTransitChallans, overdueInvoices]);
 
-  const dynamicNotifications = isCrmRoute
-    ? [...crmDigest.reminders, ...crmDigest.notifications]
-    : erpNotifications;
-  const unreadCount = isCrmRoute
-    ? crmDigest.counts.unread
-    : dynamicNotifications.filter((n) => n.unread).length;
+  const [notifTab, setNotifTab] = useState('all'); // 'all' | 'crm' | 'erp'
+
+  const erpUnreadCount = useMemo(() => erpNotifications.filter((n) => n.unread).length, [erpNotifications]);
+  const crmUnreadCount = crmDigest.counts?.unread || crmDigest.counts?.total || 0;
+  const totalUnreadCount = erpUnreadCount + crmUnreadCount;
+  const totalNotifCount = (crmDigest.reminders?.length || 0) + (crmDigest.notifications?.length || 0) + erpNotifications.length;
 
   // Close popovers on click outside
   useEffect(() => {
@@ -288,7 +288,7 @@ export default function Topbar() {
 
         {/* Harmonized Icon Buttons Cluster */}
         <div className="flex items-center gap-1.5 pl-1">
-          {/* Notifications Button & Dropdown */}
+          {/* Unified Notifications Button & Dropdown */}
           <div className="relative" ref={notifRef}>
             <button
               type="button"
@@ -298,127 +298,207 @@ export default function Topbar() {
                 setIsQuickAddOpen(false);
               }}
               className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text flex items-center justify-center transition cursor-pointer relative shadow-2xs"
-              aria-label="Notifications"
-              title="Notifications"
+              aria-label="Notifications & Reminders"
+              title="Notifications & Reminders"
             >
               <Bell size={16} />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center ring-2 ring-card">
-                  {unreadCount}
+              {totalUnreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 bg-rose-600 text-white rounded-full text-[9px] font-bold flex items-center justify-center ring-2 ring-card">
+                  {totalUnreadCount}
                 </span>
               )}
             </button>
 
             {isNotifOpen && (
-              <div className="top-dropdown-menu w-80 p-3 animate-in fade-in zoom-in-95 duration-150 shadow-xl">
+              <div className="top-dropdown-menu w-84 sm:w-96 p-3 animate-in fade-in zoom-in-95 duration-150 shadow-xl">
+                {/* Header with Title & Unread Badge */}
                 <div className="flex items-center justify-between pb-2 border-b border-border">
-                  <span className="font-bold text-xs text-text">{isCrmRoute ? 'CRM Reminders' : 'Notifications'}</span>
-                  {isCrmRoute ? (
-                    <span className="text-[10px] font-semibold text-primary">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs text-text">Notifications & Reminders</span>
+                    {totalUnreadCount > 0 && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
+                        {totalUnreadCount} unread
+                      </span>
+                    )}
+                  </div>
+                  {crmDigest.counts?.urgent > 0 && (
+                    <span className="text-[10px] font-semibold text-rose-500">
                       {crmDigest.counts.urgent} urgent
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-semibold text-primary">
-                      {unreadCount} unread
                     </span>
                   )}
                 </div>
-                {isCrmRoute ? (
-                  <div className="mt-2 space-y-3">
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded-xl border border-rose-100 bg-rose-50 px-2.5 py-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-rose-500">Overdue</p>
-                        <p className="mt-1 text-sm font-bold text-rose-700">{crmDigest.counts.overdue}</p>
-                      </div>
-                      <div className="rounded-xl border border-amber-100 bg-amber-50 px-2.5 py-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">Today</p>
-                        <p className="mt-1 text-sm font-bold text-amber-700">{crmDigest.counts.today}</p>
-                      </div>
-                      <div className="rounded-xl border border-blue-100 bg-blue-50 px-2.5 py-2">
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-blue-500">All</p>
-                        <p className="mt-1 text-sm font-bold text-blue-700">{crmDigest.counts.total}</p>
-                      </div>
-                    </div>
 
+                {/* Tab Pill Switcher */}
+                <div className="flex items-center gap-1 p-1 mt-2 mb-2.5 rounded-xl bg-soft border border-border text-[11px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setNotifTab('all')}
+                    className={`flex-1 py-1 px-2 rounded-lg text-center transition cursor-pointer ${
+                      notifTab === 'all'
+                        ? 'bg-card text-text shadow-2xs font-bold border border-border'
+                        : 'text-muted hover:text-text'
+                    }`}
+                  >
+                    All ({totalNotifCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotifTab('crm')}
+                    className={`flex-1 py-1 px-2 rounded-lg text-center transition cursor-pointer ${
+                      notifTab === 'crm'
+                        ? 'bg-card text-text shadow-2xs font-bold border border-border'
+                        : 'text-muted hover:text-text'
+                    }`}
+                  >
+                    CRM Tasks ({crmDigest.counts?.total || 0})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNotifTab('erp')}
+                    className={`flex-1 py-1 px-2 rounded-lg text-center transition cursor-pointer ${
+                      notifTab === 'erp'
+                        ? 'bg-card text-text shadow-2xs font-bold border border-border'
+                        : 'text-muted hover:text-text'
+                    }`}
+                  >
+                    ERP Alerts ({erpNotifications.length})
+                  </button>
+                </div>
+
+                {/* CRM Summary KPI Cards (Shown on 'all' and 'crm' tabs) */}
+                {(notifTab === 'all' || notifTab === 'crm') && (crmDigest.counts?.total > 0 || crmDigest.counts?.overdue > 0) && (
+                  <div className="grid grid-cols-3 gap-1.5 mb-2.5">
+                    <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-2 py-1.5 text-center">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-rose-500">Overdue</p>
+                      <p className="mt-0.5 text-xs font-extrabold text-rose-600 dark:text-rose-400">{crmDigest.counts.overdue}</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-center">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500">Today</p>
+                      <p className="mt-0.5 text-xs font-extrabold text-amber-600 dark:text-amber-400">{crmDigest.counts.today}</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-2 py-1.5 text-center">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-blue-500">All Tasks</p>
+                      <p className="mt-0.5 text-xs font-extrabold text-blue-600 dark:text-blue-400">{crmDigest.counts.total}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Scrollable Notification Lists */}
+                <div className="max-h-72 space-y-2.5 overflow-y-auto pr-1">
+                  {/* ERP ALERTS SECTION */}
+                  {(notifTab === 'all' || notifTab === 'erp') && erpNotifications.length > 0 && (
                     <div>
-                      <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Reminders</span>
-                        <Link to="/crm/tasks" onClick={() => setIsNotifOpen(false)} className="text-[10px] font-semibold text-primary hover:underline">Open Tasks</Link>
-                      </div>
-                      <div className="max-h-56 space-y-1 overflow-y-auto pr-1">
-                        {crmDigest.reminders.length > 0 ? crmDigest.reminders.slice(0, 6).map((n) => (
+                      {notifTab === 'all' && (
+                        <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted">
+                          <span>Operational & Stock Alerts</span>
+                          <span className="text-primary font-semibold">{erpNotifications.length}</span>
+                        </div>
+                      )}
+                      <div className="space-y-1">
+                        {erpNotifications.map((n) => (
                           <div
                             key={n.id}
                             onClick={() => {
                               if (n.path) navigate(n.path);
                               setIsNotifOpen(false);
                             }}
-                            className="rounded-2xl border px-2.5 py-2.5 transition cursor-pointer hover:bg-soft"
-                            style={{
-                              background: n.tone === 'overdue' ? '#fff1f2' : n.tone === 'today' ? '#fff7ed' : 'var(--card)',
-                              borderColor: n.tone === 'overdue' ? '#fecdd3' : n.tone === 'today' ? '#fed7aa' : 'var(--border)',
-                            }}
+                            className="p-2.5 rounded-xl border border-border transition cursor-pointer hover:bg-soft"
+                            style={{ background: n.unread ? 'var(--soft)' : 'var(--card)' }}
                           >
-                            <div className="flex items-center justify-between gap-3 text-[11px] font-semibold text-text">
+                            <div className="flex items-center justify-between text-[11px] font-semibold text-text gap-2">
                               <span className="truncate">{n.title}</span>
-                              <span className="shrink-0 rounded-full bg-white px-1.5 py-0.5 text-[10px] text-primary">{n.time}</span>
+                              <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                                {n.time}
+                              </span>
                             </div>
-                            <p className="mt-0.5 text-[11px] text-muted">{n.subtitle} • {n.desc}</p>
+                            <p className="text-[11px] mt-1 leading-snug text-muted">{n.desc}</p>
                           </div>
-                        )) : (
-                          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-[11px] text-emerald-700">
-                            No CRM reminders pending right now.
-                          </div>
-                        )}
+                        ))}
                       </div>
                     </div>
+                  )}
 
-                    {crmDigest.notifications.length > 0 && (
-                      <div>
-                        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Workflow Notifications</div>
-                        <div className="space-y-1">
-                          {crmDigest.notifications.slice(0, 3).map((n) => (
+                  {/* CRM TASK REMINDERS SECTION */}
+                  {(notifTab === 'all' || notifTab === 'crm') && (
+                    <div>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted">CRM Task Reminders</span>
+                        <Link
+                          to="/crm/tasks"
+                          onClick={() => setIsNotifOpen(false)}
+                          className="text-[10px] font-bold text-primary hover:underline"
+                        >
+                          Open Tasks →
+                        </Link>
+                      </div>
+                      <div className="space-y-1">
+                        {crmDigest.reminders?.length > 0 ? (
+                          crmDigest.reminders.slice(0, 8).map((n) => (
                             <div
                               key={n.id}
                               onClick={() => {
                                 if (n.path) navigate(n.path);
                                 setIsNotifOpen(false);
                               }}
-                              className="rounded-2xl px-2.5 py-2.5 transition cursor-pointer hover:bg-soft"
-                              style={{ background: n.unread ? 'var(--soft)' : 'transparent' }}
+                              className="rounded-xl border p-2.5 transition cursor-pointer hover:bg-soft"
+                              style={{
+                                background: n.tone === 'overdue' ? 'rgba(239, 68, 68, 0.08)' : n.tone === 'today' ? 'rgba(245, 158, 11, 0.08)' : 'var(--card)',
+                                borderColor: n.tone === 'overdue' ? 'rgba(239, 68, 68, 0.25)' : n.tone === 'today' ? 'rgba(245, 158, 11, 0.25)' : 'var(--border)',
+                              }}
                             >
-                              <div className="flex items-center justify-between text-[11px] font-semibold text-text">
-                                <span>{n.title}</span>
-                                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-card text-primary">{n.time}</span>
+                              <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-text">
+                                <span className="truncate">{n.title}</span>
+                                <span className="shrink-0 rounded-full bg-surface border border-border px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                                  {n.time}
+                                </span>
                               </div>
-                              <p className="text-[11px] mt-0.5 leading-snug text-muted">{n.desc}</p>
+                              <p className="mt-0.5 text-[10.5px] text-muted truncate">{n.subtitle} • {n.desc}</p>
                             </div>
-                          ))}
-                        </div>
+                          ))
+                        ) : (
+                          <div className="rounded-xl border border-border bg-soft px-3 py-2.5 text-[11px] text-muted text-center">
+                            No active CRM reminders pending.
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="max-h-72 overflow-y-auto mt-1 space-y-1">
-                    {dynamicNotifications.map((n) => (
-                      <div
-                        key={n.id}
-                        onClick={() => {
-                          if (n.path) navigate(n.path);
-                          setIsNotifOpen(false);
-                        }}
-                        className="py-2.5 px-2 rounded-xl transition cursor-pointer hover:bg-soft"
-                        style={{ background: n.unread ? 'var(--soft)' : 'transparent' }}
-                      >
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-text">
-                          <span>{n.title}</span>
-                          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-card text-primary">{n.time}</span>
-                        </div>
-                        <p className="text-[11px] mt-0.5 leading-snug text-muted">{n.desc}</p>
+                    </div>
+                  )}
+
+                  {/* CRM WORKFLOW NOTIFICATIONS */}
+                  {(notifTab === 'all' || notifTab === 'crm') && crmDigest.notifications?.length > 0 && (
+                    <div>
+                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted">Workflow Updates</div>
+                      <div className="space-y-1">
+                        {crmDigest.notifications.slice(0, 4).map((n) => (
+                          <div
+                            key={n.id}
+                            onClick={() => {
+                              if (n.path) navigate(n.path);
+                              setIsNotifOpen(false);
+                            }}
+                            className="rounded-xl border border-border p-2.5 transition cursor-pointer hover:bg-soft"
+                            style={{ background: n.unread ? 'var(--soft)' : 'var(--card)' }}
+                          >
+                            <div className="flex items-center justify-between text-[11px] font-semibold text-text gap-2">
+                              <span className="truncate">{n.title}</span>
+                              <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-surface border border-border text-primary">
+                                {n.time}
+                              </span>
+                            </div>
+                            <p className="text-[10.5px] mt-0.5 leading-snug text-muted">{n.desc}</p>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  )}
+
+                  {/* EMPTY STATE */}
+                  {totalNotifCount === 0 && (
+                    <div className="py-6 text-center text-xs text-muted">
+                      All caught up! No active notifications or pending reminders.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
