@@ -2,11 +2,9 @@ import { useMemo, useState } from "react";
 import {
   AtSign,
   CalendarDays,
-  Check,
   CheckCircle2,
   CheckSquare,
   ChevronDown,
-  ChevronRight,
   CircleDot,
   Coins,
   Copy,
@@ -49,9 +47,7 @@ const FIELD_ICONS = {
 };
 
 function readDragPayload(event) {
-  const raw =
-    event.dataTransfer?.getData("application/json") ||
-    event.dataTransfer?.getData("text/plain");
+  const raw = event.dataTransfer?.getData("application/json");
   if (!raw) return null;
 
   try {
@@ -75,13 +71,6 @@ function FieldPreview({
   const isTextArea = field.type === "Multi Line";
   const isDropdown = field.type === "Dropdown";
   const isLeadImage = field.type === "Lead Image";
-  const [previewValue, setPreviewValue] = useState("");
-  const previewOptions =
-    Array.isArray(field.options) && field.options.length > 0
-      ? field.options
-      : field.label?.toLowerCase().includes("source")
-      ? ["Website", "Referral", "Campaign", "Cold Call"]
-      : ["Option 1", "Option 2", "Option 3"];
 
   function handleDrop(event, position) {
     event.preventDefault();
@@ -96,39 +85,28 @@ function FieldPreview({
       onDrop={(event) => handleDrop(event, "before")}
     >
       <div
-        onClick={(event) => {
-          event.stopPropagation();
-          onSelect();
-        }}
-        onDoubleClick={(event) => {
-          event.stopPropagation();
-          onOpenProperties();
-        }}
+        draggable
+        onDragStart={(event) =>
+          onDragStart(event, { kind: "field", fieldId: field.id, sectionId })
+        }
+        onClick={onOpenProperties}
+        onDoubleClick={onOpenProperties}
         className={`rounded-xl border transition-all p-3.5 bg-white cursor-pointer select-none ${
           selected
             ? "border-blue-500 ring-2 ring-blue-100 shadow-xs"
             : "border-slate-200 hover:border-slate-300 hover:shadow-2xs"
         }`}
       >
+        {/* Field top row: Grip + Label + (Edit / Lock / Trash) */}
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-1.5 min-w-0">
-            <span
-              draggable
-              onDragStart={(event) =>
-                onDragStart(event, { kind: "field", fieldId: field.id, sectionId })
-              }
-              onDragOver={(event) => event.preventDefault()}
-              onClick={(event) => event.stopPropagation()}
-              className="inline-flex text-slate-300 group-hover/drop:text-slate-400 cursor-grab shrink-0"
-              role="button"
-              tabIndex={0}
-              title={`Drag ${field.label}`}
-            >
-              <GripVertical size={13} />
-            </span>
+            <GripVertical
+              size={13}
+              className="text-slate-300 group-hover/drop:text-slate-400 cursor-grab shrink-0"
+            />
             <span className="text-xs font-semibold text-slate-800 truncate">
               {field.label}
-              {field.required && <span className="text-rose-500 ml-0.5">*</span>}
+              {field.required && <span className="text-slate-800 ml-0.5">*</span>}
             </span>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -161,6 +139,7 @@ function FieldPreview({
           </div>
         </div>
 
+        {/* Field body / preview */}
         {isLeadImage ? (
           <div className="mt-1">
             <div className="flex items-center justify-between">
@@ -180,37 +159,14 @@ function FieldPreview({
             readOnly
             className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-400 resize-none pointer-events-none focus:outline-none"
           />
-        ) : isDropdown ? (
-          <div
-            className="relative"
-            onClick={(event) => {
-              event.stopPropagation();
-              onSelect();
-            }}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <select
-              value={previewValue}
-              onChange={(event) => setPreviewValue(event.target.value)}
-              onClick={(event) => event.stopPropagation()}
-              onFocus={() => onSelect()}
-              className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-700 appearance-none pr-8 cursor-pointer focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            >
-              <option value="" disabled>
-                {field.placeholder || `Select ${field.label.toLowerCase()}`}
-              </option>
-              {previewOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={14} className="text-slate-400 shrink-0 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
-          </div>
         ) : (
           <div className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 flex items-center justify-between text-xs text-slate-400 shadow-2xs pointer-events-none">
-            <span className="truncate mr-2">{field.placeholder || `Enter ${field.label.toLowerCase()}`}</span>
-            <Icon size={14} className="text-slate-400 shrink-0" />
+            <span className="truncate mr-2">{field.placeholder}</span>
+            {isDropdown ? (
+              <ChevronDown size={14} className="text-slate-400 shrink-0" />
+            ) : (
+              <Icon size={14} className="text-slate-400 shrink-0" />
+            )}
           </div>
         )}
       </div>
@@ -219,7 +175,7 @@ function FieldPreview({
 }
 
 export default function LeadFormBuilder({
-  sections = [],
+  sections,
   selectedFieldId,
   onSelectField,
   selectedField,
@@ -229,8 +185,6 @@ export default function LeadFormBuilder({
   onMoveField,
   onAddSection,
   onRemoveSection,
-  onUpdateSectionTitle,
-  onDuplicateSection,
   onPreview,
   onSaveAndOpen,
   saveSuccess = false,
@@ -239,14 +193,6 @@ export default function LeadFormBuilder({
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
-  const [activeSectionId, setActiveSectionId] = useState(() => sections[0]?.id || null);
-  const [editingSectionId, setEditingSectionId] = useState(null);
-  const [editingSectionTitle, setEditingSectionTitle] = useState("");
-  const [collapsedSections, setCollapsedSections] = useState({});
-  const [newOptionText, setNewOptionText] = useState("");
-
-  const effectiveSectionId = activeSectionId || sections[0]?.id;
-
   const SelectedTypeIcon = FIELD_ICONS[selectedField?.type] ?? Type;
 
   const libraryItems = useMemo(() => {
@@ -256,9 +202,7 @@ export default function LeadFormBuilder({
   }, [searchQuery]);
 
   function handleDragStart(event, payload) {
-    const serialized = JSON.stringify(payload);
-    event.dataTransfer.setData("application/json", serialized);
-    event.dataTransfer.setData("text/plain", serialized);
+    event.dataTransfer.setData("application/json", JSON.stringify(payload));
     event.dataTransfer.effectAllowed = "move";
   }
 
@@ -293,88 +237,62 @@ export default function LeadFormBuilder({
     }
   }
 
-  function startEditingSectionTitle(section) {
-    setEditingSectionId(section.id);
-    setEditingSectionTitle(section.title);
+  function selectField(fieldId) {
+    onSelectField(fieldId);
   }
 
-  function saveEditingSectionTitle(sectionId) {
-    if (editingSectionTitle.trim()) {
-      onUpdateSectionTitle?.(sectionId, editingSectionTitle.trim());
-    }
-    setEditingSectionId(null);
+  function openFieldProperties(fieldId) {
+    onSelectField(fieldId);
+    setIsPropertiesOpen(true);
   }
-
-  function toggleSectionCollapse(sectionId) {
-    setCollapsedSections((prev) => ({
-      ...prev,
-      [sectionId]: !prev[sectionId],
-    }));
-  }
-
-  function addOptionToField() {
-    if (!newOptionText.trim() || !selectedField) return;
-    const currentOptions = Array.isArray(selectedField.options) ? selectedField.options : [];
-    onUpdateField(selectedField.id, { options: [...currentOptions, newOptionText.trim()] });
-    setNewOptionText("");
-  }
-
-  function removeOptionFromField(index) {
-    if (!selectedField) return;
-    const currentOptions = Array.isArray(selectedField.options) ? selectedField.options : [];
-    const updated = currentOptions.filter((_, i) => i !== index);
-    onUpdateField(selectedField.id, { options: updated });
-  }
-
-  const isOptionBasedField =
-    selectedField?.type === "Dropdown" ||
-    selectedField?.type === "Multi Select" ||
-    selectedField?.type === "Radio";
 
   return (
     <section className="w-full max-w-7xl mx-auto py-2">
       {!hideHeader && (
-        <div className="mb-6">
-          <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1.5">
-            <span>CRM</span>
-            <span>&gt;</span>
-            <span>Leads</span>
-            <span>&gt;</span>
-            <span>Form Builder</span>
+      <div className="mb-6">
+        <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1.5">
+          <span>CRM</span>
+          <span>&gt;</span>
+          <span>Leads</span>
+          <span>&gt;</span>
+          <span>Form Builder</span>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{formTitle || "Lead Form Builder"}</h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Create and manage your lead form with custom fields. Drag, drop and configure fields easily.
+            </p>
           </div>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{formTitle || "Lead Form Builder"}</h1>
-              <p className="text-sm text-slate-500 mt-0.5">
-                Create and manage your lead form with custom fields. Click or drag fields to build your layout.
-              </p>
-            </div>
-            <div className="flex items-center gap-2.5 shrink-0">
-              <button
-                type="button"
-                onClick={onPreview}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
-              >
-                <Eye size={16} className="text-slate-500" />
-                Preview
-              </button>
-              <button
-                type="button"
-                onClick={onSaveAndOpen}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-xs transition cursor-pointer"
-              >
-                <Save size={16} />
-                Save Changes
-              </button>
-            </div>
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={onPreview}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            >
+              <Eye size={16} className="text-slate-500" />
+              Preview
+            </button>
+            <button
+              type="button"
+              onClick={onSaveAndOpen}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-xs transition cursor-pointer"
+            >
+              <Save size={16} />
+              Save Changes
+            </button>
           </div>
         </div>
+      </div>
       )}
 
+      {/* Main Two-Column Layout */}
       <div className="flex flex-col lg:flex-row items-start gap-6">
+        {/* Left Sidebar ("Fields") */}
         <aside className="w-full lg:w-72 shrink-0 bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs">
           <h3 className="text-sm font-bold text-slate-900 mb-3 tracking-tight">Fields</h3>
 
+          {/* Search Box */}
           <div className="relative flex items-center mb-4">
             <Type size={14} className="text-slate-400 absolute left-3 pointer-events-none" />
             <input
@@ -395,6 +313,7 @@ export default function LeadFormBuilder({
             )}
           </div>
 
+          {/* Draggable Fields List */}
           <div className="flex flex-col gap-2.5">
             {libraryItems.map((type) => {
               const Icon = FIELD_ICONS[type] ?? Type;
@@ -403,8 +322,8 @@ export default function LeadFormBuilder({
                   key={type}
                   draggable
                   onDragStart={(event) => handleDragStart(event, { kind: "library", type })}
-                  onClick={() => onAddField(effectiveSectionId, type)}
-                  className="w-full flex items-center gap-3 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 text-xs font-medium transition shadow-2xs cursor-grab active:cursor-grabbing select-none group text-left"
+                  onClick={() => onAddField(sections[0]?.id, type)}
+                  className="w-full flex items-center gap-3 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:bg-slate-50/50 text-slate-700 text-xs font-medium transition shadow-2xs cursor-grab active:cursor-grabbing select-none group text-left"
                 >
                   <Icon size={14} className="text-slate-500 group-hover:text-blue-600 transition-colors shrink-0" />
                   <span className="truncate">{type}</span>
@@ -417,12 +336,14 @@ export default function LeadFormBuilder({
           </div>
         </aside>
 
+        {/* Right Canvas ("Lead Form") */}
         <div className="flex-1 min-w-0 w-full">
+          {/* Canvas Top Bar */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3.5">
             <div>
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">Form Layout</h3>
+              <h3 className="text-sm font-bold text-slate-900 tracking-tight">Lead Form</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Click any field from the left panel to add it into the selected section.
+                Drag a field from the left panel and drop it inside any section. You can also remove or rearrange fields.
               </p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -436,7 +357,7 @@ export default function LeadFormBuilder({
               </button>
               <button
                 type="button"
-                onClick={() => onAddField(effectiveSectionId, "Single Line")}
+                onClick={() => onAddField(sections[0]?.id, "Single Line")}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition cursor-pointer"
               >
                 <Plus size={14} />
@@ -445,154 +366,75 @@ export default function LeadFormBuilder({
             </div>
           </div>
 
+          {/* Canvas Dashed Box */}
           <div className="border border-dashed border-slate-200 rounded-3xl p-4 sm:p-5 bg-transparent">
             <div className="space-y-4">
-              {sections.map((section) => {
-                const isActive = section.id === effectiveSectionId;
-                const isCollapsed = collapsedSections[section.id];
-                const isEditingTitle = editingSectionId === section.id;
-
-                return (
-                  <div
-                    key={section.id}
-                    onClick={() => setActiveSectionId(section.id)}
-                    className={`bg-white rounded-2xl border transition-all p-5 sm:p-6 shadow-xs ${
-                      isActive ? "border-blue-500 ring-2 ring-blue-50" : "border-slate-200"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-slate-100">
-                      <div className="flex items-center gap-2 text-slate-800 flex-1 min-w-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleSectionCollapse(section.id);
-                          }}
-                          className="text-slate-500 hover:text-slate-800 transition p-0.5"
-                        >
-                          {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                        </button>
-
-                        {isEditingTitle ? (
-                          <div className="flex items-center gap-1.5 flex-1 max-w-xs" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="text"
-                              value={editingSectionTitle}
-                              onChange={(e) => setEditingSectionTitle(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") saveEditingSectionTitle(section.id);
-                              }}
-                              autoFocus
-                              className="px-2 py-1 text-xs font-bold text-slate-900 border border-blue-500 rounded focus:outline-none w-full"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => saveEditingSectionTitle(section.id)}
-                              className="p-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                            >
-                              <Check size={14} />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-sm font-bold text-slate-900 truncate">{section.title}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startEditingSectionTitle(section);
-                              }}
-                              className="text-slate-400 hover:text-blue-600 transition p-0.5"
-                              title="Rename section"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 text-slate-400 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAddField(section.id, "Single Line");
-                          }}
-                          title="Add field to section"
-                          className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium rounded-md transition"
-                        >
-                          <Plus size={13} />
-                          <span>Field</span>
-                        </button>
-
-                        {onDuplicateSection && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDuplicateSection(section.id);
-                            }}
-                            title="Duplicate section"
-                            className="p-1 hover:text-slate-600 transition cursor-pointer"
-                          >
-                            <Copy size={15} />
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRemoveSection?.(section.id);
-                          }}
-                          title="Remove section"
-                          className="p-1 hover:text-rose-500 transition cursor-pointer"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
+              {sections.map((section) => (
+                <div
+                  key={section.id}
+                  className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 shadow-xs"
+                >
+                  {/* Section Title Bar */}
+                  <div className="flex items-center justify-between pb-3.5 mb-5 border-b border-slate-100">
+                    <div className="flex items-center gap-2 text-slate-800">
+                      <ChevronDown size={16} className="text-slate-600" />
+                      <span className="text-sm font-bold text-slate-900">{section.title}</span>
                     </div>
-
-                    {!isCollapsed && (
-                      <div
-                        className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                        onDragOver={(event) => event.preventDefault()}
-                        onDrop={(event) => handleDrop(readDragPayload(event), section.id)}
+                    <div className="flex items-center gap-2.5 text-slate-400">
+                      <button
+                        type="button"
+                        title="Duplicate section"
+                        className="p-1 hover:text-slate-600 transition cursor-pointer"
                       >
-                        {section.fields.map((field) => (
-                          <FieldPreview
-                            key={field.id}
-                            field={field}
-                            sectionId={section.id}
-                            selected={field.id === selectedFieldId}
-                            onSelect={() => onSelectField(field.id)}
-                            onOpenProperties={() => {
-                              onSelectField(field.id);
-                              setIsPropertiesOpen(true);
-                            }}
-                            onRemove={onRemoveField}
-                            onDragStart={handleDragStart}
-                            onDropField={(payload, targetSectionId, position) =>
-                              handleDrop(payload, targetSectionId, position, field.id)
-                            }
-                          />
-                        ))}
-                        {section.fields.length === 0 && (
-                          <div className="col-span-1 md:col-span-2 border-2 border-dashed border-slate-200 rounded-xl py-10 flex flex-col items-center justify-center text-slate-400 text-xs gap-1.5">
-                            <Plus size={20} className="text-slate-300" />
-                            <span>Drop a field from the left panel or click Add Field</span>
-                          </div>
-                        )}
+                        <Copy size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveSection?.(section.id)}
+                        title="Remove section"
+                        className="p-1 hover:text-rose-500 transition cursor-pointer"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 2-Column Fields Grid */}
+                  <div
+                    className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => handleDrop(readDragPayload(event), section.id)}
+                  >
+                    {section.fields.map((field) => (
+                      <FieldPreview
+                        key={field.id}
+                        field={field}
+                        sectionId={section.id}
+                        selected={field.id === selectedFieldId}
+                        onSelect={() => selectField(field.id)}
+                        onOpenProperties={() => openFieldProperties(field.id)}
+                        onRemove={onRemoveField}
+                        onDragStart={handleDragStart}
+                        onDropField={(payload, targetSectionId, position) =>
+                          handleDrop(payload, targetSectionId, position, field.id)
+                        }
+                      />
+                    ))}
+                    {section.fields.length === 0 && (
+                      <div className="col-span-1 md:col-span-2 border-2 border-dashed border-slate-200 rounded-xl py-10 flex flex-col items-center justify-center text-slate-400 text-xs gap-1.5">
+                        <Plus size={20} className="text-slate-300" />
+                        <span>Drop a field from the left panel or click Add Field</span>
                       </div>
                     )}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           </div>
         </div>
       </div>
 
+      {/* Field Properties Modal */}
       {isPropertiesOpen && selectedField && (
         <div
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
@@ -606,6 +448,7 @@ export default function LeadFormBuilder({
             aria-labelledby="builder-properties-title"
             onClick={(event) => event.stopPropagation()}
           >
+            {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h3 id="builder-properties-title" className="text-sm font-bold text-slate-900">
                 Field Properties
@@ -620,12 +463,25 @@ export default function LeadFormBuilder({
               </button>
             </div>
 
+            {/* Modal Body */}
             <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+              {/* Type Badge */}
               <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 rounded-lg w-fit text-slate-700">
                 <SelectedTypeIcon size={16} className="text-slate-500" />
                 <span className="text-xs font-semibold">{selectedField.type}</span>
               </div>
 
+              {/* Tabs */}
+              <div className="border-b border-slate-200">
+                <button
+                  type="button"
+                  className="px-3 py-1.5 text-xs font-semibold text-blue-600 border-b-2 border-blue-600 -mb-px"
+                >
+                  General
+                </button>
+              </div>
+
+              {/* Form Controls */}
               <div className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-medium text-slate-700 mb-1">
@@ -647,7 +503,7 @@ export default function LeadFormBuilder({
                   </label>
                   <input
                     type="text"
-                    value={selectedField.placeholder || ""}
+                    value={selectedField.placeholder}
                     onChange={(event) =>
                       onUpdateField(selectedField.id, { placeholder: event.target.value })
                     }
@@ -672,57 +528,17 @@ export default function LeadFormBuilder({
                   </select>
                 </div>
 
-                {isOptionBasedField && (
-                  <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Field Options / Choices
-                    </label>
-                    <div className="space-y-1.5">
-                      {(selectedField.options || ["Option 1", "Option 2"]).map((opt, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
-                          <span className="text-slate-700 font-medium truncate">{opt}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeOptionFromField(idx)}
-                            className="text-slate-400 hover:text-rose-500 transition p-0.5"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-1.5 pt-1">
-                      <input
-                        type="text"
-                        placeholder="Add new option..."
-                        value={newOptionText}
-                        onChange={(e) => setNewOptionText(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") addOptionToField();
-                        }}
-                        className="flex-1 px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
-                      />
-                      <button
-                        type="button"
-                        onClick={addOptionToField}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  </div>
-                )}
-
+                {/* Toggles */}
                 <div className="space-y-2 pt-1">
                   <label className="flex items-center justify-between py-1 cursor-pointer">
                     <span className="text-xs font-medium text-slate-700">Required</span>
                     <input
                       type="checkbox"
-                      checked={!!selectedField.required}
+                      checked={selectedField.required}
                       onChange={(event) =>
                         onUpdateField(selectedField.id, { required: event.target.checked })
                       }
-                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                     />
                   </label>
 
@@ -730,11 +546,11 @@ export default function LeadFormBuilder({
                     <span className="text-xs font-medium text-slate-700">Show in List View</span>
                     <input
                       type="checkbox"
-                      checked={!!selectedField.showInList}
+                      checked={selectedField.showInList}
                       onChange={(event) =>
                         onUpdateField(selectedField.id, { showInList: event.target.checked })
                       }
-                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                     />
                   </label>
 
@@ -742,13 +558,30 @@ export default function LeadFormBuilder({
                     <span className="text-xs font-medium text-slate-700">Unique Value</span>
                     <input
                       type="checkbox"
-                      checked={!!selectedField.uniqueValue}
+                      checked={selectedField.uniqueValue}
                       onChange={(event) =>
                         onUpdateField(selectedField.id, { uniqueValue: event.target.checked })
                       }
-                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                     />
                   </label>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">
+                    Default Value
+                  </label>
+                  <select
+                    value={selectedField.defaultValue}
+                    onChange={(event) =>
+                      onUpdateField(selectedField.id, { defaultValue: event.target.value })
+                    }
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800"
+                  >
+                    <option>None</option>
+                    <option>Auto</option>
+                    <option>Manual</option>
+                  </select>
                 </div>
 
                 <div>
@@ -756,17 +589,18 @@ export default function LeadFormBuilder({
                     Help Text
                   </label>
                   <textarea
-                    rows={2}
-                    value={selectedField.helpText || ""}
+                    rows={3}
+                    value={selectedField.helpText}
                     onChange={(event) =>
                       onUpdateField(selectedField.id, { helpText: event.target.value })
                     }
                     placeholder="Enter help text (optional)"
-                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800 resize-none"
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800 resize-none"
                   />
                 </div>
               </div>
 
+              {/* Modal Actions */}
               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -791,6 +625,7 @@ export default function LeadFormBuilder({
         </div>
       )}
 
+      {/* Save Success Toast */}
       {saveSuccess && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-xl text-xs font-semibold animate-in fade-in slide-in-from-bottom-3 duration-200">
           <CheckCircle2 size={16} />

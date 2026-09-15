@@ -126,34 +126,6 @@ export default function LeadFormBuilderPage() {
     setSelectedBuilderFieldId(nextField?.id ?? null);
   }
 
-  function updateLeadFormSectionTitle(sectionId, newTitle) {
-    setLeadFormSections((current) =>
-      current.map((section) => (section.id === sectionId ? { ...section, title: newTitle } : section))
-    );
-  }
-
-  function duplicateLeadFormSection(sectionId) {
-    setLeadFormSections((current) => {
-      const targetSec = current.find((s) => s.id === sectionId);
-      if (!targetSec) return current;
-      const newSecId = `custom-section-${Date.now()}`;
-      const clonedFields = (targetSec.fields || []).map((f, i) => ({
-        ...f,
-        id: `field-${Date.now()}-${i}`,
-      }));
-      const newSec = {
-        ...targetSec,
-        id: newSecId,
-        title: `${targetSec.title} (Copy)`,
-        fields: clonedFields,
-      };
-      const idx = current.findIndex((s) => s.id === sectionId);
-      const next = [...current];
-      next.splice(idx + 1, 0, newSec);
-      return next;
-    });
-  }
-
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   function openLeadCreateForm() {
@@ -197,8 +169,6 @@ export default function LeadFormBuilderPage() {
       onMoveField={moveLeadFormField}
       onAddSection={addLeadFormSection}
       onRemoveSection={removeLeadFormSection}
-      onUpdateSectionTitle={updateLeadFormSectionTitle}
-      onDuplicateSection={duplicateLeadFormSection}
       onPreview={openLeadCreateForm}
       onSaveAndOpen={saveLeadForm}
       saveSuccess={saveSuccess}
