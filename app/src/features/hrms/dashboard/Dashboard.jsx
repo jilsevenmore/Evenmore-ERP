@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Users,
   UserCheck,
@@ -17,6 +17,13 @@ import {
   Plus,
   FileText,
   Check,
+  Bell,
+  CheckCheck,
+  Search,
+  Trash2,
+  RefreshCw,
+  Settings,
+  Laptop,
 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
@@ -103,12 +110,88 @@ const INITIAL_SCHEDULE = [
   },
 ];
 
-const ACTIVITY = [
-  { name: "Priya Patel", text: "requested 3 days annual leave.", when: "12 mins ago · Leave Management", active: true },
-  { name: "Liam Cooper", text: "submitted Q3 evaluation.", when: "45 mins ago · Performance", active: false },
-  { name: "Samantha Reed", text: "New hire badge created.", when: "2 hours ago · HR Admin", active: false },
-  { name: "Financial Ops", text: "Payroll batch verified.", when: "3 hours ago · Payroll Core", active: false },
+const ACTIVITY_KEY = "hrms_recent_activity_v1";
+
+const MODULE_META = {
+  "Leave Management": { Icon: Plane, bg: "#fef3c7", fg: "#b45309" },
+  Performance: { Icon: ClipboardCheck, bg: "#dcfce7", fg: "#15803d" },
+  "HR Admin": { Icon: UserPlus, bg: "#dbeafe", fg: "#1d4ed8" },
+  "Payroll Core": { Icon: Briefcase, bg: "#f3e8ff", fg: "#7c3aed" },
+  Schedule: { Icon: CalendarDays, bg: "#e0f2fe", fg: "#0369a1" },
+  "Asset & IT": { Icon: Laptop, bg: "#e0e7ff", fg: "#4338ca" },
+  System: { Icon: Zap, bg: "#f1f5f9", fg: "#475569" },
+};
+
+const REQUEST_TYPES_KEY = "hrms_quick_request_types_v2";
+
+const DEFAULT_REQUEST_TYPES = [
+  "Casual Leave",
+  "Sick / Medical Leave",
+  "Annual / Earned Leave",
+  "Work From Home (WFH)",
+  "Attendance Regularization",
+  "Asset Request (Hardware / Laptop / Accessories)",
+  "Software & Tool License Request",
+  "Expense Reimbursement",
+  "Travel & Conveyance Request",
+  "Document & Bonafide Certificate",
+  "Shift Change Request",
+  "Overtime Approval",
+  "Training & Upskilling Request",
+  "HR Grievance / Query",
+  "Resignation / Separation Request",
 ];
+
+function loadRequestTypes() {
+  try {
+    const raw = localStorage.getItem(REQUEST_TYPES_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return DEFAULT_REQUEST_TYPES;
+}
+
+function timeAgo(ts) {
+  const s = Math.max(1, Math.floor((Date.now() - ts) / 1000));
+  if (s < 60) return "Just now";
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m} min${m > 1 ? "s" : ""} ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} hour${h > 1 ? "s" : ""} ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} day${d > 1 ? "s" : ""} ago`;
+  return new Date(ts).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function seedActivities() {
+  const now = Date.now();
+  const min = 60 * 1000;
+  return [
+    { id: "a1", actor: "Priya Patel", action: "requested 3 days annual leave.", module: "Leave Management", ts: now - 12 * min, read: false },
+    { id: "a2", actor: "Liam Cooper", action: "submitted Q3 evaluation.", module: "Performance", ts: now - 45 * min, read: false },
+    { id: "a3", actor: "Samantha Reed", action: "New hire badge created.", module: "HR Admin", ts: now - 2 * 60 * min, read: true },
+    { id: "a4", actor: "Financial Ops", action: "Payroll batch verified.", module: "Payroll Core", ts: now - 3 * 60 * min, read: true },
+  ];
+}
+
+function loadActivities() {
+  try {
+    const raw = localStorage.getItem(ACTIVITY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    }
+  } catch {}
+  return seedActivities();
+}
+
+const ACTIVITY = seedActivities().map((a) => ({
+  name: a.actor,
+  text: a.action,
+  when: `${timeAgo(a.ts)} · ${a.module}`,
+}));
 
 const badgeStyles = {
   green: { background: "#dcfce7", color: "#15803d" },
@@ -171,11 +254,137 @@ export default function HRMSDashboard() {
   // Handover notes state
   const [showHandoverModal, setShowHandoverModal] = useState(false);
 
-  // Quick request form
-  const [leaveType, setLeaveType] = useState("Casual Leave");
+  // Quick request form & configurable types
+  const [requestTypes, setRequestTypes] = useState(loadRequestTypes);
+  const [showManageTypesModal, setShowManageTypesModal] = useState(false);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [leaveType, setLeaveType] = useState(() => {
+    const list = loadRequestTypes();
+    return list[0] || "Casual Leave";
+  });
   const [leaveDate, setLeaveDate] = useState("2024-10-15");
   const [leaveNote, setLeaveNote] = useState("");
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(REQUEST_TYPES_KEY, JSON.stringify(requestTypes));
+    } catch {}
+  }, [requestTypes]);
+
+  // Recent Activity — working, minimal, user-friendly
+  const [activities, setActivities] = useState(loadActivities);
+  const [activityTab, setActivityTab] = useState("All");
+  const [showAllActivity, setShowAllActivity] = useState(false);
+  const [activityQuery, setActivityQuery] = useState("");
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activities.slice(0, 50)));
+    } catch {}
+  }, [activities]);
+
+  // Re-render relative timestamps every minute
+  useEffect(() => {
+    const t = setInterval(() => setTick((v) => v + 1), 60000);
+    return () => clearInterval(t);
+  }, []);
+
+  const pushActivity = (actor, action, module) => {
+    setActivities((prev) =>
+      [{ id: `a${Date.now()}`, actor, action, module, ts: Date.now(), read: false }, ...prev].slice(0, 50)
+    );
+  };
+
+  const activityModules = useMemo(
+    () => ["All", ...Array.from(new Set(activities.map((a) => a.module)))],
+    [activities]
+  );
+  const unreadCount = activities.filter((a) => !a.read).length;
+  const visibleActivities = useMemo(() => {
+    return activities.slice(0, 5);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activities, tick]);
+  const modalActivities = useMemo(() => {
+    const q = activityQuery.trim().toLowerCase();
+    return activities.filter((a) => {
+      const matchTab = activityTab === "All" || a.module === activityTab;
+      const matchQ = !q || `${a.actor} ${a.action} ${a.module}`.toLowerCase().includes(q);
+      return matchTab && matchQ;
+    });
+  }, [activities, activityTab, activityQuery]);
+
+  const markAllRead = () => setActivities((prev) => prev.map((a) => ({ ...a, read: true })));
+  const markOneRead = (id) => setActivities((prev) => prev.map((a) => (a.id === id ? { ...a, read: true } : a)));
+  const removeActivity = (id) => setActivities((prev) => prev.filter((a) => a.id !== id));
+  const clearActivities = () => setActivities([]);
+  const resetActivities = () => {
+    const seed = seedActivities();
+    setActivities(seed);
+    setActivityTab("All");
+    setActivityQuery("");
+  };
+
+  const handleAddRequestType = (e) => {
+    e?.preventDefault();
+    const trimmed = newTypeName.trim();
+    if (!trimmed) {
+      return setToast("Please enter a request type name.", "error");
+    }
+    if (requestTypes.some((t) => t.toLowerCase() === trimmed.toLowerCase())) {
+      return setToast("This request type already exists.", "error");
+    }
+    setRequestTypes((prev) => [...prev, trimmed]);
+    setLeaveType(trimmed);
+    setNewTypeName("");
+    setToast(`Added "${trimmed}" to request types.`);
+  };
+
+  const handleRemoveRequestType = (typeToRemove) => {
+    if (requestTypes.length <= 1) {
+      return setToast("You must keep at least one request type.", "error");
+    }
+    const updated = requestTypes.filter((t) => t !== typeToRemove);
+    setRequestTypes(updated);
+    if (leaveType === typeToRemove) {
+      setLeaveType(updated[0] || "");
+    }
+    setToast(`Removed "${typeToRemove}".`);
+  };
+
+  const handleResetRequestTypes = () => {
+    setRequestTypes(DEFAULT_REQUEST_TYPES);
+    setLeaveType(DEFAULT_REQUEST_TYPES[0]);
+    setToast("Request types reset to default list.");
+  };
+
+  const handleSelectRequestType = (e) => {
+    const val = e.target.value;
+    if (val === "__manage__") {
+      setShowManageTypesModal(true);
+      return;
+    }
+    setLeaveType(val);
+  };
+
+  const handleQuickRequest = () => {
+    if (!leaveDate) return setToast("Please pick a date for your request.", "error");
+    if (!leaveType) return setToast("Please select a request type.", "error");
+    setSubmitted(true);
+    const lower = leaveType.toLowerCase();
+    const mod = lower.includes("leave") || lower.includes("wfh") || lower.includes("attendance")
+      ? "Leave Management"
+      : lower.includes("asset") || lower.includes("software") || lower.includes("hardware") || lower.includes("equipment") || lower.includes("tool")
+      ? "Asset & IT"
+      : lower.includes("expense") || lower.includes("payroll") || lower.includes("reimburse")
+      ? "Payroll Core"
+      : "HR Admin";
+    pushActivity("You", `requested ${leaveType} for ${leaveDate.split("-").reverse().join("-")}.`, mod);
+    setToast(`${leaveType} request submitted for approval!`);
+    setLeaveNote("");
+    setTimeout(() => setSubmitted(false), 3000);
+  };
 
   const TABS = ["All", "Interviews", "Onboarding", "Reviews"];
   const filtered = filter === "All" ? scheduleItems : scheduleItems.filter((r) => r.category === filter);
@@ -192,6 +401,7 @@ export default function HRMSDashboard() {
     a.download = "schedule.csv";
     a.click();
     URL.revokeObjectURL(url);
+    setToast("Schedule exported as CSV.");
   };
 
   const handleAddRecordSubmit = () => {
@@ -208,6 +418,7 @@ export default function HRMSDashboard() {
       img: `https://randomuser.me/api/portraits/${scheduleItems.length % 2 === 0 ? "women" : "men"}/${(scheduleItems.length * 9) % 80}.jpg`,
     };
     setScheduleItems((prev) => [created, ...prev]);
+    pushActivity("You", `scheduled "${created.event}" with ${created.name}.`, "Schedule");
     setToast(`Record for ${newRecord.name} added to schedule!`);
     setShowAddModal(false);
     setNewRecord({
@@ -371,41 +582,108 @@ export default function HRMSDashboard() {
 
         {/* Right column */}
         <div style={{ display: "grid", gap: 16, alignContent: "start" }}>
-          {/* Recent Activity */}
+          {/* Recent Activity — live, minimal */}
           <div className="hrms-card" style={{ padding: "18px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-              <h3 className="hrms-h3" style={{ fontSize: 15.5 }}>Recent Activity</h3>
-              <button type="button" className="hrms-viewall">View All</button>
-            </div>
-            <div style={{ position: "relative", paddingLeft: 2 }}>
-              <div className="hrms-timeline-line" />
-              <div style={{ display: "grid", gap: 18 }}>
-                {ACTIVITY.map((a) => (
-                  <div key={a.name + a.when} style={{ display: "flex", gap: 12, position: "relative" }}>
-                    <span className={a.active ? "hrms-dot active" : "hrms-dot"} />
-                    <div>
-                      <p style={{ margin: 0, fontSize: 13, color: "#334155", lineHeight: 1.45 }}>
-                        <strong style={{ color: "#16233a" }}>{a.name}</strong> {a.text}
-                      </p>
-                      <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "#7b8aa0" }}>{a.when}</p>
-                    </div>
-                  </div>
-                ))}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <h3 className="hrms-h3" style={{ fontSize: 15.5, display: "flex", alignItems: "center", gap: 8 }}>
+                Recent Activity
+                {unreadCount > 0 && <span className="hrms-unread">{unreadCount} new</span>}
+              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                {unreadCount > 0 && (
+                  <button type="button" className="hrms-iconbtn" title="Mark all as read" onClick={markAllRead}>
+                    <CheckCheck size={15} />
+                  </button>
+                )}
+                <button type="button" className="hrms-viewall" onClick={() => setShowAllActivity(true)}>
+                  View All
+                </button>
               </div>
             </div>
+
+            <div style={{ position: "relative", paddingLeft: 2, marginTop: 6 }}>
+              <div className="hrms-timeline-line" />
+              <div style={{ display: "grid", gap: 14 }}>
+                {visibleActivities.length === 0 && (
+                  <div className="hrms-aempty">
+                    <Bell size={18} style={{ color: "#94a3b8" }} />
+                    <p>No activity yet. New leave requests, schedules and updates will appear here.</p>
+                    <button type="button" className="hrms-export" onClick={resetActivities}>
+                      <RefreshCw size={13} /> Restore sample
+                    </button>
+                  </div>
+                )}
+                {visibleActivities.map((a) => {
+                  const meta = MODULE_META[a.module] || MODULE_META.System;
+                  const MIcon = meta.Icon;
+                  return (
+                    <div
+                      key={a.id}
+                      className="hrms-arow"
+                      onClick={() => markOneRead(a.id)}
+                      title="Click to mark as read"
+                    >
+                      <span className="hrms-aicon" style={{ background: meta.bg, color: meta.fg }}>
+                        <MIcon size={14} />
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{ margin: 0, fontSize: 13, color: "#334155", lineHeight: 1.45 }}>
+                          <strong style={{ color: "#16233a" }}>{a.actor}</strong> {a.action}
+                        </p>
+                        <p style={{ margin: "4px 0 0", fontSize: 11.5, color: "#7b8aa0", display: "flex", alignItems: "center", gap: 6 }}>
+                          <span>{timeAgo(a.ts)} · {a.module}</span>
+                          {!a.read && <span className="hrms-bluedot" />}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="hrms-ax"
+                        aria-label="Dismiss"
+                        onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            {activities.length > 5 && (
+              <button type="button" className="hrms-afull" onClick={() => setShowAllActivity(true)}>
+                View all {activities.length} updates →
+              </button>
+            )}
           </div>
 
           {/* Quick Request */}
-          <div className="hrms-card" style={{ padding: "18px 18px 16px" }}>
-            <h3 className="hrms-h3" style={{ fontSize: 15.5, display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-              <Zap size={16} style={{ color: "#334155" }} /> Quick Request
-            </h3>
-            <select value={leaveType} onChange={(e) => setLeaveType(e.target.value)} className="hrms-input hrms-select">
-              <option>Casual Leave</option>
-              <option>Annual Leave</option>
-              <option>Sick Leave</option>
-              <option>Work From Home</option>
-              <option>Attendance Correction</option>
+          <div className="hrms-card" style={{ padding: "18px 20px 16px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h3 className="hrms-h3" style={{ fontSize: 15.5, display: "flex", alignItems: "center", gap: 8 }}>
+                <Zap size={16} style={{ color: "#334155" }} /> Quick Request
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowManageTypesModal(true)}
+                className="hrms-manage-pill-btn"
+                title="HR Admin: Add or remove request types"
+              >
+                <Settings size={12} /> Manage Types
+              </button>
+            </div>
+            <select
+              value={leaveType}
+              onChange={handleSelectRequestType}
+              className="hrms-input hrms-select"
+              aria-label="Select request type"
+            >
+              {requestTypes.map((type) => (
+                <option key={type} value={type}>
+                  {type}
+                </option>
+              ))}
+              <option value="__manage__" style={{ color: "#2563eb", fontWeight: 600 }}>
+                ⚙ + Manage / Edit Types (HR)...
+              </option>
             </select>
             <div className="hrms-input hrms-date-wrap">
               <span>{leaveDate.split("-").reverse().join(" - ").replaceAll(" - ", "-")}</span>
@@ -427,7 +705,7 @@ export default function HRMSDashboard() {
               rows={4}
               className="hrms-input hrms-area"
             />
-            <button type="button" onClick={() => setSubmitted(true)} className="hrms-submit">
+            <button type="button" onClick={handleQuickRequest} className="hrms-submit">
               {submitted ? "Request Submitted ✓" : "Submit Request"}
             </button>
             {submitted && (
@@ -662,8 +940,200 @@ export default function HRMSDashboard() {
         </div>
       </Modal>
 
+      {/* Recent Activity — View All */}
+      <Modal
+        isOpen={showAllActivity}
+        onClose={() => setShowAllActivity(false)}
+        title={`Recent Activity (${modalActivities.length})`}
+        footer={
+          <>
+            <button type="button" className="btn-outline" onClick={clearActivities} disabled={activities.length === 0}>
+              Clear all
+            </button>
+            <button type="button" className="btn-primary" onClick={markAllRead} disabled={unreadCount === 0}>
+              Mark all read
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <Search size={14} style={{ position: "absolute", left: 10, top: 11, color: "#94a3b8" }} />
+              <input
+                className="form-input"
+                style={{ paddingLeft: 30 }}
+                placeholder="Search activity…"
+                value={activityQuery}
+                onChange={(e) => setActivityQuery(e.target.value)}
+              />
+            </div>
+            <select className="form-select" style={{ maxWidth: 160 }} value={activityTab} onChange={(e) => setActivityTab(e.target.value)}>
+              {activityModules.map((m) => (
+                <option key={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: "grid", gap: 10, maxHeight: 380, overflowY: "auto" }}>
+            {modalActivities.length === 0 && (
+              <p style={{ fontSize: 13, color: "#64748b", textAlign: "center", padding: 16 }}>
+                No matching activity.
+              </p>
+            )}
+            {modalActivities.map((a) => {
+              const meta = MODULE_META[a.module] || MODULE_META.System;
+              const MIcon = meta.Icon;
+              return (
+                <div key={a.id} className="hrms-arow" style={{ background: a.read ? "#fff" : "#f8fafc" }} onClick={() => markOneRead(a.id)}>
+                  <span className="hrms-aicon" style={{ background: meta.bg, color: meta.fg }}>
+                    <MIcon size={14} />
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 13, color: "#334155" }}>
+                      <strong style={{ color: "#16233a" }}>{a.actor}</strong> {a.action}
+                    </p>
+                    <p style={{ margin: "3px 0 0", fontSize: 11.5, color: "#7b8aa0" }}>
+                      {timeAgo(a.ts)} · {a.module} {!a.read && "· Unread"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="hrms-ax"
+                    aria-label="Remove"
+                    onClick={(e) => { e.stopPropagation(); removeActivity(a.id); }}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </Modal>
+
+      {/* Manage Request Types Modal (HR) */}
+      <Modal
+        isOpen={showManageTypesModal}
+        onClose={() => setShowManageTypesModal(false)}
+        title="Manage Quick Request Types (HR)"
+        footer={
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+            <button
+              type="button"
+              className="btn-outline"
+              style={{ fontSize: 12.5 }}
+              onClick={handleResetRequestTypes}
+            >
+              Reset to Defaults
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => setShowManageTypesModal(false)}
+            >
+              Done
+            </button>
+          </div>
+        }
+      >
+        <div style={{ display: "grid", gap: 16 }}>
+          <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.5 }}>
+            Customize the list of requests available to employees and managers. You can add new custom request types or remove existing ones.
+          </p>
+
+          {/* Add New Type Form */}
+          <form
+            onSubmit={handleAddRequestType}
+            style={{ display: "flex", gap: 8, alignItems: "center" }}
+          >
+            <input
+              className="form-input"
+              style={{ flex: 1 }}
+              placeholder="e.g. Relocation Assistance, Maternity / Paternity Leave..."
+              value={newTypeName}
+              onChange={(e) => setNewTypeName(e.target.value)}
+            />
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ whiteSpace: "nowrap", padding: "8px 16px", display: "inline-flex", alignItems: "center", gap: 4 }}
+            >
+              <Plus size={15} /> Add Type
+            </button>
+          </form>
+
+          {/* List of Types */}
+          <div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                Configured Request Types ({requestTypes.length})
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: 6,
+                maxHeight: 280,
+                overflowY: "auto",
+                border: "1px solid #e2e8f0",
+                borderRadius: 10,
+                padding: 8,
+                background: "#f8fafc",
+              }}
+            >
+              {requestTypes.map((t) => (
+                <div
+                  key={t}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    padding: "8px 12px",
+                    background: "#ffffff",
+                    border: "1px solid #edf2f7",
+                    borderRadius: 8,
+                  }}
+                >
+                  <span style={{ fontSize: 13, fontWeight: 500, color: "#1e293b" }}>{t}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveRequestType(t)}
+                    title={`Delete "${t}"`}
+                    style={{
+                      border: 0,
+                      background: "transparent",
+                      color: "#94a3b8",
+                      cursor: "pointer",
+                      padding: 4,
+                      borderRadius: 6,
+                      display: "grid",
+                      placeItems: "center",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = "#ef4444";
+                      e.currentTarget.style.backgroundColor = "#fee2e2";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = "#94a3b8";
+                      e.currentTarget.style.backgroundColor = "transparent";
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Modal>
+
       <style>{`
         .hrms-dash { background: #f7f9fc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .hrms-manage-pill-btn { display: inline-flex; align-items: center; gap: 5px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 999px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; color: #475569; cursor: pointer; transition: all 0.15s ease; }
+        .hrms-manage-pill-btn:hover { background: #e2e8f0; color: #0f172a; border-color: #cbd5e1; }
         .hrms-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
         .hrms-title-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
         .hrms-title { margin: 0; font-size: 24px; font-weight: 800; color: #16233a; letter-spacing: -0.01em; }
@@ -696,10 +1166,24 @@ export default function HRMSDashboard() {
         .hrms-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 13px; border: 1px solid; white-space: nowrap; }
         .hrms-viewall { border: 0; background: transparent; font-size: 12.5px; font-weight: 600; color: #475569; cursor: pointer; }
         .hrms-viewall:hover { color: #111827; }
-        .hrms-timeline-line { position: absolute; left: 6px; top: 10px; bottom: 10px; width: 1.5px; background: #e2e8f0; }
-        .hrms-dot { width: 14px; height: 14px; border-radius: 999px; border: 2px solid #cbd5e1; background: #fff; margin-top: 3px; flex-shrink: 0; z-index: 1; display: flex; align-items: center; justify-content: center; }
-        .hrms-dot.active { border-color: #1e293b; background: #fff; }
-        .hrms-dot.active::after { content: ""; width: 6px; height: 6px; border-radius: 999px; background: #1e293b; display: block; }
+        .hrms-timeline-line { position: absolute; left: 20px; top: 10px; bottom: 10px; width: 1.5px; background: #e2e8f0; }
+        .hrms-unread { font-size: 10.5px; font-weight: 700; background: #1b2b4a; color: #fff; border-radius: 999px; padding: 2px 8px; }
+        .hrms-iconbtn { border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; width: 26px; height: 26px; display: grid; place-items: center; color: #475569; cursor: pointer; }
+        .hrms-iconbtn:hover { background: #f8fafc; color: #111827; }
+        .hrms-afilter { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+        .hrms-achip { border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+        .hrms-achip.active { background: #111f36; border-color: #111f36; color: #fff; }
+        .hrms-arow { display: flex; gap: 10px; position: relative; align-items: flex-start; border: 1px solid transparent; border-radius: 10px; padding: 6px; margin: 0 -6px; cursor: pointer; }
+        .hrms-arow:hover { background: #f8fafc; border-color: #f1f5f9; }
+        .hrms-arow:hover .hrms-ax { opacity: 1; }
+        .hrms-aicon { width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; flex-shrink: 0; z-index: 1; }
+        .hrms-bluedot { width: 7px; height: 7px; border-radius: 999px; background: #2563eb; display: inline-block; }
+        .hrms-ax { border: 0; background: transparent; color: #94a3b8; cursor: pointer; opacity: 0; padding: 4px; border-radius: 6px; }
+        .hrms-ax:hover { color: #ef4444; background: #fef2f2; opacity: 1; }
+        .hrms-aempty { text-align: center; padding: 18px 10px; display: grid; gap: 8px; justify-items: center; }
+        .hrms-aempty p { margin: 0; font-size: 12.5px; color: #64748b; line-height: 1.5; }
+        .hrms-afull { margin-top: 12px; width: 100%; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 10px; padding: 8px; font-size: 12.5px; font-weight: 600; color: #334155; cursor: pointer; }
+        .hrms-afull:hover { background: #eef2f7; }
         .hrms-input { width: 100%; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #334155; margin-bottom: 10px; outline: none; box-sizing: border-box; transition: all 0.15s ease; }
         .hrms-input:focus { border-color: #94a3b8; background: #fff; }
         .hrms-area { resize: none; margin-bottom: 12px; color: #334155; }

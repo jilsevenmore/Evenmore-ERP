@@ -19,6 +19,9 @@ import {
   Clock,
   ArrowRight,
   Edit3,
+  Printer,
+  FileText,
+  ChevronDown,
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import {
@@ -35,14 +38,19 @@ import { Badge } from "../../../components/hrms/Badge";
 
 // Clean browser PDF payslip generator with full formula breakdown
 function downloadPayslipPdf(p) {
-  const clean = (s) => String(s || "").replace(/[()\\]/g, "");
+  const clean = (s) =>
+    String(s || "")
+      .replace(/[()\\]/g, "")
+      .replace(/[₹•–—]/g, "-")
+      .replace(/[^\x20-\x7E]/g, " ");
+
   const name = clean(p.name || "EMPLOYEE").toUpperCase();
   const id = clean(p.id || "PAY-000");
   const empId = clean(p.empId || "EMP-000");
   const role = clean(p.role || "Team Member");
   const dept = clean(p.department || "General");
   const month = clean(p.month || "October 2024");
-  const bank = clean(p.bank || "Direct Deposit (Verified)");
+  const bank = clean(p.bank || "Direct Deposit Verified");
 
   const std = Number(p.standardSalary || 0);
   const earned = Number(p.earnedSalary || 0);
@@ -50,6 +58,9 @@ function downloadPayslipPdf(p) {
   const deductions = Number(p.deductions || 0);
   const advance = Number(p.advance || 0);
   const remaining = Math.max(0, earned + earnings - deductions - advance);
+  const basic = Number(p.basic || Math.round(earned * 0.6));
+  const hra = Number(p.hra || Math.round(earned * 0.25));
+  const allowances = Number(p.allowances || Math.max(0, earned - basic - hra));
   const status = clean(p.status || "In Progress");
   const paidDate = clean(p.paymentDate || "N/A");
   const paidAmt = p.paidAmount !== null && p.paidAmount !== undefined ? Number(p.paidAmount) : remaining;
@@ -57,23 +68,29 @@ function downloadPayslipPdf(p) {
   const lines = [
     "BT",
     "/F1 18 Tf",
-    "50 770 Td",
+    "50 780 Td",
     "(EVENMORE ERP - CONFIDENTIAL SALARY SLIP) Tj",
     "/F1 10 Tf",
-    "0 -24 Td",
+    "0 -22 Td",
     `(Pay Period: ${month}   |   Slip Ref: ${id}   |   Status: ${status}) Tj`,
-    "0 -20 Td",
+    "0 -18 Td",
     `(Employee: ${name}   |   Staff ID: ${empId}) Tj`,
     "0 -16 Td",
     `(Designation: ${role}   |   Department: ${dept}) Tj`,
     "0 -16 Td",
     `(Disbursal Bank: ${bank}) Tj`,
-    "0 -28 Td",
+    "0 -26 Td",
     "/F1 12 Tf",
-    "(MONTHLY SALARY CALCULATION BREAKDOWN:)",
+    "(MONTHLY SALARY CALCULATION BREAKDOWN:) Tj",
     "0 -18 Td",
     "/F1 10 Tf",
-    `(Standard Monthly Salary: INR ${std.toLocaleString()}) Tj`,
+    `(Standard Monthly CTC: INR ${std.toLocaleString()}) Tj`,
+    "0 -16 Td",
+    `(Basic Salary [60%]: INR ${basic.toLocaleString()}) Tj`,
+    "0 -16 Td",
+    `(House Rent Allowance [HRA 25%]: INR ${hra.toLocaleString()}) Tj`,
+    "0 -16 Td",
+    `(Special & Flexible Allowances: INR ${allowances.toLocaleString()}) Tj`,
     "0 -16 Td",
     `(Earned Salary [Pro-rated Attendance]: INR ${earned.toLocaleString()}) Tj`,
     "0 -16 Td",
@@ -83,19 +100,19 @@ function downloadPayslipPdf(p) {
     "0 -16 Td",
     `(Salary Advance Recovered: (-) INR ${advance.toLocaleString()}) Tj`,
     "0 -24 Td",
-    "/F1 12 Tf",
-    `(FORMULA: Remaining Payable = Earned Salary + Earnings - Deductions - Advance) Tj`,
-    "0 -20 Td",
+    "/F1 11 Tf",
+    "(FORMULA: Remaining Payable = Earned Salary + Earnings - Deductions - Advance) Tj",
+    "0 -22 Td",
     "/F1 14 Tf",
     `(NET REMAINING PAYABLE: INR ${remaining.toLocaleString()}) Tj`,
     "0 -24 Td",
     "/F1 10 Tf",
-    `(Month-End Payout Status: ${status}   |   Paid Amount: INR ${paidAmt.toLocaleString()}   |   Payment Date: ${paidDate}) Tj`,
-    "0 -36 Td",
+    `(Payout Status: ${status}   |   Disbursed: INR ${paidAmt.toLocaleString()}   |   Date: ${paidDate}) Tj`,
+    "0 -32 Td",
     "/F1 9 Tf",
-    "(This is a computer-generated salary slip adhering to standard HRMS payroll formulas.) Tj",
+    "(This is a verified computer-generated salary slip adhering to HRMS payroll compliance.) Tj",
     "0 -14 Td",
-    "(Evenmore ERP Technologies - Digitally Certified & Verified.) Tj",
+    "(Evenmore ERP Technologies Pvt Ltd - Digitally Certified & Verified.) Tj",
     "ET",
   ];
 
@@ -132,6 +149,145 @@ function downloadPayslipPdf(p) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+}
+
+// Modern printable/save-as-PDF window generator with corporate styling
+function printPayslip(p) {
+  const std = Number(p.standardSalary || 0);
+  const earned = Number(p.earnedSalary || 0);
+  const earnings = Number(p.additionalEarnings || 0);
+  const deductions = Number(p.deductions || 0);
+  const advance = Number(p.advance || 0);
+  const remaining = Math.max(0, earned + earnings - deductions - advance);
+  const basic = Number(p.basic || Math.round(earned * 0.6));
+  const hra = Number(p.hra || Math.round(earned * 0.25));
+  const allowances = Number(p.allowances || Math.max(0, earned - basic - hra));
+  const month = p.month || "October 2024";
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Payslip - ${p.name} - ${month}</title>
+        <style>
+          @page { size: A4; margin: 12mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1e293b; margin: 0; padding: 20px; font-size: 13px; line-height: 1.5; }
+          .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
+          .logo { font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; }
+          .subtitle { font-size: 12px; color: #64748b; }
+          .badge { background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; display: inline-block; }
+          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+          .box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+          .label { font-size: 11px; color: #64748b; text-transform: uppercase; font-weight: 600; margin-bottom: 4px; }
+          .val { font-size: 13.5px; font-weight: 700; color: #0f172a; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #f1f5f9; text-align: left; padding: 8px 12px; font-size: 12px; font-weight: 700; color: #334155; border: 1px solid #cbd5e1; }
+          td { padding: 8px 12px; font-size: 12.5px; border: 1px solid #e2e8f0; }
+          .num { text-align: right; font-weight: 600; }
+          .formula-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px; margin-bottom: 20px; }
+          .net-payable { display: flex; justify-content: space-between; align-items: center; background: #0f172a; color: #fff; padding: 14px 18px; border-radius: 8px; font-size: 16px; font-weight: 800; }
+          .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between; align-items: center; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <div class="logo">EVENMORE TECHNOLOGIES</div>
+            <div class="subtitle">CONFIDENTIAL SALARY STATEMENT • CORPORATE HRMS</div>
+          </div>
+          <div style="text-align: right;">
+            <span class="badge">${p.status || "Paid"}</span>
+            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">Pay Period: ${month}</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="box">
+            <div class="label">Employee Details</div>
+            <div class="val">${p.name}</div>
+            <div style="color: #475569; font-size: 12px; margin-top: 2px;">${p.role} • ${p.department}</div>
+            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">Staff ID: ${p.empId || "EMP1000"} | Slip Ref: ${p.id || "PAY-100"}</div>
+          </div>
+          <div class="box">
+            <div class="label">Disbursal & Attendance</div>
+            <div class="val">${p.bank || "Direct Deposit (Verified)"}</div>
+            <div style="color: #475569; font-size: 12px; margin-top: 2px;">Working Days: ${p.attendedDays || 30} / ${p.totalDays || 30} Days</div>
+            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">Disbursement Date: ${p.paymentDate || "Oct 31, 2024"}</div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>EARNINGS</th>
+              <th class="num">AMOUNT (INR)</th>
+              <th>DEDUCTIONS & RECOVERIES</th>
+              <th class="num">AMOUNT (INR)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Basic Salary (60%)</td>
+              <td class="num">${basic.toLocaleString()}</td>
+              <td>Provident Fund (PF)</td>
+              <td class="num">${Math.round(deductions * 0.55).toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>House Rent Allowance (HRA 25%)</td>
+              <td class="num">${hra.toLocaleString()}</td>
+              <td>Tax Deducted at Source (TDS) / PT</td>
+              <td class="num">${Math.round(deductions * 0.45).toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Special & Flexible Allowances</td>
+              <td class="num">${allowances.toLocaleString()}</td>
+              <td>Salary Advance Recovered</td>
+              <td class="num">${advance.toLocaleString()}</td>
+            </tr>
+            <tr>
+              <td>Additional Earnings / Overtime / Bonus</td>
+              <td class="num">+${earnings.toLocaleString()}</td>
+              <td>Total Deductions & Advances</td>
+              <td class="num" style="color: #b91c1c;">-${(deductions + advance).toLocaleString()}</td>
+            </tr>
+            <tr style="font-weight: 700; background: #f8fafc;">
+              <td>Total Gross Earnings</td>
+              <td class="num" style="color: #15803d;">${(earned + earnings).toLocaleString()}</td>
+              <td>Standard Agreed CTC</td>
+              <td class="num">${std.toLocaleString()}</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="formula-box">
+          <div style="font-weight: 700; font-size: 11.5px; color: #15803d; margin-bottom: 2px;">FORMULA AUDIT TRAIL:</div>
+          <div style="font-size: 12px; color: #334155;">
+            Remaining Payable = Earned Salary (INR ${earned.toLocaleString()}) + Additional Earnings (INR ${earnings.toLocaleString()}) - Deductions (INR ${deductions.toLocaleString()}) - Advance Recovered (INR ${advance.toLocaleString()})
+          </div>
+        </div>
+
+        <div class="net-payable">
+          <span>NET TAKE-HOME PAYABLE</span>
+          <span>INR ${remaining.toLocaleString()}</span>
+        </div>
+
+        <div class="footer">
+          <div>This is a digitally certified salary slip generated by Evenmore ERP HRMS.</div>
+          <div>Authorized Signatory: Head of Payroll & Finance</div>
+        </div>
+      </body>
+    </html>
+  `;
+
+  const printWindow = window.open("", "_blank", "width=850,height=900");
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 400);
+  }
 }
 
 export default function Payroll() {
@@ -172,6 +328,14 @@ export default function Payroll() {
   const [showAddStructureModal, setShowAddStructureModal] = useState(false);
   const [newStructure, setNewStructure] = useState({ name: "", department: "Engineering", employees: "" });
 
+  // Lifecycle transition & Payslip generator modal state
+  const [showLifecycleModal, setShowLifecycleModal] = useState(false);
+  const [targetStage, setTargetStage] = useState(null);
+  const [showGenerateSlipModal, setShowGenerateSlipModal] = useState(false);
+  const [slipSelectedEmpId, setSlipSelectedEmpId] = useState("");
+  const [slipPickerOpen, setSlipPickerOpen] = useState(false);
+  const [slipSearchQuery, setSlipSearchQuery] = useState("");
+
   // Quick edit advance & earnings modal
   const [editingEmployee, setEditingEmployee] = useState(null);
   const [editAdvance, setEditAdvance] = useState(0);
@@ -211,6 +375,29 @@ export default function Payroll() {
       };
     });
   }, [payrollEmployees, storeLeaves]);
+
+  // Selected employee for generate payslip modal
+  const slipSelectedEmp = useMemo(() => {
+    if (!slipSelectedEmpId) return computedEmployeePayrolls[0];
+    return (
+      computedEmployeePayrolls.find((e) => e.id === slipSelectedEmpId) ||
+      computedEmployeePayrolls[0]
+    );
+  }, [computedEmployeePayrolls, slipSelectedEmpId]);
+
+  // Filtered employees for slip modal picker search
+  const filteredPickerEmployees = useMemo(() => {
+    if (!slipSearchQuery.trim()) return computedEmployeePayrolls;
+    const q = slipSearchQuery.toLowerCase().trim();
+    return computedEmployeePayrolls.filter(
+      (e) =>
+        e.name?.toLowerCase().includes(q) ||
+        e.role?.toLowerCase().includes(q) ||
+        e.department?.toLowerCase().includes(q) ||
+        e.empId?.toLowerCase().includes(q) ||
+        e.id?.toLowerCase().includes(q)
+    );
+  }, [computedEmployeePayrolls, slipSearchQuery]);
 
   // Overall Statistics Aggregation
   const overallStats = useMemo(() => {
@@ -277,6 +464,58 @@ export default function Payroll() {
     );
   }, [computedEmployeePayrolls, activeOwnUser]);
 
+  // Real-world scenario descriptions for each payroll lifecycle stage
+  const STAGE_SCENARIOS = {
+    "In Progress": {
+      title: "Stage 1: Attendance Reconciliation & Draft Calculation",
+      description:
+        "HR Operations validates daily attendance logs, integrates approved leaves, calculates pro-rated earned salary, and tallies overtime hours and salary advances.",
+      actionLabel: "Set to In Progress",
+      bullets: [
+        "Pro-rated earned salary calculation enabled",
+        "Approved leave days synchronized from HRMS",
+        "Salary advance recovery deduction applied",
+        "Allows adjusting individual employee earnings & deductions",
+      ],
+    },
+    "Ready for Review": {
+      title: "Stage 2: Internal Audit & Variance Verification",
+      description:
+        "Finance Controller audits calculations against CTC budgets, checks statutory tax brackets (TDS, PF, PT), and ensures zero compliance discrepancies.",
+      actionLabel: "Submit for Audit Review",
+      bullets: [
+        "Attendance records locked across all departments",
+        "Statutory compliance check (PF, ESI, TDS) verified",
+        "Advance recovery ledger verified against employee records",
+        "Net remaining payable verified for all staff",
+      ],
+    },
+    "Approved": {
+      title: "Stage 3: Executive Sign-off & Bank Authorization",
+      description:
+        "Director of HR & Chief Financial Officer sign off on the monthly disbursement budget. Authorizes corporate bank treasury to prepare the batch payout file.",
+      actionLabel: "Authorize & Approve Budget",
+      bullets: [
+        "Executive approval stamp applied to payroll cycle",
+        "Corporate treasury funds verified for disbursement",
+        "Bank NACH / NEFT batch schedule queued",
+        "Ready for 1-click month-end disbursal",
+      ],
+    },
+    "Paid": {
+      title: "Stage 4: Month-End Bank Disbursal & Payslips",
+      description:
+        "Corporate banking gateway executes direct deposit batch transfer. All employee accounts are credited, and verified PDF payslips are released.",
+      actionLabel: "Execute Payout & Generate Slips",
+      bullets: [
+        "Disburses net remaining payable to employee bank accounts",
+        "Marks all staff records as 'Paid' with current timestamp",
+        "Net Remaining Payable cleared to ₹0",
+        "Digitally certified PDF payslips generated for download",
+      ],
+    },
+  };
+
   // Lifecycle flow helper
   const nextWorkflowStep = (current) => {
     const sequence = ["In Progress", "Ready for Review", "Approved", "Paid"];
@@ -285,6 +524,51 @@ export default function Payroll() {
       return sequence[idx + 1];
     }
     return current;
+  };
+
+  // Lifecycle interaction handlers
+  const handleStageClick = (stageId) => {
+    setTargetStage(stageId);
+    setShowLifecycleModal(true);
+  };
+
+  const handleAdvanceStage = () => {
+    const next = nextWorkflowStep(workflowStep);
+    setTargetStage(next);
+    setShowLifecycleModal(true);
+  };
+
+  const executeStageTransition = (stage) => {
+    if (stage === "Paid") {
+      runPayrollForAll();
+      showToast("Month-End payroll disbursed to all staff! PDF Payslips generated.");
+    } else {
+      setWorkflowStep(stage);
+      // Synchronize employee statuses realistically with the stage
+      payrollEmployees.forEach((emp) => {
+        if (emp.status !== "Paid") {
+          updateEmployeePayroll(emp.id, { status: stage });
+        }
+      });
+      if (stage === "Ready for Review") {
+        showToast("Audit Complete: Attendance locked & payroll submitted for review.");
+      } else if (stage === "Approved") {
+        showToast("Payroll Approved: Disbursement authorized by Director.");
+      } else if (stage === "In Progress") {
+        showToast("Payroll reopened in In Progress mode for calculations.");
+      }
+    }
+    setShowLifecycleModal(false);
+    setTargetStage(null);
+  };
+
+  const handleBatchDownloadSlips = () => {
+    computedEmployeePayrolls.forEach((emp, i) => {
+      setTimeout(() => {
+        downloadPayslipPdf(emp);
+      }, i * 150);
+    });
+    showToast(`Generating and downloading PDF payslips for all ${computedEmployeePayrolls.length} employees...`);
   };
 
   // Handlers
@@ -356,6 +640,16 @@ export default function Payroll() {
             <option value="September 2024">September 2024</option>
             <option value="August 2024">August 2024</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => setShowGenerateSlipModal(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-300 text-slate-800 rounded-xl text-[13px] font-semibold shadow-xs hover:bg-slate-50 transition-colors cursor-pointer"
+            title="Generate and download employee PDF salary slip"
+          >
+            <FileText size={15} className="text-emerald-700" />
+            <span>Generate Payslip (PDF)</span>
+          </button>
 
           <button
             type="button"
@@ -522,15 +816,12 @@ export default function Payroll() {
                   <div key={step.id} className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        setWorkflowStep(step.id);
-                        showToast(`Lifecycle step set to: ${step.label}`);
-                      }}
+                      onClick={() => handleStageClick(step.id)}
                       className={`px-3 py-1.5 rounded-xl text-[12px] font-semibold transition cursor-pointer flex items-center gap-1.5 ${
                         isActive
                           ? "bg-navy text-white shadow-xs"
                           : isPassed
-                          ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                          ? "bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
@@ -544,23 +835,45 @@ export default function Payroll() {
                 );
               })}
 
-              {workflowStep !== "Paid" && (
+              <button
+                type="button"
+                onClick={() => setShowGenerateSlipModal(true)}
+                className="ml-1 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl text-[12px] font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                title="Generate employee payslip PDF"
+              >
+                <Download size={13} className="text-emerald-600" />
+                <span>Generate Payslip (PDF)</span>
+              </button>
+
+              {workflowStep !== "Paid" ? (
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = nextWorkflowStep(workflowStep);
-                    if (next === "Paid") {
-                      setShowRunModal(true);
-                    } else {
-                      setWorkflowStep(next);
-                      showToast(`Advanced payroll lifecycle to: ${next}`);
-                    }
-                  }}
-                  className="ml-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[12px] font-semibold transition cursor-pointer shadow-xs flex items-center gap-1"
+                  onClick={handleAdvanceStage}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[12px] font-semibold transition cursor-pointer shadow-xs flex items-center gap-1"
                 >
                   <span>Advance Stage</span>
                   <ChevronRight size={14} />
                 </button>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleBatchDownloadSlips}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[12px] font-semibold transition cursor-pointer shadow-xs flex items-center gap-1"
+                    title="Download payslips for all staff"
+                  >
+                    <Download size={13} />
+                    <span>Download All Slips</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleStageClick("In Progress")}
+                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[12px] font-medium transition cursor-pointer"
+                    title="Reopen cycle for adjustments"
+                  >
+                    Reopen Cycle
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1759,6 +2072,375 @@ export default function Payroll() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 5: LIFECYCLE TRANSITION WITH REAL-LIFE SCENARIO
+         ========================================================================= */}
+      {showLifecycleModal && targetStage && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Payroll Lifecycle Transition
+                </span>
+                <h3 className="font-bold text-[17px] text-slate-900 mt-0.5">
+                  {STAGE_SCENARIOS[targetStage]?.title || `Move to ${targetStage}`}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLifecycleModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scenario Narrative Box */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
+              <div className="text-[12.5px] font-bold text-slate-800 flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-emerald-600" />
+                <span>Real-Life Business Scenario:</span>
+              </div>
+              <p className="text-[13px] text-slate-600 leading-relaxed">
+                {STAGE_SCENARIOS[targetStage]?.description}
+              </p>
+            </div>
+
+            {/* Operational Checkpoints */}
+            <div className="space-y-1.5">
+              <span className="text-[11.5px] font-bold text-slate-700 uppercase tracking-wide">
+                Key Operations in this Stage:
+              </span>
+              <ul className="space-y-1 text-[12.5px] text-slate-700">
+                {STAGE_SCENARIOS[targetStage]?.bullets?.map((b, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Check size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Financial Overview Summary */}
+            <div className="bg-slate-900 text-white rounded-xl p-3.5 flex items-center justify-between text-[12px]">
+              <div>
+                <div className="text-slate-400 text-[11px]">Pay Period</div>
+                <div className="font-bold text-white">{currentPeriod}</div>
+              </div>
+              <div>
+                <div className="text-slate-400 text-[11px]">Headcount</div>
+                <div className="font-bold text-white">{overallStats.totalHeadcount} Staff</div>
+              </div>
+              <div>
+                <div className="text-slate-400 text-[11px]">Total Net Payout</div>
+                <div className="font-extrabold text-emerald-400 text-[14px]">
+                  {formatINR(overallStats.totalRemaining)}
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-2.5 mt-1">
+              <button
+                type="button"
+                onClick={() => executeStageTransition(targetStage)}
+                className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+              >
+                <span>{STAGE_SCENARIOS[targetStage]?.actionLabel || `Confirm ${targetStage}`}</span>
+                <ChevronRight size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLifecycleModal(false)}
+                className="px-4 bg-off border border-bdr text-slate-700 hover:bg-slate-100 rounded-xl py-2.5 font-medium text-[13px] transition cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL 6: GENERATE PAYROLL SLIP (PDF)
+         ========================================================================= */}
+      {showGenerateSlipModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-xl p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
+                  <Download size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-[16px] text-slate-900">
+                    Generate Payroll Slip (PDF)
+                  </h3>
+                  <p className="text-[12px] text-muted">
+                    Certified salary slips adhering to company compensation formula
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGenerateSlipModal(false)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Employee Selector */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[12px] font-semibold text-slate-700">
+                  Select Employee:
+                </label>
+                <span className="text-[11px] text-slate-500">
+                  {computedEmployeePayrolls.length} total enrolled
+                </span>
+              </div>
+
+              {/* Selected Employee Card Trigger */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setSlipPickerOpen((prev) => !prev)}
+                  className="w-full flex items-center justify-between p-2.5 bg-slate-50/90 hover:bg-slate-100/80 border border-slate-300 rounded-xl transition cursor-pointer text-left focus:outline-none focus:border-navy"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <img
+                      src={slipSelectedEmp?.avatar}
+                      alt={slipSelectedEmp?.name}
+                      className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
+                    />
+                    <div className="min-w-0">
+                      <div className="font-bold text-[13px] text-slate-900 truncate">
+                        {slipSelectedEmp?.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500 truncate">
+                        {slipSelectedEmp?.role} • {slipSelectedEmp?.department}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11.5px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200">
+                      {formatINR(slipSelectedEmp?.remainingPayable)}
+                    </span>
+                    <div className="flex items-center gap-1 text-[11.5px] text-navy font-semibold bg-white border border-slate-200 rounded-md px-2 py-1 shadow-2xs hover:bg-slate-50">
+                      <span>{slipPickerOpen ? "Close" : "Switch"}</span>
+                      <ChevronDown
+                        size={13}
+                        className={`transition-transform duration-150 ${
+                          slipPickerOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </div>
+                  </div>
+                </button>
+
+                {/* Searchable Picker Dropdown Menu */}
+                {slipPickerOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={() => setSlipPickerOpen(false)}
+                    />
+                    <div className="absolute top-full left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-30 overflow-hidden flex flex-col animate-in fade-in zoom-in-95">
+                      {/* Search Bar */}
+                      <div className="p-2 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                        <Search size={13} className="text-slate-400 shrink-0 ml-1" />
+                        <input
+                          type="text"
+                          value={slipSearchQuery}
+                          onChange={(e) => setSlipSearchQuery(e.target.value)}
+                          placeholder="Search by name, role, department..."
+                          className="w-full bg-transparent border-none text-[12px] text-slate-800 placeholder:text-slate-400 focus:outline-none"
+                          autoFocus
+                        />
+                        {slipSearchQuery && (
+                          <button
+                            type="button"
+                            onClick={() => setSlipSearchQuery("")}
+                            className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Employee List */}
+                      <div className="max-h-52 overflow-y-auto divide-y divide-slate-100">
+                        {filteredPickerEmployees.length === 0 ? (
+                          <div className="p-4 text-center text-[12px] text-slate-400">
+                            No employee matches &quot;{slipSearchQuery}&quot;
+                          </div>
+                        ) : (
+                          filteredPickerEmployees.map((emp) => {
+                            const isSelected = emp.id === slipSelectedEmp?.id;
+                            return (
+                              <button
+                                key={emp.id}
+                                type="button"
+                                onClick={() => {
+                                  setSlipSelectedEmpId(emp.id);
+                                  setSlipPickerOpen(false);
+                                  setSlipSearchQuery("");
+                                }}
+                                className={`w-full flex items-center justify-between p-2.5 text-left transition cursor-pointer ${
+                                  isSelected
+                                    ? "bg-navy/5 font-semibold"
+                                    : "hover:bg-slate-50 text-slate-700"
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                  <img
+                                    src={emp.avatar}
+                                    alt={emp.name}
+                                    className="w-7 h-7 rounded-full object-cover border border-slate-200 shrink-0"
+                                  />
+                                  <div className="min-w-0 truncate">
+                                    <div className="text-[12.5px] font-medium text-slate-900 truncate">
+                                      {emp.name}
+                                    </div>
+                                    <div className="text-[11px] text-slate-500 truncate">
+                                      {emp.role} • {emp.department}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-[11.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                                    {formatINR(emp.remainingPayable)}
+                                  </span>
+                                  {isSelected && (
+                                    <Check size={14} className="text-navy shrink-0" />
+                                  )}
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Payslip Live Preview Card */}
+            {slipSelectedEmp && (
+              <div className="border border-slate-200 rounded-xl p-4 bg-slate-50/70 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={slipSelectedEmp.avatar}
+                      alt={slipSelectedEmp.name}
+                      className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                    />
+                    <div>
+                      <h4 className="font-bold text-[14.5px] text-slate-900">
+                        {slipSelectedEmp.name}
+                      </h4>
+                      <p className="text-[11.5px] text-muted">
+                        {slipSelectedEmp.role} • {slipSelectedEmp.department}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                      slipSelectedEmp.status === "Paid"
+                        ? "bg-emerald-100 text-emerald-800"
+                        : "bg-blue-100 text-blue-800"
+                    }`}>
+                      {slipSelectedEmp.status}
+                    </span>
+                    <div className="text-[11px] text-muted mt-1">
+                      {currentPeriod}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[12px]">
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
+                    <div className="text-slate-500 text-[11px]">Agreed CTC (Standard)</div>
+                    <div className="font-bold text-slate-800">{formatINR(slipSelectedEmp.standardSalary)}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
+                    <div className="text-slate-500 text-[11px]">Earned (Pro-rated)</div>
+                    <div className="font-bold text-blue-900">{formatINR(slipSelectedEmp.earnedSalary)}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
+                    <div className="text-slate-500 text-[11px]">Additional Earnings (+)</div>
+                    <div className="font-bold text-emerald-700">+{formatINR(slipSelectedEmp.additionalEarnings)}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
+                    <div className="text-slate-500 text-[11px]">Deductions &amp; Advance (-)</div>
+                    <div className="font-bold text-rose-700">
+                      -{formatINR((slipSelectedEmp.deductions || 0) + (slipSelectedEmp.advance || 0))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Net Remaining Payable Bar */}
+                <div className="flex items-center justify-between p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[13px]">
+                  <span className="font-semibold text-emerald-900">Net Take-Home Payable</span>
+                  <span className="text-[16px] font-extrabold text-emerald-800">
+                    {formatINR(slipSelectedEmp.remainingPayable)}
+                  </span>
+                </div>
+
+                <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                  <span>Bank: {slipSelectedEmp.bank || "Direct Deposit"}</span>
+                  <span>Attendance: {slipSelectedEmp.attendedDays || 30} / 30 Days</span>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (slipSelectedEmp) {
+                    downloadPayslipPdf(slipSelectedEmp);
+                    showToast(`Downloaded PDF Payslip for ${slipSelectedEmp.name}`);
+                  }
+                }}
+                className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <Download size={15} />
+                <span>Download PDF Slip</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (slipSelectedEmp) {
+                    printPayslip(slipSelectedEmp);
+                  }
+                }}
+                className="inline-flex items-center gap-1.5 px-4 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl py-2.5 font-semibold text-[13px] transition cursor-pointer"
+              >
+                <Printer size={15} />
+                <span>Print / Save PDF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleBatchDownloadSlips}
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-[12.5px] font-medium transition cursor-pointer"
+              >
+                <Download size={13} className="text-emerald-700" />
+                <span>Download All {computedEmployeePayrolls.length} Payslips (Batch)</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
