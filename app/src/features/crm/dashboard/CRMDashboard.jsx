@@ -278,76 +278,25 @@ export default function DashboardView() {
           </div>
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-1">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
-            <Users size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Total Active Leads</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{activeLeads}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 12%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
+        {kpis.map((k) => {
+          const Icon = k.icon;
+          const Trend = k.up ? TrendingUp : TrendingDown;
+          return (
+            <div key={k.label} style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ width: 38, height: 38, borderRadius: 10, background: k.bg, color: k.fg, display: "grid", placeItems: "center", flexShrink: 0 }}>
+                <Icon size={19} />
+              </span>
+              <span style={{ minWidth: 0 }}>
+                <span style={{ display: "block", fontSize: 11, color: "#64748b", fontWeight: 600 }}>{k.label}</span>
+                <strong style={{ display: "block", fontSize: 18, fontWeight: 800, color: "#0f1f3d", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.value}</strong>
+                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: k.up ? "#10b981" : "#ef4444", fontWeight: 700 }}>
+                  <Trend size={13} /> {k.trend} <em style={{ fontStyle: "normal", color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.note}</em>
+                </span>
+              </span>
             </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
-            <UserPlus size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">New Leads</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{newLeads}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 2%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
-            <Clock size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Pending Tasks</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{pendingTasks}</div>
-            <div className="text-[11px] font-semibold text-rose-500 mt-0.5 flex items-center gap-1">
-              <span>↓ 4%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
-            <TrendingUp size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Deals in Pipeline</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{pipelineDeals}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 15%</span>
-              <span className="text-slate-400 font-normal">Rs 1.72 Cr</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 flex-shrink-0 font-bold text-xl">
-            $
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Total Revenue Expected</div>
-            <div className="text-xl font-bold text-slate-900 leading-tight mt-0.5">$17,355,083.00</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 22%</span>
-              <span className="text-slate-400 font-normal">$5,884.00 due</span>
-            </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,2fr) minmax(280px,1fr)", gap: 12 }}>
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
