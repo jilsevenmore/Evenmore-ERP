@@ -229,5 +229,6 @@ export const useAppStore = create((set) => ({
       return { candidates: ns };
     }),
   showToast: (msg) => set({ toast: { id: Date.now().toString(), msg } }),
+  setToast: (msg) => set({ toast: { id: Date.now().toString(), msg } }),
   clearToast: () => set({ toast: null }),
 }));
