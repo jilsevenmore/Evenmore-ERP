@@ -7,7 +7,7 @@ export const PrintLabelModal = ({ isOpen, onClose, part, }) => {
         window.print();
     };
     return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150 printable-document">
         {/* Header */}
         <div className="px-5 py-3 border-b border-[#CED4DA] flex items-center justify-between bg-[#F8F9FA]">
           <div className="flex items-center gap-2">

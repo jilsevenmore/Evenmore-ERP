@@ -80,7 +80,9 @@ function printLeadsAsPdf(rows) {
   printWindow.document.write(`<!doctype html><html><head><title>Lead Details</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:24px}h1{font-size:22px}table{border-collapse:collapse;width:100%;font-size:11px}th,td{border:1px solid #cbd5e1;padding:7px;text-align:left}th{background:#e2e8f0}</style></head><body><h1>Lead Details</h1><table><thead><tr>${headers}</tr></thead><tbody>${tableRows}</tbody></table></body></html>`);
   printWindow.document.close();
   printWindow.focus();
-  printWindow.print();
+  setTimeout(() => {
+    printWindow.print();
+  }, 250);
 }
 
 const leadsGuide = {

@@ -239,7 +239,7 @@ export const VendorsPage = () => {
 
       {/* Vendor Statement / AP Ledger Modal */}
       {selectedVendor && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden printable-document">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedVendor.name}</h3>

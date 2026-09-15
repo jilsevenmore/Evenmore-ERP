@@ -380,7 +380,7 @@ export const PurchaseReturnsPage = () => {
       {/* Return Detail Modal */}
       {selectedReturn && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden printable-document">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <RotateCcw className="w-5 h-5 text-rose-600" />
@@ -390,9 +390,18 @@ export const PurchaseReturnsPage = () => {
                 </span>
                 <StatusBadge status={selectedReturn.status}/>
               </div>
-              <button onClick={() => setSelectedReturn(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
-                <X size={18}/>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  <Printer size={13} /> Print Debit Note
+                </button>
+                <button onClick={() => setSelectedReturn(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+                  <X size={18}/>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">

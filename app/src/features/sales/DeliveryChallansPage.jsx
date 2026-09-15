@@ -624,7 +624,7 @@ export const DeliveryChallansPage = () => {
 
       {/* Printable Logistics Waybill & POD Modal */}
       {selectedChallan && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden printable-document">
             <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#1F2E4A] text-white font-bold flex items-center justify-center">

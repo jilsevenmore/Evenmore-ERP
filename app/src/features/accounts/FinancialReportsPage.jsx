@@ -65,7 +65,7 @@ export function FinancialReportsPage() {
   ];
 
   return (
-    <div className="feature-page" style={{ padding: '24px 32px' }}>
+    <div className="feature-page printable-document" style={{ padding: '24px 32px' }}>
       <PageHeader
         title="Financial Reports"
         subtitle="Consolidated Profit & Loss, Balance Sheet, and Cash Flow metrics."
@@ -88,7 +88,7 @@ export function FinancialReportsPage() {
 
       <div className="card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="no-print" style={{ display: 'flex', gap: 8 }}>
             {[
               { id: 'pl', label: 'Profit & Loss Statement' },
               { id: 'cashflow', label: 'Recent Invoices Breakdown' },

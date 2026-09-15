@@ -27,7 +27,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
     const balance = customer.balance || 0;
     const creditUsedPct = Math.min(100, Math.round((balance / creditLimit) * 100));
     return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${customer.name || 'Customer'} 360 view`}>
-      <div className="bg-white w-full max-w-xl h-full shadow-2xl border-l border-slate-200 flex flex-col text-xs overflow-hidden" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white w-full max-w-xl h-full shadow-2xl border-l border-slate-200 flex flex-col text-xs overflow-hidden printable-document" onClick={(e) => e.stopPropagation()}>
         {/* Top Header */}
         <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex items-start justify-between">
           <div>
