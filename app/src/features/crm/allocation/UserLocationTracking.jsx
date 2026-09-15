@@ -200,11 +200,7 @@ export default function UserLocationTracking() {
         </div>
       )}
 
-      <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">User Location Tracking</h1>
-          <p className="text-xs text-slate-500 mt-0.5">Track your team's live location, activity and working hours in real time.</p>
-        </div>
+      <div className="flex justify-end">
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600">
             <CalendarDays size={14} className="text-slate-400" />

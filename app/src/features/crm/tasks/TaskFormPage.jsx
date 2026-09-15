@@ -169,16 +169,7 @@ export default function TaskFormPage() {
         text="These define the fields collected while doing a task. You design the form once, then every call, visit or follow-up follows the same checklist."
       />
 
-      <div className="flex items-center gap-3 mb-5">
-        <div className="relative flex-1 max-w-md">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search forms by name, description or field..."
-            className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:border-blue-500"
-          />
-        </div>
+      <div className="flex items-center justify-between mb-5">
         <span className="text-xs text-slate-500 font-medium">{visible.length} Forms</span>
       </div>
 
