@@ -16,12 +16,25 @@ import {
   RotateCcw,
   Sparkles,
   Info,
+  GripVertical,
+  ArrowDownToLine,
+  MoveHorizontal,
 } from "lucide-react";
 import { useTrainingStore, TRAINING_FUNNEL_STAGES } from "../../../stores/trainingStore";
 import { useAppStore } from "../../../stores/appStore";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
+
+const STAGE_DROP_STYLES = {
+  Requested: "ring-2 ring-slate-500/60 bg-slate-100/80 border-slate-400",
+  "Trainer Assigned": "ring-2 ring-cyan-500/60 bg-cyan-50/80 border-cyan-400",
+  Scheduled: "ring-2 ring-blue-500/60 bg-blue-50/80 border-blue-400",
+  Ongoing: "ring-2 ring-amber-500/60 bg-amber-50/80 border-amber-400",
+  Completed: "ring-2 ring-emerald-500/60 bg-emerald-50/80 border-emerald-400",
+  Evaluated: "ring-2 ring-lime-500/60 bg-lime-50/80 border-lime-400",
+  Cancelled: "ring-2 ring-rose-500/60 bg-rose-50/80 border-rose-400",
+};
 
 export default function TrainingFunnel({ embedded = false, onBack }) {
   const navigate = useNavigate();
@@ -49,6 +62,10 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   const [editingItem, setEditingItem] = useState(null);
   const [defaultStage, setDefaultStage] = useState("Requested");
   const [deleteId, setDeleteId] = useState(null);
+
+  // Drag & drop state
+  const [draggedId, setDraggedId] = useState(null);
+  const [dragOverStage, setDragOverStage] = useState(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -88,6 +105,51 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   const closedCount = filteredTrainings.filter((t) =>
     ["Completed", "Evaluated", "Cancelled"].includes(t.stage)
   ).length;
+
+  // Drag and Drop Actions
+  const handleDragStart = (e, item) => {
+    e.dataTransfer.setData("text/plain", item.id);
+    e.dataTransfer.effectAllowed = "move";
+    setDraggedId(item.id);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedId(null);
+    setDragOverStage(null);
+  };
+
+  const handleDragOver = (e, stageKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (dragOverStage !== stageKey) {
+      setDragOverStage(stageKey);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setDragOverStage(null);
+    }
+  };
+
+  const handleDrop = (e, targetStageKey, targetStageLabel) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData("text/plain") || draggedId;
+    setDragOverStage(null);
+    setDraggedId(null);
+
+    if (!id) return;
+
+    const item = trainings.find((t) => t.id === id);
+    if (!item) return;
+
+    if (item.stage === targetStageKey) {
+      return; // Already in target stage
+    }
+
+    moveTrainingStage(id, targetStageKey);
+    showToast(`Moved "${item.name}" to ${targetStageLabel}`);
+  };
 
   // Actions
   const handleOpenAdd = (stage = "Requested") => {
@@ -295,13 +357,28 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
       {/* Main Funnel Card */}
       <div className="bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col gap-5 overflow-hidden">
         {/* Card Header matching image */}
-        <div>
-          <h2 className="text-[16px] font-bold text-slate-900">Training Funnel</h2>
-          <div className="text-[12px] text-slate-500 mt-0.5 font-medium">
-            Total: <span className="text-slate-700 font-semibold">{totalCount}</span> • Open:{" "}
-            <span className="text-blue-700 font-semibold">{openCount}</span> • Closed:{" "}
-            <span className="text-slate-700 font-semibold">{closedCount}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-[16px] font-bold text-slate-900">Training Funnel</h2>
+            <div className="text-[12px] text-slate-500 mt-0.5 font-medium flex items-center gap-2 flex-wrap">
+              <span>
+                Total: <span className="text-slate-700 font-semibold">{totalCount}</span> • Open:{" "}
+                <span className="text-blue-700 font-semibold">{openCount}</span> • Closed:{" "}
+                <span className="text-slate-700 font-semibold">{closedCount}</span>
+              </span>
+              <span className="inline-block w-1 h-1 rounded-full bg-slate-300" />
+              <span className="inline-flex items-center gap-1 font-medium text-blue-600 text-[11.5px]">
+                <MoveHorizontal size={12} /> Drag & drop cards between stages
+              </span>
+            </div>
           </div>
+
+          {draggedId && (
+            <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full animate-pulse flex items-center gap-1.5 w-fit">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+              Dragging training program...
+            </span>
+          )}
         </div>
 
         {/* KANBAN FUNNEL VIEW */}
@@ -312,11 +389,19 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
               const stageCount = stageTrainings.length;
               const stagePct = totalCount > 0 ? Math.round((stageCount / totalCount) * 100) : 0;
               const stageCost = stageTrainings.reduce((sum, item) => sum + (Number(item.cost) || 0), 0);
+              const isDropActive = dragOverStage === stageObj.key;
 
               return (
                 <div
                   key={stageObj.key}
-                  className="bg-slate-50/50 border border-[#e2e8f0] rounded-2xl p-3.5 flex flex-col justify-between transition min-w-[210px] hover:border-slate-300"
+                  onDragOver={(e) => handleDragOver(e, stageObj.key)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, stageObj.key, stageObj.label)}
+                  className={`rounded-2xl p-3.5 flex flex-col justify-between transition-all duration-200 min-w-[210px] ${
+                    isDropActive
+                      ? STAGE_DROP_STYLES[stageObj.key] || "ring-2 ring-blue-500/60 bg-blue-50/70 border-blue-400"
+                      : "bg-slate-50/50 border border-[#e2e8f0] hover:border-slate-300"
+                  }`}
                 >
                   {/* Column Header matching screenshot */}
                   <div className="flex flex-col pb-2.5 border-b border-slate-200/80">
@@ -345,68 +430,98 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   </div>
 
                   {/* Column Body: Items or "Empty" placeholder */}
-                  <div className="flex-1 py-3 flex flex-col gap-2.5 overflow-y-auto max-h-[420px]">
-                    {stageTrainings.length === 0 ? (
+                  <div className="flex-1 py-3 flex flex-col gap-2.5 overflow-y-auto max-h-[440px] custom-scrollbar">
+                    {/* Active drop indicator */}
+                    {isDropActive && (
+                      <div className="border-2 border-dashed border-blue-500/70 bg-blue-500/10 rounded-xl p-2 text-center text-[10.5px] font-bold text-blue-700 flex items-center justify-center gap-1.5 animate-pulse shadow-inner">
+                        <ArrowDownToLine size={13} />
+                        <span>Drop to move to {stageObj.label}</span>
+                      </div>
+                    )}
+
+                    {stageTrainings.length === 0 && !isDropActive ? (
                       <div className="flex-1 flex items-center justify-center py-12 text-slate-400 text-[12.5px] italic font-medium">
                         Empty
                       </div>
                     ) : (
-                      stageTrainings.map((item) => (
-                        <div
-                          key={item.id}
-                          onClick={() => handleOpenEdit(item)}
-                          className="bg-white border border-bdr rounded-xl p-3 shadow-2xs hover:border-slate-300 hover:shadow-xs transition cursor-pointer flex flex-col gap-1.5 text-left group"
-                        >
-                          <div className="flex items-start justify-between gap-1">
-                            <span className="font-bold text-[12.5px] text-slate-900 group-hover:text-navy transition line-clamp-2 leading-snug">
-                              {item.name}
-                            </span>
-                            <span className="px-1.5 py-0.5 bg-off border border-bdr rounded text-[9.5px] font-medium text-slate-600 shrink-0">
-                              {item.department}
-                            </span>
-                          </div>
+                      stageTrainings.map((item) => {
+                        const isDragging = draggedId === item.id;
 
-                          {/* Trainer info */}
-                          <div className="flex items-center gap-1.5 text-[11.5px] text-slate-600 mt-0.5">
-                            {item.avatar ? (
-                              <img src={item.avatar} alt="" className="w-4 h-4 rounded-full" />
-                            ) : (
-                              <div className="w-4 h-4 rounded-full bg-slate-200 grid place-items-center text-[8px] font-bold text-slate-600">
-                                {item.trainer ? item.trainer[0] : "U"}
+                        return (
+                          <div
+                            key={item.id}
+                            draggable={true}
+                            onDragStart={(e) => handleDragStart(e, item)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => handleOpenEdit(item)}
+                            className={`bg-white border rounded-xl p-3 shadow-2xs transition-all duration-150 cursor-grab active:cursor-grabbing text-left group select-none relative flex flex-col gap-1.5 ${
+                              isDragging
+                                ? "opacity-35 border-dashed border-blue-500 ring-2 ring-blue-500/30 scale-[0.98]"
+                                : "border-bdr hover:border-slate-300 hover:shadow-xs hover:-translate-y-0.5"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-1.5">
+                              <div className="flex items-start gap-1 flex-1 min-w-0">
+                                <div
+                                  className="text-slate-300 group-hover:text-blue-600 transition-colors shrink-0 mt-0.5"
+                                  title="Drag card"
+                                >
+                                  <GripVertical size={13} />
+                                </div>
+                                <span className="font-bold text-[12.5px] text-slate-900 group-hover:text-navy transition line-clamp-2 leading-snug">
+                                  {item.name}
+                                </span>
                               </div>
-                            )}
-                            <span className="truncate">{item.trainer || "Unassigned"}</span>
-                          </div>
+                              <span className="px-1.5 py-0.5 bg-off border border-bdr rounded text-[9.5px] font-medium text-slate-600 shrink-0">
+                                {item.department}
+                              </span>
+                            </div>
 
-                          {/* Date and Cost */}
-                          <div className="flex items-center justify-between text-[10.5px] text-slate-500 pt-1 border-t border-slate-100">
-                            <span>{item.start || "TBD"}</span>
-                            <span className="font-semibold text-slate-800">
-                              ₹ {Number(item.cost || 0).toLocaleString("en-IN")}
-                            </span>
-                          </div>
+                            {/* Trainer info */}
+                            <div className="flex items-center gap-1.5 text-[11.5px] text-slate-600 mt-0.5">
+                              {item.avatar ? (
+                                <img src={item.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                              ) : (
+                                <div className="w-4 h-4 rounded-full bg-slate-200 grid place-items-center text-[8px] font-bold text-slate-600">
+                                  {item.trainer ? item.trainer[0] : "U"}
+                                </div>
+                              )}
+                              <span className="truncate">{item.trainer || "Unassigned"}</span>
+                            </div>
 
-                          {/* Move stage dropdown / quick action */}
-                          <div className="flex items-center justify-between pt-1 gap-1">
-                            <select
-                              value={item.stage}
+                            {/* Date and Cost */}
+                            <div className="flex items-center justify-between text-[10.5px] text-slate-500 pt-1 border-t border-slate-100">
+                              <span>{item.start || "TBD"}</span>
+                              <span className="font-semibold text-slate-800">
+                                ₹ {Number(item.cost || 0).toLocaleString("en-IN")}
+                              </span>
+                            </div>
+
+                            {/* Move stage dropdown / quick action */}
+                            <div
+                              className="flex items-center justify-between pt-1 gap-1"
+                              onMouseDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => {
-                                e.stopPropagation();
-                                moveTrainingStage(item.id, e.target.value);
-                                showToast(`Moved "${item.name}" to ${e.target.value}`);
-                              }}
-                              className="h-6 px-1.5 bg-off border border-bdr rounded text-[10px] text-slate-600 font-medium focus:outline-none focus:border-navy cursor-pointer w-full"
                             >
-                              {TRAINING_FUNNEL_STAGES.map((s) => (
-                                <option key={s.key} value={s.key}>
-                                  → {s.label}
-                                </option>
-                              ))}
-                            </select>
+                              <select
+                                value={item.stage}
+                                onChange={(e) => {
+                                  e.stopPropagation();
+                                  moveTrainingStage(item.id, e.target.value);
+                                  showToast(`Moved "${item.name}" to ${e.target.value}`);
+                                }}
+                                className="h-6 px-1.5 bg-off border border-bdr rounded text-[10px] text-slate-600 font-medium focus:outline-none focus:border-navy cursor-pointer w-full"
+                              >
+                                {TRAINING_FUNNEL_STAGES.map((s) => (
+                                  <option key={s.key} value={s.key}>
+                                    → {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
 

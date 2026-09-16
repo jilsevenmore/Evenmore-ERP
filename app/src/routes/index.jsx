@@ -339,6 +339,7 @@ const router = createBrowserRouter([
       { path: 'hrms/calendar', element: <Page component={CalendarPage} /> },
       // { path: 'hrms/hrms-setup', element: <Page component={HrmsSetup} /> }, // Hidden: HRMS Setup feature commented out
       { path: 'hrms/hr-admin', element: <Page component={HRAdminPage} /> },
+      { path: 'hrms/hr-admin/working-days', element: <Page component={HRAdminPage} defaultTab="working-days" /> },
       { path: 'hrms/hr-admin/terminations', element: <Page component={HRAdminPage} defaultTab="terminations" /> },
       { path: 'hrms/hr-admin/resignations', element: <Page component={HRAdminPage} defaultTab="resignations" /> },
       { path: 'hrms/hr-admin/complaints', element: <Page component={HRAdminPage} defaultTab="complaints" /> },

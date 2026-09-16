@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,
   Users,
@@ -19,6 +20,9 @@ import {
   UserX,
   MessageSquareWarning,
   Calendar,
+  CalendarCheck,
+  Receipt,
+  RotateCcw,
   Search,
   Filter,
   Eye,
@@ -42,6 +46,13 @@ import {
 import { useAppStore } from "../../../stores/appStore";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useCalendarStore } from "../../../stores/calendarStore";
+import {
+  usePayrollStore,
+  getDepartmentDays,
+  getDepartmentHours,
+  DEFAULT_DEPARTMENT_WORKING_DAYS,
+  DEFAULT_DEPARTMENT_WORKING_HOURS,
+} from "../../../stores/payrollStore";
 import TerminationLetterModal from "./TerminationLetterModal";
 import OfferLetterModal from "./OfferLetterModal";
 import GenerateOfferModal from "./GenerateOfferModal";
@@ -251,6 +262,18 @@ const INITIAL_HOLIDAYS = [
   { id: "HOL-09", name: "Christmas Day", date: "2024-12-25", day: "Wednesday", type: "National Gazetted", appliesTo: "All Locations", status: "Upcoming" },
 ];
 
+const ALL_DEPARTMENTS_CONFIG = [
+  { name: "Engineering", code: "ENG-01", head: "David Park", role: "VP of Engineering" },
+  { name: "Sales & CRM", code: "SAL-02", head: "Alex Rivera", role: "Head of Revenue & CRM" },
+  { name: "Human Resources", code: "HR-03", head: "Ayesha Khan", role: "People Operations Director" },
+  { name: "Finance", code: "FIN-04", head: "James Wilson", role: "CFO & Finance Head" },
+  { name: "Operations", code: "OPS-05", head: "Adarsh Gupta", role: "Head of Operations Admin" },
+  { name: "Marketing", code: "MKT-06", head: "Elena Rostova", role: "Head of Brand Strategy" },
+  { name: "Design", code: "DSN-07", head: "Marcus Chen", role: "Design Systems Lead" },
+  { name: "Warehouse & Inventory", code: "LOG-08", head: "Chen Li", role: "Logistics & Stock Manager" },
+  { name: "Executive", code: "EXE-09", head: "Sarah Mitchell", role: "Chief Executive Officer" },
+];
+
 export default function HRAdminPage({ defaultTab }) {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees || []);
@@ -258,7 +281,31 @@ export default function HRAdminPage({ defaultTab }) {
   const updateEmployeeStatus = useAppStore((s) => s.updateEmployeeStatus);
   const addCalendarEvent = useCalendarStore((s) => s.addEvent);
 
-  const [activeTab, setActiveTab] = useState(defaultTab || "teams");
+  // Leave Governance & Carry-Forward Policies
+  const sandwichRuleEnabled = useAppStore((s) => s.sandwichRuleEnabled);
+  const toggleSandwichRule = useAppStore((s) => s.toggleSandwichRule);
+  const maxCarryForwardDays = useAppStore((s) => s.maxCarryForwardDays);
+  const setMaxCarryForwardDays = useAppStore((s) => s.setMaxCarryForwardDays);
+  const executeCarryForwardRollover = useAppStore((s) => s.executeCarryForwardRollover);
+  const carriedForwardLeaves = useAppStore((s) => s.carriedForwardLeaves);
+
+  const [searchParams] = useSearchParams();
+  const initialTab = searchParams.get("tab") || defaultTab || "teams";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam) setActiveTab(tabParam);
+    else if (defaultTab) setActiveTab(defaultTab);
+  }, [defaultTab, searchParams]);
+
+  // Payroll Store Integration for Department Working Days & Hours
+  const departmentWorkingDays = usePayrollStore((s) => s.departmentWorkingDays);
+  const setDepartmentWorkingDays = usePayrollStore((s) => s.setDepartmentWorkingDays);
+  const departmentWorkingHours = usePayrollStore((s) => s.departmentWorkingHours);
+  const setDepartmentWorkingHours = usePayrollStore((s) => s.setDepartmentWorkingHours);
+  const resetDepartmentWorkingDays = usePayrollStore((s) => s.resetDepartmentWorkingDays);
+  const payrollEmployees = usePayrollStore((s) => s.employees || []);
 
   // Core Data Lists
   const [teams, setTeams] = useState(INITIAL_TEAMS);
@@ -711,7 +758,7 @@ export default function HRAdminPage({ defaultTab }) {
   const departmentsList = Array.from(new Set(teams.map((t) => t.dept))).filter(Boolean);
   const totalTeamMembers = teams.reduce((acc, t) => acc + (Number(t.members) || 0), 0);
 
-  // ── 7 Top KPI Button Cards Configuration ──
+  // ── 9 Top KPI Button Cards Configuration ──
   const TOP_KPI_BUTTONS = [
     {
       id: "teams",
@@ -721,6 +768,15 @@ export default function HRAdminPage({ defaultTab }) {
       icon: Users,
       iconColor: "text-blue-700",
       accentBg: "bg-blue-50 text-blue-700 border-blue-200",
+    },
+    {
+      id: "working-days",
+      label: "Work Schedule",
+      count: `${ALL_DEPARTMENTS_CONFIG.length} Depts`,
+      subtext: "Days & daily hours",
+      icon: CalendarCheck,
+      iconColor: "text-emerald-700",
+      accentBg: "bg-emerald-50 text-emerald-700 border-emerald-200",
     },
     {
       id: "approvals",
@@ -818,88 +874,80 @@ export default function HRAdminPage({ defaultTab }) {
             </button>
 
             {isQuickActionOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-60 bg-white border border-bdr rounded-2xl shadow-xl z-50 py-2 divide-y divide-bdr/40 animate-in fade-in zoom-in-95 duration-100">
-                <div className="py-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsQuickActionOpen(false);
-                      handleOpenAddTeam();
-                    }}
-                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <Users size={14} className="text-blue-600" />
-                    <span>Add New Team</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsQuickActionOpen(false);
-                      handleOpenAddChain();
-                    }}
-                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <ShieldCheck size={14} className="text-emerald-600" />
-                    <span>Create Approval Chain</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsQuickActionOpen(false);
-                      setIsGenerateOfferModalOpen(true);
-                    }}
-                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <FileCheck2 size={14} className="text-teal-600" />
-                    <span>Generate Offer Letter</span>
-                  </button>
+              <div className="absolute right-0 mt-2 w-56 bg-white border border-bdr rounded-2xl shadow-xl z-30 py-2 animate-in fade-in zoom-in-95">
+                <div className="px-3 py-1.5 text-[11px] font-bold text-muted uppercase tracking-wider">
+                  Create / Initiate
                 </div>
-                <div className="py-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsQuickActionOpen(false);
-                      setIsTerminationModalOpen(true);
-                    }}
-                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-red-700 hover:bg-red-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <UserX size={14} className="text-red-600" />
-                    <span>Record Termination</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsQuickActionOpen(false);
-                      setIsResignationModalOpen(true);
-                    }}
-                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <UserMinus size={14} className="text-amber-600" />
-                    <span>Submit Resignation</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsQuickActionOpen(false);
-                      setIsComplaintModalOpen(true);
-                    }}
-                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <MessageSquareWarning size={14} className="text-purple-600" />
-                    <span>File Grievance Ticket</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsQuickActionOpen(false);
-                      handleOpenAddHoliday();
-                    }}
-                    className="w-full px-4 py-2 text-left text-[12.5px] font-medium text-slate-800 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
-                  >
-                    <Calendar size={14} className="text-indigo-600" />
-                    <span>Add Calendar Holiday</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenAddTeam();
+                    setIsQuickActionOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  <Users size={14} className="text-blue-700" /> New Team / Squad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenAddChain();
+                    setIsQuickActionOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  <ShieldCheck size={14} className="text-emerald-700" /> Approval Workflow
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsGenerateOfferModalOpen(true);
+                    setIsQuickActionOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  <FileCheck2 size={14} className="text-teal-700" /> Generate Offer Letter
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsTerminationModalOpen(true);
+                    setIsQuickActionOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  <UserX size={14} className="text-red-700" /> Record Termination
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResignationModalOpen(true);
+                    setIsQuickActionOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  <UserMinus size={14} className="text-amber-700" /> Log Resignation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsComplaintModalOpen(true);
+                    setIsQuickActionOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  <MessageSquareWarning size={14} className="text-purple-700" /> Register Grievance
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleOpenAddHoliday();
+                    setIsQuickActionOpen(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-[13px] hover:bg-slate-50 text-slate-700 flex items-center gap-2 cursor-pointer"
+                >
+                  <Calendar size={14} className="text-indigo-700" /> Add Holiday
+                </button>
               </div>
             )}
           </div>
@@ -911,8 +959,31 @@ export default function HRAdminPage({ defaultTab }) {
               onClick={handleOpenAddTeam}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
-              <Plus size={16} /> Add Team
+              <Plus size={16} /> Create Team
             </button>
+          )}
+          {activeTab === "working-days" && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  resetDepartmentWorkingDays();
+                  showToast("Reset all departments to standard 24 working days");
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium hover:bg-slate-50 transition shadow-xs cursor-pointer"
+              >
+                <RotateCcw size={14} /> Reset (24 Days)
+              </button>
+              <Link
+                to="/hrms/payroll"
+                style={{ color: '#ffffff', backgroundColor: '#1F2E4A' }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-navy text-white !text-white rounded-xl text-[13px] font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              >
+                <Receipt size={15} className="text-white" style={{ color: '#ffffff' }} />
+                <span className="text-white font-semibold" style={{ color: '#ffffff' }}>View Live Payroll</span>
+                <ArrowRight size={14} className="text-white" style={{ color: '#ffffff' }} />
+              </Link>
+            </div>
           )}
           {activeTab === "approvals" && (
             <button
@@ -980,9 +1051,9 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       </div>
 
-      {/* ── TOP BUTTONS: Interactive 8 KPI Buttons ── */}
+      {/* ── TOP BUTTONS: Interactive 9 KPI Buttons ── */}
       {/* Clicking any button immediately switches the view */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-9 gap-3">
         {TOP_KPI_BUTTONS.map((btn) => {
           const isActive = activeTab === btn.id;
           const Icon = btn.icon;
@@ -2062,6 +2133,29 @@ export default function HRAdminPage({ defaultTab }) {
             </label>
           </div>
 
+          {/* Department Working Days Policy Preview Card */}
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold">
+                <CalendarCheck size={20} />
+              </div>
+              <div>
+                <h4 className="font-bold text-[14px] text-slate-900">Department Working Days Policy</h4>
+                <p className="text-[12px] text-muted">
+                  Configured across {ALL_DEPARTMENTS_CONFIG.length} operational departments. Controls salary per-day rates and absent day deductions in Payroll.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("working-days")}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-slate-300 text-slate-800 rounded-xl text-[12.5px] font-medium hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+            >
+              <span>Configure Schedule</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+
           <div className="flex justify-end gap-3 pt-3">
             <button
               type="submit"
@@ -2071,6 +2165,337 @@ export default function HRAdminPage({ defaultTab }) {
             </button>
           </div>
         </form>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 9: DEPARTMENT WORKING DAYS GOVERNANCE
+         ════════════════════════════════════════════════════════════════ */}
+      {activeTab === "working-days" && (
+        <div className="flex flex-col gap-4">
+          {/* Dedicated View Header */}
+          <div className="bg-white border border-bdr rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold">
+                <CalendarCheck size={20} />
+              </div>
+              <div>
+                <h2 className="text-[15px] font-bold text-slate-900">Department Working Schedule &amp; Hours Governance</h2>
+                <p className="text-[12px] text-muted">
+                  Configure monthly working days and daily operational working hours per department. All changes sync dynamically with Employee-wise Payroll calculations.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  resetDepartmentWorkingDays();
+                  showToast("Reset all departments to standard 24 working days and 8 hours/day");
+                }}
+                className="px-3.5 py-2 bg-white border border-slate-300 text-slate-700 rounded-xl text-[12.5px] font-medium hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+              >
+                Reset Defaults (24d • 8h)
+              </button>
+              <Link
+                to="/hrms/payroll"
+                style={{ color: '#ffffff', backgroundColor: '#1F2E4A' }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy text-white !text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              >
+                <Receipt size={14} className="text-white" style={{ color: '#ffffff' }} />
+                <span className="text-white font-semibold" style={{ color: '#ffffff' }}>Open Payroll Management</span>
+                <ArrowRight size={13} className="text-white" style={{ color: '#ffffff' }} />
+              </Link>
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar (4 Metrics) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-muted">Configured Departments</div>
+                <div className="text-[20px] font-bold text-slate-900 mt-0.5">{ALL_DEPARTMENTS_CONFIG.length} Departments</div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200">
+                <Building2 size={18} />
+              </div>
+            </div>
+
+            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-muted">Standard Working Days</div>
+                <div className="text-[20px] font-bold text-slate-900 mt-0.5">24 Days / Month</div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-700 flex items-center justify-center border border-purple-200">
+                <Calendar size={18} />
+              </div>
+            </div>
+
+            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-muted">Standard Daily Hours</div>
+                <div className="text-[20px] font-bold text-slate-900 mt-0.5">8.0 Hours / Day</div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200">
+                <Clock size={18} />
+              </div>
+            </div>
+
+            <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
+              <div>
+                <div className="text-[11.5px] font-medium text-muted">Payroll Attendance Sync</div>
+                <div className="text-[13px] font-bold text-emerald-700 flex items-center gap-1.5 mt-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                  Live Reactive Calculations
+                </div>
+              </div>
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-200">
+                <CheckCircle2 size={18} />
+              </div>
+            </div>
+          </div>
+
+          {/* Department Working Days & Hours Table */}
+          <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
+            <div className="p-4 border-b border-bdr/60 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-[14px] text-slate-900">Monthly Working Days &amp; Daily Hours by Department</h3>
+                <p className="text-[12px] text-muted">
+                  Use dropdowns to customize days and daily hours. Pure dropdown selectors without up/down arrows — synced to payroll calculations.
+                </p>
+              </div>
+              <span className="text-[12px] font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 flex items-center gap-1.5">
+                <Check size={12} />
+                Auto-Saved to Local Storage
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead className="bg-slate-50/75 border-b border-bdr/60 text-slate-600 font-semibold text-[12px]">
+                  <tr>
+                    <th className="py-3 px-4 text-left">Department</th>
+                    <th className="py-3 px-4 text-left">Department Head</th>
+                    <th className="py-3 px-4 text-center">Payroll Staff</th>
+                    <th className="py-3 px-4 text-left">Working Days (Dropdown)</th>
+                    <th className="py-3 px-4 text-left">Daily Working Hours (Dropdown)</th>
+                    <th className="py-3 px-4 text-right">Payroll Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-bdr/60">
+                  {ALL_DEPARTMENTS_CONFIG.map((dept) => {
+                    const currentDays = getDepartmentDays(departmentWorkingDays, dept.name);
+                    const currentHours = getDepartmentHours(departmentWorkingHours, dept.name);
+                    const staffCount = payrollEmployees.filter(
+                      (e) =>
+                        e.department?.toLowerCase() === dept.name.toLowerCase() ||
+                        (dept.name === "Human Resources" && e.department?.toLowerCase() === "hr") ||
+                        (dept.name === "Sales & CRM" && e.department?.toLowerCase().includes("sales")) ||
+                        (dept.name === "Warehouse & Inventory" && e.department?.toLowerCase().includes("warehouse"))
+                    ).length;
+
+                    return (
+                      <tr key={dept.name} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3.5 px-4 font-semibold text-slate-900">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-[12px] border border-blue-100">
+                              <Building2 size={15} />
+                            </div>
+                            <div>
+                              <div>{dept.name}</div>
+                              <div className="text-[11px] text-muted font-normal">{dept.code}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-700">
+                          <div className="font-medium">{dept.head}</div>
+                          <div className="text-[11px] text-muted">{dept.role}</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg font-semibold text-[11.5px] border border-slate-200">
+                            {staffCount} Staff
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {/* Pure Dropdown with NO up/down arrows */}
+                          <div className="inline-flex items-center gap-2 bg-slate-50 border border-bdr rounded-xl px-2.5 py-1 shadow-2xs">
+                            <Calendar size={14} className="text-navy" />
+                            <select
+                              value={currentDays}
+                              onChange={(e) => {
+                                const days = Number(e.target.value);
+                                setDepartmentWorkingDays(dept.name, days);
+                                showToast(`Updated ${dept.name} to ${days} working days. Payroll synced.`);
+                              }}
+                              className="font-bold text-slate-900 bg-transparent outline-none cursor-pointer text-[13px] py-1"
+                            >
+                              <option value={20}>20 Days</option>
+                              <option value={21}>21 Days</option>
+                              <option value={22}>22 Days</option>
+                              <option value={23}>23 Days</option>
+                              <option value={24}>24 Days (Standard)</option>
+                              <option value={25}>25 Days</option>
+                              <option value={26}>26 Days</option>
+                              <option value={27}>27 Days</option>
+                              <option value={28}>28 Days</option>
+                              <option value={30}>30 Days</option>
+                              <option value={31}>31 Days</option>
+                            </select>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {/* Pure Dropdown for Daily Hours */}
+                          <div className="inline-flex items-center gap-2 bg-slate-50 border border-bdr rounded-xl px-2.5 py-1 shadow-2xs">
+                            <Clock size={14} className="text-emerald-700" />
+                            <select
+                              value={currentHours}
+                              onChange={(e) => {
+                                const hrs = Number(e.target.value);
+                                setDepartmentWorkingHours(dept.name, hrs);
+                                showToast(`Updated ${dept.name} to ${hrs} hours/day. Synced to Payroll.`);
+                              }}
+                              className="font-bold text-slate-900 bg-transparent outline-none cursor-pointer text-[13px] py-1"
+                            >
+                              <option value={7}>7.0 Hours/day</option>
+                              <option value={7.5}>7.5 Hours/day</option>
+                              <option value={8}>8.0 Hours/day (Standard)</option>
+                              <option value={8.5}>8.5 Hours/day</option>
+                              <option value={9}>9.0 Hours/day</option>
+                              <option value={9.5}>9.5 Hours/day</option>
+                              <option value={10}>10.0 Hours/day</option>
+                            </select>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                            <Check size={12} /> Active in Payroll
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Leave Policy, Carry-Forward & Sandwich-Leave Governance Card */}
+          <div className="bg-white border border-bdr rounded-xl p-5 shadow-xs flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bdr/60 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center font-bold">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-slate-900">Leave Policy, Carry-Forward &amp; Sandwich Rule Governance</h3>
+                  <p className="text-[12px] text-muted">
+                    Configure automated sandwich leave deduction rules and annual leave rollover caps for organizational compliance.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  executeCarryForwardRollover();
+                  showToast(`Executed Year-End Rollover: Rolled over up to ${maxCarryForwardDays || 12} days per employee for the new cycle.`);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-[12.5px] font-semibold transition shadow-xs cursor-pointer"
+              >
+                <Sparkles size={14} />
+                <span>Execute Year-End Rollover</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Sandwich-Leave Rule Card */}
+              <div className="bg-slate-50 border border-bdr rounded-xl p-4 flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-bold text-slate-900 flex items-center gap-1.5">
+                      🥪 Sandwich-Leave Policy Rule
+                    </span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${sandwichRuleEnabled ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-300"}`}>
+                      {sandwichRuleEnabled ? "Active Policy" : "Rule Disabled"}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-muted mt-1 leading-relaxed">
+                    When enabled, intervening weekend days and gazetted holidays falling between leave days (e.g. Friday to Monday) are counted and deducted from employee leave balances.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-bdr/60">
+                  <span className="text-[12px] font-medium text-slate-700">Policy Mode:</span>
+                  <div className="inline-flex items-center gap-2 bg-white border border-bdr rounded-xl px-2.5 py-1 shadow-2xs">
+                    <select
+                      value={sandwichRuleEnabled ? "enabled" : "disabled"}
+                      onChange={(e) => {
+                        const val = e.target.value === "enabled";
+                        toggleSandwichRule(val);
+                        showToast(`Sandwich Rule ${val ? "Enabled" : "Disabled"}. Leave calculations updated.`);
+                      }}
+                      className="font-bold text-slate-900 bg-transparent outline-none cursor-pointer text-[12.5px] py-0.5"
+                    >
+                      <option value="enabled">Enabled (Count Intervening Weekends)</option>
+                      <option value="disabled">Disabled (Exclude Weekends &amp; Holidays)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Carry-Forward Policy Card */}
+              <div className="bg-slate-50 border border-bdr rounded-xl p-4 flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-bold text-slate-900 flex items-center gap-1.5">
+                      🔄 Annual Leave Carry-Forward Threshold
+                    </span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+                      Cap: {maxCarryForwardDays || 12} Days
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-muted mt-1 leading-relaxed">
+                    Maximum unutilized annual leave days permitted to roll over into the subsequent calendar or financial year cycle. Excess unused balances lapse automatically.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-bdr/60">
+                  <span className="text-[12px] font-medium text-slate-700">Max Carry-Forward Cap:</span>
+                  <div className="inline-flex items-center gap-2 bg-white border border-bdr rounded-xl px-2.5 py-1 shadow-2xs">
+                    <select
+                      value={maxCarryForwardDays || 12}
+                      onChange={(e) => {
+                        const days = Number(e.target.value);
+                        setMaxCarryForwardDays(days);
+                        showToast(`Updated Carry-Forward cap to ${days} days.`);
+                      }}
+                      className="font-bold text-slate-900 bg-transparent outline-none cursor-pointer text-[12.5px] py-0.5"
+                    >
+                      <option value={6}>6 Days Maximum</option>
+                      <option value={8}>8 Days Maximum</option>
+                      <option value={10}>10 Days Maximum</option>
+                      <option value={12}>12 Days Maximum (Standard Policy)</option>
+                      <option value={15}>15 Days Maximum</option>
+                      <option value={18}>18 Days Maximum (Full Rollover)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Rollover Summary Pill */}
+            <div className="p-3 bg-purple-50/60 border border-purple-200 rounded-xl text-[12px] text-purple-950 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={15} className="text-purple-700 shrink-0" />
+                <span>
+                  <b>Current Active Rollover Pool:</b>{" "}
+                  {Object.entries(carriedForwardLeaves || {}).map(([emp, d]) => `${emp}: ${d}d`).join(", ") || "Ayesha Khan: 6d, Priya Patel: 8d, Liam Cooper: 4d"}
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
+                Synced with Leave Balance Quotas
+              </span>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Modal: Add / Edit Team ── */}

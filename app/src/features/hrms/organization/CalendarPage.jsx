@@ -1,14 +1,14 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Calendar as CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
   Plus,
   Search,
   Download,
   Filter,
   RotateCcw,
   Sparkles,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useCalendarStore } from "../../../stores/calendarStore";
@@ -51,6 +51,18 @@ export function CalendarPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [modalDefaultDate, setModalDefaultDate] = useState("");
+  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false);
+  const deptRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (deptRef.current && !deptRef.current.contains(e.target)) {
+        setDeptDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Navigation handlers
   const handlePrev = () => {
@@ -253,12 +265,12 @@ export function CalendarPage() {
 
       {/* Filter & Search Bar */}
       <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3.5">
-        {/* Category Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 scrollbar-none">
+        {/* Category Chips with Scrollbar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0 pb-2 custom-scrollbar">
           <button
             type="button"
             onClick={() => setCategoryFilter("All")}
-            className={`px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition cursor-pointer ${
+            className={`shrink-0 px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition cursor-pointer ${
               categoryFilter === "All"
                 ? "bg-navy text-white shadow-2xs"
                 : "bg-off text-slate-600 hover:bg-slate-200/70 border border-bdr/60"
@@ -277,7 +289,7 @@ export function CalendarPage() {
                 key={key}
                 type="button"
                 onClick={() => setCategoryFilter(isSelected ? "All" : key)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition cursor-pointer border ${
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition cursor-pointer border ${
                   isSelected
                     ? `${cat.badgeClass} ring-1 ring-offset-1`
                     : "bg-white border-bdr/60 text-slate-600 hover:bg-off"
@@ -293,20 +305,59 @@ export function CalendarPage() {
 
         {/* Right Search & Department dropdown */}
         <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-          {/* Department Select */}
-          <div className="relative">
-            <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="h-9 px-3 pr-7 bg-off border border-bdr rounded-xl text-[12px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer font-medium"
+          {/* Department Select Dropdown with Scrollbar */}
+          <div className="relative shrink-0" ref={deptRef}>
+            <button
+              type="button"
+              onClick={() => setDeptDropdownOpen(!deptDropdownOpen)}
+              className="h-9 px-3 pr-2.5 bg-off border border-bdr rounded-xl text-[12px] text-slate-700 hover:bg-slate-200/60 focus:outline-none focus:border-navy cursor-pointer font-medium inline-flex items-center gap-2 transition"
             >
-              <option value="All">All Departments</option>
-              {DEPARTMENTS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
+              <span className="truncate max-w-[130px]">{deptFilter === "All" ? "All Departments" : deptFilter}</span>
+              <ChevronDown size={14} className={`text-slate-400 transition-transform ${deptDropdownOpen ? "rotate-180" : ""}`} />
+            </button>
+
+            {deptDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-bdr rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="max-h-48 overflow-y-auto p-1 space-y-0.5 custom-scrollbar">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeptFilter("All");
+                      setDeptDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] rounded-lg transition-colors cursor-pointer ${
+                      deptFilter === "All"
+                        ? "bg-navy/10 text-navy font-semibold"
+                        : "text-slate-700 hover:bg-off"
+                    }`}
+                  >
+                    <span>All Departments</span>
+                    {deptFilter === "All" && <Check size={13} className="text-navy shrink-0" />}
+                  </button>
+                  {DEPARTMENTS.map((d) => {
+                    const isSelected = deptFilter === d;
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => {
+                          setDeptFilter(d);
+                          setDeptDropdownOpen(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] rounded-lg transition-colors cursor-pointer ${
+                          isSelected
+                            ? "bg-navy/10 text-navy font-semibold"
+                            : "text-slate-700 hover:bg-off"
+                        }`}
+                      >
+                        <span className="truncate">{d}</span>
+                        {isSelected && <Check size={13} className="text-navy shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Search Input */}
@@ -379,30 +430,15 @@ export function CalendarPage() {
                 </span>
               </div>
 
-              {/* Prev / Today / Next */}
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={handlePrev}
-                  className="w-8 h-8 rounded-lg border border-bdr hover:bg-off grid place-items-center text-slate-600 transition cursor-pointer"
-                  title="Previous"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+              {/* Today Button */}
+              <div>
                 <button
                   type="button"
                   onClick={handleToday}
-                  className="px-3 py-1 rounded-lg border border-bdr text-[12px] font-medium hover:bg-off text-slate-700 transition cursor-pointer"
+                  className="h-8 px-3.5 rounded-lg border border-bdr text-[12px] font-medium hover:bg-off text-slate-700 transition cursor-pointer shadow-2xs"
+                  title="Visit Today"
                 >
                   Today
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNext}
-                  className="w-8 h-8 rounded-lg border border-bdr hover:bg-off grid place-items-center text-slate-600 transition cursor-pointer"
-                  title="Next"
-                >
-                  <ChevronRight size={16} />
                 </button>
               </div>
             </div>
