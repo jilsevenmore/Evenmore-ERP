@@ -77,16 +77,16 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
       {/* Interactive Page Terminology & Guide Modal */}
       {isGuideOpen && guide && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-2xl text-xs max-h-[85vh] flex flex-col overflow-hidden">
+          <div className="bg-card rounded-2xl border border-border max-w-2xl w-full p-6 shadow-2xl text-xs max-h-[85vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold">
                   <BookOpen size={16} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base text-slate-800">{guide.title} — Guide & Terms</h3>
-                  <p className="text-[11px] text-slate-500">{guide.subtitle}</p>
+                  <h3 className="font-bold text-base text-text">{guide.title} — Guide & Terms</h3>
+                  <p className="text-[11px] text-muted">{guide.subtitle}</p>
                 </div>
               </div>
               <button
@@ -100,23 +100,23 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
             {/* Modal Body */}
             <div className="space-y-5 mt-4 overflow-y-auto pr-1 flex-1">
               {guide.purpose && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider flex items-center gap-1">
-                    <HelpCircle size={12} className="text-blue-600" /> What is this page for?
+                <div className="bg-soft border border-border rounded-xl p-3.5 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-muted tracking-wider flex items-center gap-1">
+                    <HelpCircle size={12} className="text-primary" /> What is this page for?
                   </span>
-                  <p className="text-slate-700 leading-relaxed text-xs">{guide.purpose}</p>
+                  <p className="text-text leading-relaxed text-xs">{guide.purpose}</p>
                 </div>
               )}
 
               {guide.workflow && guide.workflow.length > 0 && (
                 <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  <span className="text-[10px] uppercase font-bold text-muted tracking-wider">
                     Operational Workflow
                   </span>
                   <div className="flex items-center gap-2 overflow-x-auto py-1">
                     {guide.workflow.map((step, idx) => (
                       <React.Fragment key={idx}>
-                        <div className="bg-white border border-slate-200 px-3 py-1.5 rounded-lg font-semibold text-slate-700 text-[11px] shrink-0 flex items-center gap-1.5 shadow-2xs">
+                        <div className="bg-card border border-border px-3 py-1.5 rounded-lg font-semibold text-text text-[11px] shrink-0 flex items-center gap-1.5 shadow-2xs">
                           <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] flex items-center justify-center font-mono">
                             {idx + 1}
                           </span>
@@ -133,14 +133,14 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
 
               {guide.keyTerms && guide.keyTerms.length > 0 && (
                 <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                  <span className="text-[10px] uppercase font-bold text-muted tracking-wider">
                     Key Definitions
                   </span>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                     {guide.keyTerms.map((t, idx) => (
-                      <div key={idx} className="bg-slate-50/60 p-3 rounded-xl border border-slate-200/80">
-                        <span className="font-bold text-slate-800 text-[11px] block">{t.term}</span>
-                        <p className="text-slate-600 text-[11px] mt-0.5 leading-normal">{t.definition}</p>
+                      <div key={idx} className="bg-soft/60 p-3 rounded-xl border border-border/80">
+                        <span className="font-bold text-text text-[11px] block">{t.term}</span>
+                        <p className="text-muted text-[11px] mt-0.5 leading-normal">{t.definition}</p>
                       </div>
                     ))}
                   </div>
@@ -149,7 +149,7 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
             </div>
 
             {/* Modal Footer */}
-            <div className="pt-3 border-t border-slate-200 flex justify-end">
+            <div className="pt-3 border-t border-border flex justify-end">
               <button
                 type="button"
                 onClick={() => setIsGuideOpen(false)}

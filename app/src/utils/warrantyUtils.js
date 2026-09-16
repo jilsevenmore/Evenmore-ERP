@@ -110,6 +110,9 @@ export function calculateWarrantyCoverageStatus(startDateInput, expiryDateInput,
     if (documentStatus === 'Cancelled') {
         return 'Cancelled';
     }
+    if (documentStatus === 'Suspended') {
+        return 'Suspended';
+    }
     
     if (!startDateInput || !expiryDateInput) {
         return 'Pending Activation';
@@ -151,6 +154,12 @@ export function getWarrantyStatusStyle(status) {
                 bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/30',
                 dot: 'bg-emerald-500',
                 label: 'Active Coverage',
+            };
+        case 'Suspended':
+            return {
+                bg: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30',
+                dot: 'bg-purple-500',
+                label: 'Suspended / On Hold',
             };
         case 'Expiring Soon':
             return {
