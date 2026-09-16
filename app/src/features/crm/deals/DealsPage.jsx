@@ -1,4 +1,5 @@
 import CrmKpiCard from '../common/CrmKpiCard';
+import Modal from '../../../components/ui/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -609,6 +610,7 @@ export default function DealsPage() {
   const [formError, setFormError] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showLearnMoreBanner, setShowLearnMoreBanner] = useState(true);
+  const [isLearnMoreOpen, setIsLearnMoreOpen] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -964,6 +966,8 @@ export default function DealsPage() {
                 </p>
                 <button
                   type="button"
+                  onClick={() => setIsLearnMoreOpen(true)}
+                  aria-haspopup="dialog"
                   className="mt-3 text-[14px] font-medium text-[#2457ff] transition hover:text-[#1d4ed8]"
                 >
                   Learn More -&gt;
@@ -1464,6 +1468,35 @@ export default function DealsPage() {
           </div>
         </div>
       )}
+
+      <Modal
+        isOpen={isLearnMoreOpen}
+        onClose={() => setIsLearnMoreOpen(false)}
+        title="Lead Stages vs Deal Stages"
+        size="lg"
+        footer={
+          <button type="button" onClick={() => setIsLearnMoreOpen(false)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+            Got it
+          </button>
+        }
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-slate-600">Use lead stages to track a potential customer's interest and deal stages to track a specific sales opportunity through to its outcome.</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+              <h3 className="text-sm font-bold text-slate-900">Lead Stages</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">Track enquiries, collect requirements and follow up with potential customers as you assess their needs.</p>
+              <p className="mt-3 text-xs font-semibold text-blue-700">Example: New Lead → Details Collected → Demo Done</p>
+            </div>
+            <div className="rounded-2xl border border-purple-100 bg-purple-50 p-4">
+              <h3 className="text-sm font-bold text-slate-900">Deal Stages</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">Track a sales opportunity, its value and progress. Update its stage as the proposal moves forward, then record whether it was won or lost.</p>
+              <p className="mt-3 text-xs font-semibold text-purple-700">Stages: Draft, Sent, Open, Won and Lost</p>
+            </div>
+          </div>
+          <p className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-relaxed text-slate-600">For example, a customer asking about a product starts as a lead. A proposal for that product is a deal whose value and outcome you can track here.</p>
+        </div>
+      </Modal>
 
       {isCreateModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">

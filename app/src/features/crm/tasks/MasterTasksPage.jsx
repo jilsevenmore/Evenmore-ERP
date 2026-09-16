@@ -11,7 +11,6 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
-  Lightbulb,
   Phone,
   Monitor,
   Clock,
@@ -24,9 +23,9 @@ import {
 } from 'lucide-react';
 
 import MasterTasksGuideModal from './MasterTasksGuideModal';
+import InfoBanner from '../common/InfoBanner';
 
 const STORAGE_KEY = 'leadMasterTasksV1';
-const BANNER_KEY = 'leadMasterTasksBannerV1';
 
 const ROLES = ['Tele Caller Executive', 'Sales Support Executive', 'BDE', 'Area Sales Manager'];
 const DEPARTMENTS = ['Sales', 'Support', 'Marketing'];
@@ -87,13 +86,6 @@ function loadTasks() {
   return seedTasks();
 }
 
-function loadBanner() {
-  try {
-    return localStorage.getItem(BANNER_KEY) !== '0';
-  } catch { }
-  return true;
-}
-
 const EMPTY_FORM = {
   name: '',
   icon: 'call',
@@ -108,7 +100,6 @@ const EMPTY_FORM = {
 export default function MasterTasksPage() {
   const navigate = useNavigate();
   const [tasks, setTasks] = useState(loadTasks);
-  const [bannerVisible, setBannerVisible] = useState(loadBanner);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [deptFilter, setDeptFilter] = useState('All');
@@ -136,13 +127,6 @@ export default function MasterTasksPage() {
   useEffect(() => {
     setPage(1);
   }, [search, roleFilter, deptFilter, statusFilter, perPage]);
-
-  function dismissBanner() {
-    setBannerVisible(false);
-    try {
-      localStorage.setItem(BANNER_KEY, '0');
-    } catch { }
-  }
 
   function resetFilters() {
     setSearch('');
@@ -318,22 +302,11 @@ export default function MasterTasksPage() {
         </div>
       </div>
 
-      {bannerVisible && (
-        <div className="flex items-start gap-3 bg-blue-50/70 border border-blue-100 rounded-xl px-4 py-3 mb-4">
-          <span className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 grid place-items-center shrink-0">
-            <Lightbulb size={15} />
-          </span>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-slate-900">Why use Master Lead Tasks?</p>
-            <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-              These are reusable tasks that can be assigned to one or more lead stages. You create a task here once, and then you can use it in any stage (e.g. New Lead, Demo, Negotiation etc.)
-            </p>
-          </div>
-          <button type="button" onClick={dismissBanner} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Dismiss">
-            <X size={15} />
-          </button>
-        </div>
-      )}
+      <InfoBanner
+        storageKey="leadMasterTasksBannerV2"
+        title="Why use Master Lead Tasks?"
+        text="Create reusable tasks such as calls, demos and quotations once, then link them to the relevant lead stages. Set the responsible role, department, priority and due days so your team follows a consistent process for every lead."
+      />
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center gap-2.5 p-3.5 border-b border-slate-100">

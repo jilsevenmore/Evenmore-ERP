@@ -474,6 +474,12 @@ export default function LeadsPage() {
         }
       />
 
+      <InfoBanner
+        storageKey="infoBannerLeadsV1"
+        title="Why use Leads?"
+        text="These are potential customers tracked across stages. You capture a lead once, then calls, tasks, quotations and deals stay linked to it."
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-4">
         <CrmKpiCard label="Total Active Leads" value={leadRows.length} icon={Users} tone="blue">
             <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
@@ -510,12 +516,6 @@ export default function LeadsPage() {
           </div>
         </CrmKpiCard>
       </div>
-
-      <InfoBanner
-        storageKey="infoBannerLeadsV1"
-        title="Why use Leads?"
-        text="These are potential customers tracked across stages. You capture a lead once, then calls, tasks, quotations and deals stay linked to it."
-      />
 
       <LeadsTabs
         activeTab={activeTab}

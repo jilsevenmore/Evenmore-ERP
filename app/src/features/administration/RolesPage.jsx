@@ -1,3 +1,5 @@
+import InfoBanner from '../../components/ui/InfoBanner';
+import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
@@ -813,6 +815,8 @@ export function RolesPage() {
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2.5">
+          <AdministrationGuideButton entity="role" />
         <button
           onClick={() => setIsCreateModalOpen(true)}
           className="inline-flex items-center justify-center gap-2 bg-[#1f6bff] hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all duration-150 active:scale-95"
@@ -820,7 +824,14 @@ export function RolesPage() {
           <Plus size={18} strokeWidth={2.4} />
           <span>Create New Role</span>
         </button>
+        </div>
       </div>
+
+      <InfoBanner
+        storageKey="adminRolesInfoBannerV1"
+        title="Why use Roles & Permissions?"
+        text="Group permissions into roles to control which modules and actions users can access. Select a role to review its permissions and keep access consistent for people with similar responsibilities."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Total Roles" value={stats.totalRoles} icon={Users} tone="blue">

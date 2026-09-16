@@ -1,3 +1,5 @@
+import InfoBanner from '../../components/ui/InfoBanner';
+import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
@@ -873,6 +875,8 @@ export function UsersPage() {
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2.5">
+          <AdministrationGuideButton entity="user" />
         <button
           onClick={openCreateModal}
           className="inline-flex items-center justify-center gap-2 bg-[#1f6bff] hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all duration-150 active:scale-95"
@@ -880,9 +884,16 @@ export function UsersPage() {
           <Plus size={18} strokeWidth={2.4} />
           <span>Create User</span>
         </button>
+        </div>
       </div>
 
       {/* ── Top Metric / Stat Cards (4 Cards) ──────────────────── */}
+      <InfoBanner
+        storageKey="adminUsersInfoBannerV1"
+        title="Why use User Management?"
+        text="Create user accounts, assign roles and manage active or inactive status. Keep team details up to date so each person has the right access for their responsibilities."
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Total Users" value={stats.total} icon={Users} tone="blue" />
         <KpiCard label="Active Users" value={stats.active} icon={UserCheck} tone="emerald" />

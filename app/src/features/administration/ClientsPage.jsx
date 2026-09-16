@@ -1,3 +1,5 @@
+import InfoBanner from '../../components/ui/InfoBanner';
+import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
@@ -662,7 +664,8 @@ export function ClientsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <AdministrationGuideButton entity="client" />
           <div className="relative export-menu-container">
             <button
               onClick={() => setIsExportOpen(!isExportOpen)}
@@ -705,6 +708,12 @@ export function ClientsPage() {
           </button>
         </div>
       </div>
+
+      <InfoBanner
+        storageKey="adminClientsInfoBannerV1"
+        title="Why use Client Management?"
+        text="Keep client contact details and business information in one place. Review related deals and projects, update client records and use filters to find the customers you need."
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         <KpiCard label="Total Clients" value={stats.total} icon={Users} tone="blue">
