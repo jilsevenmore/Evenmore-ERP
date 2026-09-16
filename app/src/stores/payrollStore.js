@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-const STORAGE_KEY = "hrms_payroll_store_v3";
+const STORAGE_KEY = "hrms_payroll_store_v4";
 
 export const WORKFLOW_STAGES = [
   { id: "In Progress", label: "In Progress" },
@@ -18,7 +18,7 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     department: "Operations",
     avatar: "https://i.pravatar.cc/100?img=33",
     standardSalary: 40000,
-    earnedSalary: 32500,
+    earnedSalary: 33333,
     additionalEarnings: 1000,
     deductions: 2500,
     advance: 5000,
@@ -26,12 +26,12 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     hra: 6000,
     allowances: 2500,
     status: "Paid",
-    paidAmount: 26000,
+    paidAmount: 26833,
     paymentDate: "Oct 31, 2024",
     month: "October 2024",
     bank: "ICICI Bank (•••• 4829)",
-    attendedDays: 25,
-    totalDays: 30,
+    attendedDays: 20,
+    totalDays: 24,
   },
   {
     id: "PAY-102",
@@ -53,8 +53,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: null,
     month: "October 2024",
     bank: "HDFC Bank (•••• 3921)",
-    attendedDays: 30,
-    totalDays: 30,
+    attendedDays: 24,
+    totalDays: 24,
   },
   {
     id: "PAY-103",
@@ -64,7 +64,7 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     department: "Design",
     avatar: "https://i.pravatar.cc/100?img=16",
     standardSalary: 55000,
-    earnedSalary: 51333,
+    earnedSalary: 50417,
     additionalEarnings: 1500,
     deductions: 3800,
     advance: 0,
@@ -72,12 +72,12 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     hra: 12000,
     allowances: 10000,
     status: "Paid",
-    paidAmount: 49033,
+    paidAmount: 48117,
     paymentDate: "Oct 31, 2024",
     month: "October 2024",
     bank: "Barclays Bank (•••• 7812)",
-    attendedDays: 28,
-    totalDays: 30,
+    attendedDays: 22,
+    totalDays: 24,
   },
   {
     id: "PAY-104",
@@ -87,7 +87,7 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     department: "Engineering",
     avatar: "https://i.pravatar.cc/100?img=20",
     standardSalary: 48000,
-    earnedSalary: 41600,
+    earnedSalary: 42000,
     additionalEarnings: 3000,
     deductions: 3200,
     advance: 4000,
@@ -99,8 +99,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: null,
     month: "October 2024",
     bank: "Chase Bank (•••• 4120)",
-    attendedDays: 26,
-    totalDays: 30,
+    attendedDays: 21,
+    totalDays: 24,
   },
   {
     id: "PAY-105",
@@ -122,8 +122,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: null,
     month: "October 2024",
     bank: "Emirates NBD (•••• 9901)",
-    attendedDays: 30,
-    totalDays: 30,
+    attendedDays: 24,
+    totalDays: 24,
   },
   {
     id: "PAY-106",
@@ -133,7 +133,7 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     department: "Finance",
     avatar: "https://i.pravatar.cc/100?img=12",
     standardSalary: 72000,
-    earnedSalary: 72000,
+    earnedSalary: 69000,
     additionalEarnings: 2000,
     deductions: 5500,
     advance: 0,
@@ -145,8 +145,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: null,
     month: "October 2024",
     bank: "Citibank (•••• 6044)",
-    attendedDays: 30,
-    totalDays: 30,
+    attendedDays: 23,
+    totalDays: 24,
   },
   {
     id: "PAY-107",
@@ -168,8 +168,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: "Oct 31, 2024",
     month: "October 2024",
     bank: "Standard Chartered (•••• 3319)",
-    attendedDays: 30,
-    totalDays: 30,
+    attendedDays: 24,
+    totalDays: 24,
   },
   {
     id: "PAY-108",
@@ -191,8 +191,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: null,
     month: "October 2024",
     bank: "HSBC Bank (•••• 8820)",
-    attendedDays: 30,
-    totalDays: 30,
+    attendedDays: 24,
+    totalDays: 24,
   },
   {
     id: "PAY-109",
@@ -214,8 +214,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: "Oct 31, 2024",
     month: "October 2024",
     bank: "J.P. Morgan (•••• 1002)",
-    attendedDays: 30,
-    totalDays: 30,
+    attendedDays: 24,
+    totalDays: 24,
   },
   {
     id: "PAY-110",
@@ -225,7 +225,7 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     department: "Engineering",
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150",
     standardSalary: 60000,
-    earnedSalary: 56000,
+    earnedSalary: 55000,
     additionalEarnings: 2000,
     deductions: 4200,
     advance: 5000,
@@ -237,8 +237,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: null,
     month: "October 2024",
     bank: "State Bank of India (•••• 5521)",
-    attendedDays: 28,
-    totalDays: 30,
+    attendedDays: 22,
+    totalDays: 24,
   },
   {
     id: "PAY-111",
@@ -260,8 +260,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: "Oct 31, 2024",
     month: "October 2024",
     bank: "Axis Bank (•••• 2209)",
-    attendedDays: 30,
-    totalDays: 30,
+    attendedDays: 24,
+    totalDays: 24,
   },
   {
     id: "PAY-112",
@@ -271,7 +271,7 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     department: "Engineering",
     avatar: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150",
     standardSalary: 52000,
-    earnedSalary: 48533,
+    earnedSalary: 45500,
     additionalEarnings: 1800,
     deductions: 3600,
     advance: 3500,
@@ -283,8 +283,8 @@ export const INITIAL_EMPLOYEE_PAYROLLS = [
     paymentDate: null,
     month: "October 2024",
     bank: "Wells Fargo (•••• 6710)",
-    attendedDays: 28,
-    totalDays: 30,
+    attendedDays: 21,
+    totalDays: 24,
   },
 ];
 
@@ -301,20 +301,28 @@ export const OWN_SALARY_HISTORY = [
   {
     month: "October 2024",
     standardSalary: 40000,
-    earnedSalary: 32500,
+    totalDays: 24,
+    attendedDays: 20,
+    absentDays: 4,
+    attendanceDeduction: 6667,
+    earnedSalary: 33333,
     additionalEarnings: 1000,
     deductions: 2500,
     advance: 5000,
-    remainingPayable: 26000,
-    netPay: "₹26,000",
+    remainingPayable: 26833,
+    netPay: "₹26,833",
     status: "Paid",
-    paidAmount: "₹26,000",
+    paidAmount: "₹26,833",
     payDate: "Oct 31, 2024",
     slipNo: "SLIP-2024-10",
   },
   {
     month: "September 2024",
     standardSalary: 40000,
+    totalDays: 24,
+    attendedDays: 24,
+    absentDays: 0,
+    attendanceDeduction: 0,
     earnedSalary: 40000,
     additionalEarnings: 1500,
     deductions: 2500,
@@ -329,20 +337,28 @@ export const OWN_SALARY_HISTORY = [
   {
     month: "August 2024",
     standardSalary: 40000,
-    earnedSalary: 37333,
+    totalDays: 24,
+    attendedDays: 22,
+    absentDays: 2,
+    attendanceDeduction: 3333,
+    earnedSalary: 36667,
     additionalEarnings: 800,
     deductions: 2400,
     advance: 3000,
-    remainingPayable: 32733,
-    netPay: "₹32,733",
+    remainingPayable: 32067,
+    netPay: "₹32,067",
     status: "Paid",
-    paidAmount: "₹32,733",
+    paidAmount: "₹32,067",
     payDate: "Aug 31, 2024",
     slipNo: "SLIP-2024-08",
   },
   {
     month: "July 2024",
     standardSalary: 38000,
+    totalDays: 24,
+    attendedDays: 24,
+    absentDays: 0,
+    attendanceDeduction: 0,
     earnedSalary: 38000,
     additionalEarnings: 1200,
     deductions: 2200,
@@ -357,6 +373,10 @@ export const OWN_SALARY_HISTORY = [
   {
     month: "June 2024",
     standardSalary: 38000,
+    totalDays: 24,
+    attendedDays: 24,
+    absentDays: 0,
+    attendanceDeduction: 0,
     earnedSalary: 38000,
     additionalEarnings: 0,
     deductions: 2200,
@@ -371,18 +391,90 @@ export const OWN_SALARY_HISTORY = [
   {
     month: "May 2024",
     standardSalary: 38000,
-    earnedSalary: 35467,
+    totalDays: 24,
+    attendedDays: 22,
+    absentDays: 2,
+    attendanceDeduction: 3167,
+    earnedSalary: 34833,
     additionalEarnings: 500,
     deductions: 2100,
     advance: 0,
-    remainingPayable: 33867,
-    netPay: "₹33,867",
+    remainingPayable: 33233,
+    netPay: "₹33,233",
     status: "Paid",
-    paidAmount: "₹33,867",
+    paidAmount: "₹33,233",
     payDate: "May 31, 2024",
     slipNo: "SLIP-2024-05",
   },
 ];
+
+export const DEFAULT_DEPARTMENT_WORKING_DAYS = {
+  "Engineering": 24,
+  "Operations": 24,
+  "Design": 24,
+  "Marketing": 24,
+  "Finance": 22,
+  "Human Resources": 24,
+  "Sales & CRM": 26,
+  "Warehouse & Inventory": 26,
+  "Executive": 22,
+};
+
+export const DEFAULT_DEPARTMENT_WORKING_HOURS = {
+  "Engineering": 8,
+  "Operations": 9,
+  "Design": 8,
+  "Marketing": 8,
+  "Finance": 8,
+  "Human Resources": 8,
+  "Sales & CRM": 9,
+  "Warehouse & Inventory": 9,
+  "Executive": 8,
+};
+
+export function getDepartmentDays(departmentWorkingDays, deptName) {
+  if (!deptName) return 24;
+  if (departmentWorkingDays && departmentWorkingDays[deptName]) {
+    return departmentWorkingDays[deptName];
+  }
+  const lower = deptName.toLowerCase();
+  const found = Object.keys(departmentWorkingDays || {}).find(
+    (k) => k.toLowerCase() === lower || lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)
+  );
+  if (found && departmentWorkingDays[found]) {
+    return departmentWorkingDays[found];
+  }
+  return 24;
+}
+
+export function getDepartmentHours(departmentWorkingHours, deptName) {
+  if (!deptName) return 8;
+  if (departmentWorkingHours && departmentWorkingHours[deptName]) {
+    return Number(departmentWorkingHours[deptName]);
+  }
+  const lower = deptName.toLowerCase();
+  const found = Object.keys(departmentWorkingHours || {}).find(
+    (k) => k.toLowerCase() === lower || lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)
+  );
+  if (found && departmentWorkingHours[found]) {
+    return Number(departmentWorkingHours[found]);
+  }
+  return 8;
+}
+
+function calcEmployeePayable(e) {
+  const std = Math.max(0, Number(e.standardSalary) || 0);
+  const totalD = Math.max(1, Number(e.totalDays) || 24);
+  const attended = e.attendedDays !== undefined ? Math.max(0, Number(e.attendedDays)) : totalD;
+  const absent = Math.max(0, totalD - attended);
+  const perDay = totalD > 0 ? std / totalD : 0;
+  const attDeduction = Math.round(perDay * absent);
+  const earned = Math.max(0, std - attDeduction);
+  const earnings = Math.max(0, Number(e.additionalEarnings) || 0);
+  const deductions = Math.max(0, Number(e.deductions) || 0);
+  const advance = Math.max(0, Number(e.advance) || 0);
+  return Math.max(0, earned + earnings - deductions - advance);
+}
 
 function loadSavedPayroll() {
   try {
@@ -393,7 +485,14 @@ function loadSavedPayroll() {
         // Ensure every employee has standardSalary
         const hasStandard = parsed.employees.every((e) => typeof e.standardSalary === "number");
         if (hasStandard) {
-          return parsed;
+          const deptDays = parsed.departmentWorkingDays || DEFAULT_DEPARTMENT_WORKING_DAYS;
+          const deptHours = parsed.departmentWorkingHours || DEFAULT_DEPARTMENT_WORKING_HOURS;
+          return {
+            ...parsed,
+            defaultWorkingDays: parsed.defaultWorkingDays || 24,
+            departmentWorkingDays: deptDays,
+            departmentWorkingHours: deptHours,
+          };
         }
       }
     }
@@ -403,6 +502,9 @@ function loadSavedPayroll() {
     structures: INITIAL_STRUCTURES,
     workflowStep: "Approved",
     currentPeriod: "October 2024",
+    defaultWorkingDays: 24,
+    departmentWorkingDays: DEFAULT_DEPARTMENT_WORKING_DAYS,
+    departmentWorkingHours: DEFAULT_DEPARTMENT_WORKING_HOURS,
   };
 }
 
@@ -413,6 +515,9 @@ export const usePayrollStore = create((set, get) => ({
   structures: initialLoaded.structures,
   workflowStep: initialLoaded.workflowStep,
   currentPeriod: initialLoaded.currentPeriod,
+  defaultWorkingDays: initialLoaded.defaultWorkingDays || 24,
+  departmentWorkingDays: initialLoaded.departmentWorkingDays || DEFAULT_DEPARTMENT_WORKING_DAYS,
+  departmentWorkingHours: initialLoaded.departmentWorkingHours || DEFAULT_DEPARTMENT_WORKING_HOURS,
 
   setWorkflowStep: (step) => {
     set({ workflowStep: step });
@@ -424,8 +529,153 @@ export const usePayrollStore = create((set, get) => ({
     get().persist();
   },
 
+  setDepartmentWorkingDays: (deptName, days) => {
+    const d = Math.max(1, Math.min(31, Number(days) || 24));
+    const currentMap = get().departmentWorkingDays || DEFAULT_DEPARTMENT_WORKING_DAYS;
+    const nextMap = { ...currentMap, [deptName]: d };
+
+    // Recalculate all employees in this department
+    const nextEmployees = get().employees.map((e) => {
+      const isMatch =
+        e.department?.toLowerCase() === deptName.toLowerCase() ||
+        (deptName === "HR" && e.department?.toLowerCase().includes("human")) ||
+        (deptName === "Human Resources" && e.department?.toLowerCase() === "hr") ||
+        (deptName.includes("Sales") && e.department?.toLowerCase().includes("sales")) ||
+        (deptName.includes("Warehouse") && e.department?.toLowerCase().includes("warehouse"));
+
+      if (isMatch) {
+        const std = Math.max(0, Number(e.standardSalary) || 0);
+        const totalD = d;
+        const h = e.dailyHours || getDepartmentHours(get().departmentWorkingHours, e.department);
+        const totalH = totalD * h;
+        const hourlyRate = totalH > 0 ? Math.round(std / totalH) : 0;
+        const attended = Math.min(totalD, e.attendedDays !== undefined ? Math.max(0, Number(e.attendedDays)) : totalD);
+        const absent = Math.max(0, totalD - attended);
+        const perDay = totalD > 0 ? std / totalD : 0;
+        const attDeduction = Math.round(perDay * absent);
+        const earned = Math.max(0, std - attDeduction);
+        return {
+          ...e,
+          totalDays: totalD,
+          dailyHours: h,
+          totalHours: totalH,
+          hourlyRate: hourlyRate,
+          attendedDays: attended,
+          earnedSalary: earned,
+        };
+      }
+      return e;
+    });
+
+    set({ departmentWorkingDays: nextMap, employees: nextEmployees });
+    get().persist();
+  },
+
+  setDepartmentWorkingHours: (deptName, hours) => {
+    const h = Math.max(1, Math.min(24, Number(hours) || 8));
+    const currentMap = get().departmentWorkingHours || DEFAULT_DEPARTMENT_WORKING_HOURS;
+    const nextMap = { ...currentMap, [deptName]: h };
+
+    // Recalculate all employees in this department
+    const nextEmployees = get().employees.map((e) => {
+      const isMatch =
+        e.department?.toLowerCase() === deptName.toLowerCase() ||
+        (deptName === "HR" && e.department?.toLowerCase().includes("human")) ||
+        (deptName === "Human Resources" && e.department?.toLowerCase() === "hr") ||
+        (deptName.includes("Sales") && e.department?.toLowerCase().includes("sales")) ||
+        (deptName.includes("Warehouse") && e.department?.toLowerCase().includes("warehouse"));
+
+      if (isMatch) {
+        const std = Math.max(0, Number(e.standardSalary) || 0);
+        const totalD = Number(e.totalDays) || 24;
+        const totalH = totalD * h;
+        const hourlyRate = totalH > 0 ? Math.round(std / totalH) : 0;
+        return {
+          ...e,
+          dailyHours: h,
+          totalHours: totalH,
+          hourlyRate: hourlyRate,
+        };
+      }
+      return e;
+    });
+
+    set({ departmentWorkingHours: nextMap, employees: nextEmployees });
+    get().persist();
+  },
+
+  resetDepartmentWorkingDays: () => {
+    const nextDaysMap = { ...DEFAULT_DEPARTMENT_WORKING_DAYS };
+    const nextHoursMap = { ...DEFAULT_DEPARTMENT_WORKING_HOURS };
+    const nextEmployees = get().employees.map((e) => {
+      const d = getDepartmentDays(nextDaysMap, e.department);
+      const h = getDepartmentHours(nextHoursMap, e.department);
+      const std = Math.max(0, Number(e.standardSalary) || 0);
+      const totalH = d * h;
+      const hourlyRate = totalH > 0 ? Math.round(std / totalH) : 0;
+      const attended = Math.min(d, e.attendedDays !== undefined ? Math.max(0, Number(e.attendedDays)) : d);
+      const absent = Math.max(0, d - attended);
+      const perDay = d > 0 ? std / d : 0;
+      const attDeduction = Math.round(perDay * absent);
+      const earned = Math.max(0, std - attDeduction);
+      return {
+        ...e,
+        totalDays: d,
+        dailyHours: h,
+        totalHours: totalH,
+        hourlyRate: hourlyRate,
+        attendedDays: attended,
+        earnedSalary: earned,
+      };
+    });
+    set({
+      departmentWorkingDays: nextDaysMap,
+      departmentWorkingHours: nextHoursMap,
+      employees: nextEmployees,
+    });
+    get().persist();
+  },
+
+  setDefaultWorkingDays: (days) => {
+    const d = Math.max(1, Number(days) || 24);
+    const next = get().employees.map((e) => {
+      const std = Math.max(0, Number(e.standardSalary) || 0);
+      const attended = Math.min(d, e.attendedDays !== undefined ? Math.max(0, Number(e.attendedDays)) : d);
+      const absent = Math.max(0, d - attended);
+      const perDay = d > 0 ? std / d : 0;
+      const attDeduction = Math.round(perDay * absent);
+      const earned = Math.max(0, std - attDeduction);
+      return {
+        ...e,
+        totalDays: d,
+        attendedDays: attended,
+        earnedSalary: earned,
+      };
+    });
+    set({ defaultWorkingDays: d, employees: next });
+    get().persist();
+  },
+
   updateEmployeePayroll: (id, updates) => {
-    const next = get().employees.map((e) => (e.id === id ? { ...e, ...updates } : e));
+    const next = get().employees.map((e) => {
+      if (e.id === id) {
+        const merged = { ...e, ...updates };
+        const std = Math.max(0, Number(merged.standardSalary) || 0);
+        const totalD = Math.max(1, Number(merged.totalDays) || get().defaultWorkingDays || 24);
+        const attended = merged.attendedDays !== undefined ? Math.max(0, Number(merged.attendedDays)) : totalD;
+        const absent = Math.max(0, totalD - attended);
+        const perDay = totalD > 0 ? std / totalD : 0;
+        const attDeduction = Math.round(perDay * absent);
+        const earned = Math.max(0, std - attDeduction);
+        return {
+          ...merged,
+          totalDays: totalD,
+          attendedDays: attended,
+          earnedSalary: earned,
+        };
+      }
+      return e;
+    });
     set({ employees: next });
     get().persist();
   },
@@ -436,7 +686,7 @@ export const usePayrollStore = create((set, get) => ({
       if (e.id === id) {
         const payable = remainingPayableAmount !== undefined
           ? remainingPayableAmount
-          : Math.max(0, (e.earnedSalary ?? e.standardSalary) + (e.additionalEarnings || 0) - (e.deductions || 0) - (e.advance || 0));
+          : calcEmployeePayable(e);
         return {
           ...e,
           status: "Paid",
@@ -454,7 +704,7 @@ export const usePayrollStore = create((set, get) => ({
     const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const next = get().employees.map((e) => {
       if (e.department.toLowerCase() === deptName.toLowerCase()) {
-        const payable = Math.max(0, (e.earnedSalary ?? e.standardSalary) + (e.additionalEarnings || 0) - (e.deductions || 0) - (e.advance || 0));
+        const payable = calcEmployeePayable(e);
         return {
           ...e,
           status: "Paid",
@@ -471,7 +721,7 @@ export const usePayrollStore = create((set, get) => ({
   runPayrollForAll: () => {
     const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
     const next = get().employees.map((e) => {
-      const payable = Math.max(0, (e.earnedSalary ?? e.standardSalary) + (e.additionalEarnings || 0) - (e.deductions || 0) - (e.advance || 0));
+      const payable = calcEmployeePayable(e);
       return {
         ...e,
         status: "Paid",
@@ -507,6 +757,9 @@ export const usePayrollStore = create((set, get) => ({
           structures: get().structures,
           workflowStep: get().workflowStep,
           currentPeriod: get().currentPeriod,
+          defaultWorkingDays: get().defaultWorkingDays,
+          departmentWorkingDays: get().departmentWorkingDays,
+          departmentWorkingHours: get().departmentWorkingHours,
         })
       );
     } catch (e) {}
@@ -521,6 +774,9 @@ export const usePayrollStore = create((set, get) => ({
       structures: INITIAL_STRUCTURES,
       workflowStep: "Approved",
       currentPeriod: "October 2024",
+      defaultWorkingDays: 24,
+      departmentWorkingDays: DEFAULT_DEPARTMENT_WORKING_DAYS,
+      departmentWorkingHours: DEFAULT_DEPARTMENT_WORKING_HOURS,
     });
   },
 }));

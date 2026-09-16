@@ -3,10 +3,45 @@ import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { DataTable } from "../../../components/hrms/DataTable";
-import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
-import { Search, Eye, Pencil, Trash2, Copy, Users, ArrowLeft } from "lucide-react";
+import PageHeader from "../../../components/ui/PageHeader";
+import StatusBadge from "../../../components/ui/StatusBadge";
+import {
+  Search,
+  Eye,
+  Pencil,
+  Trash2,
+  Copy,
+  Users,
+  ArrowLeft,
+  Plus,
+  Briefcase,
+  X,
+  ChevronDown,
+  Building2,
+  MapPin,
+  Calendar,
+} from "lucide-react";
+
+const JOBS_GUIDE = {
+  title: "Job Requisitions & Openings",
+  subtitle: "Define staffing requisitions, specifications, target headcount, and published status.",
+  purpose: "Job Openings serve as the central requisition records that candidates apply to, recruiters source for, and interview panels evaluate against.",
+  workflow: [
+    "Draft Specification",
+    "Define Headcount & Budget",
+    "Publish Requisition",
+    "Collect Applications",
+    "Fill & Close Position",
+  ],
+  keyTerms: [
+    { term: "Requisition Code", definition: "Unique organizational identifier for auditing and department allocations." },
+    { term: "Openings Count", definition: "Total number of approved headcount vacancies for the position." },
+    { term: "Hiring Manager", definition: "The departmental leader accountable for final hiring decisions." },
+    { term: "Work Mode", definition: "Designation of On-site, Hybrid, or fully Remote operational requirements." },
+  ],
+};
 
 export default function Jobs() {
   const { jobs, addJob, updateJob, deleteJob } = useRecruitmentStore();
@@ -199,28 +234,55 @@ export default function Jobs() {
     {
       key: "actions",
       header: "ACTIONS",
+      align: "right",
       render: (r) => (
-        <div className="flex items-center gap-1.5 text-slate-500">
-          <button aria-label="View" onClick={() => navigate(`/hrms/recruitment/jobs/${r.id}`)} className="p-1 hover:text-slate-800 transition">
+        <div className="flex items-center justify-end gap-1 text-slate-500">
+          <button
+            type="button"
+            title="View Details"
+            aria-label="View"
+            onClick={() => navigate(`/hrms/recruitment/jobs/${r.id}`)}
+            className="p-1.5 rounded-lg hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+          >
             <Eye size={15} />
           </button>
-          <button aria-label="Edit" onClick={() => openEdit(r)} className="p-1 hover:text-slate-800 transition">
+          <button
+            type="button"
+            title="Edit Requisition"
+            aria-label="Edit"
+            onClick={() => openEdit(r)}
+            className="p-1.5 rounded-lg hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+          >
             <Pencil size={15} />
           </button>
-          <button aria-label="Applicants" onClick={() => navigate(`/hrms/recruitment/applications`)} className="p-1 hover:text-slate-800 transition">
+          <button
+            type="button"
+            title="View Applicants"
+            aria-label="Applicants"
+            onClick={() => navigate(`/hrms/recruitment/applications`)}
+            className="p-1.5 rounded-lg hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+          >
             <Users size={15} />
           </button>
           <button
+            type="button"
+            title="Duplicate Requisition"
             aria-label="Duplicate"
             onClick={() => {
               addJob({ ...r, id: `JOB-${Date.now()}`, title: r.title + " Copy" });
-              showToast("Job duplicated");
+              showToast("Job opening duplicated");
             }}
-            className="p-1 hover:text-slate-800 transition"
+            className="p-1.5 rounded-lg hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition cursor-pointer"
           >
             <Copy size={15} />
           </button>
-          <button aria-label="Delete" onClick={() => setDeleteId(r.id)} className="p-1 text-red-500 hover:text-red-700 transition">
+          <button
+            type="button"
+            title="Delete Job"
+            aria-label="Delete"
+            onClick={() => setDeleteId(r.id)}
+            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+          >
             <Trash2 size={15} />
           </button>
         </div>
@@ -228,57 +290,95 @@ export default function Jobs() {
     },
   ];
 
+  const totalOpeningsCount = jobs.reduce((acc, j) => acc + (Number(j.openings) || 0), 0);
+  const totalApplicantsCount = jobs.reduce((acc, j) => acc + (Number(j.applicants) || 0), 0);
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* Back Button & Header */}
+    <div className="flex flex-col gap-5">
+      {/* Back Button */}
       <button
         type="button"
         onClick={() => navigate("/hrms/recruitment")}
-        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy transition w-fit cursor-pointer group"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-blue-600 transition-colors w-fit cursor-pointer group"
       >
-        <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
+        <ArrowLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
         <span>Back to Recruitment Setup</span>
       </button>
 
-      <div className="flex flex-col gap-0.5">
-        <div className="text-[12px] font-medium text-slate-400 flex items-center gap-1">
-          <span>Home</span>
-          <span>&gt;</span>
-          <span className="text-slate-600">Recruitment / Jobs</span>
+      {/* Standard PageHeader */}
+      <PageHeader
+        title="Job Requisitions"
+        subtitle={`Manage job requisitions, headcount targets, and staffing statuses. Showing ${filtered.length} of ${jobs.length} jobs.`}
+        breadcrumb={[
+          { label: "Dashboard", path: "/dashboard" },
+          { label: "HRMS", path: "/hrms" },
+          { label: "Recruitment", path: "/hrms/recruitment" },
+          { label: "Jobs", path: "/hrms/recruitment/jobs" },
+        ]}
+        guide={JOBS_GUIDE}
+        actions={
+          <Button variant="primary" size="sm" icon={Plus} onClick={openCreate}>
+            Create Job Opening
+          </Button>
+        }
+      />
+
+      {/* KPI Overview Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Total Requisitions</span>
+          <div className="text-2xl font-black text-text mt-1">{jobs.length}</div>
+          <span className="text-[11px] text-muted font-medium">All department records</span>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-1">
-          <div>
-            <h1 className="text-[22px] font-bold text-slate-800">Jobs</h1>
-            <p className="text-[13px] text-slate-500 mt-0.5">
-              {jobs.length} total • {jobs.filter((j) => j.status === "Open" || j.status === "Active").length} open
-            </p>
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Active Openings</span>
+          <div className="text-2xl font-black text-blue-600 mt-1">
+            {jobs.filter((j) => j.status === "Open" || j.status === "Active").length}
           </div>
-          <button
-            onClick={openCreate}
-            className="bg-[#1e3a8a] text-white px-4 py-2 rounded-xl text-[13px] font-medium hover:bg-[#1e40af] transition flex items-center gap-1.5 shadow-xs"
-          >
-            + Create Job
-          </button>
+          <span className="text-[11px] text-muted font-medium">{totalOpeningsCount} target headcount</span>
+        </div>
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Total Applicants</span>
+          <div className="text-2xl font-black text-emerald-600 mt-1">{totalApplicantsCount}</div>
+          <span className="text-[11px] text-muted font-medium">Across all open roles</span>
+        </div>
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-2xs">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Draft Requisitions</span>
+          <div className="text-2xl font-black text-slate-500 mt-1">
+            {jobs.filter((j) => j.status === "Draft").length}
+          </div>
+          <span className="text-[11px] text-muted font-medium">Pending approval</span>
         </div>
       </div>
 
-      {/* Filter Bar Card */}
-      <div className="bg-white border border-[#e2e8f0] rounded-2xl p-3.5 flex flex-wrap items-center gap-2.5 shadow-2xs">
-        <div className="relative flex-1 min-w-[200px] max-w-[240px]">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      {/* Modern FilterBar */}
+      <div className="bg-card border border-border rounded-2xl p-3.5 flex flex-wrap items-center gap-2.5 shadow-2xs">
+        {/* Search Input */}
+        <div className="relative flex-1 min-w-[200px] max-w-[260px]">
+          <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..."
-            className="w-full h-9 pl-9 pr-3 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
+            placeholder="Search job title or code..."
+            className="w-full h-9 pl-9 pr-8 bg-soft border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary focus:bg-card transition"
           />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 grid place-items-center text-muted"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
 
+        {/* Dropdowns */}
         <select
           value={dept}
           onChange={(e) => setDept(e.target.value)}
-          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
+          className="h-9 pl-3 pr-8 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer transition appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat"
         >
           <option value="All">All Departments</option>
           <option value="Engineering">Engineering</option>
@@ -292,7 +392,7 @@ export default function Jobs() {
         <select
           value={branch}
           onChange={(e) => setBranch(e.target.value)}
-          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
+          className="h-9 pl-3 pr-8 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer transition appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat"
         >
           <option value="All">All Branches</option>
           <option value="New York">New York</option>
@@ -303,18 +403,18 @@ export default function Jobs() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
+          className="h-9 pl-3 pr-8 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer transition appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat"
         >
           <option value="All">All Status</option>
           <option value="Open">Active</option>
           <option value="Draft">Draft</option>
-          <option value="Closed">Cancelled</option>
+          <option value="Closed">Closed</option>
         </select>
 
         <select
           value={workMode}
           onChange={(e) => setWorkMode(e.target.value)}
-          className="h-9 pl-3.5 pr-8 bg-[#f8fafc] border border-[#e2e8f0] rounded-xl text-[13px] text-slate-700 font-medium appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23475569%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat cursor-pointer focus:outline-none focus:border-[#1e3a8a] focus:bg-white transition"
+          className="h-9 pl-3 pr-8 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer transition appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat"
         >
           <option value="All">All Work Mode</option>
           <option value="On-site">On-site</option>
@@ -322,75 +422,90 @@ export default function Jobs() {
           <option value="Remote">Remote</option>
         </select>
 
-        <button
-          onClick={() => {
-            setSearch("");
-            setDept("All");
-            setBranch("All");
-            setStatus("All");
-            setWorkMode("All");
-          }}
-          className="h-9 px-4 bg-white border border-[#e2e8f0] rounded-xl text-[13px] font-medium text-slate-700 hover:bg-[#f8fafc] transition shadow-2xs"
-        >
-          Clear Filters
-        </button>
+        {(search || dept !== "All" || branch !== "All" || status !== "All" || workMode !== "All") && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setDept("All");
+              setBranch("All");
+              setStatus("All");
+              setWorkMode("All");
+            }}
+            className="h-9 px-3.5 bg-card border border-border hover:bg-soft rounded-xl text-xs font-semibold text-muted hover:text-text transition shadow-2xs cursor-pointer"
+          >
+            Clear Filters
+          </button>
+        )}
       </div>
 
-      {/* Table */}
+      {/* Main Jobs DataTable */}
       <DataTable
         columns={cols}
         data={filtered}
-        emptyTitle="No active jobs"
-        emptyDesc="Create your first job opening."
-        emptyAction={<Button onClick={openCreate}>+ Create Job</Button>}
+        emptyTitle="No job openings found"
+        emptyDesc="Create a new job requisition to start sourcing talent."
+        emptyAction={
+          <Button variant="primary" size="sm" icon={Plus} onClick={openCreate}>
+            Create Job Opening
+          </Button>
+        }
       />
 
-      {/* Create / Edit Drawer */}
-      <Drawer
+      {/* Create / Edit Requisition Modal */}
+      <Modal
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        title={editing ? "Edit Job" : "Create Job Opening"}
-        subtitle={editing ? "Update job details" : "Basic information, details, location and timeline"}
+        title={editing ? "Edit Job Requisition" : "Create Job Requisition"}
+        subtitle={editing ? "Update position requirements and parameters" : "Define staffing requisition, headcount, and criteria"}
+        size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => setDrawerOpen(false)}>
               Cancel
             </Button>
-            <Button variant="secondary" onClick={() => save(false)}>
+            <Button variant="secondary" size="sm" onClick={() => save(false)}>
               Save Draft
             </Button>
-            <Button onClick={() => save(true)}>{editing ? "Update Job" : "Publish Job"}</Button>
+            <Button variant="primary" size="sm" onClick={() => save(true)}>
+              {editing ? "Update Job" : "Publish Job"}
+            </Button>
           </>
         }
       >
-        <div className="space-y-6 text-[13px]">
-          <div>
-            <h4 className="font-semibold">Basic Information</h4>
-            <div className="grid sm:grid-cols-2 gap-3 mt-2">
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Job Title *</span>
+        <div className="space-y-5 text-xs">
+          {/* Section 1 */}
+          <div className="bg-soft/40 border border-border/80 rounded-2xl p-4">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-muted mb-3">
+              Basic Specification
+            </h4>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <label className="flex flex-col gap-1 sm:col-span-2">
+                <span className="font-semibold text-text text-xs">Job Title *</span>
                 <input
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
-                  placeholder="Senior Backend Developer"
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                  placeholder="e.g. Senior Backend Developer"
                 />
               </label>
+
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Job Code</span>
+                <span className="font-semibold text-text text-xs">Job Code</span>
                 <input
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
                   placeholder="ENG-BE-001"
                 />
               </label>
+
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Department *</span>
+                <span className="font-semibold text-text text-xs">Department *</span>
                 <select
                   value={form.department}
                   onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 >
                   <option>Engineering</option>
                   <option>Design</option>
@@ -400,79 +515,82 @@ export default function Jobs() {
                   <option>Operations</option>
                 </select>
               </label>
+
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Employment Type *</span>
+                <span className="font-semibold text-text text-xs">Employment Type *</span>
                 <select
                   value={form.employmentType}
                   onChange={(e) => setForm({ ...form, employmentType: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 >
                   <option>Full-time</option>
                   <option>Part-time</option>
                   <option>Contract</option>
                 </select>
               </label>
+
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Experience Required</span>
-                <input
-                  value={form.experience}
-                  onChange={(e) => setForm({ ...form, experience: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
-                />
-              </label>
-              <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Number of Openings *</span>
+                <span className="font-semibold text-text text-xs">Headcount Vacancies *</span>
                 <input
                   type="number"
+                  min="1"
                   value={form.openings}
                   onChange={(e) => setForm({ ...form, openings: Number(e.target.value) })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 />
               </label>
             </div>
           </div>
-          <div>
-            <h4 className="font-semibold">Job Details</h4>
-            <div className="grid gap-3 mt-2">
+
+          {/* Section 2 */}
+          <div className="bg-soft/40 border border-border/80 rounded-2xl p-4">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-muted mb-3">
+              Description & Requirements
+            </h4>
+            <div className="grid gap-3">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Job Description *</span>
+                <span className="font-semibold text-text text-xs">Job Description *</span>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  rows={2}
-                  className="p-3 bg-white border border-bdr rounded-xl resize-none"
-                  placeholder="Build scalable backend..."
+                  rows={3}
+                  className="p-3 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary resize-none transition"
+                  placeholder="Outline purpose and role objective..."
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Responsibilities *</span>
+                <span className="font-semibold text-text text-xs">Responsibilities *</span>
                 <textarea
                   value={form.responsibilities}
                   onChange={(e) => setForm({ ...form, responsibilities: e.target.value })}
                   rows={2}
-                  className="p-3 bg-white border border-bdr rounded-xl resize-none"
+                  className="p-3 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary resize-none transition"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Required Skills *</span>
+                <span className="font-semibold text-text text-xs">Required Skills *</span>
                 <input
                   value={form.requiredSkills}
                   onChange={(e) => setForm({ ...form, requiredSkills: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
-                  placeholder="Node.js, PostgreSQL"
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                  placeholder="e.g. Node.js, PostgreSQL, Docker"
                 />
               </label>
             </div>
           </div>
-          <div>
-            <h4 className="font-semibold">Location</h4>
-            <div className="grid sm:grid-cols-2 gap-3 mt-2">
+
+          {/* Section 3 */}
+          <div className="bg-soft/40 border border-border/80 rounded-2xl p-4">
+            <h4 className="font-bold text-xs uppercase tracking-wider text-muted mb-3">
+              Location & Team
+            </h4>
+            <div className="grid sm:grid-cols-2 gap-3">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Work Mode</span>
+                <span className="font-semibold text-text text-xs">Work Mode</span>
                 <select
                   value={form.workMode}
                   onChange={(e) => setForm({ ...form, workMode: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 >
                   <option>On-site</option>
                   <option>Hybrid</option>
@@ -480,63 +598,62 @@ export default function Jobs() {
                 </select>
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Location</span>
+                <span className="font-semibold text-text text-xs">Location</span>
                 <input
                   value={form.location}
                   onChange={(e) => setForm({ ...form, location: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 />
               </label>
-            </div>
-          </div>
-          <div>
-            <h4 className="font-semibold">Assignees</h4>
-            <div className="grid sm:grid-cols-2 gap-3 mt-2">
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Recruiter</span>
+                <span className="font-semibold text-text text-xs">Recruiter</span>
                 <input
                   value={form.recruiter}
                   onChange={(e) => setForm({ ...form, recruiter: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-[11px] font-medium text-muted">Hiring Manager</span>
+                <span className="font-semibold text-text text-xs">Hiring Manager</span>
                 <input
                   value={form.hiringManager}
                   onChange={(e) => setForm({ ...form, hiringManager: e.target.value })}
-                  className="h-9 px-3 bg-white border border-bdr rounded-xl"
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 />
               </label>
             </div>
           </div>
         </div>
-      </Drawer>
+      </Modal>
 
       {/* Delete Confirmation Modal */}
       <Modal
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="Delete Job?"
+        title="Delete Job Requisition?"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDeleteId(null)}>
+            <Button variant="outline" size="sm" onClick={() => setDeleteId(null)}>
               Cancel
             </Button>
             <Button
               variant="danger"
+              size="sm"
               onClick={() => {
                 if (deleteId) deleteJob(deleteId);
                 setDeleteId(null);
-                showToast("Job deleted");
+                showToast("Job opening deleted successfully");
               }}
             >
-              Delete
+              Confirm Delete
             </Button>
           </>
         }
       >
-        <p className="text-[13px] text-muted">Delete this job? This cannot be undone.</p>
+        <p className="text-xs text-muted leading-relaxed">
+          Are you sure you want to permanently remove this job requisition? Existing applicant records
+          and interview schedules will be archived.
+        </p>
       </Modal>
     </div>
   );

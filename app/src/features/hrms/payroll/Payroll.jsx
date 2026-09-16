@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
   Building2,
   Users,
@@ -22,10 +23,15 @@ import {
   Printer,
   FileText,
   ChevronDown,
+  ShieldCheck,
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import {
   usePayrollStore,
+  getDepartmentDays,
+  getDepartmentHours,
+  DEFAULT_DEPARTMENT_WORKING_DAYS,
+  DEFAULT_DEPARTMENT_WORKING_HOURS,
   WORKFLOW_STAGES,
   OWN_SALARY_HISTORY,
 } from "../../../stores/payrollStore";
@@ -53,7 +59,15 @@ function downloadPayslipPdf(p) {
   const bank = clean(p.bank || "Direct Deposit Verified");
 
   const std = Number(p.standardSalary || 0);
-  const earned = Number(p.earnedSalary || 0);
+  const totalD = Number(p.totalDays || 24);
+  const dailyH = Number(p.dailyHours || 8);
+  const totalH = Number(p.totalHours || (totalD * dailyH));
+  const hourlyR = Number(p.hourlyRate || (totalH > 0 ? Math.round(std / totalH) : 0));
+  const attended = p.attendedDays !== undefined ? Number(p.attendedDays) : totalD;
+  const absent = p.absentDays !== undefined ? Number(p.absentDays) : Math.max(0, totalD - attended);
+  const perDay = p.perDaySalary !== undefined ? Number(p.perDaySalary) : (totalD > 0 ? Math.round(std / totalD) : 0);
+  const attDeduction = p.attendanceDeduction !== undefined ? Number(p.attendanceDeduction) : Math.round(perDay * absent);
+  const earned = p.earnedSalary !== undefined ? Number(p.earnedSalary) : Math.max(0, std - attDeduction);
   const earnings = Number(p.additionalEarnings || 0);
   const deductions = Number(p.deductions || 0);
   const advance = Number(p.advance || 0);
@@ -84,7 +98,13 @@ function downloadPayslipPdf(p) {
     "(MONTHLY SALARY CALCULATION BREAKDOWN:) Tj",
     "0 -18 Td",
     "/F1 10 Tf",
-    `(Standard Monthly CTC: INR ${std.toLocaleString()}) Tj`,
+    `(Standard Agreed Monthly CTC: INR ${std.toLocaleString()}) Tj`,
+    "0 -16 Td",
+    `(Attendance: ${attended} of ${totalD} Days Present | ${absent} Absent | Hours: ${dailyH}h/d [Target: ${totalH}h]) Tj`,
+    "0 -16 Td",
+    `(Rate: INR ${perDay.toLocaleString()}/day [INR ${hourlyR.toLocaleString()}/hr] | LOP Removed: (-) INR ${attDeduction.toLocaleString()}) Tj`,
+    "0 -16 Td",
+    `(Earned Base Salary: INR ${earned.toLocaleString()}) Tj`,
     "0 -16 Td",
     `(Basic Salary [60%]: INR ${basic.toLocaleString()}) Tj`,
     "0 -16 Td",
@@ -92,16 +112,14 @@ function downloadPayslipPdf(p) {
     "0 -16 Td",
     `(Special & Flexible Allowances: INR ${allowances.toLocaleString()}) Tj`,
     "0 -16 Td",
-    `(Earned Salary [Pro-rated Attendance]: INR ${earned.toLocaleString()}) Tj`,
-    "0 -16 Td",
     `(Additional Earnings [Overtime & Incentives]: (+) INR ${earnings.toLocaleString()}) Tj`,
     "0 -16 Td",
-    `(Deductions [PF, Taxes, Insurance]: (-) INR ${deductions.toLocaleString()}) Tj`,
+    `(Deductions [PF, Taxes, Statutory]: (-) INR ${deductions.toLocaleString()}) Tj`,
     "0 -16 Td",
     `(Salary Advance Recovered: (-) INR ${advance.toLocaleString()}) Tj`,
     "0 -24 Td",
     "/F1 11 Tf",
-    "(FORMULA: Remaining Payable = Earned Salary + Earnings - Deductions - Advance) Tj",
+    "(FORMULA: Net Salary = Standard CTC - Attendance LOP + Earnings - Deductions - Advance) Tj",
     "0 -22 Td",
     "/F1 14 Tf",
     `(NET REMAINING PAYABLE: INR ${remaining.toLocaleString()}) Tj`,
@@ -154,7 +172,15 @@ function downloadPayslipPdf(p) {
 // Modern printable/save-as-PDF window generator with corporate styling
 function printPayslip(p) {
   const std = Number(p.standardSalary || 0);
-  const earned = Number(p.earnedSalary || 0);
+  const totalD = Number(p.totalDays || 24);
+  const dailyH = Number(p.dailyHours || 8);
+  const totalH = Number(p.totalHours || (totalD * dailyH));
+  const hourlyR = Number(p.hourlyRate || (totalH > 0 ? Math.round(std / totalH) : 0));
+  const attended = p.attendedDays !== undefined ? Number(p.attendedDays) : totalD;
+  const absent = p.absentDays !== undefined ? Number(p.absentDays) : Math.max(0, totalD - attended);
+  const perDay = p.perDaySalary !== undefined ? Number(p.perDaySalary) : (totalD > 0 ? Math.round(std / totalD) : 0);
+  const attDeduction = p.attendanceDeduction !== undefined ? Number(p.attendanceDeduction) : Math.round(perDay * absent);
+  const earned = p.earnedSalary !== undefined ? Number(p.earnedSalary) : Math.max(0, std - attDeduction);
   const earnings = Number(p.additionalEarnings || 0);
   const deductions = Number(p.deductions || 0);
   const advance = Number(p.advance || 0);
@@ -211,8 +237,8 @@ function printPayslip(p) {
           <div class="box">
             <div class="label">Disbursal & Attendance</div>
             <div class="val">${p.bank || "Direct Deposit (Verified)"}</div>
-            <div style="color: #475569; font-size: 12px; margin-top: 2px;">Working Days: ${p.attendedDays || 30} / ${p.totalDays || 30} Days</div>
-            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">Disbursement Date: ${p.paymentDate || "Oct 31, 2024"}</div>
+            <div style="color: #475569; font-size: 12px; margin-top: 2px;">Working Schedule: ${attended} Present / ${totalD} Days (${absent}d absent) • ${dailyH}h/day (${totalH}h target)</div>
+            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">Disbursement Date: ${p.paymentDate || "Oct 31, 2024"} • Rate: INR ${perDay}/day (INR ${hourlyR}/hr)</div>
           </div>
         </div>
 
@@ -229,32 +255,38 @@ function printPayslip(p) {
             <tr>
               <td>Basic Salary (60%)</td>
               <td class="num">${basic.toLocaleString()}</td>
-              <td>Provident Fund (PF)</td>
-              <td class="num">${Math.round(deductions * 0.55).toLocaleString()}</td>
+              <td>Attendance LOP (${absent} days absent @ INR ${perDay}/d)</td>
+              <td class="num" style="color: #b91c1c;">-${attDeduction.toLocaleString()}</td>
             </tr>
             <tr>
               <td>House Rent Allowance (HRA 25%)</td>
               <td class="num">${hra.toLocaleString()}</td>
-              <td>Tax Deducted at Source (TDS) / PT</td>
-              <td class="num">${Math.round(deductions * 0.45).toLocaleString()}</td>
+              <td>Salary Advance Recovered</td>
+              <td class="num" style="color: #b45309;">-${advance.toLocaleString()}</td>
             </tr>
             <tr>
               <td>Special & Flexible Allowances</td>
               <td class="num">${allowances.toLocaleString()}</td>
-              <td>Salary Advance Recovered</td>
-              <td class="num">${advance.toLocaleString()}</td>
+              <td>Provident Fund (PF)</td>
+              <td class="num">${Math.round(deductions * 0.55).toLocaleString()}</td>
             </tr>
             <tr>
               <td>Additional Earnings / Overtime / Bonus</td>
               <td class="num">+${earnings.toLocaleString()}</td>
-              <td>Total Deductions & Advances</td>
-              <td class="num" style="color: #b91c1c;">-${(deductions + advance).toLocaleString()}</td>
+              <td>Tax Deducted at Source (TDS) / PT</td>
+              <td class="num">${Math.round(deductions * 0.45).toLocaleString()}</td>
             </tr>
             <tr style="font-weight: 700; background: #f8fafc;">
-              <td>Total Gross Earnings</td>
-              <td class="num" style="color: #15803d;">${(earned + earnings).toLocaleString()}</td>
+              <td>Earned Base Salary</td>
+              <td class="num" style="color: #1e40af;">INR ${earned.toLocaleString()}</td>
+              <td>Total Deductions & Advances</td>
+              <td class="num" style="color: #b91c1c;">-INR ${(deductions + advance + attDeduction).toLocaleString()}</td>
+            </tr>
+            <tr style="font-weight: 700; background: #f8fafc;">
               <td>Standard Agreed CTC</td>
-              <td class="num">${std.toLocaleString()}</td>
+              <td class="num">INR ${std.toLocaleString()}</td>
+              <td>Total In-Hand Payable</td>
+              <td class="num" style="color: #15803d;">INR ${remaining.toLocaleString()}</td>
             </tr>
           </tbody>
         </table>
@@ -262,7 +294,7 @@ function printPayslip(p) {
         <div class="formula-box">
           <div style="font-weight: 700; font-size: 11.5px; color: #15803d; margin-bottom: 2px;">FORMULA AUDIT TRAIL:</div>
           <div style="font-size: 12px; color: #334155;">
-            Remaining Payable = Earned Salary (INR ${earned.toLocaleString()}) + Additional Earnings (INR ${earnings.toLocaleString()}) - Deductions (INR ${deductions.toLocaleString()}) - Advance Recovered (INR ${advance.toLocaleString()})
+            Remaining Payable = Standard CTC (INR ${std.toLocaleString()}) - Attendance LOP (INR ${attDeduction.toLocaleString()} for ${absent} absent days) + Additional Earnings (INR ${earnings.toLocaleString()}) - Statutory Deductions (INR ${deductions.toLocaleString()}) - Salary Advance Recovered (INR ${advance.toLocaleString()})
           </div>
         </div>
 
@@ -304,8 +336,14 @@ export default function Payroll() {
     structures,
     workflowStep,
     currentPeriod,
+    defaultWorkingDays = 24,
+    departmentWorkingDays = DEFAULT_DEPARTMENT_WORKING_DAYS,
+    departmentWorkingHours = DEFAULT_DEPARTMENT_WORKING_HOURS,
+    setDepartmentWorkingDays,
+    setDepartmentWorkingHours,
     setWorkflowStep,
     setCurrentPeriod,
+    setDefaultWorkingDays,
     markEmployeePaid,
     disburseDepartment,
     runPayrollForAll,
@@ -336,8 +374,11 @@ export default function Payroll() {
   const [slipPickerOpen, setSlipPickerOpen] = useState(false);
   const [slipSearchQuery, setSlipSearchQuery] = useState("");
 
-  // Quick edit advance & earnings modal
+  // Quick edit advance & attendance modal
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [editTotalDays, setEditTotalDays] = useState(24);
+  const [editDailyHours, setEditDailyHours] = useState(8);
+  const [editAttendedDays, setEditAttendedDays] = useState(20);
   const [editAdvance, setEditAdvance] = useState(0);
   const [editEarnings, setEditEarnings] = useState(0);
   const [editDeductions, setEditDeductions] = useState(0);
@@ -353,12 +394,19 @@ export default function Payroll() {
       );
       const leaveDays = empLeaves.reduce((sum, l) => sum + (Number(l.days) || 1), 0);
 
+      const totalDays = Number(p.totalDays) || Number(defaultWorkingDays) || 24;
+      const attendedDays = p.attendedDays !== undefined ? Number(p.attendedDays) : totalDays;
+
+      const deptHours = getDepartmentHours(departmentWorkingHours, p.department);
+      const dailyHours = Number(p.dailyHours) || deptHours || 8;
+      const totalHours = Number(p.totalHours) || (totalDays * dailyHours);
+      const hourlyRate = Number(p.hourlyRate) || (totalHours > 0 ? Math.round(Number(p.standardSalary || 0) / totalHours) : 0);
+
       // Calculation matrix from reusable engine
       const calc = calculateSalaryComponents({
         standardSalary: p.standardSalary,
-        earnedSalary: p.earnedSalary,
-        totalDays: p.totalDays || 30,
-        attendedDays: p.attendedDays !== undefined ? p.attendedDays : (30 - leaveDays),
+        totalDays: totalDays,
+        attendedDays: attendedDays,
         paidLeaves: leaveDays,
         additionalEarnings: p.additionalEarnings !== undefined ? p.additionalEarnings : (p.overtime || 0),
         deductions: p.deductions,
@@ -372,9 +420,12 @@ export default function Payroll() {
         ...p,
         ...calc,
         leaveDays,
+        dailyHours,
+        totalHours,
+        hourlyRate,
       };
     });
-  }, [payrollEmployees, storeLeaves]);
+  }, [payrollEmployees, storeLeaves, defaultWorkingDays, departmentWorkingHours]);
 
   // Selected employee for generate payslip modal
   const slipSelectedEmp = useMemo(() => {
@@ -597,20 +648,38 @@ export default function Payroll() {
 
   const openEditModal = (emp) => {
     setEditingEmployee(emp);
-    setEditAdvance(emp.advance);
-    setEditEarnings(emp.additionalEarnings);
-    setEditDeductions(emp.deductions);
+    const deptDefault = getDepartmentDays(departmentWorkingDays, emp.department);
+    const deptHoursDefault = getDepartmentHours(departmentWorkingHours, emp.department);
+    const totalD = emp.totalDays || deptDefault || 24;
+    const dailyH = emp.dailyHours || deptHoursDefault || 8;
+    setEditTotalDays(totalD);
+    setEditDailyHours(dailyH);
+    setEditAttendedDays(emp.attendedDays !== undefined ? emp.attendedDays : totalD);
+    setEditAdvance(emp.advance !== undefined ? emp.advance : 0);
+    setEditEarnings(emp.additionalEarnings !== undefined ? emp.additionalEarnings : 0);
+    setEditDeductions(emp.deductions !== undefined ? emp.deductions : 0);
   };
 
   const handleSaveParams = (e) => {
     e.preventDefault();
     if (!editingEmployee) return;
+    const tDays = Math.max(1, Number(editTotalDays) || 24);
+    const dHours = Math.max(1, Number(editDailyHours) || 8);
+    const aDays = Math.min(tDays, Math.max(0, Number(editAttendedDays) !== undefined ? Number(editAttendedDays) : tDays));
+    const std = Number(editingEmployee.standardSalary) || 0;
+    const totalH = tDays * dHours;
+    const hourlyR = totalH > 0 ? Math.round(std / totalH) : 0;
     updateEmployeePayroll(editingEmployee.id, {
+      totalDays: tDays,
+      dailyHours: dHours,
+      totalHours: totalH,
+      hourlyRate: hourlyR,
+      attendedDays: aDays,
       advance: Number(editAdvance) || 0,
       additionalEarnings: Number(editEarnings) || 0,
       deductions: Number(editDeductions) || 0,
     });
-    showToast(`Updated salary parameters for ${editingEmployee.name}`);
+    showToast(`Updated attendance & working hours for ${editingEmployee.name}`);
     setEditingEmployee(null);
   };
 
@@ -623,11 +692,48 @@ export default function Payroll() {
             Payroll Management
           </h1>
           <p className="text-[13px] text-muted">
-            Advanced monthly calculation formula: <span className="font-semibold text-slate-700">Remaining Payable = Earned Salary + Earnings - Deductions - Advance</span>
+            Attendance &amp; Advance Formula: <span className="font-semibold text-slate-700">Remaining Payable = Standard CTC - Attendance LOP (Remaining Days Removed) + Earnings - Deductions - Advance Recovered</span>
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
+          {/* Department Working Days Schedule Dropdown (Pure Dropdown - No Up/Down Arrows) */}
+          <div className="flex items-center gap-2 px-3 h-10 bg-white border border-bdr rounded-xl text-[13px] font-medium text-slate-700 shadow-xs">
+            <Building2 size={14} className="text-navy shrink-0" />
+            <span className="text-muted text-[12px] whitespace-nowrap">Dept Schedule:</span>
+            <select
+              value={deptFilter}
+              onChange={(e) => {
+                setDeptFilter(e.target.value);
+                if (e.target.value !== "All") {
+                  const days = getDepartmentDays(departmentWorkingDays, e.target.value);
+                  const hours = getDepartmentHours(departmentWorkingHours, e.target.value);
+                  showToast(`${e.target.value}: ${days} Working Days • ${hours}h/day (${days * hours}h target)`);
+                }
+              }}
+              className="font-semibold text-slate-900 bg-transparent outline-none cursor-pointer text-[13px]"
+            >
+              <option value="All">All Departments (HR Admin Schedule)</option>
+              {Object.entries(departmentWorkingDays).map(([dept, days]) => {
+                const hours = getDepartmentHours(departmentWorkingHours, dept);
+                return (
+                  <option key={dept} value={dept}>
+                    {dept} — {days} Days ({hours}h/d • {days * hours}h)
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <Link
+            to="/hrms/hr-admin?tab=working-days"
+            className="inline-flex items-center gap-1.5 px-3 h-10 bg-white border border-bdr rounded-xl text-[12.5px] font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs cursor-pointer"
+            title="Configure working days by department in HR Admin"
+          >
+            <ShieldCheck size={15} className="text-emerald-700" />
+            <span>HR Admin Setup</span>
+          </Link>
+
           <select
             value={currentPeriod}
             onChange={(e) => {
@@ -760,6 +866,11 @@ export default function Payroll() {
                   {Math.round((overallStats.totalEarned / (overallStats.totalStandard || 1)) * 100)}%
                 </span>
               </div>
+              {overallStats.totalAttendanceDeduction > 0 && (
+                <span className="text-[11px] text-rose-600 block mt-1 font-medium">
+                  -{formatINR(overallStats.totalAttendanceDeduction)} absent days removed
+                </span>
+              )}
             </div>
 
             <div className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex flex-col justify-between">
@@ -987,7 +1098,11 @@ export default function Payroll() {
                   <div className="flex items-start justify-between gap-2 mb-3">
                     <div>
                       <h4 className="font-bold text-[15px] text-slate-900">{dept.name}</h4>
-                      <span className="text-[11.5px] text-muted">{dept.headcount} staff members</span>
+                      <div className="text-[11.5px] text-muted flex items-center gap-1.5 mt-0.5">
+                        <span>{dept.headcount} staff</span>
+                        <span>•</span>
+                        <span>{getDepartmentDays(departmentWorkingDays, dept.name)}d @ {getDepartmentHours(departmentWorkingHours, dept.name)}h/d</span>
+                      </div>
                     </div>
                     <Badge tone={dept.allPaid ? "success" : "warning"}>
                       {dept.allPaid ? "Disbursed" : `${dept.paidCount}/${dept.headcount} Paid`}
@@ -1133,7 +1248,7 @@ export default function Payroll() {
                   <tr>
                     <th className="py-3.5 px-4">Employee</th>
                     <th className="py-3.5 px-3">Standard Salary</th>
-                    <th className="py-3.5 px-3">Earned Salary</th>
+                    <th className="py-3.5 px-3">Earned Salary (Attendance)</th>
                     <th className="py-3.5 px-3">Earnings (+)</th>
                     <th className="py-3.5 px-3">Deductions (-)</th>
                     <th className="py-3.5 px-3">Advance (-)</th>
@@ -1182,20 +1297,24 @@ export default function Payroll() {
                           <div className="text-[10.5px] text-muted">Agreed base</div>
                         </td>
 
-                        {/* Earned Salary */}
+                        {/* Earned Salary (Pro-rated Attendance) */}
                         <td className="py-3.5 px-3">
                           <div className="font-semibold text-blue-900">{formatINR(p.earnedSalary)}</div>
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <div className="w-12 h-1 bg-slate-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-blue-600 rounded-full"
-                                style={{ width: `${p.earnedProgress}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-slate-500 font-medium">
-                              {p.payableDays}/{p.totalDays}d
-                            </span>
+                          <div className="text-[11px] text-slate-600 font-medium mt-0.5">
+                            {p.payableDays}/{p.totalDays} days • {p.dailyHours || getDepartmentHours(departmentWorkingHours, p.department)}h/day
                           </div>
+                          <div className="text-[10px] text-muted">
+                            Target: {p.totalHours || (p.totalDays * (p.dailyHours || 8))}h • ₹{p.hourlyRate || Math.round(p.standardSalary / (p.totalDays * (p.dailyHours || 8)))}/hr
+                          </div>
+                          {p.absentDays > 0 ? (
+                            <div className="text-[10px] text-rose-700 font-medium bg-rose-50 border border-rose-200/80 rounded px-1.5 py-0.5 mt-0.5 inline-block">
+                              -{formatINR(p.attendanceDeduction)} ({p.absentDays}d absent removed)
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-emerald-600 font-medium mt-0.5">
+                              100% Present
+                            </div>
+                          )}
                         </td>
 
                         {/* Earnings (+) */}
@@ -1211,9 +1330,14 @@ export default function Payroll() {
                         {/* Advance (-) */}
                         <td className="py-3.5 px-3">
                           {p.advance > 0 ? (
-                            <span className="text-amber-800 font-semibold bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
-                              -{formatINR(p.advance)}
-                            </span>
+                            <div>
+                              <span className="text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200 inline-block">
+                                -{formatINR(p.advance)}
+                              </span>
+                              <span className="text-[10px] text-amber-700 block mt-0.5">
+                                Advance Deducted
+                              </span>
+                            </div>
                           ) : (
                             <span className="text-slate-400">₹0</span>
                           )}
@@ -1221,8 +1345,11 @@ export default function Payroll() {
 
                         {/* Remaining Payable Salary */}
                         <td className="py-3.5 px-3 font-bold text-slate-900">
-                          <span className="text-emerald-700 text-[14px]">
+                          <span className="text-emerald-700 text-[14px] block">
                             {formatINR(p.remainingPayable)}
+                          </span>
+                          <span className="text-[10px] text-muted font-normal block leading-tight">
+                            Std {formatINR(p.standardSalary)} {p.attendanceDeduction > 0 ? `- LOP ${formatINR(p.attendanceDeduction)}` : ""} {p.advance > 0 ? `- Adv ${formatINR(p.advance)}` : ""}
                           </span>
                         </td>
 
@@ -1550,6 +1677,14 @@ export default function Payroll() {
                 </div>
 
                 <div className="space-y-2 text-[13px] pt-3">
+                  {ownRecord.attendanceDeduction > 0 && (
+                    <div className="flex justify-between py-1 border-b border-slate-50 bg-rose-50/50 px-2 rounded-lg">
+                      <span className="text-rose-800 font-medium">
+                        Attendance LOP ({ownRecord.absentDays}d absent removed)
+                      </span>
+                      <span className="font-bold text-rose-700">-{formatINR(ownRecord.attendanceDeduction)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between py-1 border-b border-slate-50">
                     <span className="text-slate-500">Provident Fund (PF) &amp; Insurance</span>
                     <span className="font-medium text-slate-900">-{formatINR(Math.round(ownRecord.deductions * 0.6))}</span>
@@ -1703,13 +1838,37 @@ export default function Payroll() {
             {/* Formula Calculation Matrix */}
             <div className="space-y-2 text-[13px]">
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Standard Salary (Agreed CTC)</span>
+                <span className="text-slate-500">Standard Salary (Agreed Base CTC)</span>
                 <span className="font-semibold text-slate-800">
                   {formatINR(selectedPayslip.standardSalary)}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Earned Salary (Attendance Base)</span>
+                <span className="text-slate-500">Month Working Days &amp; Attendance</span>
+                <span className="font-semibold text-slate-700">
+                  {selectedPayslip.attendedDays !== undefined ? selectedPayslip.attendedDays : 20} Present / {selectedPayslip.totalDays || 24} Days ({selectedPayslip.absentDays || 0}d absent)
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Working Schedule &amp; Target Hours</span>
+                <span className="font-semibold text-slate-700">
+                  {selectedPayslip.dailyHours || 8}h/day • {selectedPayslip.totalHours || ((selectedPayslip.totalDays || 24) * (selectedPayslip.dailyHours || 8))}h target ({formatINR(selectedPayslip.hourlyRate || Math.round(selectedPayslip.standardSalary / ((selectedPayslip.totalDays || 24) * (selectedPayslip.dailyHours || 8))))}/hr)
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Per-Day Salary Rate</span>
+                <span className="font-medium text-slate-700">
+                  {formatINR(selectedPayslip.perDaySalary || Math.round(selectedPayslip.standardSalary / (selectedPayslip.totalDays || 24)))} / day
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Attendance LOP (Remaining Days Removed) (-)</span>
+                <span className="font-semibold text-rose-700">
+                  -{formatINR(selectedPayslip.attendanceDeduction || 0)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Earned Base Salary</span>
                 <span className="font-semibold text-blue-900">
                   {formatINR(selectedPayslip.earnedSalary)}
                 </span>
@@ -1721,26 +1880,26 @@ export default function Payroll() {
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Deductions [PF, TDS, Penalty] (-)</span>
+                <span className="text-slate-500">Deductions [PF, TDS, Statutory] (-)</span>
                 <span className="font-medium text-rose-700">
                   -{formatINR(selectedPayslip.deductions)}
                 </span>
               </div>
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Salary Advance Recovered (-)</span>
-                <span className="font-medium text-amber-800">
+                <span className="font-bold text-amber-800">
                   -{formatINR(selectedPayslip.advance)}
                 </span>
               </div>
 
               {/* Formula Badge */}
               <div className="bg-slate-50 p-2.5 rounded-xl text-[11px] text-slate-600">
-                <b>Formula:</b> Remaining Payable = Earned Salary + Earnings - Deductions - Advance
+                <b>Formula:</b> Remaining Payable = Standard CTC - Attendance LOP + Earnings - Deductions - Advance
               </div>
 
               {/* Net Remaining Payable */}
               <div className="flex justify-between py-2.5 font-bold text-[15px] text-slate-900 bg-emerald-50/70 border border-emerald-200 rounded-xl px-3 mt-2">
-                <span>Remaining Payable</span>
+                <span>Net Remaining Payable</span>
                 <span className="text-emerald-800">
                   {formatINR(selectedPayslip.remainingPayable)}
                 </span>
@@ -1883,12 +2042,12 @@ export default function Payroll() {
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <form
             onSubmit={handleSaveParams}
-            className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95"
+            className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div>
-                <h3 className="font-bold text-[16px] text-slate-900">Adjust Advance &amp; Earnings</h3>
-                <p className="text-[12px] text-muted">{editingEmployee.name} ({editingEmployee.empId})</p>
+                <h3 className="font-bold text-[16px] text-slate-900">Adjust Attendance, Advance &amp; Earnings</h3>
+                <p className="text-[12px] text-muted">{editingEmployee.name} ({editingEmployee.empId}) • {editingEmployee.department}</p>
               </div>
               <button
                 type="button"
@@ -1899,72 +2058,177 @@ export default function Payroll() {
               </button>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-xl text-[12.5px] space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted">Standard Salary:</span>
-                <span className="font-semibold text-slate-900">{formatINR(editingEmployee.standardSalary)}</span>
+            {/* Attendance & Days Input Strip */}
+            <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-2.5">
+              <div className="flex justify-between items-center text-[12.5px]">
+                <span className="text-slate-600 font-medium">Standard Agreed Base CTC:</span>
+                <span className="font-bold text-slate-900 text-[13.5px]">{formatINR(editingEmployee.standardSalary)}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Earned Salary:</span>
-                <span className="font-semibold text-blue-900">{formatINR(editingEmployee.earnedSalary)}</span>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-slate-200/60">
+                <div>
+                  <label className="block text-[11.5px] font-semibold text-slate-700 mb-1">
+                    Month Days ({editingEmployee.department})
+                  </label>
+                  <select
+                    value={Number(editTotalDays)}
+                    onChange={(e) => {
+                      const newT = Number(e.target.value);
+                      setEditTotalDays(newT);
+                      if (Number(editAttendedDays) > newT) {
+                        setEditAttendedDays(newT);
+                      }
+                    }}
+                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-lg text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
+                  >
+                    {[20, 21, 22, 23, 24, 25, 26, 27, 28, 30, 31].map((d) => (
+                      <option key={d} value={d}>
+                        {d} Days {d === getDepartmentDays(departmentWorkingDays, editingEmployee.department) ? "(Dept)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11.5px] font-semibold text-slate-700 mb-1">
+                    Daily Hours
+                  </label>
+                  <select
+                    value={Number(editDailyHours)}
+                    onChange={(e) => setEditDailyHours(Number(e.target.value))}
+                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-lg text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
+                  >
+                    {[7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0].map((h) => (
+                      <option key={h} value={h}>
+                        {h.toFixed(1)} hrs {h === getDepartmentHours(departmentWorkingHours, editingEmployee.department) ? "(Dept)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11.5px] font-semibold text-slate-700 mb-1">
+                    Days Attended
+                  </label>
+                  <select
+                    value={Number(editAttendedDays)}
+                    onChange={(e) => setEditAttendedDays(Number(e.target.value))}
+                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-lg text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
+                  >
+                    {Array.from({ length: Number(editTotalDays) + 1 }, (_, i) => i).map((num) => (
+                      <option key={num} value={num}>
+                        {num} Days {num === Number(editTotalDays) ? "(100%)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
+              {/* Dynamic Attendance Deduction & Working Hours Calculation */}
+              {(() => {
+                const curStd = Number(editingEmployee.standardSalary) || 0;
+                const curT = Math.max(1, Number(editTotalDays) || 24);
+                const curH = Math.max(1, Number(editDailyHours) || 8);
+                const curTotH = curT * curH;
+                const curHourlyRate = curTotH > 0 ? Math.round(curStd / curTotH) : 0;
+                const curA = Math.min(curT, Math.max(0, Number(editAttendedDays) !== undefined ? Number(editAttendedDays) : curT));
+                const curAbs = Math.max(0, curT - curA);
+                const curRate = curT > 0 ? curStd / curT : 0;
+                const curDeduct = Math.round(curRate * curAbs);
+                const curEarn = Math.max(0, curStd - curDeduct);
+
+                return (
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200 text-[11.5px] space-y-1">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Schedule &amp; Target:</span>
+                      <span className="font-mono font-medium">{curT}d × {curH}h/d = {curTotH} hrs target</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Wage Rates:</span>
+                      <span className="font-mono font-medium">{formatINR(curRate)}/day • {formatINR(curHourlyRate)}/hr</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-600">Remaining Absent Days:</span>
+                      <span className={`font-semibold ${curAbs > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                        {curAbs} days {curAbs > 0 ? "unattended" : "(100% Present)"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-700 font-medium">Attendance LOP (Salary Removed):</span>
+                      <span className="font-bold text-rose-700">-{formatINR(curDeduct)}</span>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-slate-100 font-semibold text-blue-900">
+                      <span>Earned Salary (Base):</span>
+                      <span>{formatINR(curEarn)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex flex-col gap-3">
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1">
-                  Additional Earnings (Overtime / Bonus / Allowance) [₹]
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editEarnings}
-                  onChange={(e) => setEditEarnings(e.target.value)}
-                  className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-700 mb-1">
-                  Monthly Deductions (PF / Tax / Deductions) [₹]
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={editDeductions}
-                  onChange={(e) => setEditDeductions(e.target.value)}
-                  className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-700 mb-1">
-                  Salary Advance Recovered [₹]
+                  Salary Advance Recovered [₹] (Deducted from final salary)
                 </label>
                 <input
                   type="number"
                   min="0"
                   value={editAdvance}
                   onChange={(e) => setEditAdvance(e.target.value)}
-                  className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
+                  className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  placeholder="e.g. 5000"
                 />
               </div>
 
-              {/* Live Preview of Formula */}
-              <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[12.5px] flex justify-between items-center font-bold">
-                <span className="text-emerald-950">Calculated Remaining Payable:</span>
-                <span className="text-emerald-800 text-[14px]">
-                  {formatINR(
-                    Math.max(
-                      0,
-                      editingEmployee.earnedSalary +
-                        (Number(editEarnings) || 0) -
-                        (Number(editDeductions) || 0) -
-                        (Number(editAdvance) || 0)
-                    )
-                  )}
-                </span>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                    Additional Earnings [₹]
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editEarnings}
+                    onChange={(e) => setEditEarnings(e.target.value)}
+                    className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                    Monthly Deductions [₹]
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={editDeductions}
+                    onChange={(e) => setEditDeductions(e.target.value)}
+                    className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
               </div>
+
+              {/* Live Preview of Full Formula */}
+              {(() => {
+                const curStd = Number(editingEmployee.standardSalary) || 0;
+                const curT = Math.max(1, Number(editTotalDays) || 24);
+                const curA = Math.min(curT, Math.max(0, Number(editAttendedDays) !== undefined ? Number(editAttendedDays) : curT));
+                const curAbs = Math.max(0, curT - curA);
+                const curRate = curT > 0 ? curStd / curT : 0;
+                const curDeduct = Math.round(curRate * curAbs);
+                const curEarn = Math.max(0, curStd - curDeduct);
+                const curNet = Math.max(0, curEarn + (Number(editEarnings) || 0) - (Number(editDeductions) || 0) - (Number(editAdvance) || 0));
+
+                return (
+                  <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[12.5px] space-y-1">
+                    <div className="flex justify-between items-center font-bold">
+                      <span className="text-emerald-950">Net Remaining Payable:</span>
+                      <span className="text-emerald-800 text-[15px] font-extrabold">{formatINR(curNet)}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 pt-1 border-t border-emerald-200/60 leading-tight">
+                      Std ({formatINR(curStd)}) - Attendance LOP ({formatINR(curDeduct)}) + Earnings ({formatINR(editEarnings)}) - Deductions ({formatINR(editDeductions)}) - Advance ({formatINR(editAdvance)})
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="flex gap-2 mt-2">
@@ -2372,17 +2636,21 @@ export default function Payroll() {
                     <div className="font-bold text-slate-800">{formatINR(slipSelectedEmp.standardSalary)}</div>
                   </div>
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
-                    <div className="text-slate-500 text-[11px]">Earned (Pro-rated)</div>
+                    <div className="text-slate-500 text-[11px]">Earned Base Salary</div>
                     <div className="font-bold text-blue-900">{formatINR(slipSelectedEmp.earnedSalary)}</div>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
+                    <div className="text-slate-500 text-[11px]">Attendance LOP (Removed)</div>
+                    <div className="font-bold text-rose-700">-{formatINR(slipSelectedEmp.attendanceDeduction || 0)}</div>
                   </div>
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
                     <div className="text-slate-500 text-[11px]">Additional Earnings (+)</div>
                     <div className="font-bold text-emerald-700">+{formatINR(slipSelectedEmp.additionalEarnings)}</div>
                   </div>
                   <div className="bg-white p-2.5 rounded-lg border border-slate-200/80">
-                    <div className="text-slate-500 text-[11px]">Deductions &amp; Advance (-)</div>
-                    <div className="font-bold text-rose-700">
-                      -{formatINR((slipSelectedEmp.deductions || 0) + (slipSelectedEmp.advance || 0))}
+                    <div className="text-slate-500 text-[11px]">Advance Recovered (-)</div>
+                    <div className="font-bold text-amber-800">
+                      -{formatINR(slipSelectedEmp.advance || 0)}
                     </div>
                   </div>
                 </div>
@@ -2395,9 +2663,9 @@ export default function Payroll() {
                   </span>
                 </div>
 
-                <div className="text-[11px] text-slate-500 flex items-center justify-between">
+                <div className="text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-1">
                   <span>Bank: {slipSelectedEmp.bank || "Direct Deposit"}</span>
-                  <span>Attendance: {slipSelectedEmp.attendedDays || 30} / 30 Days</span>
+                  <span>Attendance: {slipSelectedEmp.attendedDays !== undefined ? slipSelectedEmp.attendedDays : 20} / {slipSelectedEmp.totalDays || 24} Days ({slipSelectedEmp.absentDays || 0}d absent) • {slipSelectedEmp.dailyHours || 8}h/day ({slipSelectedEmp.totalHours || ((slipSelectedEmp.totalDays || 24) * (slipSelectedEmp.dailyHours || 8))}h target)</span>
                 </div>
               </div>
             )}

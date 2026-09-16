@@ -5,7 +5,7 @@ import { useEffect } from 'react';
  * Modal — CRM-styled modal dialog.
  * Props: isOpen, onClose, title, children, footer, size ('md'|'lg'|'xl')
  */
-export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }) {
+export function Modal({ isOpen, onClose, title, subtitle, children, footer, size = 'md' }) {
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return;
@@ -28,7 +28,10 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' })
       <div className={`modal-card ${sizeClass}`} role="dialog" aria-modal="true">
         {title && (
           <div className="modal-header">
-            <h2>{title}</h2>
+            <div>
+              <h2>{title}</h2>
+              {subtitle && <p className="text-xs text-muted mt-0.5">{subtitle}</p>}
+            </div>
             <button
               type="button"
               className="modal-close"
