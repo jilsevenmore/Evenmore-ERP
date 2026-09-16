@@ -45,41 +45,46 @@ const STAGE_STYLES = {
   Draft: {
     title: 'Draft',
     icon: FileText,
-    iconColor: 'bg-blue-100 text-blue-600',
-    colBg: 'bg-[#f4f7fb]/70 border-blue-100/60',
-    headerBadge: 'bg-blue-50 text-blue-700 border-blue-200',
+    iconColor: 'bg-blue-50 text-blue-600 border border-blue-200',
+    topBar: 'bg-blue-500',
+    headerBadge: 'bg-blue-50 text-blue-700 border border-blue-200',
+    countBadge: 'bg-blue-50 text-blue-700 border border-blue-200 font-bold',
     accentColor: 'text-blue-600',
   },
   Sent: {
     title: 'Sent',
     icon: Send,
-    iconColor: 'bg-purple-100 text-purple-600',
-    colBg: 'bg-[#f8f5fc]/70 border-purple-100/60',
-    headerBadge: 'bg-purple-50 text-purple-700 border-purple-200',
+    iconColor: 'bg-purple-50 text-purple-600 border border-purple-200',
+    topBar: 'bg-purple-500',
+    headerBadge: 'bg-purple-50 text-purple-700 border border-purple-200',
+    countBadge: 'bg-purple-50 text-purple-700 border border-purple-200 font-bold',
     accentColor: 'text-purple-600',
   },
   Open: {
     title: 'Open',
     icon: Clock,
-    iconColor: 'bg-amber-100 text-amber-600',
-    colBg: 'bg-[#fcf7ee]/70 border-amber-100/60',
-    headerBadge: 'bg-amber-50 text-amber-700 border-amber-200',
+    iconColor: 'bg-amber-50 text-amber-600 border border-amber-200',
+    topBar: 'bg-amber-500',
+    headerBadge: 'bg-amber-50 text-amber-700 border border-amber-200',
+    countBadge: 'bg-amber-50 text-amber-700 border border-amber-200 font-bold',
     accentColor: 'text-amber-600',
   },
   Won: {
     title: 'Won',
     icon: CheckCircle2,
-    iconColor: 'bg-emerald-100 text-emerald-600',
-    colBg: 'bg-[#f2faf5]/70 border-emerald-100/60',
-    headerBadge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    iconColor: 'bg-emerald-50 text-emerald-600 border border-emerald-200',
+    topBar: 'bg-emerald-500',
+    headerBadge: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    countBadge: 'bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold',
     accentColor: 'text-emerald-600',
   },
   Lost: {
     title: 'Lost',
     icon: XCircle,
-    iconColor: 'bg-rose-100 text-rose-600',
-    colBg: 'bg-[#fdf4f4]/70 border-rose-100/60',
-    headerBadge: 'bg-rose-50 text-rose-700 border-rose-200',
+    iconColor: 'bg-rose-50 text-rose-600 border border-rose-200',
+    topBar: 'bg-rose-500',
+    headerBadge: 'bg-rose-50 text-rose-700 border border-rose-200',
+    countBadge: 'bg-rose-50 text-rose-700 border border-rose-200 font-bold',
     accentColor: 'text-rose-600',
   },
 };
@@ -816,7 +821,10 @@ export default function DealsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 p-4 md:p-7 space-y-6">
+    <div
+      className="min-h-screen text-slate-800 p-4 md:p-6 lg:p-7 space-y-6"
+      style={{ backgroundColor: 'var(--page, #f4f6fb)' }}
+    >
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
           <CheckCircle2 size={18} className="text-emerald-400" />
@@ -824,15 +832,16 @@ export default function DealsPage() {
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Top Header Card */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
+          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5">
             <Link to="/dashboard" className="hover:text-blue-600 transition-colors font-medium">
               Dashboard
             </Link>
             <span>&gt;</span>
             <span className="text-slate-700 font-medium">Deals</span>
-            <span className="ml-2 px-2.5 py-0.5 rounded-full bg-slate-200/70 text-slate-600 text-[11px] font-semibold">
+            <span className="ml-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 text-[11px] font-semibold">
               {filteredDeals.length} of {deals.length} deals
             </span>
           </div>
@@ -883,71 +892,77 @@ export default function DealsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
+      {/* KPI Metrics Panel */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 rounded-t-2xl" />
+          <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
             <Handshake size={22} strokeWidth={2.2} />
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-500">Total Deals</div>
+            <div className="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Total Deals</div>
             <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.totalDeals}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 12%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold text-xl flex-shrink-0">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-2xl" />
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 font-bold text-xl flex-shrink-0">
             ₹
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-500">Total Value</div>
+            <div className="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Total Value</div>
             <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.totalValue}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 18%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500 rounded-t-2xl" />
+          <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 flex-shrink-0">
             <Trophy size={22} strokeWidth={2.2} />
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-500">Won Deals</div>
+            <div className="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Won Deals</div>
             <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.wonDeals}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 25%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-purple-500 rounded-t-2xl" />
+          <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-600 flex-shrink-0">
             <Clock size={22} strokeWidth={2.2} />
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-500">Average Deal Size</div>
+            <div className="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Average Deal Size</div>
             <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.avgDealSize}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 14%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 flex-shrink-0">
+        <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-all hover:shadow-sm relative overflow-hidden group">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-rose-500 rounded-t-2xl" />
+          <div className="w-12 h-12 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-500 flex-shrink-0">
             <TrendingUp size={22} strokeWidth={2.2} />
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-500">Conversion Rate</div>
+            <div className="text-[11px] font-semibold text-slate-500 tracking-wide uppercase">Conversion Rate</div>
             <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.conversionRate}</div>
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
+            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 6%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
@@ -955,16 +970,20 @@ export default function DealsPage() {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">
+      {/* Structured Filter & Controls Card */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-xs space-y-4">
+        {/* Dropdown Filters Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Product</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <span>Product</span>
+            </label>
             <div className="relative">
               <Package size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <select
                 value={selectedProduct}
                 onChange={(e) => setSelectedProduct(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
               >
                 {PRODUCTS.map((p) => (
                   <option key={p} value={p}>
@@ -977,13 +996,15 @@ export default function DealsPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Stage</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <span>Stage</span>
+            </label>
             <div className="relative">
               <Flag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <select
                 value={selectedStage}
                 onChange={(e) => setSelectedStage(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
               >
                 <option value="All Stages">All Stages</option>
                 {STAGES.map((s) => (
@@ -997,13 +1018,15 @@ export default function DealsPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Source</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <span>Source</span>
+            </label>
             <div className="relative">
               <Globe size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <select
                 value={selectedSource}
                 onChange={(e) => setSelectedSource(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
               >
                 {SOURCES.map((s) => (
                   <option key={s} value={s}>
@@ -1016,13 +1039,15 @@ export default function DealsPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Assigned User</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <span>Assigned User</span>
+            </label>
             <div className="relative">
               <UserRound size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <select
                 value={selectedUser}
                 onChange={(e) => setSelectedUser(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
               >
                 {USERS.map((u) => (
                   <option key={u} value={u}>
@@ -1035,13 +1060,15 @@ export default function DealsPage() {
           </div>
 
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Date Range</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1.5">
+              <span>Date Range</span>
+            </label>
             <div className="relative">
               <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <select
                 value={dateRange}
                 onChange={(e) => setDateRange(e.target.value)}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer"
               >
                 <option value="01 Sep 2025 - 30 Sep 2025">01 Sep 2025 - 30 Sep 2025</option>
                 <option value="Last 30 Days">Last 30 Days</option>
@@ -1053,7 +1080,11 @@ export default function DealsPage() {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+        {/* Partition Divider */}
+        <div className="border-t border-slate-100" />
+
+        {/* Search and Action Toolbar */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="relative flex-1 w-full">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -1061,7 +1092,7 @@ export default function DealsPage() {
               placeholder="Search by deal name, client, phone, notes..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-9 pr-4 py-2 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
             />
           </div>
 
@@ -1070,18 +1101,18 @@ export default function DealsPage() {
               type="button"
               onClick={handleResetFilters}
               title="Reset Filters"
-              className="w-9 h-9 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"
+              className="w-9 h-9 flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
             >
               <RotateCcw size={15} />
             </button>
 
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1">
               <button
                 type="button"
                 onClick={() => setViewMode('kanban')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'kanban'
-                    ? 'bg-white text-[#1f6bff] shadow-2xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -1092,9 +1123,9 @@ export default function DealsPage() {
               <button
                 type="button"
                 onClick={() => setViewMode('list')}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-white text-[#1f6bff] shadow-2xs'
+                    ? 'bg-blue-600 text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -1106,7 +1137,7 @@ export default function DealsPage() {
             <button
               type="button"
               onClick={() => handleOpenCreateModal('Draft')}
-              className="w-9 h-9 flex items-center justify-center bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 transition-colors"
+              className="w-9 h-9 flex items-center justify-center bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
               title="More Actions"
             >
               <MoreVertical size={15} />
@@ -1115,6 +1146,7 @@ export default function DealsPage() {
         </div>
       </div>
 
+      {/* Kanban Pipeline / List View */}
       {viewMode === 'kanban' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-start overflow-x-auto pb-4 pt-1">
           {STAGES.map((st) => {
@@ -1143,35 +1175,56 @@ export default function DealsPage() {
                     handleMoveStage(droppedId, st);
                   }
                 }}
-                className={`rounded-2xl border p-3 flex flex-col space-y-3 transition-all duration-200 ${
-                  stageStyle.colBg
-                } ${isDragOver ? 'ring-2 ring-blue-500/40 border-blue-400 bg-blue-50/40' : ''}`}
+                className={`border rounded-2xl p-3.5 flex flex-col space-y-3 transition-all duration-200 shadow-2xs relative ${
+                  isDragOver ? 'ring-2 ring-blue-500/40 border-blue-400' : ''
+                }`}
+                style={{
+                  backgroundColor: 'var(--soft, #edf2f8)',
+                  borderColor: 'var(--border, #dce5f4)',
+                }}
               >
-                <div className="flex items-center gap-2.5">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${stageStyle.iconColor}`}>
-                    <StageIcon size={16} />
+                {/* Column Top Accent Strip */}
+                <div className={`h-1 w-full rounded-full ${stageStyle.topBar}`} />
+
+                {/* Column Header */}
+                <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200/70">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${stageStyle.iconColor}`}>
+                      <StageIcon size={14} />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-slate-900 leading-tight">{stageStyle.title}</h3>
+                      <p className="text-[11px] text-slate-500 font-medium truncate">
+                        {formatStageSummary(totalStageAmount, items.length)}
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-bold text-slate-900 leading-tight">{stageStyle.title}</h3>
-                    <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                      {formatStageSummary(totalStageAmount, items.length)}
-                    </p>
-                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] ${stageStyle.countBadge}`}>
+                    {items.length}
+                  </span>
                 </div>
 
+                {/* Add Deal Button */}
                 <button
                   type="button"
                   onClick={() => handleOpenCreateModal(st)}
-                  className="w-full py-1.5 bg-white hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 rounded-xl text-xs font-semibold text-[#1f6bff] flex items-center justify-center gap-1.5 shadow-2xs transition-colors"
+                  className="w-full py-1.5 bg-white hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 rounded-xl text-xs font-semibold text-blue-600 flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
                 >
                   <Plus size={14} />
                   <span>Add Deal</span>
                 </button>
 
+                {/* Deal Cards Container */}
                 <div className="space-y-3 min-h-[120px]">
                   {items.length === 0 ? (
-                    <div className="bg-white/80 border border-dashed border-slate-200 rounded-2xl p-6 text-center">
+                    <div
+                      className="border border-dashed rounded-xl p-6 text-center"
+                      style={{
+                        backgroundColor: 'var(--card, #ffffff)',
+                        borderColor: 'var(--border, #dce5f4)',
+                      }}
+                    >
                       <Inbox size={22} className="text-slate-300 mx-auto mb-1" />
                       <p className="text-xs font-medium text-slate-400">No deals in {st}</p>
                     </div>
@@ -1185,8 +1238,9 @@ export default function DealsPage() {
                           onDragStart={(e) => {
                             e.dataTransfer.setData('text/plain', deal.id);
                           }}
-                          className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs hover:shadow-md hover:border-blue-300 transition-all cursor-grab active:cursor-grabbing relative group"
+                          className="bg-white border border-slate-200 hover:border-blue-400 rounded-xl p-3.5 shadow-2xs hover:shadow-md transition-all cursor-grab active:cursor-grabbing relative group space-y-2.5"
                         >
+                          {/* Deal Header */}
                           <div className="flex items-start justify-between gap-2">
                             <h4 className="text-sm font-bold text-slate-900 leading-snug truncate flex-1" title={deal.name}>
                               {deal.name}
@@ -1199,7 +1253,7 @@ export default function DealsPage() {
                                   e.stopPropagation();
                                   setOpenMenuDealId((prev) => (prev === deal.id ? null : deal.id));
                                 }}
-                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
+                                className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
                                   isMenuOpen
                                     ? 'bg-slate-200 text-slate-800'
                                     : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
@@ -1213,7 +1267,7 @@ export default function DealsPage() {
                                   <button
                                     type="button"
                                     onClick={() => handleOpenEditModal(deal)}
-                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5"
+                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                                   >
                                     <Edit2 size={13} className="text-blue-600" />
                                     <span>Edit Deal</span>
@@ -1228,7 +1282,7 @@ export default function DealsPage() {
                                         key={s}
                                         type="button"
                                         onClick={() => handleMoveStage(deal.id, s)}
-                                        className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 rounded text-left truncate"
+                                        className="px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 rounded text-left truncate cursor-pointer"
                                       >
                                         → {s}
                                       </button>
@@ -1243,7 +1297,7 @@ export default function DealsPage() {
                                       setDealToDelete(deal);
                                       setOpenMenuDealId(null);
                                     }}
-                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5"
+                                    className="w-full px-3.5 py-2 text-left text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
                                   >
                                     <Trash2 size={13} className="text-rose-500" />
                                     <span>Delete Deal</span>
@@ -1253,8 +1307,9 @@ export default function DealsPage() {
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between mt-2">
-                            <span className="text-sm md:text-base font-bold text-slate-900">
+                          {/* Deal Value & Status Tag */}
+                          <div className="flex items-center justify-between">
+                            <span className="text-base font-bold text-slate-900 tracking-tight">
                               {formatPriceINR(deal.price)}
                             </span>
 
@@ -1273,20 +1328,31 @@ export default function DealsPage() {
                             )}
                           </div>
 
-                          <div className="flex items-center justify-between gap-2 mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500">
-                            <div className="flex items-center gap-2 min-w-0">
+                          {/* Product Pill */}
+                          {deal.product && (
+                            <div>
+                              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded-md truncate max-w-full">
+                                <Tag size={10} className="text-slate-400 flex-shrink-0" />
+                                <span className="truncate">{deal.product}</span>
+                              </span>
+                            </div>
+                          )}
+
+                          {/* Divider & Metadata Footer */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 text-xs text-slate-500">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               <div
-                                className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 ${
+                                className={`w-5 h-5 rounded-full flex items-center justify-center font-bold text-[9px] flex-shrink-0 ${
                                   deal.avatarColor || 'bg-blue-100 text-blue-700'
                                 }`}
                               >
                                 {deal.initials || 'CL'}
                               </div>
-                              <span className="truncate font-medium text-slate-600 text-xs">{deal.client}</span>
+                              <span className="truncate font-medium text-slate-600 text-[11px]">{deal.client}</span>
                             </div>
 
                             <div className="flex items-center gap-1 text-[11px] text-slate-400 flex-shrink-0">
-                              <Calendar size={12} className="text-slate-400" />
+                              <Calendar size={11} className="text-slate-400" />
                               <span>{deal.date}</span>
                             </div>
                           </div>
@@ -1296,11 +1362,12 @@ export default function DealsPage() {
                   )}
                 </div>
 
+                {/* Show More/Less Button */}
                 {remainingCount > 0 && (
                   <button
                     type="button"
                     onClick={() => toggleExpandColumn(st)}
-                    className="w-full py-1.5 text-xs font-semibold text-[#1f6bff] hover:bg-blue-50/50 rounded-xl transition-colors text-center"
+                    className="w-full py-1.5 text-xs font-semibold text-blue-600 hover:bg-blue-50/50 rounded-xl transition-colors text-center cursor-pointer"
                   >
                     {isExpanded ? 'Show less' : `+ ${remainingCount} more deals`}
                   </button>
@@ -1310,25 +1377,26 @@ export default function DealsPage() {
           })}
         </div>
       ) : (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
+        /* List View */
+        <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs text-slate-700">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[11px] font-semibold">
                 <tr>
-                  <th className="py-3 px-4">Deal Name</th>
-                  <th className="py-3 px-4">Client</th>
-                  <th className="py-3 px-4">Product</th>
-                  <th className="py-3 px-4">Stage</th>
-                  <th className="py-3 px-4 text-right">Value (₹)</th>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4">Deal Name</th>
+                  <th className="py-3.5 px-4">Client</th>
+                  <th className="py-3.5 px-4">Product</th>
+                  <th className="py-3.5 px-4">Stage</th>
+                  <th className="py-3.5 px-4 text-right">Value (₹)</th>
+                  <th className="py-3.5 px-4">Date</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredDeals.map((deal) => (
                   <tr key={deal.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3 px-4 font-bold text-slate-900">{deal.name}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-4 font-bold text-slate-900">{deal.name}</td>
+                    <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
                         <div
                           className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-[10px] flex-shrink-0 ${
@@ -1340,32 +1408,32 @@ export default function DealsPage() {
                         <span className="font-medium text-slate-700">{deal.client}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-600">{deal.product}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3.5 px-4 text-slate-600">{deal.product}</td>
+                    <td className="py-3.5 px-4">
                       <span
-                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                        className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
                           STAGE_STYLES[deal.stage]?.headerBadge || 'bg-slate-100 text-slate-600 border-slate-200'
                         }`}
                       >
                         {deal.stage}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-right font-bold text-slate-900">
+                    <td className="py-3.5 px-4 text-right font-bold text-slate-900">
                       {formatPriceINR(deal.price)}
                     </td>
-                    <td className="py-3 px-4 text-slate-500">{deal.date}</td>
-                    <td className="py-3 px-4 text-right">
+                    <td className="py-3.5 px-4 text-slate-500">{deal.date}</td>
+                    <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => handleOpenEditModal(deal)}
-                          className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200"
+                          className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 cursor-pointer"
                           title="Edit"
                         >
                           <Edit2 size={13} />
                         </button>
                         <button
                           onClick={() => setDealToDelete(deal)}
-                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg border border-rose-200"
+                          className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg border border-rose-200 cursor-pointer"
                           title="Delete"
                         >
                           <Trash2 size={13} />
