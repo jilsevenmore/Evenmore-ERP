@@ -24,6 +24,11 @@ import {
   HeartPulse,
   Coffee,
   X,
+  DollarSign,
+  Coins,
+  CalendarCheck,
+  ShieldCheck,
+  Layers,
 } from "lucide-react";
 
 export default function Leave() {
@@ -35,6 +40,18 @@ export default function Leave() {
     showToast,
     employees = [],
     currentUser,
+    encashments = [],
+    compOffCredits = [],
+    sandwichRuleEnabled = true,
+    maxCarryForwardDays = 12,
+    carriedForwardLeaves = {},
+    requestEncashment,
+    approveEncashment,
+    rejectEncashment,
+    requestCompOff,
+    approveCompOff,
+    rejectCompOff,
+    toggleSandwichRule,
   } = useAppStore();
 
   const calendarEvents = useCalendarStore((s) => s.events || []);
@@ -55,6 +72,22 @@ export default function Leave() {
   const [rejectReasonInput, setRejectReasonInput] = useState("");
   const [detailModalLeave, setDetailModalLeave] = useState(null);
 
+  // Encashment & Comp-Off Modal States
+  const [encashModalOpen, setEncashModalOpen] = useState(false);
+  const [compOffModalOpen, setCompOffModalOpen] = useState(false);
+  const [encashForm, setEncashForm] = useState({
+    employeeName: "Ayesha Khan",
+    days: 5,
+    reason: "Surplus annual leave encashment into October payroll",
+  });
+  const [compOffForm, setCompOffForm] = useState({
+    employeeName: "Ayesha Khan",
+    workedDate: "2024-10-19",
+    hoursWorked: 8,
+    creditDays: 1,
+    reason: "Urgent production cloud deployment over the weekend",
+  });
+
   const [form, setForm] = useState({
     employeeName: "Ayesha Khan",
     type: "Annual Leave",
@@ -67,18 +100,37 @@ export default function Leave() {
   });
   const [delegateSelect, setDelegateSelect] = useState({});
 
-  // Dynamic leave balances
+  // Dynamic leave balances (5 categories with carry-forward & comp-off)
   const leaveBalances = useMemo(() => {
+    const carriedDays =
+      carriedForwardLeaves?.[form.employeeName] ??
+      (form.employeeName?.toLowerCase().includes("ayesha") ? 6 : 0);
+
     const defaultBalances = {
-      annual: { total: 18, used: 4, label: "Annual Leave", icon: Plane },
+      annual: { total: 18 + carriedDays, used: 4, label: "Annual Leave", icon: Plane, carried: carriedDays },
       sick: { total: 10, used: 2, label: "Sick Leave", icon: HeartPulse },
       casual: { total: 7, used: 1, label: "Casual Leave", icon: Coffee },
       floating: { total: 3, used: 0, label: "Floating Holiday", icon: Sparkles },
+      compOff: { total: 2, used: 0, label: "Comp-Off Credit", icon: Clock },
     };
+
+    // Calculate approved comp-off credits for active employee
+    const approvedCredits = compOffCredits
+      .filter(
+        (c) =>
+          c.status === "Approved" &&
+          (c.employee?.toLowerCase() === form.employeeName?.toLowerCase() ||
+            c.employee?.toLowerCase() === "ayesha khan")
+      )
+      .reduce((sum, c) => sum + (Number(c.creditDays) || 1), 0);
+
+    if (approvedCredits > 0) {
+      defaultBalances.compOff.total = approvedCredits;
+    }
 
     const activeEmpLeaves = leaves.filter(
       (l) =>
-        (l.employee?.toLowerCase() === form.employeeName.toLowerCase() ||
+        (l.employee?.toLowerCase() === form.employeeName?.toLowerCase() ||
           l.employee?.toLowerCase() === "ayesha khan") &&
         l.status !== "Rejected"
     );
@@ -88,10 +140,11 @@ export default function Leave() {
       if (l.type?.includes("Annual")) defaultBalances.annual.used = Math.min(defaultBalances.annual.total, defaultBalances.annual.used + days);
       else if (l.type?.includes("Sick")) defaultBalances.sick.used = Math.min(defaultBalances.sick.total, defaultBalances.sick.used + days);
       else if (l.type?.includes("Casual")) defaultBalances.casual.used = Math.min(defaultBalances.casual.total, defaultBalances.casual.used + days);
+      else if (l.type?.includes("Comp-Off")) defaultBalances.compOff.used = Math.min(defaultBalances.compOff.total, defaultBalances.compOff.used + days);
     });
 
     return defaultBalances;
-  }, [leaves, form.employeeName]);
+  }, [leaves, form.employeeName, compOffCredits, carriedForwardLeaves]);
 
   const filteredEmployees = useMemo(() => {
     if (!form.delegateSearch) return [];
@@ -113,15 +166,54 @@ export default function Leave() {
     });
   }, [calendarEvents, form.from, form.to]);
 
+  // Sandwich Rule calculation and diagnostics
+  const sandwichInfo = useMemo(() => {
+    if (!form.from || !form.to) return { isSandwiched: false, weekendDays: 0, holidayDays: 0, extraDeducted: 0 };
+    const start = new Date(form.from);
+    const end = new Date(form.to);
+    if (end < start) return { isSandwiched: false, weekendDays: 0, holidayDays: 0, extraDeducted: 0 };
+
+    let weekendCount = 0;
+    const cur = new Date(start);
+    while (cur <= end) {
+      const d = cur.getDay();
+      if (d === 0 || d === 6) weekendCount++;
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    const holidayCount = holidayOverlap.length;
+    const isSandwiched = Boolean(sandwichRuleEnabled && (weekendCount > 0 || holidayCount > 0));
+    return {
+      isSandwiched,
+      weekendDays: weekendCount,
+      holidayDays: holidayCount,
+      extraDeducted: isSandwiched ? weekendCount + holidayCount : 0,
+    };
+  }, [form.from, form.to, holidayOverlap, sandwichRuleEnabled]);
+
   const calculatedDays = useMemo(() => {
     if (!form.from || !form.to) return 0;
     const start = new Date(form.from);
     const end = new Date(form.to);
     if (end < start) return 0;
     const diffTime = Math.abs(end - start);
-    const raw = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-    return Math.max(1, raw - holidayOverlap.length);
-  }, [form.from, form.to, holidayOverlap.length]);
+    const totalCalendarDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+    if (sandwichRuleEnabled) {
+      // Intervening weekends and holidays are counted
+      return Math.max(1, totalCalendarDays);
+    } else {
+      // Exclude weekends and gazetted holidays
+      let weekendCount = 0;
+      const cur = new Date(start);
+      while (cur <= end) {
+        const d = cur.getDay();
+        if (d === 0 || d === 6) weekendCount++;
+        cur.setDate(cur.getDate() + 1);
+      }
+      return Math.max(1, totalCalendarDays - weekendCount - holidayOverlap.length);
+    }
+  }, [form.from, form.to, holidayOverlap.length, sandwichRuleEnabled]);
 
   function submitLeave() {
     if (!form.reason.trim()) return showToast("Reason required for leave application");
@@ -283,50 +375,73 @@ export default function Leave() {
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
           <h1 className="text-[24px] font-bold tracking-tight text-slate-900">Leave Management</h1>
-          <p className="text-[13px] text-muted">Apply, approve, monitor leave quotas, and track team delegations</p>
+          <p className="text-[13px] text-muted">Apply, approve, monitor leave quotas, encashment, and comp-off credits</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setApplyModalOpen(true)}
-          className="inline-flex items-center gap-1.5 px-4.5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium shadow-xs hover:bg-navy/90 transition-colors cursor-pointer"
-        >
-          <Plus size={16} />
-          Apply Leave
-        </button>
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setCompOffModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+          >
+            <Clock size={15} className="text-amber-600" />
+            Claim Comp-Off
+          </button>
+          <button
+            type="button"
+            onClick={() => setEncashModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-emerald-100 transition-colors cursor-pointer"
+          >
+            <Coins size={15} className="text-emerald-700" />
+            Encash Leave
+          </button>
+          <button
+            type="button"
+            onClick={() => setApplyModalOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4.5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium shadow-xs hover:bg-navy/90 transition-colors cursor-pointer"
+          >
+            <Plus size={16} />
+            Apply Leave
+          </button>
+        </div>
       </div>
 
-      {/* ── Leave Quota Balance Cards Row ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* ── Leave Quota Balance Cards Row (5 Categories with Carry-Forward & Comp-Off) ── */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
         {Object.entries(leaveBalances).map(([key, item]) => {
           const remaining = Math.max(0, item.total - item.used);
-          const percent = Math.round((remaining / item.total) * 100);
+          const percent = item.total > 0 ? Math.round((remaining / item.total) * 100) : 0;
           const IconComp = item.icon;
 
           return (
             <div
               key={key}
-              className="bg-white border border-bdr rounded-2xl p-4.5 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300"
+              className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col justify-between transition-all hover:border-slate-300"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-[12px] font-semibold text-slate-600 uppercase tracking-wide">
+                <span className="text-[11.5px] font-semibold text-slate-600 uppercase tracking-wide">
                   {item.label}
                 </span>
                 <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700">
-                  <IconComp size={16} />
+                  <IconComp size={15} />
                 </div>
               </div>
-              <div className="mt-3 flex items-baseline justify-between">
+              <div className="mt-2.5 flex items-baseline justify-between">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[26px] font-extrabold text-slate-900 tracking-tight leading-none">
+                  <span className="text-[24px] font-extrabold text-slate-900 tracking-tight leading-none">
                     {remaining}
                   </span>
-                  <span className="text-[12px] text-muted font-medium">/ {item.total} days left</span>
+                  <span className="text-[11.5px] text-muted font-medium">/ {item.total} left</span>
                 </div>
-                <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
+                <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
                   {item.used} used
                 </span>
               </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-3 overflow-hidden">
+              {item.carried > 0 && (
+                <div className="mt-1.5 text-[10.5px] font-semibold text-emerald-700 flex items-center gap-1">
+                  <span>+{item.carried} carried over</span>
+                </div>
+              )}
+              <div className="w-full h-1.5 bg-slate-100 rounded-full mt-2.5 overflow-hidden">
                 <div
                   className="h-full bg-navy rounded-full transition-all duration-300"
                   style={{ width: `${percent}%` }}
@@ -339,7 +454,7 @@ export default function Leave() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Leave Application Form */}
-        <div className="lg:col-span-5 bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col gap-4">
+        <div className="lg:col-span-5 lg:sticky lg:top-6 self-start bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col gap-4">
           <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
             <div>
               <h3 className="font-bold text-[15px] text-slate-900">Apply for Leave</h3>
@@ -377,6 +492,7 @@ export default function Leave() {
                 <option>Sick Leave</option>
                 <option>Casual Leave</option>
                 <option>Floating Holiday</option>
+                <option>Comp-Off Leave</option>
                 <option>Unpaid / Sabbatical</option>
               </select>
             </div>
@@ -402,12 +518,28 @@ export default function Leave() {
               </div>
             </div>
 
+            {/* Sandwich-Leave & Holiday Deduction Alerts */}
+            {sandwichInfo.isSandwiched && sandwichInfo.extraDeducted > 0 && (
+              <div className="p-3 bg-amber-50/80 border border-amber-200/80 rounded-xl text-[12px] text-amber-900 flex items-start gap-2">
+                <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-bold">Sandwich Rule Active:</span> Intervening weekend/holiday days ({sandwichInfo.extraDeducted} extra days) are counted towards deducted leave balance according to company policy.
+                </div>
+              </div>
+            )}
+            {!sandwichRuleEnabled && sandwichInfo.weekendDays > 0 && (
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2 text-[11.5px] text-slate-600">
+                <Info size={14} className="text-slate-500 shrink-0" />
+                <span>Sandwich rule disabled: {sandwichInfo.weekendDays} weekend days excluded from deduction.</span>
+              </div>
+            )}
+
             {holidayOverlap.length > 0 && (
               <div className="p-3 bg-emerald-50/70 border border-emerald-200/80 rounded-xl text-[12px] text-emerald-800 flex items-start gap-2">
                 <Sparkles size={16} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <span className="font-semibold">Holiday Auto-Deduction:</span> {holidayOverlap.length} official holiday(s) in this period (
-                  <b>{holidayOverlap.map((h) => h.title).join(", ")}</b>) will not deduct from your quota.
+                  <span className="font-semibold">Holiday Calendar Detection:</span> {holidayOverlap.length} official holiday(s) in this period (
+                  <b>{holidayOverlap.map((h) => h.title).join(", ")}</b>) {sandwichRuleEnabled ? "included under sandwich rule" : "will not deduct from your quota"}.
                 </div>
               </div>
             )}
@@ -553,8 +685,8 @@ export default function Leave() {
             </select>
           </div>
 
-          {/* Leaves List */}
-          <div className="space-y-3.5 mt-1">
+          {/* Leaves List with clean internal scrolling */}
+          <div className="space-y-3.5 mt-1 max-h-[600px] overflow-y-auto pr-2">
             {filteredLeaves.map((l) => {
               const currentDelegate = delegateSelect[l.id] ?? l.delegate;
               const isOverburdened = currentDelegate === "Priya Patel";
@@ -681,28 +813,43 @@ export default function Leave() {
               </div>
             )}
           </div>
+
+          {filteredLeaves.length > 0 && (
+            <div className="pt-2 border-t border-bdr/60 flex items-center justify-between text-[11.5px] text-muted">
+              <span>Showing {filteredLeaves.length} leave application{filteredLeaves.length === 1 ? "" : "s"}</span>
+              {filteredLeaves.length > 3 && (
+                <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  Scroll for more
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ── Delegations Tracker Card ── */}
+      {/* ── Delegations & Governance Tracker Card ── */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
         <div className="p-5 pb-0">
           <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
-              <h3 className="font-bold text-[16px] text-slate-900">Work Handover &amp; Delegations Tracker</h3>
+              <h3 className="font-bold text-[16px] text-slate-900">Work Handover, Comp-Off &amp; Encashment Governance</h3>
               <p className="text-[12px] text-muted mt-0.5">
-                Track responsibilities delegated to you or colleagues while out of office
+                Track team delegations, approve compensatory off claims, and manage leave encashment payouts
               </p>
             </div>
             <span className="text-[12px] text-muted">
-              Showing {tab === "assigned" ? userDelegations.assigned.length : userDelegations.mine.length} active coverage assignment(s)
+              {tab === "assigned" && `Showing ${userDelegations.assigned.length} assigned delegation(s)`}
+              {tab === "mine" && `Showing ${userDelegations.mine.length} active coverage assignment(s)`}
+              {tab === "compoff" && `Showing ${compOffCredits.length} comp-off claim(s)`}
+              {tab === "encashment" && `Showing ${encashments.length} leave encashment request(s)`}
             </span>
           </div>
 
-          <div className="flex gap-4 mt-4 border-b border-bdr">
+          <div className="flex gap-4 mt-4 border-b border-bdr overflow-x-auto">
             <button
+              type="button"
               onClick={() => setTab("assigned")}
-              className={`pb-3 text-[13.5px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 tab === "assigned"
                   ? "border-navy text-navy"
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -714,8 +861,9 @@ export default function Leave() {
               </span>
             </button>
             <button
+              type="button"
               onClick={() => setTab("mine")}
-              className={`pb-3 text-[13.5px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 ${
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
                 tab === "mine"
                   ? "border-navy text-navy"
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -726,68 +874,281 @@ export default function Leave() {
                 {userDelegations.mine.length}
               </span>
             </button>
+            <button
+              type="button"
+              onClick={() => setTab("compoff")}
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+                tab === "compoff"
+                  ? "border-navy text-navy"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Clock size={14} className="text-amber-600" />
+              <span>Comp-Off Credits</span>
+              <span className="px-2 py-0.5 text-[11px] rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+                {compOffCredits.length}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab("encashment")}
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+                tab === "encashment"
+                  ? "border-navy text-navy"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
+              }`}
+            >
+              <Coins size={14} className="text-emerald-600" />
+              <span>Leave Encashments</span>
+              <span className="px-2 py-0.5 text-[11px] rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+                {encashments.length}
+              </span>
+            </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
-              <tr>
-                <th className="py-3.5 px-5">Colleague</th>
-                <th className="py-3.5 px-5">Leave Period</th>
-                <th className="py-3.5 px-5">Handover Deliverables</th>
-                <th className="py-3.5 px-5">Type</th>
-                <th className="py-3.5 px-5">Status</th>
-                <th className="py-3.5 px-5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-bdr/40 text-[13px]">
-              {(tab === "assigned" ? userDelegations.assigned : userDelegations.mine).map((r, i) => (
-                <tr key={r.id || i} className="hover:bg-slate-50/60 transition">
-                  <td className="py-3.5 px-5">
-                    <div className="flex items-center gap-2.5">
-                      <img
-                        src={r.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(r.emp)}`}
-                        alt=""
-                        className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                      />
-                      <span className="font-semibold text-slate-900">{r.emp}</span>
-                    </div>
-                  </td>
-                  <td className="py-3.5 px-5 text-[12.5px] text-slate-700 font-medium">{r.dates}</td>
-                  <td className="py-3.5 px-5 text-[12.5px] text-slate-600 max-w-[280px]">
-                    <div className="truncate">{r.note}</div>
-                  </td>
-                  <td className="py-3.5 px-5 text-[12.5px] text-slate-600">
-                    <span className="font-medium">{r.type || "Annual Leave"}</span>
-                  </td>
-                  <td className="py-3.5 px-5">
-                    <Badge
-                      tone={
-                        r.status === "Active"
-                          ? "success"
-                          : r.status === "Upcoming"
-                          ? "warning"
-                          : "neutral"
-                      }
-                    >
-                      {r.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => setDetailModalLeave(r)}
-                      className="px-3 py-1 bg-white border border-bdr rounded-lg text-[12px] font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
-                    >
-                      View Details
-                    </button>
-                  </td>
+        {/* Delegations View */}
+        {(tab === "assigned" || tab === "mine") && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
+                <tr>
+                  <th className="py-3.5 px-5">Colleague</th>
+                  <th className="py-3.5 px-5">Leave Period</th>
+                  <th className="py-3.5 px-5">Handover Deliverables</th>
+                  <th className="py-3.5 px-5">Type</th>
+                  <th className="py-3.5 px-5">Status</th>
+                  <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-bdr/40 text-[13px]">
+                {(tab === "assigned" ? userDelegations.assigned : userDelegations.mine).map((r, i) => (
+                  <tr key={r.id || i} className="hover:bg-slate-50/60 transition">
+                    <td className="py-3.5 px-5">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={r.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(r.emp)}`}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                        />
+                        <span className="font-semibold text-slate-900">{r.emp}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px] text-slate-700 font-medium">{r.dates}</td>
+                    <td className="py-3.5 px-5 text-[12.5px] text-slate-600 max-w-[280px]">
+                      <div className="truncate">{r.note}</div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px] text-slate-600">
+                      <span className="font-medium">{r.type || "Annual Leave"}</span>
+                    </td>
+                    <td className="py-3.5 px-5">
+                      <Badge
+                        tone={
+                          r.status === "Active"
+                            ? "success"
+                            : r.status === "Upcoming"
+                            ? "warning"
+                            : "neutral"
+                        }
+                      >
+                        {r.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-5 text-right">
+                      <button
+                        type="button"
+                        onClick={() => setDetailModalLeave(r)}
+                        className="px-3 py-1 bg-white border border-bdr rounded-lg text-[12px] font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
+                      >
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Comp-Off Credits View */}
+        {tab === "compoff" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
+                <tr>
+                  <th className="py-3.5 px-5">Claim ID &amp; Employee</th>
+                  <th className="py-3.5 px-5">Worked Date &amp; Hours</th>
+                  <th className="py-3.5 px-5">Credit Entitlement</th>
+                  <th className="py-3.5 px-5">Project / Justification</th>
+                  <th className="py-3.5 px-5">Expiry Window</th>
+                  <th className="py-3.5 px-5">Status</th>
+                  <th className="py-3.5 px-5 text-right">Approval Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-bdr/40 text-[13px]">
+                {compOffCredits.map((c) => (
+                  <tr key={c.id} className="hover:bg-slate-50/60 transition">
+                    <td className="py-3.5 px-5">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={c.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(c.employee)}`}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                        />
+                        <div>
+                          <div className="font-semibold text-slate-900">{c.employee}</div>
+                          <div className="text-[11px] text-muted">{c.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px] text-slate-700 font-medium">
+                      <div>{c.workedDate}</div>
+                      <div className="text-[11px] text-muted">{c.hoursWorked}h logged</div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px]">
+                      <span className="font-bold text-slate-900 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                        {c.creditDays} Day{c.creditDays > 1 ? "s" : ""}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px] text-slate-600 max-w-[260px]">
+                      <div className="truncate">{c.reason}</div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12px] text-muted font-medium">
+                      {c.expiryDate || "2024-12-31"}
+                    </td>
+                    <td className="py-3.5 px-5">
+                      <Badge tone={c.status === "Approved" ? "success" : c.status === "Rejected" ? "critical" : "warning"}>
+                        {c.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-5 text-right">
+                      {c.status === "Pending" ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              rejectCompOff(c.id, "Insufficient overtime proof");
+                              showToast(`Comp-off claim ${c.id} rejected.`);
+                            }}
+                            className="px-2.5 py-1 text-[11.5px] font-medium text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              approveCompOff(c.id);
+                              showToast(`Comp-off claim approved: ${c.creditDays} day credited to ${c.employee}.`);
+                            }}
+                            className="px-3 py-1 text-[11.5px] font-semibold text-white bg-navy rounded-lg hover:bg-navy/90 transition shadow-2xs cursor-pointer flex items-center gap-1"
+                          >
+                            <Check size={12} /> Approve
+                          </button>
+                        </div>
+                      ) : c.status === "Approved" ? (
+                        <span className="text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1">
+                          <Check size={11} /> Credited to Balance
+                        </span>
+                      ) : (
+                        <span className="text-[11.5px] text-rose-700 font-medium">Rejected</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Leave Encashments View */}
+        {tab === "encashment" && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
+                <tr>
+                  <th className="py-3.5 px-5">Request ID &amp; Employee</th>
+                  <th className="py-3.5 px-5">Encashed Days</th>
+                  <th className="py-3.5 px-5">Estimated Payout Rate</th>
+                  <th className="py-3.5 px-5">Reason</th>
+                  <th className="py-3.5 px-5">Payroll Cycle</th>
+                  <th className="py-3.5 px-5">Status</th>
+                  <th className="py-3.5 px-5 text-right">Approval &amp; Payroll Sync</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-bdr/40 text-[13px]">
+                {encashments.map((e) => (
+                  <tr key={e.id} className="hover:bg-slate-50/60 transition">
+                    <td className="py-3.5 px-5">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={e.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(e.employee)}`}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                        />
+                        <div>
+                          <div className="font-semibold text-slate-900">{e.employee}</div>
+                          <div className="text-[11px] text-muted">{e.id} • {e.requestDate}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px]">
+                      <span className="font-bold text-slate-900 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        {e.days} Day{e.days > 1 ? "s" : ""}
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px] text-slate-700 font-medium">
+                      <div className="font-bold text-slate-900">₹{(e.amount || e.days * 2083).toLocaleString()}</div>
+                      <div className="text-[11px] text-muted">@ ₹{e.ratePerDay || 2083}/day rate</div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12.5px] text-slate-600 max-w-[240px]">
+                      <div className="truncate">{e.reason}</div>
+                    </td>
+                    <td className="py-3.5 px-5 text-[12px] text-slate-700 font-medium">
+                      {e.processedMonth || "October 2024"}
+                    </td>
+                    <td className="py-3.5 px-5">
+                      <Badge tone={e.status === "Approved" ? "success" : e.status === "Rejected" ? "critical" : "warning"}>
+                        {e.status}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-5 text-right">
+                      {e.status === "Pending" ? (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              rejectEncashment(e.id, "Exceeds annual encashment quota");
+                              showToast(`Encashment ${e.id} rejected.`);
+                            }}
+                            className="px-2.5 py-1 text-[11.5px] font-medium text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                          >
+                            Reject
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              approveEncashment(e.id);
+                              showToast(`Approved! Added ₹${(e.amount || e.days * 2083).toLocaleString()} to Payroll additional earnings.`);
+                            }}
+                            className="px-3 py-1 text-[11.5px] font-semibold text-white bg-navy rounded-lg hover:bg-navy/90 transition shadow-2xs cursor-pointer flex items-center gap-1"
+                          >
+                            <Coins size={12} /> Approve Payout
+                          </button>
+                        </div>
+                      ) : e.status === "Approved" ? (
+                        <span className="text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1">
+                          <Coins size={12} /> Synced to Payroll (+₹{(e.amount || e.days * 2083).toLocaleString()})
+                        </span>
+                      ) : (
+                        <span className="text-[11.5px] text-rose-700 font-medium">Rejected</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ── Modal 1: Apply Leave Modal ── */}
@@ -841,6 +1202,7 @@ export default function Leave() {
               <option>Sick Leave</option>
               <option>Casual Leave</option>
               <option>Floating Holiday</option>
+              <option>Comp-Off Leave</option>
               <option>Unpaid / Sabbatical</option>
             </select>
           </div>
@@ -865,6 +1227,13 @@ export default function Leave() {
               />
             </div>
           </div>
+
+          {sandwichInfo.isSandwiched && sandwichInfo.extraDeducted > 0 && (
+            <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-[12px] text-amber-900 flex items-start gap-2">
+              <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+              <span><b>Sandwich Rule Active:</b> Intervening weekend/holiday days ({sandwichInfo.extraDeducted}d) will be counted in deduction.</span>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Assign Work Delegate</label>
@@ -998,6 +1367,218 @@ export default function Leave() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ── Modal 4: Request Leave Encashment ── */}
+      <Modal
+        isOpen={encashModalOpen}
+        onClose={() => setEncashModalOpen(false)}
+        title="Request Leave Encashment"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => setEncashModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                const daysNum = Number(encashForm.days) || 1;
+                const dailyRate = 2083; // Standard rate on ₹50k CTC / 24 working days
+                const totalAmt = daysNum * dailyRate;
+                requestEncashment({
+                  employee: encashForm.employeeName,
+                  avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(encashForm.employeeName)}`,
+                  days: daysNum,
+                  ratePerDay: dailyRate,
+                  amount: totalAmt,
+                  reason: encashForm.reason,
+                  processedMonth: "October 2024",
+                });
+                showToast(`Encashment requested for ${daysNum} days (₹${totalAmt.toLocaleString()}). Will reflect in Payroll upon approval.`);
+                setEncashModalOpen(false);
+              }}
+            >
+              Submit Encashment Request
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Employee</label>
+            <select
+              className="form-select"
+              value={encashForm.employeeName}
+              onChange={(e) => setEncashForm({ ...encashForm, employeeName: e.target.value })}
+            >
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.name}>
+                  {emp.name} ({emp.department} • {emp.designation})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Unused Days to Encash (Pure Dropdown)</label>
+            <select
+              className="form-select"
+              value={encashForm.days}
+              onChange={(e) => setEncashForm({ ...encashForm, days: Number(e.target.value) })}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((d) => (
+                <option key={d} value={d}>
+                  {d} Day{d > 1 ? "s" : ""} — ₹{(d * 2083).toLocaleString()} Payout
+                </option>
+              ))}
+            </select>
+            <span className="text-[11.5px] text-muted mt-1 block">
+              Calculated at standard daily rate: ₹2,083/day (₹50,000 CTC ÷ 24 working days).
+            </span>
+          </div>
+
+          <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xl text-emerald-900 text-[13px] flex items-center justify-between">
+            <div>
+              <div className="font-bold text-[14px]">
+                ₹{(Number(encashForm.days) * 2083).toLocaleString()} Estimated Payout
+              </div>
+              <div className="text-[11.5px] text-emerald-700 mt-0.5">
+                Automatically added to Payroll additional earnings upon HR approval
+              </div>
+            </div>
+            <Coins size={24} className="text-emerald-600" />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Reason / Justification</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              placeholder="e.g. Encashing surplus accrued annual leaves..."
+              value={encashForm.reason}
+              onChange={(e) => setEncashForm({ ...encashForm, reason: e.target.value })}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Modal 5: Claim Comp-Off ── */}
+      <Modal
+        isOpen={compOffModalOpen}
+        onClose={() => setCompOffModalOpen(false)}
+        title="Claim Compensatory Off (Comp-Off)"
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn-outline"
+              onClick={() => setCompOffModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => {
+                requestCompOff({
+                  employee: compOffForm.employeeName,
+                  avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(compOffForm.employeeName)}`,
+                  workedDate: compOffForm.workedDate,
+                  hoursWorked: Number(compOffForm.hoursWorked),
+                  creditDays: Number(compOffForm.creditDays),
+                  reason: compOffForm.reason,
+                  expiryDate: "2024-12-31",
+                });
+                showToast(`Comp-off claimed for ${compOffForm.creditDays} day(s). Awaiting manager/HR approval.`);
+                setCompOffModalOpen(false);
+              }}
+            >
+              Submit Comp-Off Claim
+            </button>
+          </>
+        }
+      >
+        <div style={{ display: "grid", gap: 14 }}>
+          <div className="form-group">
+            <label className="form-label">Employee</label>
+            <select
+              className="form-select"
+              value={compOffForm.employeeName}
+              onChange={(e) => setCompOffForm({ ...compOffForm, employeeName: e.target.value })}
+            >
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.name}>
+                  {emp.name} ({emp.department} • {emp.designation})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div className="form-group">
+              <label className="form-label">Weekend / Holiday Date Worked</label>
+              <input
+                type="date"
+                className="form-input"
+                value={compOffForm.workedDate}
+                onChange={(e) => setCompOffForm({ ...compOffForm, workedDate: e.target.value })}
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Hours Logged (Pure Dropdown)</label>
+              <select
+                className="form-select"
+                value={compOffForm.hoursWorked}
+                onChange={(e) => {
+                  const hrs = Number(e.target.value);
+                  const cred = hrs >= 8 ? 1 : 0.5;
+                  setCompOffForm({ ...compOffForm, hoursWorked: hrs, creditDays: cred });
+                }}
+              >
+                <option value={4}>4 Hours (Half Day Shift)</option>
+                <option value={8}>8 Hours (Full Day Shift)</option>
+                <option value={10}>10 Hours (Overtime Extended)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Credit Entitlement (Pure Dropdown)</label>
+            <select
+              className="form-select"
+              value={compOffForm.creditDays}
+              onChange={(e) => setCompOffForm({ ...compOffForm, creditDays: Number(e.target.value) })}
+            >
+              <option value={0.5}>0.5 Comp-Off Day (Half Day)</option>
+              <option value={1}>1.0 Comp-Off Day (Full Day)</option>
+              <option value={1.5}>1.5 Comp-Off Days</option>
+              <option value={2}>2.0 Comp-Off Days (Weekend Sprint)</option>
+            </select>
+          </div>
+
+          <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-amber-900 text-[12px] flex items-start gap-2">
+            <Clock size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold">Validity:</span> Approved comp-off credits must be availed within 60 days (valid until Dec 31, 2024). Once approved, credits are added directly to your Comp-Off leave balance.
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Project / Work Done *</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              placeholder="e.g. Critical cloud infrastructure maintenance and client emergency release..."
+              value={compOffForm.reason}
+              onChange={(e) => setCompOffForm({ ...compOffForm, reason: e.target.value })}
+            />
+          </div>
+        </div>
       </Modal>
     </div>
   );

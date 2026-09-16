@@ -25,10 +25,10 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
-  --color-navy: #1F2E4A;
-  --color-off: #F8F9FA;
-  --color-bdr: #E2E8F0;
-  --color-slate: #1F2937;
+  --color-navy: var(--primary);
+  --color-off: var(--soft);
+  --color-bdr: var(--border);
+  --color-slate: var(--text);
   --radius-default: var(--radius);
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
@@ -365,10 +365,200 @@ html.dark,
   .bg-\[\#e2e8f0\],
   .bg-\[\#EEF4FF\],
   .bg-\[\#eef4ff\],
-  .bg-\[\#f8fbff\] {
+  .bg-\[\#f8fbff\],
+  .bg-off,
+  .bg-\[\#f7f9fc\],
+  .bg-\[\#eef1f6\] {
     background-color: var(--soft) !important;
   }
+
+  .border-bdr,
+  .border-\[\#cbd5e1\],
+  .border-\[\#e8edf3\],
+  .border-\[\#edf2f7\] {
+    border-color: var(--border) !important;
+  }
+
+  .text-\[\#16233a\],
+  .text-\[\#111827\],
+  .text-\[\#1e293b\] {
+    color: var(--text) !important;
+  }
+
+  .text-\[\#6b7280\],
+  .text-\[\#7b8aa0\],
+  .text-\[\#9aa7bd\] {
+    color: var(--muted) !important;
+  }
 }
+
+/* =========================================================
+   HRMS THEME SYNCHRONIZATION (UNIFIED PROJECT THEME)
+   Alarms, Panels, Cards, Tables, Forms, Chips & Buttons
+   ========================================================= */
+.hrms-dash {
+  background: var(--page) !important;
+  color: var(--text) !important;
+}
+.hrms-crumb {
+  color: var(--muted) !important;
+}
+.hrms-title {
+  color: var(--text) !important;
+}
+.hrms-card,
+.hrms-stat-card {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+.hrms-h3 {
+  color: var(--text) !important;
+}
+.hrms-sub {
+  color: var(--muted) !important;
+}
+.hrms-notice {
+  background-color: var(--soft) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+.hrms-notice-x {
+  color: var(--muted) !important;
+}
+.hrms-date-btn,
+.hrms-export,
+.hrms-iconbtn {
+  background-color: var(--card) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+.hrms-date-btn:hover,
+.hrms-export:hover,
+.hrms-iconbtn:hover {
+  background-color: var(--card-hover) !important;
+  border-color: var(--border) !important;
+}
+.hrms-add-btn,
+.hrms-submit,
+.btn-navy,
+.bg-navy,
+.bg-\[\#1F2E4A\],
+.bg-\[\#1e3a8a\],
+.bg-\[\#1b2b4a\],
+.bg-\[\#19273c\],
+.bg-\[\#111f36\] {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+.hrms-add-btn:hover,
+.hrms-submit:hover,
+.hover\:bg-navy:hover,
+.hover\:bg-navy\/90:hover,
+.hover\:bg-\[\#1e40af\]:hover {
+  background-color: var(--primary-dark) !important;
+  color: #ffffff !important;
+}
+.text-navy,
+.text-\[\#1e3a8a\],
+.text-\[\#1F2E4A\] {
+  color: var(--primary) !important;
+}
+.border-navy,
+.border-\[\#1e3a8a\] {
+  border-color: var(--primary) !important;
+}
+.hrms-tabs {
+  background-color: var(--soft) !important;
+  border-color: var(--border) !important;
+}
+.hrms-tab {
+  color: var(--muted) !important;
+}
+.hrms-tab.active {
+  background-color: var(--card) !important;
+  color: var(--primary) !important;
+  border-color: var(--primary) !important;
+}
+.hrms-table thead tr {
+  background-color: var(--table-head-bg) !important;
+  border-color: var(--border) !important;
+}
+.hrms-table th {
+  color: var(--muted) !important;
+}
+.hrms-table td {
+  color: var(--text) !important;
+}
+.hrms-table tbody tr {
+  border-color: var(--border) !important;
+}
+.hrms-table tbody tr:hover {
+  background-color: var(--table-row-hover) !important;
+}
+.hrms-time {
+  color: var(--text) !important;
+}
+.hrms-dept {
+  color: var(--muted) !important;
+}
+.hrms-event {
+  background-color: var(--soft) !important;
+  color: var(--text-secondary) !important;
+}
+.hrms-timeline-line {
+  background-color: var(--border) !important;
+}
+.hrms-unread {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+.hrms-achip {
+  background-color: var(--soft) !important;
+  border-color: var(--border) !important;
+  color: var(--muted) !important;
+}
+.hrms-achip.active {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+.hrms-arow:hover {
+  background-color: var(--soft) !important;
+  border-color: var(--border) !important;
+}
+.hrms-afull {
+  background-color: var(--soft) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+.hrms-afull:hover {
+  background-color: var(--card-hover) !important;
+}
+.hrms-input,
+.hrms-area,
+.hrms-select {
+  background-color: var(--soft) !important;
+  border-color: var(--border) !important;
+  color: var(--text) !important;
+}
+.hrms-input:focus,
+.hrms-area:focus,
+.hrms-select:focus {
+  background-color: var(--card) !important;
+  border-color: var(--primary) !important;
+}
+.hrms-manage-pill-btn {
+  background-color: var(--soft) !important;
+  border-color: var(--border) !important;
+  color: var(--text-secondary) !important;
+}
+.hrms-manage-pill-btn:hover {
+  background-color: var(--card-hover) !important;
+  color: var(--text) !important;
+  border-color: var(--border) !important;
+}
+
 
 
 
@@ -4082,3 +4272,24 @@ img { display: block; max-width: 100%; }
   .text-success { color: var(--success); }
   .rounded { border-radius: var(--radius); }
 }
+
+/* ── Sleek Custom Scrollbars ─────────────────────────────── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+

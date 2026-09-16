@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Download, ChevronRight, ChevronLeft, Trash2 } from "lucide-react";
+import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 
@@ -212,21 +212,63 @@ export default function Employees() {
       {/* Filter Card */}
       <div className="emp-card emp-filter-card">
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <select value={dept} onChange={(e) => setDept(e.target.value)} className="emp-select">
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>
-                {d === "All" ? "All" : d}
-              </option>
-            ))}
-          </select>
+          <div className={`emp-filter-dropdown ${dept !== "All" ? "active" : ""}`}>
+            <span className="emp-filter-text">
+              {dept === "All" ? "Department" : dept}
+            </span>
+            <ChevronDown size={13} className="emp-filter-arrow" />
+            <select
+              value={dept}
+              onChange={(e) => {
+                setDept(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="emp-filter-native-select"
+              aria-label="Department Filter"
+            >
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select value={status} onChange={(e) => setStatus(e.target.value)} className="emp-select">
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s === "All" ? "All" : s}
-              </option>
-            ))}
-          </select>
+          <div className={`emp-filter-dropdown ${status !== "All" ? "active" : ""}`}>
+            <span className="emp-filter-text">
+              {status === "All" ? "Status" : status}
+            </span>
+            <ChevronDown size={13} className="emp-filter-arrow" />
+            <select
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="emp-filter-native-select"
+              aria-label="Status Filter"
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(dept !== "All" || status !== "All") && (
+            <button
+              type="button"
+              onClick={() => {
+                setDept("All");
+                setStatus("All");
+                setCurrentPage(1);
+              }}
+              className="emp-btn-clear"
+            >
+              Clear Filters
+            </button>
+          )}
         </div>
 
         {/* Table / Grid Toggle */}
@@ -460,6 +502,17 @@ export default function Employees() {
         
         .emp-select { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 34px 7px 16px; font-size: 13.5px; color: #1e293b; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 13px; min-width: 110px; transition: border-color 0.15s ease; }
         .emp-select:focus { border-color: #94a3b8; }
+
+        .emp-filter-dropdown { position: relative; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 14px; height: 36px; min-width: 130px; cursor: pointer; transition: all 0.15s ease; box-sizing: border-box; }
+        .emp-filter-dropdown:hover { border-color: #cbd5e1; background: #f8fafc; }
+        .emp-filter-dropdown.active { border-color: #3b82f6; background: #eff6ff; }
+        .emp-filter-text { font-size: 13.5px; color: #1e293b; font-weight: 500; white-space: nowrap; user-select: none; }
+        .emp-filter-dropdown.active .emp-filter-text { color: #1d4ed8; font-weight: 600; }
+        .emp-filter-arrow { color: #64748b; flex-shrink: 0; pointer-events: none; }
+        .emp-filter-dropdown.active .emp-filter-arrow { color: #2563eb; }
+        .emp-filter-native-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .emp-btn-clear { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 12px; font-size: 13px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
+        .emp-btn-clear:hover { background: #f8fafc; color: #111827; }
         
         .emp-tabs { display: inline-flex; align-items: center; gap: 3px; background: #f4f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 3px 4px; }
         .emp-tab { border: 1.5px solid transparent; border-radius: 999px; padding: 4px 16px; font-size: 13px; font-weight: 500; color: #8e9baa; background: transparent; cursor: pointer; transition: all 0.15s ease; }
