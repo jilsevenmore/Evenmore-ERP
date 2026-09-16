@@ -221,6 +221,8 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
                   const b = lineTaxBreakdown(it);
                   return { net: s.net + (Number(it.amount ?? it.qty * it.rate) || 0), cgst: s.cgst + b.cgst, sgst: s.sgst + b.sgst, igst: s.igst + b.igst };
                 }, { net: 0, cgst: 0, sgst: 0, igst: 0 });
+                // [PHASE-2E.1] effective combined GST rate when no state info is available
+                const gstSplit = tx.net > 0 ? `${Math.round(((tx.cgst + tx.sgst + tx.igst) / tx.net) * 100)}%` : '0%';
                 return (
                   <>
                     <div className="flex justify-between text-slate-600">

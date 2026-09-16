@@ -33,6 +33,9 @@ const reportsGuide = {
     ],
     workflow: ['Operational Data Recorded', 'Ledger Synchronized', 'Aging Classified', 'P&L Computed', 'Executive Audit Exported'],
 };
+// AR/AP aging bucket keys (stable module-scope constants so memo deps don't churn every render)
+const AR_BUCKETS = ['current', '31-60', '61-90', '90+'];
+const AP_BUCKETS = ['current', '31-60', '61-90', '90+'];
 export const ReportsPage = () => {
     const { customers, vendors, invoices, purchaseBills, salesOrders, expenses, items, getBillOutstanding, formatCurrency } = useERP();
     const [activeReport, setActiveReport] = useState('inventory');
@@ -111,8 +114,6 @@ export const ReportsPage = () => {
     //   total AR, and 70%/25%/5% per customer) that never matched real invoices. We now
     //   bucket each invoice/bill by its dueDate using ISO date math (Phase 0).
     // Bucket keys: 'current' (0-30), '31-60', '61-90', '90+'
-    const AR_BUCKETS = ['current', '31-60', '61-90', '90+'];
-    const AP_BUCKETS = ['current', '31-60', '61-90', '90+'];
 
     const bucketForDays = (days) => {
         if (days === null || days === undefined) return 'current';

@@ -73,7 +73,7 @@ export function AssetsPage() {
     } else if (tabParam === "inventory" && activeTab !== "inventory") {
       setActiveTab("inventory");
     }
-  }, [tabParam]);
+  }, [tabParam, activeTab]);
 
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);

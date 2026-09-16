@@ -231,7 +231,16 @@ export const ERPProvider = ({ children, }) => {
     const [currency, setCurrencyState] = useState(() => {
         return initial?.currency || localStorage.getItem('evenmore_currency') || 'INR (₹)';
     });
-    const [companyProfile, setCompanyProfileState] = useState(initial?.companyProfile || { name: 'Sweven Fabricators Pvt Ltd', gstin: '', pan: '', address: '', phone: '' });
+    const [companyProfile, setCompanyProfileState] = useState(initial?.companyProfile || {
+        // [PHASE-2E.1] Sweven demo company default — Maharashtra GSTIN so intra-state
+        //   prints show CGST+SGST split and the letterhead carries GSTIN/PAN/address.
+        //   Editable from Settings → Company Profile. Keep `name` aligned with app branding.
+        name: 'Sweven Fabricators Pvt Ltd',
+        gstin: '27AABCU9912E1Z8',
+        pan: 'AABCU9912E',
+        address: 'Plot 14, MIDC Industrial Area, Waluj, Aurangabad, Maharashtra 431136',
+        phone: '+91 80 4920 1100',
+    });
     const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
 
@@ -3260,7 +3269,7 @@ export const ERPProvider = ({ children, }) => {
                     const amount = Math.round(afterDisc * (1 + tax / 100) * 100) / 100;
                     return s + amount;
                 }, 0);
-                const otherFees = (Number(b.freight || b.freightCharges) || 0) + (Number(b.otherCharges) || 0);
+                const otherFees = (Number(bill.freight || bill.freightCharges) || 0) + (Number(bill.otherCharges) || 0);
                 recomputedTotal = Math.round((sumLines + otherFees) * 100) / 100;
             }
             setPurchaseBills((prev) => prev.map((b) => b.id === billId ? {

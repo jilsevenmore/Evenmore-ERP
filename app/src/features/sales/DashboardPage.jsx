@@ -158,8 +158,8 @@ export const DashboardPage = () => {
     <div className="space-y-6">
       <PageHeader title="Unified Business Dashboard" subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration — sab modules ek jagah." actions={<div className="flex items-center gap-2.5"><Link to="/crm/dashboard" className="px-3 py-2 bg-white border border-[#CED4DA] rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs">CRM Dashboard</Link><Link to="/crm/leads" className="px-3.5 py-2 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-md text-xs font-semibold shadow-xs transition flex items-center gap-1.5">+ New Lead</Link></div>} />
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        // ── [PHASE-1-DASHBOARD] "Total Leads" stat card replaced with ERP Totals ──
-        // Old: <StatCard label="Total Leads" value={fmt(leads.length + 238)} icon={Target} tone="blue" trend="12%" trendDirection="up" note="vs last month" />
+        {/* [PHASE-1-DASHBOARD] "Total Leads" stat card replaced with ERP Totals */}
+        {/* Old: <StatCard label="Total Leads" value={fmt(leads.length + 238)} icon={Target} tone="blue" trend="12%" trendDirection="up" note="vs last month" /> */}
         <StatCard label="Quotations" value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note="challans issued" />
         <StatCard label="Sales Orders" value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note="order value" />
         <StatCard label="Invoices Value" value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />

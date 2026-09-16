@@ -218,7 +218,9 @@ const router = createBrowserRouter([
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },
-      { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
+      // [PHASE-4] DEAD ROUTE — `purchase/vendors` had no nav entry; parties live at `/parties`.
+      //   Restore if a dedicated vendor workspace is ever needed:
+      // { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
       { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
@@ -252,18 +254,21 @@ const router = createBrowserRouter([
       { path: 'inventory/audit', element: <Page component={MonthEndAuditPage} /> },
 
       // ── Legacy Root Aliases ───────────────────────────────
-      { path: 'items', element: <Navigate to="/inventory/items" replace /> },
-      { path: 'items/machines', element: <Navigate to="/inventory/items/machines" replace /> },
-      { path: 'items/stock', element: <Navigate to="/inventory/items/stock" replace /> },
-      { path: 'items/new', element: <Navigate to="/inventory/items/new" replace /> },
-      { path: 'items/edit/:id', element: <Page component={AddEditItemPage} /> },
-      { path: 'categories', element: <Navigate to="/inventory/categories" replace /> },
-      { path: 'categories/machine', element: <Navigate to="/inventory/categories/machines" replace /> },
-      { path: 'categories/machines', element: <Navigate to="/inventory/categories/machines" replace /> },
-      { path: 'categories/stock', element: <Navigate to="/inventory/categories/stock" replace /> },
-      { path: 'stock', element: <Navigate to="/inventory/stock-position" replace /> },
-      { path: 'transfers', element: <Navigate to="/inventory/transfers" replace /> },
-      { path: 'purchase-orders', element: <Navigate to="/purchase/orders" replace /> },
+      // [PHASE-4] NAV-AUDITED DEAD ALIASES — no sidebar/navigate() links point at these
+      //   root-level aliases (inventory links use /inventory/...). Commented out per the
+      //   no-delete rule; restore any alias if an old deep-link needs to keep working.
+      // { path: 'items', element: <Navigate to="/inventory/items" replace /> },
+      // { path: 'items/machines', element: <Navigate to="/inventory/items/machines" replace /> },
+      // { path: 'items/stock', element: <Navigate to="/inventory/items/stock" replace /> },
+      // { path: 'items/new', element: <Navigate to="/inventory/items/new" replace /> },
+      // { path: 'items/edit/:id', element: <Page component={AddEditItemPage} /> },
+      // { path: 'categories', element: <Navigate to="/inventory/categories" replace /> },
+      // { path: 'categories/machine', element: <Navigate to="/inventory/categories/machines" replace /> },
+      // { path: 'categories/machines', element: <Navigate to="/inventory/categories/machines" replace /> },
+      // { path: 'categories/stock', element: <Navigate to="/inventory/categories/stock" replace /> },
+      // { path: 'stock', element: <Navigate to="/inventory/stock-position" replace /> },
+      // { path: 'transfers', element: <Navigate to="/inventory/transfers" replace /> },
+      // { path: 'purchase-orders', element: <Navigate to="/purchase/orders" replace /> },
 
       // ── Accounts ──────────────────────────────────────────
       { path: 'accounts', element: <Navigate to="/accounts/cash-bank" replace /> },

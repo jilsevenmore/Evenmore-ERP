@@ -40,6 +40,9 @@ export const PaymentInPage = () => {
     const [amount, setAmount] = useState(0);
     const [mode, setMode] = useState('Bank Transfer');
     const [reference, setReference] = useState('');
+    // [PHASE-4] live outstanding for overpay guard
+    const selectedInv = invoices.find((i) => i.id === selectedInvoiceId) || invoices[0];
+    const selectedOutstanding = selectedInv ? getInvoiceOutstanding(selectedInv.id) : { balanceDue: 0, paid: 0 };
     const handleInvoiceChange = (invId) => {
         setSelectedInvoiceId(invId);
         const inv = invoices.find((i) => i.id === invId);
@@ -171,15 +174,47 @@ export const PaymentInPage = () => {
                   {invoices.map((inv) => {
                 const outstanding = getInvoiceOutstanding(inv.id);
                 return (<option key={inv.id} value={inv.id}>
-                        {inv.invoiceNumber} - {inv.customer} (Due: ${outstanding.balanceDue.toFixed(2)})
+                        {inv.invoiceNumber} - {inv.customer} (Due: {formatCurrency(outstanding.balanceDue)})
                       </option>);
             })}
                 </select>
               </div>
 
+              {/* [PHASE-4] Live outstanding badge + overpay guard */}
+              {selectedInv && (
+                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Invoice Total:</span>
+                    <span className="font-mono text-slate-800">{formatCurrency(selectedInv.grandTotal || selectedInv.total || 0)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Already Collected:</span>
+                    <span className="font-mono text-slate-600">{formatCurrency(selectedOutstanding.paid)}</span>
+                  </div>
+                  <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1">
+                    <span>Remaining Balance Due:</span>
+                    <span className="font-mono font-bold">{formatCurrency(selectedOutstanding.balanceDue)}</span>
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Receipt Settlement Amount ($) *</label>
-                <input type="number" step="0.01" required min="0.01" value={amount} onChange={(e) => setAmount(Number(e.target.value))} className="w-full border border-slate-300 rounded-lg p-2 bg-white font-mono font-bold text-sm text-slate-900"/>
+                <label className="block font-semibold text-slate-700 mb-1">Receipt Settlement Amount (₹) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  min="0.01"
+                  max={Math.max(0.01, selectedOutstanding.balanceDue)}
+                  value={amount}
+                  onChange={(e) => setAmount(Number(e.target.value))}
+                  className="w-full border border-slate-300 rounded-lg p-2 bg-white font-mono font-bold text-sm text-slate-900"
+                />
+                {amount > selectedOutstanding.balanceDue + 0.01 && selectedOutstanding.balanceDue > 0 && (
+                  <p className="text-[11px] text-rose-600 font-medium mt-1">
+                    ⚠ Overpayment: amount exceeds outstanding balance by {formatCurrency(amount - selectedOutstanding.balanceDue)}.
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -193,8 +228,8 @@ export const PaymentInPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Reference / Wire #</label>
-                  <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"/>
+                  <label className="block font-semibold text-slate-700 mb-1">Reference / UTR / Ref #</label>
+                  <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR / cheque no." className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono"/>
                 </div>
               </div>
 
@@ -202,8 +237,12 @@ export const PaymentInPage = () => {
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm">
-                  Post Payment & Update Ledger
+                <button
+                  type="submit"
+                  disabled={amount <= 0 || amount > selectedOutstanding.balanceDue + 0.01}
+                  className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-sm"
+                >
+                  {amount > selectedOutstanding.balanceDue + 0.01 ? '⚠ Amount Exceeds Balance' : 'Post Payment & Update Ledger'}
                 </button>
               </div>
             </form>
