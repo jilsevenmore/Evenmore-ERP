@@ -1,3 +1,4 @@
+import CrmKpiCard from '../common/CrmKpiCard';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -982,75 +983,40 @@ export default function DealsPage() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
-            <Handshake size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Total Deals</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.totalDeals}</div>
+        <CrmKpiCard label="Total Deals" value={stats.totalDeals} icon={Handshake} tone="blue">
             <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
               <span>↑ 12%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
-            </div>
           </div>
-        </div>
+        </CrmKpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-bold text-xl flex-shrink-0">
-            ₹
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Total Value</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.totalValue}</div>
+        <CrmKpiCard label="Total Value" value={stats.totalValue} symbol="₹" tone="emerald">
             <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
               <span>↑ 18%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
-            </div>
           </div>
-        </div>
+        </CrmKpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
-            <Trophy size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Won Deals</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.wonDeals}</div>
+        <CrmKpiCard label="Won Deals" value={stats.wonDeals} icon={Trophy} tone="amber">
             <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
               <span>↑ 25%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
-            </div>
           </div>
-        </div>
+        </CrmKpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
-            <Clock size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Average Deal Size</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.avgDealSize}</div>
+        <CrmKpiCard label="Average Deal Size" value={stats.avgDealSize} icon={Clock} tone="purple">
             <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
               <span>↑ 14%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
-            </div>
           </div>
-        </div>
+        </CrmKpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 flex-shrink-0">
-            <TrendingUp size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Conversion Rate</div>
-            <div className="text-2xl font-bold text-slate-900 leading-tight mt-0.5">{stats.conversionRate}</div>
+        <CrmKpiCard label="Conversion Rate" value={stats.conversionRate} icon={TrendingUp} tone="rose">
             <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
               <span>↑ 6%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
-            </div>
           </div>
-        </div>
+        </CrmKpiCard>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs space-y-3">

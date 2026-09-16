@@ -1,3 +1,4 @@
+import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Users,
@@ -320,19 +321,10 @@ export default function CRMSystemSetupPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 px-4">
-            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Users size={17} /></span>
-              <span><span className="block text-[11px] text-slate-500 font-medium">Total Stages</span><span className="block text-lg font-black text-slate-800 leading-tight">{leadStages.length}</span></span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0"><ShieldCheck size={17} /></span>
-              <span><span className="flex items-center gap-1 text-[11px] text-slate-500 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Active</span><span className="block text-lg font-black text-slate-800 leading-tight">{leadActive}</span></span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0"><GitBranch size={17} /></span>
-              <span><span className="block text-[11px] text-slate-500 font-medium">Inactive</span><span className="block text-lg font-black text-slate-800 leading-tight">{leadInactive}</span></span>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4">
+            <CrmKpiCard label="Total Stages" value={leadStages.length} icon={Users} tone="blue" />
+            <CrmKpiCard label="Active" value={leadActive} icon={ShieldCheck} tone="emerald" />
+            <CrmKpiCard label="Inactive" value={leadInactive} icon={GitBranch} tone="rose" />
           </div>
 
           <div className="flex gap-2 px-4 mt-3">
@@ -413,19 +405,10 @@ export default function CRMSystemSetupPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 px-4">
-            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Layers size={17} /></span>
-              <span><span className="block text-[11px] text-slate-500 font-medium">Total Stages</span><span className="block text-lg font-black text-slate-800 leading-tight">{dealStages.length}</span></span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-lg bg-green-50 text-green-600 flex items-center justify-center shrink-0"><ShieldCheck size={17} /></span>
-              <span><span className="flex items-center gap-1 text-[11px] text-slate-500 font-medium"><span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Active</span><span className="block text-lg font-black text-slate-800 leading-tight">{dealActive}</span></span>
-            </div>
-            <div className="border border-slate-200 rounded-lg p-3 flex items-center gap-2.5">
-              <span className="w-9 h-9 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0"><GitBranch size={17} /></span>
-              <span><span className="block text-[11px] text-slate-500 font-medium">Inactive</span><span className="block text-lg font-black text-slate-800 leading-tight">{dealInactive}</span></span>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4">
+            <CrmKpiCard label="Total Stages" value={dealStages.length} icon={Layers} tone="blue" />
+            <CrmKpiCard label="Active" value={dealActive} icon={ShieldCheck} tone="emerald" />
+            <CrmKpiCard label="Inactive" value={dealInactive} icon={GitBranch} tone="rose" />
           </div>
 
           <div className="flex gap-2 px-4 mt-3">

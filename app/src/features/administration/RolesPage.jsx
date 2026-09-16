@@ -1,3 +1,4 @@
+import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -822,61 +823,33 @@ export function RolesPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
-            <Users size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.totalRoles}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Total Roles</div>
+        <KpiCard label="Total Roles" value={stats.totalRoles} icon={Users} tone="blue">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 12%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
-            <Users size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.totalUsers}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Total Users</div>
+        <KpiCard label="Total Users" value={stats.totalUsers} icon={Users} tone="emerald">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 5%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600 flex-shrink-0">
-            <Shield size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.totalPermissions}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Total Permissions</div>
+        <KpiCard label="Total Permissions" value={stats.totalPermissions} icon={Shield} tone="sky">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 8%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-purple-50 flex items-center justify-center text-purple-600 flex-shrink-0">
-            <Clock size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.activeModules}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Active Modules</div>
+        <KpiCard label="Active Modules" value={stats.activeModules} icon={Clock} tone="purple">
             <div className="text-[11px] font-semibold text-slate-700 mt-1 flex items-center gap-1">
               <span className="text-slate-900 font-bold">100%</span>
               <span className="text-slate-400 font-normal">System Coverage</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
       </div>
 
       <div className="flex flex-col lg:flex-row items-start gap-5">

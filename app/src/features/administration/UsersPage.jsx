@@ -1,3 +1,4 @@
+import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -883,49 +884,10 @@ export function UsersPage() {
 
       {/* ── Top Metric / Stat Cards (4 Cards) ──────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Users */}
-        <div className="bg-[#f0f7ff] border border-[#dbeafe] rounded-2xl p-4 flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-100 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
-            <Users size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Total Users</div>
-            <div className="text-2xl font-bold text-slate-900 mt-0.5">{stats.total}</div>
-          </div>
-        </div>
-
-        {/* Active Users */}
-        <div className="bg-[#f0fdf4] border border-[#dcfce7] rounded-2xl p-4 flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 flex-shrink-0">
-            <UserCheck size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Active Users</div>
-            <div className="text-2xl font-bold text-slate-900 mt-0.5">{stats.active}</div>
-          </div>
-        </div>
-
-        {/* Inactive Users */}
-        <div className="bg-[#fef2f2] border border-[#fee2e2] rounded-2xl p-4 flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center text-rose-600 flex-shrink-0">
-            <UserX size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Inactive Users</div>
-            <div className="text-2xl font-bold text-slate-900 mt-0.5">{stats.inactive}</div>
-          </div>
-        </div>
-
-        {/* Administrators */}
-        <div className="bg-[#faf5ff] border border-[#f3e8ff] rounded-2xl p-4 flex items-center gap-4 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-600 flex-shrink-0">
-            <Shield size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-xs font-semibold text-slate-500">Administrators</div>
-            <div className="text-2xl font-bold text-slate-900 mt-0.5">{stats.admins}</div>
-          </div>
-        </div>
+        <KpiCard label="Total Users" value={stats.total} icon={Users} tone="blue" />
+        <KpiCard label="Active Users" value={stats.active} icon={UserCheck} tone="emerald" />
+        <KpiCard label="Inactive Users" value={stats.inactive} icon={UserX} tone="rose" />
+        <KpiCard label="Administrators" value={stats.admins} icon={Shield} tone="purple" />
       </div>
 
       {/* ── Search & Filter Bar ────────────────────────────────── */}

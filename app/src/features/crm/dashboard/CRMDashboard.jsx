@@ -1,3 +1,4 @@
+import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, UserPlus, Clock, TrendingUp, TrendingDown, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
@@ -316,22 +317,14 @@ export default function DashboardView() {
         </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
-        {kpis.map((k) => {
-          const Icon = k.icon;
+        {kpis.map((k, index) => {
           const Trend = k.up ? TrendingUp : TrendingDown;
           return (
-            <div key={k.label} style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 14, display: "flex", gap: 10, alignItems: "flex-start" }}>
-              <span style={{ width: 38, height: 38, borderRadius: 10, background: k.bg, color: k.fg, display: "grid", placeItems: "center", flexShrink: 0 }}>
-                <Icon size={19} />
+            <CrmKpiCard key={k.label} label={k.label} value={k.value} icon={k.icon} tone={['blue', 'emerald', 'amber', 'purple', 'rose'][index]}>
+              <span className="flex flex-wrap items-center gap-1 text-[11px] font-semibold" style={{ color: k.up ? '#10b981' : '#ef4444' }}>
+                <Trend size={13} /> {k.trend} <em className="font-normal not-italic text-slate-400">{k.note}</em>
               </span>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: "block", fontSize: 11, color: "#64748b", fontWeight: 600 }}>{k.label}</span>
-                <strong style={{ display: "block", fontSize: 18, fontWeight: 800, color: "#0f1f3d", lineHeight: 1.15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.value}</strong>
-                <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: k.up ? "#10b981" : "#ef4444", fontWeight: 700 }}>
-                  <Trend size={13} /> {k.trend} <em style={{ fontStyle: "normal", color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{k.note}</em>
-                </span>
-              </span>
-            </div>
+            </CrmKpiCard>
           );
         })}
       </div>
