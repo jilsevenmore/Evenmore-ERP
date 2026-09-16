@@ -47,7 +47,7 @@ function EditableCell({ row, field, className = "", onUpdate, renderValue }) {
   );
 }
 
-export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onRequestDelete, onRequestDeleteAll, onAddNote, onCreateTask, onOpenLead, onUpdateLead, variant = "list" }) {
+export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onRequestDelete, onRequestDeleteAll, onAddNote, onOpenLead, onUpdateLead, variant = "list" }) {
   const allChecked = rows.length > 0 && rows.every((row) => selected.includes(row.id));
   const [openMenuId, setOpenMenuId] = useState(null);
 
@@ -176,7 +176,7 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                             type="button"
                             onClick={() => {
                               setOpenMenuId(null);
-                              onCreateTask?.(row);
+                              onOpenLead?.(row);
                             }}
                           >
                             <Activity size={16} />

@@ -335,7 +335,7 @@ export default function TasksPage() {
   ];
 
   return (
-    <div className="feature-page" style={{ padding: '24px 32px' }}>
+    <div className="feature-page">
       <PageHeader
         title="CRM Tasks"
         subtitle="Track follow-ups, scheduled calls, demos, and sales milestones."

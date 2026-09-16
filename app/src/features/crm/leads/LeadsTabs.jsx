@@ -51,20 +51,21 @@ export default function LeadsTabs({
   return (
     <div className="leads-toolbar-wrap">
       <div className="tabs-bar">
-        <div className="tabs-list" role="tablist">
-          {tabs.slice(0, 1).map((t) => (
-            <button
-              key={t.key}
-              role="tab"
-              aria-selected={activeTab === t.key}
-              type="button"
-              onClick={() => onChange(t.key)}
-              className={`tab-dropdown${activeTab === t.key ? " active" : ""}`}
+        <div className="tabs-list">
+          <div className="relative">
+            <select
+              aria-label="Filter leads by status"
+              value={activeTab}
+              onChange={(event) => onChange(event.target.value)}
+              className="tab-dropdown active"
+              style={{ appearance: 'none', paddingRight: 32, cursor: 'pointer' }}
             >
-              {t.label}
-              <ChevronDown size={16} />
-            </button>
-          ))}
+              {tabs.map((tab) => (
+                <option key={tab.key} value={tab.key}>{tab.label}</option>
+              ))}
+            </select>
+            <ChevronDown size={16} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2" />
+          </div>
           <button
             type="button"
             onClick={onOpenGuide}

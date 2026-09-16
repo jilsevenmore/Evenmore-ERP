@@ -154,7 +154,7 @@ export default function TaskFormPage() {
   }, [forms, sortOrder, statusFilter]);
 
   return (
-    <section className="w-full max-w-none px-3 sm:px-4 lg:px-5 py-5">
+    <section className="w-full">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-[22px] sm:text-[24px] leading-tight font-bold text-slate-900 tracking-tight">Manage Lead Task Forms</h1>

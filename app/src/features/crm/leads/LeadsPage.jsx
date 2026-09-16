@@ -400,6 +400,7 @@ export default function LeadsPage() {
   function closeDeleteLead() {
     setDeleteTarget(null);
     setBulkDeleteTargets([]);
+    setSelected([]);
   }
 
   function deleteLead(id) {
@@ -591,7 +592,6 @@ export default function LeadsPage() {
                 onRequestDeleteAll={requestDeleteAll}
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
-                onCreateTask={openTaskForm}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
                 onDelete={deleteLead}
@@ -620,7 +620,6 @@ export default function LeadsPage() {
                 onRequestDeleteAll={requestDeleteAll}
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
-                onCreateTask={openTaskForm}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
                 variant="grid"

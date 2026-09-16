@@ -304,7 +304,7 @@ export default function DashboardView() {
     { time: "05:00 PM", title: "Send Quotations", sub: (nextQuote ? nextQuote.quoteNumber + " " + formatCurrency(nextQuote.amount || 0) : quotationsTotal + " pipeline"), color: "#f59e0b" }
   ].slice(0, 4);
   return (
-    <div style={{ display: "grid", gap: 14, padding: "16px 14px", background: "#f6f9ff", minHeight: "100%" }}>
+    <div style={{ display: "grid", gap: 14, background: "#f6f9ff", minHeight: "100%" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#0f1f3d" }}>{greet}, {firstName}!</h1>
