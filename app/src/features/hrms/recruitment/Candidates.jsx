@@ -20,8 +20,11 @@ import {
   CheckCircle2,
   Clock,
   Award,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import OfferLetterModal from "../organization/OfferLetterModal";
+import { CandidatePipeline } from "../../../components/hrms/CandidatePipeline";
 
 const CANDIDATES_GUIDE = {
   title: "Candidate Directory & Pipeline",
@@ -62,6 +65,7 @@ export default function Candidates() {
   const [job, setJob] = useState("All");
   const [stage, setStage] = useState("All");
   const [exp, setExp] = useState("All");
+  const [viewMode, setViewMode] = useState("table");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -360,9 +364,37 @@ export default function Candidates() {
         ]}
         guide={CANDIDATES_GUIDE}
         actions={
-          <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>
-            Add Candidate
-          </Button>
+          <div className="flex items-center gap-2.5">
+            <div className="inline-flex items-center bg-soft border border-border rounded-xl p-0.5">
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  viewMode === "table"
+                    ? "bg-card text-primary shadow-2xs border border-border"
+                    : "text-muted hover:text-text"
+                }`}
+              >
+                <List size={14} />
+                <span>Table</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("kanban")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  viewMode === "kanban"
+                    ? "bg-card text-primary shadow-2xs border border-border"
+                    : "text-muted hover:text-text"
+                }`}
+              >
+                <LayoutGrid size={14} />
+                <span>Kanban Pipeline</span>
+              </button>
+            </div>
+            <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>
+              Add Candidate
+            </Button>
+          </div>
         }
       />
 
@@ -396,51 +428,60 @@ export default function Candidates() {
         </div>
       </div>
 
-      {/* FilterBar */}
-      <FilterBar
-        search={search}
-        onSearch={setSearch}
-        placeholder="Search by candidate name, email, phone..."
-        selects={[
-          {
-            label: "Job",
-            value: job,
-            onChange: setJob,
-            options: uniqueJobs.map((j) => ({ value: j, label: j === "All" ? "All Jobs" : j })),
-          },
-          {
-            label: "Stage",
-            value: stage,
-            onChange: setStage,
-            options: uniqueStages.map((s) => ({ value: s, label: s === "All" ? "All Stages" : s })),
-          },
-          {
-            label: "Experience",
-            value: exp,
-            onChange: setExp,
-            options: uniqueExp.map((e) => ({ value: e, label: e === "All" ? "All Experience" : e })),
-          },
-        ]}
-        onClear={() => {
-          setSearch("");
-          setJob("All");
-          setStage("All");
-          setExp("All");
-        }}
-      />
+      {/* Main Content: Kanban Drag & Drop Pipeline vs DataTable */}
+      {viewMode === "kanban" ? (
+        <CandidatePipeline
+          onSelectCandidate={(c) => navigate(`/hrms/recruitment/candidates/${c.id}`)}
+        />
+      ) : (
+        <>
+          {/* FilterBar */}
+          <FilterBar
+            search={search}
+            onSearch={setSearch}
+            placeholder="Search by candidate name, email, phone..."
+            selects={[
+              {
+                label: "Job",
+                value: job,
+                onChange: setJob,
+                options: uniqueJobs.map((j) => ({ value: j, label: j === "All" ? "All Jobs" : j })),
+              },
+              {
+                label: "Stage",
+                value: stage,
+                onChange: setStage,
+                options: uniqueStages.map((s) => ({ value: s, label: s === "All" ? "All Stages" : s })),
+              },
+              {
+                label: "Experience",
+                value: exp,
+                onChange: setExp,
+                options: uniqueExp.map((e) => ({ value: e, label: e === "All" ? "All Experience" : e })),
+              },
+            ]}
+            onClear={() => {
+              setSearch("");
+              setJob("All");
+              setStage("All");
+              setExp("All");
+            }}
+          />
 
-      {/* Main Candidates DataTable */}
-      <DataTable
-        columns={cols}
-        data={filtered}
-        emptyTitle="No candidates found"
-        emptyDesc="Adjust filters or register a new candidate."
-        emptyAction={
-          <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>
-            Add Candidate
-          </Button>
-        }
-      />
+          {/* Main Candidates DataTable */}
+          <DataTable
+            columns={cols}
+            data={filtered}
+            emptyTitle="No candidates found"
+            emptyDesc="Adjust filters or register a new candidate."
+            emptyAction={
+              <Button variant="primary" size="sm" icon={Plus} onClick={openAdd}>
+                Add Candidate
+              </Button>
+            }
+          />
+        </>
+      )}
 
       {/* Add / Edit Candidate Modal */}
       <Modal
