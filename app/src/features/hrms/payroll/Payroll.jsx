@@ -325,6 +325,7 @@ function printPayslip(p) {
 export default function Payroll() {
   const showToast = useAppStore((s) => s.showToast);
   const storeLeaves = useAppStore((s) => s.leaves || []);
+  const storeEncashments = useAppStore((s) => s.encashments || []);
   const currentUser = useAppStore((s) => s.currentUser) || {
     name: "Adarsh Gupta",
     role: "Operations Admin",
@@ -402,13 +403,20 @@ export default function Payroll() {
       const totalHours = Number(p.totalHours) || (totalDays * dailyHours);
       const hourlyRate = Number(p.hourlyRate) || (totalHours > 0 ? Math.round(Number(p.standardSalary || 0) / totalHours) : 0);
 
+      const empApprovedEncashments = storeEncashments.filter(
+        (enc) => enc.employee?.toLowerCase() === p.name?.toLowerCase() && enc.status === "Approved"
+      );
+      const encashmentBonus = empApprovedEncashments.reduce((sum, enc) => sum + (Number(enc.amount) || 0), 0);
+      const baseEarnings = p.additionalEarnings !== undefined ? p.additionalEarnings : (p.overtime || 0);
+      const effectiveEarnings = baseEarnings + encashmentBonus;
+
       // Calculation matrix from reusable engine
       const calc = calculateSalaryComponents({
         standardSalary: p.standardSalary,
         totalDays: totalDays,
         attendedDays: attendedDays,
         paidLeaves: leaveDays,
-        additionalEarnings: p.additionalEarnings !== undefined ? p.additionalEarnings : (p.overtime || 0),
+        additionalEarnings: effectiveEarnings,
         deductions: p.deductions,
         advance: p.advance !== undefined ? p.advance : 0,
         status: p.status || "In Progress",
@@ -423,9 +431,10 @@ export default function Payroll() {
         dailyHours,
         totalHours,
         hourlyRate,
+        encashmentBonus,
       };
     });
-  }, [payrollEmployees, storeLeaves, defaultWorkingDays, departmentWorkingHours]);
+  }, [payrollEmployees, storeLeaves, storeEncashments, defaultWorkingDays, departmentWorkingHours]);
 
   // Selected employee for generate payslip modal
   const slipSelectedEmp = useMemo(() => {
@@ -1248,6 +1257,7 @@ export default function Payroll() {
                   <tr>
                     <th className="py-3.5 px-4">Employee</th>
                     <th className="py-3.5 px-3">Standard Salary</th>
+                    <th className="py-3.5 px-3">Daily &amp; Hourly Rate</th>
                     <th className="py-3.5 px-3">Earned Salary (Attendance)</th>
                     <th className="py-3.5 px-3">Earnings (+)</th>
                     <th className="py-3.5 px-3">Deductions (-)</th>
@@ -1260,12 +1270,20 @@ export default function Payroll() {
                 <tbody className="divide-y divide-bdr/40">
                   {filteredEmployees.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-12 text-center text-muted">
+                      <td colSpan={10} className="py-12 text-center text-muted">
                         No employees found matching the filters.
                       </td>
                     </tr>
                   ) : (
-                    filteredEmployees.map((p) => (
+                    filteredEmployees.map((p) => {
+                      const std = Number(p.standardSalary || 0);
+                      const tDays = Number(p.totalDays) || 24;
+                      const dHours = Number(p.dailyHours) || getDepartmentHours(departmentWorkingHours, p.department) || 8;
+                      const totHours = tDays * dHours;
+                      const dayRate = tDays > 0 ? Math.round(std / tDays) : 0;
+                      const hourRate = totHours > 0 ? Math.round(std / totHours) : 0;
+
+                      return (
                       <tr key={p.id} className="hover:bg-slate-50/60 transition">
                         {/* Employee Details */}
                         <td className="py-3.5 px-4">
@@ -1293,18 +1311,29 @@ export default function Payroll() {
 
                         {/* Standard Salary (Agreed CTC) */}
                         <td className="py-3.5 px-3 font-medium text-slate-800">
-                          <div>{formatINR(p.standardSalary)}</div>
+                          <div className="font-bold text-slate-900">{formatINR(p.standardSalary)}</div>
                           <div className="text-[10.5px] text-muted">Agreed base</div>
+                        </td>
+
+                        {/* Daily & Hourly Rate (Computed on Employee Standard CTC) */}
+                        <td className="py-3.5 px-3">
+                          <div className="font-semibold text-slate-900 text-[12.5px]">
+                            {formatINR(dayRate)}<span className="text-slate-500 font-normal text-[11px]">/day</span>
+                          </div>
+                          <div className="text-[11px] text-slate-600 font-medium mt-0.5">
+                            {formatINR(hourRate)}<span className="text-slate-500 font-normal text-[10.5px]">/hr</span>
+                            <span className="text-muted font-normal text-[10px] ml-1">({tDays}d × {dHours}h)</span>
+                          </div>
+                          <div className="text-[10px] text-muted mt-0.5">
+                            1 absent day = -{formatINR(dayRate)} LOP
+                          </div>
                         </td>
 
                         {/* Earned Salary (Pro-rated Attendance) */}
                         <td className="py-3.5 px-3">
                           <div className="font-semibold text-blue-900">{formatINR(p.earnedSalary)}</div>
                           <div className="text-[11px] text-slate-600 font-medium mt-0.5">
-                            {p.payableDays}/{p.totalDays} days • {p.dailyHours || getDepartmentHours(departmentWorkingHours, p.department)}h/day
-                          </div>
-                          <div className="text-[10px] text-muted">
-                            Target: {p.totalHours || (p.totalDays * (p.dailyHours || 8))}h • ₹{p.hourlyRate || Math.round(p.standardSalary / (p.totalDays * (p.dailyHours || 8)))}/hr
+                            {p.payableDays}/{p.totalDays} working days
                           </div>
                           {p.absentDays > 0 ? (
                             <div className="text-[10px] text-rose-700 font-medium bg-rose-50 border border-rose-200/80 rounded px-1.5 py-0.5 mt-0.5 inline-block">
@@ -1430,7 +1459,8 @@ export default function Payroll() {
                           </div>
                         </td>
                       </tr>
-                    ))
+                    );
+                  })
                   )}
                 </tbody>
               </table>

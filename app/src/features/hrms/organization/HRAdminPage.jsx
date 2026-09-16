@@ -281,6 +281,14 @@ export default function HRAdminPage({ defaultTab }) {
   const updateEmployeeStatus = useAppStore((s) => s.updateEmployeeStatus);
   const addCalendarEvent = useCalendarStore((s) => s.addEvent);
 
+  // Leave Governance & Carry-Forward Policies
+  const sandwichRuleEnabled = useAppStore((s) => s.sandwichRuleEnabled);
+  const toggleSandwichRule = useAppStore((s) => s.toggleSandwichRule);
+  const maxCarryForwardDays = useAppStore((s) => s.maxCarryForwardDays);
+  const setMaxCarryForwardDays = useAppStore((s) => s.setMaxCarryForwardDays);
+  const executeCarryForwardRollover = useAppStore((s) => s.executeCarryForwardRollover);
+  const carriedForwardLeaves = useAppStore((s) => s.carriedForwardLeaves);
+
   const [searchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") || defaultTab || "teams";
   const [activeTab, setActiveTab] = useState(initialTab);
@@ -968,11 +976,12 @@ export default function HRAdminPage({ defaultTab }) {
               </button>
               <Link
                 to="/hrms/payroll"
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+                style={{ color: '#ffffff', backgroundColor: '#1F2E4A' }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-navy text-white !text-white rounded-xl text-[13px] font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
               >
-                <Receipt size={15} />
-                <span>View Live Payroll</span>
-                <ArrowRight size={14} />
+                <Receipt size={15} className="text-white" style={{ color: '#ffffff' }} />
+                <span className="text-white font-semibold" style={{ color: '#ffffff' }}>View Live Payroll</span>
+                <ArrowRight size={14} className="text-white" style={{ color: '#ffffff' }} />
               </Link>
             </div>
           )}
@@ -2172,7 +2181,7 @@ export default function HRAdminPage({ defaultTab }) {
               <div>
                 <h2 className="text-[15px] font-bold text-slate-900">Department Working Schedule &amp; Hours Governance</h2>
                 <p className="text-[12px] text-muted">
-                  Configure monthly working days and daily operational working hours per department. Payroll salary loss of pay (LOP), hourly wages, and monthly target hours are calculated dynamically.
+                  Configure monthly working days and daily operational working hours per department. All changes sync dynamically with Employee-wise Payroll calculations.
                 </p>
               </div>
             </div>
@@ -2189,11 +2198,12 @@ export default function HRAdminPage({ defaultTab }) {
               </button>
               <Link
                 to="/hrms/payroll"
-                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy text-white rounded-xl text-[12.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+                style={{ color: '#ffffff', backgroundColor: '#1F2E4A' }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-navy text-white !text-white rounded-xl text-[12.5px] font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
               >
-                <Receipt size={14} />
-                <span>Open Payroll Management</span>
-                <ArrowRight size={13} />
+                <Receipt size={14} className="text-white" style={{ color: '#ffffff' }} />
+                <span className="text-white font-semibold" style={{ color: '#ffffff' }}>Open Payroll Management</span>
+                <ArrowRight size={13} className="text-white" style={{ color: '#ffffff' }} />
               </Link>
             </div>
           </div>
@@ -2268,8 +2278,6 @@ export default function HRAdminPage({ defaultTab }) {
                     <th className="py-3 px-4 text-center">Payroll Staff</th>
                     <th className="py-3 px-4 text-left">Working Days (Dropdown)</th>
                     <th className="py-3 px-4 text-left">Daily Working Hours (Dropdown)</th>
-                    <th className="py-3 px-4 text-left">Monthly Target Hours</th>
-                    <th className="py-3 px-4 text-left">Daily &amp; Hourly Rate (on ₹50k CTC)</th>
                     <th className="py-3 px-4 text-right">Payroll Status</th>
                   </tr>
                 </thead>
@@ -2277,7 +2285,6 @@ export default function HRAdminPage({ defaultTab }) {
                   {ALL_DEPARTMENTS_CONFIG.map((dept) => {
                     const currentDays = getDepartmentDays(departmentWorkingDays, dept.name);
                     const currentHours = getDepartmentHours(departmentWorkingHours, dept.name);
-                    const totalMonthlyHours = currentDays * currentHours;
                     const staffCount = payrollEmployees.filter(
                       (e) =>
                         e.department?.toLowerCase() === dept.name.toLowerCase() ||
@@ -2285,8 +2292,6 @@ export default function HRAdminPage({ defaultTab }) {
                         (dept.name === "Sales & CRM" && e.department?.toLowerCase().includes("sales")) ||
                         (dept.name === "Warehouse & Inventory" && e.department?.toLowerCase().includes("warehouse"))
                     ).length;
-                    const sampleDayRate = Math.round(50000 / currentDays);
-                    const sampleHourRate = totalMonthlyHours > 0 ? Math.round(50000 / totalMonthlyHours) : 0;
 
                     return (
                       <tr key={dept.name} className="hover:bg-slate-50/60 transition-colors">
@@ -2360,22 +2365,6 @@ export default function HRAdminPage({ defaultTab }) {
                             </select>
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 text-slate-700">
-                          <div className="font-bold text-slate-900 text-[13px]">
-                            {totalMonthlyHours} hrs / month
-                          </div>
-                          <div className="text-[11px] text-muted font-mono">
-                            {currentDays}d × {currentHours}h
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-600">
-                          <div className="text-[12px] font-semibold text-slate-900">
-                            ₹{sampleDayRate.toLocaleString()}/day • ₹{sampleHourRate.toLocaleString()}/hr
-                          </div>
-                          <div className="text-[11px] text-muted">
-                            1 absent day = -₹{sampleDayRate.toLocaleString()} LOP
-                          </div>
-                        </td>
                         <td className="py-3.5 px-4 text-right">
                           <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
                             <Check size={12} /> Active in Payroll
@@ -2386,6 +2375,124 @@ export default function HRAdminPage({ defaultTab }) {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Leave Policy, Carry-Forward & Sandwich-Leave Governance Card */}
+          <div className="bg-white border border-bdr rounded-xl p-5 shadow-xs flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-bdr/60 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center font-bold">
+                  <ShieldCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-slate-900">Leave Policy, Carry-Forward &amp; Sandwich Rule Governance</h3>
+                  <p className="text-[12px] text-muted">
+                    Configure automated sandwich leave deduction rules and annual leave rollover caps for organizational compliance.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  executeCarryForwardRollover();
+                  showToast(`Executed Year-End Rollover: Rolled over up to ${maxCarryForwardDays || 12} days per employee for the new cycle.`);
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-[12.5px] font-semibold transition shadow-xs cursor-pointer"
+              >
+                <Sparkles size={14} />
+                <span>Execute Year-End Rollover</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Sandwich-Leave Rule Card */}
+              <div className="bg-slate-50 border border-bdr rounded-xl p-4 flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-bold text-slate-900 flex items-center gap-1.5">
+                      🥪 Sandwich-Leave Policy Rule
+                    </span>
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${sandwichRuleEnabled ? "bg-emerald-50 text-emerald-800 border-emerald-200" : "bg-slate-100 text-slate-600 border-slate-300"}`}>
+                      {sandwichRuleEnabled ? "Active Policy" : "Rule Disabled"}
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-muted mt-1 leading-relaxed">
+                    When enabled, intervening weekend days and gazetted holidays falling between leave days (e.g. Friday to Monday) are counted and deducted from employee leave balances.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-bdr/60">
+                  <span className="text-[12px] font-medium text-slate-700">Policy Mode:</span>
+                  <div className="inline-flex items-center gap-2 bg-white border border-bdr rounded-xl px-2.5 py-1 shadow-2xs">
+                    <select
+                      value={sandwichRuleEnabled ? "enabled" : "disabled"}
+                      onChange={(e) => {
+                        const val = e.target.value === "enabled";
+                        toggleSandwichRule(val);
+                        showToast(`Sandwich Rule ${val ? "Enabled" : "Disabled"}. Leave calculations updated.`);
+                      }}
+                      className="font-bold text-slate-900 bg-transparent outline-none cursor-pointer text-[12.5px] py-0.5"
+                    >
+                      <option value="enabled">Enabled (Count Intervening Weekends)</option>
+                      <option value="disabled">Disabled (Exclude Weekends &amp; Holidays)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Carry-Forward Policy Card */}
+              <div className="bg-slate-50 border border-bdr rounded-xl p-4 flex flex-col justify-between gap-3">
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[13px] font-bold text-slate-900 flex items-center gap-1.5">
+                      🔄 Annual Leave Carry-Forward Threshold
+                    </span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+                      Cap: {maxCarryForwardDays || 12} Days
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-muted mt-1 leading-relaxed">
+                    Maximum unutilized annual leave days permitted to roll over into the subsequent calendar or financial year cycle. Excess unused balances lapse automatically.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-bdr/60">
+                  <span className="text-[12px] font-medium text-slate-700">Max Carry-Forward Cap:</span>
+                  <div className="inline-flex items-center gap-2 bg-white border border-bdr rounded-xl px-2.5 py-1 shadow-2xs">
+                    <select
+                      value={maxCarryForwardDays || 12}
+                      onChange={(e) => {
+                        const days = Number(e.target.value);
+                        setMaxCarryForwardDays(days);
+                        showToast(`Updated Carry-Forward cap to ${days} days.`);
+                      }}
+                      className="font-bold text-slate-900 bg-transparent outline-none cursor-pointer text-[12.5px] py-0.5"
+                    >
+                      <option value={6}>6 Days Maximum</option>
+                      <option value={8}>8 Days Maximum</option>
+                      <option value={10}>10 Days Maximum</option>
+                      <option value={12}>12 Days Maximum (Standard Policy)</option>
+                      <option value={15}>15 Days Maximum</option>
+                      <option value={18}>18 Days Maximum (Full Rollover)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Active Rollover Summary Pill */}
+            <div className="p-3 bg-purple-50/60 border border-purple-200 rounded-xl text-[12px] text-purple-950 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles size={15} className="text-purple-700 shrink-0" />
+                <span>
+                  <b>Current Active Rollover Pool:</b>{" "}
+                  {Object.entries(carriedForwardLeaves || {}).map(([emp, d]) => `${emp}: ${d}d`).join(", ") || "Ayesha Khan: 6d, Priya Patel: 8d, Liam Cooper: 4d"}
+                </span>
+              </div>
+              <span className="text-[11px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
+                Synced with Leave Balance Quotas
+              </span>
             </div>
           </div>
         </div>
