@@ -2028,26 +2028,52 @@ export const ERPProvider = ({ children, }) => {
             showToast(`Cannot create Invoice from Cancelled Sales Order.`);
             return undefined;
         }
-        
+
+        // ── [PHASE-2B] Double-billing guard: only invoice REMAINING qty per line ──
+        // Previously this built invoices from full ordered qty every time (line qty was
+        //   copied 1:1) with no deliveredQty/invoicedQty check and no block on an already
+        //   fully-invoiced SO. Now each line invoices (ordered − invoiced) and a fully
+        //   invoiced order is blocked — the mirror of PO→GRN→Bill integrity.
+        const srcLines = (order.items && order.items.length > 0)
+            ? order.items
+            : (order.lineItems && order.lineItems.length > 0)
+                ? order.lineItems
+                : [];
+        const totalOrderedQty = srcLines.reduce((s, l) => s + (Number(l.orderedQty ?? l.qty) || 0), 0);
+        const totalInvoicedQty = srcLines.reduce((s, l) => s + (Number(l.invoicedQty) || 0), 0);
+        const fullyInvoiced = totalOrderedQty > 0 && totalInvoicedQty >= totalOrderedQty - 0.001;
+        if (fullyInvoiced && srcLines.length > 0) {
+            showToast(`Sales Order ${order.orderNumber} is already fully invoiced (${totalInvoicedQty}/${totalOrderedQty} qty).`);
+            return undefined;
+        }
+
         const sourceLines = (order.items && order.items.length > 0)
             ? order.items
             : (order.lineItems && order.lineItems.length > 0)
                 ? order.lineItems
                 : [];
         const itemsList = sourceLines.length > 0
-            ? sourceLines.map((line, idx) => ({
-                id: line.id || `item-${Date.now()}-${idx}`,
-                itemId: line.itemId || '',
-                sku: line.sku || line.itemSku || '',
-                itemSku: line.sku || line.itemSku || '',
-                name: line.name || line.description || `Deliverable Item ${idx + 1}`,
-                description: line.name || line.description || `Deliverable Item ${idx + 1}`,
-                qty: line.qty || line.orderedQty || 1,
-                rate: line.rate || 0,
-                discount: line.discount || line.discountPercent || 0,
-                tax: line.tax !== undefined ? line.tax : (line.taxRate !== undefined ? line.taxRate : 18),
-                amount: line.amount || (line.qty || 1) * (line.rate || 0),
-            }))
+            ? sourceLines.map((line, idx) => {
+                const orderedQty = Number(line.qty || line.orderedQty || 1);
+                const alreadyInvoiced = Number(line.invoicedQty) || 0;
+                const remainingQty = Math.max(0, orderedQty - alreadyInvoiced);
+                return {
+                    id: line.id || `item-${Date.now()}-${idx}`,
+                    itemId: line.itemId || '',
+                    sku: line.sku || line.itemSku || '',
+                    itemSku: line.sku || line.itemSku || '',
+                    name: line.name || line.description || `Deliverable Item ${idx + 1}`,
+                    description: line.name || line.description || `Deliverable Item ${idx + 1}`,
+                    // [PHASE-2B] qty now reflects remaining (ordered − invoiced); old code used full qty
+                    qty: remainingQty || 1,
+                    orderedQty,
+                    alreadyInvoicedQty: alreadyInvoiced,
+                    rate: line.rate || 0,
+                    discount: line.discount || line.discountPercent || 0,
+                    tax: line.tax !== undefined ? line.tax : (line.taxRate !== undefined ? line.taxRate : 18),
+                    amount: (remainingQty || 1) * (line.rate || 0),
+                };
+            })
             : [
                 {
                     id: `item-${Date.now()}`,
@@ -2088,14 +2114,20 @@ export const ERPProvider = ({ children, }) => {
         // Update SO line items invoicedQty and stage
         setSalesOrders((prev) => prev.map((o) => {
             if (o.id !== orderId) return o;
-            const updatedItems = (o.items || []).map((line) => ({
-                ...line,
-                invoicedQty: (line.invoicedQty || 0) + (Number(line.qty || line.orderedQty) || 1),
-            }));
+            const updatedItems = (o.items || []).map((line) => {
+                const orderedQty = Number(line.qty || line.orderedQty) || 1;
+                const remaining = Math.max(0, orderedQty - (Number(line.invoicedQty) || 0));
+                // [PHASE-2B] invoicedQty now increments by the invoiced (remaining) qty
+                return {
+                    ...line,
+                    invoicedQty: (line.invoicedQty || 0) + remaining,
+                };
+            });
+            const stillOpen = updatedItems.some((l) => (Number(l.qty ?? l.orderedQty) || 1) - (Number(l.invoicedQty) || 0) > 0.001);
             return {
                 ...o,
-                stage: 'Invoiced',
-                status: 'Invoiced',
+                stage: stillOpen ? 'Partially Invoiced' : 'Invoiced',
+                status: stillOpen ? 'Partially Invoiced' : 'Invoiced',
                 items: updatedItems,
                 lineItems: updatedItems,
             };
@@ -2763,7 +2795,10 @@ export const ERPProvider = ({ children, }) => {
             amountPaid: 0,
             balanceDue: billAmt,
             status: 'Unpaid',
-            goodsReceived: true,
+            // ── [PHASE-2B] PO→Bill conversion no longer auto-receives stock ──
+            // Old code: goodsReceived: true, — stock increased automatically at bill time.
+            // Goods are now received through the standalone Goods Receipt (GRN) page.
+            goodsReceived: false,
             items: billLines,
             lineItems: billLines,
         };
@@ -2788,8 +2823,36 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        // Automatically receive inventory from line items (increases stock and registers serials)
-        if (billLines.length > 0) {
+        // ── [PHASE-2B] Auto-receive on PO→Bill kept only for pre-received (legacy) bills ──
+        // Old code auto-received inventory from every bill line at conversion time.
+        //   Now handled by GoodsReceiptPage (GRN). The block below still runs when the
+        //   bill was explicitly created as already received (goodsReceived: true).
+        // if (billLines.length > 0) {
+        //     billLines.forEach((line) => {
+        //         const targetSku = line.sku || line.itemSku;
+        //         const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+        //         if (item && item.trackingMode === 'Serial') {
+        //             const serials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
+        //             if (serials.length > 0) {
+        //                 addSerialNumbers(item.id, serials);
+        //             }
+        //         }
+        //         recordMovement({
+        //             itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+        //             itemSku: item?.sku || targetSku || 'GEN-SKU',
+        //             itemName: item?.name || line.name || line.description,
+        //             type: 'PURCHASE',
+        //             quantity: line.qty || 1,
+        //             unitCost: line.rate || item?.costPrice || 0,
+        //             referenceType: 'PurchaseBill',
+        //             referenceId: newBill.id,
+        //             referenceNumber: newBill.billNumber,
+        //             serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
+        //             notes: `Goods received via ${newBill.billNumber}`,
+        //         });
+        //     });
+        // }
+        if (newBill.goodsReceived === true && billLines.length > 0) {
             billLines.forEach((line) => {
                 const targetSku = line.sku || line.itemSku;
                 const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
@@ -2842,7 +2905,11 @@ export const ERPProvider = ({ children, }) => {
             amountPaid: bill.amountPaid || bill.paidAmount || 0,
             balanceDue: Math.max(0, billAmt - (bill.paidAmount || bill.amountPaid || 0)),
             status: bill.status || 'Unpaid',
-            goodsReceived: true,
+            // ── [PHASE-2B] New bills are NOT auto-received: stock moves only on GRN ──
+            // Old code: goodsReceived: true, — every new bill immediately increased stock.
+            // Post-GRN-split a bill can exist with goodsReceived=false and stock only
+            //   changes when GoodsReceiptPage / receivePurchaseBillGoods marks it received.
+            goodsReceived: bill.goodsReceived !== undefined ? !!bill.goodsReceived : false,
             items: billLines,
             lineItems: billLines,
             notes: bill.notes || '',
@@ -2875,8 +2942,37 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        // Auto-record PURCHASE movements for items (increases stock and registers serials)
-        if (billLines.length > 0) {
+        // ── [PHASE-2B] Auto-stock on bill creation replaced by GRN-gated stock entry ──
+        // Old code auto-recorded PURCHASE movements for every bill line here
+        //   (noted below). Now movement happens ONLY when the bill was already
+        //   received (goodsReceived === true — e.g. legacy / pre-received bills);
+        //   otherwise stock enters via GoodsReceiptPage → receivePurchaseBillGoods.
+        // if (billLines.length > 0) {
+        //     billLines.forEach((line) => {
+        //         const targetSku = line.sku || line.itemSku;
+        //         const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+        //         if (item && item.trackingMode === 'Serial') {
+        //             const serials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
+        //             if (serials.length > 0) {
+        //                 addSerialNumbers(item.id, serials);
+        //             }
+        //         }
+        //         recordMovement({
+        //             itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+        //             itemSku: item?.sku || targetSku || 'GEN-SKU',
+        //             itemName: item?.name || line.name || line.description,
+        //             type: 'PURCHASE',
+        //             quantity: line.qty || 1,
+        //             unitCost: line.rate || item?.costPrice || 0,
+        //             referenceType: 'PurchaseBill',
+        //             referenceId: newBill.id,
+        //             referenceNumber: newBill.billNumber,
+        //             serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
+        //             notes: `Goods intake via ${newBill.billNumber}`,
+        //         });
+        //     });
+        // }
+        if (newBill.goodsReceived === true && billLines.length > 0) {
             billLines.forEach((line) => {
                 const targetSku = line.sku || line.itemSku;
                 const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
@@ -2994,7 +3090,7 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Purchase Bill ${bill.billNumber} cancelled.`);
         return { success: true, message: `Purchase Bill ${bill.billNumber} cancelled.` };
     };
-    const receivePurchaseBillGoods = (billId) => {
+    const receivePurchaseBillGoods = (billId, receivedOverrides = null, qcStatus = 'Approved') => {
         const bill = purchaseBills.find((b) => b.id === billId);
         if (!bill)
             return;
@@ -3009,6 +3105,19 @@ export const ERPProvider = ({ children, }) => {
         const billLines = bill.items || bill.lineItems || [];
         if (billLines.length > 0) {
             billLines.forEach((line) => {
+                // ── [PHASE-2B] Accept per-line received quantity (partial / weight receipts) ──
+                // Old code always received line.qty. GoodsReceiptPage can now pass
+                //   receivedOverrides = [{ lineId | lineIndex | sku, receivedQty }] so the
+                //   actual received (weighed) quantity hits stock, not the ordered qty.
+                const override = Array.isArray(receivedOverrides)
+                    ? receivedOverrides.find((o) =>
+                        (o.lineId && o.lineId === (line.id || line.lineId)) ||
+                        (o.lineIndex !== undefined && Number(o.lineIndex) === billLines.indexOf(line)) ||
+                        (o.sku && String(o.sku).toLowerCase() === String(line.sku || line.itemSku || '').toLowerCase()))
+                    : null;
+                const receivedQty = override && Number(override.receivedQty) >= 0
+                    ? Number(override.receivedQty)
+                    : Number(line.qty || 1);
                 const targetSku = line.sku || line.itemSku;
                 const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
                 if (item && item.trackingMode === 'Serial') {
@@ -3022,7 +3131,7 @@ export const ERPProvider = ({ children, }) => {
                     itemSku: item?.sku || targetSku || 'GEN-SKU',
                     itemName: item?.name || line.name || line.description,
                     type: 'PURCHASE',
-                    quantity: line.qty || 1,
+                    quantity: receivedQty,
                     unitCost: line.rate || item?.costPrice || 0,
                     referenceType: 'PurchaseBill',
                     referenceId: bill.id,
@@ -3031,7 +3140,35 @@ export const ERPProvider = ({ children, }) => {
                     notes: `Manual goods receipt for bill ${bill.billNumber}`,
                 });
             });
-            setPurchaseBills((prev) => prev.map((b) => b.id === billId ? { ...b, goodsReceived: true } : b));
+            setPurchaseBills((prev) => prev.map((b) => b.id === billId ? {
+                ...b,
+                goodsReceived: true,
+                qcStatus, // [PHASE-2C] approved / pending / rejected captured on the receipt
+                receivedDate: getCurrentISODate(),
+                // [PHASE-2B] mirror the actual received qty onto bill lines for 3-way match
+                items: (receivedOverrides && receivedOverrides.length > 0)
+                    ? billLines.map((line) => {
+                        const override = receivedOverrides.find((o) =>
+                            (o.lineId && o.lineId === (line.id || line.lineId)) ||
+                            (o.lineIndex !== undefined && Number(o.lineIndex) === billLines.indexOf(line)) ||
+                            (o.sku && String(o.sku).toLowerCase() === String(line.sku || line.itemSku || '').toLowerCase()));
+                        return override && Number(override.receivedQty) >= 0
+                            ? { ...line, qty: Number(override.receivedQty), receivedQty: Number(override.receivedQty) }
+                            : { ...line, receivedQty: Number(line.qty || 1) };
+                    })
+                    : billLines.map((line) => ({ ...line, receivedQty: Number(line.qty || 1) })),
+                lineItems: (receivedOverrides && receivedOverrides.length > 0)
+                    ? billLines.map((line) => {
+                        const override = receivedOverrides.find((o) =>
+                            (o.lineId && o.lineId === (line.id || line.lineId)) ||
+                            (o.lineIndex !== undefined && Number(o.lineIndex) === billLines.indexOf(line)) ||
+                            (o.sku && String(o.sku).toLowerCase() === String(line.sku || line.itemSku || '').toLowerCase()));
+                        return override && Number(override.receivedQty) >= 0
+                            ? { ...line, qty: Number(override.receivedQty), receivedQty: Number(override.receivedQty) }
+                            : { ...line, receivedQty: Number(line.qty || 1) };
+                    })
+                    : billLines.map((line) => ({ ...line, receivedQty: Number(line.qty || 1) })),
+            } : b));
             showToast(`Stock received and added to inventory from bill ${bill.billNumber}`);
         }
     };
