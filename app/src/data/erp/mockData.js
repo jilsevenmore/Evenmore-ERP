@@ -1734,7 +1734,7 @@ export const mockTransfers = [
         itemSku: 'ITM-2210',
         itemName: 'Cat6 Shielded Patch Cable 2m (Blue)',
         qty: 50,
-        date: 'Today',
+        date: 'Sep 10, 2026',
         itemsCount: 50,
         status: 'In Transit',
         shippedBy: 'John Trucker',
@@ -1837,7 +1837,7 @@ export const mockServiceUsages = [
         customerId: 'cust-1',
         customer: 'Acme Corp',
         qtyUsed: 5,
-        date: 'Today',
+        date: 'Sep 10, 2026',
         purpose: 'Rack cabling replacement in Bay 3',
     },
     {
