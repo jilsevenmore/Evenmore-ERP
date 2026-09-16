@@ -196,17 +196,19 @@ export default function Recruitment() {
             <button
               type="button"
               onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-muted hover:text-text hover:bg-soft text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap"
             >
               <HelpCircle size={14} />
               <span>Guide</span>
             </button>
             <Button
+              variant="primary"
               size="sm"
+              icon={Plus}
               onClick={() => navigate("/hrms/recruitment/candidates", { state: { openAdd: true } })}
-              className="cursor-pointer shadow-xs"
+              className="shadow-xs whitespace-nowrap font-medium"
             >
-              + Add Candidate
+              Add Candidate
             </Button>
           </div>
         }
