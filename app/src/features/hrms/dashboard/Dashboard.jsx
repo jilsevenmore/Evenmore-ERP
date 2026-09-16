@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Users,
   UserCheck,
@@ -14,6 +14,7 @@ import {
   X,
   Zap,
   ChevronRight,
+  ChevronDown,
   Plus,
   FileText,
   Check,
@@ -24,6 +25,15 @@ import {
   RefreshCw,
   Settings,
   Laptop,
+  Home,
+  Clock,
+  Receipt,
+  Key,
+  GraduationCap,
+  LogOut,
+  HeartPulse,
+  FileCheck,
+  HelpCircle,
 } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import Modal from "../../../components/ui/Modal";
@@ -93,6 +103,15 @@ const INITIAL_SCHEDULE = [
     img: "https://randomuser.me/api/portraits/women/44.jpg",
   },
   {
+    time: "01:15 PM",
+    name: "Devansh Sharma",
+    dept: "Engineering",
+    event: "System Architecture Review",
+    category: "Reviews",
+    status: "Confirmed",
+    img: "https://randomuser.me/api/portraits/men/46.jpg",
+  },
+  {
     time: "02:15 PM",
     name: "Tariq Al-Mansoor",
     dept: "People Ops",
@@ -102,6 +121,15 @@ const INITIAL_SCHEDULE = [
     img: "https://randomuser.me/api/portraits/men/54.jpg",
   },
   {
+    time: "03:30 PM",
+    name: "Aisha Patel",
+    dept: "People Ops",
+    event: "HR Policy Orientation",
+    category: "Onboarding",
+    status: "In Progress",
+    img: "https://randomuser.me/api/portraits/women/65.jpg",
+  },
+  {
     time: "04:00 PM",
     name: "Sophia Lindqvist",
     dept: "Design System",
@@ -109,6 +137,24 @@ const INITIAL_SCHEDULE = [
     category: "Reviews",
     status: "Confirmed",
     img: "https://randomuser.me/api/portraits/women/68.jpg",
+  },
+  {
+    time: "04:45 PM",
+    name: "Michael Chang",
+    dept: "Core Infrastructure",
+    event: "Senior DevOps Interview",
+    category: "Interviews",
+    status: "Scheduled",
+    img: "https://randomuser.me/api/portraits/men/72.jpg",
+  },
+  {
+    time: "05:30 PM",
+    name: "Priya Nair",
+    dept: "Global Marketing",
+    event: "Design & Copy Final Round",
+    category: "Interviews",
+    status: "Confirmed",
+    img: "https://randomuser.me/api/portraits/women/29.jpg",
   },
 ];
 
@@ -153,6 +199,26 @@ function loadRequestTypes() {
     }
   } catch {}
   return DEFAULT_REQUEST_TYPES;
+}
+
+function getRequestTypeIcon(type = "") {
+  const lower = type.toLowerCase();
+  if (lower.includes("sick") || lower.includes("medical")) return HeartPulse;
+  if (lower.includes("annual") || lower.includes("earned") || lower.includes("vacation")) return Plane;
+  if (lower.includes("casual")) return CalendarDays;
+  if (lower.includes("wfh") || lower.includes("work from home")) return Home;
+  if (lower.includes("attendance") || lower.includes("regularization")) return Clock;
+  if (lower.includes("software") || lower.includes("license") || lower.includes("tool")) return Key;
+  if (lower.includes("asset") || lower.includes("hardware") || lower.includes("laptop")) return Laptop;
+  if (lower.includes("expense") || lower.includes("reimburse")) return Receipt;
+  if (lower.includes("travel") || lower.includes("conveyance")) return Plane;
+  if (lower.includes("document") || lower.includes("bonafide") || lower.includes("certificate")) return FileCheck;
+  if (lower.includes("shift")) return RefreshCw;
+  if (lower.includes("overtime")) return Clock;
+  if (lower.includes("training") || lower.includes("upskilling")) return GraduationCap;
+  if (lower.includes("resignation") || lower.includes("separation")) return LogOut;
+  if (lower.includes("grievance") || lower.includes("query")) return HelpCircle;
+  return Zap;
 }
 
 function timeAgo(ts) {
@@ -267,6 +333,40 @@ export default function HRMSDashboard() {
   const [leaveDate, setLeaveDate] = useState("2024-10-15");
   const [leaveNote, setLeaveNote] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [requestDropdownOpen, setRequestDropdownOpen] = useState(false);
+  const [requestSearch, setRequestSearch] = useState("");
+  const [openUpward, setOpenUpward] = useState(false);
+  const requestDropdownRef = useRef(null);
+
+  const toggleDropdown = () => {
+    if (!requestDropdownOpen && requestDropdownRef.current) {
+      const rect = requestDropdownRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      setOpenUpward(spaceBelow < 240);
+    }
+    setRequestDropdownOpen((prev) => !prev);
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (requestDropdownRef.current && !requestDropdownRef.current.contains(event.target)) {
+        setRequestDropdownOpen(false);
+      }
+    }
+    if (requestDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [requestDropdownOpen]);
+
+  const filteredRequestTypes = useMemo(() => {
+    if (!requestSearch.trim()) return requestTypes;
+    return requestTypes.filter((t) =>
+      t.toLowerCase().includes(requestSearch.toLowerCase())
+    );
+  }, [requestTypes, requestSearch]);
 
   useEffect(() => {
     try {
@@ -560,7 +660,7 @@ export default function HRMSDashboard() {
       {/* Main grid */}
       <div className="hrms-main-grid">
         {/* Schedule */}
-        <div className="hrms-card" style={{ overflow: "hidden", minHeight: 560 }}>
+        <div className="hrms-card" style={{ overflow: "hidden", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
           <div className="hrms-card-head">
             <div>
               <h3 className="hrms-h3">Today&apos;s Schedule &amp; Meetings</h3>
@@ -624,6 +724,10 @@ export default function HRMSDashboard() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-soft/30 text-[12px] text-muted font-medium mt-auto">
+            <span>Showing {filtered.length} of {scheduleItems.length} scheduled sessions</span>
+            <span className="text-[11.5px] text-text-secondary">Updated live · Wednesday, Oct 11</span>
           </div>
         </div>
 
@@ -712,9 +816,9 @@ export default function HRMSDashboard() {
           </div>
 
           {/* Quick Request */}
-          <div className="hrms-card" style={{ padding: "18px 20px 16px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <h3 className="hrms-h3" style={{ fontSize: 15.5, display: "flex", alignItems: "center", gap: 8 }}>
+          <div className="hrms-card" style={{ padding: "16px 18px 14px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+              <h3 className="hrms-h3" style={{ fontSize: 15, display: "flex", alignItems: "center", gap: 8 }}>
                 <Zap size={16} style={{ color: "#334155" }} /> Quick Request
               </h3>
               <button
@@ -726,22 +830,119 @@ export default function HRMSDashboard() {
                 <Settings size={12} /> Manage Types
               </button>
             </div>
-            <select
-              value={leaveType}
-              onChange={handleSelectRequestType}
-              className="hrms-input hrms-select"
-              aria-label="Select request type"
-            >
-              {requestTypes.map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-              <option value="__manage__" style={{ color: "#2563eb", fontWeight: 600 }}>
-                ⚙ + Manage / Edit Types (HR)...
-              </option>
-            </select>
-            <div className="hrms-input hrms-date-wrap">
+            {/* Custom Request Type Dropdown */}
+            <div className="relative mb-2" ref={requestDropdownRef}>
+              <button
+                type="button"
+                onClick={toggleDropdown}
+                className={`w-full flex items-center justify-between text-left px-3 py-2 rounded-xl border text-[13px] font-medium transition-all cursor-pointer shadow-2xs focus:outline-none ${
+                  requestDropdownOpen
+                    ? "border-primary ring-2 ring-primary/15 bg-card text-text"
+                    : "border-border bg-soft hover:bg-card-hover text-text"
+                }`}
+                aria-haspopup="listbox"
+                aria-expanded={requestDropdownOpen}
+              >
+                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                  {(() => {
+                    const TypeIcon = getRequestTypeIcon(leaveType);
+                    return <TypeIcon size={15} className="text-primary shrink-0" />;
+                  })()}
+                  <span className="truncate">{leaveType || "Select Request Type..."}</span>
+                </div>
+                <ChevronDown
+                  size={15}
+                  className={`text-muted transition-transform duration-200 shrink-0 ${
+                    requestDropdownOpen ? "rotate-180 text-primary" : ""
+                  }`}
+                />
+              </button>
+
+              {requestDropdownOpen && (
+                <div
+                  className={`absolute ${
+                    openUpward ? "bottom-full mb-1.5" : "top-full mt-1.5"
+                  } left-0 right-0 z-50 bg-card border border-border rounded-xl shadow-xl overflow-hidden backdrop-blur-md animate-in fade-in-0 duration-150`}
+                >
+                  {/* Integrated sleek search filter */}
+                  <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-soft/40">
+                    <Search size={13} className="text-muted shrink-0" />
+                    <input
+                      type="text"
+                      value={requestSearch}
+                      onChange={(e) => setRequestSearch(e.target.value)}
+                      placeholder="Search request type..."
+                      className="w-full bg-transparent text-[12px] text-text placeholder:text-muted focus:outline-none border-none p-0"
+                      autoFocus
+                    />
+                    {requestSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setRequestSearch("")}
+                        className="text-muted hover:text-text p-0.5 rounded cursor-pointer"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List of request options */}
+                  <div className="max-h-40 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
+                    {filteredRequestTypes.length === 0 ? (
+                      <div className="px-3 py-3 text-center text-[12px] text-muted">
+                        No request types found
+                      </div>
+                    ) : (
+                      filteredRequestTypes.map((type) => {
+                        const ItemIcon = getRequestTypeIcon(type);
+                        const isSelected = leaveType === type;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => {
+                              setLeaveType(type);
+                              setRequestDropdownOpen(false);
+                              setRequestSearch("");
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12.5px] rounded-lg transition-colors cursor-pointer ${
+                              isSelected
+                                ? "bg-primary/10 text-primary font-semibold"
+                                : "text-text hover:bg-soft"
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <ItemIcon
+                                size={14}
+                                className={isSelected ? "text-primary shrink-0" : "text-muted shrink-0"}
+                              />
+                              <span className="truncate">{type}</span>
+                            </div>
+                            {isSelected && <Check size={14} className="text-primary shrink-0" />}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Manage Types Action at bottom */}
+                  <div className="border-t border-border p-1 bg-soft/40">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRequestDropdownOpen(false);
+                        setShowManageTypesModal(true);
+                      }}
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[11.5px] font-semibold text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Settings size={13} className="shrink-0" />
+                      <span>Manage Request Types (HR)</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="hrms-input hrms-date-wrap mb-2" style={{ padding: "8px 12px" }}>
               <span>{leaveDate.split("-").reverse().join(" - ").replaceAll(" - ", "-")}</span>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 0, position: "relative" }}>
                 <CalendarIcon size={14} style={{ color: "#334155", pointerEvents: "none" }} />
@@ -758,10 +959,11 @@ export default function HRMSDashboard() {
               value={leaveNote}
               onChange={(e) => setLeaveNote(e.target.value)}
               placeholder="Provide brief context..."
-              rows={4}
+              rows={2}
               className="hrms-input hrms-area"
+              style={{ minHeight: "52px", resize: "none", marginBottom: "8px", padding: "8px 12px" }}
             />
-            <button type="button" onClick={handleQuickRequest} className="hrms-submit">
+            <button type="button" onClick={handleQuickRequest} className="hrms-submit" style={{ padding: "10px" }}>
               {submitted ? "Request Submitted ✓" : "Submit Request"}
             </button>
             {submitted && (

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { ChevronRight, Search, Calendar as CalendarIcon, X } from "lucide-react";
+import { ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
@@ -339,29 +339,63 @@ export default function Requests() {
             />
           </div>
 
-          <select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} className="req-select">
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
+          {/* Dropdown Filters */}
+          <div className={`req-filter-dropdown ${deptFilter !== "All" ? "active" : ""}`}>
+            <span className="req-filter-text">
+              {deptFilter === "All" ? "Department" : deptFilter}
+            </span>
+            <ChevronDown size={13} className="req-filter-arrow" />
+            <select
+              value={deptFilter}
+              onChange={(e) => setDeptFilter(e.target.value)}
+              className="req-filter-native-select"
+              aria-label="Department Filter"
+            >
+              {DEPARTMENTS.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="req-select">
-            {TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <div className={`req-filter-dropdown ${typeFilter !== "All" ? "active" : ""}`}>
+            <span className="req-filter-text">
+              {typeFilter === "All" ? "Request Type" : typeFilter}
+            </span>
+            <ChevronDown size={13} className="req-filter-arrow" />
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="req-filter-native-select"
+              aria-label="Request Type Filter"
+            >
+              {TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </div>
 
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="req-select">
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <div className={`req-filter-dropdown ${statusFilter !== "All" ? "active" : ""}`}>
+            <span className="req-filter-text">
+              {statusFilter === "All" ? "Status" : statusFilter}
+            </span>
+            <ChevronDown size={13} className="req-filter-arrow" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="req-filter-native-select"
+              aria-label="Status Filter"
+            >
+              {STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* Date Picker Input */}
           <div className="req-date-wrap">
@@ -768,6 +802,16 @@ export default function Requests() {
 
         .req-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 90px; }
         .req-select:focus { border-color: #94a3b8; background-color: #fff; }
+        .req-select-active { border-color: #3b82f6 !important; background-color: #eff6ff !important; color: #1d4ed8 !important; font-weight: 600 !important; }
+
+        .req-filter-dropdown { position: relative; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 12px; height: 35px; cursor: pointer; transition: all 0.15s ease; box-sizing: border-box; }
+        .req-filter-dropdown:hover { border-color: #cbd5e1; background: #f1f5f9; }
+        .req-filter-dropdown.active { border-color: #3b82f6; background: #eff6ff; }
+        .req-filter-text { font-size: 13px; color: #374151; font-weight: 500; white-space: nowrap; user-select: none; }
+        .req-filter-dropdown.active .req-filter-text { color: #1d4ed8; font-weight: 600; }
+        .req-filter-arrow { color: #64748b; flex-shrink: 0; pointer-events: none; }
+        .req-filter-dropdown.active .req-filter-arrow { color: #2563eb; }
+        .req-filter-native-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
         .req-btn-clear { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
         .req-btn-clear:hover { background: #f8fafc; color: #111827; }
