@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts, mockProformaInvoices, mockEstimates, mockWarrantyCards } from '../data/erp/mockData';
-import { formatDateDDMMYYYY, getCurrentDateFormatted } from '../utils/dateUtils';
+import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES } from '../utils/currencyUtils';
 import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
 const STORAGE_KEY = 'horizon_erp_v2_state';
@@ -97,6 +97,42 @@ const loadSavedState = () => {
             } else {
                 parsed.warranties = mockWarrantyCards;
             }
+            // ── Date migration: normalize text dates into ISO (YYYY-MM-DD) ──
+            const migrateDateFields = (doc) => {
+                if (!doc || typeof doc !== 'object') return doc;
+                const next = { ...doc };
+                ['dueDate', 'expectedDate', 'deliveryDate', 'dispatchDate'].forEach((key) => {
+                    if (next[key] && typeof next[key] === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(next[key])) {
+                        const iso = toISODate(next[key]);
+                        if (iso) next[key] = iso;
+                    }
+                });
+                if (next.date && typeof next.date === 'string') {
+                    const iso = toISODate(next.date);
+                    if (iso && /^(Today|In\s+\d+\s*(day|month|week|year)s?\b|\d+\s*(day|month|week|year)s?\s*(from now|ago))/i.test(next.date)) next.date = iso;
+                }
+                return next;
+            };
+            ['invoices', 'proformaInvoices', 'salesOrders', 'deliveryChallans', 'purchaseOrders', 'purchaseBills', 'quotation', 'quotations', 'estimates'].forEach((slice) => {
+                if (Array.isArray(parsed?.[slice])) parsed[slice] = parsed[slice].map(migrateDateFields);
+            });
+
+            // ── Legacy backfill: GRN flag on old bills (post-GRN-split safe) ──
+            if (Array.isArray(parsed?.purchaseBills)) {
+                parsed.purchaseBills = parsed.purchaseBills.map((b) => ({
+                    ...b,
+                    goodsReceived: b.goodsReceived !== false,
+                }));
+            }
+
+            // ── Legacy backfill: paymentOuts typed as Final (advances migration safe) ──
+            if (Array.isArray(parsed?.paymentOuts)) {
+                parsed.paymentOuts = parsed.paymentOuts.map((p) => ({
+                    ...p,
+                    type: p.type || 'Final',
+                }));
+            }
+
             return parsed;
         }
     }
@@ -170,8 +206,9 @@ export const ERPProvider = ({ children, }) => {
     const [inventoryMovements, setInventoryMovements] = useState(initial?.inventoryMovements || mockInventoryMovements);
     const [warranties, setWarranties] = useState(initial?.warranties || mockWarrantyCards);
     const [currency, setCurrencyState] = useState(() => {
-        return initial?.currency || localStorage.getItem('evenmore_currency') || 'USD ($)';
+        return initial?.currency || localStorage.getItem('evenmore_currency') || 'INR (₹)';
     });
+    const [companyProfile, setCompanyProfileState] = useState(initial?.companyProfile || { name: 'Sweven Fabricators Pvt Ltd', gstin: '', pan: '', address: '', phone: '' });
     const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
 
@@ -191,6 +228,10 @@ export const ERPProvider = ({ children, }) => {
         showToast(`System base currency updated to ${newCurr}`);
     };
 
+    const setCompanyProfile = (profile) => {
+        setCompanyProfileState((prev) => ({ ...prev, ...profile }));
+    };
+
     const formatCurrency = (amount, opts = {}) => {
         return formatCurrencyUtil(amount, currency, { ...opts, customRates: liveRates });
     };
@@ -204,6 +245,7 @@ export const ERPProvider = ({ children, }) => {
                 estimates,
                 faultyParts,
                 invoices,
+                companyProfile,
                 zoneRequests,
                 customers,
                 vendors,
@@ -244,6 +286,7 @@ export const ERPProvider = ({ children, }) => {
         estimates,
         faultyParts,
         invoices,
+        companyProfile,
         proformaInvoices,
         zoneRequests,
         customers,
@@ -575,7 +618,7 @@ export const ERPProvider = ({ children, }) => {
             id: `fp-${Date.now()}`,
             rmaNumber: newPart.rmaNumber ||
                 `RMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-            date: newPart.date || 'Today',
+            date: newPart.date || getCurrentDateFormatted(),
             product: newPart.product || 'Unknown Hardware Item',
             sku: newPart.sku || 'SKU-GEN-01',
             serialNumber: newPart.serialNumber || 'SN-UNKNOWN',
@@ -588,7 +631,7 @@ export const ERPProvider = ({ children, }) => {
                 {
                     id: 'tl-1',
                     title: 'Fault Reported',
-                    timestamp: `${newPart.date || 'Today'} • Just now`,
+                    timestamp: `${newPart.date || getCurrentDateFormatted()} • Just now`,
                     description: newPart.notes || 'Diagnostic logs attached.',
                     status: 'completed',
                 },
@@ -777,7 +820,7 @@ export const ERPProvider = ({ children, }) => {
             proformaInvoiceId: newInvoice.proformaInvoiceId,
             linkedPi: newInvoice.linkedPi,
             date: formatDateDDMMYYYY(newInvoice.date || 'Today'),
-            dueDate: newInvoice.dueDate || '30 Days from now',
+            dueDate: newInvoice.dueDate || addDaysISO(getCurrentISODate(), 30),
             status: finalStatus,
             finalized: isFinalized,
             items: invItems,
@@ -1217,7 +1260,7 @@ export const ERPProvider = ({ children, }) => {
             proformaInvoiceId: pi.id,
             linkedPi: pi.proformaNumber,
             date: getCurrentDateFormatted(),
-            dueDate: 'In 30 days',
+            dueDate: addDaysISO(getCurrentISODate(), 30),
             status: 'Draft',
             finalized: false,
             items: targetItems,
@@ -1256,7 +1299,7 @@ export const ERPProvider = ({ children, }) => {
             qty: newReq.qty || 1,
             zone: newReq.zone || 'Zone A',
             targetSector: newReq.targetSector || 'Zone A (Main)',
-            date: newReq.date || 'Today',
+            date: newReq.date || getCurrentDateFormatted(),
             submittedAt: newReq.submittedAt || 'Submitted just now',
             status: 'Requested',
             notes: newReq.notes || 'Emergency requisition.',
@@ -1907,7 +1950,7 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: createAddressSnapshot(order.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(order.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(order.date || 'Today'),
-            deliveryDate: order.deliveryDate || 'In 10 days',
+            deliveryDate: order.deliveryDate || addDaysISO(getCurrentISODate(), 10),
             amount: orderAmt,
             stage: order.stage || 'Draft',
             status: order.stage || 'Draft',
@@ -1968,8 +2011,8 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(order.shippingAddress),
             date: getCurrentDateFormatted(),
             dispatchDate: getCurrentDateFormatted(),
-            transporter: 'FedEx Freight Direct',
-            vehicleNo: 'TRK-8821-WA',
+            transporter: '',
+            vehicleNo: '',
             status: 'In Transit',
             items: dispatchLines,
             lineItems: dispatchLines,
@@ -2032,7 +2075,7 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(order.shippingAddress),
             linkedSo: order.orderNumber,
             date: getCurrentDateFormatted(),
-            dueDate: '30 Days from now',
+            dueDate: addDaysISO(getCurrentISODate(), 30),
             status: 'Unpaid',
             items: itemsList,
             lineItems: itemsList,
@@ -2076,10 +2119,10 @@ export const ERPProvider = ({ children, }) => {
             customer: challan.customer || 'Acme Corp',
             billingAddress: createAddressSnapshot(challan.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(challan.shippingAddress) || defaultAddresses.shipping,
-            date: challan.date || 'Today',
-            dispatchDate: challan.dispatchDate || 'Today',
-            transporter: challan.transporter || 'FedEx Freight',
-            vehicleNo: challan.vehicleNo || 'TRK-9041-WA',
+            date: challan.date || getCurrentISODate(),
+            dispatchDate: challan.dispatchDate || getCurrentISODate(),
+            transporter: challan.transporter || '',
+            vehicleNo: challan.vehicleNo || '',
             status: challan.status || 'In Transit',
             items: challanItems,
             lineItems: challanItems,
@@ -2581,7 +2624,7 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: createAddressSnapshot(po.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(po.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(po.date || 'Today'),
-            expectedDate: po.expectedDate || 'In 10 days',
+            expectedDate: po.expectedDate || addDaysISO(getCurrentISODate(), 10),
             amount: poAmt,
             total: poAmt,
             status: po.status || 'Draft',
@@ -2713,7 +2756,7 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(po.shippingAddress) || defaultAddresses.shipping,
             billDate: getCurrentDateFormatted(),
             date: getCurrentDateFormatted(),
-            dueDate: '30 Days from now',
+            dueDate: addDaysISO(getCurrentISODate(), 30),
             amount: billAmt,
             total: billAmt,
             paidAmount: 0,
@@ -2792,7 +2835,7 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(bill.shippingAddress) || defaultAddresses.shipping,
             billDate: bill.billDate || getCurrentDateFormatted(),
             date: bill.date || getCurrentDateFormatted(),
-            dueDate: bill.dueDate || '30 Days from now',
+            dueDate: bill.dueDate || addDaysISO(getCurrentISODate(), 30),
             amount: billAmt,
             total: billAmt,
             paidAmount: bill.paidAmount || bill.amountPaid || 0,
@@ -3261,7 +3304,7 @@ export const ERPProvider = ({ children, }) => {
             expenseNumber: exp.expenseNumber ||
                 `EXP-2026-${String(expenses.length + 119).padStart(3, '0')}`,
             category: exp.category || 'Logistics',
-            date: exp.date || 'Today',
+            date: exp.date || getCurrentDateFormatted(),
             payee: exp.payee || 'Freight Logistics Inc',
             amount: exp.amount ?? 150,
             paidVia: exp.paidVia || 'Corporate Card',
@@ -3310,7 +3353,7 @@ export const ERPProvider = ({ children, }) => {
             sourceLocation: tr.sourceLocation || 'Main Central Warehouse',
             destLocationId: tr.destLocationId,
             destLocation: tr.destLocation || 'Assembly Bay Zone A',
-            date: tr.date || 'Today',
+            date: tr.date || getCurrentDateFormatted(),
             itemsCount: tr.itemsCount ?? 1,
             status: tr.status || 'In Transit',
             shippedBy: tr.shippedBy || 'Logistics Clerk',
@@ -3368,7 +3411,7 @@ export const ERPProvider = ({ children, }) => {
             itemId: usage.itemId,
             sku: usage.sku || 'CAB-6-01',
             qtyUsed: usage.qtyUsed ?? 1,
-            date: usage.date || 'Today',
+            date: usage.date || getCurrentDateFormatted(),
             purpose: usage.purpose || 'Rack cabling replacement',
         };
         setServiceUsages((prev) => [newUsage, ...prev]);
@@ -3408,7 +3451,7 @@ export const ERPProvider = ({ children, }) => {
         const newEntry = {
             id: entry.id || `je-${Date.now()}`,
             entryNumber: entry.entryNumber || `JE-2026-${String(journalEntries.length + 81).padStart(3, '0')}`,
-            date: entry.date || 'Today',
+            date: entry.date || getCurrentDateFormatted(),
             description: entry.description || 'General Ledger Adjusting Entry',
             reference: entry.reference || 'MANUAL-ADJ',
             debitAccount: entry.debitAccount || '1010 - Cash & Bank',
@@ -3749,8 +3792,12 @@ export const ERPProvider = ({ children, }) => {
             setCurrency,
             formatCurrency,
             currencySymbol,
+            companyProfile,
+            setCompanyProfile,
             formatDateDDMMYYYY,
             getCurrentDateFormatted,
+            getCurrentISODate,
+            addDaysISO,
             toastMessage,
             showToast,
             calculateItemStock,

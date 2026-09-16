@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Download, DollarSign, Package, AlertTriangle, Clock, ShieldCheck, Printer } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { PageHeader } from '../../components/common/PageHeader';
 import { exportToCSV } from '../../services/exportUtils';
+import { toISODate, getCurrentISODate, daysBetween } from '../../utils/dateUtils';
 const reportsGuide = {
     title: 'Financial & Inventory Analytics',
     subtitle: 'Executive audit reports, AR/AP aging schedules, stock valuation, and P&L summaries.',
@@ -105,17 +106,111 @@ export const ReportsPage = () => {
         return sum + Math.max(0, billTotal - billPaid);
     }, 0);
 
+    // ── [PHASE-1-AGING-FIX] Real AR/AP aging buckets by dueDate vs today ──
+    // Previously the aging schedule used hardcoded percentage splits (65%/22%/9%/4% of
+    //   total AR, and 70%/25%/5% per customer) that never matched real invoices. We now
+    //   bucket each invoice/bill by its dueDate using ISO date math (Phase 0).
+    // Bucket keys: 'current' (0-30), '31-60', '61-90', '90+'
+    const AR_BUCKETS = ['current', '31-60', '61-90', '90+'];
+    const AP_BUCKETS = ['current', '31-60', '61-90', '90+'];
+
+    const bucketForDays = (days) => {
+        if (days === null || days === undefined) return 'current';
+        const d = Number(days);
+        if (d <= 30) return 'current';
+        if (d <= 60) return '31-60';
+        if (d <= 90) return '61-90';
+        return '90+';
+    };
+
+    // outstanding amount of one invoice (respects paidAmount / balanceDue)
+    const invoiceOutstanding = (inv) => {
+        if (inv.balanceDue !== undefined && inv.balanceDue !== null) return Number(inv.balanceDue) || 0;
+        const total = Number(inv.grandTotal ?? inv.total ?? inv.amount ?? 0);
+        const paid = Number(inv.paidAmount ?? inv.amountPaid ?? 0);
+        return Math.max(0, total - paid);
+    };
+
+    // AR aging buckets — invoice due date minus today
+    const arBuckets = useMemo(() => {
+        const agg = { current: 0, '31-60': 0, '61-90': 0, '90+': 0 };
+        (invoices || []).forEach((inv) => {
+            const bucket = bucketForDays(daysBetween(inv.dueDate, getCurrentISODate()));
+            agg[bucket] = (agg[bucket] || 0) + invoiceOutstanding(inv);
+        });
+        // Legacy: customer.balance as fallback if no invoices exist yet
+        if ((invoices || []).length === 0) agg.current = totalAr;
+        return agg;
+    }, [invoices, totalAr]);
+
+    // AP aging buckets — bill due date minus today
+    const apBuckets = useMemo(() => {
+        const agg = { current: 0, '31-60': 0, '61-90': 0, '90+': 0 };
+        (purchaseBills || []).forEach((b) => {
+            const outstanding = (getBillOutstanding?.(b.id)?.balanceDue)
+                ?? Math.max(0, Number(b.total ?? b.amount ?? 0) - Number(b.paidAmount ?? b.amountPaid ?? 0));
+            const bucket = bucketForDays(daysBetween(b.dueDate, getCurrentISODate()));
+            agg[bucket] = (agg[bucket] || 0) + outstanding;
+        });
+        return agg;
+    }, [purchaseBills, getBillOutstanding]);
+
+    // Per-customer AR aging breakdown (for the table)
+    const customerAging = useMemo(() => {
+        return customers.map((c) => {
+            const agg = { current: 0, '31-60': 0, '61-90': 0, '90+': 0 };
+            (invoices || [])
+                .filter((inv) => inv.customer === c.name || inv.customerId === c.id)
+                .forEach((inv) => {
+                    const bucket = bucketForDays(daysBetween(inv.dueDate, getCurrentISODate()));
+                    agg[bucket] = (agg[bucket] || 0) + invoiceOutstanding(inv);
+                });
+            const bucketTotal = AR_BUCKETS.reduce((s, k) => s + (agg[k] || 0), 0);
+            // If the invoice-driven total doesn't match c.balance, fall back to c.balance
+            const displayBalance = bucketTotal > 0 ? bucketTotal : (c.balance || 0);
+            if (bucketTotal === 0 && c.balance > 0) agg.current = c.balance;
+            return { customer: c, balance: displayBalance, buckets: agg };
+        });
+    }, [customers, invoices]);
+
     // Dynamic P&L calculations
     const totalRevenue = grossSales;
-    const totalCogs = totalProcurement;
+
+    // ── COGS: cost of SOLD items from finalized invoices (qty × item costPrice) ──
+    // [PHASE-1-COGS-FIX] COGS was previously totalProcurement (all bills), which is wrong —
+    //   procurement is not the same as cost of items actually sold. We now compute from
+    //   finalized invoices where each line has qty × costPrice/unitCost. If costPrice is
+    //   missing on items, falls back to line.costPrice or line.unitCost then 0.
+    // const totalCogs = totalProcurement;  // [REMOVED] incorrect: included unsold inventory spend
+    const totalCogs = useMemo(() => {
+        return invoices
+            .filter(i => i.status !== 'Cancelled' && i.status !== 'Draft' && i.finalized !== false)
+            .reduce((sum, inv) => {
+                const invLines = inv.items || inv.lineItems || [];
+                const lineCost = invLines.reduce((s, line) => {
+                    const qty = Number(line.qty || 0);
+                    const cost = Number(line.costPrice ?? line.unitCost ?? 0);
+                    return s + qty * cost;
+                }, 0);
+                return sum + lineCost;
+            }, 0) || 0;
+    }, [invoices]);
+
     const grossProfit = totalRevenue - totalCogs;
     const grossMarginPct = totalRevenue > 0 ? (grossProfit / totalRevenue) * 100 : 0;
-    const totalExpenses = (expenses || []).reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0) || 16650;
+
+    // ── Operating Expenses: sum from expenses array (no hardcoded fallback) ──
+    // [PHASE-1-EXPENSES-FIX] Expenses previously had || 16650 as fallback —
+    //   that inflated net profit when no expenses were recorded. Now 0 is valid.
+    // const totalExpenses = (expenses || []).reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0) || 16650;  // [REMOVED]
+    const totalExpenses = useMemo(() => {
+        return (expenses || []).reduce((sum, exp) => sum + (Number(exp.amount) || 0), 0) || 0;
+    }, [expenses]);
     const netOperatingProfit = grossProfit - totalExpenses;
 
     const handleExportReport = () => {
         if (activeReport === 'inventory') {
-            const headers = ['SKU', 'Item Name', 'Category', 'Available Qty', 'Unit Cost ($)', 'Unit Price ($)', 'Total Valuation ($)', 'Location'];
+            const headers = ['SKU', 'Item Name', 'Category', 'Available Qty', 'Unit Cost', 'Unit Price', 'Total Valuation', 'Location'];
             const rows = items.map((i) => [
                 i.sku,
                 i.name,
@@ -129,7 +224,7 @@ export const ReportsPage = () => {
             exportToCSV('Inventory_Valuation_Report', headers, rows);
         }
         else if (activeReport === 'sales') {
-            const headers = ['Invoice Number', 'Customer', 'Date', 'Due Date', 'Total ($)', 'Status'];
+            const headers = ['Invoice Number', 'Customer', 'Date', 'Due Date', 'Total', 'Status'];
             const rows = invoices.map((inv) => [
                 inv.invoiceNumber,
                 inv.customer,
@@ -141,7 +236,7 @@ export const ReportsPage = () => {
             exportToCSV('Sales_Invoices_Report', headers, rows);
         }
         else if (activeReport === 'purchases') {
-            const headers = ['Bill Number', 'Vendor', 'Date', 'Due Date', 'Total ($)', 'Status'];
+            const headers = ['Bill Number', 'Vendor', 'Date', 'Due Date', 'Total', 'Status'];
             const rows = purchaseBills.map((b) => [
                 b.billNumber,
                 b.vendor,
@@ -153,22 +248,25 @@ export const ReportsPage = () => {
             exportToCSV('Vendor_Procurement_Report', headers, rows);
         }
         else if (activeReport === 'aging') {
-            const headers = ['Customer', 'Code', 'Outstanding Balance ($)', 'Credit Limit ($)', 'Aging Bracket', 'Risk Rating'];
-            const rows = customers.map((c) => [
-                c.name,
-                c.code,
-                c.balance.toFixed(2),
-                (c.creditLimit || 50000).toFixed(2),
-                c.balance > 20000 ? '61-90 Days' : c.balance > 5000 ? '31-60 Days' : '0-30 Days (Current)',
-                c.balance > 25000 ? 'High' : c.balance > 10000 ? 'Moderate' : 'Low',
+            // [PHASE-1-AGING-FIX] Old export bucketed by balance thresholds (c.balance > 20000 etc).
+            // Now exports real invoice/bill due-date buckets per customer + vendor.
+            const headers = ['Customer', 'Code', 'Total Outstanding', '0-30 Days', '31-60 Days', '61-90 Days', '90+ Days'];
+            const rows = customerAging.map((row) => [
+                row.customer.name,
+                row.customer.code,
+                row.balance.toFixed(2),
+                (row.buckets.current || 0).toFixed(2),
+                (row.buckets['31-60'] || 0).toFixed(2),
+                (row.buckets['61-90'] || 0).toFixed(2),
+                (row.buckets['90+'] || 0).toFixed(2),
             ]);
             exportToCSV('AR_Aging_Schedule_Report', headers, rows);
         }
         else {
-            const headers = ['Account Code', 'Category', 'Line Item Description', 'Amount ($)'];
+            const headers = ['Account Code', 'Category', 'Line Item Description', 'Amount'];
             const rows = [
                 ['4010', 'Revenue', 'Sales Revenue (Recognized Invoices)', totalRevenue.toFixed(2)],
-                ['5010', 'Cost of Sales', 'Cost of Goods Sold (Procured Materials)', (-totalCogs).toFixed(2)],
+                ['5010', 'Cost of Sales', 'Cost of Goods Sold (Sold Items at Cost)', (-totalCogs).toFixed(2)],
                 ['--', 'Gross Profit', `Gross Margin (${grossMarginPct.toFixed(1)}%)`, grossProfit.toFixed(2)],
                 ['6000', 'Operating Expenses', 'Direct & Overhead Operating Expenses', (-totalExpenses).toFixed(2)],
                 ['--', 'Operating Income', 'Net Operating Profit (EBITDA)', netOperatingProfit.toFixed(2)],
@@ -336,34 +434,39 @@ export const ReportsPage = () => {
               <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
                 <span className="text-emerald-700 font-bold block text-[11px] uppercase">Current (0 - 30 Days)</span>
                 <p className="font-mono font-bold text-base text-emerald-900 mt-1">
-                  {formatCurrency(totalAr * 0.65)}
+                  {formatCurrency(arBuckets.current)}
                 </p>
-                <span className="text-[10px] text-emerald-600">65% of AR</span>
+                <span className="text-[10px] text-emerald-600">{totalAr > 0 ? ((arBuckets.current / totalAr) * 100).toFixed(0) : 0}% of AR</span>
               </div>
               <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
                 <span className="text-blue-700 font-bold block text-[11px] uppercase">31 - 60 Days</span>
                 <p className="font-mono font-bold text-base text-blue-900 mt-1">
-                  {formatCurrency(totalAr * 0.22)}
+                  {formatCurrency(arBuckets['31-60'])}
                 </p>
-                <span className="text-[10px] text-blue-600">22% of AR</span>
+                <span className="text-[10px] text-blue-600">{totalAr > 0 ? ((arBuckets['31-60'] / totalAr) * 100).toFixed(0) : 0}% of AR</span>
               </div>
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
                 <span className="text-amber-700 font-bold block text-[11px] uppercase">61 - 90 Days</span>
                 <p className="font-mono font-bold text-base text-amber-900 mt-1">
-                  {formatCurrency(totalAr * 0.09)}
+                  {formatCurrency(arBuckets['61-90'])}
                 </p>
-                <span className="text-[10px] text-amber-600">9% of AR</span>
+                <span className="text-[10px] text-amber-600">{totalAr > 0 ? ((arBuckets['61-90'] / totalAr) * 100).toFixed(0) : 0}% of AR</span>
               </div>
               <div className="bg-rose-50 border border-rose-200 p-3 rounded-lg">
                 <span className="text-rose-700 font-bold block text-[11px] uppercase">90+ Days Overdue</span>
                 <p className="font-mono font-bold text-base text-rose-900 mt-1">
-                  {formatCurrency(totalAr * 0.04)}
+                  {formatCurrency(arBuckets['90+'])}
                 </p>
-                <span className="text-[10px] text-rose-600">4% of AR</span>
+                <span className="text-[10px] text-rose-600">{totalAr > 0 ? ((arBuckets['90+'] / totalAr) * 100).toFixed(0) : 0}% of AR</span>
               </div>
             </div>
 
-            {/* Customer Breakdown Table */}
+            {/* [PHASE-1-AGING-FIX] The four buckets above used to be hardcoded percentage splits of
+                total AR (65%/22%/9%/4%). Old code was: {formatCurrency(totalAr * 0.65)} at :339,
+                {formatCurrency(totalAr * 0.22)} at :346, {formatCurrency(totalAr * 0.09)} at :353,
+                {formatCurrency(totalAr * 0.04)} at :360. Replaced with real invoice due-date buckets. */}
+
+            {/* AR Customer Breakdown Table */}
             <div className="overflow-x-auto pt-2">
               <table className="w-full text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
@@ -373,31 +476,102 @@ export const ReportsPage = () => {
                     <th className="py-2.5 px-3 text-right">Total Outstanding</th>
                     <th className="py-2.5 px-3 text-right">0-30 Days</th>
                     <th className="py-2.5 px-3 text-right">31-60 Days</th>
+                    <th className="py-2.5 px-3 text-right">61-90 Days</th>
                     <th className="py-2.5 px-3 text-right">90+ Days</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {customers.map((c) => (<tr key={c.id} className="hover:bg-slate-50/70">
+                  {customerAging.map((row) => (<tr key={row.customer.id} className="hover:bg-slate-50/70">
                       <td className="p-2.5">
-                        <p className="font-semibold text-slate-800">{c.name}</p>
-                        <span className="text-[10px] text-slate-400 font-mono">Code: {c.code}</span>
+                        <p className="font-semibold text-slate-800">{row.customer.name}</p>
+                        <span className="text-[10px] text-slate-400 font-mono">Code: {row.customer.code}</span>
                       </td>
                       <td className="p-2.5 text-right font-mono text-slate-600">
-                        {formatCurrency(c.creditLimit || 50000)}
+                        {formatCurrency(row.customer.creditLimit || 50000)}
                       </td>
                       <td className="p-2.5 text-right font-mono font-bold text-slate-900">
-                        {formatCurrency(c.balance)}
+                        {formatCurrency(row.balance)}
                       </td>
                       <td className="p-2.5 text-right font-mono text-emerald-700">
-                        {formatCurrency(c.balance * 0.7)}
+                        {formatCurrency(row.buckets.current || 0)}
                       </td>
                       <td className="p-2.5 text-right font-mono text-blue-700">
-                        {formatCurrency(c.balance * 0.25)}
+                        {formatCurrency(row.buckets['31-60'] || 0)}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-amber-700">
+                        {formatCurrency(row.buckets['61-90'] || 0)}
                       </td>
                       <td className="p-2.5 text-right font-mono text-rose-700 font-semibold">
-                        {formatCurrency(c.balance * 0.05)}
+                        {formatCurrency(row.buckets['90+'] || 0)}
                       </td>
                     </tr>))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* AP Aging Buckets Schedule */}
+          <div className="bg-white border border-[#CED4DA] rounded-xl p-5 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-[#1F2E4A]">Accounts Payable (AP) Aging Analysis</h3>
+              <span className="text-[11px] text-slate-500 font-mono">Real-time Payable Due Window by Bill Due Date</span>
+            </div>
+
+            <div className="grid grid-cols-4 gap-3 text-center text-xs">
+              <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
+                <span className="text-emerald-700 font-bold block text-[11px] uppercase">Current (0 - 30 Days)</span>
+                <p className="font-mono font-bold text-base text-emerald-900 mt-1">{formatCurrency(apBuckets.current)}</p>
+                <span className="text-[10px] text-emerald-600">{totalAp > 0 ? ((apBuckets.current / totalAp) * 100).toFixed(0) : 0}% of AP</span>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+                <span className="text-blue-700 font-bold block text-[11px] uppercase">31 - 60 Days</span>
+                <p className="font-mono font-bold text-base text-blue-900 mt-1">{formatCurrency(apBuckets['31-60'])}</p>
+                <span className="text-[10px] text-blue-600">{totalAp > 0 ? ((apBuckets['31-60'] / totalAp) * 100).toFixed(0) : 0}% of AP</span>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+                <span className="text-amber-700 font-bold block text-[11px] uppercase">61 - 90 Days</span>
+                <p className="font-mono font-bold text-base text-amber-900 mt-1">{formatCurrency(apBuckets['61-90'])}</p>
+                <span className="text-[10px] text-amber-600">{totalAp > 0 ? ((apBuckets['61-90'] / totalAp) * 100).toFixed(0) : 0}% of AP</span>
+              </div>
+              <div className="bg-rose-50 border border-rose-200 p-3 rounded-lg">
+                <span className="text-rose-700 font-bold block text-[11px] uppercase">90+ Days Overdue</span>
+                <p className="font-mono font-bold text-base text-rose-900 mt-1">{formatCurrency(apBuckets['90+'])}</p>
+                <span className="text-[10px] text-rose-600">{totalAp > 0 ? ((apBuckets['90+'] / totalAp) * 100).toFixed(0) : 0}% of AP</span>
+              </div>
+            </div>
+
+            {/* AP Vendor Breakdown Table */}
+            <div className="overflow-x-auto pt-2">
+              <table className="w-full text-left text-xs text-slate-600">
+                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Vendor Account</th>
+                    <th className="py-2.5 px-3 text-right">Total Payable</th>
+                    <th className="py-2.5 px-3 text-right">0-30 Days</th>
+                    <th className="py-2.5 px-3 text-right">31-60 Days</th>
+                    <th className="py-2.5 px-3 text-right">61-90 Days</th>
+                    <th className="py-2.5 px-3 text-right">90+ Days</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {purchaseBills.map((b) => {
+                      const outstanding = (getBillOutstanding?.(b.id)?.balanceDue)
+                          ?? Math.max(0, Number(b.total ?? b.amount ?? 0) - Number(b.paidAmount ?? b.amountPaid ?? 0));
+                      const bucket = bucketForDays(daysBetween(b.dueDate, getCurrentISODate()));
+                      const rowBuckets = { current: 0, '31-60': 0, '61-90': 0, '90+': 0 };
+                      rowBuckets[bucket] = outstanding;
+                      return (<tr key={b.id} className="hover:bg-slate-50/70">
+                          <td className="p-2.5">
+                            <p className="font-semibold text-slate-800">{b.vendor || 'Unknown Vendor'}</p>
+                            <span className="text-[10px] text-slate-400 font-mono">{b.billNumber}</span>
+                          </td>
+                          <td className="p-2.5 text-right font-mono font-bold text-slate-900">{formatCurrency(outstanding)}</td>
+                          <td className="p-2.5 text-right font-mono text-emerald-700">{formatCurrency(rowBuckets.current)}</td>
+                          <td className="p-2.5 text-right font-mono text-blue-700">{formatCurrency(rowBuckets['31-60'])}</td>
+                          <td className="p-2.5 text-right font-mono text-amber-700">{formatCurrency(rowBuckets['61-90'])}</td>
+                          <td className="p-2.5 text-right font-mono text-rose-700 font-semibold">{formatCurrency(rowBuckets['90+'])}</td>
+                        </tr>);
+                    })}
                 </tbody>
               </table>
             </div>
@@ -412,7 +586,7 @@ export const ReportsPage = () => {
               <span className="font-bold font-mono text-slate-900">{formatCurrency(totalRevenue)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-slate-100 text-rose-600">
-              <span className="font-medium">Less: Cost of Goods Sold (Procured Bills)</span>
+              <span className="font-medium">Less: Cost of Goods Sold (Sold Items at Cost)</span>
               <span className="font-bold font-mono">-{formatCurrency(totalCogs)}</span>
             </div>
             <div className="flex justify-between py-2 border-b border-slate-200 bg-slate-50 px-2 rounded">

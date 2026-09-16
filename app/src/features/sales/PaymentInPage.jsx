@@ -37,9 +37,9 @@ export const PaymentInPage = () => {
     const { paymentIns, invoices, customers, addPaymentIn, getInvoiceOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
-    const [amount, setAmount] = useState(1000);
+    const [amount, setAmount] = useState(0);
     const [mode, setMode] = useState('Bank Transfer');
-    const [reference, setReference] = useState('WIRE-49821');
+    const [reference, setReference] = useState('');
     const handleInvoiceChange = (invId) => {
         setSelectedInvoiceId(invId);
         const inv = invoices.find((i) => i.id === invId);
@@ -54,13 +54,13 @@ export const PaymentInPage = () => {
         const cust = customers.find((c) => c.name === inv?.customer || c.id === inv?.customerId);
         addPaymentIn({
             customerId: cust?.id,
-            customer: inv?.customer || cust?.name || 'Acme Corp',
+            customer: inv?.customer || cust?.name || 'Walk-in Customer',
             invoiceId: inv?.id,
             invoiceNumber: inv?.invoiceNumber || 'INV-2026-001',
             date: getCurrentDateFormatted(),
             mode,
-            amount: Number(amount) || 1000,
-            reference: reference || `WIRE-${Date.now()}`,
+            amount: Number(amount) || 0,
+            reference: reference || `REC-${Date.now()}`,
         });
         setShowAddModal(false);
     };

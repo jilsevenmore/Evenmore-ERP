@@ -7,21 +7,26 @@ import StatusBadge from '../../components/ui/StatusBadge';
 import { Printer, Download, TrendingUp, TrendingDown, DollarSign, PieChart, FileText } from 'lucide-react';
 
 export function FinancialReportsPage() {
-  const { salesInvoices = [], purchaseBills = [], expenses = [], formatCurrency, formatDateDDMMYYYY } = useERP();
+  const { invoices = [], purchaseBills = [], expenses = [], formatCurrency, formatDateDDMMYYYY } = useERP();
   const [reportType, setReportType] = useState('pl'); // 'pl' | 'cashflow' | 'sales_summary'
 
   // Calculate financials
   const totalRevenue = useMemo(() => {
-    return salesInvoices
+    return invoices
       .filter(i => i.status !== 'Cancelled')
       .reduce((sum, i) => sum + (Number(i.grandTotal) || Number(i.total) || 0), 0);
-  }, [salesInvoices]);
+  }, [invoices]);
 
   const totalCOGS = useMemo(() => {
-    return purchaseBills
-      .filter(b => b.status !== 'Cancelled')
-      .reduce((sum, b) => sum + (Number(b.grandTotal) || Number(b.total) || 0), 0);
-  }, [purchaseBills]);
+    // COGS = cost of SOLD items from finalized invoices (qty × item costPrice), not procurement spend
+    return invoices
+      .filter(i => i.status !== 'Cancelled' && i.finalized !== false && i.status !== 'Draft')
+      .reduce((sum, inv) => {
+        const invLines = inv.items || inv.lineItems || [];
+        const lineCost = invLines.reduce((s, line) => s + (Number(line.qty || 0) * (Number(line.costPrice ?? line.unitCost) || 0)), 0);
+        return sum + lineCost;
+      }, 0) || 0;
+  }, [invoices]);
 
   const totalExpenses = useMemo(() => {
     return expenses.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -64,6 +69,25 @@ export function FinancialReportsPage() {
     )},
   ];
 
+  const exportToCSV = (filename, headers, rows) => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const csv = [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))].join('\n');
+    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${filename}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  const handleExport = () => {
+    const headers = ['Category', 'Description', 'Amount'];
+    const rows = plRows.map((r) => [r.category, r.item, r.amount]);
+    exportToCSV(`Financial_Report_${reportType.toUpperCase()}`, headers, rows);
+  };
+
   return (
     <div className="feature-page printable-document" style={{ padding: '24px 32px' }}>
       <PageHeader
@@ -75,7 +99,7 @@ export function FinancialReportsPage() {
             <button type="button" className="btn-outline" onClick={() => window.print()}>
               <Printer size={15} /> Print Statement
             </button>
-            <button type="button" className="btn-primary" onClick={() => alert('Financial report exported as CSV/PDF.')}>
+            <button type="button" className="btn-primary" onClick={() => handleExport()}>
               <Download size={15} /> Export Report
             </button>
           </div>
@@ -144,7 +168,7 @@ export function FinancialReportsPage() {
                 { key: 'grandTotal', label: 'Total', render: (v) => formatCurrency(Number(v || 0)) },
                 { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
               ]}
-              data={salesInvoices}
+              data={invoices}
               rowKey="id"
               emptyMessage="No invoices found."
             />

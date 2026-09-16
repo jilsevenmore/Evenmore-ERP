@@ -71,7 +71,7 @@ export default function Topbar() {
   const items = erp?.items;
   const deliveryChallans = erp?.deliveryChallans;
   const zoneRequests = erp?.zoneRequests;
-  const salesInvoices = erp?.salesInvoices;
+  const salesInvoices = erp?.invoices;
   const isCrmRoute = pathname === '/crm' || pathname.startsWith('/crm/');
 
   const lowStockItems = useMemo(() => {

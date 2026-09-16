@@ -3,8 +3,13 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Link } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
-import { dashboardData } from '../../data/crm/dashboardData';
-import { leads } from '../../data/crm/mockLeads';
+// ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
+// Before (kept for reference if the CRM dashboard panel is ever re-added):
+// import { dashboardData } from '../../data/crm/dashboardData';
+// import { leads } from '../../data/crm/mockLeads';
+// Reason: the ERP dashboard should compute from live ERP state (invoices, paymentIns,
+//   purchaseBills, items, calculateItemStock), not from static CRM fixture data.
+// import { toISODate, getCurrentISODate } from '../../utils/dateUtils';
 import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown } from 'lucide-react';
 function buildChart(values, width, height, padding) {
   const max = Math.max(...values);
@@ -43,18 +48,67 @@ const CARD_STYLES = {
 };
 export const DashboardPage = () => {
   const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock } = useERP();
-  const overview = dashboardData.leadsOverview;
-  const chart = buildChart(overview.series.map((item) => item.value), 620, 260, 28);
-  const totalTasks = dashboardData.taskStatus.reduce((sum, item) => sum + item.value, 0);
-  const completedTasks = dashboardData.taskStatus.find((item) => item.key === 'done')?.value || 0;
+  // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──
+  // Before (kept for reference): dashboardData.leadsOverview, dashboardData.taskStatus drove
+  //   the chart + donut. Now we chart invoice revenue over the last 6 months and show
+  //   invoice status distribution, both computed from live ERP state.
+  // const overview = dashboardData.leadsOverview;
+  // const chart = buildChart(overview.series.map((item) => item.value), 620, 260, 28);
+  // const totalTasks = dashboardData.taskStatus.reduce((sum, item) => sum + item.value, 0);
+  // const completedTasks = dashboardData.taskStatus.find((item) => item.key === 'done')?.value || 0;
+  // const completedPct = Math.round((completedTasks / (totalTasks || 1)) * 100);
+  // let currentAngle = 0;
+  // const donutSegments = dashboardData.taskStatus.map((item) => {...});
+  const monthKey = (iso) => { const p = String(iso || '').split('-'); return p.length === 3 ? `${p[0]}-${p[1]}` : ''; };
+  const last6Months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (5 - i));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const revenueByMonth = last6Months.map((mk) => invoices
+    .filter((inv) => monthKey(inv.date) === mk || monthKey(inv.dueDate) === mk)
+    .reduce((sum, inv) => sum + (Number(inv.total ?? inv.amount) || 0), 0));
+  const overview = {
+    headline: `${invoices.length} tax invoices booked across the last 6 months`,
+    period: 'Last 6 Months',
+    summary: 'Invoiced value trend by month. Filter or open Sales > Invoices for details.',
+    series: last6Months.map((mk, i) => ({ month: mk.split('-')[1], value: revenueByMonth[i] })),
+  };
+  const chart = buildChart(revenueByMonth, 620, 260, 28);
+  const invoiceStatusMap = {
+    Paid: { label: 'Paid', color: '#1bb878' },
+    Unpaid: { label: 'Unpaid', color: '#1f6bff' },
+    Overdue: { label: 'Overdue', color: '#ef9b06' },
+    Cancelled: { label: 'Cancelled', color: '#ef4444' },
+    Draft: { label: 'Draft', color: '#94a3b8' },
+  };
+  const taskStatus = Object.entries(invoiceStatusMap)
+    .map(([key, meta]) => ({
+      key: key.toLowerCase(),
+      label: meta.label,
+      color: meta.color,
+      value: invoices.filter((inv) => (inv.status || 'Unpaid') === key).length,
+    }))
+    .filter((s) => s.value > 0);
+  const totalTasks = taskStatus.reduce((sum, item) => sum + item.value, 0);
+  const doneKey = taskStatus.find((s) => s.key === 'paid');
+  const completedTasks = doneKey?.value || 0;
   const completedPct = Math.round((completedTasks / (totalTasks || 1)) * 100);
   let currentAngle = 0;
-  const donutSegments = dashboardData.taskStatus.map((item) => {
+  const donutSegments = taskStatus.map((item) => {
     const angle = (item.value / (totalTasks || 1)) * 360;
     const segment = { ...item, path: describeArc(110, 110, 72, currentAngle, currentAngle + angle) };
     currentAngle += angle;
     return segment;
   });
+  const recentActivity = invoices.slice(0, 3).map((inv) => ({
+    icon: invoices.length ? 'check' : 'task',
+    tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
+    title: inv.customer || 'Customer',
+    person: `${inv.invoiceNumber} • ${inv.status}`,
+    time: inv.date,
+  }));
   const enriched = items.map((itm) => {
     const calc = calculateItemStock(itm.id);
     let status = 'Optimal';
@@ -76,7 +130,9 @@ export const DashboardPage = () => {
   const expenseTotal = expenses.reduce((a, e) => a + (e.amount || e.total || 0), 0);
   const bankBalance = bankAccounts.reduce((a, b) => a + (b.balance || b.currentBalance || 0), 0);
   const modules = [
-    { label: 'CRM', desc: `${leads.length} Leads | Deals | Tasks`, to: '/crm/dashboard', icon: Target, tone: 'blue', count: leads.length, tag: 'Leads' },
+    // ── [PHASE-1-DASHBOARD] CRM module card now counts ERP quotations (was: leads) ──
+    // Old: { label: 'CRM', desc: `${leads.length} Leads | Deals | Tasks`, ... count: leads.length, tag: 'Leads' }
+    { label: 'CRM', desc: `${quotations.length} Quotes | Deals | Tasks`, to: '/crm/dashboard', icon: Target, tone: 'blue', count: quotations.length, tag: 'Quotes' },
     { label: 'Sales', desc: `${salesOrders.length} Orders | ${quotations.length} Quotes | ${invoices.length} Invoices`, to: '/sales/quotations', icon: TrendingUp, tone: 'green', count: salesOrders.length, tag: 'Orders' },
     { label: 'Purchase', desc: `${purchaseOrders.length} Orders | ${purchaseBills.length} Bills`, to: '/purchase/orders', icon: Truck, tone: 'amber', count: purchaseOrders.length, tag: 'POs' },
     { label: 'Inventory', desc: `${items.length} SKUs | ${lowStockItems.length} Low Stock`, to: '/inventory/items', icon: Package, tone: 'purple', count: items.length, tag: 'SKUs' },
@@ -91,12 +147,14 @@ export const DashboardPage = () => {
     <div className="space-y-6">
       <PageHeader title="Unified Business Dashboard" subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration — sab modules ek jagah." actions={<div className="flex items-center gap-2.5"><Link to="/crm/dashboard" className="px-3 py-2 bg-white border border-[#CED4DA] rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs">CRM Dashboard</Link><Link to="/crm/leads" className="px-3.5 py-2 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-md text-xs font-semibold shadow-xs transition flex items-center gap-1.5">+ New Lead</Link></div>} />
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <StatCard label="Total Leads" value={fmt(leads.length + 238)} icon={Target} tone="blue" trend="12%" trendDirection="up" note="vs last month" />
+        // ── [PHASE-1-DASHBOARD] "Total Leads" stat card replaced with ERP Totals ──
+        // Old: <StatCard label="Total Leads" value={fmt(leads.length + 238)} icon={Target} tone="blue" trend="12%" trendDirection="up" note="vs last month" />
+        <StatCard label="Quotations" value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note="challans issued" />
         <StatCard label="Sales Orders" value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note="order value" />
-        <StatCard label="Invoices Value" value={`$${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />
+        <StatCard label="Invoices Value" value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />
         <StatCard label="Purchase Orders" value={fmt(purchaseOrders.length)} icon={ClipboardList} tone="amber" trend={`${fmt(Math.round(purchaseTotal / 1000))}k`} note="purchase value" />
-        <StatCard label="Stock Value" value={`$${fmt(Math.round(totalStockValue))}`} icon={Package} tone="teal" trend={`${fmt(lowStockItems.length)}`} note="low stock" />
-        <StatCard label="Bank Balance" value={`$${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note="net flow" />
+        <StatCard label="Stock Value" value={`₹${fmt(Math.round(totalStockValue))}`} icon={Package} tone="teal" trend={`${fmt(lowStockItems.length)}`} note="low stock" />
+        <StatCard label="Bank Balance" value={`₹${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note="net flow" />
       </div>
       <div className="bg-white border border-[#CED4DA] rounded-lg p-5 shadow-xs">
         <div className="flex items-center justify-between mb-4">
@@ -122,7 +180,16 @@ export const DashboardPage = () => {
       </div>
       <div className="dashboard-view" style={{ padding: 0 }}>
         <div className="dashboard-stats">
-          {dashboardData.stats.map((stat) => {
+          {/* ── [PHASE-1-DASHBOARD] was: {dashboardData.stats.map((stat) => {...})} ──
+              CRM stat cards (leads/tasks pipeline) replaced with live ERP stats below. */}
+          {[
+            { label: 'Invoices (PKG)', value: fmt(invoices.length), icon: 'file', tone: 'blue', trend: `${fmt(Math.round(invoiceTotal))}`, note: 'billed value' },
+            { label: 'SO Orders', value: fmt(salesOrders.length), icon: 'users', tone: 'green', trend: `${fmt(Math.round(salesTotal))}`, note: 'order value' },
+            { label: 'Purchase Bills', value: fmt(purchaseBills.length), icon: 'building', tone: 'amber', trend: `${fmt(Math.round(billTotal))}`, note: 'bill value' },
+            { label: 'Payments In', value: fmt(paymentIns.length), icon: 'check', tone: 'purple', trend: `${fmt(Math.round(paymentInTotal))}`, note: 'received' },
+            { label: 'Payments Out', value: fmt(paymentOuts.length), icon: 'users', tone: 'teal', trend: `${fmt(Math.round(paymentOutTotal))}`, note: 'paid' },
+            { label: 'Expenses', value: fmt(expenses.length), icon: 'bars', tone: 'pink', trend: `${fmt(Math.round(expenseTotal))}`, note: 'mt expense' },
+          ].map((stat) => {
             const Icon = ICONS[stat.icon] || Users;
             const style = CARD_STYLES[stat.tone] || CARD_STYLES.blue;
             const TrendIcon = stat.trendDirection === 'down' ? TrendingDown : TrendingUp;
@@ -140,9 +207,10 @@ export const DashboardPage = () => {
           <article className="dashboard-stat">
             <div className="dashboard-stat-top">
               <span className="dashboard-stat-icon" style={{ background: CARD_STYLES.green.bg, color: CARD_STYLES.green.fg }}><FileText size={24} /></span>
-              <div className="dashboard-stat-copy"><strong>{fmt(quotations.length + 64)}</strong><span>Quotations</span></div>
+              {/* ── [PHASE-1-DASHBOARD] was: {fmt(quotations.length + 64)} — removed demo +64 offset ── */}
+              <div className="dashboard-stat-copy"><strong>{fmt(quotations.length)}</strong><span>Quotations</span></div>
             </div>
-            <small className="dashboard-stat-trend"><TrendingUp size={14} /><b>9%</b><em>this month</em></small>
+            <small className="dashboard-stat-trend"><TrendingUp size={14} /><b>100%</b><em>live count</em></small>
           </article>
           <article className="dashboard-stat">
             <div className="dashboard-stat-top">
@@ -155,11 +223,11 @@ export const DashboardPage = () => {
         <div className="dashboard-main-grid">
           <section className="dashboard-panel dashboard-chart-card">
             <div className="panel-head panel-head-spread">
-              <div><h3>Leads Overview</h3><p>{overview.headline}</p></div>
+              <div><h3>Revenue Overview</h3><p>{overview.headline}</p></div>
               <button type="button" className="dashboard-filter-btn">{overview.period}</button>
             </div>
             <div className="chart-wrap">
-              <svg viewBox="0 0 620 260" className="chart-svg" aria-label="Leads overview chart">
+              <svg viewBox="0 0 620 260" className="chart-svg" aria-label="Invoiced revenue chart">
                 <defs>
                   <linearGradient id="uniChartArea" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor="#2b7cff" stopOpacity="0.28" />
@@ -185,16 +253,17 @@ export const DashboardPage = () => {
             </div>
             <p className="chart-note">{overview.summary}</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-              <Link to="/crm/leads" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Leads: {fmt(leads.length)}</Link>
-              <Link to="/crm/deals" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Deals</Link>
-              <Link to="/crm/tasks" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Tasks: {totalTasks}</Link>
-              <Link to="/crm/system-setup" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50 flex items-center justify-center gap-1"><Settings size={12} /> Setup</Link>
+              {/* ── [PHASE-1-DASHBOARD] was: Leads: {fmt(leads.length)} link to /crm/leads ── */}
+              <Link to="/sales/quotes" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Quotes: {fmt(quotations.length)}</Link>
+              <Link to="/sales/invoices" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Invoices: {fmt(invoices.length)}</Link>
+              <Link to="/sales/challans" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Challans: {fmt(deliveryChallans.length)}</Link>
+              <Link to="/sales/orders" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50 flex items-center justify-center gap-1"><Settings size={12} /> Orders</Link>
             </div>
           </section>
           <section className="dashboard-panel dashboard-donut-card">
             <div className="panel-head panel-head-spread">
-              <div><h3>Task Status</h3><p>Team work distribution.</p></div>
-              <Link to="/crm/tasks" className="view-all-link">View All</Link>
+              <div><h3>Invoice Status</h3><p>Billing distribution.</p></div>
+              <Link to="/sales/invoices" className="view-all-link">View All</Link>
             </div>
             <div className="donut-layout">
               <div className="donut-chart">
@@ -204,10 +273,11 @@ export const DashboardPage = () => {
                     <path key={item.key} d={item.path} stroke={item.color} strokeWidth="22" strokeLinecap="round" fill="none" />
                   ))}
                 </svg>
-                <div className="donut-center"><strong>{completedPct}%</strong><span>Completed</span></div>
+                <div className="donut-center"><strong>{completedPct}%</strong><span>Paid</span></div>
               </div>
               <div className="donut-legend">
-                {dashboardData.taskStatus.map((item) => (
+                {/* ── [PHASE-1-DASHBOARD] was: dashboardData.taskStatus.map(...) — now ERP taskStatus ── */}
+                {taskStatus.map((item) => (
                   <div key={item.key} className="legend-row">
                     <div className="legend-meta"><span className="legend-dot" style={{ backgroundColor: item.color }} /><span>{item.label}</span></div>
                     <strong>{item.value}</strong>
@@ -216,7 +286,8 @@ export const DashboardPage = () => {
               </div>
             </div>
             <div className="activity-list mt-4">
-              {dashboardData.recentActivity.slice(0, 3).map((item) => {
+              {/* ── [PHASE-1-DASHBOARD] was: dashboardData.recentActivity.slice(0,3) — now ERP recentActivity ── */}
+              {recentActivity.map((item) => {
                 const Icon = ACTIVITY_ICONS[item.icon] || UserPlus;
                 const style = CARD_STYLES[item.tone] || CARD_STYLES.blue;
                 return (
@@ -280,7 +351,7 @@ export const DashboardPage = () => {
             <div className="space-y-2 text-xs">
               {salesOrders.slice(0, 3).map((o) => (
                 <div key={o.id} className="p-3 rounded-md border border-slate-200 bg-[#F8F9FA] flex items-center justify-between gap-3">
-                  <div className="min-w-0"><p className="font-mono text-xs font-bold text-slate-800">{o.orderNumber || o.id}</p><p className="text-[11px] text-slate-500 truncate">{o.customer} | ${fmt(o.amount || 0)}</p></div>
+                  <div className="min-w-0"><p className="font-mono text-xs font-bold text-slate-800">{o.orderNumber || o.id}</p><p className="text-[11px] text-slate-500 truncate">{o.customer} | ₹{fmt(o.amount || 0)}</p></div>
                   <StatusBadge status={o.stage || o.status || 'Draft'} />
                 </div>
               ))}
@@ -294,18 +365,18 @@ export const DashboardPage = () => {
             <div className="space-y-2 text-xs">
               {purchaseOrders.slice(0, 3).map((o) => (
                 <div key={o.id} className="p-3 rounded-md border border-slate-200 bg-[#F8F9FA] flex items-center justify-between gap-3">
-                  <div className="min-w-0"><p className="font-mono text-xs font-bold text-slate-800">{o.orderNumber || o.poNumber || o.id}</p><p className="text-[11px] text-slate-500 truncate">{o.vendor} | ${fmt(o.total || o.amount || 0)}</p></div>
+                  <div className="min-w-0"><p className="font-mono text-xs font-bold text-slate-800">{o.orderNumber || o.poNumber || o.id}</p><p className="text-[11px] text-slate-500 truncate">{o.vendor} | ₹{fmt(o.total || o.amount || 0)}</p></div>
                   <StatusBadge status={o.status || 'Draft'} />
                 </div>
               ))}
             </div>
           </div>
           <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
-            <Link to="/sales/invoices" className="px-2 py-2 rounded-md bg-slate-900 text-white text-center font-semibold">Invoices ${fmt(Math.round(invoiceTotal))}</Link>
-            <Link to="/purchase/bills" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">Bills ${fmt(Math.round(billTotal))}</Link>
-            <Link to="/sales/payments" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">PayIn ${fmt(Math.round(paymentInTotal))}</Link>
-            <Link to="/purchase/payments" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">PayOut ${fmt(Math.round(paymentOutTotal))}</Link>
-            <Link to="/purchase/expenses" className="px-2 py-2 rounded-md bg-white border text-center font-semibold col-span-2">Expenses ${fmt(Math.round(expenseTotal))} | Challans {fmt(deliveryChallans.length)} | Returns {fmt(salesReturns.length)}</Link>
+            <Link to="/sales/invoices" className="px-2 py-2 rounded-md bg-slate-900 text-white text-center font-semibold">Invoices ₹{fmt(Math.round(invoiceTotal))}</Link>
+            <Link to="/purchase/bills" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">Bills ₹{fmt(Math.round(billTotal))}</Link>
+            <Link to="/sales/payments" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">PayIn ₹{fmt(Math.round(paymentInTotal))}</Link>
+            <Link to="/purchase/payments" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">PayOut ₹{fmt(Math.round(paymentOutTotal))}</Link>
+            <Link to="/purchase/expenses" className="px-2 py-2 rounded-md bg-white border text-center font-semibold col-span-2">Expenses ₹{fmt(Math.round(expenseTotal))} | Challans {fmt(deliveryChallans.length)} | Returns {fmt(salesReturns.length)}</Link>
           </div>
         </div>
       </div>
@@ -327,7 +398,7 @@ export const DashboardPage = () => {
             <Link to="/accounts/cash-bank" className="text-xs font-semibold text-[#1F2E4A] hover:underline">View All</Link>
           </div>
           <div className="space-y-2 text-xs">
-            <Link to="/accounts/cash-bank" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><Landmark size={14} /> Bank Balance</span><strong>${fmt(Math.round(bankBalance))}</strong></Link>
+            <Link to="/accounts/cash-bank" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><Landmark size={14} /> Bank Balance</span><strong>₹{fmt(Math.round(bankBalance))}</strong></Link>
             <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><FileText size={14} /> Ledger</span><strong>Open</strong></Link>
             <Link to="/accounts/reports" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><PieChart size={14} /> Finance Reports</span><strong>View</strong></Link>
           </div>
