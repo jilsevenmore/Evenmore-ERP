@@ -61,7 +61,7 @@ export default function TaskAllocationDetailPage() {
   }
 
   return (
-    <section className="w-full">
+    <section className="w-full space-y-4">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">{task.title}</h1>

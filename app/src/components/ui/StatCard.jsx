@@ -13,12 +13,12 @@ const ICONS = {
 };
 
 const TONES = {
-  blue: { bg: 'linear-gradient(180deg, #f0f6ff 0%, #e7f0ff 100%)', fg: '#1f6bff' },
-  green: { bg: 'linear-gradient(180deg, #ebfbf5 0%, #def8ed 100%)', fg: '#1bb878' },
-  pink: { bg: 'linear-gradient(180deg, #fff0f7 0%, #ffe6f1 100%)', fg: '#ff4f8f' },
-  amber: { bg: 'linear-gradient(180deg, #fff7e8 0%, #ffefcf 100%)', fg: '#ef9b06' },
-  purple: { bg: 'linear-gradient(180deg, #f5ebff 0%, #ecdafe 100%)', fg: '#9b51e0' },
-  teal: { bg: 'linear-gradient(180deg, #e6fffe 0%, #ccfbf1 100%)', fg: '#0cb1ac' },
+  blue: { bg: 'rgba(31, 107, 255, 0.12)', fg: '#1f6bff' },
+  green: { bg: 'rgba(27, 184, 120, 0.12)', fg: '#1bb878' },
+  pink: { bg: 'rgba(255, 79, 143, 0.12)', fg: '#ff4f8f' },
+  amber: { bg: 'rgba(239, 155, 6, 0.12)', fg: '#ef9b06' },
+  purple: { bg: 'rgba(155, 81, 224, 0.12)', fg: '#9b51e0' },
+  teal: { bg: 'rgba(12, 177, 172, 0.12)', fg: '#0cb1ac' },
 };
 
 /**

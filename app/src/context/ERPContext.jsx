@@ -3455,16 +3455,53 @@ export const ERPProvider = ({ children, }) => {
         showToast('Warranty Card updated successfully.');
     };
 
-    const cancelWarrantyCard = (id) => {
+    const cancelWarrantyCard = (id, reason = '') => {
         setWarranties((prev) => prev.map((w) => {
             if (w.id !== id && w.cardNumber !== id) return w;
             return {
                 ...w,
                 documentStatus: 'Cancelled',
                 coverageStatus: 'Cancelled',
+                cancellationReason: reason || w.cancellationReason,
             };
         }));
-        showToast('Warranty Card marked as Cancelled.');
+        showToast('Warranty Card marked as Void / Cancelled.');
+    };
+
+    const voidWarrantyCard = (id, reason = '') => {
+        cancelWarrantyCard(id, reason);
+    };
+
+    const suspendWarrantyCard = (id, reason = '') => {
+        setWarranties((prev) => prev.map((w) => {
+            if (w.id !== id && w.cardNumber !== id) return w;
+            return {
+                ...w,
+                coverageStatus: 'Suspended',
+                documentStatus: 'Suspended',
+                suspendReason: reason || 'Temporarily suspended on hold',
+            };
+        }));
+        showToast('Warranty coverage paused / suspended.');
+    };
+
+    const resumeWarrantyCard = (id) => {
+        setWarranties((prev) => prev.map((w) => {
+            if (w.id !== id && w.cardNumber !== id) return w;
+            const updated = {
+                ...w,
+                documentStatus: 'Generated',
+                suspendReason: undefined,
+            };
+            updated.coverageStatus = calculateWarrantyCoverageStatus(updated.startDate, updated.expiryDate, updated.documentStatus);
+            return updated;
+        }));
+        showToast('Warranty coverage resumed to Active.');
+    };
+
+    const deleteWarrantyCard = (id) => {
+        setWarranties((prev) => prev.filter((w) => w.id !== id && w.cardNumber !== id));
+        showToast('Warranty draft deleted.');
     };
 
     const getWarrantyByChallanId = (challanId) => {
@@ -3650,6 +3687,10 @@ export const ERPProvider = ({ children, }) => {
             addWarrantyCard,
             updateWarrantyCard,
             cancelWarrantyCard,
+            voidWarrantyCard,
+            suspendWarrantyCard,
+            resumeWarrantyCard,
+            deleteWarrantyCard,
             getWarrantyByChallanId,
             getWarrantyBySerial,
             faultyParts,

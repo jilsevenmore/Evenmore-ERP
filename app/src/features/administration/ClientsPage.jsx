@@ -641,7 +641,7 @@ export function ClientsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-800 p-4 md:p-7 space-y-6">
+    <div className="min-h-screen text-slate-800 p-4 md:p-7 space-y-6" style={{ backgroundColor: 'var(--page, #f6f9ff)', color: 'var(--text)' }}>
       {toastMessage && (
         <div className="fixed top-6 right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
           <CheckCircle2 size={18} className="text-emerald-400" />
