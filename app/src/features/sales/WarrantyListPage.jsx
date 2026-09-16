@@ -3,7 +3,22 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { PageHeader } from '../../components/common/PageHeader';
-import { ShieldCheck, Award, Eye, Send, Printer, Plus, AlertTriangle, Clock, Ban, CheckCircle2, User, Package, QrCode, FileText } from 'lucide-react';
+import {
+    ShieldCheck,
+    Award,
+    Eye,
+    Send,
+    Trash2,
+    PauseCircle,
+    PlayCircle,
+    Ban,
+    Clock,
+    FileText,
+    Pencil,
+    AlertTriangle,
+    X,
+    CheckCircle2,
+} from 'lucide-react';
 import { formatDisplayDate, formatWarrantyPeriod, getWarrantyStatusStyle } from '../../utils/warrantyUtils';
 import { WarrantyCardModal } from '../../components/common/WarrantyCardModal';
 import { CreateWarrantyCardModal } from '../../components/common/CreateWarrantyCardModal';
@@ -15,18 +30,27 @@ const warrantyGuide = {
     purpose: 'The Customer Warranty Registry tracks all equipment warranty certificates issued to customers upon delivery dispatch. It automatically manages warranty periods, expiry dates, serial number associations, and component-level coverage without requiring manual data duplication.',
     keyTerms: [
         { term: 'Warranty Card', definition: 'The official customer-facing certificate confirming equipment coverage, serial numbers, and validity periods.' },
-        { term: 'Coverage Status', definition: 'Real-time coverage state (Active, Expiring Soon, Expired, Pending Activation, or Cancelled) dynamically calculated from dates.' },
-        { term: 'Component Warranty', definition: 'Modular sub-assemblies (e.g. motors, sensors, camera heads) that have independent warranty durations distinct from the parent machine.' },
+        { term: 'Coverage Status', definition: 'Real-time coverage state (Active, Expiring Soon, Expired, Suspended, Pending Activation, or Cancelled) dynamically calculated from dates.' },
+        { term: 'Suspension / Hold', definition: 'Temporary hold on warranty claims during commercial reviews or technical investigation.' },
+        { term: 'Void / Cancellation', definition: 'Official cancellation of warranty terms with an auditable reason (e.g. equipment return or term violation).' },
     ],
     tips: [
         'Warranty Cards are auto-populated from Delivery Challan dispatch manifests and linked sales orders.',
-        'Editing a warranty card for a specific delivery does not modify the master catalog or serialized inventory rules.',
+        'Hard deletion is strictly limited to Draft certificates to preserve legal and serial number audit trails.',
     ],
     workflow: ['Delivery Challan Dispatched', 'Warranty Card Attached & Verified', 'Card Generated', 'Consignment & Card Sent to Customer'],
 };
 
 export const WarrantyListPage = () => {
-    const { warranties = [], deliveryChallans = [], cancelWarrantyCard } = useERP();
+    const {
+        warranties = [],
+        deliveryChallans = [],
+        cancelWarrantyCard,
+        voidWarrantyCard = cancelWarrantyCard,
+        suspendWarrantyCard,
+        resumeWarrantyCard,
+        deleteWarrantyCard,
+    } = useERP();
 
     const [selectedWarranty, setSelectedWarranty] = useState(null);
     const [editWarrantyChallan, setEditWarrantyChallan] = useState(null);
@@ -34,24 +58,47 @@ export const WarrantyListPage = () => {
     const [sendChallan, setSendChallan] = useState(null);
     const [statusFilter, setStatusFilter] = useState('All');
 
+    // Action dialog state (for Void, Pause, Delete confirmations)
+    const [actionDialog, setActionDialog] = useState(null); // { type: 'void' | 'pause' | 'delete', card: obj }
+    const [actionReason, setActionReason] = useState('');
+
     // Summary counts
-    const activeCount = warranties.filter((w) => w.coverageStatus === 'Active' && w.documentStatus !== 'Cancelled').length;
-    const expiringSoonCount = warranties.filter((w) => w.coverageStatus === 'Expiring Soon' && w.documentStatus !== 'Cancelled').length;
+    const activeCount = warranties.filter((w) => w.coverageStatus === 'Active' && w.documentStatus !== 'Cancelled' && w.documentStatus !== 'Suspended').length;
+    const expiringSoonCount = warranties.filter((w) => w.coverageStatus === 'Expiring Soon' && w.documentStatus !== 'Cancelled' && w.documentStatus !== 'Suspended').length;
+    const suspendedCount = warranties.filter((w) => w.coverageStatus === 'Suspended' || w.documentStatus === 'Suspended').length;
     const expiredCount = warranties.filter((w) => w.coverageStatus === 'Expired' && w.documentStatus !== 'Cancelled').length;
     const draftCount = warranties.filter((w) => w.documentStatus === 'Draft').length;
+    const cancelledCount = warranties.filter((w) => w.documentStatus === 'Cancelled' || w.coverageStatus === 'Cancelled').length;
 
     const filteredWarranties = useMemo(() => {
         return warranties.filter((w) => {
             if (statusFilter === 'All') return true;
-            if (statusFilter === 'Active') return w.coverageStatus === 'Active' && w.documentStatus !== 'Cancelled';
-            if (statusFilter === 'Expiring Soon') return w.coverageStatus === 'Expiring Soon' && w.documentStatus !== 'Cancelled';
+            if (statusFilter === 'Active') return (w.coverageStatus === 'Active' || w.coverageStatus === 'Pending Activation') && w.documentStatus !== 'Cancelled' && w.documentStatus !== 'Suspended';
+            if (statusFilter === 'Expiring Soon') return w.coverageStatus === 'Expiring Soon' && w.documentStatus !== 'Cancelled' && w.documentStatus !== 'Suspended';
+            if (statusFilter === 'Suspended') return w.coverageStatus === 'Suspended' || w.documentStatus === 'Suspended';
             if (statusFilter === 'Expired') return w.coverageStatus === 'Expired' && w.documentStatus !== 'Cancelled';
-            if (statusFilter === 'Pending') return w.coverageStatus === 'Pending Activation' && w.documentStatus !== 'Cancelled';
             if (statusFilter === 'Draft') return w.documentStatus === 'Draft';
             if (statusFilter === 'Cancelled') return w.documentStatus === 'Cancelled' || w.coverageStatus === 'Cancelled';
             return true;
         });
     }, [warranties, statusFilter]);
+
+    function handleConfirmAction(e) {
+        e.preventDefault();
+        if (!actionDialog?.card) return;
+
+        const { type, card } = actionDialog;
+        if (type === 'delete') {
+            if (deleteWarrantyCard) deleteWarrantyCard(card.id);
+        } else if (type === 'void') {
+            if (voidWarrantyCard) voidWarrantyCard(card.id, actionReason.trim() || 'Warranty cancelled/voided');
+        } else if (type === 'pause') {
+            if (suspendWarrantyCard) suspendWarrantyCard(card.id, actionReason.trim() || 'Temporary hold');
+        }
+
+        setActionDialog(null);
+        setActionReason('');
+    }
 
     const columns = [
         {
@@ -138,7 +185,7 @@ export const WarrantyListPage = () => {
         {
             key: 'expiryDate',
             header: 'Duration / Expiry',
-            width: '13%',
+            width: '12%',
             render: (w) => (
                 <div>
                     <span className="font-bold text-emerald-700 dark:text-emerald-400 text-[11px] block">
@@ -154,8 +201,10 @@ export const WarrantyListPage = () => {
             align: 'center',
             width: '12%',
             render: (w) => {
-                const style = getWarrantyStatusStyle(w.coverageStatus);
                 const isDraft = w.documentStatus === 'Draft';
+                const isSuspended = w.documentStatus === 'Suspended' || w.coverageStatus === 'Suspended';
+                const style = getWarrantyStatusStyle(isSuspended ? 'Suspended' : w.coverageStatus);
+
                 return (
                     <div className="space-y-0.5 text-center">
                         <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
@@ -163,6 +212,16 @@ export const WarrantyListPage = () => {
                         }`}>
                             {isDraft ? 'Draft Certificate' : style.label}
                         </span>
+                        {w.cancellationReason && (
+                            <p className="text-[9px] text-rose-500 truncate max-w-[120px] mx-auto" title={w.cancellationReason}>
+                                {w.cancellationReason}
+                            </p>
+                        )}
+                        {w.suspendReason && (
+                            <p className="text-[9px] text-purple-500 truncate max-w-[120px] mx-auto" title={w.suspendReason}>
+                                {w.suspendReason}
+                            </p>
+                        )}
                     </div>
                 );
             },
@@ -171,38 +230,98 @@ export const WarrantyListPage = () => {
             key: 'actions',
             header: 'Actions',
             align: 'right',
-            width: '10%',
+            width: '14%',
             render: (w) => {
                 const linkedChallan = deliveryChallans.find((c) => c.id === w.deliveryChallanId || c.challanNumber === w.challanNumber);
+                const isDraft = w.documentStatus === 'Draft';
+                const isCancelled = w.documentStatus === 'Cancelled' || w.coverageStatus === 'Cancelled';
+                const isSuspended = w.documentStatus === 'Suspended' || w.coverageStatus === 'Suspended';
+
                 return (
-                    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                        {/* View Preview */}
                         <button
                             onClick={() => setSelectedWarranty(w)}
-                            className="p-1 text-slate-500 hover:text-primary hover:bg-slate-100 rounded text-xs flex items-center gap-1 cursor-pointer"
+                            className="p-1.5 text-slate-500 hover:text-primary hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-xs transition cursor-pointer"
                             title="Preview / Print Certificate"
                         >
-                            <Eye size={13} />
+                            <Eye size={14} />
                         </button>
-                        {linkedChallan && w.documentStatus !== 'Cancelled' && (
+
+                        {/* Send via Challan */}
+                        {linkedChallan && !isCancelled && !isDraft && (
                             <button
                                 onClick={() => setSendChallan(linkedChallan)}
-                                className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded text-xs flex items-center gap-1 cursor-pointer"
+                                className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-xs transition cursor-pointer"
                                 title="Send with Delivery Challan"
                             >
-                                <Send size={13} />
+                                <Send size={14} />
                             </button>
                         )}
-                        {w.documentStatus === 'Draft' && linkedChallan && (
-                            <button
-                                onClick={() => {
-                                    setEditingCard(w);
-                                    setEditWarrantyChallan(linkedChallan);
-                                }}
-                                className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded text-xs cursor-pointer font-semibold"
-                                title="Edit Draft"
-                            >
-                                Edit
-                            </button>
+
+                        {/* DRAFT ACTIONS: Edit & Delete */}
+                        {isDraft && (
+                            <>
+                                {linkedChallan && (
+                                    <button
+                                        onClick={() => {
+                                            setEditingCard(w);
+                                            setEditWarrantyChallan(linkedChallan);
+                                        }}
+                                        className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 dark:hover:bg-amber-900/30 rounded text-xs transition cursor-pointer"
+                                        title="Edit Draft"
+                                    >
+                                        <Pencil size={14} />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => setActionDialog({ type: 'delete', card: w })}
+                                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded text-xs transition cursor-pointer"
+                                    title="Delete Draft"
+                                >
+                                    <Trash2 size={14} />
+                                </button>
+                            </>
+                        )}
+
+                        {/* ACTIVE / ISSUED ACTIONS: Pause & Void */}
+                        {!isDraft && !isCancelled && !isSuspended && (
+                            <>
+                                <button
+                                    onClick={() => setActionDialog({ type: 'pause', card: w })}
+                                    className="p-1.5 text-purple-600 hover:text-purple-800 hover:bg-purple-50 dark:hover:bg-purple-900/30 rounded text-xs transition cursor-pointer"
+                                    title="Pause / Suspend Warranty Coverage"
+                                >
+                                    <PauseCircle size={14} />
+                                </button>
+                                <button
+                                    onClick={() => setActionDialog({ type: 'void', card: w })}
+                                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded text-xs transition cursor-pointer"
+                                    title="Void / Cancel Warranty"
+                                >
+                                    <Ban size={14} />
+                                </button>
+                            </>
+                        )}
+
+                        {/* SUSPENDED ACTIONS: Resume & Void */}
+                        {isSuspended && (
+                            <>
+                                <button
+                                    onClick={() => resumeWarrantyCard(w.id)}
+                                    className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded text-xs transition cursor-pointer"
+                                    title="Resume Active Coverage"
+                                >
+                                    <PlayCircle size={14} />
+                                </button>
+                                <button
+                                    onClick={() => setActionDialog({ type: 'void', card: w })}
+                                    className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded text-xs transition cursor-pointer"
+                                    title="Void / Cancel Warranty"
+                                >
+                                    <Ban size={14} />
+                                </button>
+                            </>
                         )}
                     </div>
                 );
@@ -211,7 +330,7 @@ export const WarrantyListPage = () => {
     ];
 
     return (
-        <div className="space-y-6">
+        <div className="w-full space-y-5">
             <PageHeader
                 title="Customer Warranty & Equipment Guarantee Registry"
                 subtitle="Manage equipment warranty cards, serial number registrations, and multi-document consignment dispatches."
@@ -219,7 +338,7 @@ export const WarrantyListPage = () => {
             />
 
             {/* Summary Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <StatCard
                     label="Active Warranties"
                     value={`${activeCount} Cards`}
@@ -231,9 +350,9 @@ export const WarrantyListPage = () => {
                     icon={Clock}
                 />
                 <StatCard
-                    label="Expired Warranties"
-                    value={`${expiredCount} Cards`}
-                    icon={Ban}
+                    label="Suspended / On Hold"
+                    value={`${suspendedCount} Cards`}
+                    icon={PauseCircle}
                 />
                 <StatCard
                     label="Draft Certificates"
@@ -243,27 +362,28 @@ export const WarrantyListPage = () => {
             </div>
 
             {/* Status Filter Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                 {[
                     { id: 'All', label: 'All Warranties', count: warranties.length },
                     { id: 'Active', label: 'Active Coverage', count: activeCount },
                     { id: 'Expiring Soon', label: 'Expiring Soon', count: expiringSoonCount },
+                    { id: 'Suspended', label: 'Suspended / On Hold', count: suspendedCount },
                     { id: 'Expired', label: 'Expired', count: expiredCount },
                     { id: 'Draft', label: 'Drafts', count: draftCount },
-                    { id: 'Cancelled', label: 'Cancelled / Void', count: warranties.filter((w) => w.documentStatus === 'Cancelled').length },
+                    { id: 'Cancelled', label: 'Cancelled / Void', count: cancelledCount },
                 ].map((tab) => (
                     <button
                         key={tab.id}
                         onClick={() => setStatusFilter(tab.id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer transition-colors flex items-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition flex items-center gap-1.5 ${
                             statusFilter === tab.id
-                                ? 'bg-[#1F2E4A] text-white shadow-2xs'
-                                : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                                ? 'bg-primary text-white shadow-2xs'
+                                : 'bg-card text-muted hover:text-text border border-border'
                         }`}
                     >
                         <span>{tab.label}</span>
                         <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                            statusFilter === tab.id ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                            statusFilter === tab.id ? 'bg-white/20 text-white' : 'bg-soft text-muted'
                         }`}>
                             {tab.count}
                         </span>
@@ -338,6 +458,104 @@ export const WarrantyListPage = () => {
                         if (wc) setSelectedWarranty(wc);
                     }}
                 />
+            )}
+
+            {/* ACTION DIALOG: Void, Pause, Delete Confirmations */}
+            {actionDialog && (
+                <div
+                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+                    role="presentation"
+                    onMouseDown={() => setActionDialog(null)}
+                >
+                    <form
+                        onSubmit={handleConfirmAction}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                    >
+                        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-soft/50">
+                            <div className="flex items-center gap-2">
+                                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                                    actionDialog.type === 'delete' || actionDialog.type === 'void'
+                                        ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                                        : 'bg-purple-500/10 text-purple-500 border border-purple-500/20'
+                                }`}>
+                                    {actionDialog.type === 'delete' && <Trash2 size={15} />}
+                                    {actionDialog.type === 'void' && <Ban size={15} />}
+                                    {actionDialog.type === 'pause' && <PauseCircle size={15} />}
+                                </div>
+                                <h3 className="text-sm font-black text-text">
+                                    {actionDialog.type === 'delete' && 'Delete Draft Warranty'}
+                                    {actionDialog.type === 'void' && 'Void / Cancel Warranty Certificate'}
+                                    {actionDialog.type === 'pause' && 'Pause / Suspend Warranty Coverage'}
+                                </h3>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setActionDialog(null)}
+                                className="text-muted hover:text-text p-1 rounded-lg hover:bg-soft transition cursor-pointer"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="p-5 space-y-3.5 text-xs">
+                            <p className="text-muted leading-relaxed">
+                                {actionDialog.type === 'delete' && (
+                                    <>Are you sure you want to delete draft certificate <strong>{actionDialog.card?.cardNumber}</strong> for <strong>{actionDialog.card?.customerName}</strong>? This draft record will be permanently removed.</>
+                                )}
+                                {actionDialog.type === 'void' && (
+                                    <>Voiding certificate <strong>{actionDialog.card?.cardNumber}</strong> will invalidate customer coverage while retaining the serial number audit history under the <strong>Cancelled / Void</strong> tab.</>
+                                )}
+                                {actionDialog.type === 'pause' && (
+                                    <>Suspending certificate <strong>{actionDialog.card?.cardNumber}</strong> will put warranty claims on hold (e.g. during commercial disputes or equipment inspections).</>
+                                )}
+                            </p>
+
+                            {actionDialog.type !== 'delete' && (
+                                <div>
+                                    <label className="block text-xs font-bold text-text mb-1">
+                                        Reason / Audit Notes <span className="text-rose-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        required
+                                        autoFocus
+                                        value={actionReason}
+                                        onChange={(e) => setActionReason(e.target.value)}
+                                        placeholder={
+                                            actionDialog.type === 'void'
+                                                ? 'e.g. Unit returned for refund / Tampering violation'
+                                                : 'e.g. Customer payment dispute / Inspection hold'
+                                        }
+                                        className="w-full bg-card border border-border rounded-xl px-3 py-2 text-xs text-text focus:outline-none focus:border-primary shadow-2xs"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-soft/50 border-t border-border">
+                            <button
+                                type="button"
+                                onClick={() => setActionDialog(null)}
+                                className="inline-flex items-center justify-center h-9 px-4 text-xs font-semibold text-text bg-card hover:bg-soft border border-border rounded-xl shadow-2xs transition cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className={`inline-flex items-center justify-center h-9 px-5 text-xs font-bold text-white rounded-xl shadow-xs transition cursor-pointer ${
+                                    actionDialog.type === 'delete' || actionDialog.type === 'void'
+                                        ? 'bg-rose-600 hover:bg-rose-700'
+                                        : 'bg-purple-600 hover:bg-purple-700'
+                                }`}
+                            >
+                                {actionDialog.type === 'delete' && 'Delete Draft'}
+                                {actionDialog.type === 'void' && 'Void Certificate'}
+                                {actionDialog.type === 'pause' && 'Suspend Coverage'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             )}
         </div>
     );
