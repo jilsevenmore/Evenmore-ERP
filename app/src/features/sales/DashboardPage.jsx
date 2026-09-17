@@ -156,7 +156,26 @@ export const DashboardPage = () => {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Unified Business Dashboard" subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration — sab modules ek jagah." actions={<div className="flex items-center gap-2.5"><Link to="/crm/dashboard" className="px-3 py-2 bg-white border border-[#CED4DA] rounded-md text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs">CRM Dashboard</Link><Link to="/crm/leads" className="px-3.5 py-2 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-md text-xs font-semibold shadow-xs transition flex items-center gap-1.5">+ New Lead</Link></div>} />
+      <PageHeader
+        title="Unified Business Dashboard"
+        subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration"
+        actions={
+          <div className="flex items-center gap-2.5">
+            <Link
+              to="/crm/dashboard"
+              className="px-3.5 py-2 bg-card border border-border hover:bg-soft text-text rounded-xl text-xs font-semibold shadow-2xs transition"
+            >
+              CRM Dashboard
+            </Link>
+            <Link
+              to="/crm/leads"
+              className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+            >
+              + New Lead
+            </Link>
+          </div>
+        }
+      />
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* [PHASE-1-DASHBOARD] "Total Leads" stat card replaced with ERP Totals */}
         {/* Old: <StatCard label="Total Leads" value={fmt(leads.length + 238)} icon={Target} tone="blue" trend="12%" trendDirection="up" note="vs last month" /> */}
@@ -310,11 +329,10 @@ export const DashboardPage = () => {
             </div>
             <p className="chart-note">{overview.summary}</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-              {/* ── [PHASE-1-DASHBOARD] was: Leads: {fmt(leads.length)} link to /crm/leads ── */}
-              <Link to="/sales/quotes" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Quotes: {fmt(quotations.length)}</Link>
-              <Link to="/sales/invoices" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Invoices: {fmt(invoices.length)}</Link>
-              <Link to="/sales/challans" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50">Challans: {fmt(deliveryChallans.length)}</Link>
-              <Link to="/sales/orders" className="text-center px-2 py-2 rounded-md border border-slate-200 text-xs font-semibold hover:bg-slate-50 flex items-center justify-center gap-1"><Settings size={12} /> Orders</Link>
+              <Link to="/sales/quotes" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Quotes: {fmt(quotations.length)}</Link>
+              <Link to="/sales/invoices" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Invoices: {fmt(invoices.length)}</Link>
+              <Link to="/sales/challans" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Challans: {fmt(deliveryChallans.length)}</Link>
+              <Link to="/sales/orders" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition flex items-center justify-center gap-1.5"><Settings size={12} className="text-primary" /> Orders: {fmt(salesOrders.length)}</Link>
             </div>
           </section>
 
@@ -459,8 +477,11 @@ export const DashboardPage = () => {
             </div>
             <div className="space-y-2 text-xs">
               {salesOrders.slice(0, 3).map((o) => (
-                <div key={o.id} className="p-3 rounded-md border border-slate-200 bg-[#F8F9FA] flex items-center justify-between gap-3">
-                  <div className="min-w-0"><p className="font-mono text-xs font-bold text-slate-800">{o.orderNumber || o.id}</p><p className="text-[11px] text-slate-500 truncate">{o.customer} | ₹{fmt(o.amount || 0)}</p></div>
+                <div key={o.id} className="p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs font-bold text-text">{o.orderNumber || o.id}</p>
+                    <p className="text-[11px] text-muted truncate">{o.customer} • ₹{fmt(o.amount || 0)}</p>
+                  </div>
                   <StatusBadge status={o.stage || o.status || 'Draft'} />
                 </div>
               ))}
@@ -480,19 +501,32 @@ export const DashboardPage = () => {
             </div>
             <div className="space-y-2 text-xs">
               {purchaseOrders.slice(0, 3).map((o) => (
-                <div key={o.id} className="p-3 rounded-md border border-slate-200 bg-[#F8F9FA] flex items-center justify-between gap-3">
-                  <div className="min-w-0"><p className="font-mono text-xs font-bold text-slate-800">{o.orderNumber || o.poNumber || o.id}</p><p className="text-[11px] text-slate-500 truncate">{o.vendor} | ₹{fmt(o.total || o.amount || 0)}</p></div>
+                <div key={o.id} className="p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
+                  <div className="min-w-0">
+                    <p className="font-mono text-xs font-bold text-text">{o.orderNumber || o.poNumber || o.id}</p>
+                    <p className="text-[11px] text-muted truncate">{o.vendor} • ₹{fmt(o.total || o.amount || 0)}</p>
+                  </div>
                   <StatusBadge status={o.status || 'Draft'} />
                 </div>
               ))}
             </div>
           </div>
-          <div className="pt-3 border-t border-slate-100 grid grid-cols-2 gap-2 text-xs">
-            <Link to="/sales/invoices" className="px-2 py-2 rounded-md bg-slate-900 text-white text-center font-semibold">Invoices ₹{fmt(Math.round(invoiceTotal))}</Link>
-            <Link to="/purchase/bills" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">Bills ₹{fmt(Math.round(billTotal))}</Link>
-            <Link to="/sales/payments" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">PayIn ₹{fmt(Math.round(paymentInTotal))}</Link>
-            <Link to="/purchase/payments" className="px-2 py-2 rounded-md bg-white border text-center font-semibold">PayOut ₹{fmt(Math.round(paymentOutTotal))}</Link>
-            <Link to="/purchase/expenses" className="px-2 py-2 rounded-md bg-white border text-center font-semibold col-span-2">Expenses ₹{fmt(Math.round(expenseTotal))} | Challans {fmt(deliveryChallans.length)} | Returns {fmt(salesReturns.length)}</Link>
+          <div className="pt-3 border-t border-border grid grid-cols-2 gap-2 text-xs font-semibold">
+            <Link to="/sales/invoices" className="px-3 py-2 rounded-xl bg-primary text-white text-center shadow-2xs hover:bg-primary/90 transition">
+              Invoices ₹{fmt(Math.round(invoiceTotal))}
+            </Link>
+            <Link to="/purchase/bills" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+              Bills ₹{fmt(Math.round(billTotal))}
+            </Link>
+            <Link to="/sales/payments" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+              PayIn ₹{fmt(Math.round(paymentInTotal))}
+            </Link>
+            <Link to="/purchase/payments" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+              PayOut ₹{fmt(Math.round(paymentOutTotal))}
+            </Link>
+            <Link to="/purchase/expenses" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center col-span-2 transition">
+              Expenses ₹{fmt(Math.round(expenseTotal))} • Challans {fmt(deliveryChallans.length)} • Returns {fmt(salesReturns.length)}
+            </Link>
           </div>
         </div>
       </div>
@@ -544,10 +578,28 @@ export const DashboardPage = () => {
               View All
             </Link>
           </div>
-          <div className="space-y-2 text-xs">
-            <Link to="/accounts/cash-bank" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><Landmark size={14} /> Bank Balance</span><strong>₹{fmt(Math.round(bankBalance))}</strong></Link>
-            <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><FileText size={14} /> Ledger</span><strong>Open</strong></Link>
-            <Link to="/accounts/reports" className="flex items-center justify-between p-2.5 rounded-md bg-slate-50 border"><span className="flex items-center gap-2 font-semibold"><PieChart size={14} /> Finance Reports</span><strong>View</strong></Link>
+          <div className="space-y-2 text-xs font-semibold">
+            <Link to="/accounts/cash-bank" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
+              <span className="flex items-center gap-2 font-bold text-text">
+                <Landmark size={14} className="text-primary" />
+                <span>Bank Balance</span>
+              </span>
+              <strong className="text-text font-mono font-bold">₹{fmt(Math.round(bankBalance))}</strong>
+            </Link>
+            <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
+              <span className="flex items-center gap-2 font-bold text-text">
+                <FileText size={14} className="text-primary" />
+                <span>General Ledger</span>
+              </span>
+              <span className="text-primary text-xs font-bold">Open →</span>
+            </Link>
+            <Link to="/accounts/reports" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
+              <span className="flex items-center gap-2 font-bold text-text">
+                <PieChart size={14} className="text-primary" />
+                <span>Financial Reports</span>
+              </span>
+              <span className="text-primary text-xs font-bold">View →</span>
+            </Link>
           </div>
         </div>
 
@@ -582,16 +634,16 @@ export const DashboardPage = () => {
             </Link>
           </div>
           <div className="mt-3 flex items-center gap-2 text-xs font-semibold">
-            <Link to="/crm/user-allocation" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1">
-              <ListChecks size={13} />
+            <Link to="/crm/user-allocation" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
+              <ListChecks size={13} className="text-primary" />
               <span>Allocation</span>
             </Link>
-            <Link to="/inventory/zone-requests" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition">
-              Zone ({pendingZoneReqs})
+            <Link to="/inventory/zone-requests" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
+              <span>Zone Requests ({pendingZoneReqs})</span>
             </Link>
-            <Link to="/inventory/transfers" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1">
-              <ArrowLeftRight size={13} />
-              <span>{pendingTransfers}</span>
+            <Link to="/inventory/transfers" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
+              <ArrowLeftRight size={13} className="text-primary" />
+              <span>Transfers ({pendingTransfers})</span>
             </Link>
           </div>
         </div>
