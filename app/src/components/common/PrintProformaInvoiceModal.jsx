@@ -1,11 +1,27 @@
 import React, { useEffect } from 'react';
 import { X, Printer, FileSpreadsheet, Clock, Info } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
 
 export const PrintProformaInvoiceModal = ({
   isOpen,
   onClose,
   proforma,
 }) => {
+  // [PHASE-2E.1] company profile drives letterhead; GSTIN was hardcoded 29AABCU9912E1Z8
+  const { companyProfile } = useERP();
+  const companyName = companyProfile?.name || 'EVENMORE ERP MEDICAL & SYSTEMS';
+  const companyShort = (companyName || 'E').trim().charAt(0).toUpperCase() || 'E';
+  const gstin = companyProfile?.gstin || '';
+  const pan = companyProfile?.pan || '';
+  const companyAddress = companyProfile?.address || 'Corporate Towers, Sector 62, Electronic City • Bengaluru, Karnataka 560100';
+  const phone = companyProfile?.phone || '+91 80 4920 1100';
+  const companyStateCode = (gstin || '').slice(0, 2).toUpperCase();
+  const posRaw = String(proforma.placeOfSupplyState || proforma.placeOfSupply || proforma.billingAddress?.state || '');
+  const posMatch = posRaw.match(/(\d{2})/);
+  const posStateCode = posMatch ? posMatch[1] : posRaw.slice(0, 2).toUpperCase();
+  const hasStates = Boolean(companyStateCode && posStateCode);
+  const isIntraState = hasStates && companyStateCode === posStateCode;
+
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -60,21 +76,21 @@ export const PrintProformaInvoiceModal = ({
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                  E
+                  {companyShort}
                 </div>
                 <div>
                   <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
-                    EVENMORE ERP MEDICAL & SYSTEMS
+                    {companyName}
                   </h1>
                   <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                    Enterprise Healthcare & Surgical Equipment Division
+                    Steel Fabrication &amp; MS Table Manufacturing
                   </p>
                 </div>
               </div>
               <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                <p>Corporate Towers, Sector 62, Electronic City • Bengaluru, Karnataka 560100</p>
-                <p>Tax Registration / GSTIN: <strong className="text-slate-700">29AABCU9912E1Z8</strong> • PAN: <strong className="text-slate-700">AABCU9912E</strong></p>
-                <p>Commercial Billing Desk: billing@evenmore.io | +91 80 4920 1100</p>
+                <p>{companyAddress}</p>
+                <p>Tax Registration / GSTIN: <strong className="text-slate-700">{gstin || '—'}</strong>{pan ? <> • PAN: <strong className="text-slate-700">{pan}</strong></> : ''}</p>
+                <p>Commercial Billing Desk: billing@sweven.in | {phone}</p>
               </div>
             </div>
 
@@ -117,10 +133,10 @@ export const PrintProformaInvoiceModal = ({
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 ISSUED BY (SUPPLIER)
               </span>
-              <p className="font-bold text-sm text-slate-900">EVENMORE SYSTEMS PRIVATE LIMITED</p>
-              <p className="text-slate-600">Corporate Towers, Sector 62, Electronic City</p>
-              <p className="text-slate-600">Bengaluru, Karnataka - 560100, India</p>
-              <p className="text-slate-600">GSTIN: 29AABCU9912E1Z8</p>
+              {/* [PHASE-2E.1] GSTIN from companyProfile (was hardcoded 29AABCU9912E1Z8) */}
+              <p className="font-bold text-sm text-slate-900">{companyName}</p>
+              <p className="text-slate-600">{companyAddress}</p>
+              <p className="text-slate-600">GSTIN: {gstin || '—'}</p>
             </div>
 
             <div className="space-y-1 sm:border-l sm:border-slate-200 sm:pl-6">
@@ -216,7 +232,7 @@ export const PrintProformaInvoiceModal = ({
               <div className="p-2.5 bg-blue-50/60 rounded-lg border border-blue-200/80 text-[10px] text-blue-900">
                 <p className="font-bold uppercase tracking-wider text-blue-800 mb-0.5">Bank Wire Details for Advance Deposit:</p>
                 <p>Bank: <strong>HDFC Bank Ltd</strong> • A/C: <strong>092810029311</strong> • IFSC: <strong>HDFC0001245</strong></p>
-                <p>Beneficiary: <strong>Evenmore Medical Systems Private Limited</strong></p>
+                <p>Beneficiary: <strong>{companyName}</strong></p>
               </div>
             </div>
 
@@ -226,10 +242,31 @@ export const PrintProformaInvoiceModal = ({
                 <span>Taxable Amount (Pre-Tax):</span>
                 <span>₹{taxableAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
-              <div className="flex justify-between text-slate-600">
-                <span>CGST + SGST (18% / IGST):</span>
-                <span>₹{taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-              </div>
+              {/* [PHASE-2E.1] state-aware GST summary — intra-state splits CGST+SGST, inter-state shows IGST */}
+              {hasStates ? (
+                isIntraState ? (
+                  <>
+                    <div className="flex justify-between text-slate-600">
+                      <span>CGST ({((taxAmount * 0.5) / taxableAmount * 100).toFixed(1)}%):</span>
+                      <span>₹{(taxAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>SGST ({((taxAmount * 0.5) / taxableAmount * 100).toFixed(1)}%):</span>
+                      <span>₹{(taxAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between text-slate-600">
+                    <span>IGST ({taxableAmount > 0 ? ((taxAmount / taxableAmount) * 100).toFixed(1) : 0}%) [inter-state]:</span>
+                    <span>₹{taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )
+              ) : (
+                <div className="flex justify-between text-slate-600">
+                  <span>CGST + SGST ({taxableAmount > 0 ? ((taxAmount / taxableAmount) * 100).toFixed(1) : 0}%):</span>
+                  <span>₹{taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+              )}
               <div className="flex justify-between text-slate-600">
                 <span>Other Charges (Freight/Logistics):</span>
                 <span>₹0.00</span>
@@ -261,7 +298,7 @@ export const PrintProformaInvoiceModal = ({
             <div className="space-y-10">
               <p className="text-slate-400 uppercase text-[10px] font-bold">Authorized Signatory & Seal</p>
               <div className="border-b border-slate-300 w-3/4 mx-auto" />
-              <p className="font-semibold text-slate-700 text-[11px]">Evenmore Systems Private Limited</p>
+              <p className="font-semibold text-slate-700 text-[11px]">{companyName}</p>
             </div>
           </div>
 

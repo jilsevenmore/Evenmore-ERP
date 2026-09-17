@@ -1,9 +1,23 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts, mockProformaInvoices, mockEstimates, mockWarrantyCards } from '../data/erp/mockData';
-import { formatDateDDMMYYYY, getCurrentDateFormatted } from '../utils/dateUtils';
+import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES } from '../utils/currencyUtils';
 import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
 const STORAGE_KEY = 'horizon_erp_v2_state';
+// ── [PHASE-2E.1] steel-category → HSN default map (Sweven fabrication master) ──
+//   Falls back to 7216 (angles/shapes/sections) unless the category matches a known steel family.
+function mapCategoryToHSN(category) {
+    const cat = String(category || '').toLowerCase();
+    if (cat.includes('angle') || cat.includes('channel') || cat.includes('section') || cat.includes('beam')) return '7216.32';
+    if (cat.includes('pipe') || cat.includes('tube') || cat.includes('hollow')) return '7306.30';
+    if (cat.includes('sheet') || cat.includes('coil') || cat.includes('plate') || cat.includes('flat')) return '7208.10';
+    if (cat.includes('bar') || cat.includes('rod') || cat.includes('round')) return '7214.10';
+    if (cat.includes('wire')) return '7217.10';
+    if (cat.includes('table') || cat.includes('furniture')) return '9403.20';
+    if (cat.includes('fastener') || cat.includes('bolt') || cat.includes('nut') || cat.includes('screw')) return '7318.15';
+    if (cat.includes('fabrication') || cat.includes('fabricated')) return '7308.90';
+    return '7216.99';
+}
 const initialJournalEntries = [
     {
         id: 'je-1',
@@ -97,6 +111,42 @@ const loadSavedState = () => {
             } else {
                 parsed.warranties = mockWarrantyCards;
             }
+            // ── Date migration: normalize text dates into ISO (YYYY-MM-DD) ──
+            const migrateDateFields = (doc) => {
+                if (!doc || typeof doc !== 'object') return doc;
+                const next = { ...doc };
+                ['dueDate', 'expectedDate', 'deliveryDate', 'dispatchDate'].forEach((key) => {
+                    if (next[key] && typeof next[key] === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(next[key])) {
+                        const iso = toISODate(next[key]);
+                        if (iso) next[key] = iso;
+                    }
+                });
+                if (next.date && typeof next.date === 'string') {
+                    const iso = toISODate(next.date);
+                    if (iso && /^(Today|In\s+\d+\s*(day|month|week|year)s?\b|\d+\s*(day|month|week|year)s?\s*(from now|ago))/i.test(next.date)) next.date = iso;
+                }
+                return next;
+            };
+            ['invoices', 'proformaInvoices', 'salesOrders', 'deliveryChallans', 'purchaseOrders', 'purchaseBills', 'quotation', 'quotations', 'estimates'].forEach((slice) => {
+                if (Array.isArray(parsed?.[slice])) parsed[slice] = parsed[slice].map(migrateDateFields);
+            });
+
+            // ── Legacy backfill: GRN flag on old bills (post-GRN-split safe) ──
+            if (Array.isArray(parsed?.purchaseBills)) {
+                parsed.purchaseBills = parsed.purchaseBills.map((b) => ({
+                    ...b,
+                    goodsReceived: b.goodsReceived !== false,
+                }));
+            }
+
+            // ── Legacy backfill: paymentOuts typed as Final (advances migration safe) ──
+            if (Array.isArray(parsed?.paymentOuts)) {
+                parsed.paymentOuts = parsed.paymentOuts.map((p) => ({
+                    ...p,
+                    type: p.type || 'Final',
+                }));
+            }
+
             return parsed;
         }
     }
@@ -167,10 +217,29 @@ export const ERPProvider = ({ children, }) => {
     const [monthEndAudits, setMonthEndAudits] = useState(initial?.monthEndAudits || mockMonthEndAudits);
     const [bankAccounts, setBankAccounts] = useState(initial?.bankAccounts || mockBankAccounts);
     const [journalEntries, setJournalEntries] = useState(initial?.journalEntries || initialJournalEntries);
+    // ── [PHASE-2C] QC quality standards master (steel: dimensional + weight + surface checks)
+    //   Seed rows model Sweven's metal-intake checks; used to guide GRN QC review.
+    const defaultQualityStandards = [
+        { id: 'qs-ms-angle', name: 'MS Angle – Structural', category: 'Structural Steel', checks: ['Dimension tolerance ±2 mm', 'Weight variance within tolerance %', 'Surface: no scale / spalling', 'Check length, leg, thickness, mass'], tolerancePct: 2, active: true },
+        { id: 'qs-chequered', name: 'Chequered Plate – MS', category: 'Flat Steel', checks: ['Thickness per IS 2062', 'Chequer height 1.0–1.4 mm', 'Flatness ≤ 4 mm bow per 1 m', 'Mass per theoretical kg'], tolerancePct: 3, active: true },
+        { id: 'qs-hr-sheet', name: 'HR Sheet / Coil', category: 'Flat Steel', checks: ['Gauge per IS 1079', 'Edges trimmed, no oil stains', 'Width tolerance ±2 mm', 'Weighed on receipt'], tolerancePct: 2, active: true },
+        { id: 'qs-sq-pipe', name: 'Square Pipe – Structural', category: 'Structural Steel', checks: ['Section size per IS 4923', 'Wall thickness ±5%', 'Bend/straightness check', 'Weight variance within tolerance %'], tolerancePct: 2.5, active: true },
+    ];
+    const [qualityStandards, setQualityStandards] = useState(initial?.qualityStandards || defaultQualityStandards);
     const [inventoryMovements, setInventoryMovements] = useState(initial?.inventoryMovements || mockInventoryMovements);
     const [warranties, setWarranties] = useState(initial?.warranties || mockWarrantyCards);
     const [currency, setCurrencyState] = useState(() => {
-        return initial?.currency || localStorage.getItem('evenmore_currency') || 'USD ($)';
+        return initial?.currency || localStorage.getItem('evenmore_currency') || 'INR (₹)';
+    });
+    const [companyProfile, setCompanyProfileState] = useState(initial?.companyProfile || {
+        // [PHASE-2E.1] Sweven demo company default — Maharashtra GSTIN so intra-state
+        //   prints show CGST+SGST split and the letterhead carries GSTIN/PAN/address.
+        //   Editable from Settings → Company Profile. Keep `name` aligned with app branding.
+        name: 'Sweven Fabricators Pvt Ltd',
+        gstin: '27AABCU9912E1Z8',
+        pan: 'AABCU9912E',
+        address: 'Plot 14, MIDC Industrial Area, Waluj, Aurangabad, Maharashtra 431136',
+        phone: '+91 80 4920 1100',
     });
     const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
@@ -191,6 +260,10 @@ export const ERPProvider = ({ children, }) => {
         showToast(`System base currency updated to ${newCurr}`);
     };
 
+    const setCompanyProfile = (profile) => {
+        setCompanyProfileState((prev) => ({ ...prev, ...profile }));
+    };
+
     const formatCurrency = (amount, opts = {}) => {
         return formatCurrencyUtil(amount, currency, { ...opts, customRates: liveRates });
     };
@@ -204,6 +277,7 @@ export const ERPProvider = ({ children, }) => {
                 estimates,
                 faultyParts,
                 invoices,
+                companyProfile,
                 zoneRequests,
                 customers,
                 vendors,
@@ -244,6 +318,7 @@ export const ERPProvider = ({ children, }) => {
         estimates,
         faultyParts,
         invoices,
+        companyProfile,
         proformaInvoices,
         zoneRequests,
         customers,
@@ -325,7 +400,13 @@ export const ERPProvider = ({ children, }) => {
         const moves = inventoryMovements.filter((m) => m.itemId === targetId || (m.itemSku && m.itemSku.toLowerCase() === targetSku.toLowerCase()));
         let netMovementQty = 0;
         moves.forEach((m) => {
-            netMovementQty += m.quantity;
+            // [PHASE-2A] For weight-based items (steel by kg) prefer the weighed quantity —
+            //   stock on hand then reflects actual kg received on the weighbridge.
+            if (item?.isWeightItem && m.weighedQty !== undefined && m.weighedQty !== null) {
+                netMovementQty += Number(m.weighedQty) || 0;
+            } else {
+                netMovementQty += m.quantity;
+            }
         });
         // Count damaged parts
         const damagedMoves = moves.filter((m) => m.type === 'FAULTY');
@@ -575,7 +656,7 @@ export const ERPProvider = ({ children, }) => {
             id: `fp-${Date.now()}`,
             rmaNumber: newPart.rmaNumber ||
                 `RMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-            date: newPart.date || 'Today',
+            date: newPart.date || getCurrentDateFormatted(),
             product: newPart.product || 'Unknown Hardware Item',
             sku: newPart.sku || 'SKU-GEN-01',
             serialNumber: newPart.serialNumber || 'SN-UNKNOWN',
@@ -588,7 +669,7 @@ export const ERPProvider = ({ children, }) => {
                 {
                     id: 'tl-1',
                     title: 'Fault Reported',
-                    timestamp: `${newPart.date || 'Today'} • Just now`,
+                    timestamp: `${newPart.date || getCurrentDateFormatted()} • Just now`,
                     description: newPart.notes || 'Diagnostic logs attached.',
                     status: 'completed',
                 },
@@ -777,7 +858,7 @@ export const ERPProvider = ({ children, }) => {
             proformaInvoiceId: newInvoice.proformaInvoiceId,
             linkedPi: newInvoice.linkedPi,
             date: formatDateDDMMYYYY(newInvoice.date || 'Today'),
-            dueDate: newInvoice.dueDate || '30 Days from now',
+            dueDate: newInvoice.dueDate || addDaysISO(getCurrentISODate(), 30),
             status: finalStatus,
             finalized: isFinalized,
             items: invItems,
@@ -789,6 +870,10 @@ export const ERPProvider = ({ children, }) => {
             sgst,
             igst,
             tax: totalTax,
+            // [PHASE-2E.1] GST party metadata — powers intra/inter-state split on printed invoices
+            customerGstin: newInvoice.customerGstin || cust?.gstin || party?.gstin || 'URP / Unregistered',
+            placeOfSupply: newInvoice.placeOfSupply || pos,
+            placeOfSupplyState: newInvoice.placeOfSupplyState || String(pos).match(/(\d{2})/)?.[1] || '',
             otherCharges,
             roundOff,
             total,
@@ -1163,6 +1248,10 @@ export const ERPProvider = ({ children, }) => {
             sgst,
             igst,
             tax: cgst + sgst + igst,
+            // [PHASE-2E.1] GST party metadata for proforma print (intra/inter-state split)
+            customerGstin: pi.customerGstin || pi.gstin || 'URP / Unregistered',
+            placeOfSupply: pi.placeOfSupply || 'Maharashtra (27)',
+            placeOfSupplyState: pi.placeOfSupplyState || String(pi.placeOfSupply || 'Maharashtra (27)').match(/(\d{2})/)?.[1] || '',
             otherCharges,
             roundOff,
             grandTotal,
@@ -1217,7 +1306,7 @@ export const ERPProvider = ({ children, }) => {
             proformaInvoiceId: pi.id,
             linkedPi: pi.proformaNumber,
             date: getCurrentDateFormatted(),
-            dueDate: 'In 30 days',
+            dueDate: addDaysISO(getCurrentISODate(), 30),
             status: 'Draft',
             finalized: false,
             items: targetItems,
@@ -1256,7 +1345,7 @@ export const ERPProvider = ({ children, }) => {
             qty: newReq.qty || 1,
             zone: newReq.zone || 'Zone A',
             targetSector: newReq.targetSector || 'Zone A (Main)',
-            date: newReq.date || 'Today',
+            date: newReq.date || getCurrentDateFormatted(),
             submittedAt: newReq.submittedAt || 'Submitted just now',
             status: 'Requested',
             notes: newReq.notes || 'Emergency requisition.',
@@ -1314,6 +1403,14 @@ export const ERPProvider = ({ children, }) => {
             purchaseUnit: item.purchaseUnit || item.uom || 'Unit',
             salesUnit: item.salesUnit || item.uom || 'Unit',
             unitConversionFactor: Number(item.unitConversionFactor) || 1,
+            // ── [PHASE-2A] Weight-based item fields (Sweven steel: bought/sold by weight) ──
+            // isWeightItem marks steel/profiles that are weighed at intake instead of counted;
+            // theoreticalWeight = expected kg per unit; tolerancePct = allowed variance %
+            //   before a receipt auto-flags 'Pending Approval' (default ±2%).
+            isWeightItem: Boolean(item.isWeightItem),
+            theoreticalWeight: Number(item.theoreticalWeight) || 0,
+            tolerancePct: item.tolerancePct !== undefined && item.tolerancePct !== '' ? Number(item.tolerancePct) : 2,
+            weightUnit: item.weightUnit || 'kg',
             trackingMode: isService ? 'None' : (item.trackingMode || 'Quantity'),
             serialNumbers: serials,
             batchNumber: item.batchNumber || undefined,
@@ -1321,6 +1418,10 @@ export const ERPProvider = ({ children, }) => {
             manufactureDate: item.manufactureDate || undefined,
             expiryDate: item.expiryDate || undefined,
             taxRate: Number(item.taxRate !== undefined ? item.taxRate : 18),
+            // ── [PHASE-2E.1] GST compliance: HSN (goods) / SAC (services) code per item ──
+            //   Shown on tax invoices & proformas; defaults per steel category.
+            hsnCode: item.hsnCode || (item.itemKind === 'Service' ? item.sacCode || '' : mapCategoryToHSN(item.category)),
+            sacCode: item.sacCode || '',
             warrantyApplicable: Boolean(item.warrantyApplicable),
             warrantyPeriod: item.warrantyPeriod !== undefined ? Number(item.warrantyPeriod) : 1,
             warrantyUnit: item.warrantyUnit || 'Years',
@@ -1907,7 +2008,7 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: createAddressSnapshot(order.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(order.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(order.date || 'Today'),
-            deliveryDate: order.deliveryDate || 'In 10 days',
+            deliveryDate: order.deliveryDate || addDaysISO(getCurrentISODate(), 10),
             amount: orderAmt,
             stage: order.stage || 'Draft',
             status: order.stage || 'Draft',
@@ -1941,6 +2042,17 @@ export const ERPProvider = ({ children, }) => {
             showToast(`Cannot create Challan from Cancelled Sales Order.`);
             return undefined;
         }
+        // ── [PHASE-2C] QC gate — never dispatch unchecked steel ──
+        // Lines still to dispatch that trace back to a Pending/Rejected/Rework inbound
+        //   receipt are held until QC clears (updateQCStatus → 'Approved').
+        const inboundHold = (order.items || []).filter((line) =>
+            Number(line.remainingQty ?? (Number(line.orderedQty ?? line.qty ?? 0) - Number(line.deliveredQty || 0))) > 0 &&
+            getItemQCBlock(line.itemId || line.itemSku || line.sku)
+        );
+        if (inboundHold.length > 0) {
+            showToast(`Dispatch blocked — QC pending/rejected for: ${inboundHold.map((l) => l.name || l.description || 'item').join(', ')}. Approve inbound QC before dispatch.`);
+            return undefined;
+        }
         
         // Prepare line items for delivery (dispatch remaining quantities)
         const dispatchLines = (order.items || []).map((line) => {
@@ -1968,8 +2080,8 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(order.shippingAddress),
             date: getCurrentDateFormatted(),
             dispatchDate: getCurrentDateFormatted(),
-            transporter: 'FedEx Freight Direct',
-            vehicleNo: 'TRK-8821-WA',
+            transporter: '',
+            vehicleNo: '',
             status: 'In Transit',
             items: dispatchLines,
             lineItems: dispatchLines,
@@ -1985,26 +2097,52 @@ export const ERPProvider = ({ children, }) => {
             showToast(`Cannot create Invoice from Cancelled Sales Order.`);
             return undefined;
         }
-        
+
+        // ── [PHASE-2B] Double-billing guard: only invoice REMAINING qty per line ──
+        // Previously this built invoices from full ordered qty every time (line qty was
+        //   copied 1:1) with no deliveredQty/invoicedQty check and no block on an already
+        //   fully-invoiced SO. Now each line invoices (ordered − invoiced) and a fully
+        //   invoiced order is blocked — the mirror of PO→GRN→Bill integrity.
+        const srcLines = (order.items && order.items.length > 0)
+            ? order.items
+            : (order.lineItems && order.lineItems.length > 0)
+                ? order.lineItems
+                : [];
+        const totalOrderedQty = srcLines.reduce((s, l) => s + (Number(l.orderedQty ?? l.qty) || 0), 0);
+        const totalInvoicedQty = srcLines.reduce((s, l) => s + (Number(l.invoicedQty) || 0), 0);
+        const fullyInvoiced = totalOrderedQty > 0 && totalInvoicedQty >= totalOrderedQty - 0.001;
+        if (fullyInvoiced && srcLines.length > 0) {
+            showToast(`Sales Order ${order.orderNumber} is already fully invoiced (${totalInvoicedQty}/${totalOrderedQty} qty).`);
+            return undefined;
+        }
+
         const sourceLines = (order.items && order.items.length > 0)
             ? order.items
             : (order.lineItems && order.lineItems.length > 0)
                 ? order.lineItems
                 : [];
         const itemsList = sourceLines.length > 0
-            ? sourceLines.map((line, idx) => ({
-                id: line.id || `item-${Date.now()}-${idx}`,
-                itemId: line.itemId || '',
-                sku: line.sku || line.itemSku || '',
-                itemSku: line.sku || line.itemSku || '',
-                name: line.name || line.description || `Deliverable Item ${idx + 1}`,
-                description: line.name || line.description || `Deliverable Item ${idx + 1}`,
-                qty: line.qty || line.orderedQty || 1,
-                rate: line.rate || 0,
-                discount: line.discount || line.discountPercent || 0,
-                tax: line.tax !== undefined ? line.tax : (line.taxRate !== undefined ? line.taxRate : 18),
-                amount: line.amount || (line.qty || 1) * (line.rate || 0),
-            }))
+            ? sourceLines.map((line, idx) => {
+                const orderedQty = Number(line.qty || line.orderedQty || 1);
+                const alreadyInvoiced = Number(line.invoicedQty) || 0;
+                const remainingQty = Math.max(0, orderedQty - alreadyInvoiced);
+                return {
+                    id: line.id || `item-${Date.now()}-${idx}`,
+                    itemId: line.itemId || '',
+                    sku: line.sku || line.itemSku || '',
+                    itemSku: line.sku || line.itemSku || '',
+                    name: line.name || line.description || `Deliverable Item ${idx + 1}`,
+                    description: line.name || line.description || `Deliverable Item ${idx + 1}`,
+                    // [PHASE-2B] qty now reflects remaining (ordered − invoiced); old code used full qty
+                    qty: remainingQty || 1,
+                    orderedQty,
+                    alreadyInvoicedQty: alreadyInvoiced,
+                    rate: line.rate || 0,
+                    discount: line.discount || line.discountPercent || 0,
+                    tax: line.tax !== undefined ? line.tax : (line.taxRate !== undefined ? line.taxRate : 18),
+                    amount: (remainingQty || 1) * (line.rate || 0),
+                };
+            })
             : [
                 {
                     id: `item-${Date.now()}`,
@@ -2032,7 +2170,7 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(order.shippingAddress),
             linkedSo: order.orderNumber,
             date: getCurrentDateFormatted(),
-            dueDate: '30 Days from now',
+            dueDate: addDaysISO(getCurrentISODate(), 30),
             status: 'Unpaid',
             items: itemsList,
             lineItems: itemsList,
@@ -2045,14 +2183,20 @@ export const ERPProvider = ({ children, }) => {
         // Update SO line items invoicedQty and stage
         setSalesOrders((prev) => prev.map((o) => {
             if (o.id !== orderId) return o;
-            const updatedItems = (o.items || []).map((line) => ({
-                ...line,
-                invoicedQty: (line.invoicedQty || 0) + (Number(line.qty || line.orderedQty) || 1),
-            }));
+            const updatedItems = (o.items || []).map((line) => {
+                const orderedQty = Number(line.qty || line.orderedQty) || 1;
+                const remaining = Math.max(0, orderedQty - (Number(line.invoicedQty) || 0));
+                // [PHASE-2B] invoicedQty now increments by the invoiced (remaining) qty
+                return {
+                    ...line,
+                    invoicedQty: (line.invoicedQty || 0) + remaining,
+                };
+            });
+            const stillOpen = updatedItems.some((l) => (Number(l.qty ?? l.orderedQty) || 1) - (Number(l.invoicedQty) || 0) > 0.001);
             return {
                 ...o,
-                stage: 'Invoiced',
-                status: 'Invoiced',
+                stage: stillOpen ? 'Partially Invoiced' : 'Invoiced',
+                status: stillOpen ? 'Partially Invoiced' : 'Invoiced',
                 items: updatedItems,
                 lineItems: updatedItems,
             };
@@ -2076,10 +2220,10 @@ export const ERPProvider = ({ children, }) => {
             customer: challan.customer || 'Acme Corp',
             billingAddress: createAddressSnapshot(challan.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(challan.shippingAddress) || defaultAddresses.shipping,
-            date: challan.date || 'Today',
-            dispatchDate: challan.dispatchDate || 'Today',
-            transporter: challan.transporter || 'FedEx Freight',
-            vehicleNo: challan.vehicleNo || 'TRK-9041-WA',
+            date: challan.date || getCurrentISODate(),
+            dispatchDate: challan.dispatchDate || getCurrentISODate(),
+            transporter: challan.transporter || '',
+            vehicleNo: challan.vehicleNo || '',
             status: challan.status || 'In Transit',
             items: challanItems,
             lineItems: challanItems,
@@ -2581,7 +2725,7 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: createAddressSnapshot(po.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(po.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(po.date || 'Today'),
-            expectedDate: po.expectedDate || 'In 10 days',
+            expectedDate: po.expectedDate || addDaysISO(getCurrentISODate(), 10),
             amount: poAmt,
             total: poAmt,
             status: po.status || 'Draft',
@@ -2713,14 +2857,17 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(po.shippingAddress) || defaultAddresses.shipping,
             billDate: getCurrentDateFormatted(),
             date: getCurrentDateFormatted(),
-            dueDate: '30 Days from now',
+            dueDate: addDaysISO(getCurrentISODate(), 30),
             amount: billAmt,
             total: billAmt,
             paidAmount: 0,
             amountPaid: 0,
             balanceDue: billAmt,
             status: 'Unpaid',
-            goodsReceived: true,
+            // ── [PHASE-2B] PO→Bill conversion no longer auto-receives stock ──
+            // Old code: goodsReceived: true, — stock increased automatically at bill time.
+            // Goods are now received through the standalone Goods Receipt (GRN) page.
+            goodsReceived: false,
             items: billLines,
             lineItems: billLines,
         };
@@ -2745,8 +2892,36 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        // Automatically receive inventory from line items (increases stock and registers serials)
-        if (billLines.length > 0) {
+        // ── [PHASE-2B] Auto-receive on PO→Bill kept only for pre-received (legacy) bills ──
+        // Old code auto-received inventory from every bill line at conversion time.
+        //   Now handled by GoodsReceiptPage (GRN). The block below still runs when the
+        //   bill was explicitly created as already received (goodsReceived: true).
+        // if (billLines.length > 0) {
+        //     billLines.forEach((line) => {
+        //         const targetSku = line.sku || line.itemSku;
+        //         const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+        //         if (item && item.trackingMode === 'Serial') {
+        //             const serials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
+        //             if (serials.length > 0) {
+        //                 addSerialNumbers(item.id, serials);
+        //             }
+        //         }
+        //         recordMovement({
+        //             itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+        //             itemSku: item?.sku || targetSku || 'GEN-SKU',
+        //             itemName: item?.name || line.name || line.description,
+        //             type: 'PURCHASE',
+        //             quantity: line.qty || 1,
+        //             unitCost: line.rate || item?.costPrice || 0,
+        //             referenceType: 'PurchaseBill',
+        //             referenceId: newBill.id,
+        //             referenceNumber: newBill.billNumber,
+        //             serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
+        //             notes: `Goods received via ${newBill.billNumber}`,
+        //         });
+        //     });
+        // }
+        if (newBill.goodsReceived === true && billLines.length > 0) {
             billLines.forEach((line) => {
                 const targetSku = line.sku || line.itemSku;
                 const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
@@ -2792,14 +2967,18 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress: createAddressSnapshot(bill.shippingAddress) || defaultAddresses.shipping,
             billDate: bill.billDate || getCurrentDateFormatted(),
             date: bill.date || getCurrentDateFormatted(),
-            dueDate: bill.dueDate || '30 Days from now',
+            dueDate: bill.dueDate || addDaysISO(getCurrentISODate(), 30),
             amount: billAmt,
             total: billAmt,
             paidAmount: bill.paidAmount || bill.amountPaid || 0,
             amountPaid: bill.amountPaid || bill.paidAmount || 0,
             balanceDue: Math.max(0, billAmt - (bill.paidAmount || bill.amountPaid || 0)),
             status: bill.status || 'Unpaid',
-            goodsReceived: true,
+            // ── [PHASE-2B] New bills are NOT auto-received: stock moves only on GRN ──
+            // Old code: goodsReceived: true, — every new bill immediately increased stock.
+            // Post-GRN-split a bill can exist with goodsReceived=false and stock only
+            //   changes when GoodsReceiptPage / receivePurchaseBillGoods marks it received.
+            goodsReceived: bill.goodsReceived !== undefined ? !!bill.goodsReceived : false,
             items: billLines,
             lineItems: billLines,
             notes: bill.notes || '',
@@ -2832,8 +3011,37 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        // Auto-record PURCHASE movements for items (increases stock and registers serials)
-        if (billLines.length > 0) {
+        // ── [PHASE-2B] Auto-stock on bill creation replaced by GRN-gated stock entry ──
+        // Old code auto-recorded PURCHASE movements for every bill line here
+        //   (noted below). Now movement happens ONLY when the bill was already
+        //   received (goodsReceived === true — e.g. legacy / pre-received bills);
+        //   otherwise stock enters via GoodsReceiptPage → receivePurchaseBillGoods.
+        // if (billLines.length > 0) {
+        //     billLines.forEach((line) => {
+        //         const targetSku = line.sku || line.itemSku;
+        //         const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+        //         if (item && item.trackingMode === 'Serial') {
+        //             const serials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
+        //             if (serials.length > 0) {
+        //                 addSerialNumbers(item.id, serials);
+        //             }
+        //         }
+        //         recordMovement({
+        //             itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+        //             itemSku: item?.sku || targetSku || 'GEN-SKU',
+        //             itemName: item?.name || line.name || line.description,
+        //             type: 'PURCHASE',
+        //             quantity: line.qty || 1,
+        //             unitCost: line.rate || item?.costPrice || 0,
+        //             referenceType: 'PurchaseBill',
+        //             referenceId: newBill.id,
+        //             referenceNumber: newBill.billNumber,
+        //             serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
+        //             notes: `Goods intake via ${newBill.billNumber}`,
+        //         });
+        //     });
+        // }
+        if (newBill.goodsReceived === true && billLines.length > 0) {
             billLines.forEach((line) => {
                 const targetSku = line.sku || line.itemSku;
                 const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
@@ -2951,7 +3159,7 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Purchase Bill ${bill.billNumber} cancelled.`);
         return { success: true, message: `Purchase Bill ${bill.billNumber} cancelled.` };
     };
-    const receivePurchaseBillGoods = (billId) => {
+    const receivePurchaseBillGoods = (billId, receivedOverrides = null, qcStatus = 'Approved') => {
         const bill = purchaseBills.find((b) => b.id === billId);
         if (!bill)
             return;
@@ -2965,9 +3173,46 @@ export const ERPProvider = ({ children, }) => {
         }
         const billLines = bill.items || bill.lineItems || [];
         if (billLines.length > 0) {
-            billLines.forEach((line) => {
+            // ── [PHASE-2A] Weight-variation tracking (Sweven steel) ──
+            // For isWeightItem lines the receipt can carry an actual receivedWeight (kg from the
+            //   weighbridge). We compute variance vs the theoretical weight
+            //   (expected = theoreticalWeight × ordered qty) and if it exceeds the item's
+            //   tolerancePct the GRN is auto-flagged 'Pending Approval' (overrides qcStatus).
+            const MATCH = (line, o) =>
+                (o.lineId && o.lineId === (line.id || line.lineId)) ||
+                (o.lineIndex !== undefined && Number(o.lineIndex) === billLines.indexOf(line)) ||
+                (o.sku && String(o.sku).toLowerCase() === String(line.sku || line.itemSku || '').toLowerCase());
+            const findOverride = (line) => Array.isArray(receivedOverrides) ? receivedOverrides.find((o) => MATCH(line, o)) : null;
+            const weightMeta = {};
+            let autoFlagPending = false;
+            billLines.forEach((line, idx) => {
+                const override = findOverride(line);
                 const targetSku = line.sku || line.itemSku;
                 const item = items.find((i) => i.id === line.itemId || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+                const isWeightItem = Boolean(line.isWeightItem) || Boolean(item?.isWeightItem);
+                const tolerancePct = line.tolerancePct !== undefined ? Number(line.tolerancePct) : (item?.tolerancePct !== undefined ? Number(item.tolerancePct) : 2);
+                const theoreticalWeight = Number(line.theoreticalWeight ?? item?.theoreticalWeight ?? 0) || 0;
+                const orderedQty = Number(line.qty || line.orderedQty || 1);
+                const receivedQty = override && Number(override.receivedQty) >= 0 ? Number(override.receivedQty) : orderedQty;
+                let receivedWeight, variationPct = null;
+                if (isWeightItem && theoreticalWeight > 0) {
+                    receivedWeight = override && Number(override.receivedWeight) > 0
+                        ? Number(override.receivedWeight)
+                        : (Number(line.receivedWeight) > 0 ? Number(line.receivedWeight) : theoreticalWeight * receivedQty);
+                    const expectedWeight = theoreticalWeight * orderedQty;
+                    variationPct = expectedWeight > 0 ? ((receivedWeight - expectedWeight) / expectedWeight) * 100 : 0;
+                    // Tolerance exceeded → auto QC Pending Approval (variances need manual approval)
+                    if (Math.abs(variationPct) > tolerancePct) autoFlagPending = true;
+                }
+                weightMeta[line.id || `line-${idx}`] = {
+                    isWeightItem,
+                    tolerancePct,
+                    theoreticalWeight,
+                    orderedQty,
+                    receivedQty,
+                    receivedWeight,
+                    variationPct,
+                };
                 if (item && item.trackingMode === 'Serial') {
                     const serials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
                     if (serials.length > 0) {
@@ -2979,17 +3224,73 @@ export const ERPProvider = ({ children, }) => {
                     itemSku: item?.sku || targetSku || 'GEN-SKU',
                     itemName: item?.name || line.name || line.description,
                     type: 'PURCHASE',
-                    quantity: line.qty || 1,
+                    quantity: receivedQty,
                     unitCost: line.rate || item?.costPrice || 0,
+                    // [PHASE-2A] capture weighed quantity for stock valuation on weight items
+                    weighedQty: isWeightItem && receivedWeight ? receivedWeight : undefined,
                     referenceType: 'PurchaseBill',
                     referenceId: bill.id,
                     referenceNumber: bill.billNumber,
                     serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
-                    notes: `Manual goods receipt for bill ${bill.billNumber}`,
+                    notes: isWeightItem && variationPct !== null
+                        ? `Weighed receipt for ${bill.billNumber} (${receivedWeight} ${line.weightUnit || item?.weightUnit || 'kg'}, var ${variationPct.toFixed(2)}%)`
+                        : `Manual goods receipt for bill ${bill.billNumber}`,
                 });
             });
-            setPurchaseBills((prev) => prev.map((b) => b.id === billId ? { ...b, goodsReceived: true } : b));
-            showToast(`Stock received and added to inventory from bill ${bill.billNumber}`);
+            const finalQcStatus = autoFlagPending ? 'Pending Approval' : qcStatus;
+            const updatedLine = (line, idx) => {
+                const override = findOverride(line);
+                const receivedQty = override && Number(override.receivedQty) >= 0 ? Number(override.receivedQty) : Number(line.qty || 1);
+                const meta = weightMeta[line.id || `line-${idx}`] || {};
+                return {
+                    ...line,
+                    qty: receivedQty,
+                    receivedQty,
+                    isWeightItem: meta.isWeightItem ?? Boolean(line.isWeightItem),
+                    theoreticalWeight: meta.theoreticalWeight ?? line.theoreticalWeight,
+                    tolerancePct: meta.tolerancePct ?? line.tolerancePct,
+                    receivedWeight: meta.receivedWeight ?? line.receivedWeight,
+                    variationPct: meta.variationPct !== null && meta.variationPct !== undefined ? Number(meta.variationPct.toFixed(2)) : undefined,
+                };
+            };
+            // ── [PHASE-2A] bill at received weight: recompute line amounts + bill total when
+            //   the bill contains at least one weight item (steel billed by weighed kg).
+            const hasWeightLine = billLines.some((l) => weightMeta[l.id || `line-${billLines.indexOf(l)}`]?.isWeightItem);
+            const recomputedLines = billLines.map(updatedLine);
+            let recomputedTotal = null;
+            if (hasWeightLine) {
+                const sumLines = recomputedLines.reduce((s, line) => {
+                    const qty = Number(line.qty || 0);
+                    const rate = Number(line.rate || 0);
+                    const disc = Number(line.discount || 0);
+                    const tax = Number(line.tax !== undefined ? line.tax : 18);
+                    const gross = qty * rate;
+                    const afterDisc = gross * (1 - disc / 100);
+                    const amount = Math.round(afterDisc * (1 + tax / 100) * 100) / 100;
+                    return s + amount;
+                }, 0);
+                const otherFees = (Number(bill.freight || bill.freightCharges) || 0) + (Number(bill.otherCharges) || 0);
+                recomputedTotal = Math.round((sumLines + otherFees) * 100) / 100;
+            }
+            setPurchaseBills((prev) => prev.map((b) => b.id === billId ? {
+                ...b,
+                goodsReceived: true,
+                qcStatus: finalQcStatus, // [PHASE-2C] approved / pending / rejected captured on the receipt
+                receivedDate: getCurrentISODate(),
+                items: recomputedLines,
+                lineItems: recomputedLines,
+                // [PHASE-2A] bill revalued at the weighed quantity (kg) when weight lines exist
+                ...(recomputedTotal !== null ? {
+                    total: recomputedTotal,
+                    amount: recomputedTotal,
+                    balanceDue: Math.max(0, recomputedTotal - (Number(b.paidAmount ?? b.amountPaid) || 0)),
+                } : {}),
+            } : b));
+            showToast(
+                autoFlagPending
+                    ? `Goods received with weight variance beyond tolerance — QC set to Pending Approval for ${bill.billNumber}.`
+                    : `Stock received and added to inventory from bill ${bill.billNumber}`
+            );
         }
     };
     const updatePurchaseBillStatus = (id, status) => {
@@ -2998,6 +3299,11 @@ export const ERPProvider = ({ children, }) => {
     };
     const addPaymentOut = (pay) => {
         const payAmt = Number(pay.amount) || 1000;
+        // ── [PHASE-2D] Payment classification: Advance (against PO, no bill yet) vs Final/Bill ──
+        // Old code always treated the disbursement as a bill settlement. Sweven releases
+        //   advances to suppliers (steel on credit) which later adjust against the bill.
+        const paymentType = pay.paymentType || (pay.billId || pay.billNumber ? 'Final' : 'Advance');
+        const isAdvance = paymentType === 'Advance';
         let targetBill = null;
         if (pay.billId || pay.billNumber) {
             targetBill = purchaseBills.find((b) => (pay.billId && b.id === pay.billId) || (pay.billNumber && b.billNumber === pay.billNumber));
@@ -3011,12 +3317,14 @@ export const ERPProvider = ({ children, }) => {
                     return null;
                 }
                 const remainingBal = targetBill.balanceDue !== undefined ? targetBill.balanceDue : Math.max(0, (targetBill.total || targetBill.amount || 0) - (targetBill.paidAmount || targetBill.amountPaid || 0));
-                if (payAmt > remainingBal + 0.01) {
+                if (!isAdvance && payAmt > remainingBal + 0.01) {
                     showToast(`Disbursement amount (${formatCurrency(payAmt)}) exceeds remaining bill balance (${formatCurrency(remainingBal)}).`);
                     return null;
                 }
             }
         }
+
+        const targetPo = pay.poNumber && purchaseOrders.find((p) => p.poNumber === pay.poNumber || p.id === pay.poId) || (pay.poId && purchaseOrders.find((p) => p.id === pay.poId));
 
         const newPay = {
             id: pay.id || `pout-${Date.now()}`,
@@ -3024,8 +3332,13 @@ export const ERPProvider = ({ children, }) => {
                 `VOU-2026-${String(paymentOuts.length + 93).padStart(3, '0')}`,
             vendorId: pay.vendorId || targetBill?.vendorId,
             vendor: pay.vendor || targetBill?.vendor || 'Arrow Electronics Supply',
-            billId: pay.billId || targetBill?.id,
-            billNumber: pay.billNumber || targetBill?.billNumber || 'PB-2026-015',
+            billId: isAdvance ? undefined : (pay.billId || targetBill?.id),
+            billNumber: isAdvance ? undefined : (pay.billNumber || targetBill?.billNumber || 'PB-2026-015'),
+            // [PHASE-2D] link advances to the purchase order they fund
+            poId: pay.poId || targetPo?.id,
+            poNumber: pay.poNumber || targetPo?.poNumber,
+            paymentType,
+            advanceApplied: Boolean(pay.advanceApplied),
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'ACH',
             amount: payAmt,
@@ -3033,8 +3346,8 @@ export const ERPProvider = ({ children, }) => {
             status: 'Paid',
         };
         setPaymentOuts((prev) => [newPay, ...prev]);
-        // Update vendor bill payment tracking and dynamic status
-        if (newPay.billNumber || newPay.billId) {
+        // Update vendor bill payment tracking and dynamic status (skipped for pure advances)
+        if (!isAdvance && (newPay.billNumber || newPay.billId)) {
             setPurchaseBills((prev) => prev.map((b) => {
                 if (b.billNumber === newPay.billNumber || (newPay.billId && b.id === newPay.billId)) {
                     const currentPaid = Number(b.amountPaid ?? b.paidAmount ?? 0);
@@ -3053,27 +3366,231 @@ export const ERPProvider = ({ children, }) => {
                 return b;
             }));
         }
-        // Decrease vendor balance liability across vendors and parties
-        syncVendorBalance(newPay.vendorId, newPay.vendor, -payAmt);
-        // Deduct from Operating Bank Account
-        setBankAccounts((prev) => prev.map((acc, idx) => idx === 0
-            ? { ...acc, balance: Math.max(0, acc.balance - payAmt) }
-            : acc));
+        // Decrease vendor balance liability only for bill settlements.
+        // Advances are vendor receivables (Dr Vendor Advances) and do not reduce AP.
+        if (!isAdvance) {
+            syncVendorBalance(newPay.vendorId, newPay.vendor, -payAmt);
+        }
+        // Deduct from Operating Bank Account (advance-applied adjustments already drew cash earlier)
+        if (!newPay.advanceApplied) {
+            setBankAccounts((prev) => prev.map((acc, idx) => idx === 0
+                ? { ...acc, balance: Math.max(0, acc.balance - payAmt) }
+                : acc));
+        }
         // Auto-create Journal Entry
         const newJe = {
             id: `je-${Date.now()}`,
             entryNumber: `JE-2026-${String(journalEntries.length + 88).padStart(3, '0')}`,
             date: newPay.date,
-            description: `Disbursement to Vendor ${newPay.vendor}`,
+            description: isAdvance
+                ? `Advance to Vendor ${newPay.vendor}${newPay.poNumber ? ` against ${newPay.poNumber}` : ''}`
+                : newPay.advanceApplied
+                    ? `Advance adjustment applied to bill ${newPay.billNumber} (${newPay.vendor})`
+                    : `Disbursement to Vendor ${newPay.vendor}`,
             reference: newPay.voucherNumber || 'VOU-PAID',
-            debitAccount: '2010 - Accounts Payable',
-            creditAccount: '1010 - Cash & Bank',
+            // [PHASE-2D] advance sits in a Vendor Advances asset account until a bill is adjusted
+            debitAccount: isAdvance ? '1025 - Vendor Advances' : newPay.advanceApplied ? '2010 - Accounts Payable' : '2010 - Accounts Payable',
+            creditAccount: isAdvance ? '1010 - Cash & Bank' : newPay.advanceApplied ? '1025 - Vendor Advances' : '1010 - Cash & Bank',
             amount: payAmt,
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        showToast(`Disbursed ${formatCurrency(payAmt)} to ${newPay.vendor}`);
+        if (isAdvance) {
+            showToast(`Advance of ${formatCurrency(payAmt)} released to ${newPay.vendor}${newPay.poNumber ? ` for ${newPay.poNumber}` : ''}`);
+        } else if (newPay.advanceApplied) {
+            showToast(`Advance of ${formatCurrency(payAmt)} applied to bill ${newPay.billNumber}`);
+        } else {
+            showToast(`Disbursed ${formatCurrency(payAmt)} to ${newPay.vendor}`);
+        }
         return newPay;
+    };
+    // ── [PHASE-2D] Vendor / PO advance balance ──
+    // Advance balance = sum of 'Advance' paymentOuts − advance-applied adjustments for a vendor.
+    const getVendorAdvanceBalance = (vendorIdOrName, vendorName) => {
+        const matchVendor = (p) => {
+            if (!vendorIdOrName && !vendorName) return false;
+            if (vendorIdOrName && p.vendorId === vendorIdOrName) return true;
+            if (vendorIdOrName && p.vendor?.toLowerCase() === String(vendorIdOrName).toLowerCase()) return true;
+            // [PHASE-2D] fall back to the name arg for bills without a vendorId
+            if (vendorName && p.vendor?.toLowerCase() === String(vendorName).toLowerCase()) return true;
+            return false;
+        };
+        const released = paymentOuts
+            .filter((p) => p.paymentType === 'Advance' && matchVendor(p))
+            .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const applied = paymentOuts
+            .filter((p) => p.advanceApplied === true && matchVendor(p))
+            .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        return Math.max(0, released - applied);
+    };
+    // Apply an existing advance against a vendor bill (no new cash flow).
+    const applyVendorAdvanceToBill = (billId, amount) => {
+        const bill = purchaseBills.find((b) => b.id === billId);
+        if (!bill) {
+            showToast('Bill not found.');
+            return null;
+        }
+        const advance = getVendorAdvanceBalance(bill.vendorId, bill.vendor);
+        if (advance <= 0) {
+            showToast(`No unapplied advance balance for ${bill.vendor}.`);
+            return null;
+        }
+        const applyAmt = Math.min(Number(amount) || advance, advance);
+        if (applyAmt <= 0) return null;
+        return addPaymentOut({
+            vendorId: bill.vendorId,
+            vendor: bill.vendor,
+            billId: bill.id,
+            billNumber: bill.billNumber,
+            paymentType: 'Final',
+            advanceApplied: true,
+            amount: applyAmt,
+            date: getCurrentDateFormatted(),
+            mode: 'Advance Adjustment',
+            reference: `ADJ-${bill.billNumber}`,
+        });
+    };
+    // ── [PHASE-2C] QC review, approval & rework of received goods ──
+    // qcStatus lives on the purchase bill receipt: 'Approved' (stock usable),
+    //   'Pending Approval' (auto-flagged on weight variance / manual hold),
+    //   'Rejected' (raise purchase return / debit note), 'Rework' (sent back, re-receive).
+    const updateQCStatus = (billId, newStatus, qcNote = '') => {
+        const bill = purchaseBills.find((b) => b.id === billId);
+        if (!bill) {
+            showToast('Bill not found.');
+            return null;
+        }
+        if (bill.status === 'Cancelled') {
+            showToast('Cannot QC a cancelled bill.');
+            return null;
+        }
+        setPurchaseBills((prev) => prev.map((b) => b.id === billId ? {
+            ...b,
+            qcStatus: newStatus,
+            qcNote: qcNote || b.qcNote,
+            qcUpdatedAt: getCurrentISODate(),
+        } : b));
+        const hintMap = {
+            'Approved': 'approved for inventory',
+            'Pending Approval': 'held for inspection',
+            'Rejected': 'rejected — raise a purchase return / debit note',
+            'Rework': 'sent back for rework — goods will be re-received',
+        };
+        showToast(`QC set to ${newStatus} — ${bill.billNumber} ${hintMap[newStatus] || ''}`);
+        return { ...bill, qcStatus: newStatus };
+    };
+    // QC gate for outbound dispatch: blocks selling any item whose latest inbound
+    //   stock is still pending / rejected / rework. Sweven never ships unchecked steel.
+    const getItemQCBlock = (itemIdOrSku) => {
+        if (!itemIdOrSku) return false;
+        const target = String(itemIdOrSku).toLowerCase();
+        const lineHas = (line) =>
+            (line.itemId && String(line.itemId).toLowerCase() === target) ||
+            (line.itemSku && String(line.itemSku).toLowerCase() === target) ||
+            (line.sku && String(line.sku).toLowerCase() === target);
+        return (purchaseBills || []).some((b) =>
+            b.goodsReceived === true &&
+            (b.qcStatus === 'Pending Approval' || b.qcStatus === 'Rejected' || b.qcStatus === 'Rework') &&
+            (b.items || b.lineItems || []).some(lineHas)
+        );
+    };
+    const addQualityStandard = (std) => {
+        const newStd = {
+            id: std.id || `qs-${Date.now()}`,
+            name: std.name || 'New QC Standard',
+            category: std.category || 'General',
+            checks: Array.isArray(std.checks) ? std.checks : [],
+            tolerancePct: std.tolerancePct !== undefined ? Number(std.tolerancePct) : 2,
+            active: std.active !== false,
+        };
+        setQualityStandards((prev) => [newStd, ...prev]);
+        showToast(`Quality standard "${newStd.name}" added.`);
+        return newStd;
+    };
+    const updateQualityStandard = (id, updates) => {
+        setQualityStandards((prev) => prev.map((s) => s.id === id ? { ...s, ...updates } : s));
+        showToast('Quality standard updated.');
+    };
+    // ── [PHASE-2E] Chart of Accounts: derive balances from journal entries ──
+    // Account balances are computed on-the-fly from posted journal entries (no separate ledger).
+    // Assets (bank, AR, inventory, advances): Dr positive, Cr reduces. Liabilities/AP: Cr positive, Dr reduces.
+    const getAccountBalances = () => {
+        const balances = {};
+        const posted = journalEntries.filter((e) => e.status === 'Posted');
+        posted.forEach((e) => {
+            const dr = e.debitAccount || 'Unmapped';
+            const cr = e.creditAccount || 'Unmapped';
+            balances[dr] = (balances[dr] || 0) + (Number(e.amount) || 0);
+            balances[cr] = (balances[cr] || 0) - (Number(e.amount) || 0);
+        });
+        // Merge in live bank account balances so the COA reflects treasury
+        (bankAccounts || []).forEach((a) => {
+            const key = `1010 - Cash & Bank (${a.bankName || a.accountName || 'Operating'})`;
+            balances[key] = Number(a.balance) || 0;
+        });
+        return balances;
+    };
+    // ── [PHASE-2E] Inter-bank transfer (no net AP/AR change, just treasury reshuffling) ──
+    const addInterbankTransfer = (transfer) => {
+        const amt = Number(transfer.amount) || 0;
+        if (amt <= 0) { showToast('Transfer amount must be > 0.'); return null; }
+        const fromIdx = bankAccounts.findIndex((a) => a.id === transfer.fromAccountId);
+        const toIdx = bankAccounts.findIndex((a) => a.id === transfer.toAccountId);
+        if (fromIdx < 0 || toIdx < 0) { showToast('Select valid source and destination accounts.'); return null; }
+        if (fromIdx === toIdx) { showToast('Source and destination accounts must differ.'); return null; }
+        if (bankAccounts[fromIdx].balance < amt + 0.01) {
+            showToast(`Insufficient balance in ${bankAccounts[fromIdx].bankName}.`);
+            return null;
+        }
+        setBankAccounts((prev) => prev.map((a, idx) => {
+            if (idx === fromIdx) return { ...a, balance: Math.round((a.balance - amt) * 100) / 100 };
+            if (idx === toIdx) return { ...a, balance: Math.round((a.balance + amt) * 100) / 100 };
+            return a;
+        }));
+        const trNum = transfer.transferNumber || `TR-2026-${String((initial?.transfers?.length || 0) + 30 + transfers.length).padStart(3, '0')}`;
+        const newTr = {
+            id: `tr-${Date.now()}`,
+            transferNumber: trNum,
+            date: transfer.date || getCurrentDateFormatted(),
+            fromAccount: bankAccounts[fromIdx]?.bankName || 'Operating',
+            toAccount: bankAccounts[toIdx]?.bankName || 'Savings',
+            amount: amt,
+            reference: transfer.reference || '',
+            status: 'Completed',
+        };
+        setTransfers((prev) => [newTr, ...prev]);
+        setJournalEntries((prev) => [{
+            id: `je-${Date.now()}`,
+            entryNumber: `JE-2026-${String(prev.length + 90).padStart(3, '0')}`,
+            date: newTr.date,
+            description: `Inter-bank transfer ${bankAccounts[fromIdx]?.bankName} → ${bankAccounts[toIdx]?.bankName}`,
+            reference: trNum,
+            debitAccount: `1010 - Cash & Bank (${bankAccounts[toIdx]?.bankName || 'Target'})`,
+            creditAccount: `1010 - Cash & Bank (${bankAccounts[fromIdx]?.bankName || 'Source'})`,
+            amount: amt,
+            status: 'Posted',
+        }, ...prev]);
+        showToast(`Inter-bank transfer ${trNum}: ${formatCurrency(amt)} moved from ${bankAccounts[fromIdx]?.bankName} to ${bankAccounts[toIdx]?.bankName}.`);
+        return newTr;
+    };
+    // ── [PHASE-2E] Budgets master: planned amounts by account/category ──
+    const defaultBudgets = [
+        { id: 'bud-rent', name: 'Office & Warehouse Rent', category: 'Facility', annualAmount: 360000, account: '5020 - Rent', active: true },
+        { id: 'bud-salary', name: 'Staff Salaries', category: 'Payroll', annualAmount: 2400000, account: '5010 - Salaries', active: true },
+        { id: 'bud-raw', name: 'Raw Material (MS Steel)', category: 'COGS', annualAmount: 5000000, account: '5030 - Raw Material', active: true },
+        { id: 'bud-utilities', name: 'Electricity & Power', category: 'Utilities', annualAmount: 480000, account: '5040 - Utilities', active: true },
+        { id: 'bud-freight', name: 'Freight & Logistics', category: 'Logistics', annualAmount: 720000, account: '5050 - Freight', active: true },
+        { id: 'bud-office', name: 'Office & Admin Supplies', category: 'Admin', annualAmount: 120000, account: '5060 - Office Supplies', active: true },
+    ];
+    const [budgets, setBudgets] = useState(initial?.budgets || defaultBudgets);
+    const addBudget = (b) => {
+        const newB = { id: b.id || `bud-${Date.now()}`, name: b.name || 'New Budget', category: b.category || 'General', annualAmount: Number(b.annualAmount) || 0, account: b.account || '5xxx - Expense', active: b.active !== false };
+        setBudgets((prev) => [newB, ...prev]);
+        showToast(`Budget "${newB.name}" created.`);
+        return newB;
+    };
+    const updateBudget = (id, updates) => {
+        setBudgets((prev) => prev.map((b) => b.id === id ? { ...b, ...updates } : b));
     };
     const addPurchaseReturn = (ret) => {
         const bill = purchaseBills.find((b) => b.id === ret.billId || b.billNumber === ret.billRef);
@@ -3154,12 +3671,14 @@ export const ERPProvider = ({ children, }) => {
                     itemName: item?.name || line.name || line.description,
                     type: isGood ? 'PURCHASE_RETURN' : (line.condition === 'Scrap' ? 'SCRAP_RETURN' : 'DAMAGED_RETURN'),
                     quantity: isGood ? -(line.qty || 1) : 0,
+                    // [PHASE-2A] weight-item returns reduce stock by the actual weighed kg returned
+                    weighedQty: (isGood && item?.isWeightItem && Number(line.returnedWeight) > 0) ? -Number(line.returnedWeight) : undefined,
                     unitCost: item?.costPrice || line.rate || 0,
                     referenceType: 'PurchaseReturn',
                     referenceId: newDebit.id,
                     referenceNumber: newDebit.debitNoteNumber,
                     serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
-                    notes: `Returned to ${newDebit.vendor} (${line.condition || 'Good'}): ${newDebit.reason}`,
+                    notes: `Returned to ${newDebit.vendor} (${line.condition || 'Good'}): ${newDebit.reason}` + (item?.isWeightItem && Number(line.returnedWeight) > 0 ? ` (${line.returnedWeight} kg weighed)` : ''),
                 });
             });
         }
@@ -3261,7 +3780,7 @@ export const ERPProvider = ({ children, }) => {
             expenseNumber: exp.expenseNumber ||
                 `EXP-2026-${String(expenses.length + 119).padStart(3, '0')}`,
             category: exp.category || 'Logistics',
-            date: exp.date || 'Today',
+            date: exp.date || getCurrentDateFormatted(),
             payee: exp.payee || 'Freight Logistics Inc',
             amount: exp.amount ?? 150,
             paidVia: exp.paidVia || 'Corporate Card',
@@ -3310,7 +3829,7 @@ export const ERPProvider = ({ children, }) => {
             sourceLocation: tr.sourceLocation || 'Main Central Warehouse',
             destLocationId: tr.destLocationId,
             destLocation: tr.destLocation || 'Assembly Bay Zone A',
-            date: tr.date || 'Today',
+            date: tr.date || getCurrentDateFormatted(),
             itemsCount: tr.itemsCount ?? 1,
             status: tr.status || 'In Transit',
             shippedBy: tr.shippedBy || 'Logistics Clerk',
@@ -3368,7 +3887,7 @@ export const ERPProvider = ({ children, }) => {
             itemId: usage.itemId,
             sku: usage.sku || 'CAB-6-01',
             qtyUsed: usage.qtyUsed ?? 1,
-            date: usage.date || 'Today',
+            date: usage.date || getCurrentDateFormatted(),
             purpose: usage.purpose || 'Rack cabling replacement',
         };
         setServiceUsages((prev) => [newUsage, ...prev]);
@@ -3408,7 +3927,7 @@ export const ERPProvider = ({ children, }) => {
         const newEntry = {
             id: entry.id || `je-${Date.now()}`,
             entryNumber: entry.entryNumber || `JE-2026-${String(journalEntries.length + 81).padStart(3, '0')}`,
-            date: entry.date || 'Today',
+            date: entry.date || getCurrentDateFormatted(),
             description: entry.description || 'General Ledger Adjusting Entry',
             reference: entry.reference || 'MANUAL-ADJ',
             debitAccount: entry.debitAccount || '1010 - Cash & Bank',
@@ -3749,8 +4268,12 @@ export const ERPProvider = ({ children, }) => {
             setCurrency,
             formatCurrency,
             currencySymbol,
+            companyProfile,
+            setCompanyProfile,
             formatDateDDMMYYYY,
             getCurrentDateFormatted,
+            getCurrentISODate,
+            addDaysISO,
             toastMessage,
             showToast,
             calculateItemStock,
@@ -3809,6 +4332,21 @@ export const ERPProvider = ({ children, }) => {
             updatePurchaseBillStatus,
             receivePurchaseBillGoods,
             addPaymentOut,
+            // [PHASE-2D] advance-vs-final payment support, PO-linked advances & advance adjustment
+            getVendorAdvanceBalance,
+            applyVendorAdvanceToBill,
+            // [PHASE-2C] QC status control, dispatch gate & quality standards master
+            qualityStandards,
+            addQualityStandard,
+            updateQualityStandard,
+            updateQCStatus,
+            getItemQCBlock,
+            // [PHASE-2E] COA balances, inter-bank transfer & budgets
+            getAccountBalances,
+            addInterbankTransfer,
+            budgets,
+            addBudget,
+            updateBudget,
             addPurchaseReturn,
             cancelPurchaseReturn,
             updatePurchaseReturnStatus,

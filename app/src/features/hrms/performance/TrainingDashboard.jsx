@@ -37,7 +37,7 @@ export default function TrainingDashboard({ initialTab }) {
     if (queryTab && queryTab !== activeTab) {
       setActiveTab(queryTab);
     }
-  }, [queryTab]);
+  }, [queryTab, activeTab]);
 
   const handleTabChange = (tabKey) => {
     setActiveTab(tabKey);

@@ -50,6 +50,8 @@ const STATUS_MAP = {
 
   // HRMS leave
   'Pending Approval': 'badge-yellow',
+  // QC (Phase 2C)
+  'Rework': 'badge-orange',
 
   // HRMS payroll
   'Processed': 'badge-green',

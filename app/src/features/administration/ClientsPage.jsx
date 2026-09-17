@@ -503,7 +503,7 @@ export function ClientsPage() {
       withProjects: clientsWithProjects,
       satisfaction: clientSatisfaction,
     };
-  }, [clients]);
+  }, []);
 
   const filteredClients = useMemo(() => {
     return clients.filter((c) => {

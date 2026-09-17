@@ -47,6 +47,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         formatCurrency,
         formatDateDDMMYYYY,
         getCurrentDateFormatted,
+        getCurrentISODate,
+        addDaysISO,
     } = useERP();
 
     const [filterText, setFilterText] = useState('');
@@ -75,8 +77,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [linkedSoId, setLinkedSoId] = useState('None');
     const [linkedPiId, setLinkedPiId] = useState('None');
-    const [invoiceDate, setInvoiceDate] = useState('2026-10-25');
-    const [dueDate, setDueDate] = useState('2026-11-25');
+    const [invoiceDate, setInvoiceDate] = useState(getCurrentDateFormatted());
+    const [dueDate, setDueDate] = useState(() => addDaysISO(getCurrentISODate(), 30));
     const [notes, setNotes] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const [billingAddress, setBillingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });

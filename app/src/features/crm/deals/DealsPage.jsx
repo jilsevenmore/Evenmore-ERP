@@ -658,7 +658,7 @@ export default function DealsPage() {
       avgDealSize,
       conversionRate,
     };
-  }, [deals]);
+  }, []);
 
   const handleResetFilters = () => {
     setSearchQuery('');
