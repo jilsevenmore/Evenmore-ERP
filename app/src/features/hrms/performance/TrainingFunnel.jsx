@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
   Plus,
@@ -12,7 +12,6 @@ import {
   ArrowLeft,
   Pencil,
   Trash2,
-  ChevronLeft,
   ChevronRight,
   RotateCcw,
   Sparkles,
@@ -55,16 +54,6 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
   // View state: 'kanban' or 'list'
   const [viewMode, setViewMode] = useState("kanban");
-  // Kanban layout mode: 'fit' (One Page) vs 'scroll' (Expanded)
-  const [kanbanFitMode, setKanbanFitMode] = useState("fit");
-  const kanbanContainerRef = useRef(null);
-
-  const scrollKanban = (direction) => {
-    if (kanbanContainerRef.current) {
-      const scrollAmount = direction === "left" ? -300 : 300;
-      kanbanContainerRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
-    }
-  };
 
   // Filters
   const [search, setSearch] = useState("");
@@ -239,10 +228,11 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   ];
 
   return (
-    <div className="flex flex-col gap-3.5 sm:gap-4 w-full pb-10">
-      {/* Top Breadcrumb & Header - Only shown when not embedded in tabs */}
-      {!embedded && (
-        <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-5 w-full pb-16">
+      {/* Top Breadcrumb & Header matching screenshot */}
+      <div className="flex flex-col gap-1">
+        {/* Back button to Training Setup */}
+        {!embedded && (
           <button
             type="button"
             onClick={() => (onBack ? onBack() : navigate("/hrms/training"))}
@@ -251,155 +241,118 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
             <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
             <span>Back to Training Setup</span>
           </button>
+        )}
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-[20px] sm:text-[24px] font-bold text-slate-900 tracking-tight">Training Funnel</h1>
-                <PageInfoButton guide={hrmsGuides.trainingFunnel} />
-              </div>
-              <div className="text-[12.5px] sm:text-[13px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
-                <Link to="/hrms/training" className="hover:text-navy hover:underline">
-                  Dashboard
-                </Link>
-                <span>&gt;</span>
-                <span className="text-slate-700">Training Funnel</span>
-              </div>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Training Funnel</h1>
+              <PageInfoButton guide={hrmsGuides.trainingFunnel} />
             </div>
-
-            {/* View switcher & Add Button */}
-            <div className="flex items-center gap-2">
-              <div className="flex p-1 bg-white border border-bdr rounded-xl shadow-xs">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("kanban")}
-                  className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
-                    viewMode === "kanban" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
-                  }`}
-                  title="Kanban Funnel View"
-                >
-                  <LayoutGrid size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("list")}
-                  className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
-                    viewMode === "list" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
-                  }`}
-                  title="Table / List View"
-                >
-                  <ListIcon size={16} />
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleOpenAdd("Requested")}
-                className="w-9 h-9 rounded-xl bg-[#1e3a8a] text-white hover:bg-[#1e40af] transition grid place-items-center shadow-xs cursor-pointer"
-                title="Add / Request Training"
-              >
-                <Plus size={18} />
-              </button>
+            <div className="text-[13px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
+              <Link to="/hrms/training" className="hover:text-navy hover:underline">
+                Dashboard
+              </Link>
+              <span>&gt;</span>
+              <span className="text-slate-700">Training Funnel</span>
             </div>
           </div>
+
+          {/* Top Right Action Icons */}
+          <div className="flex items-center gap-2">
+            {/* View switcher: Kanban vs List */}
+            <div className="flex p-1 bg-white border border-bdr rounded-xl shadow-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("kanban")}
+                className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
+                  viewMode === "kanban" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
+                }`}
+                title="Kanban Funnel View"
+              >
+                <LayoutGrid size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
+                  viewMode === "list" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
+                }`}
+                title="Table / List View"
+              >
+                <ListIcon size={16} />
+              </button>
+            </div>
+
+            {/* + Add Button */}
+            <button
+              type="button"
+              onClick={() => handleOpenAdd("Requested")}
+              className="w-9 h-9 rounded-xl bg-[#1e3a8a] text-white hover:bg-[#1e40af] transition grid place-items-center shadow-xs cursor-pointer"
+              title="Add / Request Training"
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Filter Toolbar */}
-      <div className="bg-white border border-bdr rounded-2xl p-2.5 sm:p-3 shadow-xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 min-w-0">
+      <div className="bg-white border border-bdr rounded-2xl p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-[280px]">
           {/* Search */}
-          <div className="relative flex-1 min-w-0 sm:max-w-xs">
+          <div className="relative flex-1 max-w-xs">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Search trainings, trainers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full h-8.5 pl-8 pr-3 bg-off border border-bdr rounded-xl text-[12px] focus:bg-white focus:outline-none focus:border-navy transition"
+              className="w-full h-9 pl-8 pr-3 bg-off border border-bdr rounded-xl text-[12.5px] focus:bg-white focus:outline-none focus:border-navy transition"
             />
           </div>
 
           {/* Department Filter */}
-          <div className="flex items-center gap-2">
-            <select
-              value={deptFilter}
-              onChange={(e) => setDeptFilter(e.target.value)}
-              className="h-8.5 px-3 bg-off border border-bdr rounded-xl text-[12px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer font-medium flex-1 sm:flex-initial"
-            >
-              {departmentsList.map((d) => (
-                <option key={d} value={d}>
-                  {d === "All" ? "All Departments" : d}
-                </option>
-              ))}
-            </select>
+          <select
+            value={deptFilter}
+            onChange={(e) => setDeptFilter(e.target.value)}
+            className="h-9 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer font-medium"
+          >
+            {departmentsList.map((d) => (
+              <option key={d} value={d}>
+                {d === "All" ? "All Departments" : d}
+              </option>
+            ))}
+          </select>
 
-            {(search || deptFilter !== "All") && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setDeptFilter("All");
-                }}
-                className="h-8.5 px-2.5 rounded-xl border border-bdr text-muted hover:text-slate-800 hover:bg-off text-[11.5px] flex items-center gap-1 transition shrink-0 cursor-pointer"
-              >
-                <RotateCcw size={11} />
-                Reset
-              </button>
-            )}
-          </div>
+          {(search || deptFilter !== "All") && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setDeptFilter("All");
+              }}
+              className="h-9 px-2.5 rounded-xl border border-bdr text-muted hover:text-slate-800 hover:bg-off text-[12px] flex items-center gap-1 transition"
+            >
+              <RotateCcw size={12} />
+              Reset
+            </button>
+          )}
         </div>
 
-        {/* Action Controls & Quick Links */}
-        <div className="flex items-center justify-between md:justify-end gap-2 pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-          {embedded && (
-            <div className="flex items-center gap-1.5 mr-1">
-              <div className="flex p-0.5 bg-off border border-bdr rounded-lg">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("kanban")}
-                  className={`p-1.5 rounded-md text-slate-700 transition cursor-pointer ${
-                    viewMode === "kanban" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-slate-200"
-                  }`}
-                  title="Kanban Funnel View"
-                >
-                  <LayoutGrid size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("list")}
-                  className={`p-1.5 rounded-md text-slate-700 transition cursor-pointer ${
-                    viewMode === "list" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
-                  }`}
-                  title="Table / List View"
-                >
-                  <ListIcon size={14} />
-                </button>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => handleOpenAdd("Requested")}
-                className="h-7.5 px-2.5 rounded-lg bg-[#1e3a8a] text-white hover:bg-[#1e40af] text-[11.5px] font-semibold transition flex items-center gap-1 shadow-xs cursor-pointer"
-                title="Add / Request Training"
-              >
-                <Plus size={14} />
-                <span>Add</span>
-              </button>
-            </div>
-          )}
-
+        {/* Quick Links to other training modules */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/hrms/training/list")}
-            className="text-[11.5px] text-slate-600 hover:text-navy px-2 py-1 rounded-lg hover:bg-off font-medium transition"
+            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-lg hover:bg-off font-medium transition"
           >
             Programs List &rarr;
           </button>
           <button
             type="button"
             onClick={() => navigate("/hrms/training/trainers")}
-            className="text-[11.5px] text-slate-600 hover:text-navy px-2 py-1 rounded-lg hover:bg-off font-medium transition"
+            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-lg hover:bg-off font-medium transition"
           >
             Trainers &rarr;
           </button>
@@ -407,128 +360,35 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
       </div>
 
       {/* Main Funnel Card */}
-      <div className="bg-white border border-bdr rounded-2xl p-3 sm:p-4 lg:p-4.5 shadow-xs flex flex-col gap-3 sm:gap-4 overflow-hidden">
-        {/* Card Header with View Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+      <div className="bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col gap-5 overflow-hidden">
+        {/* Card Header matching image */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-[15px] font-bold text-slate-900">Training Funnel</h2>
-              {embedded && <PageInfoButton guide={hrmsGuides.trainingFunnel} />}
-            </div>
-            <div className="text-[11.5px] text-slate-500 font-medium flex items-center gap-2 flex-wrap mt-0.5">
+            <h2 className="text-[16px] font-bold text-slate-900">Training Funnel</h2>
+            <div className="text-[12px] text-slate-500 mt-0.5 font-medium flex items-center gap-2 flex-wrap">
               <span>
                 Total: <span className="text-slate-700 font-semibold">{totalCount}</span> • Open:{" "}
                 <span className="text-blue-700 font-semibold">{openCount}</span> • Closed:{" "}
                 <span className="text-slate-700 font-semibold">{closedCount}</span>
               </span>
-              <span className="hidden sm:inline-block w-1 h-1 rounded-full bg-slate-300" />
-              <span className="inline-flex items-center gap-1 font-medium text-blue-600 text-[11px]">
-                <MoveHorizontal size={12} /> Drag &amp; drop or use card menu
+              <span className="inline-block w-1 h-1 rounded-full bg-slate-300" />
+              <span className="inline-flex items-center gap-1 font-medium text-blue-600 text-[11.5px]">
+                <MoveHorizontal size={12} /> Drag & drop cards between stages
               </span>
             </div>
           </div>
 
-          <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
-            {draggedId && (
-              <span className="text-[10.5px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1 w-fit">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
-                Dragging...
-              </span>
-            )}
-
-            {/* Kanban Mode Switcher: One Page (Fit) vs Scrollable */}
-            {viewMode === "kanban" && (
-              <div className="flex items-center gap-1.5 ml-auto sm:ml-0">
-                <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[11px] font-medium text-slate-600">
-                  <button
-                    type="button"
-                    onClick={() => setKanbanFitMode("fit")}
-                    className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                      kanbanFitMode === "fit"
-                        ? "bg-white text-slate-900 shadow-2xs font-semibold"
-                        : "hover:text-slate-900 text-slate-500"
-                    }`}
-                    title="Fit all 7 stages on one page without scrolling"
-                  >
-                    Fit to Screen
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setKanbanFitMode("scroll")}
-                    className={`px-2 py-0.5 rounded-md transition cursor-pointer ${
-                      kanbanFitMode === "scroll"
-                        ? "bg-white text-slate-900 shadow-2xs font-semibold"
-                        : "hover:text-slate-900 text-slate-500"
-                    }`}
-                    title="Scrollable wide columns"
-                  >
-                    Scroll View
-                  </button>
-                </div>
-
-                {kanbanFitMode === "scroll" && (
-                  <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                    <button
-                      type="button"
-                      onClick={() => scrollKanban("left")}
-                      className="p-1 hover:bg-white text-slate-600 hover:text-slate-900 rounded-md transition shadow-2xs cursor-pointer"
-                      title="Scroll Left"
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => scrollKanban("right")}
-                      className="p-1 hover:bg-white text-slate-600 hover:text-slate-900 rounded-md transition shadow-2xs cursor-pointer"
-                      title="Scroll Right"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {draggedId && (
+            <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full animate-pulse flex items-center gap-1.5 w-fit">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600" />
+              Dragging training program...
+            </span>
+          )}
         </div>
-
-        {/* Mobile / Tablet Quick-Jump Pills */}
-        {viewMode === "kanban" && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 custom-scrollbar lg:hidden -mt-1">
-            {TRAINING_FUNNEL_STAGES.map((s, idx) => {
-              const stageTrainings = filteredTrainings.filter((t) => t.stage === s.key);
-              return (
-                <button
-                  key={s.key}
-                  type="button"
-                  onClick={() => {
-                    if (kanbanContainerRef.current) {
-                      const targetCol = kanbanContainerRef.current.children[idx];
-                      if (targetCol) {
-                        targetCol.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "start" });
-                      }
-                    }
-                  }}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 shrink-0 transition cursor-pointer"
-                >
-                  <span className={`w-1.5 h-1.5 rounded-full ${s.dotClass}`} />
-                  <span>{s.label}</span>
-                  <span className="text-[9px] font-bold text-slate-500">({stageTrainings.length})</span>
-                </button>
-              );
-            })}
-          </div>
-        )}
 
         {/* KANBAN FUNNEL VIEW */}
         {viewMode === "kanban" && (
-          <div
-            ref={kanbanContainerRef}
-            className={
-              kanbanFitMode === "fit"
-                ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-1.5 xl:gap-2 w-full min-h-[440px]"
-                : "flex items-stretch gap-3 overflow-x-auto min-h-[460px] pb-3 custom-scrollbar scroll-smooth"
-            }
-          >
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3.5 overflow-x-auto min-h-[480px] pb-2">
             {TRAINING_FUNNEL_STAGES.map((stageObj) => {
               const stageTrainings = filteredTrainings.filter((t) => t.stage === stageObj.key);
               const stageCount = stageTrainings.length;
@@ -542,55 +402,50 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   onDragOver={(e) => handleDragOver(e, stageObj.key)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, stageObj.key, stageObj.label)}
-                  className={`rounded-xl p-2 sm:p-2.5 flex flex-col justify-between transition-all duration-200 min-w-0 ${
-                    kanbanFitMode === "scroll" ? "w-[260px] min-w-[260px] shrink-0" : "flex-1"
-                  } ${
+                  className={`rounded-2xl p-3.5 flex flex-col justify-between transition-all duration-200 min-w-[210px] ${
                     isDropActive
                       ? STAGE_DROP_STYLES[stageObj.key] || "ring-2 ring-blue-500/60 bg-blue-50/70 border-blue-400"
-                      : "bg-slate-50/70 border border-[#e2e8f0] hover:border-slate-300"
+                      : "bg-slate-50/50 border border-[#e2e8f0] hover:border-slate-300"
                   }`}
                 >
-                  {/* Column Header: Fits perfectly in one line without overflow */}
-                  <div className="flex flex-col pb-1.5 border-b border-slate-200/80 min-w-0">
-                    <div className="flex items-center justify-between gap-1 mb-1 min-w-0">
+                  {/* Column Header matching screenshot */}
+                  <div className="flex flex-col pb-2.5 border-b border-slate-200/80">
+                    <div className="flex items-center justify-between gap-2 mb-2">
                       <span
-                        className={`px-1.5 py-0.5 rounded text-[9.5px] font-bold tracking-tight truncate max-w-[78%] shadow-2xs ${stageObj.badgeClass}`}
-                        title={stageObj.label}
+                        className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wide shadow-2xs ${stageObj.badgeClass}`}
                       >
                         {stageObj.label}
                       </span>
-                      <span className="text-[11px] font-bold text-slate-800 font-mono shrink-0 bg-white/90 border border-slate-200 px-1 py-0.2 rounded">
+                      <span className="text-[14px] font-bold text-slate-800 font-mono">
                         {stageCount}
                       </span>
                     </div>
 
-                    <div className="flex items-baseline justify-between text-[10px] text-slate-500 font-medium pt-1 border-t border-slate-200/60 min-w-0">
-                      <span>{stagePct}%</span>
-                      <span
-                        className="font-semibold text-slate-700 truncate"
-                        title={`Cost: ₹ ${stageCost.toLocaleString("en-IN")}`}
-                      >
-                        ₹{stageCost >= 100000 ? `${(stageCost / 100000).toFixed(1)}L` : stageCost >= 1000 ? `${(stageCost / 1000).toFixed(0)}k` : stageCost}
-                      </span>
+                    <div className="text-[11px] text-slate-500 font-medium">
+                      {stagePct}% of all records
                     </div>
 
-                    <div className="text-[9px] text-slate-400 italic mt-0.5 truncate leading-tight" title={stageObj.subtitle}>
+                    <div className="text-[11px] text-slate-700 font-semibold mt-0.5">
+                      Cost: ₹ {stageCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 italic mt-1 leading-tight line-clamp-2">
                       {stageObj.subtitle}
                     </div>
                   </div>
 
-                  {/* Column Body: Cards with smooth scroll */}
-                  <div className="flex-1 py-1.5 flex flex-col gap-1.5 overflow-y-auto max-h-[380px] sm:max-h-[420px] custom-scrollbar min-w-0">
+                  {/* Column Body: Items or "Empty" placeholder */}
+                  <div className="flex-1 py-3 flex flex-col gap-2.5 overflow-y-auto max-h-[440px] custom-scrollbar">
                     {/* Active drop indicator */}
                     {isDropActive && (
-                      <div className="border-2 border-dashed border-blue-500/70 bg-blue-500/10 rounded-lg p-1.5 text-center text-[10px] font-bold text-blue-700 flex items-center justify-center gap-1 animate-pulse shadow-inner">
-                        <ArrowDownToLine size={12} />
-                        <span>Drop to move</span>
+                      <div className="border-2 border-dashed border-blue-500/70 bg-blue-500/10 rounded-xl p-2 text-center text-[10.5px] font-bold text-blue-700 flex items-center justify-center gap-1.5 animate-pulse shadow-inner">
+                        <ArrowDownToLine size={13} />
+                        <span>Drop to move to {stageObj.label}</span>
                       </div>
                     )}
 
                     {stageTrainings.length === 0 && !isDropActive ? (
-                      <div className="flex-1 flex items-center justify-center py-8 text-slate-400 text-[11px] italic font-medium">
+                      <div className="flex-1 flex items-center justify-center py-12 text-slate-400 text-[12.5px] italic font-medium">
                         Empty
                       </div>
                     ) : (
@@ -604,35 +459,35 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                             onDragStart={(e) => handleDragStart(e, item)}
                             onDragEnd={handleDragEnd}
                             onClick={() => handleOpenEdit(item)}
-                            className={`bg-white border rounded-lg p-2 shadow-2xs transition-all duration-150 cursor-grab active:cursor-grabbing text-left group select-none relative flex flex-col gap-1.5 min-w-0 ${
+                            className={`bg-white border rounded-xl p-3 shadow-2xs transition-all duration-150 cursor-grab active:cursor-grabbing text-left group select-none relative flex flex-col gap-1.5 ${
                               isDragging
                                 ? "opacity-35 border-dashed border-blue-500 ring-2 ring-blue-500/30 scale-[0.98]"
-                                : "border-bdr hover:border-slate-300 hover:shadow-xs"
+                                : "border-bdr hover:border-slate-300 hover:shadow-xs hover:-translate-y-0.5"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-1 min-w-0">
+                            <div className="flex items-start justify-between gap-1.5">
                               <div className="flex items-start gap-1 flex-1 min-w-0">
                                 <div
                                   className="text-slate-300 group-hover:text-blue-600 transition-colors shrink-0 mt-0.5"
                                   title="Drag card"
                                 >
-                                  <GripVertical size={11} />
+                                  <GripVertical size={13} />
                                 </div>
-                                <span className="font-bold text-[11px] text-slate-900 group-hover:text-navy transition line-clamp-2 leading-tight min-w-0">
+                                <span className="font-bold text-[12.5px] text-slate-900 group-hover:text-navy transition line-clamp-2 leading-snug">
                                   {item.name}
                                 </span>
                               </div>
-                              <span className="px-1 py-0.2 bg-slate-100 border border-slate-200 rounded text-[8px] font-medium text-slate-600 shrink-0">
+                              <span className="px-1.5 py-0.5 bg-off border border-bdr rounded text-[9.5px] font-medium text-slate-600 shrink-0">
                                 {item.department}
                               </span>
                             </div>
 
                             {/* Trainer info */}
-                            <div className="flex items-center gap-1 text-[10px] text-slate-600 min-w-0">
+                            <div className="flex items-center gap-1.5 text-[11.5px] text-slate-600 mt-0.5">
                               {item.avatar ? (
-                                <img src={item.avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
+                                <img src={item.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
                               ) : (
-                                <div className="w-3.5 h-3.5 rounded-full bg-slate-200 grid place-items-center text-[7.5px] font-bold text-slate-600 shrink-0">
+                                <div className="w-4 h-4 rounded-full bg-slate-200 grid place-items-center text-[8px] font-bold text-slate-600">
                                   {item.trainer ? item.trainer[0] : "U"}
                                 </div>
                               )}
@@ -640,16 +495,16 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                             </div>
 
                             {/* Date and Cost */}
-                            <div className="flex items-center justify-between text-[9.5px] text-slate-500 pt-1 border-t border-slate-100 min-w-0">
-                              <span className="truncate">{item.start || "TBD"}</span>
-                              <span className="font-semibold text-slate-800 shrink-0">
-                                ₹{Number(item.cost || 0).toLocaleString("en-IN")}
+                            <div className="flex items-center justify-between text-[10.5px] text-slate-500 pt-1 border-t border-slate-100">
+                              <span>{item.start || "TBD"}</span>
+                              <span className="font-semibold text-slate-800">
+                                ₹ {Number(item.cost || 0).toLocaleString("en-IN")}
                               </span>
                             </div>
 
                             {/* Move stage dropdown / quick action */}
                             <div
-                              className="pt-0.5"
+                              className="flex items-center justify-between pt-1 gap-1"
                               onMouseDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -660,7 +515,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                                   moveTrainingStage(item.id, e.target.value);
                                   showToast(`Moved "${item.name}" to ${e.target.value}`);
                                 }}
-                                className="h-5 px-1 bg-slate-50 border border-slate-200 hover:bg-white rounded text-[9px] text-slate-600 font-medium focus:outline-none focus:border-navy cursor-pointer w-full truncate"
+                                className="h-6 px-1.5 bg-off border border-bdr rounded text-[10px] text-slate-600 font-medium focus:outline-none focus:border-navy cursor-pointer w-full"
                               >
                                 {TRAINING_FUNNEL_STAGES.map((s) => (
                                   <option key={s.key} value={s.key}>
@@ -679,9 +534,9 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   <button
                     type="button"
                     onClick={() => handleOpenAdd(stageObj.key)}
-                    className="w-full py-1 rounded-lg border border-dashed border-bdr text-slate-500 hover:text-navy hover:border-navy hover:bg-white text-[10.5px] font-medium flex items-center justify-center gap-1 transition cursor-pointer mt-1"
+                    className="w-full py-1.5 rounded-xl border border-dashed border-bdr text-slate-500 hover:text-navy hover:border-navy hover:bg-white text-[11.5px] font-medium flex items-center justify-center gap-1 transition cursor-pointer mt-1"
                   >
-                    <Plus size={12} />
+                    <Plus size={13} />
                     Add
                   </button>
                 </div>
