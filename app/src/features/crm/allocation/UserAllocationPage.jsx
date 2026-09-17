@@ -1,3 +1,4 @@
+import CrmKpiCard from '../common/CrmKpiCard';
 import React, { useState } from 'react';
 import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone, MapPin, ListChecks } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
@@ -190,42 +191,10 @@ export default function UserAllocationPage() {
       <>
       {/* Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div className="stat-card">
-          <div className="stat-badge bg-blue-50 text-blue-600 dark:bg-blue-900/30">
-            <Users size={22} />
-          </div>
-          <div className="stat-body">
-            <span className="stat-num">{teamMembers.length}</span>
-            <span className="stat-label">Active Representatives</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-badge bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30">
-            <CheckCircle2 size={22} />
-          </div>
-          <div className="stat-body">
-            <span className="stat-num">{totalDeals}</span>
-            <span className="stat-label">Total Won Deals</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-badge bg-amber-50 text-amber-600 dark:bg-amber-900/30">
-            <Award size={22} />
-          </div>
-          <div className="stat-body">
-            <span className="stat-num">48.2%</span>
-            <span className="stat-label">Avg. Conversion Rate</span>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-badge bg-purple-50 text-purple-600 dark:bg-purple-900/30">
-            <ArrowUpRight size={22} />
-          </div>
-          <div className="stat-body">
-            <span className="stat-num">{formatCurrency(totalPipeline, { noDecimals: true })}</span>
-            <span className="stat-label">Allocated Pipeline</span>
-          </div>
-        </div>
+        <CrmKpiCard label="Active Representatives" value={teamMembers.length} icon={Users} tone="blue" />
+        <CrmKpiCard label="Total Won Deals" value={totalDeals} icon={CheckCircle2} tone="emerald" />
+        <CrmKpiCard label="Avg. Conversion Rate" value="48.2%" icon={Award} tone="amber" />
+        <CrmKpiCard label="Allocated Pipeline" value={formatCurrency(totalPipeline, { noDecimals: true })} icon={ArrowUpRight} tone="purple" />
       </div>
 
       {/* Team Roster & Allocation Table */}

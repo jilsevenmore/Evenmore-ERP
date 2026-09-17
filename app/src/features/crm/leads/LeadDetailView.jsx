@@ -1,3 +1,4 @@
+import CrmKpiCard from '../common/CrmKpiCard';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useERP } from '../../../context/ERPContext';
@@ -1784,7 +1785,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     }
   }
 
-  async function submitCompleteTask(outcome, nextAction) {
+  async function submitCompleteTask(outcome, nextAction, note) {
     const detailTask = tasks.find((t) => t.id === completeId);
     if (!detailTask) {
       return { ok: false, message: 'Task could not be found.' };
@@ -1801,6 +1802,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       lead,
       outcome,
       nextAction,
+      note,
       completedBy: actor,
       leadDetailTask: detailTask,
     });
@@ -1904,7 +1906,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {!done && showNote && (
-            <button type="button" title="Note" className="w-8 h-8 grid place-items-center rounded-md bg-lime-500 hover:bg-lime-600 text-white transition">
+            <button type="button" onClick={() => setCompleteId(task.id)} title="Fill Task Form" className="w-8 h-8 grid place-items-center rounded-md bg-lime-500 hover:bg-lime-600 text-white transition">
               <ClipboardList size={14} />
             </button>
           )}
@@ -3964,26 +3966,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        {metrics.map((m, idx) => {
-          const Icon = m.icon;
-          return (
-            <div
-              key={idx}
-              className="bg-white rounded-2xl border border-slate-200/80 p-3.5 flex items-center gap-3 shadow-xs hover:border-slate-300 transition"
-            >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
-                style={{ background: m.bg, color: m.color }}
-              >
-                <Icon size={17} strokeWidth={2} />
-              </div>
-              <div className="min-w-0 leading-tight">
-                <span className="text-[11px] font-medium text-slate-500 block truncate">{m.label}</span>
-                <strong className="text-sm font-bold text-slate-900">{m.value}</strong>
-              </div>
-            </div>
-          );
-        })}
+        {metrics.map((m, index) => (
+          <CrmKpiCard key={m.label} label={m.label} value={m.value} icon={m.icon} tone={['rose', 'emerald', 'purple', 'amber', 'blue', 'teal', 'orange'][index]} />
+        ))}
       </div>
 
       <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/80 p-1.5 shadow-xs scrollbar-none">

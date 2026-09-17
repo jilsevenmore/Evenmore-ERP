@@ -439,6 +439,7 @@ function moveLeadToNextStage(lead) {
  * @param {string}       params.outcome         - One of TASK_OUTCOMES[].value
  * @param {string}       params.nextAction      - One of NEXT_ACTIONS[].value
  * @param {string}       [params.completedBy]
+ * @param {string}       [params.note]
  * @param {Object|null}  [params.leadDetailTask]- Lead Detail task record (from evenmore-crm-lead-details-v1)
  * @returns {{
  *   ok: boolean,
@@ -451,13 +452,14 @@ function moveLeadToNextStage(lead) {
  *   activities: Array|null,
  * }}
  */
-export function completeTaskWithOutcome({ task, lead, outcome, nextAction, completedBy, leadDetailTask }) {
+export function completeTaskWithOutcome({ task, lead, outcome, nextAction, completedBy, note, leadDetailTask }) {
   const warnings = [];
   const completedAt = new Date().toISOString();
   const completedAtDisplay = formatStamp(new Date());
   const actionLabel = NEXT_ACTION_LABELS[nextAction] || nextAction || '';
   const taskTitle = task?.title || leadDetailTask?.title || 'Task';
   const actor = String(completedBy || lead?.owner || '').trim() || 'CRM User';
+  const completionNote = String(note || '').trim();
 
   // 1. Update the Task List store (evenmore-crm-tasks-v1)
   if (task?.id) {
@@ -469,6 +471,7 @@ export function completeTaskWithOutcome({ task, lead, outcome, nextAction, compl
             status: 'Completed',
             completionOutcome: outcome,
             nextAction,
+            completionNote,
             completedAt,
             completedBy: actor,
           }
@@ -499,6 +502,7 @@ export function completeTaskWithOutcome({ task, lead, outcome, nextAction, compl
         process: 'Done',
         completionOutcome: outcome,
         nextAction,
+        completionNote,
         completedAt,
         completedBy: actor,
       };
@@ -509,6 +513,7 @@ export function completeTaskWithOutcome({ task, lead, outcome, nextAction, compl
       title: `Task "${taskTitle}" completed`,
       outcome,
       nextAction: actionLabel,
+      note: completionNote,
       employee: actor,
       time: completedAtDisplay,
       color: '#16a34a',
