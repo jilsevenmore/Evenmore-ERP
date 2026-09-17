@@ -25,13 +25,13 @@ A modern, enterprise-grade unified frontend application consolidating **CRM**, *
 From the project root:
 
 ```bash
-npm --prefix app install
+npm --prefix frontend/app install
 ```
 
-Or inside `app/`:
+Or inside `frontend/app/`:
 
 ```bash
-cd app
+cd frontend/app
 npm install
 ```
 
@@ -43,10 +43,10 @@ Run the development server on `http://localhost:5173/`:
 npm run dev
 ```
 
-Or from inside `app/`:
+Or from inside `frontend/app/`:
 
 ```bash
-cd app
+cd frontend/app
 npm run dev
 ```
 
@@ -107,12 +107,12 @@ All components adhere strictly to the **CRM Visual Baseline**:
 - **Background Color**: `#f8fafc`
 - **Border Tokens**: `rgba(226, 232, 240, 1)` / Slate
 - **Typography**: Inter font family with strict size scales
-- **Shared UI Primitives** in `app/src/components/ui/`: `Button`, `DataTable`, `StatCard`, `MetricChip`, `StatusBadge`, `Modal`, `Drawer`, `EmptyState`, `ProgressBar`, `Skeleton`, `PageHeader`, `Pagination`, `ErrorBoundary`.
+- **Shared UI Primitives** in `frontend/app/src/components/ui/`: `Button`, `DataTable`, `StatCard`, `MetricChip`, `StatusBadge`, `Modal`, `Drawer`, `EmptyState`, `ProgressBar`, `Skeleton`, `PageHeader`, `Pagination`, `ErrorBoundary`.
 
 ---
 
 ## 🔌 API Service Layer (Backend Ready)
 
-Prepared under `app/src/services/`:
+Prepared under `frontend/app/src/services/`:
 - `api.js`: Base API client with JWT bearer header support and unified error handling.
 - `domainServices.js`: Ready-to-connect service endpoints for CRM, Sales, HRMS, and Inventory.
