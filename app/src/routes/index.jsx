@@ -167,7 +167,10 @@ function RootErrorBoundary() {
   );
 }
 
+const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotationPage'));
+
 const router = createBrowserRouter([
+  { path: '/quote/:quotationNumber/:secureToken', element: <Page component={PublicQuotationPage} /> },
   {
     path: '/',
     element: <MainLayout />,

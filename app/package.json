@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "sharing:server": "node server/quotation-server.mjs",
+    "test:quotations": "node --test server/quotation-server.test.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
@@ -14,6 +16,7 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.43.0",
     "motion": "^12.23.24",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.87.0",

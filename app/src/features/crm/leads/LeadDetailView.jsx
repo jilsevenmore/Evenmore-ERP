@@ -2374,8 +2374,7 @@ function QuotationsTab({ lead, onActivity }) {
   }
 
   function sendQuotation(q) {
-    updateQuotationStatus?.(q.id, 'Sent');
-    onActivity?.(`Quotation ${q.quoteNumber} sent to ${lead?.name || 'lead'}`, '#3b82f6');
+    window.location.assign(`/sales/quotations?quotationId=${encodeURIComponent(q.id)}&send=1`);
   }
 
   function quotationTone(status) {
@@ -2752,6 +2751,7 @@ function ActivityTab({ lead, items }) {
     ...linkedEstimates.map((e) => ({ id: `sys-est-${e.id}`, title: `Estimate ${e.estimateNumber} • ${e.status}`, time: e.date || '', color: '#f59e0b' })),
     ...linkedQuotations.map((q) => ({ id: `sys-q-${q.id}`, title: `Quotation ${q.quoteNumber} • ${q.status}`, time: q.date || '', color: '#10b981' })),
   ];
+  systemEntries.push(...linkedQuotations.flatMap(q => (q.activity || []).map(event => ({ id: event.id, title: `${q.quoteNumber} ? ${event.type}`, time: event.timestamp, color: '#10b981' }))));
   const total = entries.length + systemEntries.length;
   return (
     <div className="card p-5 space-y-4">

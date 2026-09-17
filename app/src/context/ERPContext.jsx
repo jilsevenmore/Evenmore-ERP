@@ -1,3 +1,4 @@
+import { sharingRequest } from '../services/quotationSharing';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts, mockProformaInvoices, mockEstimates, mockWarrantyCards } from '../data/erp/mockData';
 import { formatDateDDMMYYYY, getCurrentDateFormatted } from '../utils/dateUtils';
@@ -1789,12 +1790,17 @@ export const ERPProvider = ({ children, }) => {
     };
 
     const addQuotation = (quote) => {
-        const totalAmount = quote.amount ||
-            (quote.items ? quote.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+        const totalAmount = quote.amount ??
+            (quote.items ? quote.items.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) : 0);
         const defaultAddresses = resolvePartyAddresses(quote.customerId, quote.customer);
         const newQ = {
             id: quote.id || `q-${Date.now()}`,
             quoteNumber: quote.quoteNumber || `EST-2026-${String(quotations.length + 91).padStart(3, '0')}`,
+            dealId: quote.dealId,
+            dealReference: quote.dealReference,
+            terms: quote.terms,
+            termsAndConditions: quote.termsAndConditions,
+            freight: quote.freight,
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
@@ -1813,6 +1819,59 @@ export const ERPProvider = ({ children, }) => {
         setQuotations((prev) => [newQ, ...prev]);
         showToast(`Quotation ${newQ.quoteNumber} issued.`);
         return newQ;
+    };
+    const recordQuotationActivity = (id, type) => {
+        const event = { id: crypto.randomUUID(), type, quotationId: id, timestamp: new Date().toISOString() };
+        setQuotations(prev => prev.map(q => q.id === id ? { ...q, activity: [...(q.activity || []), event] } : q));
+    };
+    const syncQuotationShare = (id, share) => {
+        setQuotations(prev => prev.map(q => {
+            if (q.id !== id) return q;
+            const events = new Map([...(q.activity || []), ...(share.events || [])].map(event => [event.id, event]));
+            const activity = [...events.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+            const viewed = activity.some(event => event.type === 'Quotation Viewed');
+            return { ...q, share: { url: share.url, expiresAt: share.expiresAt, allowDownload: share.allowDownload, allowAcceptance: share.allowAcceptance, localOnly: share.localOnly }, activity,
+                status: ['Draft', 'Sent', 'Viewed'].includes(q.status) ? (share.decision || (viewed ? 'Viewed' : q.status)) : q.status };
+        }));
+    };
+    const sharedQuotationIds = JSON.stringify(quotations.filter(q => q.share).map(q => q.id));
+    useEffect(() => {
+        if (window.location.pathname.startsWith('/quote/')) return;
+        let active = true;
+        const refresh = async () => {
+            if (!sessionStorage.getItem('quotation_admin_token')) return;
+            for (const id of JSON.parse(sharedQuotationIds)) {
+                try {
+                    const share = await sharingRequest(id);
+                    if (active) syncQuotationShare(id, share);
+                } catch { /* The quotation share dialog exposes connection errors. */ }
+            }
+        };
+        refresh();
+        const timer = setInterval(refresh, 15000);
+        return () => { active = false; clearInterval(timer); };
+        // syncQuotationShare only uses the functional state setter.
+    }, [sharedQuotationIds]);
+    const convertQuotationToDeliveryChallan = (id) => {
+        const quote = quotations.find(q => q.id === id);
+        if (!quote) return;
+        const existing = deliveryChallans.find(dc => dc.sourceQuotationId === id);
+        if (existing) return existing;
+        if (['Rejected', 'Expired'].includes(quote.status) || !quote.items?.length) {
+            showToast('An active quotation with line items is required.');
+            return;
+        }
+        const challan = addDeliveryChallan({
+            sourceQuotationId: quote.id, sourceQuotationNumber: quote.quoteNumber,
+            customerId: quote.customerId, customer: quote.customer,
+            billingAddress: quote.billingAddress, shippingAddress: quote.shippingAddress,
+            leadId: quote.leadId, dealId: quote.dealId, status: 'Draft',
+            date: getCurrentDateFormatted(), dispatchDate: '', transporter: '', vehicleNo: '',
+            items: quote.items.map(item => ({ ...item })),
+        });
+        setQuotations(prev => prev.map(q => q.id === id ? { ...q, deliveryChallanId: challan.id,
+            activity: [...(q.activity || []), { id: crypto.randomUUID(), type: `Delivery challan ${challan.challanNumber} created`, quotationId: id, timestamp: new Date().toISOString() }] } : q));
+        return challan;
     };
     const updateQuotationStatus = (id, status) => {
         setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
@@ -1858,6 +1917,11 @@ export const ERPProvider = ({ children, }) => {
             quotationNumber: quote.quoteNumber,
             sourceQuotationId: quote.id,
             sourceQuotationNumber: quote.quoteNumber,
+            dealId: quote.dealId,
+            dealReference: quote.dealReference,
+            terms: quote.terms,
+            termsAndConditions: quote.termsAndConditions,
+            freight: quote.freight,
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
@@ -2062,6 +2126,9 @@ export const ERPProvider = ({ children, }) => {
         return createdInvoice;
     };
     const addDeliveryChallan = (challan) => {
+        const previous = challan.id ? deliveryChallans.find(dc => dc.id === challan.id) : null;
+        if (previous && previous.status !== 'Draft') return previous;
+
         const challanItems = challan.items || challan.lineItems || [];
         const defaultAddresses = resolvePartyAddresses(challan.customerId, challan.customer);
         const newChallan = {
@@ -2070,21 +2137,31 @@ export const ERPProvider = ({ children, }) => {
                 `DC-2026-${String(deliveryChallans.length + 80).padStart(3, '0')}`,
             salesOrderId: challan.salesOrderId,
             sourceSalesOrderId: challan.salesOrderId,
-            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || 'SO-2026-0102',
-            linkedSo: challan.salesOrderNumber || challan.linkedSo || 'SO-2026-0102',
+            sourceQuotationId: challan.sourceQuotationId,
+            sourceQuotationNumber: challan.sourceQuotationNumber,
+            leadId: challan.leadId,
+            dealId: challan.dealId,
+            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
+            linkedSo: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
             customerId: challan.customerId,
             customer: challan.customer || 'Acme Corp',
             billingAddress: createAddressSnapshot(challan.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(challan.shippingAddress) || defaultAddresses.shipping,
             date: challan.date || 'Today',
-            dispatchDate: challan.dispatchDate || 'Today',
-            transporter: challan.transporter || 'FedEx Freight',
-            vehicleNo: challan.vehicleNo || 'TRK-9041-WA',
+            dispatchDate: challan.dispatchDate ?? 'Today',
+            transporter: challan.transporter ?? 'FedEx Freight',
+            vehicleNo: challan.vehicleNo ?? 'TRK-9041-WA',
             status: challan.status || 'In Transit',
             items: challanItems,
             lineItems: challanItems,
         };
-        setDeliveryChallans((prev) => [newChallan, ...prev]);
+        setDeliveryChallans((prev) => previous ? prev.map(dc => dc.id === newChallan.id ? newChallan : dc) : [newChallan, ...prev]);
+
+        // Draft quotation conversions reserve no stock and have no fulfillment effects.
+        if (newChallan.status === 'Draft') {
+            showToast(`Draft delivery challan ${newChallan.challanNumber} created.`);
+            return newChallan;
+        }
 
         // Record SALE movement and handle serial numbers
         if (newChallan.items && newChallan.items.length > 0) {
@@ -2164,6 +2241,10 @@ export const ERPProvider = ({ children, }) => {
         return newChallan;
     };
     const updateDeliveryChallanStatus = (id, status) => {
+        if (deliveryChallans.find(c => c.id === id)?.status === 'Draft') {
+            showToast('This challan is a draft. Dispatch must be prepared before delivery can be recorded.');
+            return;
+        }
         setDeliveryChallans((prev) => prev.map((c) => {
             if (c.id !== id)
                 return c;
@@ -2183,6 +2264,12 @@ export const ERPProvider = ({ children, }) => {
         const challan = deliveryChallans.find((c) => c.id === challanId);
         if (!challan) return { success: false, message: 'Challan not found.' };
         if (challan.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
+
+        if (challan.status === 'Draft') {
+            setDeliveryChallans(prev => prev.map(c => c.id === challanId ? { ...c, status: 'Cancelled' } : c));
+            showToast('Draft challan cancelled.');
+            return { success: true, message: 'Draft challan cancelled.' };
+        }
 
         // 1. Reverse stock movements and restore serial numbers
         if (challan.items && challan.items.length > 0) {
@@ -3786,6 +3873,9 @@ export const ERPProvider = ({ children, }) => {
             updateCategory,
             addQuotation,
             updateQuotationStatus,
+            recordQuotationActivity,
+            syncQuotationShare,
+            convertQuotationToDeliveryChallan,
             convertQuotationToSalesOrder,
             addSalesOrder,
             updateSalesOrderStage,

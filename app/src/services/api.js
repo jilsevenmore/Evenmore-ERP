@@ -68,7 +68,7 @@ async function parseBodySafe(response) {
 
 export async function apiClient(
   endpoint,
-  { data, method = 'GET', headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS, retries = 0, query = null, ...customConfig } = {},
+  { data, method = 'GET', headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS, retries = 0, query = null, clearAuthOnUnauthorized = true, ...customConfig } = {},
 ) {
   const token = getAuthToken();
   const url = `${API_BASE_URL}${endpoint}${query ? buildQuery(query) : ''}`;
@@ -90,7 +90,7 @@ export async function apiClient(
   for (;;) {
     try {
       const response = await fetchWithTimeout(url, config, timeoutMs);
-      if (response.status === 401) {
+      if (response.status === 401 && clearAuthOnUnauthorized) {
         // Token invalid — clear it so the next backend-authenticated
         // session starts clean. No redirect here (router owns navigation).
         try {
