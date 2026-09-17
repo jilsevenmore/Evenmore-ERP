@@ -56,6 +56,8 @@ import {
 import TerminationLetterModal from "./TerminationLetterModal";
 import OfferLetterModal from "./OfferLetterModal";
 import GenerateOfferModal from "./GenerateOfferModal";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 // ── Initial Mock Data ──────────────────────────────────────────
 
@@ -850,6 +852,7 @@ export default function HRAdminPage({ defaultTab }) {
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="text-[24px] font-bold text-slate-900">HR Admin Setup &amp; Governance</h1>
+            <PageInfoButton guide={hrmsGuides.hrAdmin} />
             <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-800 border border-blue-200">
               Live Governance Hub
             </span>

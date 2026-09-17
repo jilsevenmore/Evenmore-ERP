@@ -3,6 +3,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { useDocumentStore } from "../../../stores/documentStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   FileText,
   Download,
@@ -449,12 +451,15 @@ export function DocumentsPage() {
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
-            <span>Document Management</span>
-            <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
-              PDF Vault
-            </span>
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold tracking-tight text-slate-900 flex items-center gap-2.5">
+              <span>Document Management</span>
+              <span className="text-[12px] font-semibold px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                PDF Vault
+              </span>
+            </h1>
+            <PageInfoButton guide={hrmsGuides.documents} />
+          </div>
           <p className="text-[13px] text-muted mt-0.5">
             Manage company compliance policies, employee personnel dossiers, and personal records in PDF format
           </p>

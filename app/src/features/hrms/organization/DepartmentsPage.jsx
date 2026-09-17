@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { Badge } from '../../../components/hrms/Badge';
 import Modal from '../../../components/ui/Modal';
+import PageInfoButton from '../../../components/common/PageInfoButton';
+import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import {
   Building2,
   Plus,
@@ -60,7 +62,10 @@ export function DepartmentsPage() {
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h1 className="text-[24px] font-bold tracking-tight">Departments</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold tracking-tight">Departments</h1>
+            <PageInfoButton guide={hrmsGuides.departments} />
+          </div>
           <p className="text-[13px] text-muted">
             Manage organizational structure, operational units, and leadership
           </p>

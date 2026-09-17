@@ -3,6 +3,8 @@ import { Download, ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, 
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
+import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const MOCK_ATTENDANCE = [
   {
@@ -247,7 +249,10 @@ export default function AttendanceOverview() {
       {/* Header Row */}
       <div className="att-title-row">
         <div>
-          <h1 className="att-title">Attendance Management</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="att-title">Attendance Management</h1>
+            <PageInfoButton guide={hrmsGuides.attendanceOverview} />
+          </div>
           <p className="att-sub">Daily tracking, attendance status, regularization, shifts and overtime.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
