@@ -388,7 +388,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
         {/* KANBAN FUNNEL VIEW */}
         {viewMode === "kanban" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-3.5 overflow-x-auto min-h-[480px] pb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5 lg:gap-2 xl:gap-2.5 w-full min-h-[480px]">
             {TRAINING_FUNNEL_STAGES.map((stageObj) => {
               const stageTrainings = filteredTrainings.filter((t) => t.stage === stageObj.key);
               const stageCount = stageTrainings.length;
@@ -402,50 +402,51 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   onDragOver={(e) => handleDragOver(e, stageObj.key)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, stageObj.key, stageObj.label)}
-                  className={`rounded-2xl p-3.5 flex flex-col justify-between transition-all duration-200 min-w-[210px] ${
+                  className={`rounded-2xl p-2.5 lg:p-2 xl:p-2.5 flex flex-col justify-between transition-all duration-200 min-w-0 w-full ${
                     isDropActive
                       ? STAGE_DROP_STYLES[stageObj.key] || "ring-2 ring-blue-500/60 bg-blue-50/70 border-blue-400"
                       : "bg-slate-50/50 border border-[#e2e8f0] hover:border-slate-300"
                   }`}
                 >
                   {/* Column Header matching screenshot */}
-                  <div className="flex flex-col pb-2.5 border-b border-slate-200/80">
-                    <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex flex-col pb-2 border-b border-slate-200/80 min-w-0">
+                    <div className="flex items-center justify-between gap-1 mb-1.5 min-w-0">
                       <span
-                        className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wide shadow-2xs ${stageObj.badgeClass}`}
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold tracking-tight shadow-2xs truncate ${stageObj.badgeClass}`}
+                        title={stageObj.label}
                       >
                         {stageObj.label}
                       </span>
-                      <span className="text-[14px] font-bold text-slate-800 font-mono">
+                      <span className="text-[12.5px] font-bold text-slate-800 font-mono shrink-0">
                         {stageCount}
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-slate-500 font-medium">
+                    <div className="text-[10px] text-slate-500 font-medium truncate">
                       {stagePct}% of all records
                     </div>
 
-                    <div className="text-[11px] text-slate-700 font-semibold mt-0.5">
-                      Cost: ₹ {stageCost.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <div className="text-[10.5px] text-slate-700 font-semibold mt-0.5 truncate">
+                      Cost: ₹ {stageCost.toLocaleString("en-IN")}
                     </div>
 
-                    <div className="text-[10px] text-slate-400 italic mt-1 leading-tight line-clamp-2">
+                    <div className="text-[9.5px] text-slate-400 italic mt-0.5 leading-tight line-clamp-2" title={stageObj.subtitle}>
                       {stageObj.subtitle}
                     </div>
                   </div>
 
                   {/* Column Body: Items or "Empty" placeholder */}
-                  <div className="flex-1 py-3 flex flex-col gap-2.5 overflow-y-auto max-h-[440px] custom-scrollbar">
+                  <div className="flex-1 py-2 flex flex-col gap-2 overflow-y-auto max-h-[440px] custom-scrollbar min-w-0">
                     {/* Active drop indicator */}
                     {isDropActive && (
-                      <div className="border-2 border-dashed border-blue-500/70 bg-blue-500/10 rounded-xl p-2 text-center text-[10.5px] font-bold text-blue-700 flex items-center justify-center gap-1.5 animate-pulse shadow-inner">
-                        <ArrowDownToLine size={13} />
-                        <span>Drop to move to {stageObj.label}</span>
+                      <div className="border-2 border-dashed border-blue-500/70 bg-blue-500/10 rounded-xl p-2 text-center text-[10px] font-bold text-blue-700 flex items-center justify-center gap-1 animate-pulse shadow-inner">
+                        <ArrowDownToLine size={12} />
+                        <span className="truncate">Drop to move</span>
                       </div>
                     )}
 
                     {stageTrainings.length === 0 && !isDropActive ? (
-                      <div className="flex-1 flex items-center justify-center py-12 text-slate-400 text-[12.5px] italic font-medium">
+                      <div className="flex-1 flex items-center justify-center py-12 text-slate-400 text-[12px] italic font-medium">
                         Empty
                       </div>
                     ) : (
@@ -459,35 +460,35 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                             onDragStart={(e) => handleDragStart(e, item)}
                             onDragEnd={handleDragEnd}
                             onClick={() => handleOpenEdit(item)}
-                            className={`bg-white border rounded-xl p-3 shadow-2xs transition-all duration-150 cursor-grab active:cursor-grabbing text-left group select-none relative flex flex-col gap-1.5 ${
+                            className={`bg-white border rounded-xl p-2 lg:p-2.5 shadow-2xs transition-all duration-150 cursor-grab active:cursor-grabbing text-left group select-none relative flex flex-col gap-1.5 min-w-0 w-full ${
                               isDragging
                                 ? "opacity-35 border-dashed border-blue-500 ring-2 ring-blue-500/30 scale-[0.98]"
                                 : "border-bdr hover:border-slate-300 hover:shadow-xs hover:-translate-y-0.5"
                             }`}
                           >
-                            <div className="flex items-start justify-between gap-1.5">
+                            <div className="flex items-start justify-between gap-1 min-w-0">
                               <div className="flex items-start gap-1 flex-1 min-w-0">
                                 <div
                                   className="text-slate-300 group-hover:text-blue-600 transition-colors shrink-0 mt-0.5"
                                   title="Drag card"
                                 >
-                                  <GripVertical size={13} />
+                                  <GripVertical size={12} />
                                 </div>
-                                <span className="font-bold text-[12.5px] text-slate-900 group-hover:text-navy transition line-clamp-2 leading-snug">
+                                <span className="font-bold text-[11px] lg:text-[11.5px] text-slate-900 group-hover:text-navy transition line-clamp-2 leading-snug break-words">
                                   {item.name}
                                 </span>
                               </div>
-                              <span className="px-1.5 py-0.5 bg-off border border-bdr rounded text-[9.5px] font-medium text-slate-600 shrink-0">
+                              <span className="px-1 py-0.5 bg-off border border-bdr rounded text-[8.5px] lg:text-[9px] font-medium text-slate-600 shrink-0 truncate max-w-[54px]" title={item.department}>
                                 {item.department}
                               </span>
                             </div>
 
                             {/* Trainer info */}
-                            <div className="flex items-center gap-1.5 text-[11.5px] text-slate-600 mt-0.5">
+                            <div className="flex items-center gap-1 text-[10.5px] text-slate-600 mt-0.5 min-w-0">
                               {item.avatar ? (
-                                <img src={item.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+                                <img src={item.avatar} alt="" className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
                               ) : (
-                                <div className="w-4 h-4 rounded-full bg-slate-200 grid place-items-center text-[8px] font-bold text-slate-600">
+                                <div className="w-3.5 h-3.5 rounded-full bg-slate-200 grid place-items-center text-[7.5px] font-bold text-slate-600 shrink-0">
                                   {item.trainer ? item.trainer[0] : "U"}
                                 </div>
                               )}
@@ -495,16 +496,16 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                             </div>
 
                             {/* Date and Cost */}
-                            <div className="flex items-center justify-between text-[10.5px] text-slate-500 pt-1 border-t border-slate-100">
-                              <span>{item.start || "TBD"}</span>
-                              <span className="font-semibold text-slate-800">
+                            <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-slate-100 gap-1 min-w-0">
+                              <span className="truncate">{item.start || "TBD"}</span>
+                              <span className="font-semibold text-slate-800 text-[10px] lg:text-[10.5px] whitespace-nowrap shrink-0">
                                 ₹ {Number(item.cost || 0).toLocaleString("en-IN")}
                               </span>
                             </div>
 
                             {/* Move stage dropdown / quick action */}
                             <div
-                              className="flex items-center justify-between pt-1 gap-1"
+                              className="flex items-center justify-between pt-0.5 gap-1 min-w-0"
                               onMouseDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -515,7 +516,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                                   moveTrainingStage(item.id, e.target.value);
                                   showToast(`Moved "${item.name}" to ${e.target.value}`);
                                 }}
-                                className="h-6 px-1.5 bg-off border border-bdr rounded text-[10px] text-slate-600 font-medium focus:outline-none focus:border-navy cursor-pointer w-full"
+                                className="h-5.5 px-1 bg-off border border-bdr rounded text-[9.5px] text-slate-600 font-medium focus:outline-none focus:border-navy cursor-pointer w-full truncate"
                               >
                                 {TRAINING_FUNNEL_STAGES.map((s) => (
                                   <option key={s.key} value={s.key}>
@@ -534,9 +535,9 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   <button
                     type="button"
                     onClick={() => handleOpenAdd(stageObj.key)}
-                    className="w-full py-1.5 rounded-xl border border-dashed border-bdr text-slate-500 hover:text-navy hover:border-navy hover:bg-white text-[11.5px] font-medium flex items-center justify-center gap-1 transition cursor-pointer mt-1"
+                    className="w-full py-1 rounded-xl border border-dashed border-bdr text-slate-500 hover:text-navy hover:border-navy hover:bg-white text-[11px] font-medium flex items-center justify-center gap-1 transition cursor-pointer mt-1"
                   >
-                    <Plus size={13} />
+                    <Plus size={12} />
                     Add
                   </button>
                 </div>
