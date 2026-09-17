@@ -1,3 +1,6 @@
+import InfoBanner from '../../components/ui/InfoBanner';
+import AdministrationGuideButton from './AdministrationGuideButton';
+import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -661,7 +664,8 @@ export function ClientsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <AdministrationGuideButton entity="client" />
           <div className="relative export-menu-container">
             <button
               onClick={() => setIsExportOpen(!isExportOpen)}
@@ -705,76 +709,47 @@ export function ClientsPage() {
         </div>
       </div>
 
+      <InfoBanner
+        storageKey="adminClientsInfoBannerV1"
+        title="Why use Client Management?"
+        text="Keep client contact details and business information in one place. Review related deals and projects, update client records and use filters to find the customers you need."
+      />
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center text-[#1f6bff] flex-shrink-0">
-            <Users size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.total}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Total Clients</div>
+        <KpiCard label="Total Clients" value={stats.total} icon={Users} tone="blue">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 12%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 flex-shrink-0">
-            <UserCheck size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.active}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Active Clients</div>
+        <KpiCard label="Active Clients" value={stats.active} icon={UserCheck} tone="emerald">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 18%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-sky-50 flex items-center justify-center text-sky-600 flex-shrink-0">
-            <Handshake size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.withDeals}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Clients with Deals</div>
+        <KpiCard label="Clients with Deals" value={stats.withDeals} icon={Handshake} tone="sky">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 8%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600 flex-shrink-0">
-            <Folder size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.withProjects}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Clients with Projects</div>
+        <KpiCard label="Clients with Projects" value={stats.withProjects} icon={Folder} tone="amber">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 20%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
 
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex items-center gap-3.5 transition-transform hover:-translate-y-0.5">
-          <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center text-orange-500 flex-shrink-0">
-            <Star size={22} strokeWidth={2.2} />
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900 leading-none">{stats.satisfaction}</div>
-            <div className="text-xs font-semibold text-slate-500 mt-1">Client Satisfaction</div>
+        <KpiCard label="Client Satisfaction" value={stats.satisfaction} icon={Star} tone="orange">
             <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
               <span>↑ 4%</span>
               <span className="text-slate-400 font-normal">vs last month</span>
             </div>
-          </div>
-        </div>
+        </KpiCard>
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">

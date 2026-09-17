@@ -332,7 +332,7 @@ export default function LeadFormBuilder({
     selectedField?.type === "Radio";
 
   return (
-    <section className="w-full max-w-7xl mx-auto py-2">
+    <section className="w-full">
       {!hideHeader && (
         <div className="mb-6">
           <div className="text-xs font-medium text-slate-500 mb-1 flex items-center gap-1.5">

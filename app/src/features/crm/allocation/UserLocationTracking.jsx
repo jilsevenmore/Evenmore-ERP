@@ -1,3 +1,4 @@
+import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Search,
@@ -227,27 +228,12 @@ export default function UserLocationTracking() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 grid place-items-center shrink-0"><Users size={19} /></span>
-          <span><span className="block text-[11px] text-slate-500 font-medium">Total Employees</span><strong className="text-xl font-bold text-slate-900">{STAFF.length}</strong></span>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 grid place-items-center shrink-0"><Wifi size={19} /></span>
-          <span><span className="block text-[11px] text-slate-500 font-medium">Online Now</span><strong className="text-xl font-bold text-slate-900">{online.length}</strong> <em className="not-italic text-[10px] font-bold text-emerald-600">23.8%</em></span>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-slate-100 text-slate-500 grid place-items-center shrink-0"><WifiOff size={19} /></span>
-          <span><span className="block text-[11px] text-slate-500 font-medium">Offline</span><strong className="text-xl font-bold text-slate-900">{offline.length}</strong> <em className="not-italic text-[10px] font-bold text-slate-400">76.2%</em></span>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 grid place-items-center shrink-0"><Navigation size={19} /></span>
-          <span><span className="block text-[11px] text-slate-500 font-medium">Tracked with Location</span><strong className="text-xl font-bold text-slate-900">{STAFF.length - 3}</strong></span>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-3.5 flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-amber-50 text-amber-500 grid place-items-center shrink-0"><Briefcase size={19} /></span>
-          <span><span className="block text-[11px] text-slate-500 font-medium">Out of Office</span><strong className="text-xl font-bold text-slate-900">3</strong></span>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+        <CrmKpiCard label="Total Employees" value={STAFF.length} icon={Users} tone="blue" />
+        <CrmKpiCard label="Online Now" value={online.length} icon={Wifi} tone="emerald"> <em className="not-italic text-[10px] font-bold text-emerald-600">23.8%</em></CrmKpiCard>
+        <CrmKpiCard label="Offline" value={offline.length} icon={WifiOff} tone="rose"> <em className="not-italic text-[10px] font-bold text-slate-400">76.2%</em></CrmKpiCard>
+        <CrmKpiCard label="Tracked with Location" value={STAFF.length - 3} icon={Navigation} tone="purple" />
+        <CrmKpiCard label="Out of Office" value="3" icon={Briefcase} tone="amber" />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-2.5">

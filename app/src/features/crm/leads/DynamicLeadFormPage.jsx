@@ -144,7 +144,7 @@ export default function DynamicLeadFormPage({
   }, [sections]);
 
   return (
-    <section className="w-full max-w-5xl mx-auto py-4">
+    <section className="w-full">
       {/* Top Bar */}
       <div className="flex items-center justify-between mb-6">
         <button

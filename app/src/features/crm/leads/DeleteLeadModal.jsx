@@ -27,6 +27,9 @@ export default function DeleteLeadModal({ lead, leads = [], onClose, onConfirm, 
           Are you sure you want to delete <strong>{isBulk ? recordLabel : lead.name}</strong>? This action cannot be undone.
         </p>
         <div className="delete-lead-actions">
+          <button type="button" className="btn-outline" onClick={onClose}>
+            Cancel
+          </button>
           <button
             type="button"
             className="delete-confirm-btn"
