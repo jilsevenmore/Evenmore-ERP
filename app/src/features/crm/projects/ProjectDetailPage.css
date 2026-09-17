@@ -1,0 +1,54 @@
+.project-mobile-navigation,
+.project-navigation-backdrop {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .app-shell:has(.crm-project-detail) {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .app-shell:has(.crm-project-detail) > .sidebar {
+    display: none;
+  }
+
+  .app-shell:has(.crm-project-detail[data-navigation-open="true"]) > .sidebar {
+    display: flex;
+    position: fixed;
+    width: min(280px, calc(100vw - 70px));
+    inset: 0 auto 0 0;
+    height: 100dvh;
+    z-index: 60;
+  }
+
+  .app-shell:has(.crm-project-detail) .content {
+    padding: 16px 12px 24px;
+  }
+
+  .app-shell:has(.crm-project-detail) .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  .app-shell:has(.crm-project-detail) .top-search {
+    display: none;
+  }
+
+  .crm-project-detail .project-mobile-navigation {
+    display: inline-flex;
+    position: fixed;
+    right: 12px;
+    bottom: 80px;
+    z-index: 70;
+    background: var(--card);
+    box-shadow: var(--shadow-modal);
+  }
+
+  .crm-project-detail .project-navigation-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    background: rgb(15 23 42 / 40%);
+  }
+}

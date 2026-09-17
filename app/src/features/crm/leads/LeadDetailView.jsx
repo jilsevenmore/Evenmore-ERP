@@ -1,3 +1,4 @@
+import { findDealForLead } from '../../../services/dealService';
 import CrmKpiCard from '../common/CrmKpiCard';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -65,7 +66,7 @@ import { employeesMock } from '../../../data/hrms/mocks/data';
 import { LineItemEditor } from '../../../components/common/LineItemEditor';
 import { loadCrmTasks, saveCrmTasks, runLeadStageAutomation, TASK_SOURCE_AUTOMATION } from '../../../services/leadStageAutomation';
 import { useAppStore } from '../../../stores/appStore';
-import { completeTaskWithOutcome, NEXT_ACTION_LABELS } from '../../../services/taskCompletionService';
+import { completeTaskWithOutcome, NEXT_ACTION_LABELS, getLeadStageOrder } from '../../../services/taskCompletionService';
 import CompleteTaskModal from '../tasks/CompleteTaskModal';
 
 const DETAIL_TABS = [
@@ -3679,12 +3680,15 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     challans: lead?.deliveryChallansCount ?? 0,
   }));
   const [activities, setActivities] = useState(() => (storedDetailState.activities || buildSeedActivities(lead)));
+  const [convertedDeal, setConvertedDeal] = useState(() => findDealForLead(lead?.id));
 
   const logActivity = React.useCallback((title, color) => {
     if (!title) return;
     const entry = { id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' };
     setActivities((current) => {
-      const next = [entry, ...current];
+      const persisted = loadStoredLeadDetails()[String(viewLead?.id ?? lead?.id)]?.activities || [];
+      const merged = new Map([...current, ...persisted].map((item) => [item.id, item]));
+      const next = [entry, ...merged.values()];
       updateStoredLeadDetail(viewLead?.id ?? lead?.id, { activities: next });
       return next;
     });
@@ -3711,7 +3715,11 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     function syncFromStore() {
       const target = viewLead ?? lead;
       if (!target?.id) return;
+      const freshLead = loadStoredLeadRows().find((row) => String(row.id) === String(target.id));
+      if (freshLead) setViewLead((current) => JSON.stringify(current) === JSON.stringify(freshLead) ? current : freshLead);
       const fresh = loadLeadDetailState(target);
+      setConvertedDeal(findDealForLead(target.id));
+
       setActivities((current) => {
         const incoming = fresh.activities || buildSeedActivities(target);
         if (JSON.stringify(incoming) === JSON.stringify(current)) return current;
@@ -3856,6 +3864,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
   return (
     <div className="space-y-4">
+      <div className="card p-3 text-xs text-slate-600">
+        {convertedDeal ? <>Converted to Deal: {convertedDeal.id} <Link className="ml-2 text-blue-600 hover:underline" to={`/crm/deals?deal=${encodeURIComponent(convertedDeal.id)}`}>View Deal</Link></> : 'Not converted / No Deal'}
+      </div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
         <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <Link to="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
@@ -4059,13 +4070,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Lead Status
                 <select className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white" value={editForm.status} onChange={(e) => updateEditField('status', e.target.value)}>
-                  <option value="New">New</option>
-                  <option value="Contacted">Contacted</option>
-                  <option value="Qualified">Qualified</option>
-                  <option value="Proposal">Proposal</option>
-                  <option value="Converted">Converted</option>
-                  <option value="Lost">Lost</option>
-                  <option value="Lost Lead">Lost Lead</option>
+                  {Array.from(new Set([editForm.status, ...getLeadStageOrder()].filter(Boolean))).map((stage) => (
+                    <option key={stage} value={stage}>{stage}</option>
+                  ))}
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">

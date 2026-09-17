@@ -1,3 +1,6 @@
+import { convertLeadToDealIfNeeded } from './leadDealConversion.js';
+import { useAppStore } from '../stores/appStore';
+
 /**
  * leadStageAutomation.js — CRM Lead Stage Task Automation Engine
  *
@@ -394,6 +397,13 @@ export function runLeadStageAutomation(lead, targetStage, options = {}) {
 
   const normalizedStage = normalizeStageName(targetStage || lead.status);
   const normalizedPrevStage = options.previousStage ? normalizeStageName(options.previousStage) : null;
+
+  try {
+    convertLeadToDealIfNeeded(lead, { targetStage: targetStage || lead.status, stages: loadLeadStageTasksConfig() });
+  } catch (error) {
+    console.error('[CRM Conversion] Lead conversion failed:', lead.id, error);
+    useAppStore.getState().showToast(`Lead could not be converted to a Deal: ${error.message}`);
+  }
 
   // If stage didn't change and previousStage was passed, ignore
   if (normalizedPrevStage && normalizedStage === normalizedPrevStage) {

@@ -1,7 +1,8 @@
+import DealProjectHandoff from './DealProjectHandoff';
 import CrmKpiCard from '../common/CrmKpiCard';
 import Modal from '../../../components/ui/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -37,7 +38,7 @@ import {
   Info,
 } from 'lucide-react';
 
-const STORAGE_KEY = 'evenmore_crm_deals_v2';
+import { DEALS_STORAGE_KEY as STORAGE_KEY, loadDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
 
 const STAGES = ['Draft', 'Sent', 'Open', 'Won', 'Lost'];
 const PRODUCTS = ['All Products', 'Diamond Jewelry', 'Gold Ornaments', 'Silver Collection', 'Laser Machine', 'CNC Spindle', 'AMC Service'];
@@ -92,429 +93,6 @@ const STAGE_STYLES = {
   },
 };
 
-const INITIAL_DEALS = [
-  {
-    id: 'dl-101',
-    name: 'Diamond Ring Inquiry',
-    price: 500000,
-    client: 'Priya Patel',
-    initials: 'PP',
-    avatarColor: 'bg-blue-100 text-blue-700',
-    stage: 'Draft',
-    date: '15 Sep 2025',
-    phone: '+91 98765 43210',
-    product: 'Diamond Jewelry',
-    source: 'Website',
-    assignedUser: 'Priya Patel',
-  },
-  {
-    id: 'dl-102',
-    name: 'Custom Pendant',
-    price: 320000,
-    client: 'Rohit Sharma',
-    initials: 'RS',
-    avatarColor: 'bg-purple-100 text-purple-700',
-    stage: 'Draft',
-    date: '16 Sep 2025',
-    phone: '+91 98765 43211',
-    product: 'Gold Ornaments',
-    source: 'Referral',
-    assignedUser: 'Rohit Sharma',
-  },
-  {
-    id: 'dl-103',
-    name: 'Bracelet Collection',
-    price: 875000,
-    client: 'Neha Shah',
-    initials: 'NS',
-    avatarColor: 'bg-indigo-100 text-indigo-700',
-    stage: 'Draft',
-    date: '17 Sep 2025',
-    phone: '+91 98765 43212',
-    product: 'Silver Collection',
-    source: 'Walk-in',
-    assignedUser: 'Jayesh Patel',
-  },
-  {
-    id: 'dl-104',
-    name: 'Laser Cutting Spare Rig',
-    price: 650000,
-    client: 'Amit Bhai',
-    initials: 'AB',
-    avatarColor: 'bg-amber-100 text-amber-700',
-    stage: 'Draft',
-    date: '18 Sep 2025',
-    phone: '+91 98765 43213',
-    product: 'Laser Machine',
-    source: 'Website',
-    assignedUser: 'Priya Patel',
-  },
-  {
-    id: 'dl-105',
-    name: 'Fiber Optics Lens Set',
-    price: 450000,
-    client: 'Kavita Desai',
-    initials: 'KD',
-    avatarColor: 'bg-emerald-100 text-emerald-700',
-    stage: 'Draft',
-    date: '19 Sep 2025',
-    phone: '+91 98765 43214',
-    product: 'CNC Spindle',
-    source: 'Referral',
-    assignedUser: 'Kavita Desai',
-  },
-  {
-    id: 'dl-106',
-    name: 'CNC Router Maintenance',
-    price: 455000,
-    client: 'Utsav Faldu',
-    initials: 'UF',
-    avatarColor: 'bg-rose-100 text-rose-700',
-    stage: 'Draft',
-    date: '20 Sep 2025',
-    phone: '+91 98765 43215',
-    product: 'AMC Service',
-    source: 'Trade Show',
-    assignedUser: 'Utsav Faldu',
-  },
-
-  {
-    id: 'dl-201',
-    name: 'Engagement Ring',
-    price: 750000,
-    client: 'Jayesh Patel',
-    initials: 'JP',
-    avatarColor: 'bg-purple-100 text-purple-700',
-    stage: 'Sent',
-    date: '14 Sep 2025',
-    phone: '+91 98765 43216',
-    product: 'Diamond Jewelry',
-    source: 'Website',
-    assignedUser: 'Jayesh Patel',
-  },
-  {
-    id: 'dl-202',
-    name: 'Earrings Set',
-    price: 425000,
-    client: 'Amit Kumar',
-    initials: 'AK',
-    avatarColor: 'bg-rose-100 text-rose-700',
-    stage: 'Sent',
-    date: '15 Sep 2025',
-    phone: '+91 98765 43217',
-    product: 'Gold Ornaments',
-    source: 'Walk-in',
-    assignedUser: 'Amit Kumar',
-  },
-  {
-    id: 'dl-203',
-    name: 'Gold Chain',
-    price: 630000,
-    client: 'Sneha Mehta',
-    initials: 'SM',
-    avatarColor: 'bg-purple-100 text-purple-700',
-    stage: 'Sent',
-    date: '15 Sep 2025',
-    phone: '+91 98765 43218',
-    product: 'Gold Ornaments',
-    source: 'Referral',
-    assignedUser: 'Jayesh Patel',
-  },
-  {
-    id: 'dl-204',
-    name: 'Platinum Band Order',
-    price: 890000,
-    client: 'Dr. Deepan',
-    initials: 'DD',
-    avatarColor: 'bg-sky-100 text-sky-700',
-    stage: 'Sent',
-    date: '16 Sep 2025',
-    phone: '+91 98765 43219',
-    product: 'Diamond Jewelry',
-    source: 'Cold Call',
-    assignedUser: 'Priya Patel',
-  },
-  {
-    id: 'dl-205',
-    name: 'Jewelry Marker 50W',
-    price: 600000,
-    client: 'Vruti Lakhani',
-    initials: 'VL',
-    avatarColor: 'bg-amber-100 text-amber-700',
-    stage: 'Sent',
-    date: '17 Sep 2025',
-    phone: '+91 98765 43220',
-    product: 'Laser Machine',
-    source: 'Website',
-    assignedUser: 'Hetal Patel',
-  },
-  {
-    id: 'dl-206',
-    name: 'Industrial Laser Bed',
-    price: 525000,
-    client: 'Pooja Verma',
-    initials: 'PV',
-    avatarColor: 'bg-emerald-100 text-emerald-700',
-    stage: 'Sent',
-    date: '18 Sep 2025',
-    phone: '+91 98765 43221',
-    product: 'Laser Machine',
-    source: 'Social Media',
-    assignedUser: 'Rohit Sharma',
-  },
-  {
-    id: 'dl-207',
-    name: 'Optical Sensor Upgrade',
-    price: 480000,
-    client: 'Ankur Jain',
-    initials: 'AJ',
-    avatarColor: 'bg-blue-100 text-blue-700',
-    stage: 'Sent',
-    date: '19 Sep 2025',
-    phone: '+91 98765 43222',
-    product: 'CNC Spindle',
-    source: 'Referral',
-    assignedUser: 'Ankush Jain',
-  },
-  {
-    id: 'dl-208',
-    name: 'Rotary Tooling Pack',
-    price: 520000,
-    client: 'Nikhil Patil',
-    initials: 'NP',
-    avatarColor: 'bg-rose-100 text-rose-700',
-    stage: 'Sent',
-    date: '20 Sep 2025',
-    phone: '+91 98765 43223',
-    product: 'AMC Service',
-    source: 'Trade Show',
-    assignedUser: 'Nikhil Patil',
-  },
-
-  {
-    id: 'dl-301',
-    name: 'Wedding Set',
-    price: 1250000,
-    client: 'Kavita Desai',
-    initials: 'KD',
-    avatarColor: 'bg-amber-100 text-amber-700',
-    stage: 'Open',
-    date: '14 Sep 2025',
-    phone: '+91 98765 43224',
-    product: 'Diamond Jewelry',
-    source: 'Walk-in',
-    assignedUser: 'Kavita Desai',
-  },
-  {
-    id: 'dl-302',
-    name: 'Solitaire Ring',
-    price: 890000,
-    client: 'Utsav Faldu',
-    initials: 'UF',
-    avatarColor: 'bg-blue-100 text-blue-700',
-    tag: 'Hot',
-    stage: 'Open',
-    date: '13 Sep 2025',
-    phone: '+91 98765 43225',
-    product: 'Diamond Jewelry',
-    source: 'Referral',
-    assignedUser: 'Utsav Faldu',
-  },
-  {
-    id: 'dl-303',
-    name: 'Diamond Necklace',
-    price: 1875000,
-    client: 'Chetan Chaudhari',
-    initials: 'CC',
-    avatarColor: 'bg-indigo-100 text-indigo-700',
-    stage: 'Open',
-    date: '12 Sep 2025',
-    phone: '+91 98765 43226',
-    product: 'Diamond Jewelry',
-    source: 'Website',
-    assignedUser: 'Jayesh Patel',
-  },
-  {
-    id: 'dl-304',
-    name: 'Custom Laser Unit',
-    price: 1000000,
-    client: 'Alpha Corp',
-    initials: 'AC',
-    avatarColor: 'bg-emerald-100 text-emerald-700',
-    stage: 'Open',
-    date: '14 Sep 2025',
-    phone: '+91 98765 43227',
-    product: 'Laser Machine',
-    source: 'Cold Call',
-    assignedUser: 'Priya Patel',
-  },
-  {
-    id: 'dl-305',
-    name: 'CNC Spindle Rig',
-    price: 515000,
-    client: 'Rohit Traders',
-    initials: 'RT',
-    avatarColor: 'bg-amber-100 text-amber-700',
-    stage: 'Open',
-    date: '15 Sep 2025',
-    phone: '+91 98765 43228',
-    product: 'CNC Spindle',
-    source: 'Referral',
-    assignedUser: 'Rohit Sharma',
-  },
-  {
-    id: 'dl-306',
-    name: 'Gold Bangle Set',
-    price: 750000,
-    client: 'Sunita Jain',
-    initials: 'SJ',
-    avatarColor: 'bg-purple-100 text-purple-700',
-    stage: 'Open',
-    date: '16 Sep 2025',
-    phone: '+91 98765 43229',
-    product: 'Gold Ornaments',
-    source: 'Walk-in',
-    assignedUser: 'Kavita Desai',
-  },
-
-  {
-    id: 'dl-401',
-    name: 'Anniversary Ring',
-    price: 980000,
-    client: 'Hetal Patel',
-    initials: 'HP',
-    avatarColor: 'bg-rose-100 text-rose-700',
-    tag: 'Won',
-    stage: 'Won',
-    date: '10 Sep 2025',
-    phone: '+91 98765 43230',
-    product: 'Diamond Jewelry',
-    source: 'Website',
-    assignedUser: 'Hetal Patel',
-  },
-  {
-    id: 'dl-402',
-    name: 'Office Bulk Order',
-    price: 2500000,
-    client: 'Dr. Meera',
-    initials: 'DM',
-    avatarColor: 'bg-amber-100 text-amber-700',
-    tag: 'Won',
-    stage: 'Won',
-    date: '09 Sep 2025',
-    phone: '+91 98765 43231',
-    product: 'Silver Collection',
-    source: 'Referral',
-    assignedUser: 'Dr. Meera',
-  },
-  {
-    id: 'dl-403',
-    name: 'Festival Collection',
-    price: 645000,
-    client: 'Rohit M Shreshth',
-    initials: 'RM',
-    avatarColor: 'bg-emerald-100 text-emerald-700',
-    tag: 'Won',
-    stage: 'Won',
-    date: '08 Sep 2025',
-    phone: '+91 98765 43232',
-    product: 'Gold Ornaments',
-    source: 'Social Media',
-    assignedUser: 'Rohit Sharma',
-  },
-  {
-    id: 'dl-404',
-    name: 'Corporate Gifting Silver',
-    price: 1550000,
-    client: 'Tata Auto Ltd',
-    initials: 'TA',
-    avatarColor: 'bg-blue-100 text-blue-700',
-    tag: 'Won',
-    stage: 'Won',
-    date: '07 Sep 2025',
-    phone: '+91 98765 43233',
-    product: 'Silver Collection',
-    source: 'Trade Show',
-    assignedUser: 'Jayesh Patel',
-  },
-  {
-    id: 'dl-405',
-    name: 'Laser Precision Head',
-    price: 1825000,
-    client: 'Apex Tools',
-    initials: 'AT',
-    avatarColor: 'bg-indigo-100 text-indigo-700',
-    tag: 'Won',
-    stage: 'Won',
-    date: '06 Sep 2025',
-    phone: '+91 98765 43234',
-    product: 'Laser Machine',
-    source: 'Website',
-    assignedUser: 'Priya Patel',
-  },
-  {
-    id: 'dl-406',
-    name: 'Diamond Brooch Custom',
-    price: 1200000,
-    client: 'Sanjay Rawat',
-    initials: 'SR',
-    avatarColor: 'bg-purple-100 text-purple-700',
-    tag: 'Won',
-    stage: 'Won',
-    date: '05 Sep 2025',
-    phone: '+91 98765 43235',
-    product: 'Diamond Jewelry',
-    source: 'Walk-in',
-    assignedUser: 'Kavita Desai',
-  },
-
-  {
-    id: 'dl-501',
-    name: 'Silver Collection',
-    price: 450000,
-    client: 'Prashant Dudhagara',
-    initials: 'PD',
-    avatarColor: 'bg-rose-100 text-rose-700',
-    tag: 'Lost',
-    stage: 'Lost',
-    date: '10 Sep 2025',
-    phone: '+91 98765 43236',
-    product: 'Silver Collection',
-    source: 'Website',
-    assignedUser: 'Prashant Dudhagara',
-  },
-  {
-    id: 'dl-502',
-    name: "Men's Bracelet",
-    price: 320000,
-    client: 'Ankush Jain',
-    initials: 'AJ',
-    avatarColor: 'bg-indigo-100 text-indigo-700',
-    tag: 'Lost',
-    stage: 'Lost',
-    date: '08 Sep 2025',
-    phone: '+91 98765 43237',
-    product: 'Gold Ornaments',
-    source: 'Referral',
-    assignedUser: 'Ankush Jain',
-  },
-  {
-    id: 'dl-503',
-    name: 'Client - Retail Order',
-    price: 1070000,
-    client: 'Nikhil Patil',
-    initials: 'NP',
-    avatarColor: 'bg-rose-100 text-rose-700',
-    tag: 'Lost',
-    stage: 'Lost',
-    date: '07 Sep 2025',
-    phone: '+91 98765 43238',
-    product: 'Diamond Jewelry',
-    source: 'Cold Call',
-    assignedUser: 'Nikhil Patil',
-  },
-];
-
 function formatPriceINR(value) {
   const n = Number(value) || 0;
   return `₹ ${n.toLocaleString('en-IN')}`;
@@ -542,59 +120,33 @@ function formatStageSummary(totalAmount, count) {
   return `${count} deals • ${formatted}`;
 }
 
-function getInitialsFromName(name = '') {
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-function getAvatarColorFromName(name = '') {
-  const colors = [
-    'bg-blue-100 text-blue-700',
-    'bg-purple-100 text-purple-700',
-    'bg-amber-100 text-amber-700',
-    'bg-rose-100 text-rose-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-indigo-100 text-indigo-700',
-    'bg-sky-100 text-sky-700',
-  ];
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash += name.charCodeAt(i);
-  }
-  return colors[hash % colors.length];
-}
-
-const EMPTY_DEAL_FORM = {
-  name: '',
-  price: '',
-  client: '',
-  phone: '',
-  product: 'Diamond Jewelry',
-  stage: 'Draft',
-  source: 'Website',
-  assignedUser: 'Priya Patel',
-  date: '15 Sep 2025',
-  tag: '',
-};
-
 export default function DealsPage() {
   const [deals, setDeals] = useState(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
-    return INITIAL_DEALS;
+    try { return loadDeals(); } catch { return []; }
   });
 
   useEffect(() => {
     try {
+      loadDeals(); // Do not overwrite malformed saved data with an empty display fallback.
       localStorage.setItem(STORAGE_KEY, JSON.stringify(deals));
-    } catch {}
+    } catch (error) {
+      console.error('[CRM Deals] Persistence failed:', error);
+      setToastMessage('Deals could not be loaded or saved. Existing saved data has been preserved.');
+    }
   }, [deals]);
+
+  const [searchParams] = useSearchParams();
+  const linkedDealId = searchParams.get('deal');
+
+  useEffect(() => {
+    const sync = () => {
+      try { setDeals(loadDeals()); }
+      catch (error) { console.error('[CRM Deals] Refresh failed:', error); }
+    };
+    window.addEventListener('crm:data-updated', sync);
+    window.addEventListener('storage', sync);
+    return () => { window.removeEventListener('crm:data-updated', sync); window.removeEventListener('storage', sync); };
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState('All Products');
@@ -626,6 +178,18 @@ export default function DealsPage() {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
+
+  useEffect(() => {
+    if (!linkedDealId) return;
+    let deal;
+    try { deal = loadDeals().find((item) => item.id === linkedDealId); }
+    catch { return; }
+    if (deal) {
+      setEditingDeal(deal);
+      setFormState({ ...EMPTY_DEAL_FORM, ...deal });
+      setIsCreateModalOpen(true);
+    }
+  }, [linkedDealId]);
 
   const showNotification = (msg) => {
     setToastMessage(msg);
@@ -806,7 +370,7 @@ export default function DealsPage() {
       stage: deal.stage || 'Draft',
       source: deal.source || 'Website',
       assignedUser: deal.assignedUser || 'Priya Patel',
-      date: deal.date || '15 Sep 2025',
+      date: deal.date ?? '',
       tag: deal.tag || '',
     });
     setFormError('');
@@ -857,21 +421,7 @@ export default function DealsPage() {
       );
       showNotification(`Deal "${formState.name.trim()}" updated successfully!`);
     } else {
-      const newDeal = {
-        id: `dl-${Date.now()}`,
-        name: formState.name.trim(),
-        price: priceNum,
-        client: formState.client.trim(),
-        initials,
-        avatarColor,
-        phone: formState.phone.trim(),
-        product: formState.product,
-        stage: formState.stage,
-        source: formState.source,
-        assignedUser: formState.assignedUser,
-        date: formState.date || '15 Sep 2025',
-        tag: formState.stage === 'Won' ? 'Won' : formState.stage === 'Lost' ? 'Lost' : formState.tag || '',
-      };
+      const newDeal = buildDeal(formState);
       setDeals((prev) => [newDeal, ...prev]);
       showNotification(`New deal "${newDeal.name}" added!`);
     }
@@ -1547,6 +1097,7 @@ export default function DealsPage() {
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">
                 {editingDeal ? 'Edit Deal' : 'Create New Deal'}
+                {editingDeal?.leadId != null && <Link className="ml-3 text-xs text-blue-600 hover:underline" to={`/crm/leads/${editingDeal.leadId}`}>Source Lead: {editingDeal.leadNumber || editingDeal.leadId} - View Lead</Link>}
               </h3>
               <button
                 type="button"
@@ -1556,6 +1107,8 @@ export default function DealsPage() {
                 <X size={16} />
               </button>
             </div>
+
+            {editingDeal && <DealProjectHandoff key={editingDeal.id} deal={deals.find((item) => item.id === editingDeal.id) || editingDeal} onNotify={showNotification} />}
 
             {formError && (
               <div className="m-5 mb-0 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">
