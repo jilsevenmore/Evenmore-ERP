@@ -28,7 +28,7 @@ const purchaseBillGuide = {
     workflow: ['PO Issued', 'Physical Goods Intake', 'Vendor Bill Recorded', '3-Way Match Verified', 'Payment Disbursed'],
 };
 export const PurchaseBillsPage = () => {
-    const { purchaseBills, purchaseOrders, vendors, addPurchaseBill, cancelPurchaseBill, addPaymentOut, getBillOutstanding, getPoBilledStatus, paymentOuts, purchaseReturns, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { purchaseBills, purchaseOrders, vendors, addPurchaseBill, cancelPurchaseBill, addPaymentOut, getBillOutstanding, getPoBilledStatus, paymentOuts, purchaseReturns, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBill, setSelectedBill] = useState(null);
     const [showPayModal, setShowPayModal] = useState(null);
@@ -36,12 +36,12 @@ export const PurchaseBillsPage = () => {
     // Form state
     const [selectedPoId, setSelectedPoId] = useState('manual');
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
-    const [dueDate, setDueDate] = useState('30 Days from now');
+    const [dueDate, setDueDate] = useState(() => addDaysISO(getCurrentISODate(), 30));
     const [lineItems, setLineItems] = useState([]);
     // Payment form state
     const [payAmount, setPayAmount] = useState(0);
-    const [payMode, setPayMode] = useState('ACH');
-    const [payRef, setPayRef] = useState('ACH-9941');
+    const [payMode, setPayMode] = useState('Bank Transfer');
+    const [payRef, setPayRef] = useState('');
     const handleSelectPo = (poId) => {
         setSelectedPoId(poId);
         if (poId !== 'manual') {
@@ -74,7 +74,7 @@ export const PurchaseBillsPage = () => {
             vendor: vend?.name || 'Cisco Systems Direct',
             billDate: getCurrentDateFormatted(),
             date: getCurrentDateFormatted(),
-            dueDate: dueDate || '30 Days from now',
+            dueDate: dueDate || addDaysISO(getCurrentISODate(), 30),
             amount: totalAmt > 0 ? totalAmt : 5000,
             total: totalAmt > 0 ? totalAmt : 5000,
             paidAmount: 0,
@@ -414,7 +414,7 @@ export const PurchaseBillsPage = () => {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Due Date</label>
-                  <input type="text" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"/>
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"/>
                 </div>
               </div>
 

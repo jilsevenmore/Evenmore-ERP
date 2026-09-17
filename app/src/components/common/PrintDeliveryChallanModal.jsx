@@ -1,7 +1,16 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, Truck, ShieldCheck, FileText, MapPin } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
 
 export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
+    // [PHASE-2E.1] profile-driven letterhead (was hardcoded EVENMORE / US strings)
+    const { companyProfile } = useERP();
+    const companyName = companyProfile?.name || 'EVENMORE ENTERPRISES';
+    const companyShort = (companyName || 'E').trim().charAt(0).toUpperCase() || 'E';
+    const gstin = companyProfile?.gstin || '';
+    const pan = companyProfile?.pan || '';
+    const companyAddress = companyProfile?.address || '742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134';
+    const phone = companyProfile?.phone || '+1 (800) 555-0199';
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -54,20 +63,21 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                         <div className="space-y-1">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                                    E
+                                    {companyShort}
                                 </div>
                                 <div>
                                     <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
-                                        EVENMORE ENTERPRISES
+                                        {companyName}
                                     </h1>
                                     <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                                        Global Commercial Logistics & Warehousing Hub
+                                        Steel Fabrication & MS Table Manufacturing
                                     </p>
                                 </div>
                             </div>
+                            {/* [PHASE-2E.1] GSTIN now flows from companyProfile (was US-8849201-CORP) */}
                             <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                                <p>Corporate HQ: 742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134</p>
-                                <p>Tax Registration / GSTIN: US-8849201-CORP • Logistics Desk: +1 (800) 555-0199</p>
+                                <p>{companyAddress}</p>
+                                <p>Tax Registration / GSTIN: {gstin || '—'}{pan ? ` • PAN: ${pan}` : ''} • Logistics Desk: {phone}</p>
                             </div>
                         </div>
 

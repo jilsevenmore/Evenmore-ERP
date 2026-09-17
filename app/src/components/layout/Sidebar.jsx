@@ -40,6 +40,7 @@ import {
   Send,
   User,
   ShieldCheck,
+  PackageCheck, // [PHASE-2B] Goods Receipt (GRN) nav icon
   Calendar,
   Sliders,
   Search,
@@ -127,6 +128,8 @@ const NAV = [
     icon: Truck,
     children: [
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
+      // ── [PHASE-2B] New standalone Goods Receipt (GRN) nav entry ──
+      { label: 'Goods Receipt', icon: PackageCheck, to: '/purchase/receipts' },
       { label: 'Purchase Bills', icon: Receipt, to: '/purchase/bills' },
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
       { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },

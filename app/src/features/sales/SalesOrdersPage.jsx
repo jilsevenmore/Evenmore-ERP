@@ -32,7 +32,7 @@ const salesOrderGuide = {
 };
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
     const [stageFilter, setStageFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -40,7 +40,7 @@ export const SalesOrdersPage = () => {
     const [printSalesOrderTarget, setPrintSalesOrderTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
-    const [deliveryDate, setDeliveryDate] = useState('In 10 days');
+    const [deliveryDate, setDeliveryDate] = useState(() => addDaysISO(getCurrentISODate(), 10));
     const [lineItems, setLineItems] = useState([]);
     // Auto-PO Requisition Modal State
     const [autoPOState, setAutoPOState] = useState({ isOpen: false });
@@ -51,7 +51,7 @@ export const SalesOrdersPage = () => {
 
     const handleOpenCreateModal = () => {
         setSelectedCustomerId(customers[0]?.id || '');
-        setDeliveryDate('In 10 days');
+        setDeliveryDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
         setIsFullscreen(false);
         setShowAddModal(true);
@@ -60,14 +60,14 @@ export const SalesOrdersPage = () => {
     const handleCloseCreateModal = () => {
         setShowAddModal(false);
         setSelectedCustomerId(customers[0]?.id || '');
-        setDeliveryDate('In 10 days');
+        setDeliveryDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
         setIsFullscreen(false);
     };
 
     const handleCloneOrder = (order) => {
         setSelectedCustomerId(order.customerId || customers[0]?.id || '');
-        setDeliveryDate('In 10 days (Repeat Order)');
+        setDeliveryDate(order.deliveryDate || addDaysISO(getCurrentISODate(), 10));
         setLineItems((order.items || []).map((it) => ({
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -80,9 +80,9 @@ export const SalesOrdersPage = () => {
         const cust = selectedCustomer || customers[0];
         addSalesOrder({
             customerId: cust?.id,
-            customer: cust?.name || 'Acme Corp',
-            amount: totalAmt > 0 ? totalAmt : 5000,
-            deliveryDate: deliveryDate || 'In 10 days',
+            customer: cust?.name || 'Walk-in Customer',
+            amount: totalAmt > 0 ? totalAmt : 0,
+            deliveryDate: deliveryDate || addDaysISO(getCurrentISODate(), 10),
             stage: 'Draft',
             status: 'Draft',
             paymentStatus: 'Unpaid',
@@ -479,7 +479,7 @@ export const SalesOrdersPage = () => {
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Target Delivery Date</label>
-                  <input type="text" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} placeholder="e.g. In 10 days" className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
               </div>
 
@@ -489,7 +489,7 @@ export const SalesOrdersPage = () => {
                   <div className="space-y-0.5">
                     <p className="font-bold">Credit Limit Guard Warning</p>
                     <p className="text-[11px] text-rose-700">
-                      Customer current outstanding (${selectedCustomer.balance.toLocaleString()}) + this order (${totalAmt.toLocaleString()}) = ${(selectedCustomer.balance + totalAmt).toLocaleString()}, which exceeds the approved credit limit (${creditLimit.toLocaleString()}).
+                      Customer current outstanding ({formatCurrency(selectedCustomer.balance)}) + this order ({formatCurrency(totalAmt)}) = {formatCurrency(selectedCustomer.balance + totalAmt)}, which exceeds the approved credit limit ({formatCurrency(creditLimit)}).
                     </p>
                   </div>
                 </div>)}

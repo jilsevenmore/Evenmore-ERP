@@ -1,3 +1,8 @@
+/**
+ * [PHASE-4] LEGACY ORPHAN — this component is NOT routed or imported anywhere.
+ *   Superseded by the ERP-scope Sales Dashboard (features/sales/DashboardPage.jsx).
+ *   Kept for reference per the no-delete rule. Do not route it without review.
+ */
 import React from 'react';
 import { AlertTriangle, Receipt, GitPullRequest, ArrowRight, ShieldCheck, ArrowUpRight, } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
-import { Building, Bell, Database, Save, Check, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Building, Bell, Database, Save, Check, RotateCcw, AlertTriangle, MapPin, Phone, Hash } from 'lucide-react';
 export const SettingsPage = () => {
     const {
         resetDemoData,
@@ -9,18 +9,33 @@ export const SettingsPage = () => {
         importDatabaseSnapshot,
         currency: globalCurrency,
         setCurrency: setGlobalCurrency,
+        companyProfile,
+        setCompanyProfile,
         showToast,
     } = useERP();
     const [saved, setSaved] = useState(false);
-    const [companyName, setCompanyName] = useState('Horizon Global Industrial Corp');
-    const [currency, setCurrency] = useState(globalCurrency || 'USD ($)');
-    const [fiscalYear, setFiscalYear] = useState('Jan - Dec');
+    const [companyName, setCompanyName] = useState(companyProfile?.name || 'Sweven Fabricators Pvt Ltd');
+    const [gstin, setGstin] = useState(companyProfile?.gstin || '');
+    const [pan, setPan] = useState(companyProfile?.pan || '');
+    const [address, setAddress] = useState(companyProfile?.address || '');
+    const [phone, setPhone] = useState(companyProfile?.phone || '');
+    const [currency, setCurrency] = useState(globalCurrency || 'INR (₹)');
+    const [fiscalYear, setFiscalYear] = useState('Apr - Mar');
     const [autoReorder, setAutoReorder] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(true);
     const [showConfirmReset, setShowConfirmReset] = useState(false);
     const handleSave = (e) => {
         e.preventDefault();
         setGlobalCurrency(currency);
+        if (typeof setCompanyProfile === 'function') {
+            setCompanyProfile({
+                name: companyName,
+                gstin,
+                pan,
+                address,
+                phone,
+            });
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
     };
@@ -52,10 +67,10 @@ export const SettingsPage = () => {
             <div>
               <label className="font-semibold text-slate-700 block mb-1">Base Currency</label>
               <select value={currency} onChange={(e) => setCurrency(e.target.value)} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]">
+                <option value="INR (₹)">INR (₹) - Indian Rupee</option>
                 <option value="USD ($)">USD ($) - United States Dollar</option>
                 <option value="EUR (€)">EUR (€) - Euro</option>
                 <option value="GBP (£)">GBP (£) - British Pound</option>
-                <option value="INR (₹)">INR (₹) - Indian Rupee</option>
               </select>
             </div>
             <div>
@@ -63,8 +78,20 @@ export const SettingsPage = () => {
               <input type="text" value={fiscalYear} onChange={(e) => setFiscalYear(e.target.value)} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
             </div>
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Tax ID / VAT Registration</label>
-              <input type="text" defaultValue="US-991283912-TX" className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
+              <label className="font-semibold text-slate-700 block mb-1">GSTIN (Tax Registration)</label>
+              <input type="text" value={gstin} onChange={(e) => setGstin(e.target.value)} placeholder="e.g. 29AABCU8912E1ZB" className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
+            </div>
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">PAN</label>
+              <input type="text" value={pan} onChange={(e) => setPan(e.target.value)} placeholder="e.g. AABCU8912E" className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
+            </div>
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Business Phone</label>
+              <input type="text" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +91 22 4000 0000" className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="font-semibold text-slate-700 block mb-1">Registered Address</label>
+              <textarea value={address} onChange={(e) => setAddress(e.target.value)} rows={2} placeholder="Line 1, Line 2, City, State, PIN" className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
             </div>
           </div>
         </div>

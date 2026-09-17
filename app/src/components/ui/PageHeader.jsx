@@ -1,6 +1,4 @@
-/**
- * PageHeader — Canonical CRM & ERP Page Header with safe breadcrumbs & guide modal support.
- */
+import React from 'react';
 import { ChevronRight } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { toTitleCase, safeString } from '../../utils/stringUtils';

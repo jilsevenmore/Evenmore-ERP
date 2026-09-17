@@ -1,8 +1,17 @@
 import React, { useEffect } from 'react';
 import { X, Printer, ShieldCheck, FileCheck, Award, Send, Check } from 'lucide-react';
 import { formatDisplayDate, getWarrantyStatusStyle, formatWarrantyPeriod } from '../../utils/warrantyUtils';
+import { useERP } from '../../context/ERPContext';
 
 export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null }) => {
+    // [PHASE-2E.1] company identity flows from companyProfile (was hardcoded Horizon US strings)
+    const { companyProfile } = useERP();
+    const companyName = companyProfile?.name || 'Horizon Enterprise Logistics';
+    const companyShort = (companyName || 'H').trim().charAt(0).toUpperCase() || 'H';
+    const gstin = companyProfile?.gstin || '';
+    const pan = companyProfile?.pan || '';
+    const companyAddress = companyProfile?.address || '742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134 • USA';
+    const phone = companyProfile?.phone || '+1 (800) 555-0199';
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -73,20 +82,21 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                         <div className="space-y-1.5">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xl font-mono shadow-sm">
-                                    H
+                                    {companyShort}
                                 </div>
                                 <div>
                                     <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight uppercase">
-                                        HORIZON ENTERPRISE LOGISTICS
+                                        {companyName}
                                     </h1>
                                     <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
                                         Industrial Systems & Equipment Quality Division
                                     </p>
                                 </div>
                             </div>
+                            {/* [PHASE-2E.1] company GSTIN now from companyProfile (was US-8849201-CORP) */}
                             <div className="text-[11px] text-slate-500 space-y-0.5 pt-1">
-                                <p>742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134 • USA</p>
-                                <p>Corporate Registry: US-8849201-CORP • Support: support@horizon-systems.io</p>
+                                <p>{companyAddress}</p>
+                                <p>Corporate Registry: {gstin || '—'}{pan ? ` • PAN: ${pan}` : ''} • Support: support@sweven.in | {phone}</p>
                             </div>
                         </div>
 
