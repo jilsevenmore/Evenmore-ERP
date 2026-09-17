@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
+import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const MOCK_EMPLOYEES = [
   {
@@ -194,7 +196,10 @@ export default function Employees() {
       {/* Header Row */}
       <div className="emp-title-row">
         <div>
-          <h1 className="emp-title">Employee Directory</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="emp-title">Employee Directory</h1>
+            <PageInfoButton guide={hrmsGuides.employees} />
+          </div>
           <p className="emp-sub">
             {filtered.length} employees • 12 departments
           </p>

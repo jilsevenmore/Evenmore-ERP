@@ -3,6 +3,8 @@ import { ChevronRight, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
+import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const DEFAULT_EMPLOYEES = [
   {
@@ -143,7 +145,10 @@ export default function IndividualAttendance() {
       {/* Header Row */}
       <div className="ind-title-row">
         <div>
-          <h1 className="ind-title">Individual Attendance</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="ind-title">Individual Attendance</h1>
+            <PageInfoButton guide={hrmsGuides.attendanceIndividual} />
+          </div>
           <p className="ind-sub">View and manage per-employee attendance history.</p>
         </div>
       </div>

@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { useAppStore } from "../../../stores/appStore";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export default function Flexibility() {
   const flexibility = useAttendanceStore((s) => s.flexibility);
@@ -102,9 +104,12 @@ export default function Flexibility() {
 
         <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
           <div>
-            <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-              Attendance Flexibility Rules
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight">
+                Attendance Flexibility Rules
+              </h1>
+              <PageInfoButton guide={hrmsGuides.attendanceFlexibility} />
+            </div>
             <p className="text-[13px] text-slate-500 mt-0.5">
               Set organizational grace periods, work shifts, approval gates, and overtime thresholds.
             </p>

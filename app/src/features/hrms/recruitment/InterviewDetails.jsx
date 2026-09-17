@@ -5,6 +5,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { Button } from "../../../components/hrms/Button";
 import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   ArrowLeft,
   Calendar,
@@ -94,6 +96,7 @@ export default function InterviewDetails() {
                 <h1 className="text-xl font-bold text-slate-900 dark:text-white">
                   {it.candidateName}
                 </h1>
+                <PageInfoButton guide={hrmsGuides.interviewDetails} />
                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11.5px] font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800">
                   {it.type}
                 </span>

@@ -8,6 +8,8 @@ import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   Eye,
   Pencil,
@@ -460,8 +462,9 @@ export default function Appraisal() {
       {/* Header & Role Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <h1 className="text-[22px] font-bold text-slate-800">Performance Appraisal</h1>
+            <PageInfoButton guide={hrmsGuides.appraisal} />
             <button
               onClick={() => setScaleGuideOpen(true)}
               className="px-2 py-0.5 rounded-full text-[11px] bg-slate-100 text-slate-600 hover:bg-slate-200 transition font-medium flex items-center gap-1"

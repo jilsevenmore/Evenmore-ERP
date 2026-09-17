@@ -25,6 +25,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const STAGE_DROP_STYLES = {
   Requested: "ring-2 ring-slate-500/60 bg-slate-100/80 border-slate-400",
@@ -243,7 +245,10 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Training Funnel</h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Training Funnel</h1>
+              <PageInfoButton guide={hrmsGuides.trainingFunnel} />
+            </div>
             <div className="text-[13px] text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
               <Link to="/hrms/training" className="hover:text-navy hover:underline">
                 Dashboard

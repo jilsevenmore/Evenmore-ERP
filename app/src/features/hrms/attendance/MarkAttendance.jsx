@@ -3,6 +3,8 @@ import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
+import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const INITIAL_EMPLOYEES = [
   {
@@ -220,7 +222,10 @@ export default function MarkAttendance() {
       {/* Header Row */}
       <div className="mark-title-row">
         <div>
-          <h1 className="mark-title">Mark Attendance</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="mark-title">Mark Attendance</h1>
+            <PageInfoButton guide={hrmsGuides.attendanceMark} />
+          </div>
           <p className="mark-sub">Record daily employee attendance.</p>
         </div>
       </div>

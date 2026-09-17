@@ -4,6 +4,8 @@ import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
 import { Button } from "../../../components/ui/Button";
 import StatusBadge from "../../../components/ui/StatusBadge";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   ArrowLeft,
   FileText,
@@ -154,6 +156,7 @@ export default function CandidateDetails() {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-xl font-black text-text tracking-tight">{c.name}</h1>
+                <PageInfoButton guide={hrmsGuides.candidateDetails} />
                 <span className="font-mono text-xs px-2 py-0.5 bg-soft border border-border rounded-md text-muted">
                   {c.id}
                 </span>

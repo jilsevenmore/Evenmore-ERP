@@ -8,6 +8,8 @@ import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
 import { Eye, Pencil, Trash2, Star, Target, Sliders, Layers } from "lucide-react";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export default function Indicators() {
   const showToast = useAppStore((s) => s.showToast);
@@ -407,7 +409,10 @@ export default function Indicators() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-bold text-slate-800">Performance Indicators</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-800">Performance Indicators</h1>
+            <PageInfoButton guide={hrmsGuides.indicators} />
+          </div>
           <p className="text-[13px] text-slate-500 mt-0.5">
             Technical and organizational indicators with benchmarks, measurement types, and weightages.
           </p>

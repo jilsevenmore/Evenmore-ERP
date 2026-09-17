@@ -9,6 +9,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { useTrainingStore } from "../../../stores/trainingStore";
 import { useNavigate } from "react-router-dom";
 import { Eye, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export default function Trainers({ embedded = false, onBack }) {
   const showToast = useAppStore((s) => s.showToast);
@@ -94,7 +96,10 @@ export default function Trainers({ embedded = false, onBack }) {
 
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
-          <h1 className="text-[22px] font-bold text-slate-900">Trainer Directory</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-900">Trainer Directory</h1>
+            <PageInfoButton guide={hrmsGuides.trainers} />
+          </div>
           <p className="text-[13px] text-muted">{trainers.length} registered trainers across departments</p>
         </div>
         <div className="flex items-center gap-2">
