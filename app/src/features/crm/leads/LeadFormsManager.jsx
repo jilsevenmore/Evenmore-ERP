@@ -48,7 +48,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
   }, [forms, sortOrder, statusFilter]);
 
   return (
-    <section className="w-full max-w-none px-3 sm:px-4 lg:px-5 py-5">
+    <section className="w-full">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h1 className="text-[22px] sm:text-[24px] leading-tight font-bold text-slate-900 tracking-tight">
@@ -66,9 +66,11 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
             <button
               type="button"
               onClick={onOpenGuide}
-              className="inline-flex h-11 items-center justify-center rounded-[14px] border border-slate-200 bg-white px-4 text-sm font-semibold text-[#2f6fed] transition hover:bg-slate-50 cursor-pointer"
+              aria-haspopup="dialog"
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 cursor-pointer"
             >
-              How to create a form
+              <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">?</span>
+              <span>How to create a form?</span>
             </button>
           )}
 

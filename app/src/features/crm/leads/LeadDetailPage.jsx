@@ -25,7 +25,7 @@ export default function LeadDetailPage() {
 
   if (!activeLead) {
     return (
-      <div className="p-1">
+      <div>
         <div className="card p-8 text-center space-y-3">
           <h3 className="text-sm font-bold text-slate-900">Lead not found</h3>
           <p className="text-xs text-slate-500">This lead may have been deleted.</p>
@@ -38,7 +38,7 @@ export default function LeadDetailPage() {
   }
 
   return (
-    <div className="p-1">
+    <div>
       <LeadDetailView lead={activeLead} onBackToLeads={() => navigate('/crm/leads')} />
     </div>
   );
