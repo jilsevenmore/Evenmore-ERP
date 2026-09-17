@@ -8,6 +8,8 @@ import { Modal } from "../../../components/hrms/Modal";
 import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
 import { Eye, Pencil, Trash2, Target, Award, Layers } from "lucide-react";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export default function KpiData() {
   const showToast = useAppStore((s) => s.showToast);
@@ -343,7 +345,10 @@ export default function KpiData() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-bold text-slate-800">Key Performance Indicators (KPI Data)</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-800">Key Performance Indicators (KPI Data)</h1>
+            <PageInfoButton guide={hrmsGuides.kpiData} />
+          </div>
           <p className="text-[13px] text-slate-500 mt-0.5">
             Define organizational KPIs with targets, measurement scales, and department/role assignments.
           </p>

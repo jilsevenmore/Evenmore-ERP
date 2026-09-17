@@ -3,6 +3,8 @@ import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
+import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const INITIAL_EMPLOYEES = [
   { id: "EMP1024", name: "Priya Patel", dept: "Engineering", status: "Present", avatar: "https://randomuser.me/api/portraits/women/44.jpg" },
@@ -139,7 +141,10 @@ export default function BulkAttendance() {
       {/* Header Row */}
       <div className="bulk-title-row">
         <div>
-          <h1 className="bulk-title">Bulk Attendance</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="bulk-title">Bulk Attendance</h1>
+            <PageInfoButton guide={hrmsGuides.attendanceBulk} />
+          </div>
           <p className="bulk-sub">Update attendance for multiple employees at once.</p>
         </div>
       </div>
@@ -188,16 +193,6 @@ export default function BulkAttendance() {
 
       {/* Action & Selection Bar Card */}
       <div className="bulk-card bulk-action-card">
-        <label className="bulk-checkbox-label">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={(e) => toggleAll(e.target.checked)}
-            className="bulk-checkbox"
-          />
-          <span>Select All ({selectedIds.size} selected)</span>
-        </label>
-
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {/* Status Options Pills */}
           <div className="bulk-pills-group">
@@ -304,7 +299,7 @@ export default function BulkAttendance() {
         .bulk-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 100px; }
         .bulk-select:focus { border-color: #94a3b8; background-color: #fff; }
 
-        .bulk-action-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+        .bulk-action-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: flex-end; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .bulk-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #374151; cursor: pointer; user-select: none; }
         .bulk-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: #16233a; cursor: pointer; }
 

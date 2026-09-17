@@ -47,6 +47,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { usePolicyStore } from "../../../stores/policyStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 // Category icon helper
 function getCategoryIcon(catName) {
@@ -412,9 +414,12 @@ export function CompanyPolicyModule({ forcedSection }) {
             )}
           </nav>
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight">
-              Company Policy
-            </h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight">
+                Company Policy
+              </h1>
+              <PageInfoButton guide={hrmsGuides.companyPolicy} />
+            </div>
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 border border-bdr text-[11px] font-semibold text-slate-700">
               <Shield size={12} className="text-navy" /> Enterprise Governance
             </span>

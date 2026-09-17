@@ -1,10 +1,21 @@
 import { useState } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { Badge } from "../../../components/hrms/Badge";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 export function Locations() {
   const showToast = useAppStore((s) => s.showToast);
   return <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[24px] font-bold">Locations</h1><p className="text-[13px] text-muted">6 offices across 3 regions</p></div><button onClick={() => showToast("Add location")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Location</button></div>
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold">Locations</h1>
+            <PageInfoButton guide={hrmsGuides.locations} />
+          </div>
+          <p className="text-[13px] text-muted">6 offices across 3 regions</p>
+        </div>
+        <button onClick={() => showToast("Add location")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Location</button>
+      </div>
       <div className="grid md:grid-cols-2 gap-5">
         {[
     { name: "Headquarters \u2014 New York", addr: "350 5th Avenue, New York, NY 10118", tz: "EST \u2022 UTC-5", count: 342 },
@@ -23,7 +34,15 @@ export function Designations() {
     { title: "HR Operations Lead", level: "L6", dept: "HR", count: 4 }
   ]);
   return <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[24px] font-bold">Designations</h1><p className="text-[13px] text-muted">Define roles and hierarchy</p></div><button onClick={() => {
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold">Designations</h1>
+            <PageInfoButton guide={hrmsGuides.designations} />
+          </div>
+          <p className="text-[13px] text-muted">Define roles and hierarchy</p>
+        </div>
+        <button onClick={() => {
     const t = prompt("Title");
     if (t) setRows([...rows, { title: t, level: "L3", dept: "General", count: 0 }]);
   }} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Designation</button></div>
@@ -39,7 +58,16 @@ export function Designations() {
 export function Training() {
   const showToast = useAppStore((s) => s.showToast);
   return <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[24px] font-bold">Training Setup</h1><p className="text-[13px] text-muted">Programs, sessions, assessments & certificates</p></div><button onClick={() => showToast("Create program")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Create Program</button></div>
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold">Training Setup</h1>
+            <PageInfoButton guide={hrmsGuides.trainingDashboard} />
+          </div>
+          <p className="text-[13px] text-muted">Programs, sessions, assessments & certificates</p>
+        </div>
+        <button onClick={() => showToast("Create program")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Create Program</button>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">{[{ l: "Active Programs", v: "12" }, { l: "Enrolled", v: "186" }, { l: "Upcoming", v: "8" }, { l: "Completion", v: "74%" }, { l: "Certificates", v: "94" }].map((x) => <div key={x.l} className="bg-white border border-bdr rounded-xl p-4 shadow-sm"><div className="text-[12px] text-muted">{x.l}</div><div className="text-[20px] font-bold mt-1">{x.v}</div></div>)}</div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-hidden"><table className="w-full text-left text-[13px]"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Program</th><th className="py-3 px-5">Trainer</th><th className="py-3 px-5">Date</th><th className="py-3 px-5">Status</th></tr></thead>
         <tbody className="divide-y divide-bdr/40"><tr><td className="py-3 px-5 font-medium">Leadership Essentials</td><td className="py-3 px-5">Sarah Mitchell</td><td className="py-3 px-5">Oct 18 • 2 days</td><td className="py-3 px-5"><Badge tone="warning">Upcoming</Badge></td></tr><tr><td className="py-3 px-5 font-medium">Secure Coding 101</td><td className="py-3 px-5">David Park</td><td className="py-3 px-5">Oct 08 • 4h</td><td className="py-3 px-5"><Badge tone="success">Completed</Badge></td></tr></tbody>
@@ -48,7 +76,16 @@ export function Training() {
 }
 export function Assets() {
   return <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[24px] font-bold">Asset Setup</h1><p className="text-[13px] text-muted">Inventory, assignment, return & maintenance</p></div><button className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Asset</button></div>
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold">Asset Setup</h1>
+            <PageInfoButton guide={hrmsGuides.assets} />
+          </div>
+          <p className="text-[13px] text-muted">Inventory, assignment, return & maintenance</p>
+        </div>
+        <button className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Asset</button>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">{[{ l: "Total Assets", v: "342" }, { l: "Assigned", v: "248" }, { l: "Available", v: "72" }, { l: "Under Maintenance", v: "14" }, { l: "Lost/Damaged", v: "8" }].map((x) => <div key={x.l} className="bg-white border border-bdr rounded-xl p-4 shadow-sm"><div className="text-[12px] text-muted">{x.l}</div><div className="text-[20px] font-bold mt-1">{x.v}</div></div>)}</div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-hidden"><table className="w-full text-left text-[13px]"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Asset</th><th className="py-3 px-5">ID</th><th className="py-3 px-5">Category</th><th className="py-3 px-5">Assigned To</th><th className="py-3 px-5">Status</th></tr></thead>
         <tbody className="divide-y divide-bdr/40"><tr><td className="py-3 px-5">MacBook Pro 16" — Space Gray</td><td className="py-3 px-5 text-muted">AST-1001</td><td className="py-3 px-5">Laptop</td><td className="py-3 px-5">Priya Patel</td><td className="py-3 px-5"><Badge tone="success">Assigned</Badge></td></tr></tbody>
@@ -57,7 +94,16 @@ export function Assets() {
 }
 export function Documents() {
   return <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[24px] font-bold">Documents</h1><p className="text-[13px] text-muted">Versioning & expiry</p></div><button className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Upload Document</button></div>
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold">Documents</h1>
+            <PageInfoButton guide={hrmsGuides.documents} />
+          </div>
+          <p className="text-[13px] text-muted">Versioning & expiry</p>
+        </div>
+        <button className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Upload Document</button>
+      </div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-hidden"><table className="w-full text-left text-[13px]"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Document</th><th className="py-3 px-5">Employee</th><th className="py-3 px-5">Expiry</th><th className="py-3 px-5">Status</th></tr></thead>
         <tbody className="divide-y divide-bdr/40"><tr><td className="py-3 px-5">Employment Contract — Priya Patel</td><td className="py-3 px-5">Priya Patel</td><td className="py-3 px-5">—</td><td className="py-3 px-5"><Badge tone="success">Valid</Badge></td></tr><tr><td className="py-3 px-5">Work Permit — Chen Li</td><td className="py-3 px-5">Chen Li</td><td className="py-3 px-5">Nov 15, 2024</td><td className="py-3 px-5"><Badge tone="warning">Expiring Soon</Badge></td></tr><tr><td className="py-3 px-5">NDA — Rahul Verma</td><td className="py-3 px-5">Rahul Verma</td><td className="py-3 px-5">Expired Jan 02</td><td className="py-3 px-5"><Badge tone="danger">Expired</Badge></td></tr></tbody>
       </table></div>

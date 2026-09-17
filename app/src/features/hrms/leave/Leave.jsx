@@ -4,6 +4,8 @@ import { useCalendarStore } from "../../../stores/calendarStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   Calendar,
   Search,
@@ -374,7 +376,10 @@ export default function Leave() {
       {/* ── Top Header Bar ── */}
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h1 className="text-[24px] font-bold tracking-tight text-slate-900">Leave Management</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold tracking-tight text-slate-900">Leave Management</h1>
+            <PageInfoButton guide={hrmsGuides.leave} />
+          </div>
           <p className="text-[13px] text-muted">Apply, approve, monitor leave quotas, encashment, and comp-off credits</p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">

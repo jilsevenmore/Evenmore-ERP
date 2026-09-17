@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import Modal from '../../../components/ui/Modal';
+import PageInfoButton from '../../../components/common/PageInfoButton';
+import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import { Plus, MapPin, Search, Edit2, Trash2, Globe, Building } from 'lucide-react';
 
 const INITIAL_LOCATIONS = [
@@ -44,7 +46,10 @@ export function LocationsPage() {
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h1 className="text-[24px] font-bold tracking-tight">Locations</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold tracking-tight">Locations</h1>
+            <PageInfoButton guide={hrmsGuides.locations} />
+          </div>
           <p className="text-[13px] text-muted">
             {locations.length} global offices and distributed workspaces
           </p>

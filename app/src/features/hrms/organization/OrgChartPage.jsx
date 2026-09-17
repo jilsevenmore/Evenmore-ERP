@@ -19,6 +19,8 @@ import {
   Printer,
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
+import PageInfoButton from '../../../components/common/PageInfoButton';
+import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 
 const INITIAL_TREE = {
   id: 'EMP1031',
@@ -277,7 +279,10 @@ export function OrgChartPage() {
       {/* ── Page Header ─────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
-          <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Org Chart</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Org Chart</h1>
+            <PageInfoButton guide={hrmsGuides.orgChart} />
+          </div>
           <p className="text-[13px] text-muted mt-1">
             {departmentCount} Departments • 1,248 Employees • Last updated Oct 11, 2024
           </p>
