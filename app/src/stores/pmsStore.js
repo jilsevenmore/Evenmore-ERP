@@ -440,6 +440,201 @@ export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
 }
 
+// ─── Stage 11 Workspaces & Analytics ─────────────────────────
+
+/**
+ * Bucket a contributor's tasks for the My Tasks workbench.
+ *
+ * Overdue work is folded into Due Today rather than given its own bucket, so
+ * the top group is always "what needs attention now".
+ */
+export function groupMyTasks(tasks = [], now = Date.now()) {
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = startOfToday.getTime() + MS_PER_DAY;
+
+  const groups = { dueToday: [], inProgress: [], upcoming: [], completed: [] };
+
+  for (const task of tasks) {
+    if (task.status === "Completed") {
+      groups.completed.push(task);
+      continue;
+    }
+    const due = toDate(task.dueDate)?.getTime() ?? null;
+    if (due != null && due < endOfToday) groups.dueToday.push(task);
+    else if (task.status === "In Progress" || task.status === "Blocked") {
+      groups.inProgress.push(task);
+    } else groups.upcoming.push(task);
+  }
+
+  // An undated task is the least urgent, not the most, so it sorts last in
+  // every bucket rather than being treated as due at the epoch.
+  const dueMs = (t) => toDate(t.dueDate)?.getTime() ?? null;
+  const compare = (a, b, direction) => {
+    const x = dueMs(a);
+    const y = dueMs(b);
+    if (x === null && y === null) return 0;
+    if (x === null) return 1;
+    if (y === null) return -1;
+    return direction * (x - y);
+  };
+
+  groups.dueToday.sort((a, b) => compare(a, b, 1));
+  groups.inProgress.sort((a, b) => compare(a, b, 1));
+  groups.upcoming.sort((a, b) => compare(a, b, 1));
+  groups.completed.sort((a, b) => compare(a, b, -1));
+  return groups;
+}
+
+/** On-time versus delayed delivery across completed projects. */
+export function computeVelocityReport(projects = []) {
+  let onTime = 0;
+  let delayed = 0;
+
+  for (const p of projects) {
+    if (p.status !== "Completed" || !p.actualCompletionDate) continue;
+    const expected = toDate(p.expectedCompletionDate);
+    const actual = toDate(p.actualCompletionDate);
+    if (!expected || !actual) continue;
+    if (actual.getTime() <= expected.getTime()) onTime += 1;
+    else delayed += 1;
+  }
+
+  const completed = onTime + delayed;
+  return {
+    completed,
+    onTime,
+    delayed,
+    onTimePct: completed > 0 ? Math.round((onTime / completed) * 100) : 0,
+  };
+}
+
+/**
+ * Average cycle time per department, measured only on stages that actually
+ * finished — an unfinished stage has no cycle time yet, and counting it as
+ * "so far" would flatter slow departments.
+ */
+export function computeStageBottlenecks(projects = []) {
+  const byDepartment = new Map();
+
+  for (const p of projects) {
+    for (const stage of p.stages ?? []) {
+      const start = toDate(stage.startDateTime);
+      const end = toDate(stage.actualCompletionDateTime);
+      if (!start || !end) continue;
+
+      const dept = stage.department ?? "Unassigned";
+      const entry = byDepartment.get(dept) ?? { department: dept, totalMs: 0, samples: 0, plannedMs: 0 };
+      entry.totalMs += Math.max(0, end.getTime() - start.getTime());
+      entry.plannedMs += durationToMs(stage.plannedDuration, stage.durationUnit);
+      entry.samples += 1;
+      byDepartment.set(dept, entry);
+    }
+  }
+
+  return [...byDepartment.values()]
+    .map((e) => {
+      const avgMs = e.samples > 0 ? e.totalMs / e.samples : 0;
+      const avgPlannedMs = e.samples > 0 ? e.plannedMs / e.samples : 0;
+      return {
+        department: e.department,
+        samples: e.samples,
+        avgCycleMs: avgMs,
+        avgCycleDays: Math.round((avgMs / MS_PER_DAY) * 10) / 10,
+        avgPlannedDays: Math.round((avgPlannedMs / MS_PER_DAY) * 10) / 10,
+        // >100% means the department routinely overruns its own estimate.
+        scheduleRatioPct: avgPlannedMs > 0 ? Math.round((avgMs / avgPlannedMs) * 100) : 0,
+      };
+    })
+    .sort((a, b) => b.avgCycleMs - a.avgCycleMs);
+}
+
+/**
+ * Delay causes ranked by frequency with a running cumulative share.
+ *
+ * Both measures are percentages of the same total, so the bars and the
+ * cumulative curve share one 0–100 axis — no second scale.
+ */
+export function computeDelayPareto(projects = []) {
+  const counts = new Map();
+  let total = 0;
+
+  for (const p of projects) {
+    for (const stage of p.stages ?? []) {
+      const details = stage.delayDetails;
+      if (!details || (!details.isDelayed && !details.reason)) continue;
+      const category = details.category ?? "Other";
+      counts.set(category, (counts.get(category) ?? 0) + 1);
+      total += 1;
+    }
+  }
+
+  const rows = [...counts.entries()]
+    .map(([category, count]) => ({ category, count, sharePct: Math.round((count / total) * 100) }))
+    .sort((a, b) => b.count - a.count);
+
+  let running = 0;
+  return rows.map((r) => {
+    running += r.count;
+    return { ...r, cumulativePct: Math.round((running / total) * 100) };
+  });
+}
+
+/** Stage spans for the cross-project Gantt. */
+export function computeTimelineRows(projects = [], now = Date.now()) {
+  const rows = [];
+
+  for (const p of projects) {
+    if (p.status === "Draft") continue;
+    const bars = [];
+
+    for (const stage of [...(p.stages ?? [])].sort((a, b) => a.sequence - b.sequence)) {
+      const start = toDate(stage.startDateTime);
+      if (!start) continue;
+      const end =
+        toDate(stage.actualCompletionDateTime) ??
+        toDate(stage.expectedCompletionDateTime) ??
+        new Date(now);
+
+      bars.push({
+        id: stage.id,
+        name: stage.name,
+        department: stage.department,
+        status: stage.status,
+        startMs: start.getTime(),
+        endMs: Math.max(end.getTime(), start.getTime() + MS_PER_DAY / 4),
+        isOverdue: isStageOverdue(stage, now),
+        completionPct: computeStageCompletionPct(stage),
+      });
+    }
+
+    if (bars.length === 0) continue;
+    rows.push({
+      projectId: p.id,
+      customerName: p.customerName,
+      status: p.status,
+      priority: p.priority,
+      department: p.currentDepartment,
+      projectManagerId: p.projectManager?.id ?? null,
+      bars,
+      startMs: Math.min(...bars.map((b) => b.startMs)),
+      endMs: Math.max(...bars.map((b) => b.endMs)),
+    });
+  }
+
+  return rows.sort((a, b) => a.startMs - b.startMs);
+}
+
+/** The overall time window a set of Gantt rows spans, padded for readability. */
+export function computeTimelineWindow(rows = [], now = Date.now()) {
+  if (rows.length === 0) {
+    return { startMs: now - 7 * MS_PER_DAY, endMs: now + 7 * MS_PER_DAY, totalMs: 14 * MS_PER_DAY };
+  }
+  const startMs = Math.min(...rows.map((r) => r.startMs)) - MS_PER_DAY;
+  const endMs = Math.max(...rows.map((r) => r.endMs)) + MS_PER_DAY;
+  return { startMs, endMs, totalMs: Math.max(1, endMs - startMs) };
+}
+
 // ─── Stage 10 Delay Engine ───────────────────────────────────
 
 /** Standard root causes a delay must be attributed to. */
