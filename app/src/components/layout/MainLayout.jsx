@@ -5,6 +5,7 @@ import Topbar from './Topbar';
 import { CommandPalette } from '../common/CommandPalette';
 import { FloatingSupportModal } from '../common/FloatingSupportModal';
 import { useAppStore } from '../../stores/appStore';
+import { useProofApprovalSync } from '../../features/pms/approval/useProofApprovalSync';
 
 // ERP-only UI scope: graph.json global-shell guidance applied purely as a
 // CSS class. CRM/HRMS routes never receive `erp-scope`, so their UI is
@@ -19,6 +20,9 @@ export default function MainLayout() {
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
   const { pathname } = useLocation();
   const isErpRoute = ERP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+  // Pick up design approvals taken in a client's approval-link tab.
+  useProofApprovalSync();
 
   // Global keydown for Ctrl+K / Cmd+K
   useEffect(() => {

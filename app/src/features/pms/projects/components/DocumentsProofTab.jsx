@@ -1,11 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Upload, Send, ShieldCheck, Layers, Check, RefreshCw, Clock, AlertCircle } from 'lucide-react';
+import { Upload, Send, ShieldCheck, Layers, Check, RefreshCw, Clock, AlertCircle, Link2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
 import { MockPdfViewer } from '../../components/MockPdfViewer';
 import { ClientApprovalModal } from '../../components/ClientApprovalModal';
+import { ShareProofModal } from '../../approval/ShareProofModal';
 import { UploadProofModal } from './UploadProofModal';
 import { usePmsStore, getProofWorkflowState } from '../../../../stores/pmsStore';
+import { useProofShareStore, shareUrlFor } from '../../../../stores/proofShareStore';
 
 /**
  * DocumentsProofTab — the design proofing centre.
@@ -41,6 +43,7 @@ function stamp(value) {
 
 export function DocumentsProofTab({ project }) {
   const requestApproval = usePmsStore((s) => s.requestApproval);
+  const shares = useProofShareStore((s) => s.shares);
 
   const proofStages = useMemo(
     () => [...(project.stages ?? [])].sort((a, b) => a.sequence - b.sequence),
@@ -53,6 +56,7 @@ export function DocumentsProofTab({ project }) {
   const [versionId, setVersionId] = useState(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [approvalOpen, setApprovalOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [annotations, setAnnotations] = useState({});
 
   const activeStage =
@@ -91,6 +95,11 @@ export function DocumentsProofTab({ project }) {
 
   const step = workflow ? STEP_COPY[workflow.step] : null;
   const isClosed = project.status === 'Completed';
+
+  // A live approval link on the selected version, if one has been issued.
+  const activeShare = shares.find(
+    (s) => s.documentId === selected?.id && s.status === 'Active' && !s.decision
+  ) ?? null;
 
   return (
     <div className="space-y-4">
@@ -158,6 +167,20 @@ export function DocumentsProofTab({ project }) {
             </Button>
             <Button
               size="sm"
+              variant="secondary"
+              icon={Link2}
+              disabled={isClosed || !selected}
+              title={
+                selected
+                  ? 'Generate a client link carrying this drawing, the order details and Approve / Reject buttons'
+                  : 'Upload a version first'
+              }
+              onClick={() => setShareOpen(true)}
+            >
+              {activeShare ? 'Approval Link' : 'Generate Link'}
+            </Button>
+            <Button
+              size="sm"
               icon={ShieldCheck}
               disabled={isClosed || !workflow?.canDecide}
               title={
@@ -171,6 +194,25 @@ export function DocumentsProofTab({ project }) {
             </Button>
           </div>
         </div>
+
+        {activeShare && (
+          <p className="flex items-start gap-1.5 text-[11px] text-slate-700 bg-[#f6f9ff] border border-[#dce5f4] rounded-lg px-3 py-2 mt-3">
+            <Link2 size={12} className="shrink-0 mt-0.5 text-blue-500" />
+            <span className="min-w-0">
+              <strong>Approval link live</strong> for v{activeShare.documentVersion}.0 — issued to{' '}
+              {activeShare.recipientName || 'the client'}
+              {activeShare.openedAt ? ' and opened' : ', not opened yet'}.{' '}
+              <a
+                href={shareUrlFor(activeShare.token)}
+                target="_blank"
+                rel="noreferrer"
+                className="font-bold text-blue-600 hover:underline break-all"
+              >
+                {shareUrlFor(activeShare.token)}
+              </a>
+            </span>
+          </p>
+        )}
 
         {workflow?.needsRevision && (
           <p className="flex items-start gap-1.5 text-[11px] text-orange-800 bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 mt-3">
@@ -305,6 +347,15 @@ export function DocumentsProofTab({ project }) {
         stage={activeStage}
         document={selected}
         onClose={() => setApprovalOpen(false)}
+      />
+
+      <ShareProofModal
+        isOpen={shareOpen}
+        project={project}
+        stage={activeStage}
+        document={selected}
+        canCirculate={Boolean(workflow?.canSendToClient)}
+        onClose={() => setShareOpen(false)}
       />
     </div>
   );

@@ -165,6 +165,82 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
           </div>
         )}
 
+        {/* Device file picker */}
+        <div>
+          <span className={labelClass}>Design file</span>
+
+          {picked ? (
+            <div className="flex items-start gap-2.5 rounded-lg border border-[#dce5f4] bg-white px-3 py-2.5">
+              <span className="w-9 h-9 rounded-lg bg-[#f6f9ff] border border-[#dce5f4] flex items-center justify-center shrink-0">
+                <FileText size={15} className="text-blue-500" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-bold text-slate-800 truncate" title={picked.name}>
+                  {picked.name}
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5">
+                  {formatFileSize(picked.size)} · {previewKindFor(picked.type, picked.name) === 'file'
+                    ? 'download only'
+                    : 'previews in the approval portal'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={clearFile}
+                aria-label="Remove the selected file"
+                className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 shrink-0"
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragging(false);
+                acceptFile(e.dataTransfer.files?.[0]);
+              }}
+              className="rounded-lg border border-dashed px-3 py-5 text-center transition-colors"
+              style={
+                dragging
+                  ? { borderColor: '#1f6bff', background: '#f6f9ff' }
+                  : { borderColor: '#dce5f4', background: '#fbfdff' }
+              }
+            >
+              <Paperclip size={16} className="text-slate-300 mx-auto mb-1.5" />
+              <p className="text-[11px] text-slate-600">
+                Drag a drawing here, or{' '}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="font-bold text-blue-600 hover:underline cursor-pointer"
+                >
+                  browse your device
+                </button>
+              </p>
+              <p className="text-[10px] text-slate-400 mt-1">
+                PDF, image or CAD export · up to {formatFileSize(MAX_FILE_BYTES)} · optional
+              </p>
+            </div>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED}
+            className="hidden"
+            onChange={(e) => acceptFile(e.target.files?.[0])}
+          />
+
+          {errors.file && (
+            <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
+              <AlertCircle size={11} /> {errors.file}
+            </p>
+          )}
+        </div>
+
         <div>
           <label className={labelClass} htmlFor="proof-file">
             File name <span className="text-rose-500">*</span>
