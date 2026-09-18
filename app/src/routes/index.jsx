@@ -23,6 +23,18 @@ const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAll
 const CRMSystemSetupPage = lazy(() => import('../features/crm/setup/CRMSystemSetupPage'));
 const CRMReportsPage = lazy(() => import('../features/crm/reports/CRMReportsPage'));
 
+// ── PMS — Project Management (Lazy Loaded) ───────────────────
+const PMSDashboard = lazy(() => import('../features/pms/dashboard/PMSDashboard'));
+const PMSProjectsPage = lazy(() => import('../features/pms/projects/ProjectsPage'));
+const PMSProjectDetailPage = lazy(() => import('../features/pms/projects/ProjectDetailPage'));
+const PMSMyProjectsPage = lazy(() => import('../features/pms/projects/MyProjectsPage'));
+const PMSMyTasksPage = lazy(() => import('../features/pms/tasks/MyTasksPage'));
+const PMSStageConfigPage = lazy(() => import('../features/pms/stages/StageConfigPage'));
+const PMSTimelinePage = lazy(() => import('../features/pms/timeline/TimelinePage'));
+const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDashboardPage'));
+const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
+const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
+
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
@@ -202,6 +214,18 @@ const router = createBrowserRouter([
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
       { path: 'crm/reports', element: <Page component={CRMReportsPage} /> },
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
+
+      // ── PMS — Project Management ──────────────────────────
+      { path: 'pms', element: <Page component={PMSDashboard} /> },
+      { path: 'pms/projects', element: <Page component={PMSProjectsPage} /> },
+      { path: 'pms/projects/:id', element: <Page component={PMSProjectDetailPage} /> },
+      { path: 'pms/my-projects', element: <Page component={PMSMyProjectsPage} /> },
+      { path: 'pms/my-tasks', element: <Page component={PMSMyTasksPage} /> },
+      { path: 'pms/stages', element: <Page component={PMSStageConfigPage} /> },
+      { path: 'pms/timeline', element: <Page component={PMSTimelinePage} /> },
+      { path: 'pms/delays', element: <Page component={PMSDelayDashboardPage} /> },
+      { path: 'pms/reports', element: <Page component={PMSReportsPage} /> },
+      { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
 
       // ── Sales ─────────────────────────────────────────────
       { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },

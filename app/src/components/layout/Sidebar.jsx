@@ -55,6 +55,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useERP } from '../../context/ERPContext';
 import { UserGuideModal } from '../common/UserGuideModal';
 
@@ -104,6 +105,23 @@ const NAV = [
       { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' },
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
       { label: 'CRM System Setup', icon: Settings, to: '/crm/system-setup' },
+    ],
+  },
+
+  {
+    label: 'PMS (Projects)',
+    icon: Briefcase,
+    badgeKey: 'pmsActiveCount',
+    children: [
+      { label: 'PMS Dashboard', icon: Home, to: '/pms' },
+      { label: 'All Projects', icon: Layers, to: '/pms/projects' },
+      { label: 'My Projects', icon: UserCheck, to: '/pms/my-projects' },
+      { label: 'My Tasks', icon: ListChecks, to: '/pms/my-tasks', badgeKey: 'pmsMyTasksPending' },
+      { label: 'Dynamic Stages', icon: Sliders, to: '/pms/stages' },
+      { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
+      { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
+      { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
+      { label: 'PMS Settings', icon: Settings, to: '/pms/settings' },
     ],
   },
 
@@ -346,6 +364,30 @@ function filterNavTree(items, query) {
 }
 
 // ── Sub-item (leaf node) ────────────────────────────────────
+// ── Nav count badge ─────────────────────────────────────────
+// Defaults to the original blue pill; `color` (hex) opts a row into its own
+// tone, e.g. the red used by the PMS Delay Center.
+function NavBadge({ count, color }) {
+  if (!count) return null;
+
+  if (!color) {
+    return (
+      <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
+        {count}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full border"
+      style={{ background: `${color}33`, color, borderColor: `${color}4d` }}
+    >
+      {count}
+    </span>
+  );
+}
+
 function SubItem({ item, depth = 1, badges = {} }) {
   const location = useLocation();
   const currentPath = location.pathname;
@@ -383,11 +425,7 @@ function SubItem({ item, depth = 1, badges = {} }) {
       >
         <Icon size={16} strokeWidth={2} className="nav-ico" />
         <span className="nav-txt">{item.label}</span>
-        {count > 0 && (
-          <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
-            {count}
-          </span>
-        )}
+        <NavBadge count={count} color={item.badgeColor} />
       </NavLink>
     );
   }
@@ -403,11 +441,7 @@ function SubItem({ item, depth = 1, badges = {} }) {
     >
       <span className="sub-dot" />
       <span className="sub-label">{item.label}</span>
-      {count > 0 && (
-        <span className="ml-auto px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30">
-          {count}
-        </span>
-      )}
+      <NavBadge count={count} color={item.badgeColor} />
     </NavLink>
   );
 }
@@ -467,6 +501,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
   }
 
   const isRoot = depth === 0;
+  const groupCount = item.badgeKey ? (badges?.[item.badgeKey] ?? 0) : 0;
 
   return (
     <div className="nav-group">
@@ -482,6 +517,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
       >
         {Icon && <Icon size={isRoot ? 18 : 16} strokeWidth={1.9} className="nav-ico" />}
         <span className="nav-txt">{item.label}</span>
+        <NavBadge count={groupCount} color={item.badgeColor} />
         {item.children && (
           <span className="nav-chev">
             {open ? <ChevronDown size={isRoot ? 14 : 12} /> : <ChevronRight size={isRoot ? 14 : 12} />}
@@ -510,6 +546,15 @@ export default function Sidebar() {
 
   const filteredNav = useMemo(() => filterNavTree(NAV, searchQuery), [searchQuery]);
 
+  // PMS live nav counters. Subscribe to stable slices and derive, so the
+  // selector never hands useSyncExternalStore a fresh object each render.
+  const pmsProjects = usePmsStore((s) => s.projects);
+  const pmsCurrentUserId = usePmsStore((s) => s.currentUserId);
+  const pmsBadges = useMemo(
+    () => computeNavBadges(pmsProjects, pmsCurrentUserId),
+    [pmsProjects, pmsCurrentUserId]
+  );
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (profileRef.current && !profileRef.current.contains(e.target)) {
@@ -520,7 +565,7 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  let badges = { zone: 0, faulty: 0 };
+  let badges = { zone: 0, faulty: 0, ...pmsBadges };
   try {
     const erp = useERP();
     if (erp) {

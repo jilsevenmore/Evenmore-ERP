@@ -1,0 +1,1025 @@
+/**
+ * PMS Module — Centralized State (Stage 1)
+ *
+ * Single source of truth for the Project Management System: projects, their
+ * runtime stage instances, tasks, design documents, approvals and the audit
+ * trail. Zustand + localStorage, matching the convention used by the other
+ * HRMS/ERP stores in this folder.
+ *
+ * The recalculation helpers at the top are exported as pure functions so
+ * presentation layers (later stages) can derive timings without pulling the
+ * whole store in.
+ */
+
+import { create } from "zustand";
+import {
+  projectsMock,
+  stageConfigsMock,
+  pmsEmployeesMock,
+  pmsSettingsMock,
+} from "../data/mockPmsData";
+
+const LS = "pms_store_v1";
+
+// ─── Time Primitives ─────────────────────────────────────────────────
+
+export const MS_PER_HOUR = 60 * 60 * 1000;
+export const MS_PER_DAY = 24 * MS_PER_HOUR;
+
+/** Parse anything date-ish into a valid Date, or null. */
+export function toDate(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Convert a planned duration + unit into milliseconds. */
+export function durationToMs(duration, unit = "Days") {
+  const n = Number(duration);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return unit === "Hours" ? n * MS_PER_HOUR : n * MS_PER_DAY;
+}
+
+// ─── Core Formulas ───────────────────────────────────────────────────
+//
+//   Expected Completion = Start + Planned Duration
+//   Remaining Time      = max(0, Expected Completion − Now)
+//   Delay Duration      = max(0, (Actual ?? Now) − Expected Completion)
+//   Stage Completion %  = mean(task %) when tasks exist, else the stage's own %
+//   Project Completion% = mean(stage completion %)
+
+/** Start + planned duration → ISO string (null when the stage has not started). */
+export function computeExpectedCompletion(startDateTime, plannedDuration, durationUnit) {
+  const start = toDate(startDateTime);
+  if (!start) return null;
+  const ms = durationToMs(plannedDuration, durationUnit);
+  return new Date(start.getTime() + ms).toISOString();
+}
+
+/** Milliseconds left before the expected completion; never negative. */
+export function computeRemainingMs(expectedCompletionDateTime, now = Date.now()) {
+  const expected = toDate(expectedCompletionDateTime);
+  if (!expected) return 0;
+  return Math.max(0, expected.getTime() - now);
+}
+
+/** Milliseconds overdue, measured against the actual completion or now. */
+export function computeDelayMs(
+  expectedCompletionDateTime,
+  actualCompletionDateTime = null,
+  now = Date.now()
+) {
+  const expected = toDate(expectedCompletionDateTime);
+  if (!expected) return 0;
+  const actual = toDate(actualCompletionDateTime);
+  const reference = actual ? actual.getTime() : now;
+  return Math.max(0, reference - expected.getTime());
+}
+
+/** Share of the planned window already consumed, 0–100+ (can exceed 100). */
+export function computeElapsedPct(stage, now = Date.now()) {
+  const start = toDate(stage?.startDateTime);
+  const total = durationToMs(stage?.plannedDuration, stage?.durationUnit);
+  if (!start || total <= 0) return 0;
+  return ((now - start.getTime()) / total) * 100;
+}
+
+/** Stage completion: mean of its task percentages, else its own value. */
+export function computeStageCompletionPct(stage) {
+  const tasks = stage?.tasks ?? [];
+  if (tasks.length === 0) return clampPct(stage?.completionPct ?? 0);
+  const sum = tasks.reduce((acc, t) => acc + clampPct(t.completionPct ?? 0), 0);
+  return clampPct(sum / tasks.length);
+}
+
+/** Project completion: mean of all stage completion percentages. */
+export function computeProjectCompletionPct(stages = []) {
+  if (stages.length === 0) return 0;
+  const sum = stages.reduce((acc, s) => acc + computeStageCompletionPct(s), 0);
+  return clampPct(sum / stages.length);
+}
+
+/** Project start + the sum of every stage's planned duration. */
+export function computeProjectExpectedCompletion(startDate, stages = []) {
+  const start = toDate(startDate);
+  if (!start || stages.length === 0) return null;
+  const totalMs = stages.reduce(
+    (acc, s) => acc + durationToMs(s.plannedDuration, s.durationUnit),
+    0
+  );
+  if (totalMs <= 0) return null;
+  return new Date(start.getTime() + totalMs).toISOString();
+}
+
+function clampPct(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return 0;
+  return Math.min(100, Math.max(0, Math.round(v)));
+}
+
+/** Humanize a millisecond span as "3d 4h" / "5h 30m" / "—". */
+export function formatDuration(ms) {
+  const v = Number(ms);
+  if (!Number.isFinite(v) || v <= 0) return "—";
+  const days = Math.floor(v / MS_PER_DAY);
+  const hours = Math.floor((v % MS_PER_DAY) / MS_PER_HOUR);
+  const minutes = Math.floor((v % MS_PER_HOUR) / (60 * 1000));
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  return `${minutes}m`;
+}
+
+// ─── Derived Status ──────────────────────────────────────────────────
+
+// Statuses the delay engine may overwrite. Anything else (Submitted, Under
+// Review, Approved, Completed, Blocked, …) was set deliberately by a human and
+// is left untouched.
+const AUTO_STATUSES = new Set(["Assigned", "In Progress", "At Risk", "Delayed"]);
+
+/**
+ * Re-derive a stage's status from the clock. Returns the existing status
+ * unchanged unless the stage is in an auto-managed state.
+ */
+export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = 80) {
+  const current = stage?.status;
+  if (!AUTO_STATUSES.has(current)) return current;
+  if (stage?.delayDetails?.isDelayed) return "Delayed";
+
+  const expected = toDate(stage?.expectedCompletionDateTime);
+  if (!expected) return current;
+
+  if (now > expected.getTime()) return "Delayed";
+  if (computeElapsedPct(stage, now) >= atRiskThresholdPct) return "At Risk";
+  return current === "At Risk" || current === "Delayed" ? "In Progress" : current;
+}
+
+/** Roll stage-level signals up into the project status. */
+export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPct = 80) {
+  if (project?.status === "On Hold" || project?.status === "Draft") {
+    return project.status;
+  }
+  // An explicit sign-off stamps actualCompletionDate and is terminal — a later
+  // stage edit must not quietly reopen a closed project.
+  if (project?.actualCompletionDate) return "Completed";
+
+  const stages = project?.stages ?? [];
+  if (stages.length === 0) return project?.status ?? "Draft";
+
+  const statuses = stages.map((s) => deriveStageStatus(s, now, atRiskThresholdPct));
+
+  if (statuses.every((s) => s === "Completed")) return "Completed";
+  if (statuses.includes("Delayed")) return "Delayed";
+  if (statuses.includes("At Risk")) return "At Risk";
+  if (statuses.some((s) => s !== "Not Started")) return "In Progress";
+  return project.status ?? "Draft";
+}
+
+// ─── Recalculation ───────────────────────────────────────────────────
+
+/** Recompute one stage's derived fields (dates, %, status). */
+export function recalcStage(stage, now = Date.now(), atRiskThresholdPct = 80) {
+  const completionPct = computeStageCompletionPct(stage);
+  const expectedCompletionDateTime =
+    computeExpectedCompletion(
+      stage.startDateTime,
+      stage.plannedDuration,
+      stage.durationUnit
+    ) ?? stage.expectedCompletionDateTime ?? null;
+
+  const next = { ...stage, completionPct, expectedCompletionDateTime };
+  next.status = deriveStageStatus(next, now, atRiskThresholdPct);
+  return next;
+}
+
+/** Recompute a whole project: every stage, then the project rollups. */
+export function recalcProject(project, now = Date.now(), atRiskThresholdPct = 80) {
+  const stages = (project.stages ?? []).map((s) =>
+    recalcStage(s, now, atRiskThresholdPct)
+  );
+  const next = {
+    ...project,
+    stages,
+    overallCompletionPct: computeProjectCompletionPct(stages),
+    expectedCompletionDate:
+      computeProjectExpectedCompletion(project.startDate, stages) ??
+      project.expectedCompletionDate ??
+      null,
+  };
+  next.status = deriveProjectStatus(next, now, atRiskThresholdPct);
+  return next;
+}
+
+/**
+ * Sidebar nav counters, derived purely so components can memoize on the raw
+ * slices rather than on a fresh object handed back by a store selector.
+ */
+export function computeNavBadges(projects = [], currentUserId = null) {
+  let pmsActiveCount = 0;
+  let pmsDelayedCount = 0;
+  let pmsMyTasksPending = 0;
+
+  for (const p of projects) {
+    if (p.status === "Delayed") pmsDelayedCount += 1;
+    if (p.status !== "Completed" && p.status !== "Draft") pmsActiveCount += 1;
+
+    for (const stage of p.stages ?? []) {
+      for (const task of stage.tasks ?? []) {
+        if (task.assignedUser?.id === currentUserId && task.status !== "Completed") {
+          pmsMyTasksPending += 1;
+        }
+      }
+    }
+  }
+
+  return { pmsActiveCount, pmsDelayedCount, pmsMyTasksPending };
+}
+
+/** Per-stage timing summary for timeline / card rendering. */
+export function getStageTiming(stage, now = Date.now()) {
+  const expected = stage?.expectedCompletionDateTime ?? null;
+  const remainingMs = computeRemainingMs(expected, now);
+  const delayMs = computeDelayMs(expected, stage?.actualCompletionDateTime, now);
+  return {
+    expectedCompletionDateTime: expected,
+    remainingMs,
+    remainingLabel: formatDuration(remainingMs),
+    delayMs,
+    delayLabel: formatDuration(delayMs),
+    isOverdue: delayMs > 0,
+    elapsedPct: Math.round(computeElapsedPct(stage, now)),
+  };
+}
+
+// ─── Persistence ─────────────────────────────────────────────────────
+
+function load() {
+  try {
+    const v = localStorage.getItem(LS);
+    if (v) return JSON.parse(v);
+  } catch {
+    /* corrupt or unavailable storage — fall back to seed data */
+  }
+  return null;
+}
+
+function persist(state) {
+  try {
+    localStorage.setItem(
+      LS,
+      JSON.stringify({
+        projects: state.projects,
+        stageConfigs: state.stageConfigs,
+        employees: state.employees,
+        settings: state.settings,
+        currentUserId: state.currentUserId,
+      })
+    );
+  } catch {
+    /* quota or private mode — state stays in memory only */
+  }
+}
+
+// Demo persona backing the "My Projects" / "My Tasks" workspaces until real
+// auth is wired in. Swap via setCurrentUserId.
+const DEFAULT_CURRENT_USER_ID = "EMP-PM-01";
+
+const s = load();
+
+// ─── ID & Log Helpers ────────────────────────────────────────────────
+
+const uid = (prefix) =>
+  `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+function makeActivity(action, entityType, entityId, description, actor) {
+  return {
+    id: uid("ACT"),
+    timestamp: new Date().toISOString(),
+    actor: actor ?? { id: "SYSTEM", name: "System" },
+    action,
+    entityType,
+    entityId,
+    description,
+  };
+}
+
+/**
+ * Apply `mutator` to one project, recalculate it, optionally append an audit
+ * entry, then persist. Every mutating action funnels through here so derived
+ * fields can never drift from the raw data.
+ */
+function applyToProject(state, projectId, mutator, activity) {
+  const threshold = state.settings.atRiskThresholdPct;
+  const now = Date.now();
+  const projects = state.projects.map((p) => {
+    if (p.id !== projectId) return p;
+    const mutated = mutator(p);
+    const withLog = activity
+      ? { ...mutated, activityLog: [...(mutated.activityLog ?? []), activity] }
+      : mutated;
+    return recalcProject(withLog, now, threshold);
+  });
+  persist({ ...state, projects });
+  return { projects };
+}
+
+// ─── Store ───────────────────────────────────────────────────────────
+
+const seededProjects = (s?.projects ?? projectsMock).map((p) =>
+  recalcProject(p, Date.now(), (s?.settings ?? pmsSettingsMock).atRiskThresholdPct)
+);
+
+export const usePmsStore = create((set, get) => ({
+  // ── State ──
+  projects: seededProjects,
+  stageConfigs: s?.stageConfigs ?? stageConfigsMock,
+  employees: s?.employees ?? pmsEmployeesMock,
+  settings: s?.settings ?? pmsSettingsMock,
+  currentUserId: s?.currentUserId ?? DEFAULT_CURRENT_USER_ID,
+
+  setCurrentUserId: (userId) =>
+    set((st) => {
+      persist({ ...st, currentUserId: userId });
+      return { currentUserId: userId };
+    }),
+
+  // Transient UI state (not persisted)
+  toast: null,
+  showToast: (msg) => set({ toast: { msg, id: Date.now().toString() } }),
+  clearToast: () => set({ toast: null }),
+
+  // ── Global recalculation ──
+
+  /** Re-derive every project against the current clock. */
+  recalcAll: () =>
+    set((st) => {
+      const threshold = st.settings.atRiskThresholdPct;
+      const now = Date.now();
+      const projects = st.projects.map((p) => recalcProject(p, now, threshold));
+      persist({ ...st, projects });
+      return { projects };
+    }),
+
+  /** Discard local changes and reload the seed data. */
+  resetPmsData: () =>
+    set((st) => {
+      const next = {
+        projects: projectsMock.map((p) =>
+          recalcProject(p, Date.now(), pmsSettingsMock.atRiskThresholdPct)
+        ),
+        stageConfigs: stageConfigsMock,
+        employees: pmsEmployeesMock,
+        settings: pmsSettingsMock,
+      };
+      persist({ ...st, ...next });
+      return next;
+    }),
+
+  // ── Settings ──
+
+  updateSettings: (patch) =>
+    set((st) => {
+      const settings = { ...st.settings, ...patch };
+      const projects = st.projects.map((p) =>
+        recalcProject(p, Date.now(), settings.atRiskThresholdPct)
+      );
+      persist({ ...st, settings, projects });
+      return { settings, projects };
+    }),
+
+  // ── Stage configuration templates ──
+
+  addStageConfig: (config) =>
+    set((st) => {
+      const stageConfigs = [
+        ...st.stageConfigs,
+        {
+          id: uid("stage-cfg"),
+          sequence: st.stageConfigs.length + 1,
+          durationUnit: "Days",
+          requiredApproval: false,
+          requiredDocument: false,
+          isActive: true,
+          ...config,
+        },
+      ];
+      persist({ ...st, stageConfigs });
+      return { stageConfigs };
+    }),
+
+  updateStageConfig: (id, patch) =>
+    set((st) => {
+      const stageConfigs = st.stageConfigs.map((c) =>
+        c.id === id ? { ...c, ...patch } : c
+      );
+      persist({ ...st, stageConfigs });
+      return { stageConfigs };
+    }),
+
+  deleteStageConfig: (id) =>
+    set((st) => {
+      const stageConfigs = st.stageConfigs
+        .filter((c) => c.id !== id)
+        .map((c, i) => ({ ...c, sequence: i + 1 }));
+      persist({ ...st, stageConfigs });
+      return { stageConfigs };
+    }),
+
+  /** Move a template up (-1) or down (+1) in the execution order. */
+  reorderStageConfig: (id, direction) =>
+    set((st) => {
+      const ordered = [...st.stageConfigs].sort((a, b) => a.sequence - b.sequence);
+      const idx = ordered.findIndex((c) => c.id === id);
+      const target = idx + direction;
+      if (idx === -1 || target < 0 || target >= ordered.length) return {};
+      [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
+      const stageConfigs = ordered.map((c, i) => ({ ...c, sequence: i + 1 }));
+      persist({ ...st, stageConfigs });
+      return { stageConfigs };
+    }),
+
+  // ── Projects ──
+
+  addProject: (project) =>
+    set((st) => {
+      const id = project.id ?? uid("PRJ");
+      const created = recalcProject(
+        {
+          overallCompletionPct: 0,
+          actualCompletionDate: null,
+          status: "Draft",
+          priority: "Medium",
+          currentStageId: null,
+          stages: [],
+          activityLog: [],
+          ...project,
+          id,
+        },
+        Date.now(),
+        st.settings.atRiskThresholdPct
+      );
+      created.activityLog = [
+        ...created.activityLog,
+        makeActivity(
+          "PROJECT_CREATED",
+          "Project",
+          id,
+          `Project created${project.crmOrderId ? ` from sales order ${project.crmOrderId}` : ""}.`,
+          project.projectManager
+        ),
+      ];
+      const projects = [created, ...st.projects];
+      persist({ ...st, projects });
+      return { projects };
+    }),
+
+  updateProject: (projectId, patch) =>
+    set((st) => applyToProject(st, projectId, (p) => ({ ...p, ...patch }))),
+
+  deleteProject: (projectId) =>
+    set((st) => {
+      const projects = st.projects.filter((p) => p.id !== projectId);
+      persist({ ...st, projects });
+      return { projects };
+    }),
+
+  /** Build a project's runtime stages from the active templates. */
+  applyStageTemplate: (projectId, configIds = null) =>
+    set((st) => {
+      const configs = st.stageConfigs
+        .filter((c) => c.isActive && (!configIds || configIds.includes(c.id)))
+        .sort((a, b) => a.sequence - b.sequence);
+
+      return applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: configs.map((c, i) => ({
+            id: uid("stg-inst"),
+            stageConfigId: c.id,
+            name: c.name,
+            sequence: i + 1,
+            department: c.department,
+            assignedTeam: null,
+            assignedUser: null,
+            completionPct: 0,
+            plannedDuration: c.defaultDuration,
+            durationUnit: c.durationUnit,
+            startDateTime: null,
+            expectedCompletionDateTime: null,
+            actualCompletionDateTime: null,
+            status: "Not Started",
+            tasks: [],
+            documents: [],
+            approvals: [],
+          })),
+        }),
+        makeActivity(
+          "STAGES_CONFIGURED",
+          "Project",
+          projectId,
+          `${configs.length} stages applied from the template library.`
+        )
+      );
+    }),
+
+  /** Mark a project complete and stamp the actual completion date. */
+  completeProject: (projectId, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          status: "Completed",
+          actualCompletionDate: new Date().toISOString(),
+        }),
+        makeActivity(
+          "PROJECT_COMPLETED",
+          "Project",
+          projectId,
+          "Project signed off and marked completed.",
+          actor
+        )
+      )
+    ),
+
+  // ── Stage instances ──
+
+  /** Assign a stage to a user/team and start its clock. */
+  assignStage: (projectId, stageId, { assignedUser, assignedTeam, plannedDuration, durationUnit, startDateTime }) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          currentStageId: stageId,
+          currentDepartment:
+            p.stages.find((s2) => s2.id === stageId)?.department ?? p.currentDepartment,
+          stages: p.stages.map((stage) =>
+            stage.id !== stageId
+              ? stage
+              : {
+                  ...stage,
+                  assignedUser: assignedUser ?? stage.assignedUser,
+                  assignedTeam: assignedTeam ?? stage.assignedTeam,
+                  plannedDuration: plannedDuration ?? stage.plannedDuration,
+                  durationUnit: durationUnit ?? stage.durationUnit,
+                  startDateTime:
+                    startDateTime ?? stage.startDateTime ?? new Date().toISOString(),
+                  status: "Assigned",
+                }
+          ),
+        }),
+        makeActivity(
+          "STAGE_ASSIGNED",
+          "Stage",
+          stageId,
+          `Stage assigned to ${assignedUser?.name ?? assignedTeam ?? "team"}.`
+        )
+      )
+    ),
+
+  updateStage: (projectId, stageId, patch) =>
+    set((st) =>
+      applyToProject(st, projectId, (p) => ({
+        ...p,
+        stages: p.stages.map((stage) =>
+          stage.id === stageId ? { ...stage, ...patch } : stage
+        ),
+      }))
+    ),
+
+  /** Set a stage's own progress. Ignored once the stage has tasks driving it. */
+  setStageProgress: (projectId, stageId, pct) =>
+    set((st) =>
+      applyToProject(st, projectId, (p) => ({
+        ...p,
+        stages: p.stages.map((stage) =>
+          stage.id === stageId ? { ...stage, completionPct: clampPct(pct) } : stage
+        ),
+      }))
+    ),
+
+  setStageStatus: (projectId, stageId, status, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: p.stages.map((stage) =>
+            stage.id !== stageId
+              ? stage
+              : {
+                  ...stage,
+                  status,
+                  actualCompletionDateTime:
+                    status === "Completed"
+                      ? stage.actualCompletionDateTime ?? new Date().toISOString()
+                      : stage.actualCompletionDateTime,
+                }
+          ),
+        }),
+        makeActivity("STAGE_STATUS_CHANGED", "Stage", stageId, `Stage marked ${status}.`, actor)
+      )
+    ),
+
+  /** Complete a stage and advance the project pointer to the next one. */
+  completeStageAndAdvance: (projectId, stageId, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => {
+          const ordered = [...p.stages].sort((a, b) => a.sequence - b.sequence);
+          const idx = ordered.findIndex((s2) => s2.id === stageId);
+          const next = idx >= 0 ? ordered[idx + 1] : undefined;
+          const nowIso = new Date().toISOString();
+
+          return {
+            ...p,
+            currentStageId: next?.id ?? stageId,
+            currentDepartment: next?.department ?? p.currentDepartment,
+            stages: p.stages.map((stage) => {
+              if (stage.id === stageId) {
+                return {
+                  ...stage,
+                  status: "Completed",
+                  completionPct: 100,
+                  actualCompletionDateTime: stage.actualCompletionDateTime ?? nowIso,
+                  tasks: stage.tasks.map((t) => ({
+                    ...t,
+                    completionPct: 100,
+                    status: "Completed",
+                  })),
+                };
+              }
+              if (next && stage.id === next.id) {
+                return { ...stage, status: "Assigned", startDateTime: nowIso };
+              }
+              return stage;
+            }),
+          };
+        },
+        makeActivity(
+          "STAGE_HANDOFF",
+          "Stage",
+          stageId,
+          "Stage completed and handed off to the next department.",
+          actor
+        )
+      )
+    ),
+
+  // ── Delay tracking ──
+
+  logDelay: (projectId, stageId, delayDetails, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: p.stages.map((stage) =>
+            stage.id !== stageId
+              ? stage
+              : {
+                  ...stage,
+                  status: "Delayed",
+                  delayDetails: {
+                    isDelayed: true,
+                    reason: "",
+                    responsibleDepartment: stage.department,
+                    responsibleUser: stage.assignedUser?.name ?? "",
+                    delayStartDateTime: new Date().toISOString(),
+                    expectedRecoveryDate: null,
+                    resolutionNotes: "",
+                    ...delayDetails,
+                  },
+                }
+          ),
+        }),
+        makeActivity(
+          "DELAY_LOGGED",
+          "Stage",
+          stageId,
+          `Delay logged: ${delayDetails?.reason ?? "reason not stated"}.`,
+          actor
+        )
+      )
+    ),
+
+  resolveDelay: (projectId, stageId, resolutionNotes, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: p.stages.map((stage) =>
+            stage.id !== stageId
+              ? stage
+              : {
+                  ...stage,
+                  status: "In Progress",
+                  delayDetails: {
+                    ...stage.delayDetails,
+                    isDelayed: false,
+                    resolutionNotes: resolutionNotes ?? "",
+                  },
+                }
+          ),
+        }),
+        makeActivity("DELAY_RESOLVED", "Stage", stageId, "Delay resolved.", actor)
+      )
+    ),
+
+  // ── Tasks ──
+
+  addTask: (projectId, stageId, task) =>
+    set((st) =>
+      applyToProject(st, projectId, (p) => ({
+        ...p,
+        stages: p.stages.map((stage) =>
+          stage.id !== stageId
+            ? stage
+            : {
+                ...stage,
+                tasks: [
+                  ...stage.tasks,
+                  {
+                    id: uid("TSK"),
+                    stageId,
+                    projectId,
+                    completionPct: 0,
+                    priority: "Medium",
+                    status: "Not Started",
+                    department: stage.department,
+                    ...task,
+                  },
+                ],
+              }
+        ),
+      }))
+    ),
+
+  updateTask: (projectId, stageId, taskId, patch) =>
+    set((st) =>
+      applyToProject(st, projectId, (p) => ({
+        ...p,
+        stages: p.stages.map((stage) =>
+          stage.id !== stageId
+            ? stage
+            : {
+                ...stage,
+                tasks: stage.tasks.map((t) => {
+                  if (t.id !== taskId) return t;
+                  const next = { ...t, ...patch };
+                  if (patch.completionPct !== undefined) {
+                    next.completionPct = clampPct(patch.completionPct);
+                    if (next.completionPct === 100) next.status = "Completed";
+                    else if (next.status === "Completed") next.status = "In Progress";
+                  }
+                  if (patch.status === "Completed") next.completionPct = 100;
+                  return next;
+                }),
+              }
+        ),
+      }))
+    ),
+
+  deleteTask: (projectId, stageId, taskId) =>
+    set((st) =>
+      applyToProject(st, projectId, (p) => ({
+        ...p,
+        stages: p.stages.map((stage) =>
+          stage.id !== stageId
+            ? stage
+            : { ...stage, tasks: stage.tasks.filter((t) => t.id !== taskId) }
+        ),
+      }))
+    ),
+
+  // ── Design documents & versioning ──
+
+  /** Upload a proof. Version auto-increments from the stage's existing stack. */
+  addDocument: (projectId, stageId, doc, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: p.stages.map((stage) => {
+            if (stage.id !== stageId) return stage;
+            const nextVersion =
+              stage.documents.reduce((max, d) => Math.max(max, d.version ?? 0), 0) + 1;
+            return {
+              ...stage,
+              documents: [
+                ...stage.documents,
+                {
+                  id: uid("DOC"),
+                  version: nextVersion,
+                  fileSize: "—",
+                  previewUrl: "",
+                  uploadedAt: new Date().toISOString(),
+                  comments: "",
+                  approvalStatus: "Pending",
+                  ...doc,
+                },
+              ],
+            };
+          }),
+        }),
+        makeActivity(
+          "DOCUMENT_UPLOADED",
+          "Stage",
+          stageId,
+          `Design proof uploaded: ${doc?.fileName ?? "document"}.`,
+          actor
+        )
+      )
+    ),
+
+  /** Record an approval decision against a document. */
+  decideDocument: (projectId, stageId, documentId, decision, { comments, revisionReason, approverName, approverType } = {}, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: p.stages.map((stage) => {
+            if (stage.id !== stageId) return stage;
+            return {
+              ...stage,
+              status: decision === "Need Improvement" ? "Need Improvement" : "Approved",
+              documents: stage.documents.map((d) =>
+                d.id !== documentId
+                  ? d
+                  : {
+                      ...d,
+                      approvalStatus: decision,
+                      comments: comments ?? d.comments,
+                      ...(decision === "Need Improvement" ? { revisionReason } : {}),
+                    }
+              ),
+              approvals: [
+                ...stage.approvals,
+                {
+                  id: uid("APR"),
+                  documentId,
+                  approverType: approverType ?? "Client",
+                  approverName: approverName ?? "Client",
+                  requestedBy: actor ?? null,
+                  requestedAt: new Date().toISOString(),
+                  status: decision,
+                  decisionAt: new Date().toISOString(),
+                  comments: comments ?? "",
+                  ...(decision === "Need Improvement" ? { revisionReason } : {}),
+                },
+              ],
+            };
+          }),
+        }),
+        makeActivity(
+          decision === "Need Improvement" ? "REVISION_REQUESTED" : "DOCUMENT_APPROVED",
+          "Document",
+          documentId,
+          decision === "Need Improvement"
+            ? `Revision requested: ${revisionReason ?? "no reason given"}.`
+            : "Document approved.",
+          actor
+        )
+      )
+    ),
+
+  // ── Audit trail ──
+
+  logActivity: (projectId, action, entityType, entityId, description, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => p,
+        makeActivity(action, entityType, entityId, description, actor)
+      )
+    ),
+
+  // ── Selectors ──
+
+  getProjectById: (projectId) => get().projects.find((p) => p.id === projectId) ?? null,
+
+  getStage: (projectId, stageId) => {
+    const project = get().projects.find((p) => p.id === projectId);
+    return project?.stages.find((s2) => s2.id === stageId) ?? null;
+  },
+
+  getCurrentStage: (projectId) => {
+    const project = get().projects.find((p) => p.id === projectId);
+    if (!project) return null;
+    return project.stages.find((s2) => s2.id === project.currentStageId) ?? null;
+  },
+
+  getProjectsByStatus: (status) =>
+    status && status !== "all"
+      ? get().projects.filter((p) => p.status === status)
+      : get().projects,
+
+  /** Every stage currently flagged Delayed, flattened with project context. */
+  getDelayedStages: () =>
+    get().projects.flatMap((p) =>
+      p.stages
+        .filter((s2) => s2.status === "Delayed" || s2.delayDetails?.isDelayed)
+        .map((s2) => ({
+          projectId: p.id,
+          projectCustomer: p.customerName,
+          projectPriority: p.priority,
+          stage: s2,
+          timing: getStageTiming(s2),
+        }))
+    ),
+
+  /** Every task assigned to one user across all projects. */
+  getTasksForUser: (userId) =>
+    get().projects.flatMap((p) =>
+      p.stages.flatMap((s2) =>
+        s2.tasks
+          .filter((t) => t.assignedUser?.id === userId)
+          .map((t) => ({
+            ...t,
+            projectId: p.id,
+            projectCustomer: p.customerName,
+            stageName: s2.name,
+          }))
+      )
+    ),
+
+  getCurrentUser: () => {
+    const { employees, currentUserId } = get();
+    return employees.find((e) => e.id === currentUserId) ?? null;
+  },
+
+  /** Projects managed by the current user — backs /pms/my-projects. */
+  getMyProjects: () => {
+    const { projects, currentUserId } = get();
+    return projects.filter((p) => p.projectManager?.id === currentUserId);
+  },
+
+  /** Unfinished tasks assigned to the current user — backs /pms/my-tasks. */
+  getMyPendingTasks: () => {
+    const { currentUserId } = get();
+    return get()
+      .getTasksForUser(currentUserId)
+      .filter((t) => t.status !== "Completed");
+  },
+
+  /** Live counters for the sidebar nav badges. */
+  getNavBadges: () => computeNavBadges(get().projects, get().currentUserId),
+
+  /** Merged, newest-first audit feed across every project. */
+  getRecentActivity: (limit = 20) =>
+    get()
+      .projects.flatMap((p) =>
+        (p.activityLog ?? []).map((a) => ({
+          ...a,
+          projectId: p.id,
+          projectCustomer: p.customerName,
+        }))
+      )
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, limit),
+
+  /** Headline metrics for the executive dashboard. */
+  getKpis: () => {
+    const projects = get().projects;
+    const active = projects.filter(
+      (p) => p.status !== "Completed" && p.status !== "Draft"
+    );
+    const delayed = projects.filter((p) => p.status === "Delayed");
+    const atRisk = projects.filter((p) => p.status === "At Risk");
+    const completed = projects.filter((p) => p.status === "Completed");
+    const avgCompletion = projects.length
+      ? Math.round(
+          projects.reduce((acc, p) => acc + (p.overallCompletionPct ?? 0), 0) /
+            projects.length
+        )
+      : 0;
+    const orderValue = projects.reduce(
+      (acc, p) => acc + (p.productDetails?.orderValue ?? 0),
+      0
+    );
+    return {
+      totalProjects: projects.length,
+      activeProjects: active.length,
+      delayedProjects: delayed.length,
+      atRiskProjects: atRisk.length,
+      completedProjects: completed.length,
+      avgCompletionPct: avgCompletion,
+      totalOrderValue: orderValue,
+    };
+  },
+}));
