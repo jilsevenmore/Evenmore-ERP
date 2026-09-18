@@ -1,3 +1,8 @@
+import { convertLeadToDealIfNeeded } from './leadDealConversion.js';
+import { useAppStore } from '../stores/appStore';
+import { seedDemoDealTasks } from '../data/crm/mockDealTasks.js';
+import { emitCrmEvent, CRM_EVENT_TYPES } from './crmEventNotifications.js';
+
 /**
  * leadStageAutomation.js — CRM Lead Stage Task Automation Engine
  *
@@ -271,18 +276,45 @@ export function loadMasterTasksConfig() {
  * Load tasks for Task List (/crm/tasks)
  */
 export function loadCrmTasks() {
-  const stored = readJson(CRM_TASKS_STORAGE_KEY, null);
-  if (Array.isArray(stored) && stored.length > 0) return stored;
-  return DEFAULT_INITIAL_TASKS;
+  if (typeof localStorage === 'undefined') return DEFAULT_INITIAL_TASKS;
+  let tasks = DEFAULT_INITIAL_TASKS;
+  try {
+    const raw = localStorage.getItem(CRM_TASKS_STORAGE_KEY);
+    if (raw !== null) {
+      const stored = JSON.parse(raw);
+      if (!Array.isArray(stored)) return DEFAULT_INITIAL_TASKS;
+      tasks = stored;
+    }
+    return seedDemoDealTasks(tasks);
+  } catch {
+    return tasks;
+  }
 }
 
 /**
  * Save tasks to Task List
  */
 export function saveCrmTasks(tasks) {
+  const previousIds = new Set((loadCrmTasks() || []).map((entry) => String(entry?.id)));
   const success = writeJson(CRM_TASKS_STORAGE_KEY, tasks);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(CRM_EVENT));
+  }
+  if (success) {
+    (tasks || [])
+      .filter((entry) => entry && !previousIds.has(String(entry.id)))
+      .forEach((entry) => emitCrmEvent({
+        type: CRM_EVENT_TYPES.TASK_CREATED,
+        entityType: 'task',
+        entityId: entry.id,
+        payload: {
+          title: entry.title,
+          ownerName: entry.owner,
+          leadName: entry.lead,
+          leadId: entry.leadId,
+          path: '/crm/tasks',
+        },
+      }));
   }
   return success;
 }
@@ -394,6 +426,13 @@ export function runLeadStageAutomation(lead, targetStage, options = {}) {
 
   const normalizedStage = normalizeStageName(targetStage || lead.status);
   const normalizedPrevStage = options.previousStage ? normalizeStageName(options.previousStage) : null;
+
+  try {
+    convertLeadToDealIfNeeded(lead, { targetStage: targetStage || lead.status, stages: loadLeadStageTasksConfig() });
+  } catch (error) {
+    console.error('[CRM Conversion] Lead conversion failed:', lead.id, error);
+    useAppStore.getState().showToast(`Lead could not be converted to a Deal: ${error.message}`);
+  }
 
   // If stage didn't change and previousStage was passed, ignore
   if (normalizedPrevStage && normalizedStage === normalizedPrevStage) {

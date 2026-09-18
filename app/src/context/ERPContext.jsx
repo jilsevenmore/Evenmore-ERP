@@ -3,6 +3,7 @@ import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuo
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES } from '../utils/currencyUtils';
 import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
+import { emitCrmEvent, CRM_EVENT_TYPES } from '../services/crmEventNotifications';
 const STORAGE_KEY = 'horizon_erp_v2_state';
 // ── [PHASE-2E.1] steel-category → HSN default map (Sweven fabrication master) ──
 //   Falls back to 7216 (angles/shapes/sections) unless the category matches a known steel family.
@@ -1890,12 +1891,17 @@ export const ERPProvider = ({ children, }) => {
     };
 
     const addQuotation = (quote) => {
-        const totalAmount = quote.amount ||
-            (quote.items ? quote.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+        const totalAmount = quote.amount ??
+            (quote.items ? quote.items.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) : 0);
         const defaultAddresses = resolvePartyAddresses(quote.customerId, quote.customer);
         const newQ = {
             id: quote.id || `q-${Date.now()}`,
             quoteNumber: quote.quoteNumber || `EST-2026-${String(quotations.length + 91).padStart(3, '0')}`,
+            dealId: quote.dealId,
+            dealReference: quote.dealReference,
+            terms: quote.terms,
+            termsAndConditions: quote.termsAndConditions,
+            freight: quote.freight,
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
@@ -1915,8 +1921,76 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Quotation ${newQ.quoteNumber} issued.`);
         return newQ;
     };
+    const recordQuotationActivity = (id, type) => {
+        const event = { id: crypto.randomUUID(), type, quotationId: id, timestamp: new Date().toISOString() };
+        setQuotations(prev => prev.map(q => q.id === id ? { ...q, activity: [...(q.activity || []), event] } : q));
+    };
+    const syncQuotationShare = (id, share) => {
+        const current = quotations.find((q) => String(q.id) === String(id));
+        const viewedNow = [...(current?.activity || []), ...(share.events || [])].some((event) => event.type === 'Quotation Viewed');
+        const nextStatus = current && ['Draft', 'Sent', 'Viewed'].includes(current.status)
+            ? (share.decision || (viewedNow ? 'Viewed' : current.status))
+            : current?.status;
+        setQuotations(prev => prev.map(q => {
+            if (q.id !== id) return q;
+            const events = new Map([...(q.activity || []), ...(share.events || [])].map(event => [event.id, event]));
+            const activity = [...events.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+            const viewed = activity.some(event => event.type === 'Quotation Viewed');
+            return { ...q, share: { token: share.token, url: share.url, expiresAt: share.expiresAt, allowDownload: share.allowDownload, allowAcceptance: share.allowAcceptance, localOnly: share.localOnly }, activity,
+                status: ['Draft', 'Sent', 'Viewed'].includes(q.status) ? (share.decision || (viewed ? 'Viewed' : q.status)) : q.status };
+        }));
+        if (current && current.status !== 'Viewed' && nextStatus === 'Viewed') {
+            emitCrmEvent({
+                type: CRM_EVENT_TYPES.QUOTATION_VIEWED,
+                entityType: 'quotation',
+                entityId: id,
+                payload: {
+                    quoteRef: current.quoteNumber,
+                    customerId: current.customerId,
+                    customerName: current.customer,
+                    dealId: current.dealId,
+                    path: current.dealId ? `/crm/deals?deal=${encodeURIComponent(current.dealId)}` : '/crm/quotations',
+                },
+            });
+        }
+    };
+    const convertQuotationToDeliveryChallan = (id) => {
+        const quote = quotations.find(q => q.id === id);
+        if (!quote) return;
+        const existing = deliveryChallans.find(dc => dc.sourceQuotationId === id);
+        if (existing) return existing;
+        if (['Rejected', 'Expired'].includes(quote.status) || !quote.items?.length) {
+            showToast('An active quotation with line items is required.');
+            return;
+        }
+        const challan = addDeliveryChallan({
+            sourceQuotationId: quote.id, sourceQuotationNumber: quote.quoteNumber,
+            customerId: quote.customerId, customer: quote.customer,
+            billingAddress: quote.billingAddress, shippingAddress: quote.shippingAddress,
+            leadId: quote.leadId, dealId: quote.dealId, status: 'Draft',
+            date: getCurrentDateFormatted(), dispatchDate: '', transporter: '', vehicleNo: '',
+            items: quote.items.map(item => ({ ...item })),
+        });
+        setQuotations(prev => prev.map(q => q.id === id ? { ...q, deliveryChallanId: challan.id,
+            activity: [...(q.activity || []), { id: crypto.randomUUID(), type: `Delivery challan ${challan.challanNumber} created`, quotationId: id, timestamp: new Date().toISOString() }] } : q));
+        return challan;
+    };
     const updateQuotationStatus = (id, status) => {
+        const target = quotations.find((q) => String(q.id) === String(id));
         setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+        if (target && target.status !== 'Sent' && status === 'Sent') {
+            emitCrmEvent({
+                type: CRM_EVENT_TYPES.QUOTATION_SENT,
+                entityType: 'quotation',
+                entityId: id,
+                payload: {
+                    quoteRef: target.quoteNumber,
+                    customerId: target.customerId,
+                    customerName: target.customer,
+                    path: target.dealId ? `/crm/deals?deal=${encodeURIComponent(target.dealId)}` : '/crm/quotations',
+                },
+            });
+        }
     };
     const convertQuotationToSalesOrder = (quoteId) => {
         const quote = quotations.find((q) => q.id === quoteId);
@@ -1959,6 +2033,11 @@ export const ERPProvider = ({ children, }) => {
             quotationNumber: quote.quoteNumber,
             sourceQuotationId: quote.id,
             sourceQuotationNumber: quote.quoteNumber,
+            dealId: quote.dealId,
+            dealReference: quote.dealReference,
+            terms: quote.terms,
+            termsAndConditions: quote.termsAndConditions,
+            freight: quote.freight,
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
@@ -2206,6 +2285,9 @@ export const ERPProvider = ({ children, }) => {
         return createdInvoice;
     };
     const addDeliveryChallan = (challan) => {
+        const previous = challan.id ? deliveryChallans.find(dc => dc.id === challan.id) : null;
+        if (previous && previous.status !== 'Draft') return previous;
+
         const challanItems = challan.items || challan.lineItems || [];
         const defaultAddresses = resolvePartyAddresses(challan.customerId, challan.customer);
         const newChallan = {
@@ -2214,8 +2296,12 @@ export const ERPProvider = ({ children, }) => {
                 `DC-2026-${String(deliveryChallans.length + 80).padStart(3, '0')}`,
             salesOrderId: challan.salesOrderId,
             sourceSalesOrderId: challan.salesOrderId,
-            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || 'SO-2026-0102',
-            linkedSo: challan.salesOrderNumber || challan.linkedSo || 'SO-2026-0102',
+            sourceQuotationId: challan.sourceQuotationId,
+            sourceQuotationNumber: challan.sourceQuotationNumber,
+            leadId: challan.leadId,
+            dealId: challan.dealId,
+            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
+            linkedSo: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
             customerId: challan.customerId,
             customer: challan.customer || 'Acme Corp',
             billingAddress: createAddressSnapshot(challan.billingAddress) || defaultAddresses.billing,
@@ -2228,7 +2314,13 @@ export const ERPProvider = ({ children, }) => {
             items: challanItems,
             lineItems: challanItems,
         };
-        setDeliveryChallans((prev) => [newChallan, ...prev]);
+        setDeliveryChallans((prev) => previous ? prev.map(dc => dc.id === newChallan.id ? newChallan : dc) : [newChallan, ...prev]);
+
+        // Draft quotation conversions reserve no stock and have no fulfillment effects.
+        if (newChallan.status === 'Draft') {
+            showToast(`Draft delivery challan ${newChallan.challanNumber} created.`);
+            return newChallan;
+        }
 
         // Record SALE movement and handle serial numbers
         if (newChallan.items && newChallan.items.length > 0) {
@@ -2308,6 +2400,10 @@ export const ERPProvider = ({ children, }) => {
         return newChallan;
     };
     const updateDeliveryChallanStatus = (id, status) => {
+        if (deliveryChallans.find(c => c.id === id)?.status === 'Draft') {
+            showToast('This challan is a draft. Dispatch must be prepared before delivery can be recorded.');
+            return;
+        }
         setDeliveryChallans((prev) => prev.map((c) => {
             if (c.id !== id)
                 return c;
@@ -2327,6 +2423,12 @@ export const ERPProvider = ({ children, }) => {
         const challan = deliveryChallans.find((c) => c.id === challanId);
         if (!challan) return { success: false, message: 'Challan not found.' };
         if (challan.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
+
+        if (challan.status === 'Draft') {
+            setDeliveryChallans(prev => prev.map(c => c.id === challanId ? { ...c, status: 'Cancelled' } : c));
+            showToast('Draft challan cancelled.');
+            return { success: true, message: 'Draft challan cancelled.' };
+        }
 
         // 1. Reverse stock movements and restore serial numbers
         if (challan.items && challan.items.length > 0) {
@@ -4309,6 +4411,9 @@ export const ERPProvider = ({ children, }) => {
             updateCategory,
             addQuotation,
             updateQuotationStatus,
+            recordQuotationActivity,
+            syncQuotationShare,
+            convertQuotationToDeliveryChallan,
             convertQuotationToSalesOrder,
             addSalesOrder,
             updateSalesOrderStage,

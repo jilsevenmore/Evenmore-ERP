@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router-dom';
 import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
@@ -29,6 +30,11 @@ const challanGuide = {
 };
 export const DeliveryChallansPage = () => {
     const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId } = useERP();
+    const location = useLocation();
+    React.useEffect(() => {
+        if (location.state?.challanId) setSelectedChallan(deliveryChallans.find(dc => dc.id === location.state.challanId) || null);
+    }, [location.state, deliveryChallans]);
+    const [draftChallan, setDraftChallan] = useState(null);
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedChallan, setSelectedChallan] = useState(null);
     const [printChallanTarget, setPrintChallanTarget] = useState(null);
@@ -76,11 +82,23 @@ export const DeliveryChallansPage = () => {
     };
 
     const openAddModal = () => {
+        setDraftChallan(null);
         const defaultSo = salesOrders.find((o) => o.stage !== 'Delivered' && o.stage !== 'Invoiced') || salesOrders[0];
         if (defaultSo) {
             setSelectedSoId(defaultSo.id);
             setLineItems(prepareOrderLines(defaultSo));
         }
+        setValidationError('');
+        setShowAddModal(true);
+    };
+
+    const prepareDraftDispatch = (challan) => {
+        setDraftChallan(challan);
+        setSelectedChallan(null);
+        setSelectedSoId('');
+        setLineItems(prepareOrderLines(challan));
+        setTransporter(challan.transporter || '');
+        setVehicleNo(challan.vehicleNo || '');
         setValidationError('');
         setShowAddModal(true);
     };
@@ -125,7 +143,7 @@ export const DeliveryChallansPage = () => {
 
     const handleCreate = (e) => {
         e.preventDefault();
-        const order = salesOrders.find((o) => o.id === selectedSoId) || salesOrders[0];
+        const order = draftChallan || salesOrders.find((o) => o.id === selectedSoId) || salesOrders[0];
         
         // Over-delivery validation
         for (const item of lineItems) {
@@ -148,13 +166,14 @@ export const DeliveryChallansPage = () => {
             return;
         }
 
-        addDeliveryChallan({
-            challanNumber: `DC-2026-${String(deliveryChallans.length + 45).padStart(3, '0')}`,
-            salesOrderId: order?.id,
-            sourceSalesOrderId: order?.id,
-            salesOrderNumber: order?.orderNumber || 'SO-2026-0102',
-            sourceSalesOrderNumber: order?.orderNumber || 'SO-2026-0102',
-            linkedSo: order?.orderNumber || 'SO-2026-0102',
+        const created = addDeliveryChallan({
+            ...(draftChallan ? { ...draftChallan, id: draftChallan.id } : {}),
+            challanNumber: draftChallan?.challanNumber || `DC-2026-${String(deliveryChallans.length + 45).padStart(3, '0')}`,
+            salesOrderId: draftChallan ? undefined : order?.id,
+            sourceSalesOrderId: draftChallan ? undefined : order?.id,
+            salesOrderNumber: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
+            sourceSalesOrderNumber: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
+            linkedSo: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
             customerId: order?.customerId,
             customer: order?.customer || 'Walk-in Customer',
             dispatchDate: new Date().toISOString().split('T')[0],
@@ -164,7 +183,7 @@ export const DeliveryChallansPage = () => {
             items: validLines,
             lineItems: validLines,
         });
-        setShowAddModal(false);
+        if (created) { setShowAddModal(false); setSelectedChallan(created); setDraftChallan(null); }
     };
     const markDelivered = (id) => {
         updateDeliveryChallanStatus(id, 'Delivered');
@@ -228,7 +247,7 @@ export const DeliveryChallansPage = () => {
             key: 'salesOrderNumber',
             header: 'Linked Sales Order',
             width: '14%',
-            render: (c) => <span className="font-mono font-semibold text-text whitespace-nowrap">{c.salesOrderNumber || c.linkedSo}</span>,
+            render: (c) => <span className="font-mono font-semibold text-text whitespace-nowrap">{c.salesOrderNumber || c.linkedSo || c.sourceQuotationNumber}</span>,
         },
         {
             key: 'customer',
@@ -385,7 +404,8 @@ export const DeliveryChallansPage = () => {
                     <Send size={13}/>
                   </button>
                 )}
-                {c.status !== 'Delivered' && c.status !== 'Cancelled' && (
+                {c.status === 'Draft' && <Button size="sm" onClick={() => prepareDraftDispatch(c)}>Prepare Dispatch</Button>}
+                {c.status !== 'Draft' && c.status !== 'Delivered' && c.status !== 'Cancelled' && (
                   <button
                     onClick={() => markDelivered(c.id)}
                     className="px-2 py-0.5 bg-primary hover:bg-primary-hover text-white rounded text-[11px] font-semibold cursor-pointer flex items-center gap-1 shadow-2xs transition-colors"
@@ -448,7 +468,8 @@ export const DeliveryChallansPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Source Sales Order *</label>
-                  <select required value={selectedSoId} onChange={(e) => handleSoChange(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
+                  <select disabled={Boolean(draftChallan)} required={!draftChallan} value={selectedSoId} onChange={(e) => handleSoChange(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
+                    {draftChallan && <option value="">{draftChallan.sourceQuotationNumber} - {draftChallan.customer}</option>}
                     {salesOrders.map((so) => (<option key={so.id} value={so.id}>
                         {so.orderNumber} - {so.customer} ({so.items?.length || 0} items)
                       </option>))}
@@ -684,7 +705,7 @@ export const DeliveryChallansPage = () => {
                   ) : (
                     <p className="text-slate-600">Customer Receiving Facility / Inbound Dock</p>
                   )}
-                  <p className="text-slate-600 mt-1">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo}</strong></p>
+                  <p className="text-slate-600 mt-1">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo || selectedChallan.sourceQuotationNumber}</strong></p>
                 </div>
               </div>
 
@@ -990,7 +1011,8 @@ export const DeliveryChallansPage = () => {
                 Logistics Status: <strong className="text-slate-800">{selectedChallan.status}</strong>
               </span>
               <div className="flex items-center gap-2">
-                {selectedChallan.status !== 'Delivered' && selectedChallan.status !== 'Cancelled' && (
+                {selectedChallan.status === 'Draft' && <Button onClick={() => prepareDraftDispatch(selectedChallan)}>Prepare Dispatch</Button>}
+                {selectedChallan.status !== 'Draft' && selectedChallan.status !== 'Delivered' && selectedChallan.status !== 'Cancelled' && (
                   <Button onClick={() => markDelivered(selectedChallan.id)}>
                     Confirm Proof of Delivery (POD)
                   </Button>
