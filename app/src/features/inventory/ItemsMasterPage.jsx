@@ -9,6 +9,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { PageHeader } from '../../components/common/PageHeader';
 import { BarcodeLabelModal } from '../../components/common/BarcodeLabelModal';
 import { ImportModal } from '../../components/common/ImportModal';
+import { formatSheetDimensions, formatSheetWeight } from '../../utils/dimensionUtils';
 
 export const ItemsMasterPage = () => {
     const { items, itemParts = [], addInventoryItem, vendors, addPurchaseOrder, formatCurrency } = useERP();
@@ -117,6 +118,8 @@ export const ItemsMasterPage = () => {
               const machinePartsCount = i.itemKind === 'Machine'
                 ? itemParts.filter(ip => String(ip.parentItemId || ip.itemId) === String(i.id)).length
                 : 0;
+              const sheetDims = formatSheetDimensions(i);
+              const sheetWeight = formatSheetWeight(i);
 
               return (
                 <div className="space-y-0.5">
@@ -134,6 +137,15 @@ export const ItemsMasterPage = () => {
                         <span>•</span>
                         <span className="font-bold text-indigo-700 bg-indigo-50 dark:bg-indigo-500/15 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/30 text-[10px]">
                           {machinePartsCount} BOM parts
+                        </span>
+                      </>
+                    )}
+                    {sheetDims && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-[10px] text-text-secondary" title="Registered sheet size (H × W × L)">
+                          {sheetDims}
+                          {sheetWeight ? ` • ${sheetWeight}` : ''}
                         </span>
                       </>
                     )}

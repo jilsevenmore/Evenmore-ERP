@@ -88,6 +88,10 @@
  */
 
 /**
+ * @typedef {'mm' | 'cm' | 'm' | 'in'} DimensionUnit
+ */
+
+/**
  * @typedef {Object} DocumentLineItem
  * @property {string} id
  * @property {string} itemId - InventoryItem.id
@@ -141,6 +145,16 @@
  * @property {number} [unitConversionFactor]
  * @property {TrackingMode} [trackingMode]
  * @property {string[]} [serialNumbers]
+ * @property {boolean} [hasSheetSpec] - true when the part carries a physical sheet size
+ * @property {number} [sheetHeight] - height / thickness of one piece, in sheetHeightUnit
+ * @property {DimensionUnit} [sheetHeightUnit]
+ * @property {number} [sheetWidth] - width of one piece, in sheetWidthUnit
+ * @property {DimensionUnit} [sheetWidthUnit]
+ * @property {number} [sheetLength] - length of one piece, in sheetLengthUnit
+ * @property {DimensionUnit} [sheetLengthUnit]
+ * @property {number} [sheetWeightKg] - weight of one piece, always kilograms
+ * @property {DimensionUnit} [dimensionUnit] - legacy: single unit for all three axes,
+ *   still read as a fallback on records saved before per-axis units
  */
 
 /**

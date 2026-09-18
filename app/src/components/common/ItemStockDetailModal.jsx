@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ArrowDownLeft, ArrowUpRight, AlertTriangle, Layers, Sliders, ShieldCheck, Award, QrCode, Eye } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { formatDisplayDate, formatWarrantyPeriod, getWarrantyStatusStyle } from '../../utils/warrantyUtils';
+import { dimensionUnitLabel, sheetAxisUnit } from '../../utils/dimensionUtils';
 import { WarrantyCardModal } from './WarrantyCardModal';
 // Display unit without double-pluralizing ("Pcs" -> "Pcs", "Unit" -> "Units").
 const pluralizeUom = (uom) => {
@@ -168,6 +169,49 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                 </button>
               </div>
             </form>)}
+
+          {/* Sheet / Part Dimensional Spec — registered H × W × L and piece weight */}
+          {item.hasSheetSpec && (
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <Layers className="w-5 h-5 text-blue-600"/>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    Sheet / Part Dimensional Spec
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Registered physical size of one {item.uom || 'piece'}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-white p-3 rounded-lg border border-slate-200 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Height / Thickness</span>
+                  <p className="font-mono font-bold text-slate-800">
+                    {item.sheetHeight || 0} <span className="font-sans font-normal text-slate-400">{dimensionUnitLabel(sheetAxisUnit(item, 'height'))}</span>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Width</span>
+                  <p className="font-mono font-bold text-slate-800">
+                    {item.sheetWidth || 0} <span className="font-sans font-normal text-slate-400">{dimensionUnitLabel(sheetAxisUnit(item, 'width'))}</span>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Length</span>
+                  <p className="font-mono font-bold text-slate-800">
+                    {item.sheetLength || 0} <span className="font-sans font-normal text-slate-400">{dimensionUnitLabel(sheetAxisUnit(item, 'length'))}</span>
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 font-semibold uppercase">Weight</span>
+                  <p className="font-mono font-bold text-blue-700">
+                    {item.sheetWeightKg || 0} <span className="font-sans font-normal text-slate-400">kg</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Warranty Policy & Physical Asset Registry Section */}
           <div className="bg-gradient-to-r from-emerald-50/60 to-teal-50/60 border border-emerald-200 rounded-xl p-4 space-y-3">

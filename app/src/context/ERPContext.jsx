@@ -1411,6 +1411,18 @@ export const ERPProvider = ({ children, }) => {
             theoreticalWeight: Number(item.theoreticalWeight) || 0,
             tolerancePct: item.tolerancePct !== undefined && item.tolerancePct !== '' ? Number(item.tolerancePct) : 2,
             weightUnit: item.weightUnit || 'kg',
+            // ── Sheet / part dimensional spec ──
+            // hasSheetSpec gates the block; each of sheetHeight/Width/Length is stored
+            // exactly as entered next to its own unit ('mm' | 'cm' | 'm' | 'in'), so a
+            // plate can be 2 mm thick and 4 ft wide. sheetWeightKg is always kilograms.
+            hasSheetSpec: Boolean(item.hasSheetSpec),
+            sheetHeight: Number(item.sheetHeight) || 0,
+            sheetHeightUnit: item.sheetHeightUnit || item.dimensionUnit || 'mm',
+            sheetWidth: Number(item.sheetWidth) || 0,
+            sheetWidthUnit: item.sheetWidthUnit || item.dimensionUnit || 'mm',
+            sheetLength: Number(item.sheetLength) || 0,
+            sheetLengthUnit: item.sheetLengthUnit || item.dimensionUnit || 'mm',
+            sheetWeightKg: Number(item.sheetWeightKg) || 0,
             trackingMode: isService ? 'None' : (item.trackingMode || 'Quantity'),
             serialNumbers: serials,
             batchNumber: item.batchNumber || undefined,
@@ -1473,9 +1485,37 @@ export const ERPProvider = ({ children, }) => {
                 : updatedAvailableQty <= reorderLvl
                 ? 'Low Stock'
                 : 'Optimal';
+            // Sheet spec: keep the stored shape numeric, and clear the whole block
+            // (rather than leaving stale dimensions behind) when it is switched off.
+            const sheetSpecOn = updates.hasSheetSpec !== undefined ? Boolean(updates.hasSheetSpec) : Boolean(item.hasSheetSpec);
+            const pickSheetNumber = (key) => Number(updates[key] !== undefined ? updates[key] : item[key]) || 0;
+            // `dimensionUnit` is the pre-per-axis field, still honoured for legacy records
+            const pickSheetUnit = (key) => updates[key] || item[key] || item.dimensionUnit || 'mm';
+            const sheetSpec = sheetSpecOn
+                ? {
+                    hasSheetSpec: true,
+                    sheetHeight: pickSheetNumber('sheetHeight'),
+                    sheetHeightUnit: pickSheetUnit('sheetHeightUnit'),
+                    sheetWidth: pickSheetNumber('sheetWidth'),
+                    sheetWidthUnit: pickSheetUnit('sheetWidthUnit'),
+                    sheetLength: pickSheetNumber('sheetLength'),
+                    sheetLengthUnit: pickSheetUnit('sheetLengthUnit'),
+                    sheetWeightKg: pickSheetNumber('sheetWeightKg'),
+                }
+                : {
+                    hasSheetSpec: false,
+                    sheetHeight: 0,
+                    sheetHeightUnit: pickSheetUnit('sheetHeightUnit'),
+                    sheetWidth: 0,
+                    sheetWidthUnit: pickSheetUnit('sheetWidthUnit'),
+                    sheetLength: 0,
+                    sheetLengthUnit: pickSheetUnit('sheetLengthUnit'),
+                    sheetWeightKg: 0,
+                };
             const updated = {
                 ...item,
                 ...updates,
+                ...sheetSpec,
                 serialNumbers: serials,
                 availableQty: updatedAvailableQty,
                 status: computedStatus,

@@ -3,6 +3,15 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import {
+  DIMENSION_UNITS,
+  DEFAULT_DIMENSION_UNIT,
+  STEEL_DENSITY_KG_M3,
+  convertDimension,
+  calcSheetWeightKg,
+  dimensionUnitLabel,
+  sheetAxisUnit,
+} from '../../utils/dimensionUtils';
+import {
   ChevronRight,
   ChevronDown,
   Save,
@@ -33,6 +42,40 @@ import {
   Check,
   ShieldCheck,
 } from 'lucide-react';
+
+/**
+ * One axis of the sheet spec: a number paired with its own unit selector.
+ * `onUnitChange` is expected to convert the value in place, so the operator
+ * never has to re-key a dimension just to change how it is expressed.
+ */
+const DimensionField = ({ label, value, onValueChange, unit, onUnitChange, placeholders }) => (
+  <div>
+    <label className="block text-[11px] font-medium text-slate-600 mb-1">{label}</label>
+    <div className="flex">
+      <input
+        type="number"
+        step="any"
+        min="0"
+        value={value}
+        onChange={(e) => onValueChange(e.target.value)}
+        className="w-full h-9 border border-slate-300 border-r-0 rounded-l-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+        placeholder={placeholders?.[unit] || ''}
+      />
+      <select
+        value={unit}
+        onChange={(e) => onUnitChange(e.target.value)}
+        aria-label={`${label} unit`}
+        className="h-9 w-[70px] shrink-0 border border-slate-300 rounded-r-lg px-1.5 bg-slate-50 text-slate-700 text-xs cursor-pointer focus:outline-none focus:border-blue-600"
+      >
+        {DIMENSION_UNITS.map((u) => (
+          <option key={u.code} value={u.code}>
+            {u.short}
+          </option>
+        ))}
+      </select>
+    </div>
+  </div>
+);
 
 export const AddEditItemPage = () => {
   const { id } = useParams();
@@ -84,6 +127,20 @@ export const AddEditItemPage = () => {
   const [isWeightItem, setIsWeightItem] = useState(false);
   const [theoreticalWeight, setTheoreticalWeight] = useState('');
   const [tolerancePct, setTolerancePct] = useState('2');
+
+  // ── Sheet / part dimensional spec (H × W × L + piece weight) ──
+  // Steel parts are registered against a physical sheet size. Each dimension
+  // keeps its own unit (mm / cm / m / in) because a drawing may call out
+  // thickness in mm and the plate size in inches; sheetWeightKg is always
+  // kilograms so weighbridge & valuation logic needs no conversion.
+  const [hasSheetSpec, setHasSheetSpec] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState('');
+  const [sheetHeightUnit, setSheetHeightUnit] = useState(DEFAULT_DIMENSION_UNIT);
+  const [sheetWidth, setSheetWidth] = useState('');
+  const [sheetWidthUnit, setSheetWidthUnit] = useState(DEFAULT_DIMENSION_UNIT);
+  const [sheetLength, setSheetLength] = useState('');
+  const [sheetLengthUnit, setSheetLengthUnit] = useState(DEFAULT_DIMENSION_UNIT);
+  const [sheetWeightKg, setSheetWeightKg] = useState('');
 
   // Tracking Mode & Serial / Batch numbers
   const [trackingMode, setTrackingMode] = useState('Quantity'); // 'Quantity' | 'Serial' | 'Batch'
@@ -208,6 +265,16 @@ export const AddEditItemPage = () => {
       setIsWeightItem(Boolean(existingItem.isWeightItem));
       setTheoreticalWeight(existingItem.theoreticalWeight !== undefined ? String(existingItem.theoreticalWeight) : '');
       setTolerancePct(existingItem.tolerancePct !== undefined ? String(existingItem.tolerancePct) : '2');
+      // load sheet dimensional spec on edit
+      setHasSheetSpec(Boolean(existingItem.hasSheetSpec));
+      // sheetAxisUnit falls back to the pre-per-axis `dimensionUnit` on older records
+      setSheetHeightUnit(sheetAxisUnit(existingItem, 'height'));
+      setSheetWidthUnit(sheetAxisUnit(existingItem, 'width'));
+      setSheetLengthUnit(sheetAxisUnit(existingItem, 'length'));
+      setSheetHeight(existingItem.sheetHeight !== undefined && existingItem.sheetHeight !== null ? String(existingItem.sheetHeight) : '');
+      setSheetWidth(existingItem.sheetWidth !== undefined && existingItem.sheetWidth !== null ? String(existingItem.sheetWidth) : '');
+      setSheetLength(existingItem.sheetLength !== undefined && existingItem.sheetLength !== null ? String(existingItem.sheetLength) : '');
+      setSheetWeightKg(existingItem.sheetWeightKg !== undefined && existingItem.sheetWeightKg !== null ? String(existingItem.sheetWeightKg) : '');
       setTrackingMode(existingItem.trackingMode || (existingItem.serialNumbers?.length ? 'Serial' : existingItem.batchNumber ? 'Batch' : 'Quantity'));
       setBatchNumber(existingItem.batchNumber || '');
       setLotNumber(existingItem.lotNumber || '');
@@ -536,9 +603,38 @@ export const AddEditItemPage = () => {
     );
   };
 
+  /**
+   * Switching one dimension's unit re-expresses only that value, so 2500 mm
+   * becomes 250 cm rather than silently changing the physical size. The other
+   * two dimensions keep whatever units they were given.
+   */
+  const handleDimensionUnitChange = (setValue, currentUnit, setUnit) => (nextUnit) => {
+    if (nextUnit === currentUnit) return;
+    setValue((v) => convertDimension(v, currentUnit, nextUnit));
+    setUnit(nextUnit);
+  };
+
+  // Theoretical mild-steel weight for the entered H x W x L — each axis is
+  // normalised from its own unit — offered as a one-click fill; the operator can
+  // always overwrite it with a weighed value.
+  const suggestedSheetWeightKg = useMemo(
+    () => calcSheetWeightKg({
+      height: sheetHeight,
+      width: sheetWidth,
+      length: sheetLength,
+      heightUnit: sheetHeightUnit,
+      widthUnit: sheetWidthUnit,
+      lengthUnit: sheetLengthUnit,
+    }),
+    [sheetHeight, sheetWidth, sheetLength, sheetHeightUnit, sheetWidthUnit, sheetLengthUnit]
+  );
+
   const handleSubmit = (e) => {
     e.preventDefault();
     const isService = itemKind === 'Service';
+    // Services have no physical sheet, so the spec is dropped even if it was filled
+    // in before the kind was switched.
+    const sheetSpecEnabled = hasSheetSpec && !isService;
     const parsedCost = parseFloat(costPrice) || 0;
     const parsedSelling = parseFloat(sellingPrice) || 0;
     const parsedQty = isService ? 0 : (trackingMode === 'Serial' ? parsedSerialNumbers.length : (parseInt(availableQty, 10) || 0));
@@ -574,6 +670,15 @@ export const AddEditItemPage = () => {
       isWeightItem,
       theoreticalWeight: isWeightItem ? (parseFloat(theoreticalWeight) || 0) : undefined,
       tolerancePct: isWeightItem ? (parseFloat(tolerancePct) > 0 ? parseFloat(tolerancePct) : 2) : undefined,
+      // persist the sheet dimensional spec (each of H × W × L with its own unit, weight always kg)
+      hasSheetSpec: sheetSpecEnabled,
+      sheetHeight: sheetSpecEnabled ? (parseFloat(sheetHeight) || 0) : undefined,
+      sheetHeightUnit: sheetSpecEnabled ? sheetHeightUnit : undefined,
+      sheetWidth: sheetSpecEnabled ? (parseFloat(sheetWidth) || 0) : undefined,
+      sheetWidthUnit: sheetSpecEnabled ? sheetWidthUnit : undefined,
+      sheetLength: sheetSpecEnabled ? (parseFloat(sheetLength) || 0) : undefined,
+      sheetLengthUnit: sheetSpecEnabled ? sheetLengthUnit : undefined,
+      sheetWeightKg: sheetSpecEnabled ? (parseFloat(sheetWeightKg) || 0) : undefined,
       trackingMode: isService ? 'None' : trackingMode,
       serialNumbers: trackingMode === 'Serial' ? parsedSerialNumbers : [],
       batchNumber: trackingMode === 'Batch' ? batchNumber : undefined,
@@ -632,7 +737,7 @@ export const AddEditItemPage = () => {
 
     setSavedAlert(true);
     setTimeout(() => {
-      navigate(itemKind === 'Machine' ? '/items/machines' : '/items/stock');
+      navigate(itemKind === 'Machine' ? '/inventory/items/machines' : '/inventory/items/stock');
     }, 500);
   };
 
@@ -652,7 +757,7 @@ export const AddEditItemPage = () => {
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
             <Link
-              to={itemKind === 'Machine' ? '/items/machines' : '/items/stock'}
+              to={itemKind === 'Machine' ? '/inventory/items/machines' : '/inventory/items/stock'}
               className="text-blue-600 hover:underline font-semibold"
             >
               {itemKind === 'Machine' ? 'Machine Master' : 'Stock Inventory'}
@@ -676,7 +781,7 @@ export const AddEditItemPage = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link to={itemKind === 'Machine' ? '/items/machines' : '/items/stock'}>
+          <Link to={itemKind === 'Machine' ? '/inventory/items/machines' : '/inventory/items/stock'}>
             <Button variant="outline" icon={ArrowLeft}>
               Back to {itemKind === 'Machine' ? 'Machines' : 'Stock'}
             </Button>
@@ -1037,6 +1142,98 @@ export const AddEditItemPage = () => {
                   )}
                 </div>
               </div>
+
+              {/* ── Sheet / Part Dimensional Spec (H × W × L + kg) ──
+                    Registered per part so cutting plans, nesting and freight all read the
+                    same physical size. The linear unit is operator-selectable (mm / cm / m)
+                    because mill certificates and drawings quote different units; weight is
+                    always kilograms. Not applicable to services. */}
+              {itemKind !== 'Service' && (
+                <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-xl space-y-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={hasSheetSpec}
+                      onChange={(e) => setHasSheetSpec(e.target.checked)}
+                      className="w-4 h-4 accent-blue-600 cursor-pointer"
+                    />
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                      <Layers size={13} className="text-blue-600" /> Sheet / Part Dimensions (H × W × L + Weight)
+                    </span>
+                  </label>
+                  <p className="text-[11px] text-slate-500 -mt-1.5 ml-6">
+                    Physical size of one piece — used for cutting plans, nesting and freight.
+                    Each dimension has its own unit; switching a unit converts the value already entered.
+                  </p>
+
+                  {hasSheetSpec && (
+                    <div className="ml-6 space-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <DimensionField
+                          label="Height / Thickness"
+                          value={sheetHeight}
+                          onValueChange={setSheetHeight}
+                          unit={sheetHeightUnit}
+                          onUnitChange={handleDimensionUnitChange(setSheetHeight, sheetHeightUnit, setSheetHeightUnit)}
+                          placeholders={{ mm: 'e.g. 2', cm: 'e.g. 0.2', m: 'e.g. 0.002', in: 'e.g. 0.079' }}
+                        />
+                        <DimensionField
+                          label="Width"
+                          value={sheetWidth}
+                          onValueChange={setSheetWidth}
+                          unit={sheetWidthUnit}
+                          onUnitChange={handleDimensionUnitChange(setSheetWidth, sheetWidthUnit, setSheetWidthUnit)}
+                          placeholders={{ mm: 'e.g. 1250', cm: 'e.g. 125', m: 'e.g. 1.25', in: 'e.g. 49.2' }}
+                        />
+                        <DimensionField
+                          label="Length"
+                          value={sheetLength}
+                          onValueChange={setSheetLength}
+                          unit={sheetLengthUnit}
+                          onUnitChange={handleDimensionUnitChange(setSheetLength, sheetLengthUnit, setSheetLengthUnit)}
+                          placeholders={{ mm: 'e.g. 2500', cm: 'e.g. 250', m: 'e.g. 2.5', in: 'e.g. 98.4' }}
+                        />
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                            Weight (per piece)
+                          </label>
+                          <div className="flex">
+                            <input
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              value={sheetWeightKg}
+                              onChange={(e) => setSheetWeightKg(e.target.value)}
+                              className="w-full h-9 border border-slate-300 border-r-0 rounded-l-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+                              placeholder="e.g. 49.06"
+                            />
+                            <span className="h-9 w-[70px] shrink-0 border border-slate-300 rounded-r-lg bg-slate-100 text-slate-500 text-xs flex items-center justify-center">
+                              kg
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {suggestedSheetWeightKg > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200">
+                          <span>
+                            <span className="font-semibold text-slate-800">Theoretical weight: </span>
+                            <span className="font-mono">{suggestedSheetWeightKg} kg</span>
+                            <span className="text-slate-400"> (mild steel @ {STEEL_DENSITY_KG_M3} kg/m³)</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSheetWeightKg(String(suggestedSheetWeightKg))}
+                            className="px-2 py-0.5 rounded-md border border-blue-200 bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 cursor-pointer"
+                          >
+                            Use this
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Pricing & GST Tax Rate */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2013,7 +2210,7 @@ export const AddEditItemPage = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate(itemKind === 'Machine' ? '/items/machines' : '/items/stock')}
+              onClick={() => navigate(itemKind === 'Machine' ? '/inventory/items/machines' : '/inventory/items/stock')}
             >
               Cancel
             </Button>
