@@ -419,6 +419,95 @@ export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
 }
 
+// ─── Stage 8 Handoff Gates ───────────────────────────────────
+
+/**
+ * Pre-conditions a stage must satisfy before it can be handed off.
+ *
+ * Returns one entry per unmet gate, each with the reason and whether it is
+ * hard (config-mandated) or advisory, so the dialog can explain precisely why
+ * the confirm button is disabled instead of just greying it out.
+ */
+export function validateStageHandoff(stage, config, now = Date.now()) {
+  const blockers = [];
+  if (!stage) return [{ code: "NO_STAGE", label: "Stage not found.", hard: true }];
+
+  if (stage.status === "Completed") {
+    blockers.push({ code: "ALREADY_DONE", label: "This stage is already completed.", hard: true });
+  }
+
+  if (stage.status === "Not Started" || !stage.startDateTime) {
+    blockers.push({ code: "NOT_STARTED", label: "Stage has not been started yet.", hard: true });
+  }
+
+  const completion = computeStageCompletionPct(stage);
+  if (completion < 100) {
+    blockers.push({
+      code: "INCOMPLETE",
+      label: `Stage is at ${completion}% — finish the work before handing off.`,
+      hard: false,
+    });
+  }
+
+  const blockedTasks = (stage.tasks ?? []).filter((t) => t.status === "Blocked");
+  if (blockedTasks.length > 0) {
+    blockers.push({
+      code: "BLOCKED_TASKS",
+      label: `${blockedTasks.length} task${blockedTasks.length === 1 ? " is" : "s are"} still blocked.`,
+      hard: true,
+    });
+  }
+
+  if (stage.delayDetails?.isDelayed) {
+    blockers.push({
+      code: "OPEN_DELAY",
+      label: "An open delay is logged against this stage — resolve it first.",
+      hard: true,
+    });
+  }
+
+  if (config?.requiredDocument && (stage.documents ?? []).length === 0) {
+    blockers.push({
+      code: "NEEDS_DOCUMENT",
+      label: "This stage requires a document upload before handoff.",
+      hard: true,
+    });
+  }
+
+  if (config?.requiredApproval) {
+    const approved = (stage.approvals ?? []).some((a) => a.status === "Approved");
+    if (!approved) {
+      blockers.push({
+        code: "NEEDS_APPROVAL",
+        label: "This stage requires an approved sign-off before handoff.",
+        hard: true,
+      });
+    }
+  }
+
+  void now;
+  return blockers;
+}
+
+/** A completed stage's headline numbers, for the handoff summary panel. */
+export function summariseStageForHandoff(stage, now = Date.now()) {
+  const timing = getStageTiming(stage, now);
+  const start = toDate(stage?.startDateTime);
+  const takenMs = start ? Math.max(0, now - start.getTime()) : 0;
+  const plannedMs = durationToMs(stage?.plannedDuration, stage?.durationUnit);
+
+  return {
+    plannedLabel: `${stage?.plannedDuration ?? 0} ${stage?.durationUnit ?? "Days"}`,
+    takenLabel: formatDuration(takenMs),
+    delayLabel: timing.delayMs > 0 ? timing.delayLabel : "On time",
+    isOverdue: timing.delayMs > 0,
+    overrunPct: plannedMs > 0 ? Math.round((takenMs / plannedMs) * 100) : 0,
+    completionPct: computeStageCompletionPct(stage),
+    taskCount: (stage?.tasks ?? []).length,
+    doneTaskCount: (stage?.tasks ?? []).filter((t) => t.status === "Completed").length,
+  };
+}
+
 // ─── Stage 6 Configurator Derivations ────────────────────────
 
 /**
@@ -1067,40 +1156,111 @@ export const usePmsStore = create((set, get) => ({
 
   // ── Stage instances ──
 
-  /** Assign a stage to a user/team and start its clock. */
-  assignStage: (projectId, stageId, { assignedUser, assignedTeam, plannedDuration, durationUnit, startDateTime }) =>
-    set((st) =>
-      applyToProject(
+  /**
+   * Assign a stage to a department, team and employee — the Stage 8 workflow.
+   *
+   * Stamps the start time, lets the expected completion recalculate from the
+   * (possibly overridden) duration, and injects an actionable task for the
+   * assignee so the work shows up in their /pms/my-tasks list. The audit entry
+   * records who assigned what to whom.
+   */
+  assignStage: (
+    projectId,
+    stageId,
+    {
+      assignedUser,
+      assignedTeam,
+      department,
+      plannedDuration,
+      durationUnit,
+      startDateTime,
+      status = "Assigned",
+      notes = "",
+      actor = null,
+      injectTask = true,
+    } = {}
+  ) =>
+    set((st) => {
+      const project = st.projects.find((p) => p.id === projectId);
+      const target = project?.stages.find((s2) => s2.id === stageId);
+      const stageName = target?.name ?? "stage";
+      const nextDepartment = department ?? target?.department;
+
+      const assignment = makeActivity(
+        "STAGE_ASSIGNED",
+        "Stage",
+        stageId,
+        `${actor?.name ?? "PM"} assigned Stage ${target?.sequence ?? "?"} (${stageName}) to ${
+          assignedUser?.name ?? assignedTeam ?? "the team"
+        }${nextDepartment ? ` in ${nextDepartment}` : ""}.`,
+        actor
+      );
+      assignment.from = target?.assignedUser?.name ?? "Unassigned";
+      assignment.to = assignedUser?.name ?? assignedTeam ?? "Team";
+      if (notes) assignment.comments = notes;
+
+      return applyToProject(
         st,
         projectId,
         (p) => ({
           ...p,
           currentStageId: stageId,
-          currentDepartment:
-            p.stages.find((s2) => s2.id === stageId)?.department ?? p.currentDepartment,
-          stages: p.stages.map((stage) =>
-            stage.id !== stageId
-              ? stage
-              : {
-                  ...stage,
-                  assignedUser: assignedUser ?? stage.assignedUser,
-                  assignedTeam: assignedTeam ?? stage.assignedTeam,
-                  plannedDuration: plannedDuration ?? stage.plannedDuration,
-                  durationUnit: durationUnit ?? stage.durationUnit,
-                  startDateTime:
-                    startDateTime ?? stage.startDateTime ?? new Date().toISOString(),
-                  status: "Assigned",
-                }
-          ),
+          currentDepartment: nextDepartment ?? p.currentDepartment,
+          stages: p.stages.map((stage) => {
+            if (stage.id !== stageId) return stage;
+
+            const start = startDateTime ?? stage.startDateTime ?? new Date().toISOString();
+            const duration = plannedDuration ?? stage.plannedDuration;
+            const unit = durationUnit ?? stage.durationUnit;
+
+            const next = {
+              ...stage,
+              assignedUser: assignedUser ?? stage.assignedUser,
+              assignedTeam: assignedTeam ?? stage.assignedTeam,
+              department: nextDepartment ?? stage.department,
+              plannedDuration: duration,
+              durationUnit: unit,
+              startDateTime: start,
+              status,
+            };
+
+            // Give the assignee something actionable. A stage with no tasks
+            // tracks its own percentage, so the injected task inherits it and
+            // the rollup does not jump backwards.
+            if (injectTask && assignedUser?.id) {
+              const alreadyHasOne = (stage.tasks ?? []).some(
+                (t) => t.assignedUser?.id === assignedUser.id && t.status !== "Completed"
+              );
+              if (!alreadyHasOne) {
+                next.tasks = [
+                  ...(stage.tasks ?? []),
+                  {
+                    id: uid("TSK"),
+                    stageId,
+                    projectId,
+                    taskName: `${stageName} — ${nextDepartment ?? "work"}`,
+                    description:
+                      notes || `Complete the ${stageName} stage and submit it for review.`,
+                    assignedUser: { id: assignedUser.id, name: assignedUser.name },
+                    department: nextDepartment ?? stage.department,
+                    startDate: start,
+                    dueDate:
+                      computeExpectedCompletion(start, duration, unit) ?? start,
+                    completionPct:
+                      (stage.tasks ?? []).length === 0 ? clampPct(stage.completionPct ?? 0) : 0,
+                    priority: p.priority ?? "Medium",
+                    status: status === "In Progress" ? "In Progress" : "Not Started",
+                  },
+                ];
+              }
+            }
+
+            return next;
+          }),
         }),
-        makeActivity(
-          "STAGE_ASSIGNED",
-          "Stage",
-          stageId,
-          `Stage assigned to ${assignedUser?.name ?? assignedTeam ?? "team"}.`
-        )
-      )
-    ),
+        assignment
+      );
+    }),
 
   /**
    * Start a stage: stamps the start time (first start only) and moves it to
@@ -1221,6 +1381,97 @@ export const usePmsStore = create((set, get) => ({
         )
       )
     ),
+
+  /**
+   * Hand a completed stage to the next department — the Stage 8 protocol:
+   * current department completes → PM review → next department starts.
+   *
+   * Closes the current stage with its actual completion time, unlocks and
+   * assigns the next stage in sequence, and writes a handoff record carrying
+   * From User → To User and From Dept → To Dept with the handover notes.
+   */
+  handoffStage: (
+    projectId,
+    stageId,
+    { recipient, recipientTeam, notes = "", checklist = [], actor = null, force = false } = {}
+  ) => {
+    const state = get();
+    const project = state.projects.find((p) => p.id === projectId);
+    if (!project) throw new Error(`Unknown project ${projectId}`);
+
+    const ordered = [...(project.stages ?? [])].sort((a, b) => a.sequence - b.sequence);
+    const index = ordered.findIndex((s) => s.id === stageId);
+    const stage = ordered[index];
+    if (!stage) throw new Error(`Unknown stage ${stageId}`);
+
+    const config = state.stageConfigs.find((c) => c.id === stage.stageConfigId);
+    const blockers = validateStageHandoff(stage, config);
+    const hardBlockers = blockers.filter((b) => b.hard);
+    if (hardBlockers.length > 0 && !force) {
+      const err = new Error(hardBlockers.map((b) => b.label).join(" "));
+      err.blockers = hardBlockers;
+      throw err;
+    }
+
+    const nextStage = ordered[index + 1] ?? null;
+    const nowIso = new Date().toISOString();
+
+    const handoff = makeActivity(
+      "STAGE_HANDOFF",
+      "Stage",
+      stageId,
+      nextStage
+        ? `${stage.name} completed and handed off to ${nextStage.name}.`
+        : `${stage.name} completed — final stage in the pipeline.`,
+      actor
+    );
+    handoff.from = `${stage.assignedUser?.name ?? "Unassigned"} · ${stage.department}`;
+    handoff.to = nextStage
+      ? `${recipient?.name ?? "Unassigned"} · ${nextStage.department}`
+      : "Project close-out";
+    if (notes) handoff.comments = notes;
+    if (checklist.length > 0) handoff.checklist = checklist;
+
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          currentStageId: nextStage?.id ?? stageId,
+          currentDepartment: nextStage?.department ?? p.currentDepartment,
+          stages: p.stages.map((s2) => {
+            if (s2.id === stageId) {
+              return {
+                ...s2,
+                status: "Completed",
+                completionPct: 100,
+                actualCompletionDateTime: s2.actualCompletionDateTime ?? nowIso,
+                tasks: (s2.tasks ?? []).map((t) => ({
+                  ...t,
+                  completionPct: 100,
+                  status: "Completed",
+                })),
+              };
+            }
+            if (nextStage && s2.id === nextStage.id) {
+              return {
+                ...s2,
+                assignedUser: recipient ?? s2.assignedUser,
+                assignedTeam: recipientTeam ?? s2.assignedTeam,
+                startDateTime: s2.startDateTime ?? nowIso,
+                status: "Assigned",
+              };
+            }
+            return s2;
+          }),
+        }),
+        handoff
+      )
+    );
+
+    return nextStage?.id ?? null;
+  },
 
   // ── Delay tracking ──
 

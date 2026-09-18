@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, ListChecks, Send, FileText, ShieldCheck, Check, Clock } from 'lucide-react';
+import { Play, ListChecks, Send, FileText, ShieldCheck, Check, Clock, ArrowRightLeft } from 'lucide-react';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { DynamicProgressBar } from '../../components/DynamicProgressBar';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
@@ -70,7 +70,7 @@ function GateBadge({ required, satisfied, label, icon: Icon }) {
   );
 }
 
-function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, onSubmit, readOnly }) {
+function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, onSubmit, onHandoff, readOnly }) {
   const timing = getStageTiming(stage);
   const tone = DEPARTMENT_TONES[stage.department] ?? { bg: '#f1f5f9', fg: '#475569' };
 
@@ -229,6 +229,15 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
             >
               <Send size={12} /> Submit Stage
             </button>
+            <button
+              type="button"
+              onClick={() => onHandoff?.(stage)}
+              disabled={isDone || notStarted}
+              title="Hand off to the next department"
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-violet-700 hover:border-violet-300 hover:bg-violet-50 disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-slate-600 disabled:hover:border-[#dce5f4] disabled:cursor-not-allowed"
+            >
+              <ArrowRightLeft size={12} /> Hand Off
+            </button>
             {isCurrent && (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 ml-auto">
                 <Clock size={11} /> Active stage
@@ -241,7 +250,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
   );
 }
 
-export function StageTimelineTab({ project, stageConfigs = [], onStart, onManageTasks, onSubmit }) {
+export function StageTimelineTab({ project, stageConfigs = [], onStart, onManageTasks, onSubmit, onHandoff }) {
   const ordered = [...(project.stages ?? [])].sort((a, b) => a.sequence - b.sequence);
   const configById = new Map(stageConfigs.map((c) => [c.id, c]));
 
@@ -270,6 +279,7 @@ export function StageTimelineTab({ project, stageConfigs = [], onStart, onManage
           onStart={onStart}
           onManageTasks={onManageTasks}
           onSubmit={onSubmit}
+          onHandoff={onHandoff}
         />
       ))}
     </ol>

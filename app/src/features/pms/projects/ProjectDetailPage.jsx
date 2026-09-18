@@ -12,6 +12,8 @@ import { StageTasksTab } from './components/StageTasksTab';
 import { DocumentsProofTab } from './components/DocumentsProofTab';
 import { ApprovalsTab } from './components/ApprovalsTab';
 import { ActivityAuditTab } from './components/ActivityAuditTab';
+import { AssignStageModal } from './components/AssignStageModal';
+import { StageHandoffModal } from '../components/StageHandoffModal';
 
 /**
  * ProjectDetailPage (/pms/projects/:id) — the project workspace.
@@ -43,6 +45,8 @@ export default function ProjectDetailPage() {
   const [tab, setTab] = useState('timeline');
   const [focusStageId, setFocusStageId] = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
+  const [assignStageId, setAssignStageId] = useState(null); // null = closed
+  const [handoffStageId, setHandoffStageId] = useState(null);
 
   const project = useMemo(() => projects.find((p) => p.id === id) ?? null, [projects, id]);
   const meta = useMemo(() => (project ? getProjectRowMeta(project) : null), [project]);
@@ -88,10 +92,7 @@ export default function ProjectDetailPage() {
       <ProjectHeader
         project={project}
         meta={meta}
-        onAssignStage={() => {
-          setTab('timeline');
-          setFocusStageId(currentStage?.id ?? null);
-        }}
+        onAssignStage={() => setAssignStageId(currentStage?.id ?? '')}
         onSubmitForReview={() => currentStage && handleSubmitStage(currentStage)}
         onLogDelay={() => navigate(`/pms/delays?project=${project.id}`)}
         onCompleteProject={() => setConfirmComplete(true)}
@@ -149,6 +150,7 @@ export default function ProjectDetailPage() {
             onStart={(stage) => startStage(project.id, stage.id, project.projectManager)}
             onManageTasks={handleManageTasks}
             onSubmit={handleSubmitStage}
+            onHandoff={(stage) => setHandoffStageId(stage.id)}
           />
         )}
 
@@ -171,6 +173,21 @@ export default function ProjectDetailPage() {
         {tab === 'approvals' && <ApprovalsTab project={project} />}
         {tab === 'activity' && <ActivityAuditTab project={project} />}
       </div>
+
+      <AssignStageModal
+        isOpen={assignStageId !== null}
+        initialStageId={assignStageId || null}
+        project={project}
+        onClose={() => setAssignStageId(null)}
+      />
+
+      <StageHandoffModal
+        isOpen={handoffStageId !== null}
+        stageId={handoffStageId}
+        project={project}
+        onClose={() => setHandoffStageId(null)}
+        onHandedOff={(nextId) => setFocusStageId(nextId)}
+      />
 
       {/* Complete project confirmation */}
       <Modal
