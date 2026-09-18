@@ -41,6 +41,8 @@ import {
   formatINR,
 } from "./salaryCalculations";
 import { Badge } from "../../../components/hrms/Badge";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 // Clean browser PDF payslip generator with full formula breakdown
 function downloadPayslipPdf(p) {
@@ -697,9 +699,12 @@ export default function Payroll() {
       {/* ── Top Header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold tracking-tight text-slate-900">
-            Payroll Management
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold tracking-tight text-slate-900">
+              Payroll Management
+            </h1>
+            <PageInfoButton guide={hrmsGuides.payroll} />
+          </div>
           <p className="text-[13px] text-muted">
             Attendance &amp; Advance Formula: <span className="font-semibold text-slate-700">Remaining Payable = Standard CTC - Attendance LOP (Remaining Days Removed) + Earnings - Deductions - Advance Recovered</span>
           </p>

@@ -9,6 +9,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { useTrainingStore, TRAINING_FUNNEL_STAGES } from "../../../stores/trainingStore";
 import { useNavigate } from "react-router-dom";
 import { Eye, Pencil, Trash2, ArrowLeft } from "lucide-react";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export default function TrainingList({ embedded = false, onBack }) {
   const showToast = useAppStore((s) => s.showToast);
@@ -161,7 +163,10 @@ export default function TrainingList({ embedded = false, onBack }) {
 
       <div className="flex flex-wrap justify-between items-center gap-3">
         <div>
-          <h1 className="text-[22px] font-bold text-slate-900">Training Programs</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-900">Training Programs</h1>
+            <PageInfoButton guide={hrmsGuides.trainingList} />
+          </div>
           <p className="text-[13px] text-muted">{trainings.length} total programs linked to Funnel and Performance</p>
         </div>
         <div className="flex items-center gap-2">

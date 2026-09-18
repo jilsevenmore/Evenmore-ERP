@@ -1,4 +1,6 @@
 import { AlertTriangle } from "lucide-react";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 const stages = [
   { label: "Created", count: 42, pct: 100 },
   { label: "Assigned", count: 38, pct: 90 },
@@ -9,7 +11,13 @@ const stages = [
 export default function GoalFunnel() {
   const max = stages[0].count;
   return <div className="flex flex-col gap-6">
-      <div><h1 className="text-[22px] font-bold">Goal Funnel</h1><p className="text-[13px] text-muted">Created to completed with at-risk visibility.</p></div>
+      <div>
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-[22px] font-bold text-slate-800">Goal Funnel</h1>
+          <PageInfoButton guide={hrmsGuides.goalFunnel} />
+        </div>
+        <p className="text-[13px] text-muted">Created to completed with at-risk visibility.</p>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <div className="lg:col-span-8 bg-white border border-bdr rounded-xl p-6 shadow-sm">
           <div className="flex flex-col gap-4">

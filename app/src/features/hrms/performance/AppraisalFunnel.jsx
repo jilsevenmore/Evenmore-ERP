@@ -2,6 +2,8 @@ import { useMemo } from "react";
 import { usePerformanceStore } from "../../../stores/performanceStore";
 import { AlertTriangle, CheckCircle, ArrowRight, Clock, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export default function AppraisalFunnel() {
   const navigate = useNavigate();
@@ -52,7 +54,10 @@ export default function AppraisalFunnel() {
         </div>
         <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[22px] font-bold text-slate-800">Appraisal Funnel</h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[22px] font-bold text-slate-800">Appraisal Funnel</h1>
+              <PageInfoButton guide={hrmsGuides.appraisalFunnel} />
+            </div>
             <p className="text-[13px] text-slate-500 mt-0.5">
               Live workflow progression from initiation to finalized rating sync.
             </p>

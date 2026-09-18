@@ -27,6 +27,18 @@ const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAll
 const CRMSystemSetupPage = lazy(() => import('../features/crm/setup/CRMSystemSetupPage'));
 const CRMReportsPage = lazy(() => import('../features/crm/reports/CRMReportsPage'));
 
+// ── PMS — Project Management (Lazy Loaded) ───────────────────
+const PMSDashboard = lazy(() => import('../features/pms/dashboard/PMSDashboard'));
+const PMSProjectsPage = lazy(() => import('../features/pms/projects/ProjectsPage'));
+const PMSProjectDetailPage = lazy(() => import('../features/pms/projects/ProjectDetailPage'));
+const PMSMyProjectsPage = lazy(() => import('../features/pms/projects/MyProjectsPage'));
+const PMSMyTasksPage = lazy(() => import('../features/pms/tasks/MyTasksPage'));
+const PMSStageConfigPage = lazy(() => import('../features/pms/stages/StageConfigPage'));
+const PMSTimelinePage = lazy(() => import('../features/pms/timeline/TimelinePage'));
+const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDashboardPage'));
+const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
+const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
+
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
@@ -90,6 +102,8 @@ const PurchaseBillsPage = lazy(() => import('../features/purchase/PurchaseBillsP
 const PurchaseReturnsPage = lazy(() => import('../features/purchase/PurchaseReturnsPage').then(m => ({ default: m.PurchaseReturnsPage })));
 const PaymentOutPage = lazy(() => import('../features/purchase/PaymentOutPage').then(m => ({ default: m.PaymentOutPage })));
 const ExpensesPage = lazy(() => import('../features/purchase/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
+// ── [PHASE-2B] Standalone Goods Receipt (GRN) page — route: /purchase/receipts ──
+const GoodsReceiptPage = lazy(() => import('../features/purchase/GoodsReceiptPage').then(m => ({ default: m.GoodsReceiptPage })));
 
 // ── ERP — Inventory (Lazy Loaded) ─────────────────────────────
 const ItemsMasterPage = lazy(() => import('../features/inventory/ItemsMasterPage').then(m => ({ default: m.ItemsMasterPage })));
@@ -212,6 +226,18 @@ const router = createBrowserRouter([
       { path: 'crm/reports', element: <Page component={CRMReportsPage} /> },
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
 
+      // ── PMS — Project Management ──────────────────────────
+      { path: 'pms', element: <Page component={PMSDashboard} /> },
+      { path: 'pms/projects', element: <Page component={PMSProjectsPage} /> },
+      { path: 'pms/projects/:id', element: <Page component={PMSProjectDetailPage} /> },
+      { path: 'pms/my-projects', element: <Page component={PMSMyProjectsPage} /> },
+      { path: 'pms/my-tasks', element: <Page component={PMSMyTasksPage} /> },
+      { path: 'pms/stages', element: <Page component={PMSStageConfigPage} /> },
+      { path: 'pms/timeline', element: <Page component={PMSTimelinePage} /> },
+      { path: 'pms/delays', element: <Page component={PMSDelayDashboardPage} /> },
+      { path: 'pms/reports', element: <Page component={PMSReportsPage} /> },
+      { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
+
       // ── Sales ─────────────────────────────────────────────
       { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },
       { path: 'sales/estimates', element: <Page component={EstimatesPage} /> },
@@ -227,8 +253,11 @@ const router = createBrowserRouter([
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },
-      { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
+      // [PHASE-4] DEAD ROUTE — `purchase/vendors` had no nav entry; parties live at `/parties`.
+      //   Restore if a dedicated vendor workspace is ever needed:
+      // { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
+      { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
       { path: 'purchase/returns', element: <Page component={PurchaseReturnsPage} /> },
       { path: 'purchase/payments', element: <Page component={PaymentOutPage} /> },
@@ -260,18 +289,21 @@ const router = createBrowserRouter([
       { path: 'inventory/audit', element: <Page component={MonthEndAuditPage} /> },
 
       // ── Legacy Root Aliases ───────────────────────────────
-      { path: 'items', element: <Navigate to="/inventory/items" replace /> },
-      { path: 'items/machines', element: <Navigate to="/inventory/items/machines" replace /> },
-      { path: 'items/stock', element: <Navigate to="/inventory/items/stock" replace /> },
-      { path: 'items/new', element: <Navigate to="/inventory/items/new" replace /> },
-      { path: 'items/edit/:id', element: <Page component={AddEditItemPage} /> },
-      { path: 'categories', element: <Navigate to="/inventory/categories" replace /> },
-      { path: 'categories/machine', element: <Navigate to="/inventory/categories/machines" replace /> },
-      { path: 'categories/machines', element: <Navigate to="/inventory/categories/machines" replace /> },
-      { path: 'categories/stock', element: <Navigate to="/inventory/categories/stock" replace /> },
-      { path: 'stock', element: <Navigate to="/inventory/stock-position" replace /> },
-      { path: 'transfers', element: <Navigate to="/inventory/transfers" replace /> },
-      { path: 'purchase-orders', element: <Navigate to="/purchase/orders" replace /> },
+      // [PHASE-4] NAV-AUDITED DEAD ALIASES — no sidebar/navigate() links point at these
+      //   root-level aliases (inventory links use /inventory/...). Commented out per the
+      //   no-delete rule; restore any alias if an old deep-link needs to keep working.
+      // { path: 'items', element: <Navigate to="/inventory/items" replace /> },
+      // { path: 'items/machines', element: <Navigate to="/inventory/items/machines" replace /> },
+      // { path: 'items/stock', element: <Navigate to="/inventory/items/stock" replace /> },
+      // { path: 'items/new', element: <Navigate to="/inventory/items/new" replace /> },
+      // { path: 'items/edit/:id', element: <Page component={AddEditItemPage} /> },
+      // { path: 'categories', element: <Navigate to="/inventory/categories" replace /> },
+      // { path: 'categories/machine', element: <Navigate to="/inventory/categories/machines" replace /> },
+      // { path: 'categories/machines', element: <Navigate to="/inventory/categories/machines" replace /> },
+      // { path: 'categories/stock', element: <Navigate to="/inventory/categories/stock" replace /> },
+      // { path: 'stock', element: <Navigate to="/inventory/stock-position" replace /> },
+      // { path: 'transfers', element: <Navigate to="/inventory/transfers" replace /> },
+      // { path: 'purchase-orders', element: <Navigate to="/purchase/orders" replace /> },
 
       // ── Accounts ──────────────────────────────────────────
       { path: 'accounts', element: <Navigate to="/accounts/cash-bank" replace /> },

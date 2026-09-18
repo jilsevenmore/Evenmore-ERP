@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { Badge } from "../../../components/hrms/Badge";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 export default function Performance() {
   const showToast = useAppStore((s) => s.showToast);
   const [goals, setGoals] = useState([
@@ -10,7 +12,13 @@ export default function Performance() {
   const [filter, setFilter] = useState("All");
   const filtered = filter === "All" ? goals : goals.filter((g) => g.status === filter);
   return <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap justify-between gap-4"><h1 className="text-[24px] font-bold">Performance Management</h1><button onClick={() => showToast("New review cycle created")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">New Review Cycle</button></div>
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-[24px] font-bold">Performance Management</h1>
+          <PageInfoButton guide={hrmsGuides.performanceDashboard} />
+        </div>
+        <button onClick={() => showToast("New review cycle created")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">New Review Cycle</button>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[{ l: "Active Cycle", v: "Q3 2024" }, { l: "Reviews Pending", v: "42" }, { l: "Completed", v: "186" }, { l: "Avg Rating", v: "4.2 / 5" }, { l: "Goals Completed", v: "78%" }].map((x) => <div key={x.l} className="bg-white border border-bdr rounded-xl p-4 shadow-sm"><div className="text-[12px] text-muted">{x.l}</div><div className="text-[20px] font-bold mt-1">{x.v}</div></div>)}
       </div>

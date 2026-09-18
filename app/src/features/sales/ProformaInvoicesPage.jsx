@@ -107,6 +107,7 @@ export const ProformaInvoicesPage = () => {
     formatCurrency,
     formatDateDDMMYYYY,
     getCurrentDateFormatted,
+    companyProfile,
   } = useERP();
 
   const [statusFilter, setStatusFilter] = useState('All');
@@ -1054,12 +1055,12 @@ export const ProformaInvoicesPage = () => {
               {/* Company & Client Header Grid */}
               <div className="grid grid-cols-2 gap-6 p-4 rounded-xl border border-slate-200 bg-white">
                 <div>
-                  <h4 className="font-extrabold text-sm text-[#1F2E4A] mb-1">EVENMORE ERP MEDICAL & SYSTEMS</h4>
+                  {/* [PHASE-2E.1] company identity from companyProfile (was hardcoded Evenmore strings) */}
+                  <h4 className="font-extrabold text-sm text-[#1F2E4A] mb-1">{companyProfile?.name || 'EVENMORE ERP MEDICAL & SYSTEMS'}</h4>
                   <p className="text-slate-600 text-[11px] leading-relaxed">
-                    Corporate Towers, Sector 62, Electronic City<br />
-                    Bengaluru, Karnataka - 560100, India<br />
-                    <strong>GSTIN:</strong> 29AABCU9912E1Z8 • <strong>PAN:</strong> AABCU9912E<br />
-                    <strong>Email:</strong> billing@evenmore.io • <strong>Phone:</strong> +91 80 4920 1100
+                    {companyProfile?.address || 'Corporate Towers, Sector 62, Electronic City<br />Bengaluru, Karnataka - 560100, India'}<br />
+                    <strong>GSTIN:</strong> {companyProfile?.gstin || '29AABCU9912E1Z8'} • <strong>PAN:</strong> {companyProfile?.pan || 'AABCU9912E'}<br />
+                    <strong>Email:</strong> billing@sweven.in • <strong>Phone:</strong> {companyProfile?.phone || '+91 80 4920 1100'}
                   </p>
                 </div>
 

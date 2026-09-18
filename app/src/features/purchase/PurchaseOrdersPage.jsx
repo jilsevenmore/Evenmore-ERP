@@ -28,18 +28,18 @@ const purchaseOrderGuide = {
 };
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
-    const { purchaseOrders, vendors, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { purchaseOrders, vendors, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedPo, setSelectedPo] = useState(null);
     const [printPoTarget, setPrintPoTarget] = useState(null);
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
-    const [expectedDate, setExpectedDate] = useState('In 10 days');
+    const [expectedDate, setExpectedDate] = useState(() => addDaysISO(getCurrentISODate(), 10));
     const [lineItems, setLineItems] = useState([]);
 
     const handleOpenCreateModal = () => {
         setSelectedVendorId(vendors[0]?.id || '');
-        setExpectedDate('In 10 days');
+        setExpectedDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
         setIsFullscreen(false);
         setShowAddModal(true);
@@ -48,14 +48,14 @@ export const PurchaseOrdersPage = () => {
     const handleCloseCreateModal = () => {
         setShowAddModal(false);
         setSelectedVendorId(vendors[0]?.id || '');
-        setExpectedDate('In 10 days');
+        setExpectedDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
         setIsFullscreen(false);
     };
 
     const handleClonePo = (po) => {
         setSelectedVendorId(po.vendorId || vendors[0]?.id || '');
-        setExpectedDate('In 10 days (Reorder)');
+        setExpectedDate(po.expectedDate || addDaysISO(getCurrentISODate(), 10));
         setLineItems((po.items || []).map((it) => ({
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -69,10 +69,10 @@ export const PurchaseOrdersPage = () => {
         const totalAmt = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
         addPurchaseOrder({
             vendorId: vend?.id,
-            vendor: vend?.name || 'Cisco Systems Direct',
-            amount: totalAmt > 0 ? totalAmt : 2500,
+            vendor: vend?.name || 'Direct Vendor',
+            amount: totalAmt > 0 ? totalAmt : 0,
             date: getCurrentDateFormatted(),
-            expectedDate: expectedDate || 'In 10 days',
+            expectedDate: expectedDate || addDaysISO(getCurrentISODate(), 10),
             status: 'Draft',
             items: lineItems,
         });
@@ -334,7 +334,7 @@ export const PurchaseOrdersPage = () => {
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Expected Intake Date</label>
-                  <input type="text" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} placeholder="e.g. In 10 days" className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"/>
+                  <input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800"/>
                 </div>
               </div>
 

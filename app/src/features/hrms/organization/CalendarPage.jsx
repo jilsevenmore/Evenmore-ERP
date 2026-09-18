@@ -27,6 +27,8 @@ import { CalendarWeekView } from "./CalendarWeekView";
 import { CalendarListView } from "./CalendarListView";
 import { CalendarAgendaSidebar } from "./CalendarAgendaSidebar";
 import { AddEditEventModal } from "./AddEditEventModal";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export function CalendarPage() {
   const showToast = useAppStore((s) => s.showToast);
@@ -215,9 +217,12 @@ export function CalendarPage() {
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">
-            Personal &amp; Team Calendar
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">
+              Personal &amp; Team Calendar
+            </h1>
+            <PageInfoButton guide={hrmsGuides.calendar} />
+          </div>
           <p className="text-[13px] text-muted mt-0.5">
             Track leaves, company public holidays, scheduled training sessions, and key milestones.
           </p>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import Modal from '../../../components/ui/Modal';
+import PageInfoButton from '../../../components/common/PageInfoButton';
+import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import { Plus, Award, Search, Edit2, Trash2 } from 'lucide-react';
 
 const INITIAL_DESIGNATIONS = [
@@ -51,7 +53,10 @@ export function DesignationsPage() {
       {/* Header */}
       <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h1 className="text-[24px] font-bold tracking-tight">Designations</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold tracking-tight">Designations</h1>
+            <PageInfoButton guide={hrmsGuides.designations} />
+          </div>
           <p className="text-[13px] text-muted">
             Define corporate job roles, leveling framework, and departmental allocations
           </p>

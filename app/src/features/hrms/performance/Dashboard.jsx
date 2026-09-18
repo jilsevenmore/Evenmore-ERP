@@ -6,6 +6,8 @@ import { DataTable } from "../../../components/hrms/DataTable";
 import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   CalendarCheck,
   Clock,
@@ -244,7 +246,10 @@ export default function Dashboard() {
       {/* Header & New Cycle Action */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-bold text-slate-800">Performance Management</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-800">Performance Management</h1>
+            <PageInfoButton guide={hrmsGuides.performanceDashboard} />
+          </div>
           <p className="text-[13px] text-slate-500 mt-0.5">
             Overview of review cycles, appraisal workflows, indicators, and department ratings.
           </p>

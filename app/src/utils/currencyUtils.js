@@ -65,8 +65,8 @@ try {
   }
 } catch (e) {}
 
-export function getCurrencyConfig(currencyStr = 'USD ($)', customRates = null) {
-  if (!currencyStr) return CURRENCY_CONFIGS.USD;
+export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null) {
+  if (!currencyStr) return CURRENCY_CONFIGS.INR;
   const str = String(currencyStr).toUpperCase();
   let config = CURRENCY_CONFIGS.USD;
 
@@ -87,11 +87,11 @@ export function getCurrencyConfig(currencyStr = 'USD ($)', customRates = null) {
   return config;
 }
 
-export function getCurrencySymbol(currencyStr = 'USD ($)') {
+export function getCurrencySymbol(currencyStr = 'INR (₹)') {
   return getCurrencyConfig(currencyStr).symbol;
 }
 
-export function formatCurrency(amount, currencyStr = 'USD ($)', options = {}) {
+export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) {
   const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
   const config = getCurrencyConfig(currencyStr, options.customRates);
   const converted = num * config.rate;
