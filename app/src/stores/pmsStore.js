@@ -140,7 +140,7 @@ const AUTO_STATUSES = new Set(["Assigned", "In Progress", "At Risk", "Delayed"])
  * Re-derive a stage's status from the clock. Returns the existing status
  * unchanged unless the stage is in an auto-managed state.
  */
-export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = 80) {
+export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = 70) {
   const current = stage?.status;
   if (!AUTO_STATUSES.has(current)) return current;
   if (stage?.delayDetails?.isDelayed) return "Delayed";
@@ -148,13 +148,23 @@ export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = 
   const expected = toDate(stage?.expectedCompletionDateTime);
   if (!expected) return current;
 
+  // Delay detection: past the expected completion and not finished.
   if (now > expected.getTime()) return "Delayed";
-  if (computeElapsedPct(stage, now) >= atRiskThresholdPct) return "At Risk";
+
+  // At-risk heuristic: burning the window faster than the work is progressing.
+  // Both conditions are required — a stage at 90% elapsed and 95% done is
+  // simply near the finish line, not at risk.
+  const elapsed = computeElapsedPct(stage, now);
+  const completion = computeStageCompletionPct(stage);
+  if (elapsed > atRiskThresholdPct && completion < DASHBOARD_AT_RISK_COMPLETION_PCT) {
+    return "At Risk";
+  }
+
   return current === "At Risk" || current === "Delayed" ? "In Progress" : current;
 }
 
 /** Roll stage-level signals up into the project status. */
-export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPct = 80) {
+export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPct = 70) {
   // On Hold is a deliberate pause and only a human clears it.
   if (project?.status === "On Hold") return project.status;
 
@@ -179,7 +189,7 @@ export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPc
 // ─── Recalculation ───────────────────────────────────────────────────
 
 /** Recompute one stage's derived fields (dates, %, status). */
-export function recalcStage(stage, now = Date.now(), atRiskThresholdPct = 80) {
+export function recalcStage(stage, now = Date.now(), atRiskThresholdPct = 70) {
   const completionPct = computeStageCompletionPct(stage);
   const expectedCompletionDateTime =
     computeExpectedCompletion(
@@ -194,7 +204,7 @@ export function recalcStage(stage, now = Date.now(), atRiskThresholdPct = 80) {
 }
 
 /** Recompute a whole project: every stage, then the project rollups. */
-export function recalcProject(project, now = Date.now(), atRiskThresholdPct = 80) {
+export function recalcProject(project, now = Date.now(), atRiskThresholdPct = 70) {
   const stages = (project.stages ?? []).map((s) =>
     recalcStage(s, now, atRiskThresholdPct)
   );
@@ -379,6 +389,7 @@ export function computeDelayWatchlist(projects = [], now = Date.now()) {
       rows.push({
         id: `${p.id}:${stage.id}`,
         projectId: p.id,
+        stageId: stage.id,
         customerName: p.customerName,
         productName: p.productDetails?.productName ?? "",
         priority: p.priority,
@@ -386,8 +397,18 @@ export function computeDelayWatchlist(projects = [], now = Date.now()) {
         department: stage.department,
         status: stage.status,
         owner: stage.assignedUser?.name ?? stage.assignedTeam ?? "Unassigned",
+        // A stage can be overdue before anyone has logged a reason; the Delay
+        // Center surfaces both so nothing slips through unattributed.
+        isLogged: Boolean(stage.delayDetails?.isDelayed),
+        category: stage.delayDetails?.category ?? null,
         reason: stage.delayDetails?.reason ?? "",
+        responsibleDepartment: stage.delayDetails?.responsibleDepartment ?? stage.department,
+        responsibleUser:
+          stage.delayDetails?.responsibleUser ?? stage.assignedUser?.name ?? "Unassigned",
         expectedRecoveryDate: stage.delayDetails?.expectedRecoveryDate ?? null,
+        resolutionNotes: stage.delayDetails?.resolutionNotes ?? "",
+        expectedCompletionDateTime: stage.expectedCompletionDateTime ?? null,
+        completionPct: computeStageCompletionPct(stage),
         delayMs: timing.delayMs,
         delayLabel: timing.delayLabel,
         timing,
@@ -417,6 +438,142 @@ export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now
     })
     .filter((row) => row.daysRemaining != null && row.daysRemaining <= days)
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
+}
+
+// ─── Stage 10 Delay Engine ───────────────────────────────────
+
+/** Standard root causes a delay must be attributed to. */
+export const DELAY_REASON_CATEGORIES = [
+  "Client Revision",
+  "Client Approval Pending",
+  "Design Issue",
+  "Resource Unavailable",
+  "Production Issue",
+  "Quality Issue",
+  "Material Issue",
+  "Internal Dependency",
+  "Other",
+];
+
+/** Validate a delay entry before it reaches the store. */
+export function validateDelayEntry(draft = {}) {
+  const errors = {};
+  if (!DELAY_REASON_CATEGORIES.includes(draft.category)) {
+    errors.category = "Select a root-cause category.";
+  }
+  if (!(draft.reason ?? "").trim()) {
+    errors.reason = "Describe what actually happened.";
+  }
+  if (!draft.expectedRecoveryDate) {
+    errors.expectedRecoveryDate = "Set an expected recovery date.";
+  }
+  return errors;
+}
+
+/** Headline metrics for the Delay Center. */
+export function computeDelayMetrics(rows = []) {
+  const projectIds = new Set();
+  const byDepartment = new Map();
+  let totalDelayMs = 0;
+  let measured = 0;
+
+  for (const row of rows) {
+    projectIds.add(row.projectId);
+    if (row.delayMs > 0) {
+      totalDelayMs += row.delayMs;
+      measured += 1;
+    }
+    const dept = row.department ?? "Unassigned";
+    const entry = byDepartment.get(dept) ?? { department: dept, count: 0, delayMs: 0 };
+    entry.count += 1;
+    entry.delayMs += row.delayMs;
+    byDepartment.set(dept, entry);
+  }
+
+  const departments = [...byDepartment.values()].sort(
+    (a, b) => b.delayMs - a.delayMs || b.count - a.count
+  );
+  const avgDelayMs = measured > 0 ? Math.round(totalDelayMs / measured) : 0;
+
+  return {
+    delayedProjects: projectIds.size,
+    delayedStages: rows.length,
+    avgDelayMs,
+    avgDelayLabel: formatDuration(avgDelayMs),
+    totalDelayMs,
+    bottleneck: departments[0] ?? null,
+    departments,
+  };
+}
+
+const EMPTY_DELAY_FILTERS = {
+  projectId: "all",
+  department: "all",
+  stageName: "all",
+  category: "all",
+  dateFrom: "",
+  dateTo: "",
+};
+
+export function emptyDelayFilters() {
+  return { ...EMPTY_DELAY_FILTERS };
+}
+
+export function hasActiveDelayFilters(filters = {}) {
+  const f = { ...EMPTY_DELAY_FILTERS, ...filters };
+  return Boolean(
+    f.projectId !== "all" ||
+      f.department !== "all" ||
+      f.stageName !== "all" ||
+      f.category !== "all" ||
+      f.dateFrom ||
+      f.dateTo
+  );
+}
+
+/** Apply the Delay Center filter bar to watchlist rows. */
+export function filterDelays(rows = [], filters = {}) {
+  const f = { ...EMPTY_DELAY_FILTERS, ...filters };
+
+  return rows.filter((row) => {
+    if (f.projectId !== "all" && row.projectId !== f.projectId) return false;
+    if (f.department !== "all" && row.department !== f.department) return false;
+    if (f.stageName !== "all" && row.stageName !== f.stageName) return false;
+    if (f.category !== "all" && (row.category ?? "Other") !== f.category) return false;
+
+    if (f.dateFrom || f.dateTo) {
+      // Filter on when the stage was due, which is when the delay began.
+      const due = toDate(row.expectedCompletionDateTime);
+      if (!due) return false;
+      if (f.dateFrom && due.getTime() < new Date(f.dateFrom).setHours(0, 0, 0, 0)) return false;
+      if (f.dateTo && due.getTime() > new Date(f.dateTo).setHours(23, 59, 59, 999)) return false;
+    }
+
+    return true;
+  });
+}
+
+/** Distinct dropdown options for the Delay Center filter bar. */
+export function getDelayFilterOptions(rows = []) {
+  const projects = new Map();
+  const departments = new Set();
+  const stageNames = new Set();
+  const categories = new Set();
+
+  for (const row of rows) {
+    projects.set(row.projectId, row.customerName ?? row.projectId);
+    if (row.department) departments.add(row.department);
+    if (row.stageName) stageNames.add(row.stageName);
+    if (row.category) categories.add(row.category);
+  }
+
+  const sorted = (set) => [...set].sort((a, b) => a.localeCompare(b));
+  return {
+    projects: [...projects.entries()].map(([id, label]) => ({ id, label })),
+    departments: sorted(departments),
+    stageNames: sorted(stageNames),
+    categories: sorted(categories),
+  };
 }
 
 // ─── Stage 9 Design Proofing ─────────────────────────────────
@@ -1543,7 +1700,15 @@ export const usePmsStore = create((set, get) => ({
 
   // ── Delay tracking ──
 
-  logDelay: (projectId, stageId, delayDetails, actor) =>
+  /** Record a delay against a stage with its root cause and recovery date. */
+  logDelay: (projectId, stageId, delayDetails = {}, actor = null) => {
+    const errors = validateDelayEntry(delayDetails);
+    if (Object.keys(errors).length > 0) {
+      const err = new Error(Object.values(errors).join(" "));
+      err.fieldErrors = errors;
+      throw err;
+    }
+
     set((st) =>
       applyToProject(
         st,
@@ -1558,10 +1723,12 @@ export const usePmsStore = create((set, get) => ({
                   status: "Delayed",
                   delayDetails: {
                     isDelayed: true,
+                    category: "Other",
                     reason: "",
                     responsibleDepartment: stage.department,
                     responsibleUser: stage.assignedUser?.name ?? "",
-                    delayStartDateTime: new Date().toISOString(),
+                    delayStartDateTime:
+                      stage.delayDetails?.delayStartDateTime ?? new Date().toISOString(),
                     expectedRecoveryDate: null,
                     resolutionNotes: "",
                     ...delayDetails,
@@ -1569,17 +1736,70 @@ export const usePmsStore = create((set, get) => ({
                 }
           ),
         }),
-        makeActivity(
-          "DELAY_LOGGED",
-          "Stage",
-          stageId,
-          `Delay logged: ${delayDetails?.reason ?? "reason not stated"}.`,
-          actor
-        )
+        (() => {
+          const entry = makeActivity(
+            "DELAY_LOGGED",
+            "Stage",
+            stageId,
+            `Delay logged — ${delayDetails.category}: ${delayDetails.reason}`,
+            actor
+          );
+          entry.comments = delayDetails.reason;
+          return entry;
+        })()
       )
-    ),
+    );
+  },
 
-  resolveDelay: (projectId, stageId, resolutionNotes, actor) =>
+  /** Revise the recovery plan without clearing the delay. */
+  updateRecoveryPlan: (projectId, stageId, { expectedRecoveryDate, resolutionNotes, category, responsibleUser } = {}, actor = null) =>
+    set((st) => {
+      const before = st.projects
+        .find((p) => p.id === projectId)
+        ?.stages.find((s2) => s2.id === stageId)?.delayDetails?.expectedRecoveryDate;
+
+      return applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: p.stages.map((stage) =>
+            stage.id !== stageId
+              ? stage
+              : {
+                  ...stage,
+                  delayDetails: {
+                    ...(stage.delayDetails ?? { isDelayed: true }),
+                    ...(expectedRecoveryDate !== undefined ? { expectedRecoveryDate } : {}),
+                    ...(resolutionNotes !== undefined ? { resolutionNotes } : {}),
+                    ...(category !== undefined ? { category } : {}),
+                    ...(responsibleUser !== undefined ? { responsibleUser } : {}),
+                  },
+                }
+          ),
+        }),
+        (() => {
+          const entry = makeActivity(
+            "RECOVERY_PLAN_UPDATED",
+            "Stage",
+            stageId,
+            "Recovery plan updated.",
+            actor
+          );
+          if (expectedRecoveryDate !== undefined) {
+            entry.from = before ? new Date(before).toLocaleDateString("en-GB") : "—";
+            entry.to = expectedRecoveryDate
+              ? new Date(expectedRecoveryDate).toLocaleDateString("en-GB")
+              : "—";
+          }
+          if (resolutionNotes) entry.comments = resolutionNotes;
+          return entry;
+        })()
+      );
+    }),
+
+  /** Clear a delay and return the stage to the running pipeline. */
+  resolveDelay: (projectId, stageId, resolutionNotes = "", actor = null) =>
     set((st) =>
       applyToProject(
         st,
@@ -1595,12 +1815,19 @@ export const usePmsStore = create((set, get) => ({
                   delayDetails: {
                     ...stage.delayDetails,
                     isDelayed: false,
-                    resolutionNotes: resolutionNotes ?? "",
+                    resolvedAt: new Date().toISOString(),
+                    resolutionNotes: resolutionNotes || stage.delayDetails?.resolutionNotes || "",
                   },
                 }
           ),
         }),
-        makeActivity("DELAY_RESOLVED", "Stage", stageId, "Delay resolved.", actor)
+        (() => {
+          const entry = makeActivity("DELAY_RESOLVED", "Stage", stageId, "Delay resolved.", actor);
+          entry.from = "Delayed";
+          entry.to = "In Progress";
+          if (resolutionNotes) entry.comments = resolutionNotes;
+          return entry;
+        })()
       )
     ),
 

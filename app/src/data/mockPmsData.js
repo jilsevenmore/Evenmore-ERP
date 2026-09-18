@@ -774,6 +774,7 @@ export const projectsMock = [
         approvals: [],
         delayDetails: {
           isDelayed: true,
+          category: "Material Issue",
           reason:
             "Antistatic laminate consignment delayed by vendor; substitute grade pending QA clearance.",
           responsibleDepartment: "Production",
@@ -1150,9 +1151,9 @@ export const projectsMock = [
 // ─── Global PMS Settings ─────────────────────────────────────────────
 
 export const pmsSettingsMock = {
-  // A stage is flagged "At Risk" once this share of its planned window has
-  // elapsed while it is still incomplete.
-  atRiskThresholdPct: 80,
+  // Share of a stage's planned window that may elapse before it is flagged
+  // At Risk — and only when completion is also under 50%.
+  atRiskThresholdPct: 70,
   workingHoursPerDay: 8,
   requireClientApprovalOnDesign: true,
   requireQaCertificate: true,
