@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "sharing:server": "node server/quotation-server.mjs",
-    "test:quotations": "node --test server/quotation-server.test.mjs",
+    "test:contracts": "node --test server/contract-signing.test.mjs",
+  "test:quotations": "node --test server/quotation-server.test.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",

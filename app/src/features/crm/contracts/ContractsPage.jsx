@@ -235,7 +235,7 @@ export default function ContractsPage() {
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 bg-white text-slate-600">
             <option value="All">All Status</option>
-            {['Active', 'Expiring Soon', 'Expired', 'Draft', 'Sent', 'Signed', 'Closed', 'Cancelled'].map((status) => <option key={status} value={status}>{status}</option>)}
+            {['Active', 'Expiring Soon', 'Expired', 'Draft', 'Sent', 'Viewed', 'Customer Signed', 'Company Signed', 'Accepted', 'Signed', 'Closed', 'Cancelled'].map((status) => <option key={status} value={status}>{status}</option>)}
           </select>
           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 bg-white text-slate-600">

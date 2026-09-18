@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createContractSigningHandler } from './contract-signing.mjs';
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -9,6 +10,7 @@ export async function createQuotationServer({ file, adminToken, publicOrigin }) 
   if (!adminToken || adminToken.length < 32) throw new Error('QUOTATION_ADMIN_TOKEN must contain at least 32 characters.');
   const origin = new URL(publicOrigin);
   if (origin.protocol !== 'https:' || /^(localhost|127\.|\[::1\])/.test(origin.hostname)) throw new Error('QUOTATION_PUBLIC_ORIGIN must be a public HTTPS origin.');
+  const handleContractSigning = await createContractSigningHandler({ file: `${file}.contracts.json`, adminToken, publicOrigin });
   let records = Object.create(null);
   try { records = JSON.parse(await readFile(file, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
   let queue = Promise.resolve();
@@ -22,6 +24,7 @@ export async function createQuotationServer({ file, adminToken, publicOrigin }) 
       res.setHeader('Referrer-Policy', 'no-referrer');
       const reply = (status, data) => { res.writeHead(status); res.end(JSON.stringify(data)); };
       try {
+        if (await handleContractSigning(req, res)) return;
         const path = new URL(req.url, 'http://server').pathname;
         const admin = path.match(/^\/api\/v1\/quotation-sharing\/([^/]+)$/);
         const shared = path.match(/^\/api\/v1\/public-quotations\/([^/]+)\/([a-f0-9]{64})(?:\/(view|download|accept|reject))?$/);

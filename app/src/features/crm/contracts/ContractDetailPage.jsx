@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import './ContractDetailPage.css';
+import ContractSigningPanel from './ContractSigningPanel';
+import { printContract } from '../../../utils/contractPrint';
 import { useAppStore } from '../../../stores/appStore';
 import { loadProjects } from '../../../services/dealProjectService';
 import {
@@ -30,34 +32,6 @@ function statusTone(status) {
   if (/^signed$/i.test(status)) return 'bg-blue-50 text-blue-700 border border-blue-200';
   if (/^sent$/i.test(status)) return 'bg-sky-50 text-sky-700 border border-sky-200';
   return 'bg-slate-100 text-slate-600 border border-slate-200';
-}
-
-function escapeHtml(value) {
-  return String(value ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
-function printContract(contract, deal) {
-  const rows = [
-    ['Contract Number', contract.contractNumber],
-    ['Contract Type', contract.contractType],
-    ['Customer', contract.customer || deal?.client],
-    ['Deal', `${deal?.dealNumber || deal?.id || '—'} — ${deal?.name || ''}`],
-    ['Template', contract.template],
-    ['Start Date', formatContractDate(contract.startDate)],
-    ['End Date', formatContractDate(contract.endDate)],
-    ['Contract Value', formatContractMoney(contract.amount)],
-    ['Status', getContractDisplayStatus(contract)],
-    ['Created On', formatContractDate(contract.createdAt)],
-    ['Description', contract.description],
-  ];
-  const printWindow = window.open('', '_blank', 'width=900,height=700');
-  if (!printWindow) return;
-  printWindow.document.write(`<!doctype html><html><head><title>${escapeHtml(contract.contractNumber)} - Contract</title><style>body{font-family:Arial,sans-serif;color:#172033;padding:40px}h1{margin:0 0 4px;font-size:24px}p.sub{color:#64748b;margin:0 0 24px}table{border-collapse:collapse;width:100%;max-width:720px}th,td{border:1px solid #dbe2ea;padding:10px;text-align:left;font-size:13px;vertical-align:top}th{background:#f1f5f9;width:32%}h2{font-size:15px;margin:28px 0 8px}p.terms{font-size:13px;line-height:1.8;white-space:pre-wrap}</style></head><body><h1>Contract ${escapeHtml(contract.contractNumber)}</h1><p class="sub">${escapeHtml(contract.contractType || '')} — ${escapeHtml(contract.customer || '')}</p><table>${rows.map(([label, value]) => `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value || '—')}</td></tr>`).join('')}</table><h2>Terms & Conditions</h2><p class="terms">${escapeHtml(contract.terms || 'No terms recorded.')}</p></body></html>`);
-  printWindow.document.close();
-  printWindow.focus();
-  printWindow.print();
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -95,7 +69,7 @@ function ContractActivitiesTimeline({ activities }) {
           <li key={item.id || index}>
             <div className="contract-activity-stamp"><strong>{dateText}</strong><span>{timeText}</span></div>
             <span className="contract-activity-icon" style={{ background, color }}><Icon size={13} /></span>
-            <div className="contract-activity-detail"><strong>{kind}</strong><p>{detail || kind}</p></div>
+            <div className="contract-activity-detail"><strong>{kind}</strong><p>{detail || kind}</p><p>{item.actor || 'CRM User'}{item.previousStatus && item.newStatus ? ` · ${item.previousStatus} → ${item.newStatus}` : ''}</p></div>
           </li>
         );
       })}
@@ -171,8 +145,8 @@ export default function ContractDetailPage() {
   const displayStatus = contract ? getContractDisplayStatus(contract) : '';
   const attachments = contract?.attachments || [];
   const activities = useMemo(() => {
-    const list = [...(deal?.activities || [])];
-    if (contract?.contractNumber && !list.some((item) => String(item.title || '').includes(contract.contractNumber))) {
+    const list = (deal?.activities || []).filter(item => !item.contractId || String(item.contractId) === String(contract?.id));
+    if (contract?.contractNumber && !list.some((item) => item.activityType === 'Contract Created' && String(item.contractId) === String(contract.id))) {
       list.push({
         id: `contract-created-${contract.id}`,
         activityType: 'Contract Created',
@@ -229,14 +203,7 @@ export default function ContractDetailPage() {
     finally { setBusy(false); }
   }
 
-  function handleSend() {
-    try {
-      updateContract(contract.dealId, contract.id, { status: 'Sent' });
-      appendDealActivity(contract.dealId, `Contract ${contract.contractNumber} sent to customer.`);
-      setNotice(`Contract ${contract.contractNumber} sent to customer.`);
-      refresh();
-    } catch (failure) { setError(failure.message); }
-  }
+  function handleSend() { document.getElementById('contract-signatures')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); document.getElementById('contract-send-action')?.click(); }
 
   function handleClose() {
     try {
@@ -401,15 +368,15 @@ export default function ContractDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button type="button" className="btn-outline btn-sm" onClick={openEdit}><Pencil size={14} /> Edit</button>
-            <button type="button" className="btn-outline btn-sm" onClick={() => printContract(contract, deal)}><Download size={14} /> Download PDF</button>
-            <button type="button" className="btn-outline btn-sm" onClick={handleSend}><Send size={14} /> Send to Customer</button>
+            <button type="button" className="btn-outline btn-sm" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={openEdit}><Pencil size={14} /> Edit</button>
+            <button type="button" className="btn-outline btn-sm" onClick={() => printContract(contract, deal)}><Download size={14} /> {contract.signing?.companySignature ? 'Download Signed Contract' : 'Download PDF'}</button>
+            <button type="button" className="btn-outline btn-sm" disabled={Boolean(contract.signing && !contract.signing.revoked) || !['Draft', 'Active', 'Sent'].includes(contract.status)} onClick={handleSend}><Send size={14} /> Send to Customer</button>
             <details className="relative">
               <summary className="btn-outline btn-sm cursor-pointer list-none"><MoreHorizontal size={15} /> More</summary>
               <div className="absolute z-10 top-full right-0 mt-1.5 w-48 bg-white border border-slate-200 rounded-xl shadow-xl py-1.5 text-xs">
-                <button type="button" className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-slate-50 text-left" onClick={openRenew}><RefreshCw size={14} /> Renew Contract</button>
-                <button type="button" className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-slate-50 text-left" onClick={() => setCloseOpen(true)}><CheckCircle2 size={14} /> Close Contract</button>
-                <button type="button" className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-rose-50 text-rose-600 text-left" onClick={() => setDeleteOpen(true)}><Trash2 size={14} /> Delete Contract</button>
+                <button type="button" className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-slate-50 text-left" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={openRenew}><RefreshCw size={14} /> Renew Contract</button>
+                <button type="button" className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-slate-50 text-left" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={() => setCloseOpen(true)}><CheckCircle2 size={14} /> Close Contract</button>
+                <button type="button" className="flex w-full items-center gap-2 px-3.5 py-2 hover:bg-rose-50 text-rose-600 text-left" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={() => setDeleteOpen(true)}><Trash2 size={14} /> Delete Contract</button>
               </div>
             </details>
           </div>
@@ -428,6 +395,8 @@ export default function ContractDetailPage() {
           ))}
         </div>}
       </div>
+
+      <ContractSigningPanel key={contract.id} contract={contract} currentUser={currentUser} />
 
       <div className="card contract-detail-content">
         <div className="flex overflow-x-auto gap-1 px-4 border-b border-slate-100" role="tablist" aria-label="Contract sections">
@@ -458,11 +427,11 @@ export default function ContractDetailPage() {
                 </Panel>
                 <Panel title="Quick Actions">
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <button type="button" className="btn-outline btn-sm justify-start" onClick={handleSend}><Send size={14} /> Send to Customer</button>
-                    <button type="button" className="btn-outline btn-sm justify-start" onClick={() => printContract(contract, deal)}><Download size={14} /> Download PDF</button>
-                    <button type="button" className="btn-outline btn-sm justify-start" onClick={openEdit}><Pencil size={14} /> Edit Contract</button>
-                    <button type="button" className="btn-outline btn-sm justify-start" onClick={() => setCloseOpen(true)}><X size={14} /> Close Contract</button>
-                    <button type="button" className="btn-outline btn-sm justify-start col-span-2" onClick={openRenew}><RefreshCw size={14} /> Renew Contract</button>
+                    <button type="button" className="btn-outline btn-sm justify-start" disabled={Boolean(contract.signing && !contract.signing.revoked) || !['Draft', 'Active', 'Sent'].includes(contract.status)} onClick={handleSend}><Send size={14} /> Send to Customer</button>
+                    <button type="button" className="btn-outline btn-sm justify-start" onClick={() => printContract(contract, deal)}><Download size={14} /> {contract.signing?.companySignature ? 'Download Signed Contract' : 'Download PDF'}</button>
+                    <button type="button" className="btn-outline btn-sm justify-start" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={openEdit}><Pencil size={14} /> Edit Contract</button>
+                    <button type="button" className="btn-outline btn-sm justify-start" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={() => setCloseOpen(true)}><X size={14} /> Close Contract</button>
+                    <button type="button" className="btn-outline btn-sm justify-start col-span-2" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={openRenew}><RefreshCw size={14} /> Renew Contract</button>
                   </div>
                 </Panel>
               </div>
@@ -522,7 +491,7 @@ export default function ContractDetailPage() {
 
           {tab === 'Terms & Conditions' && (
             <Panel title="Terms & Conditions" action={
-              <button type="button" className="btn-outline btn-sm" onClick={editTerms}><Pencil size={13} /> Edit</button>
+              <button type="button" className="btn-outline btn-sm" disabled={Boolean(contract.signing && !contract.signing.revoked)} onClick={editTerms}><Pencil size={13} /> Edit</button>
             }>
               {clauses.length === 0 ? (
                 <p className="text-center py-8 text-xs text-slate-400">No terms recorded.</p>
