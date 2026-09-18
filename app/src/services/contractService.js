@@ -12,7 +12,7 @@ export const CONTRACT_TYPES = [
   'Other',
 ];
 
-export const CONTRACT_STATUSES = ['Draft', 'Sent', 'Viewed', 'Customer Signed', 'Company Signed', 'Accepted', 'Active', 'Signed', 'Closed', 'Cancelled'];
+export const CONTRACT_STATUSES = ['Draft', 'Active', 'Closed', 'Cancelled'];
 
 export const CONTRACT_TEMPLATES = [
   'Standard Supply Agreement',
@@ -59,7 +59,6 @@ export function nextContractNumber(contracts) {
 
 export function getContractDisplayStatus(contract, today = new Date()) {
   const stored = contract.status || 'Draft';
-  if (contract.signing && !contract.signing.revoked) return stored;
   if (/^(cancelled|closed)$/i.test(stored)) return stored.charAt(0).toUpperCase() + stored.slice(1).toLowerCase();
   const end = toDay(contract.endDate);
   if (end) {
@@ -68,7 +67,7 @@ export function getContractDisplayStatus(contract, today = new Date()) {
     const daysLeft = Math.round((end - base) / 86400000);
     if (daysLeft <= 30) return 'Expiring Soon';
   }
-  if (/^(draft|sent)$/i.test(stored)) return stored.charAt(0).toUpperCase() + stored.slice(1).toLowerCase();
+  if (/^draft$/i.test(stored)) return 'Draft';
   return 'Active';
 }
 
@@ -124,7 +123,6 @@ function writeDeals(deals, storage) {
 }
 
 export function createContract(input = {}, { storage = localStorage } = {}) {
-  if (['Viewed', 'Customer Signed', 'Company Signed', 'Accepted'].includes(input.status)) throw new Error('Signatures are required for this status.');
   const deals = loadDeals(storage);
   const deal = deals.find((item) => sameId(item.id, input.dealId));
   if (!deal) throw new Error('Select a deal for this contract.');
@@ -168,8 +166,6 @@ export function updateContract(dealId, contractId, patch = {}, { storage = local
   if (!deal) throw new Error('Deal was not found.');
   const current = (deal.contracts || []).find((item) => sameId(item.id, contractId));
   if (!current) throw new Error('Contract was not found.');
-  if (current.signing && !current.signing.revoked) throw new Error('Revoke the unsigned signing link before editing. Signed contracts cannot be changed.');
-  if (['Viewed', 'Customer Signed', 'Company Signed', 'Accepted'].includes(patch.status)) throw new Error('Signature statuses are managed by the signing workflow.');
   const updated = { ...current };
   for (const field of ['customer', 'contractType', 'description', 'terms', 'template', 'status']) {
     if (patch[field] !== undefined) updated[field] = typeof patch[field] === 'string' ? patch[field].trim() : patch[field];
@@ -198,7 +194,6 @@ export function deleteContract(dealId, contractId, { storage = localStorage } = 
   if (!deal) throw new Error('Deal was not found.');
   const removed = (deal.contracts || []).find((item) => sameId(item.id, contractId));
   if (!removed) throw new Error('Contract was not found.');
-  if (removed.signing && !removed.signing.revoked) throw new Error('Revoke the unsigned signing link before deleting. Signed contracts must be retained.');
   writeDeals(deals.map((item) => sameId(item.id, deal.id)
     ? { ...item, contracts: (item.contracts || []).filter((entry) => !sameId(entry.id, contractId)) }
     : item), storage);
@@ -229,26 +224,4 @@ export function addDealActivity(dealId, entry = {}, { storage = localStorage } =
   };
   writeDeals(deals.map((item) => sameId(item.id, deal.id) ? { ...item, activities: [activity, ...(item.activities || [])] } : item), storage);
   return activity;
-}
-
-// Merge the authoritative signing result into the existing contract and activity timeline.
-export function persistContractSigning(contractId, signing, storage = localStorage) {
-  const deals = loadDeals(storage);
-  let found = false;
-  const next = deals.map(deal => {
-    if (!(deal.contracts || []).some(c => sameId(c.id, contractId))) return deal;
-    found = true;
-    const known = new Set((deal.activities || []).map(a => a.id));
-    return { ...deal,
-      contracts: deal.contracts.map(c => sameId(c.id, contractId) ? {
-        ...c,
-        ...(!signing.revoked ? signing.document : {}),
-        status: signing.revoked && c.signing?.revoked ? c.status : signing.status,
-        signing,
-      } : c),
-      activities: [...signing.events.filter(e => !known.has(e.id)), ...(deal.activities || [])],
-    };
-  });
-  if (!found) throw new Error('Contract was not found.');
-  writeDeals(next, storage);
 }

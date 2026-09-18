@@ -30,8 +30,6 @@ function statusTone(status) {
   if (/^active$/i.test(status)) return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
   if (/expiring/i.test(status)) return 'bg-amber-50 text-amber-700 border border-amber-200';
   if (/^expired$/i.test(status)) return 'bg-rose-50 text-rose-700 border border-rose-200';
-  if (/^signed$/i.test(status)) return 'bg-blue-50 text-blue-700 border border-blue-200';
-  if (/^sent$/i.test(status)) return 'bg-sky-50 text-sky-700 border border-sky-200';
   if (/^draft$/i.test(status)) return 'bg-slate-100 text-slate-600 border border-slate-200';
   return 'bg-slate-100 text-slate-600 border border-slate-200';
 }
@@ -235,7 +233,7 @@ export default function ContractsPage() {
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 bg-white text-slate-600">
             <option value="All">All Status</option>
-            {['Active', 'Expiring Soon', 'Expired', 'Draft', 'Sent', 'Viewed', 'Customer Signed', 'Company Signed', 'Accepted', 'Signed', 'Closed', 'Cancelled'].map((status) => <option key={status} value={status}>{status}</option>)}
+            {['Active', 'Expiring Soon', 'Expired', 'Draft', 'Closed', 'Cancelled'].map((status) => <option key={status} value={status}>{status}</option>)}
           </select>
           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 bg-white text-slate-600">
