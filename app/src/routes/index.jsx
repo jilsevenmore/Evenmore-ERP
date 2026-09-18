@@ -18,6 +18,9 @@ const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage')
 const TaskFormPage = lazy(() => import('../features/crm/tasks/TaskFormPage'));
 const TaskFormBuilderPage = lazy(() => import('../features/crm/tasks/TaskFormBuilderPage'));
 const CRMDashboard = lazy(() => import('../features/crm/dashboard/CRMDashboard'));
+const ProjectsPage = lazy(() => import('../features/crm/projects/ProjectsPage'));
+const ContractsPage = lazy(() => import('../features/crm/contracts/ContractsPage'));
+const ContractDetailPage = lazy(() => import('../features/crm/contracts/ContractDetailPage'));
 const ProjectDetailPage = lazy(() => import('../features/crm/projects/ProjectDetailPage'));
 const DealsPage = lazy(() => import('../features/crm/deals/DealsPage'));
 const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAllocationPage'));
@@ -199,6 +202,9 @@ const router = createBrowserRouter([
       { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
       { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
       { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> },
+      { path: 'crm/projects', element: <Page component={ProjectsPage} /> },
+      { path: 'crm/contracts', element: <Page component={ContractsPage} /> },
+      { path: 'crm/contracts/:id', element: <Page component={ContractDetailPage} /> },
       { path: 'crm/projects/:id', element: <Page component={ProjectDetailPage} /> },
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },

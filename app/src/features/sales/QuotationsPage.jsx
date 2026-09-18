@@ -31,13 +31,14 @@ export const QuotationsPage = () => {
     const { customers, quotations, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
-    const leadRequest = location.state && location.state.fromLead ? location.state : null;
+    const leadRequest = location.state && (location.state.fromLead || location.state.fromDeal) ? location.state : null;
     const autoOpened = React.useRef(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedQuoteTarget, setSelectedQuote] = useState(null);
     const selectedQuote = quotations.find(q => q.id === selectedQuoteTarget?.id) || selectedQuoteTarget;
     const [printQuotationTarget, setPrintQuotationTarget] = useState(null);
+    const openedPrintRequest = React.useRef('');
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [validUntil, setValidUntil] = useState('In 30 days');
     const [quoteDate, setQuoteDate] = useState(new Date().toLocaleDateString('en-CA'));
@@ -49,15 +50,16 @@ export const QuotationsPage = () => {
     React.useEffect(() => {
         if (!leadRequest || autoOpened.current) return;
         autoOpened.current = true;
-        const match = customers.find((c) => c.name === leadRequest.company) || customers[0];
-        if (match) setSelectedCustomerId(match.id);
+        const match = customers.find((c) => c.id === leadRequest.customerId || c.name === leadRequest.company) || (!leadRequest.fromDeal ? customers[0] : null);
+        setSelectedCustomerId(match?.id || '');
+        if (leadRequest.fromDeal) setDealReference(leadRequest.dealReference || leadRequest.dealId);
         if (Array.isArray(leadRequest.items) && leadRequest.items.length > 0) {
             setLineItems(leadRequest.items.map((it, i) => ({
                 id: `li-${Date.now()}-${i}`,
-                description: it.name,
-                qty: 1,
+                description: it.description || it.name,
+                qty: it.qty ?? 1,
                 rate: it.rate || 0,
-                amount: it.rate || 0,
+                amount: (it.qty ?? 1) * (it.rate || 0),
             })));
         }
         setIsModalOpen(true);
@@ -65,7 +67,13 @@ export const QuotationsPage = () => {
     React.useEffect(() => {
         const quoteId = location.state?.quotationId || new URLSearchParams(location.search).get('quotationId');
         if (quoteId) setSelectedQuote(quotations.find(q => q.id === quoteId) || null);
-    }, [location.state, location.search, quotations]);
+        const request = `${location.key}:${quoteId}`;
+        const quote = quotations.find(q => q.id === quoteId);
+        if (quote && new URLSearchParams(location.search).get('print') === 'true' && openedPrintRequest.current !== request) {
+            openedPrintRequest.current = request;
+            setPrintQuotationTarget(quote);
+        }
+    }, [location.state, location.search, location.key, quotations]);
     const totalPipeline = quotations.reduce((sum, q) => sum + (q.amount || 0), 0);
 
     const handleOpenCreateModal = () => {
@@ -208,13 +216,15 @@ export const QuotationsPage = () => {
     ];
     const handleCreate = (e) => {
         e.preventDefault();
-        const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
+        const cust = customers.find((c) => c.id === selectedCustomerId);
+        if (!cust) return;
         const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
         addQuotation({
             customerId: cust?.id,
             customer: cust?.name || 'Acme Corp',
             leadId: leadRequest?.leadId || '',
             leadName: leadRequest?.leadName || '',
+            dealId: leadRequest?.fromDeal ? leadRequest.dealId : undefined,
             date: quoteDate,
             dealReference,
             terms,
@@ -234,7 +244,7 @@ export const QuotationsPage = () => {
         <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs">
           <FileText size={15} className="text-blue-600 shrink-0" />
           <span className="text-slate-700">
-            Creating quotation for lead <strong className="text-slate-900">{leadRequest.leadName}</strong>
+            Creating quotation for {leadRequest.fromDeal ? 'deal' : 'lead'} <strong className="text-slate-900">{leadRequest.fromDeal ? leadRequest.dealReference : leadRequest.leadName}</strong>
             {leadRequest.company && <span> • {leadRequest.company}</span>}
           </span>
         </div>
@@ -279,6 +289,7 @@ export const QuotationsPage = () => {
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
                   <select required value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
+                    <option value="" disabled>Select a customer account</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
@@ -286,7 +297,7 @@ export const QuotationsPage = () => {
                     ))}
                   </select>
                   {(() => {
-                    const cust = customers.find(c => c.id === selectedCustomerId) || customers[0];
+                    const cust = customers.find(c => c.id === selectedCustomerId);
                     if (!cust) return null;
                     return (
                       <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">

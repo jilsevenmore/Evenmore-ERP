@@ -1,4 +1,4 @@
-import DealProjectHandoff from './DealProjectHandoff';
+import DealDetailView from './DealDetailView';
 import CrmKpiCard from '../common/CrmKpiCard';
 import Modal from '../../../components/ui/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -135,7 +135,7 @@ export default function DealsPage() {
     }
   }, [deals]);
 
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const linkedDealId = searchParams.get('deal');
 
   useEffect(() => {
@@ -178,18 +178,6 @@ export default function DealsPage() {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
-
-  useEffect(() => {
-    if (!linkedDealId) return;
-    let deal;
-    try { deal = loadDeals().find((item) => item.id === linkedDealId); }
-    catch { return; }
-    if (deal) {
-      setEditingDeal(deal);
-      setFormState({ ...EMPTY_DEAL_FORM, ...deal });
-      setIsCreateModalOpen(true);
-    }
-  }, [linkedDealId]);
 
   const showNotification = (msg) => {
     setToastMessage(msg);
@@ -360,6 +348,10 @@ export default function DealsPage() {
   };
 
   const handleOpenEditModal = (deal) => {
+    if (!linkedDealId) {
+      handleOpenDealDetail(deal);
+      return;
+    }
     setEditingDeal(deal);
     setFormState({
       name: deal.name,
@@ -376,6 +368,13 @@ export default function DealsPage() {
     setFormError('');
     setOpenMenuDealId(null);
     setIsCreateModalOpen(true);
+  };
+
+  const handleOpenDealDetail = (deal) => {
+    setIsCreateModalOpen(false);
+    setEditingDeal(null);
+    setOpenMenuDealId(null);
+    setSearchParams({ deal: String(deal.id) });
   };
 
   const handleSaveDeal = (e) => {
@@ -469,6 +468,20 @@ export default function DealsPage() {
         </div>
       )}
 
+      {linkedDealId ? <DealDetailView key={linkedDealId} deal={deals.find((item) => String(item.id) === linkedDealId)} onEdit={handleOpenEditModal} onNotify={showNotification} onDelete={setDealToDelete} onUpdate={(patch) => {
+        const current = loadDeals();
+        const updated = current.map((item) => String(item.id) === linkedDealId ? { ...item, ...patch } : item);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        setDeals(updated);
+        window.dispatchEvent(new Event('crm:data-updated'));
+      }} onDuplicate={(deal) => {
+        const copy = buildDeal({ name: `${deal.name} (copy)`, client: deal.client, phone: deal.phone, price: deal.price, product: deal.product, products: deal.products, source: deal.source, assignedUser: deal.assignedUser, team: deal.team, description: deal.description, stage: 'Draft', createdAt: new Date().toISOString() }, `dl-${crypto.randomUUID()}`);
+        const updated = [copy, ...loadDeals()];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        setDeals(updated);
+        setSearchParams({ deal: copy.id });
+        showNotification('Deal duplicated as a new draft.');
+      }} /> : <>
       {/* Top Header Card */}
       <div className="bg-white border border-slate-200/90 rounded-2xl p-4 md:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -849,6 +862,15 @@ export default function DealsPage() {
                         <div
                           key={deal.id}
                           draggable={true}
+                          tabIndex={0}
+                          role="link"
+                          aria-label={`View deal ${deal.name}`}
+                          onClick={(event) => {
+                            if (!event.target.closest('a, button, .deal-action-menu-container')) handleOpenDealDetail(deal);
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.target === event.currentTarget && event.key === 'Enter') handleOpenDealDetail(deal);
+                          }}
                           onDragStart={(e) => {
                             e.dataTransfer.setData('text/plain', deal.id);
                           }}
@@ -857,7 +879,7 @@ export default function DealsPage() {
                           {/* Deal Header */}
                           <div className="flex items-start justify-between gap-2">
                             <h4 className="text-sm font-bold text-slate-900 leading-snug truncate flex-1" title={deal.name}>
-                              {deal.name}
+                              <Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link>
                             </h4>
 
                             <div className="relative deal-action-menu-container flex-shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -880,11 +902,11 @@ export default function DealsPage() {
                                 <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border border-slate-200 rounded-xl shadow-xl z-30 py-1.5 animate-in fade-in zoom-in-95 duration-150">
                                   <button
                                     type="button"
-                                    onClick={() => handleOpenEditModal(deal)}
+                                    onClick={() => handleOpenDealDetail(deal)}
                                     className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                                   >
                                     <Edit2 size={13} className="text-blue-600" />
-                                    <span>Edit Deal</span>
+                                    <span>View Deal</span>
                                   </button>
 
                                   <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
@@ -1009,7 +1031,7 @@ export default function DealsPage() {
               <tbody className="divide-y divide-slate-100">
                 {filteredDeals.map((deal) => (
                   <tr key={deal.id} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-slate-900">{deal.name}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-900"><Link to={`?deal=${encodeURIComponent(deal.id)}`} className="hover:text-blue-600 hover:underline">{deal.name}</Link></td>
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-2">
                         <div
@@ -1039,9 +1061,10 @@ export default function DealsPage() {
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => handleOpenEditModal(deal)}
+                          onClick={() => handleOpenDealDetail(deal)}
                           className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 cursor-pointer"
-                          title="Edit"
+                          title="View Deal"
+                          aria-label={`View deal ${deal.name}`}
                         >
                           <Edit2 size={13} />
                         </button>
@@ -1062,6 +1085,7 @@ export default function DealsPage() {
         </div>
       )}
 
+      </>}
       <Modal
         isOpen={isLearnMoreOpen}
         onClose={() => setIsLearnMoreOpen(false)}
@@ -1108,7 +1132,6 @@ export default function DealsPage() {
               </button>
             </div>
 
-            {editingDeal && <DealProjectHandoff key={editingDeal.id} deal={deals.find((item) => item.id === editingDeal.id) || editingDeal} onNotify={showNotification} />}
 
             {formError && (
               <div className="m-5 mb-0 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl flex items-center gap-2">

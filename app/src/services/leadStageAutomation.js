@@ -1,5 +1,6 @@
 import { convertLeadToDealIfNeeded } from './leadDealConversion.js';
 import { useAppStore } from '../stores/appStore';
+import { seedDemoDealTasks } from '../data/crm/mockDealTasks.js';
 
 /**
  * leadStageAutomation.js — CRM Lead Stage Task Automation Engine
@@ -274,9 +275,19 @@ export function loadMasterTasksConfig() {
  * Load tasks for Task List (/crm/tasks)
  */
 export function loadCrmTasks() {
-  const stored = readJson(CRM_TASKS_STORAGE_KEY, null);
-  if (Array.isArray(stored) && stored.length > 0) return stored;
-  return DEFAULT_INITIAL_TASKS;
+  if (typeof localStorage === 'undefined') return DEFAULT_INITIAL_TASKS;
+  let tasks = DEFAULT_INITIAL_TASKS;
+  try {
+    const raw = localStorage.getItem(CRM_TASKS_STORAGE_KEY);
+    if (raw !== null) {
+      const stored = JSON.parse(raw);
+      if (!Array.isArray(stored)) return DEFAULT_INITIAL_TASKS;
+      tasks = stored;
+    }
+    return seedDemoDealTasks(tasks);
+  } catch {
+    return tasks;
+  }
 }
 
 /**

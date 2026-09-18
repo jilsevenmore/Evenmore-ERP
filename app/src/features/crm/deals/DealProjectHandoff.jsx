@@ -15,7 +15,7 @@ function TransferConfirmation({ project }) {
   return <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">{items.map(([label, confirmed]) => <p key={label} className="flex items-center gap-2 text-xs text-slate-600">{confirmed ? <CheckCircle2 size={14} className="text-emerald-600 shrink-0" /> : <CircleDashed size={14} className="text-slate-400 shrink-0" />}{label}</p>)}</div>;
 }
 
-export default function DealProjectHandoff({ deal, onNotify }) {
+export default function DealProjectHandoff({ deal, onNotify, renderTrigger }) {
   const [form, setForm] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -54,7 +54,7 @@ export default function DealProjectHandoff({ deal, onNotify }) {
   }
 
   return <>
-    <div className="mx-5 mt-4 rounded-xl border border-slate-200 p-4 text-xs space-y-3">
+    {renderTrigger ? renderTrigger({ open, project, referenceError }) : <div className="mx-5 mt-4 rounded-xl border border-slate-200 p-4 text-xs space-y-3">
       {referenceError ? <p role="alert" className="text-rose-600">{referenceError}</p> : project ? <>
         <div className="flex items-start gap-3"><span className="p-2 rounded-lg bg-emerald-50 text-emerald-600"><CheckCircle2 size={19} /></span><div className="min-w-0"><p className="font-bold text-sm">Project Already Created</p><p className="mt-1 font-semibold text-blue-600">{project.projectNumber}</p><p className="mt-1 text-slate-500 break-words">{project.name}</p></div><span className="ml-auto rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">{project.status}</span></div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-slate-100 pt-3">
@@ -64,7 +64,7 @@ export default function DealProjectHandoff({ deal, onNotify }) {
         <div className="rounded-lg bg-emerald-50/60 p-3 space-y-2"><p className="font-semibold text-emerald-700">Project Linked</p><p className="text-slate-600 leading-5">This deal has been converted to a project. Open the linked project to view its details.</p><Link className="btn-outline btn-sm" to={`/crm/projects/${encodeURIComponent(project.id)}`}>View Project<ArrowRight size={13} /></Link></div>
       </> : deal.stage === 'Won' ? <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-2"><FolderPlus size={20} className="text-blue-600" /><div><p className="font-bold">Create a project from this deal</p><p className="text-slate-500 mt-1">Carry over customer, owner and team details.</p></div></div><button type="button" className="btn-primary btn-sm" onClick={open}>Create Project</button></div> : <p className="text-slate-500">Project hand-off is available after the deal is saved as Won.</p>}
       {(deal.activities || []).filter((item) => item.type === 'project-created').map((item) => <p key={item.id} className="text-slate-500 border-t border-slate-100 pt-2 leading-5">{project ? item.title.replace(project.id, project.projectNumber) : item.title}</p>)}
-    </div>
+    </div>}
     <Modal isOpen={Boolean(form)} onClose={() => !busy && setForm(null)} title="Create Project from Deal" subtitle="Pre-filled information from the deal" size="lg">
       {form && <form onSubmit={submit} className="space-y-5 text-xs">
         <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3"><Handshake size={19} className="text-blue-600 shrink-0" /><div><p className="font-semibold text-blue-700">{deal.name}</p><p className="mt-1 text-slate-500">Source Deal: {deal.dealNumber || deal.id}</p></div><span className="ml-auto bg-emerald-50 text-emerald-700 rounded-full px-2 py-1">{deal.stage}</span></div>

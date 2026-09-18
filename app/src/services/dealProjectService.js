@@ -31,6 +31,33 @@ export function findDealProject(deal, storage = localStorage) {
   return byDeal || null;
 }
 
+function notifyUpdated() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('crm:data-updated'));
+}
+
+function isValidCalendarDate(value) {
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+  if (!parts) return false;
+  const year = Number(parts[1]);
+  const month = Number(parts[2]);
+  const day = Number(parts[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function assertValidDates(startDate, expectedEndDate) {
+  for (const date of [startDate, expectedEndDate]) {
+    if (date && !isValidCalendarDate(date)) throw new Error('Enter valid project dates.');
+  }
+  if (startDate && expectedEndDate && startDate > expectedEndDate) throw new Error('Expected end date must be on or after start date.');
+}
+
+function nextProjectNumber(projects) {
+  const next = Math.max(0, ...projects.map((item) => Number(/^P-(\d+)$/.exec(item.projectNumber || '')?.[1]) || 0)) + 1;
+  return `P-${String(next).padStart(6, '0')}`;
+}
+
 export function projectDefaults(deal) {
   return {
     name: deal.name || '', customer: deal.client || deal.company || '',
@@ -56,10 +83,7 @@ export function createProjectFromDeal(dealId, input = {}, { storage = localStora
   const startDate = input.startDate || '';
   if (!existing && !startDate) throw new Error('Start date is required.');
   const expectedEndDate = input.expectedEndDate || '';
-  for (const date of [startDate, expectedEndDate]) {
-    if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) throw new Error('Enter valid project dates.');
-  }
-  if (startDate && expectedEndDate && startDate > expectedEndDate) throw new Error('Expected end date must be on or after start date.');
+  assertValidDates(startDate, expectedEndDate);
   const references = {};
   for (const field of ['customerId', 'partyId', 'ownerId', 'teamId', 'productId', 'products', 'product', 'quantity', 'price', 'source', 'sourceId', 'contactPerson', 'email', 'phone', 'company', 'files', 'attachments']) {
     if (deal[field] !== undefined) references[field] = deal[field];
@@ -108,4 +132,84 @@ export function createProjectFromDeal(dealId, input = {}, { storage = localStora
   }
   if (typeof window !== 'undefined') window.dispatchEvent(new Event('crm:data-updated'));
   return { project, created: !existing };
+}
+
+export function createStandaloneProject(input = {}, { storage = localStorage } = {}) {
+  const name = String(input.name ?? '').trim();
+  if (!name) throw new Error('Project name is required.');
+  const customer = String(input.customer ?? input.client ?? '').trim();
+  if (!customer) throw new Error('Customer is required.');
+  const owner = String(input.owner ?? '').trim();
+  if (!owner) throw new Error('Project manager is required.');
+  const startDate = input.startDate || '';
+  if (!startDate) throw new Error('Start date is required.');
+  const expectedEndDate = input.expectedEndDate || '';
+  assertValidDates(startDate, expectedEndDate);
+  const projects = loadProjects(storage);
+  const timestamp = new Date().toISOString();
+  const project = {
+    id: `p-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    projectNumber: nextProjectNumber(projects),
+    name,
+    customer,
+    owner,
+    team: String(input.team ?? '').trim(),
+    projectType: String(input.projectType ?? '').trim(),
+    startDate,
+    expectedEndDate,
+    description: String(input.description ?? ''),
+    status: input.status || 'Active',
+    sourceDealId: input.sourceDealId ?? null,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+  storage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify([project, ...projects]));
+  notifyUpdated();
+  return project;
+}
+
+export function updateProject(projectId, patch = {}, { storage = localStorage } = {}) {
+  const projects = loadProjects(storage);
+  const index = projects.findIndex((item) => sameId(item.id, projectId));
+  if (index === -1) throw new Error('Project was not found.');
+  const current = projects[index];
+  const updated = { ...current };
+  for (const field of ['name', 'customer', 'owner', 'team', 'projectType', 'description', 'status']) {
+    if (patch[field] !== undefined) updated[field] = typeof patch[field] === 'string' ? patch[field].trim() : patch[field];
+  }
+  if (patch.startDate !== undefined) updated.startDate = patch.startDate || '';
+  if (patch.expectedEndDate !== undefined) updated.expectedEndDate = patch.expectedEndDate || '';
+  if (!updated.name) throw new Error('Project name is required.');
+  if (!updated.customer && !updated.customerId && !updated.partyId) throw new Error('Customer is required.');
+  if (!updated.owner && !updated.ownerId) throw new Error('Project manager is required.');
+  if (!updated.startDate) throw new Error('Start date is required.');
+  assertValidDates(updated.startDate, updated.expectedEndDate);
+  updated.updatedAt = new Date().toISOString();
+  const next = projects.map((item, i) => (i === index ? updated : item));
+  storage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(next));
+  notifyUpdated();
+  return updated;
+}
+
+export function deleteProject(projectId, { storage = localStorage } = {}) {
+  const projects = loadProjects(storage);
+  const project = projects.find((item) => sameId(item.id, projectId));
+  if (!project) throw new Error('Project was not found.');
+  storage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects.filter((item) => !sameId(item.id, projectId))));
+  // Unlink from deal if linked
+  try {
+    const deals = loadDeals(storage);
+    let changed = false;
+    const nextDeals = deals.map((deal) => {
+      if (sameId(deal.projectId, projectId) || sameId(deal.id, project?.sourceDealId)) {
+        if (deal.projectId == null) return deal;
+        changed = true;
+        return { ...deal, projectId: null };
+      }
+      return deal;
+    });
+    if (changed) storage.setItem(DEALS_STORAGE_KEY, JSON.stringify(nextDeals));
+  } catch { /* deals unlink is best-effort */ }
+  notifyUpdated();
+  return project;
 }

@@ -12,8 +12,8 @@ function formatDate(value) {
 }
 
 function InfoCard({ icon: Icon, title, children, action }) {
-  return <section className="card overflow-hidden min-w-0">
-    <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+  return <section className="card project-panel overflow-hidden min-w-0">
+    <div className="project-panel-heading flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
       <h2 className="flex items-center gap-2 text-sm font-bold"><Icon size={17} className="text-blue-600" />{title}</h2>{action}
     </div>
     <div className="p-5">{children}</div>
@@ -21,7 +21,7 @@ function InfoCard({ icon: Icon, title, children, action }) {
 }
 
 function Fields({ rows }) {
-  return <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">{rows.map(([label, value]) => <div key={label} className="min-w-0">
+  return <dl className="project-fields grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5">{rows.map(([label, value]) => <div key={label} className="min-w-0">
     <dt className="text-xs text-slate-500">{label}</dt><dd className="mt-1.5 text-sm font-semibold break-words">{value ?? 'Not specified'}</dd>
   </div>)}</dl>;
 }
@@ -59,6 +59,7 @@ export default function ProjectDetailPage() {
   const owner = project.owner || project.ownerId;
   const team = project.team || project.teamId;
   const status = project.status || 'Not specified';
+  const statusTone = /^(active|completed)$/i.test(status) ? 'positive' : 'neutral';
   const dealNumber = deal?.dealNumber || project.sourceDealId;
   const linked = deal && String(deal.projectId) === String(project.id);
   const checks = [
@@ -72,38 +73,44 @@ export default function ProjectDetailPage() {
     ['Customer', customer || 'Not specified', Building2, 'bg-blue-50 text-blue-600'],
     ['Project Manager', owner || 'Not specified', UserRound, 'bg-violet-50 text-violet-600'],
     ['Team', team || 'Not assigned', Users, 'bg-amber-50 text-amber-600'],
-    ['Status', status, CheckCircle2, 'bg-emerald-50 text-emerald-600'],
+    ['Status', status, statusTone === 'positive' ? CheckCircle2 : CircleDashed, statusTone === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'],
   ];
   return <div className="crm-project-detail space-y-4 pb-5" data-navigation-open={navigationOpen}>
     <button type="button" className="project-mobile-navigation btn-outline btn-sm" aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navigationOpen} onClick={() => setNavigationOpen(!navigationOpen)}>{navigationOpen ? <X size={16} /> : <Menu size={16} />}Menu</button>
     {navigationOpen && <button type="button" className="project-navigation-backdrop" aria-label="Close navigation overlay" onClick={() => setNavigationOpen(false)} />}
-    <header className="card p-5 sm:p-6 space-y-4">
+    <header className="card project-hero p-5 sm:p-6 space-y-4">
       <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-slate-500"><Link to="/crm/deals" className="hover:text-blue-600">CRM Deals</Link><span>/</span><span>Project</span><span>/</span><span className="text-blue-600 font-semibold">{project.projectNumber}</span></nav>
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
         <div className="flex gap-3 min-w-0"><div className="rounded-xl bg-blue-50 p-3 text-blue-600 self-start"><FolderOpen size={25} /></div>
-          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold tracking-wide text-slate-500">PROJECT {project.projectNumber}</span><span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">{status}</span></div><h1 className="mt-2 text-xl sm:text-2xl font-bold break-words">{project.name}</h1>
+          <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="text-xs font-semibold tracking-wide text-slate-500">PROJECT {project.projectNumber}</span><span className="project-status" data-tone={statusTone}>{status}</span></div><h1 className="mt-2 text-xl sm:text-2xl font-bold break-words">{project.name}</h1>
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1.5"><Building2 size={14} />{customer || 'Customer not specified'}</span><Link to={dealUrl} className="inline-flex items-center gap-1.5 text-blue-600 hover:underline"><Handshake size={14} />Source Deal: {dealNumber}</Link></div>
           </div>
         </div>
         <Link className="btn-outline btn-sm self-start shrink-0" to={dealUrl}><ArrowLeft size={14} />Back to Deal</Link>
       </div>
+      <div className="project-schedule">
+        <div><CalendarDays size={17} /><span>Start date<strong>{formatDate(project.startDate)}</strong></span></div>
+        <ArrowRight size={16} className="project-schedule-arrow" />
+        <div><CalendarDays size={17} /><span>Expected end date<strong>{formatDate(project.expectedEndDate)}</strong></span></div>
+      </div>
     </header>
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+    <div className="project-summary grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
       {summary.map(([label, value, Icon, tone]) => <div key={label} className="card p-4 flex items-center gap-3 min-w-0"><span className={`p-2.5 rounded-xl shrink-0 ${tone}`}><Icon size={20} /></span><div className="min-w-0"><p className="text-xs text-slate-500">{label}</p><p className="mt-1 text-sm font-bold break-words">{value}</p></div></div>)}
     </div>
-    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+    <div className="project-information-grid grid grid-cols-1 xl:grid-cols-2 gap-4">
       <InfoCard icon={FolderOpen} title="Project Information"><Fields rows={[
         ['Project Number', project.projectNumber], ['Project Name', project.name], ...(project.projectType ? [['Project Type', project.projectType]] : []), ['Customer', customer], ['Project Manager', owner], ['Team', team], ['Status', status], ['Start Date', formatDate(project.startDate)], ['Expected End Date', formatDate(project.expectedEndDate)],
       ]} /></InfoCard>
       <InfoCard icon={Handshake} title="Deal Information" action={<Link className="text-xs font-semibold text-blue-600 inline-flex items-center gap-1 hover:underline" to={dealUrl}>View Deal<ArrowRight size={13} /></Link>}>
         {record.warning && <p role="alert" className="text-xs text-amber-700 mb-4">{record.warning}</p>}
+        {deal && <div className="project-deal-value"><div><span>Deal value</span><strong>{deal.price != null ? `Rs. ${Number(deal.price).toLocaleString('en-IN')}` : 'Not specified'}</strong></div><span className="project-status" data-tone={deal.stage === 'Won' ? 'positive' : 'neutral'}>{deal.stage || 'Not specified'}</span></div>}
         {deal ? <Fields rows={[
-          ['Source Deal', deal.name], ['Deal ID', dealNumber], ['Deal Value', deal.price != null ? `Rs. ${Number(deal.price).toLocaleString('en-IN')}` : undefined], ['Deal Owner', deal.assignedUser || deal.owner || deal.ownerId], ['Deal Stage', deal.stage], ['Expected Close Date', formatDate(deal.expectedCloseDate || deal.date)],
+          ['Source Deal', deal.name], ['Deal ID', dealNumber], ['Deal Owner', deal.assignedUser || deal.owner || deal.ownerId], ['Expected Close Date', formatDate(deal.expectedCloseDate || deal.date)],
         ]} /> : <p className="text-sm text-slate-500">The originating deal is unavailable. The project record and source reference have been retained.</p>}
       </InfoCard>
     </div>
     <InfoCard icon={Link2} title="CRM Relationship">
-      <div className="flex flex-col md:flex-row md:items-center gap-3">
+      <div className="project-relationship flex flex-col md:flex-row md:items-center gap-3">
         <div className="flex-1 min-w-0 rounded-xl border border-slate-200 p-3"><p className="text-[11px] text-slate-500 mb-1">SOURCE LEAD</p>{deal?.leadId != null ? <Link className="text-sm font-semibold text-blue-600 hover:underline break-words" to={`/crm/leads/${encodeURIComponent(deal.leadId)}`}>{deal.leadNumber || deal.leadId}</Link> : <p className="text-sm text-slate-500">No source lead linked</p>}</div>
         <ArrowRight size={18} className="text-slate-300 rotate-90 md:rotate-0 self-center shrink-0" />
         <Link to={dealUrl} className="flex-1 min-w-0 rounded-xl border border-slate-200 p-3 hover:border-blue-300"><p className="text-[11px] text-slate-500 mb-1">SOURCE DEAL</p><p className="text-sm font-semibold text-blue-600 break-words">{dealNumber}</p><p className="text-xs text-slate-500 mt-1 break-words">{deal?.name || 'Source reference'}</p></Link>
