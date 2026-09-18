@@ -419,6 +419,74 @@ export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
 }
 
+// ─── Stage 9 Design Proofing ─────────────────────────────────
+
+export const PROOF_DECISIONS = ["Approved", "Need Improvement"];
+
+/**
+ * Validate a client/PM decision on a proof.
+ *
+ * A "Need Improvement" verdict without a reason is useless to the designer who
+ * has to act on it, so the reason is mandatory and enforced here rather than
+ * only in the dialog.
+ */
+export function validateApprovalDecision(decision, { revisionReason = "", approverName = "" } = {}) {
+  const errors = {};
+  if (!PROOF_DECISIONS.includes(decision)) {
+    errors.decision = "Choose Approve or Need Improvement.";
+  }
+  if (!approverName.trim()) {
+    errors.approverName = "Signer name is required.";
+  }
+  if (decision === "Need Improvement" && !revisionReason.trim()) {
+    errors.revisionReason = "A revision reason is required so the designer knows what to change.";
+  }
+  return errors;
+}
+
+/** The newest proof on a stage, or null. */
+export function getLatestDocument(stage) {
+  const docs = stage?.documents ?? [];
+  if (docs.length === 0) return null;
+  return docs.reduce((latest, d) => ((d.version ?? 0) > (latest.version ?? 0) ? d : latest), docs[0]);
+}
+
+/**
+ * Where a stage sits in the proofing chain:
+ * upload → PM review → sent to client → client decision.
+ */
+export function getProofWorkflowState(stage) {
+  const latest = getLatestDocument(stage);
+  const approvals = stage?.approvals ?? [];
+  const pending = approvals.find(
+    (a) => a.status === "Pending" && (!latest || a.documentId === latest.id)
+  );
+  const decided = latest
+    ? approvals.filter((a) => a.documentId === latest.id && a.status !== "Pending")
+    : [];
+
+  let step = "awaiting-upload";
+  if (latest) {
+    if (latest.approvalStatus === "Approved") step = "approved";
+    else if (latest.approvalStatus === "Need Improvement") step = "needs-revision";
+    else if (pending) step = "with-client";
+    else step = "pm-review";
+  }
+
+  return {
+    latest,
+    versionCount: (stage?.documents ?? []).length,
+    pendingApproval: pending ?? null,
+    decisions: decided,
+    step,
+    canUpload: true,
+    canSendToClient: Boolean(latest) && step === "pm-review",
+    canDecide: Boolean(latest) && step === "with-client",
+    isApproved: step === "approved",
+    needsRevision: step === "needs-revision",
+  };
+}
+
 // ─── Stage 8 Handoff Gates ───────────────────────────────────
 
 /**
@@ -1651,8 +1719,82 @@ export const usePmsStore = create((set, get) => ({
       )
     ),
 
-  /** Record an approval decision against a document. */
-  decideDocument: (projectId, stageId, documentId, decision, { comments, revisionReason, approverName, approverType } = {}, actor) =>
+  /**
+   * Send a proof out for sign-off — the "Send to Client" step.
+   *
+   * Opens a Pending approval record against the document and parks the stage in
+   * Under Review, so the proofing centre can tell "not circulated yet" apart
+   * from "waiting on the client".
+   */
+  requestApproval: (projectId, stageId, documentId, { approverType = "Client", approverName, actor = null } = {}) =>
+    set((st) => {
+      const project = st.projects.find((p) => p.id === projectId);
+      const stage = project?.stages.find((s2) => s2.id === stageId);
+      const doc = stage?.documents.find((d) => d.id === documentId);
+
+      return applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          stages: p.stages.map((s2) =>
+            s2.id !== stageId
+              ? s2
+              : {
+                  ...s2,
+                  status: "Under Review",
+                  approvals: [
+                    ...(s2.approvals ?? []),
+                    {
+                      id: uid("APR"),
+                      documentId,
+                      approverType,
+                      approverName: approverName ?? p.customerName ?? "Client",
+                      requestedBy: actor,
+                      requestedAt: new Date().toISOString(),
+                      status: "Pending",
+                      decisionAt: null,
+                      comments: "",
+                    },
+                  ],
+                }
+          ),
+        }),
+        makeActivity(
+          "APPROVAL_REQUESTED",
+          "Document",
+          documentId,
+          `${doc?.fileName ?? "Proof"} sent to ${approverName ?? project?.customerName ?? "the client"} for approval.`,
+          actor
+        )
+      );
+    }),
+
+  /**
+   * Record a decision on a proof.
+   *
+   * Resolves the open Pending request for that document rather than stacking a
+   * second record beside it, so the approvals list reads as one thread per
+   * circulation. Past versions are never touched.
+   */
+  decideDocument: (
+    projectId,
+    stageId,
+    documentId,
+    decision,
+    { comments = "", revisionReason = "", approverName = "", approverType = "Client" } = {},
+    actor = null
+  ) => {
+    const errors = validateApprovalDecision(decision, { revisionReason, approverName });
+    if (Object.keys(errors).length > 0) {
+      const err = new Error(Object.values(errors).join(" "));
+      err.fieldErrors = errors;
+      throw err;
+    }
+
+    const nowIso = new Date().toISOString();
+    const isRevision = decision === "Need Improvement";
+
     set((st) =>
       applyToProject(
         st,
@@ -1661,48 +1803,65 @@ export const usePmsStore = create((set, get) => ({
           ...p,
           stages: p.stages.map((stage) => {
             if (stage.id !== stageId) return stage;
+
+            const approvals = stage.approvals ?? [];
+            const openIndex = approvals.findIndex(
+              (a) => a.documentId === documentId && a.status === "Pending"
+            );
+
+            const resolved = {
+              id: openIndex >= 0 ? approvals[openIndex].id : uid("APR"),
+              documentId,
+              approverType,
+              approverName,
+              requestedBy: openIndex >= 0 ? approvals[openIndex].requestedBy : actor,
+              requestedAt: openIndex >= 0 ? approvals[openIndex].requestedAt : nowIso,
+              status: decision,
+              decisionAt: nowIso,
+              comments,
+              ...(isRevision ? { revisionReason } : {}),
+            };
+
             return {
               ...stage,
-              status: decision === "Need Improvement" ? "Need Improvement" : "Approved",
+              status: isRevision ? "Need Improvement" : "Approved",
+              // Only the addressed version changes; earlier versions are frozen.
               documents: stage.documents.map((d) =>
                 d.id !== documentId
                   ? d
                   : {
                       ...d,
                       approvalStatus: decision,
-                      comments: comments ?? d.comments,
-                      ...(decision === "Need Improvement" ? { revisionReason } : {}),
+                      comments: comments || d.comments,
+                      ...(isRevision ? { revisionReason } : {}),
                     }
               ),
-              approvals: [
-                ...stage.approvals,
-                {
-                  id: uid("APR"),
-                  documentId,
-                  approverType: approverType ?? "Client",
-                  approverName: approverName ?? "Client",
-                  requestedBy: actor ?? null,
-                  requestedAt: new Date().toISOString(),
-                  status: decision,
-                  decisionAt: new Date().toISOString(),
-                  comments: comments ?? "",
-                  ...(decision === "Need Improvement" ? { revisionReason } : {}),
-                },
-              ],
+              approvals:
+                openIndex >= 0
+                  ? approvals.map((a, i) => (i === openIndex ? resolved : a))
+                  : [...approvals, resolved],
             };
           }),
         }),
-        makeActivity(
-          decision === "Need Improvement" ? "REVISION_REQUESTED" : "DOCUMENT_APPROVED",
-          "Document",
-          documentId,
-          decision === "Need Improvement"
-            ? `Revision requested: ${revisionReason ?? "no reason given"}.`
-            : "Document approved.",
-          actor
-        )
+        (() => {
+          const entry = makeActivity(
+            isRevision ? "REVISION_REQUESTED" : "DOCUMENT_APPROVED",
+            "Document",
+            documentId,
+            isRevision
+              ? `${approverName} requested a revision.`
+              : `${approverName} approved the proof.`,
+            actor
+          );
+          entry.from = "Pending";
+          entry.to = decision;
+          if (isRevision) entry.comments = revisionReason;
+          else if (comments) entry.comments = comments;
+          return entry;
+        })()
       )
-    ),
+    );
+  },
 
   // ── Audit trail ──
 
