@@ -1102,6 +1102,34 @@ export const usePmsStore = create((set, get) => ({
       )
     ),
 
+  /**
+   * Start a stage: stamps the start time (first start only) and moves it to
+   * In Progress, which is what makes the expected-completion clock run.
+   */
+  startStage: (projectId, stageId, actor) =>
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => ({
+          ...p,
+          currentStageId: stageId,
+          currentDepartment:
+            p.stages.find((s2) => s2.id === stageId)?.department ?? p.currentDepartment,
+          stages: p.stages.map((stage) =>
+            stage.id !== stageId
+              ? stage
+              : {
+                  ...stage,
+                  startDateTime: stage.startDateTime ?? new Date().toISOString(),
+                  status: "In Progress",
+                }
+          ),
+        }),
+        makeActivity("STAGE_STARTED", "Stage", stageId, "Stage started.", actor)
+      )
+    ),
+
   updateStage: (projectId, stageId, patch) =>
     set((st) =>
       applyToProject(st, projectId, (p) => ({
@@ -1295,6 +1323,9 @@ export const usePmsStore = create((set, get) => ({
             ? stage
             : {
                 ...stage,
+                // Progress and status are kept consistent in both directions:
+                // 100% means Completed, and reopening a task must drop it below
+                // 100% or the stage average would still count it as finished.
                 tasks: stage.tasks.map((t) => {
                   if (t.id !== taskId) return t;
                   const next = { ...t, ...patch };
@@ -1303,7 +1334,11 @@ export const usePmsStore = create((set, get) => ({
                     if (next.completionPct === 100) next.status = "Completed";
                     else if (next.status === "Completed") next.status = "In Progress";
                   }
-                  if (patch.status === "Completed") next.completionPct = 100;
+                  if (patch.status === "Completed") {
+                    next.completionPct = 100;
+                  } else if (patch.status !== undefined && next.completionPct === 100) {
+                    next.completionPct = 99;
+                  }
                   return next;
                 }),
               }

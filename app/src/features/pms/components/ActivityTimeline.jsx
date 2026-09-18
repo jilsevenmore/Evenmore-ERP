@@ -11,6 +11,7 @@ import {
   ArrowRight,
   Sliders,
   CircleDot,
+  PlayCircle,
 } from 'lucide-react';
 import { EmptyStatePms } from './EmptyStatePms';
 
@@ -27,6 +28,7 @@ const ACTION_NODES = {
   PROJECT_CREATED: { icon: Plus, bg: '#e0f2fe', fg: '#0369a1', label: 'Created' },
   STAGES_CONFIGURED: { icon: Sliders, bg: '#e0e7ff', fg: '#3730a3', label: 'Configured' },
   STAGE_ASSIGNED: { icon: UserCheck, bg: '#e0f2fe', fg: '#0369a1', label: 'Assigned' },
+  STAGE_STARTED: { icon: PlayCircle, bg: '#e0e7ff', fg: '#3730a3', label: 'Started' },
   STAGE_STATUS_CHANGED: { icon: CircleDot, bg: '#e0e7ff', fg: '#3730a3', label: 'Status' },
   DOCUMENT_UPLOADED: { icon: Upload, bg: '#f3e8ff', fg: '#6b21a8', label: 'Uploaded' },
   APPROVAL_REQUESTED: { icon: Eye, bg: '#e0e7ff', fg: '#3730a3', label: 'Reviewed' },

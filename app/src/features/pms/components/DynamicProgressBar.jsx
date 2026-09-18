@@ -19,8 +19,15 @@ const HEALTH_COLORS = {
   delayed: '#f43f5e',
 };
 
-/** Pick the bar colour from the stage status, falling back to the timing. */
+/**
+ * Pick the bar colour from the stage status, falling back to the timing.
+ *
+ * Finished work is always green: once a stage is done, elapsed time and
+ * overdue-ness say nothing about the bar, and how late it ran is already shown
+ * by the status badge and the delay figure in the analytics grid.
+ */
 export function resolveHealth(status, { isOverdue = false, elapsedPct = 0 } = {}, atRiskThresholdPct = 80) {
+  if (status === 'Completed' || status === 'Approved') return 'onTrack';
   if (status === 'Delayed' || status === 'Blocked' || isOverdue) return 'delayed';
   if (status === 'At Risk' || elapsedPct >= atRiskThresholdPct) return 'atRisk';
   return 'onTrack';
