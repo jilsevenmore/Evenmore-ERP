@@ -1,4 +1,3 @@
-import { sharingRequest } from '../services/quotationSharing';
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts, mockProformaInvoices, mockEstimates, mockWarrantyCards } from '../data/erp/mockData';
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
@@ -1931,28 +1930,10 @@ export const ERPProvider = ({ children, }) => {
             const events = new Map([...(q.activity || []), ...(share.events || [])].map(event => [event.id, event]));
             const activity = [...events.values()].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
             const viewed = activity.some(event => event.type === 'Quotation Viewed');
-            return { ...q, share: { url: share.url, expiresAt: share.expiresAt, allowDownload: share.allowDownload, allowAcceptance: share.allowAcceptance, localOnly: share.localOnly }, activity,
+            return { ...q, share: { token: share.token, url: share.url, expiresAt: share.expiresAt, allowDownload: share.allowDownload, allowAcceptance: share.allowAcceptance, localOnly: share.localOnly }, activity,
                 status: ['Draft', 'Sent', 'Viewed'].includes(q.status) ? (share.decision || (viewed ? 'Viewed' : q.status)) : q.status };
         }));
     };
-    const sharedQuotationIds = JSON.stringify(quotations.filter(q => q.share).map(q => q.id));
-    useEffect(() => {
-        if (window.location.pathname.startsWith('/quote/')) return;
-        let active = true;
-        const refresh = async () => {
-            if (!sessionStorage.getItem('quotation_admin_token')) return;
-            for (const id of JSON.parse(sharedQuotationIds)) {
-                try {
-                    const share = await sharingRequest(id);
-                    if (active) syncQuotationShare(id, share);
-                } catch { /* The quotation share dialog exposes connection errors. */ }
-            }
-        };
-        refresh();
-        const timer = setInterval(refresh, 15000);
-        return () => { active = false; clearInterval(timer); };
-        // syncQuotationShare only uses the functional state setter.
-    }, [sharedQuotationIds]);
     const convertQuotationToDeliveryChallan = (id) => {
         const quote = quotations.find(q => q.id === id);
         if (!quote) return;

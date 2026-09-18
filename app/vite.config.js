@@ -9,7 +9,6 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    proxy: { '/api/v1/quotation-sharing': 'http://127.0.0.1:8787', '/api/v1/public-quotations': 'http://127.0.0.1:8787' },
     host: true,
   },
   resolve: {
