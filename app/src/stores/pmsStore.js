@@ -155,9 +155,9 @@ export function deriveStageStatus(stage, now = Date.now(), atRiskThresholdPct = 
 
 /** Roll stage-level signals up into the project status. */
 export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPct = 80) {
-  if (project?.status === "On Hold" || project?.status === "Draft") {
-    return project.status;
-  }
+  // On Hold is a deliberate pause and only a human clears it.
+  if (project?.status === "On Hold") return project.status;
+
   // An explicit sign-off stamps actualCompletionDate and is terminal — a later
   // stage edit must not quietly reopen a closed project.
   if (project?.actualCompletionDate) return "Completed";
@@ -167,11 +167,13 @@ export function deriveProjectStatus(project, now = Date.now(), atRiskThresholdPc
 
   const statuses = stages.map((s) => deriveStageStatus(s, now, atRiskThresholdPct));
 
+  // Draft is derived, not sticky: a project stays Draft only while no stage has
+  // been picked up. Assigning the first stage moves it on by itself.
+  if (statuses.every((s) => s === "Not Started")) return "Draft";
   if (statuses.every((s) => s === "Completed")) return "Completed";
   if (statuses.includes("Delayed")) return "Delayed";
   if (statuses.includes("At Risk")) return "At Risk";
-  if (statuses.some((s) => s !== "Not Started")) return "In Progress";
-  return project.status ?? "Draft";
+  return "In Progress";
 }
 
 // ─── Recalculation ───────────────────────────────────────────────────
@@ -417,6 +419,166 @@ export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
 }
 
+// ─── Stage 5 Directory Derivations ───────────────────────────
+
+/** Next sequential project code for a year, e.g. "PRJ-2026-006". */
+export function nextProjectId(projects = [], year = new Date().getFullYear()) {
+  const prefix = `PRJ-${year}-`;
+  const highest = projects.reduce((max, p) => {
+    if (typeof p?.id !== "string" || !p.id.startsWith(prefix)) return max;
+    const n = Number.parseInt(p.id.slice(prefix.length), 10);
+    return Number.isFinite(n) ? Math.max(max, n) : max;
+  }, 0);
+  return `${prefix}${String(highest + 1).padStart(3, "0")}`;
+}
+
+/**
+ * Per-row display data for the project directory: which stage is live, where
+ * it sits in the sequence, and how the schedule is tracking.
+ */
+export function getProjectRowMeta(project, now = Date.now()) {
+  const stages = project?.stages ?? [];
+  const ordered = [...stages].sort((a, b) => a.sequence - b.sequence);
+  const current =
+    ordered.find((s) => s.id === project?.currentStageId) ??
+    ordered.find((s) => s.status !== "Completed") ??
+    null;
+
+  const index = current ? ordered.findIndex((s) => s.id === current.id) + 1 : 0;
+  const timing = current ? getStageTiming(current, now) : null;
+
+  // Project-level delay measures the promised end date, not the live stage.
+  const projectDelayMs = computeDelayMs(
+    project?.expectedCompletionDate,
+    project?.actualCompletionDate,
+    now
+  );
+  const remainingMs = computeRemainingMs(project?.expectedCompletionDate, now);
+
+  return {
+    currentStage: current,
+    sequenceLabel: current ? `Stage ${index}/${ordered.length}: ${current.name}` : "No stages",
+    stageIndex: index,
+    stageCount: ordered.length,
+    department: current?.department ?? project?.currentDepartment ?? "—",
+    timing,
+    projectDelayMs,
+    projectDelayLabel: formatDuration(projectDelayMs),
+    isOverdue: projectDelayMs > 0 && project?.status !== "Completed",
+    remainingMs,
+    remainingLabel: remainingMs > 0 ? `In ${formatDuration(remainingMs)}` : "Overdue",
+  };
+}
+
+const EMPTY_FILTERS = {
+  search: "",
+  customer: "all",
+  projectManagerId: "all",
+  department: "all",
+  stageName: "all",
+  statuses: [],
+  delayedOnly: false,
+  dateField: "startDate",
+  dateFrom: "",
+  dateTo: "",
+};
+
+/** The blank filter set, for a page's initial state and its Reset action. */
+export function emptyProjectFilters() {
+  return { ...EMPTY_FILTERS, statuses: [] };
+}
+
+/** True when anything is actually narrowing the list. */
+export function hasActiveFilters(filters = {}) {
+  const f = { ...EMPTY_FILTERS, ...filters };
+  return Boolean(
+    f.search.trim() ||
+      f.customer !== "all" ||
+      f.projectManagerId !== "all" ||
+      f.department !== "all" ||
+      f.stageName !== "all" ||
+      (f.statuses?.length ?? 0) > 0 ||
+      f.delayedOnly ||
+      f.dateFrom ||
+      f.dateTo
+  );
+}
+
+/** Apply the directory's multi-facet filter bar to a project list. */
+export function filterProjects(projects = [], filters = {}, now = Date.now()) {
+  const f = { ...EMPTY_FILTERS, ...filters };
+  const q = f.search.trim().toLowerCase();
+
+  return projects.filter((p) => {
+    // Global search spans project code, customer, order id and product name.
+    if (q) {
+      const haystack = [
+        p.id,
+        p.customerName,
+        p.crmOrderId,
+        p.productDetails?.productName,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+
+    if (f.customer !== "all" && p.customerName !== f.customer) return false;
+    if (f.projectManagerId !== "all" && p.projectManager?.id !== f.projectManagerId) {
+      return false;
+    }
+    if (f.statuses?.length > 0 && !f.statuses.includes(p.status)) return false;
+
+    const meta = getProjectRowMeta(p, now);
+    if (f.department !== "all" && meta.department !== f.department) return false;
+    if (f.stageName !== "all" && meta.currentStage?.name !== f.stageName) return false;
+
+    if (f.delayedOnly) {
+      const overdueStage = (p.stages ?? []).some((s) => isStageOverdue(s, now));
+      if (p.status !== "Delayed" && !meta.isOverdue && !overdueStage) return false;
+    }
+
+    if (f.dateFrom || f.dateTo) {
+      const value = toDate(p[f.dateField]);
+      if (!value) return false;
+      if (f.dateFrom && value.getTime() < new Date(f.dateFrom).setHours(0, 0, 0, 0)) {
+        return false;
+      }
+      if (f.dateTo && value.getTime() > new Date(f.dateTo).setHours(23, 59, 59, 999)) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+/** Distinct dropdown options derived from the projects themselves. */
+export function getProjectFilterOptions(projects = []) {
+  const customers = new Set();
+  const departments = new Set();
+  const stageNames = new Set();
+  const managers = new Map();
+
+  for (const p of projects) {
+    if (p.customerName) customers.add(p.customerName);
+    if (p.projectManager?.id) managers.set(p.projectManager.id, p.projectManager);
+    for (const stage of p.stages ?? []) {
+      if (stage.department) departments.add(stage.department);
+      if (stage.name) stageNames.add(stage.name);
+    }
+  }
+
+  const sorted = (set) => [...set].sort((a, b) => a.localeCompare(b));
+  return {
+    customers: sorted(customers),
+    departments: sorted(departments),
+    stageNames: sorted(stageNames),
+    managers: [...managers.values()].sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
 /** Per-stage timing summary for timeline / card rendering. */
 export function getStageTiming(stage, now = Date.now()) {
   const expected = stage?.expectedCompletionDateTime ?? null;
@@ -654,6 +816,98 @@ export const usePmsStore = create((set, get) => ({
       persist({ ...st, projects });
       return { projects };
     }),
+
+  /**
+   * Create a project from a CRM sales order — the Stage 5 creation workflow.
+   *
+   * Does the whole thing in one write: allocates the next sequential code,
+   * copies the order's commercial detail, initialises every chosen active
+   * stage template in "Not Started", and logs the Project Created audit entry.
+   * Returns the new project id so the caller can navigate to it.
+   */
+  createProjectFromOrder: ({
+    order,
+    projectManager,
+    priority = "Medium",
+    startDate,
+    stageConfigIds = null,
+    specifications = "",
+  }) => {
+    if (!order) throw new Error("A CRM order is required to create a project.");
+    if (!projectManager) throw new Error("A project manager is required.");
+
+    const state = get();
+    const id = nextProjectId(state.projects);
+    const start = startDate || new Date().toISOString();
+
+    const configs = state.stageConfigs
+      .filter((c) => c.isActive && (!stageConfigIds || stageConfigIds.includes(c.id)))
+      .sort((a, b) => a.sequence - b.sequence);
+
+    const stages = configs.map((c, i) => ({
+      id: uid("stg-inst"),
+      stageConfigId: c.id,
+      name: c.name,
+      sequence: i + 1,
+      department: c.department,
+      assignedTeam: null,
+      assignedUser: null,
+      completionPct: 0,
+      plannedDuration: c.defaultDuration,
+      durationUnit: c.durationUnit,
+      startDateTime: null,
+      expectedCompletionDateTime: null,
+      actualCompletionDateTime: null,
+      status: "Not Started",
+      tasks: [],
+      documents: [],
+      approvals: [],
+    }));
+
+    const project = recalcProject(
+      {
+        id,
+        crmOrderId: order.orderNumber ?? order.id,
+        crmCustomerId: order.customerId ?? null,
+        customerName: order.customer ?? "",
+        productDetails: {
+          productName: order.items?.[0]?.description ?? order.customer ?? "Order items",
+          orderValue: order.total ?? order.amount ?? 0,
+          quantity: order.itemsCount ?? order.items?.length ?? 1,
+          specifications,
+        },
+        projectManager,
+        currentStageId: stages[0]?.id ?? null,
+        currentDepartment: stages[0]?.department ?? "Design",
+        priority,
+        overallCompletionPct: 0,
+        startDate: start,
+        expectedCompletionDate: null,
+        actualCompletionDate: null,
+        status: "Draft",
+        stages,
+        activityLog: [
+          makeActivity(
+            "PROJECT_CREATED",
+            "Project",
+            id,
+            `Project created from sales order ${order.orderNumber ?? order.id} for ${order.customer ?? "customer"}.`,
+            projectManager
+          ),
+        ],
+      },
+      Date.now(),
+      state.settings.atRiskThresholdPct
+    );
+
+    set((st) => {
+      const projects = [project, ...st.projects];
+      persist({ ...st, projects });
+      return { projects };
+    });
+
+    return id;
+  },
 
   updateProject: (projectId, patch) =>
     set((st) => applyToProject(st, projectId, (p) => ({ ...p, ...patch }))),

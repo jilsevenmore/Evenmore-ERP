@@ -988,8 +988,10 @@ export const projectsMock = [
     priority: "Low",
     overallCompletionPct: 0,
     startDate: "2026-08-10T09:00:00.000Z",
-    expectedCompletionDate: "2026-09-07T18:00:00.000Z",
-    actualCompletionDate: "2026-09-05T16:00:00.000Z",
+    // Stages run back to back with no idle gap, so the derived expected date
+    // (start + summed durations = 21 Aug) matches the story of an early finish.
+    expectedCompletionDate: "2026-08-21T09:00:00.000Z",
+    actualCompletionDate: "2026-08-20T16:00:00.000Z",
     status: "Completed",
     stages: [
       {
@@ -1053,9 +1055,9 @@ export const projectsMock = [
         completionPct: 100,
         plannedDuration: 1,
         durationUnit: "Days",
-        startDateTime: "2026-09-04T09:00:00.000Z",
-        expectedCompletionDateTime: "2026-09-05T09:00:00.000Z",
-        actualCompletionDateTime: "2026-09-05T16:00:00.000Z",
+        startDateTime: "2026-08-20T09:00:00.000Z",
+        expectedCompletionDateTime: "2026-08-21T09:00:00.000Z",
+        actualCompletionDateTime: "2026-08-20T16:00:00.000Z",
         status: "Completed",
         tasks: [],
         documents: [
@@ -1066,7 +1068,7 @@ export const projectsMock = [
             fileSize: "0.9 MB",
             previewUrl: "/mock/pdf/cyberdyne-packing-v1.pdf",
             uploadedBy: { id: "EMP-PK-01", name: "Suresh Iyer" },
-            uploadedAt: "2026-09-05T15:30:00.000Z",
+            uploadedAt: "2026-08-20T15:30:00.000Z",
             comments: "Final packing list and dispatch note.",
             approvalStatus: "Approved",
           },
@@ -1086,12 +1088,12 @@ export const projectsMock = [
       },
       {
         id: "ACT-0402",
-        timestamp: "2026-09-05T16:00:00.000Z",
+        timestamp: "2026-08-20T16:00:00.000Z",
         actor: { id: "EMP-PM-01", name: "Rahul Mehta" },
         action: "PROJECT_COMPLETED",
         entityType: "Project",
         entityId: "PRJ-2026-004",
-        description: "Project signed off, 2 days ahead of schedule.",
+        description: "Project signed off, 1 day ahead of schedule.",
       },
     ],
   },
