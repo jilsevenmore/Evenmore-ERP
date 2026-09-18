@@ -80,7 +80,7 @@ function ActorAvatar({ actor }) {
   );
 }
 
-export function ActivityTimeline({ entries = [], limit, className = '' }) {
+export function ActivityTimeline({ entries = [], limit, renderContext, className = '' }) {
   // Newest first; the store appends chronologically.
   const ordered = [...entries].sort(
     (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
@@ -134,6 +134,9 @@ export function ActivityTimeline({ entries = [], limit, className = '' }) {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-slate-800">{node.label}</span>
                 <span className="text-[11px] text-slate-400">{formatTimestamp(entry.timestamp)}</span>
+                {/* Optional caller-supplied context, e.g. a project link on a
+                    cross-project feed. */}
+                {typeof renderContext === 'function' && renderContext(entry)}
               </div>
 
               {entry.description && (

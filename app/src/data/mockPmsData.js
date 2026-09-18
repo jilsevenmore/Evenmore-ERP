@@ -1147,4 +1147,15 @@ export const pmsSettingsMock = {
   workingHoursPerDay: 8,
   requireClientApprovalOnDesign: true,
   requireQaCertificate: true,
+
+  // Concurrent open tasks each department can absorb, used as the denominator
+  // for the dashboard's workload utilisation cards.
+  defaultDepartmentCapacity: 20,
+  departmentCapacity: {
+    Design: 18,
+    Production: 24,
+    Quality: 12,
+    Packaging: 10,
+    Installation: 8,
+  },
 };

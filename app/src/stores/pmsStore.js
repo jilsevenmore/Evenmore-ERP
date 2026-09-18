@@ -234,6 +234,189 @@ export function computeNavBadges(projects = [], currentUserId = null) {
   return { pmsActiveCount, pmsDelayedCount, pmsMyTasksPending };
 }
 
+// ─── Stage 4 Dashboard Derivations ───────────────────────────
+//
+// These follow the dashboard spec's own definitions, which are deliberately
+// stricter than the store's general-purpose getKpis(): "active" excludes On
+// Hold, "delayed" also counts projects whose stages have run past due, and
+// "at risk" is measured per stage at a 70%/50% cut rather than via
+// settings.atRiskThresholdPct.
+
+export const DASHBOARD_AT_RISK_ELAPSED_PCT = 70;
+export const DASHBOARD_AT_RISK_COMPLETION_PCT = 50;
+
+const ACTIVE_STATUSES = new Set(["In Progress", "At Risk", "Delayed"]);
+
+/** A stage still open and already past its expected completion. */
+export function isStageOverdue(stage, now = Date.now()) {
+  if (!stage || stage.status === "Completed") return false;
+  const expected = toDate(stage.expectedCompletionDateTime);
+  return Boolean(expected) && now > expected.getTime();
+}
+
+/** A started, unfinished stage burning its window faster than its progress. */
+export function isStageAtRisk(stage, now = Date.now()) {
+  if (!stage || stage.status === "Completed" || !stage.startDateTime) return false;
+  return (
+    computeElapsedPct(stage, now) > DASHBOARD_AT_RISK_ELAPSED_PCT &&
+    computeStageCompletionPct(stage) < DASHBOARD_AT_RISK_COMPLETION_PCT
+  );
+}
+
+/** Days from now until `iso`, or null. Negative means already past. */
+function daysUntil(iso, now = Date.now()) {
+  const d = toDate(iso);
+  if (!d) return null;
+  return (d.getTime() - now) / MS_PER_DAY;
+}
+
+/** The seven headline dashboard metrics. */
+export function computeDashboardMetrics(projects = [], now = Date.now()) {
+  let activeProjects = 0;
+  let completedProjects = 0;
+  let delayedProjects = 0;
+  let atRiskStages = 0;
+  let dueTodayCount = 0;
+  let dueThisWeekCount = 0;
+
+  const startOfToday = new Date(now);
+  startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = startOfToday.getTime() + MS_PER_DAY;
+
+  for (const p of projects) {
+    if (ACTIVE_STATUSES.has(p.status)) activeProjects += 1;
+    if (p.status === "Completed") completedProjects += 1;
+
+    const stages = p.stages ?? [];
+    if (p.status === "Delayed" || stages.some((s) => isStageOverdue(s, now))) {
+      delayedProjects += 1;
+    }
+    for (const stage of stages) {
+      if (isStageAtRisk(stage, now)) atRiskStages += 1;
+    }
+
+    // Deadline counters only make sense for work still in flight.
+    if (p.status !== "Completed" && p.expectedCompletionDate) {
+      const due = toDate(p.expectedCompletionDate)?.getTime();
+      if (due != null) {
+        if (due >= startOfToday.getTime() && due < endOfToday) dueTodayCount += 1;
+        if (due >= now && due <= now + 7 * MS_PER_DAY) dueThisWeekCount += 1;
+      }
+    }
+  }
+
+  return {
+    totalProjects: projects.length,
+    activeProjects,
+    completedProjects,
+    delayedProjects,
+    atRiskStages,
+    dueTodayCount,
+    dueThisWeekCount,
+  };
+}
+
+/** Project counts bucketed by the department currently holding the work. */
+export function computePipelineByDepartment(projects = []) {
+  const buckets = new Map();
+  for (const p of projects) {
+    if (p.status === "Completed" || p.status === "Draft") continue;
+    const current = p.stages?.find((s) => s.id === p.currentStageId);
+    const dept = current?.department ?? p.currentDepartment ?? "Unassigned";
+    const entry = buckets.get(dept) ?? { department: dept, count: 0, projects: [] };
+    entry.count += 1;
+    entry.projects.push(p.id);
+    buckets.set(dept, entry);
+  }
+  const rows = [...buckets.values()].sort((a, b) => b.count - a.count);
+  const max = rows.reduce((m, r) => Math.max(m, r.count), 0);
+  return rows.map((r) => ({ ...r, sharePct: max > 0 ? Math.round((r.count / max) * 100) : 0 }));
+}
+
+/** Open task load per department against its configured capacity. */
+export function computeDepartmentWorkload(projects = [], capacityPerDept = {}, defaultCapacity = 20) {
+  const buckets = new Map();
+
+  for (const p of projects) {
+    for (const stage of p.stages ?? []) {
+      for (const task of stage.tasks ?? []) {
+        if (task.status === "Completed") continue;
+        const dept = task.department ?? stage.department ?? "Unassigned";
+        const entry = buckets.get(dept) ?? { department: dept, openTasks: 0, blockedTasks: 0 };
+        entry.openTasks += 1;
+        if (task.status === "Blocked") entry.blockedTasks += 1;
+        buckets.set(dept, entry);
+      }
+    }
+  }
+
+  return [...buckets.values()]
+    .map((entry) => {
+      const capacity = capacityPerDept[entry.department] ?? defaultCapacity;
+      const utilisationPct = capacity > 0 ? Math.round((entry.openTasks / capacity) * 100) : 0;
+      return {
+        ...entry,
+        capacity,
+        utilisationPct,
+        load: utilisationPct >= 90 ? "High" : utilisationPct >= 65 ? "Medium" : "Low",
+      };
+    })
+    .sort((a, b) => b.utilisationPct - a.utilisationPct);
+}
+
+/** Every stage that is overdue or explicitly delayed, with project context. */
+export function computeDelayWatchlist(projects = [], now = Date.now()) {
+  const rows = [];
+  for (const p of projects) {
+    for (const stage of p.stages ?? []) {
+      const flagged = stage.delayDetails?.isDelayed || stage.status === "Delayed";
+      const overdue = isStageOverdue(stage, now);
+      if (!flagged && !overdue) continue;
+
+      const timing = getStageTiming(stage, now);
+      rows.push({
+        id: `${p.id}:${stage.id}`,
+        projectId: p.id,
+        customerName: p.customerName,
+        productName: p.productDetails?.productName ?? "",
+        priority: p.priority,
+        stageName: stage.name,
+        department: stage.department,
+        status: stage.status,
+        owner: stage.assignedUser?.name ?? stage.assignedTeam ?? "Unassigned",
+        reason: stage.delayDetails?.reason ?? "",
+        expectedRecoveryDate: stage.delayDetails?.expectedRecoveryDate ?? null,
+        delayMs: timing.delayMs,
+        delayLabel: timing.delayLabel,
+        timing,
+      });
+    }
+  }
+  return rows.sort((a, b) => b.delayMs - a.delayMs);
+}
+
+/** In-flight projects due within `days`, soonest first. */
+export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now()) {
+  return projects
+    .filter((p) => p.status !== "Completed" && p.status !== "Draft" && p.expectedCompletionDate)
+    .map((p) => {
+      const remaining = daysUntil(p.expectedCompletionDate, now);
+      return {
+        id: p.id,
+        customerName: p.customerName,
+        productName: p.productDetails?.productName ?? "",
+        priority: p.priority,
+        status: p.status,
+        completionPct: p.overallCompletionPct ?? 0,
+        expectedCompletionDate: p.expectedCompletionDate,
+        daysRemaining: remaining,
+        isOverdue: remaining != null && remaining < 0,
+      };
+    })
+    .filter((row) => row.daysRemaining != null && row.daysRemaining <= days)
+    .sort((a, b) => a.daysRemaining - b.daysRemaining);
+}
+
 /** Per-stage timing summary for timeline / card rendering. */
 export function getStageTiming(stage, now = Date.now()) {
   const expected = stage?.expectedCompletionDateTime ?? null;
@@ -979,6 +1162,25 @@ export const usePmsStore = create((set, get) => ({
 
   /** Live counters for the sidebar nav badges. */
   getNavBadges: () => computeNavBadges(get().projects, get().currentUserId),
+
+  // ── Stage 4 dashboard selectors ──
+
+  getDashboardMetrics: () => computeDashboardMetrics(get().projects),
+
+  getPipelineByDepartment: () => computePipelineByDepartment(get().projects),
+
+  getDepartmentWorkload: () => {
+    const { projects, settings } = get();
+    return computeDepartmentWorkload(
+      projects,
+      settings.departmentCapacity ?? {},
+      settings.defaultDepartmentCapacity ?? 20
+    );
+  },
+
+  getDelayWatchlist: () => computeDelayWatchlist(get().projects),
+
+  getUpcomingDeadlines: (days = 7) => computeUpcomingDeadlines(get().projects, days),
 
   /** Merged, newest-first audit feed across every project. */
   getRecentActivity: (limit = 20) =>
