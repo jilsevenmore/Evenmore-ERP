@@ -21,6 +21,8 @@ import {
 import TrainingList from "./TrainingList";
 import TrainingFunnel from "./TrainingFunnel";
 import Trainers from "./Trainers";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 export default function TrainingDashboard({ initialTab }) {
   const navigate = useNavigate();
@@ -35,7 +37,7 @@ export default function TrainingDashboard({ initialTab }) {
     if (queryTab && queryTab !== activeTab) {
       setActiveTab(queryTab);
     }
-  }, [queryTab]);
+  }, [queryTab, activeTab]);
 
   const handleTabChange = (tabKey) => {
     setActiveTab(tabKey);
@@ -109,7 +111,10 @@ export default function TrainingDashboard({ initialTab }) {
             <span className="text-slate-600">Training</span>
           </div>
           <div className="mt-1">
-            <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight">Training Management</h1>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight">Training Management</h1>
+              <PageInfoButton guide={hrmsGuides.trainingDashboard} />
+            </div>
             <p className="text-[13px] text-slate-500 mt-0.5">
               Unified training setup: overview, programs list, funnel progression & trainers directory
             </p>

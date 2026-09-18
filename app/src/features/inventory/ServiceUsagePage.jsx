@@ -4,21 +4,22 @@ import { DataTable } from '../../components/ui/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Plus, Wrench, User } from 'lucide-react';
 export const ServiceUsagePage = () => {
-    const { serviceUsages, items, addServiceUsage } = useERP();
+    const { serviceUsages, items, addServiceUsage, getCurrentISODate } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
-    const [ticketNumber, setTicketNumber] = useState('TKT-9041');
-    const [technician, setTechnician] = useState('Liam Vance');
-    const [sku, setSku] = useState(items[0]?.sku || 'CAB-6-01');
-    const [qtyUsed, setQtyUsed] = useState('5');
-    const [purpose, setPurpose] = useState('Rack cabling replacement');
+    // [PHASE-4] clear demo defaults → empty/new-entry state
+    const [ticketNumber, setTicketNumber] = useState('');
+    const [technician, setTechnician] = useState('');
+    const [sku, setSku] = useState(items[0]?.sku || '');
+    const [qtyUsed, setQtyUsed] = useState('');
+    const [purpose, setPurpose] = useState('');
     const handleCreate = (e) => {
         e.preventDefault();
         addServiceUsage({
-            ticketNumber,
-            technician,
+            ticketNumber: ticketNumber || `TKT-${String(serviceUsages.length + 1).padStart(3, '0')}`,
+            technician: technician || 'Unassigned',
             sku,
             qtyUsed: parseInt(qtyUsed, 10) || 1,
-            date: 'Today',
+            date: getCurrentISODate(),
             purpose,
         });
         setShowAddModal(false);

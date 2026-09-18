@@ -9,6 +9,8 @@ import { Drawer } from "../../../components/hrms/Drawer";
 import { Button } from "../../../components/hrms/Button";
 import { useAppStore } from "../../../stores/appStore";
 import { Eye, Pencil, Trash2 } from "lucide-react";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 export default function GoalTracking() {
   const { showToast, employees } = useAppStore();
   const [data, setData] = useState(goalsMock);
@@ -93,7 +95,15 @@ export default function GoalTracking() {
       </div>;
   }
   return <div className="flex flex-col gap-5">
-      <div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-[22px] font-bold">Goal Tracking</h1><p className="text-[13px] text-muted">Track and manage employee goals.</p></div><Button onClick={() => {
+      <div className="flex flex-wrap justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[22px] font-bold text-slate-800">Goal Tracking</h1>
+            <PageInfoButton guide={hrmsGuides.goalTracking} />
+          </div>
+          <p className="text-[13px] text-muted">Track and manage individual employee goals, progress bars, and completion deadlines.</p>
+        </div>
+        <Button onClick={() => {
     setForm({ employee: "", goal: "", target: "", current: "", progress: 30, due: "31 Dec 2024", status: "In Progress", department: "Engineering" });
     setAddOpen(true);
   }}>+ Add Goal</Button></div>

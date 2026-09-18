@@ -43,11 +43,11 @@ export const DeliveryChallansPage = () => {
     const [selectedWarrantyCard, setSelectedWarrantyCard] = useState(null);
     const [sendModalChallan, setSendModalChallan] = useState(null);
     const [selectedSoId, setSelectedSoId] = useState(salesOrders[0]?.id || '');
-    const [transporter, setTransporter] = useState('FedEx Freight Direct');
-    const [vehicleNo, setVehicleNo] = useState('TRK-9041-WA');
-    const [driverContact, setDriverContact] = useState('+1 (555) 349-2810');
-    const [totalPackages, setTotalPackages] = useState(4);
-    const [dispatchNote, setDispatchNote] = useState('Fragile electronic components. Handle with pallet forklift.');
+    const [transporter, setTransporter] = useState('');
+    const [vehicleNo, setVehicleNo] = useState('');
+    const [driverContact, setDriverContact] = useState('');
+    const [totalPackages, setTotalPackages] = useState(1);
+    const [dispatchNote, setDispatchNote] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const [validationError, setValidationError] = useState('');
 
@@ -175,7 +175,7 @@ export const DeliveryChallansPage = () => {
             sourceSalesOrderNumber: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
             linkedSo: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
             customerId: order?.customerId,
-            customer: order?.customer || 'Acme Corp',
+            customer: order?.customer || 'Walk-in Customer',
             dispatchDate: new Date().toISOString().split('T')[0],
             transporter,
             vehicleNo,
@@ -477,11 +477,11 @@ export const DeliveryChallansPage = () => {
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Carrier / Transporter</label>
-                  <input type="text" value={transporter} onChange={(e) => setTransporter(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. FedEx Freight, DHL"/>
+                  <input type="text" value={transporter} onChange={(e) => setTransporter(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. Transporter / Carrier name"/>
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Vehicle / Truck Plate #</label>
-                  <input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. TRK-9041-WA"/>
+                  <input type="text" value={vehicleNo} onChange={(e) => setVehicleNo(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="e.g. MH-12-AB-9041"/>
                 </div>
               </div>
 
@@ -713,11 +713,11 @@ export const DeliveryChallansPage = () => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-white p-3 rounded-xl border border-slate-200">
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Transporter</span>
-                  <p className="font-semibold text-slate-800">{selectedChallan.transporter || 'FedEx Freight'}</p>
+                  <p className="font-semibold text-slate-800">{selectedChallan.transporter || '—'}</p>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Vehicle / Reg #</span>
-                  <p className="font-mono font-semibold text-slate-800">{selectedChallan.vehicleNo || 'TRK-9041-WA'}</p>
+                  <p className="font-mono font-semibold text-slate-800">{selectedChallan.vehicleNo || '—'}</p>
                 </div>
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Dispatch Date</span>
@@ -757,7 +757,7 @@ export const DeliveryChallansPage = () => {
                             Live Fleet Route & Vehicle Tracking
                           </h4>
                           <p className="text-[10px] text-slate-500">
-                            Vehicle: <strong className="font-mono text-slate-800">{selectedChallan.vehicleNo || 'TRK-9041-WA'}</strong> • Carrier: {selectedChallan.transporter || 'FedEx Freight Direct'}
+                            Vehicle: <strong className="font-mono text-slate-800">{selectedChallan.vehicleNo || '—'}</strong> • Carrier: {selectedChallan.transporter || '—'}
                           </p>
                         </div>
                       </div>
@@ -816,7 +816,7 @@ export const DeliveryChallansPage = () => {
                             <Truck size={15} />
                           </div>
                           <span className="mt-1 font-mono text-[9px] font-bold bg-slate-900 text-white px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
-                            {selectedChallan.vehicleNo || 'TRK-9041'}
+                            {selectedChallan.vehicleNo || '—'}
                           </span>
                         </div>
                       )}

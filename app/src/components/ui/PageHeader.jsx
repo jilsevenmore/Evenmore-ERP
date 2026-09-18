@@ -1,13 +1,10 @@
-/**
- * PageHeader — Canonical CRM & ERP Page Header with safe breadcrumbs & guide modal support.
- */
-import React, { useState } from 'react';
-import { Info, X, HelpCircle, BookOpen, ArrowRight, ChevronRight } from 'lucide-react';
+import React from 'react';
+import { ChevronRight } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { toTitleCase, safeString } from '../../utils/stringUtils';
+import { PageInfoButton } from './PageInfoButton';
 
 export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
-  const [isGuideOpen, setIsGuideOpen] = useState(false);
   const location = useLocation();
 
   const pathname = safeString(location?.pathname, '/');
@@ -56,111 +53,13 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
         <div>
           <div className="flex items-center gap-2.5">
             <h2 className="text-2xl font-black text-slate-800 tracking-tight">{title}</h2>
-            {guide && (
-              <button
-                type="button"
-                onClick={() => setIsGuideOpen(true)}
-                className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 text-xs font-bold transition-transform hover:scale-105 cursor-pointer shadow-2xs"
-                title="Click for Page Guide & Terminology"
-                aria-label="Page Information and Terminology Guide"
-              >
-                <Info size={13} />
-              </button>
-            )}
+            <PageInfoButton guide={guide} title={title} />
           </div>
           {subtitle && <p className="text-xs text-slate-500 mt-1 max-w-3xl">{subtitle}</p>}
         </div>
 
         {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
       </div>
-
-      {/* Interactive Page Terminology & Guide Modal */}
-      {isGuideOpen && guide && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-card rounded-2xl border border-border max-w-2xl w-full p-6 shadow-2xl text-xs max-h-[85vh] flex flex-col overflow-hidden">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-600 flex items-center justify-center font-bold">
-                  <BookOpen size={16} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-text">{guide.title} — Guide & Terms</h3>
-                  <p className="text-[11px] text-muted">{guide.subtitle}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsGuideOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="space-y-5 mt-4 overflow-y-auto pr-1 flex-1">
-              {guide.purpose && (
-                <div className="bg-soft border border-border rounded-xl p-3.5 space-y-1">
-                  <span className="text-[10px] uppercase font-bold text-muted tracking-wider flex items-center gap-1">
-                    <HelpCircle size={12} className="text-primary" /> What is this page for?
-                  </span>
-                  <p className="text-text leading-relaxed text-xs">{guide.purpose}</p>
-                </div>
-              )}
-
-              {guide.workflow && guide.workflow.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-muted tracking-wider">
-                    Operational Workflow
-                  </span>
-                  <div className="flex items-center gap-2 overflow-x-auto py-1">
-                    {guide.workflow.map((step, idx) => (
-                      <React.Fragment key={idx}>
-                        <div className="bg-card border border-border px-3 py-1.5 rounded-lg font-semibold text-text text-[11px] shrink-0 flex items-center gap-1.5 shadow-2xs">
-                          <span className="w-4 h-4 rounded-full bg-blue-600 text-white text-[9px] flex items-center justify-center font-mono">
-                            {idx + 1}
-                          </span>
-                          <span>{step}</span>
-                        </div>
-                        {idx < guide.workflow.length - 1 && (
-                          <ArrowRight size={13} className="text-slate-300 shrink-0" />
-                        )}
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {guide.keyTerms && guide.keyTerms.length > 0 && (
-                <div className="space-y-2">
-                  <span className="text-[10px] uppercase font-bold text-muted tracking-wider">
-                    Key Definitions
-                  </span>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                    {guide.keyTerms.map((t, idx) => (
-                      <div key={idx} className="bg-soft/60 p-3 rounded-xl border border-border/80">
-                        <span className="font-bold text-text text-[11px] block">{t.term}</span>
-                        <p className="text-muted text-[11px] mt-0.5 leading-normal">{t.definition}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="pt-3 border-t border-border flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsGuideOpen(false)}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-xs transition"
-              >
-                Got It
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

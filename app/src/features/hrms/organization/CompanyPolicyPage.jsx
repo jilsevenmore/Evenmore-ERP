@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { CompanyPolicyModule } from "../policy/CompanyPolicyModule";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   FileText,
   CheckCircle2,
@@ -141,7 +143,10 @@ export function LegacyCompanyPolicyPage() {
       {/* Top Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold text-slate-900">Company Policy</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold text-slate-900">Company Policy</h1>
+            <PageInfoButton guide={hrmsGuides.companyPolicy} />
+          </div>
           <p className="text-[13px] text-muted">
             Versioned enterprise policies, compliance terms, and employee acknowledgement tracking.
           </p>

@@ -4,6 +4,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
 import { ConfirmModal } from "../../../components/hrms/Shared";
+import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const SAMPLE_REQUESTS = [
   {
@@ -297,7 +299,10 @@ export default function Requests() {
       {/* Header Row */}
       <div className="req-title-row">
         <div>
-          <h1 className="req-title">Attendance Requests</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="req-title">Attendance Requests</h1>
+            <PageInfoButton guide={hrmsGuides.attendanceRequests} />
+          </div>
           <p className="req-sub">Single request management for regularization &amp; early clock-out.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

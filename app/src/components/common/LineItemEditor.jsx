@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Plus, Trash2, Package, ShoppingCart, Boxes, AlertTriangle, Search, X, Layers, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Package, ShoppingCart, Boxes, AlertTriangle, Search, X, Layers, ChevronDown, Scale } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../ui/Button';
 
@@ -86,6 +86,14 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             tax: 18,
             amount: Math.round(unitRate * 1.18 * 100) / 100,
             isUserModified: false,
+            // [PHASE-2A] propagate weight-item config (steel by kg) onto the transaction line
+            isWeightItem: Boolean(defaultItem.isWeightItem),
+            theoreticalWeight: Number(defaultItem.theoreticalWeight) || 0,
+            tolerancePct: defaultItem.tolerancePct !== undefined ? Number(defaultItem.tolerancePct) : 2,
+            weightUnit: defaultItem.weightUnit || 'kg',
+            // [PHASE-2E.1] propagate HSN/SAC codes for GST invoice printing
+            hsnCode: defaultItem.hsnCode || defaultItem.hsnSac || '',
+            sacCode: defaultItem.sacCode || '',
         };
 
         // If the added item is a Machine, expand its BOM
@@ -223,6 +231,14 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             rate: unitRate,
             amount,
             isUserModified: false,
+            // [PHASE-2A] propagate weight-item config (steel by kg) onto the transaction line
+            isWeightItem: Boolean(selected.isWeightItem),
+            theoreticalWeight: Number(selected.theoreticalWeight) || 0,
+            tolerancePct: selected.tolerancePct !== undefined ? Number(selected.tolerancePct) : 2,
+            weightUnit: selected.weightUnit || 'kg',
+            // [PHASE-2E.1] propagate HSN/SAC codes for GST invoice printing
+            hsnCode: selected.hsnCode || current.hsnCode || '',
+            sacCode: selected.sacCode || current.sacCode || '',
         };
 
         // 1. Check machine-specific BOM from itemParts (authoritative source)
@@ -499,6 +515,12 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                     </option>
                                   ))}
                                 </select>
+                                {/* [PHASE-2A] weight-based steel line indicator */}
+                                {item.isWeightItem && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 px-2 py-0.5 rounded-full shrink-0" title="Weighed at intake — stock & billing follow received kg">
+                                    <Scale size={10} /> kg
+                                  </span>
+                                )}
                               </div>
                               {isMachine && (
                                 <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -552,7 +574,14 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                               </div>
                             ) : (
                               <div>
-                                <p className="font-bold text-text">{item.name || item.description || '—'}</p>
+                                <p className="font-bold text-text flex items-center gap-1.5">{item.name || item.description || '—'}
+                                  {/* [PHASE-2A] weight-based steel line indicator (read-only view) */}
+                                  {item.isWeightItem && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/40 border border-blue-300 dark:border-blue-700 px-2 py-0.5 rounded-full shrink-0" title="Weight-based item — stock & billing follow received kg">
+                                      <Scale size={10} /> kg
+                                    </span>
+                                  )}
+                                </p>
                                 {item.itemSku && (
                                   <span className="text-[10px] text-muted font-mono block mt-0.5">
                                     SKU: {item.itemSku}

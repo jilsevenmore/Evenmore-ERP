@@ -1,3 +1,8 @@
+/**
+ * [PHASE-4] LEGACY ORPHAN — this component is NOT routed. The live Settings page is
+ *   features/settings/SettingsPage.jsx (company profile, currency, GSTIN). Deprecated
+ *   `features/accounts/SettingsPage.jsx` kept intact per the no-delete rule.
+ */
 import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';

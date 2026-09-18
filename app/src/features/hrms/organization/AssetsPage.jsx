@@ -4,6 +4,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { useAssetStore } from "../../../stores/assetStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
+import PageInfoButton from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   Laptop,
   Monitor,
@@ -73,7 +75,7 @@ export function AssetsPage() {
     } else if (tabParam === "inventory" && activeTab !== "inventory") {
       setActiveTab("inventory");
     }
-  }, [tabParam]);
+  }, [tabParam, activeTab]);
 
   const handleTabChange = (newTab) => {
     setActiveTab(newTab);
@@ -468,7 +470,10 @@ export function AssetsPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Asset Setup &amp; Inventory</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-[24px] font-bold text-slate-900 tracking-tight">Asset Setup &amp; Inventory</h1>
+            <PageInfoButton guide={hrmsGuides.assets} />
+          </div>
           <p className="text-[13px] text-muted">
             Lifecycle management, hardware provisioning, allocations, repairs &amp; return audits.
           </p>

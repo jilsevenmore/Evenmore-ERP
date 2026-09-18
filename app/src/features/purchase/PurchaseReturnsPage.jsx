@@ -62,11 +62,17 @@ export const PurchaseReturnsPage = () => {
             const returnableQty = Math.max(0, billedQty - prevReturned);
             const isSerial = Boolean(line.selectedSerials?.length || line.serialNumbers?.length || line.serialNumber);
             const availableSerials = line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []);
+            // [PHASE-2A] weight-item return: carry kg meta + default returned weight = theoretical × qty
+            const isWeightItem = Boolean(line.isWeightItem);
+            const theoreticalWeight = Number(line.theoreticalWeight) || 0;
             return {
                 id: line.id || `prt-line-${idx}`,
                 itemId: line.itemId,
                 sku: line.sku || line.itemSku || 'SKU-HW',
                 description: line.name || line.description || 'Hardware Item',
+                isWeightItem,
+                theoreticalWeight,
+                returnedWeight: isWeightItem ? Number((theoreticalWeight * (returnableQty > 0 ? 1 : 0)).toFixed(3)) : undefined,
                 billedQty,
                 previouslyReturnedQty: prevReturned,
                 returnableQty,
@@ -91,6 +97,10 @@ export const PurchaseReturnsPage = () => {
                 updated.qty = num;
                 if (updated.isSerial) {
                     updated.selectedSerials = (updated.availableSerials || []).slice(0, num);
+                }
+                // [PHASE-2A] keep returned weight in sync with returned qty for steel lines
+                if (updated.isWeightItem && updated.theoreticalWeight) {
+                    updated.returnedWeight = Number((updated.theoreticalWeight * num).toFixed(3));
                 }
             }
             return updated;
@@ -309,6 +319,7 @@ export const PurchaseReturnsPage = () => {
                         <th className="py-2.5 px-2 text-center w-24">Prev. Ret</th>
                         <th className="py-2.5 px-2 text-center w-24">Returnable</th>
                         <th className="py-2.5 px-2 text-center w-28">Return Qty</th>
+                        <th className="py-2.5 px-2 text-center w-28">Returned Wt (kg)</th>
                         <th className="py-2.5 px-2 text-center w-36">Condition</th>
                         <th className="py-2.5 px-3 text-right w-28">Line Total</th>
                       </tr>
@@ -316,7 +327,7 @@ export const PurchaseReturnsPage = () => {
                     <tbody className="divide-y divide-slate-100">
                       {returnItems.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="py-6 text-center text-slate-400">
+                          <td colSpan={8} className="py-6 text-center text-slate-400">
                             No line items found on selected bill.
                           </td>
                         </tr>
@@ -346,6 +357,23 @@ export const PurchaseReturnsPage = () => {
                                 onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
                                 className="w-20 p-1 text-center font-mono font-bold border border-slate-300 rounded-lg bg-white text-slate-900 disabled:bg-slate-100"
                               />
+                            </td>
+                            {/* [PHASE-2A] weighed kg returned (steel) */}
+                            <td className="py-2.5 px-2 text-center">
+                              {line.isWeightItem ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={line.returnedWeight ?? ''}
+                                  disabled={line.qty <= 0}
+                                  onChange={(e) => handleItemChange(idx, 'returnedWeight', e.target.value)}
+                                  className="w-24 p-1 text-center font-mono font-bold border border-blue-200 rounded-lg bg-white text-slate-900 disabled:bg-slate-100"
+                                  title="Weighed kg returned on the weighbridge"
+                                />
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
                             </td>
                             <td className="py-2.5 px-2 text-center">
                               <select

@@ -40,6 +40,8 @@ import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAssetStore } from "../../../stores/assetStore";
 import AnalyticsVolumeChart from "./AnalyticsVolumeChart";
+import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
 const TOP_STATS = [
   {
@@ -595,7 +597,10 @@ export default function HRMSDashboard() {
 
       {/* Title row */}
       <div className="hrms-title-row">
-        <h1 className="hrms-title">Dashboard Overview</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <h1 className="hrms-title">Dashboard Overview</h1>
+          <PageInfoButton guide={hrmsGuides.dashboard} />
+        </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             type="button"
