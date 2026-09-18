@@ -6,6 +6,7 @@ import { usePmsStore, groupMyTasks } from '../../../stores/pmsStore';
 import { TaskFilterBar } from './components/TaskFilterBar';
 import { TaskCardItem } from './components/TaskCardItem';
 import { TaskDetailModal } from './components/TaskDetailModal';
+import { PmsToast } from '../components/PmsToast';
 
 /**
  * MyTasksPage (/pms/my-tasks) — the individual contributor workbench.
@@ -161,6 +162,7 @@ export default function MyTasksPage() {
         task={openTask}
         onClose={() => setOpenTask(null)}
       />
+      <PmsToast />
     </div>
   );
 }

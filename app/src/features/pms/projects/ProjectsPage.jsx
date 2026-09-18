@@ -13,6 +13,7 @@ import {
 import { ProjectFilterBar } from './components/ProjectFilterBar';
 import { ProjectsTable } from './components/ProjectsTable';
 import { CreateProjectModal } from './components/CreateProjectModal';
+import { PmsToast } from '../components/PmsToast';
 
 /**
  * ProjectsPage (/pms/projects) — the master project directory.
@@ -81,6 +82,7 @@ export default function ProjectsPage() {
           navigate(`/pms/projects/${id}`);
         }}
       />
+      <PmsToast />
     </div>
   );
 }

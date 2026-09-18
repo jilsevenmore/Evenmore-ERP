@@ -25,6 +25,7 @@ function suggestName(project, stage, nextVersion) {
 export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }) {
   const employees = usePmsStore((s) => s.employees);
   const addDocument = usePmsStore((s) => s.addDocument);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const latest = getLatestDocument(stage);
   const nextVersion = (latest?.version ?? 0) + 1;
@@ -64,6 +65,7 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
       project.projectManager
     );
 
+    showToast(`v${nextVersion}.0 uploaded.`);
     onUploaded?.();
     onClose?.();
   }

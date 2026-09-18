@@ -15,6 +15,7 @@ import {
 import { DelayMetricsRow } from './components/DelayMetricsRow';
 import { DelayResolutionTable } from './components/DelayResolutionTable';
 import { LogDelayModal } from './components/LogDelayModal';
+import { PmsToast } from '../components/PmsToast';
 
 /**
  * DelayDashboardPage (/pms/delays) — the delay resolution desk.
@@ -200,6 +201,7 @@ export default function DelayDashboardPage() {
         mode={modal?.mode ?? 'log'}
         onClose={() => setModal(null)}
       />
+      <PmsToast />
     </div>
   );
 }

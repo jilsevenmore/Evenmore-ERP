@@ -6,6 +6,7 @@ import { Modal } from '../../../components/ui/Modal';
 import { usePmsStore, computeStageConfigUsage } from '../../../stores/pmsStore';
 import { StageListTable } from './components/StageListTable';
 import { AddEditStageModal } from './components/AddEditStageModal';
+import { PmsToast } from '../components/PmsToast';
 
 /**
  * StageConfigPage (/pms/stages) — the dynamic stage configurator.
@@ -139,6 +140,7 @@ export default function StageConfigPage() {
           </p>
         </div>
       </Modal>
+      <PmsToast />
     </div>
   );
 }

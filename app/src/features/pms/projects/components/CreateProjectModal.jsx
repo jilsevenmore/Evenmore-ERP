@@ -31,6 +31,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
   const employees = usePmsStore((s) => s.employees);
   const createProjectFromOrder = usePmsStore((s) => s.createProjectFromOrder);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const activeConfigs = useMemo(
     () => stageConfigs.filter((c) => c.isActive).sort((a, b) => a.sequence - b.sequence),
@@ -111,6 +112,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
       specifications,
     });
 
+    showToast(`${id} created from ${selectedOrder.orderNumber}.`);
     reset();
     onCreated?.(id);
   }

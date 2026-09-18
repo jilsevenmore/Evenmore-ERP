@@ -18,6 +18,7 @@ const labelClass = 'block text-[11px] font-semibold text-slate-600 mb-1.5';
 
 export function ClientApprovalModal({ isOpen, onClose, project, stage, document: doc, onDecided }) {
   const decideDocument = usePmsStore((s) => s.decideDocument);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const [decision, setDecision] = useState('Approved');
   const [approverName, setApproverName] = useState('');
@@ -53,6 +54,10 @@ export function ClientApprovalModal({ isOpen, onClose, project, stage, document:
           approverType: 'Client',
         },
         project.projectManager
+      );
+      showToast(
+        isRevision ? `Revision requested on v${doc.version}.0.` : `v${doc.version}.0 approved by ${approverName.trim()}.`,
+        isRevision ? 'info' : 'success'
       );
       onDecided?.(decision);
       onClose?.();

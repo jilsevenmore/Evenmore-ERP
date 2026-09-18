@@ -440,6 +440,106 @@ export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
 }
 
+// ─── Stage 12 Completion Sign-Off ────────────────────────────
+
+/**
+ * The completion gate: a project may close only when every stage it carries is
+ * Completed and a project manager signs off.
+ *
+ * Returns one blocker per unfinished stage. An empty array means the first half
+ * of the rule holds; the sign-off is the caller supplying an actor.
+ */
+export function validateProjectCompletion(project) {
+  const blockers = [];
+  if (!project) return [{ code: "NO_PROJECT", label: "Project not found.", hard: true }];
+
+  if (project.status === "Completed") {
+    blockers.push({ code: "ALREADY_COMPLETED", label: "This project is already completed.", hard: true });
+  }
+
+  const stages = project.stages ?? [];
+  if (stages.length === 0) {
+    blockers.push({
+      code: "NO_STAGES",
+      label: "No stages configured — there is nothing to sign off.",
+      hard: true,
+    });
+  }
+
+  for (const stage of stages) {
+    if (stage.status === "Completed") continue;
+    blockers.push({
+      code: "STAGE_OPEN",
+      stageId: stage.id,
+      label: `Stage ${stage.sequence} (${stage.name}) is ${stage.status}.`,
+      hard: true,
+    });
+  }
+
+  return blockers;
+}
+
+/**
+ * The immutable record written at sign-off.
+ *
+ * Captured once, at the moment of closure, rather than derived later — the
+ * planned dates a project was judged against can change afterwards, and a
+ * turnaround figure that silently rewrites itself is worthless for reporting.
+ */
+export function computeProjectCompletionMetrics(project, now = Date.now(), signedOffBy = null) {
+  const start = toDate(project?.startDate);
+  const actual = new Date(now);
+  const expected = toDate(project?.expectedCompletionDate);
+
+  const totalDurationMs = start ? Math.max(0, actual.getTime() - start.getTime()) : 0;
+  const totalDelayMs = expected ? Math.max(0, actual.getTime() - expected.getTime()) : 0;
+
+  return {
+    actualCompletionDate: actual.toISOString(),
+    totalDurationDays: Math.round((totalDurationMs / MS_PER_DAY) * 10) / 10,
+    totalDelayHours: Math.round((totalDelayMs / MS_PER_HOUR) * 10) / 10,
+    finalCompletionPct: 100,
+    stageCount: (project?.stages ?? []).length,
+    signedOffBy: signedOffBy ? { id: signedOffBy.id, name: signedOffBy.name } : null,
+    signedOffAt: actual.toISOString(),
+  };
+}
+
+/** Audit event types, with the label each one reads as in the trail. */
+export const AUDIT_EVENT_TYPES = [
+  { action: "PROJECT_CREATED", label: "Project Created" },
+  { action: "STAGES_CONFIGURED", label: "Stages Configured" },
+  { action: "STAGE_ASSIGNED", label: "Stage Assigned" },
+  { action: "STAGE_STARTED", label: "Stage Started" },
+  { action: "PROGRESS_UPDATED", label: "Progress Updated" },
+  { action: "STAGE_STATUS_CHANGED", label: "Status Changed" },
+  { action: "DOCUMENT_UPLOADED", label: "Design Uploaded" },
+  { action: "APPROVAL_REQUESTED", label: "Sent for Approval" },
+  { action: "DOCUMENT_APPROVED", label: "Client Approved" },
+  { action: "REVISION_REQUESTED", label: "Revision Requested" },
+  { action: "DELAY_LOGGED", label: "Delay Logged" },
+  { action: "RECOVERY_PLAN_UPDATED", label: "Recovery Plan Updated" },
+  { action: "DELAY_RESOLVED", label: "Delay Resolved" },
+  { action: "STAGE_HANDOFF", label: "Stage Handoff" },
+  { action: "PROJECT_COMPLETED", label: "Project Completed" },
+];
+
+/** Filter an audit trail by event type and free text. */
+export function filterAuditTrail(entries = [], { action = "all", search = "" } = {}) {
+  const q = search.trim().toLowerCase();
+  return entries.filter((e) => {
+    if (action !== "all" && e.action !== action) return false;
+    if (q) {
+      const hay = [e.description, e.actor?.name, e.comments, e.from, e.to]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
 // ─── Stage 11 Workspaces & Analytics ─────────────────────────
 
 /**
@@ -1261,7 +1361,8 @@ export const usePmsStore = create((set, get) => ({
 
   // Transient UI state (not persisted)
   toast: null,
-  showToast: (msg) => set({ toast: { msg, id: Date.now().toString() } }),
+  showToast: (msg, tone = 'success') =>
+    set({ toast: { msg, tone, id: Date.now().toString() } }),
   clearToast: () => set({ toast: null }),
 
   // ── Global recalculation ──
@@ -1553,8 +1654,40 @@ export const usePmsStore = create((set, get) => ({
       );
     }),
 
-  /** Mark a project complete and stamp the actual completion date. */
-  completeProject: (projectId, actor) =>
+  /**
+   * Close a project — the Stage 12 sign-off.
+   *
+   * Enforces the completion rule (every stage Completed, plus a PM sign-off)
+   * and writes the immutable completion record. `force` exists for the case
+   * where a manager consciously closes work that is not formally finished; it
+   * still requires an actor, because an unsigned closure is not a sign-off.
+   */
+  completeProject: (projectId, actor = null, { force = false } = {}) => {
+    const state = get();
+    const project = state.projects.find((p) => p.id === projectId);
+    if (!project) throw new Error(`Unknown project ${projectId}`);
+
+    if (!actor) {
+      const err = new Error("A project manager must sign off before a project can be completed.");
+      err.blockers = [{ code: "NO_SIGNOFF", label: "Sign-off is required.", hard: true }];
+      throw err;
+    }
+
+    const blockers = validateProjectCompletion(project);
+    const blocking = blockers.filter((b) => b.hard && b.code !== "ALREADY_COMPLETED");
+    if (blockers.some((b) => b.code === "ALREADY_COMPLETED")) {
+      const err = new Error("This project is already completed.");
+      err.blockers = blockers;
+      throw err;
+    }
+    if (blocking.length > 0 && !force) {
+      const err = new Error(blocking.map((b) => b.label).join(" "));
+      err.blockers = blocking;
+      throw err;
+    }
+
+    const metrics = computeProjectCompletionMetrics(project, Date.now(), actor);
+
     set((st) =>
       applyToProject(
         st,
@@ -1562,17 +1695,30 @@ export const usePmsStore = create((set, get) => ({
         (p) => ({
           ...p,
           status: "Completed",
-          actualCompletionDate: new Date().toISOString(),
+          actualCompletionDate: metrics.actualCompletionDate,
+          // Frozen at closure; never recomputed by recalcProject.
+          completion: { ...metrics, forced: force && blocking.length > 0 },
         }),
-        makeActivity(
-          "PROJECT_COMPLETED",
-          "Project",
-          projectId,
-          "Project signed off and marked completed.",
-          actor
-        )
+        (() => {
+          const entry = makeActivity(
+            "PROJECT_COMPLETED",
+            "Project",
+            projectId,
+            `Project signed off by ${actor.name} — ${metrics.totalDurationDays} day turnaround.`,
+            actor
+          );
+          entry.from = project.status;
+          entry.to = "Completed";
+          if (force && blocking.length > 0) {
+            entry.comments = `Closed with ${blocking.length} stage(s) still open.`;
+          }
+          return entry;
+        })()
       )
-    ),
+    );
+
+    return metrics;
+  },
 
   // ── Stage instances ──
 
@@ -2055,9 +2201,35 @@ export const usePmsStore = create((set, get) => ({
       }))
     ),
 
-  updateTask: (projectId, stageId, taskId, patch) =>
-    set((st) =>
-      applyToProject(st, projectId, (p) => ({
+  updateTask: (projectId, stageId, taskId, patch, actor = null) =>
+    set((st) => {
+      // Capture the previous percentage so the audit trail can record the
+      // before → after the spec asks for.
+      const previous = st.projects
+        .find((p) => p.id === projectId)
+        ?.stages.find((s2) => s2.id === stageId)
+        ?.tasks.find((t) => t.id === taskId);
+
+      const progressChanged =
+        patch.completionPct !== undefined &&
+        clampPct(patch.completionPct) !== clampPct(previous?.completionPct ?? 0);
+
+      const activity = progressChanged
+        ? (() => {
+            const entry = makeActivity(
+              "PROGRESS_UPDATED",
+              "Task",
+              taskId,
+              `${previous?.taskName ?? "Task"} progress updated.`,
+              actor
+            );
+            entry.from = `${clampPct(previous?.completionPct ?? 0)}%`;
+            entry.to = `${clampPct(patch.completionPct)}%`;
+            return entry;
+          })()
+        : undefined;
+
+      return applyToProject(st, projectId, (p) => ({
         ...p,
         stages: p.stages.map((stage) =>
           stage.id !== stageId
@@ -2084,8 +2256,8 @@ export const usePmsStore = create((set, get) => ({
                 }),
               }
         ),
-      }))
-    ),
+      }), activity);
+    }),
 
   deleteTask: (projectId, stageId, taskId) =>
     set((st) =>

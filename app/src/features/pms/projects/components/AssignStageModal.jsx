@@ -33,6 +33,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
   const employees = usePmsStore((s) => s.employees);
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
   const assignStage = usePmsStore((s) => s.assignStage);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const stages = useMemo(
     () => [...(project?.stages ?? [])].sort((a, b) => a.sequence - b.sequence),
@@ -137,6 +138,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
       actor: project.projectManager,
     });
 
+    showToast(`${stage?.name ?? 'Stage'} assigned to ${employee?.name ?? (team.trim() || 'the team')}.`);
     onClose?.();
   }
 

@@ -54,6 +54,7 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
   const addStageConfig = usePmsStore((s) => s.addStageConfig);
   const updateStageConfig = usePmsStore((s) => s.updateStageConfig);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const isEdit = Boolean(stage);
   const [draft, setDraft] = useState(BLANK);
@@ -89,6 +90,7 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
     if (isEdit) updateStageConfig(stage.id, payload);
     else addStageConfig(payload);
 
+    showToast(isEdit ? `${payload.name} updated.` : `${payload.name} added to the pipeline.`);
     onClose?.();
   }
 

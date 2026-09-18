@@ -32,6 +32,7 @@ export function StageHandoffModal({ isOpen, onClose, project, stageId, onHandedO
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
   const employees = usePmsStore((s) => s.employees);
   const handoffStage = usePmsStore((s) => s.handoffStage);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const ordered = useMemo(
     () => [...(project?.stages ?? [])].sort((a, b) => a.sequence - b.sequence),
@@ -89,6 +90,7 @@ export function StageHandoffModal({ isOpen, onClose, project, stageId, onHandedO
         checklist: checked,
         actor: project.projectManager,
       });
+      showToast(nextId ? `${stage.name} handed off to ${nextStage?.name}.` : `${stage.name} completed.`);
       onHandedOff?.(nextId);
       onClose?.();
     } catch (err) {

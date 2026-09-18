@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { Modal } from '../../../components/ui/Modal';
 import { EmptyStatePms } from '../components/EmptyStatePms';
 import { usePmsStore, getProjectRowMeta } from '../../../stores/pmsStore';
 import { ProjectHeader } from './components/ProjectHeader';
@@ -14,6 +13,8 @@ import { ApprovalsTab } from './components/ApprovalsTab';
 import { ActivityAuditTab } from './components/ActivityAuditTab';
 import { AssignStageModal } from './components/AssignStageModal';
 import { StageHandoffModal } from '../components/StageHandoffModal';
+import { CompleteProjectModal } from './components/CompleteProjectModal';
+import { PmsToast } from '../components/PmsToast';
 
 /**
  * ProjectDetailPage (/pms/projects/:id) — the project workspace.
@@ -40,7 +41,6 @@ export default function ProjectDetailPage() {
   const startStage = usePmsStore((s) => s.startStage);
   const setStageStatus = usePmsStore((s) => s.setStageStatus);
   const updateTask = usePmsStore((s) => s.updateTask);
-  const completeProject = usePmsStore((s) => s.completeProject);
 
   const [tab, setTab] = useState('timeline');
   const [focusStageId, setFocusStageId] = useState(null);
@@ -189,42 +189,13 @@ export default function ProjectDetailPage() {
         onHandedOff={(nextId) => setFocusStageId(nextId)}
       />
 
-      {/* Complete project confirmation */}
-      <Modal
+      <CompleteProjectModal
         isOpen={confirmComplete}
+        project={project}
         onClose={() => setConfirmComplete(false)}
-        title="Complete this project?"
-        subtitle={`${project.id} — ${project.customerName}`}
-        footer={
-          <>
-            <Button variant="secondary" type="button" onClick={() => setConfirmComplete(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                completeProject(project.id, project.projectManager);
-                setConfirmComplete(false);
-              }}
-            >
-              Complete Project
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-2.5">
-          <p className="text-xs text-slate-600">
-            This stamps the actual completion date and closes the project. Completion is terminal —
-            later stage edits will not reopen it.
-          </p>
-          {project.overallCompletionPct < 100 && (
-            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              This project is at <strong>{project.overallCompletionPct}%</strong>. Completing it now
-              closes it with stages still outstanding.
-            </p>
-          )}
-        </div>
-      </Modal>
+      />
+
+      <PmsToast />
     </div>
   );
 }

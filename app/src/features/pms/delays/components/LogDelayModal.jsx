@@ -34,6 +34,7 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
   const logDelay = usePmsStore((s) => s.logDelay);
   const updateRecoveryPlan = usePmsStore((s) => s.updateRecoveryPlan);
   const resolveDelay = usePmsStore((s) => s.resolveDelay);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const project = projects.find((p) => p.id === row?.projectId) ?? null;
 
@@ -92,6 +93,10 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
         if (Object.keys(found).length > 0) return;
         logDelay(project.id, row.stageId, draft, actor);
       }
+      showToast(
+        isResolve ? `Delay resolved on ${row.stageName}.` : isPlan ? 'Recovery plan updated.' : `Delay logged — ${category}.`,
+        isResolve ? 'success' : 'info'
+      );
       onClose?.();
     } catch (err) {
       setErrors(err.fieldErrors ?? { submit: err.message });
