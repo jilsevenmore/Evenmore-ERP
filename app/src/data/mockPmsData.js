@@ -12,20 +12,36 @@
 
 // ─── Domain Enumerations ─────────────────────────────────────────────
 
-// Departments a stage template can be assigned to. The first five are the
-// operational departments the seed pipeline runs through; the last three come
-// from the Stage 6 configurator spec so an administrator can route a stage to
-// a support function without editing code.
-export const PMS_DEPARTMENTS = [
-  "Design",
-  "Production",
-  "Quality",
-  "Packaging",
-  "Installation",
-  "Logistics",
-  "Management",
-  "Procurement",
+// The department catalogue an administrator maintains from PMS Settings:
+// each one carries the identity colour it wears on the timeline and pipeline
+// charts. This array is only the shipped default the store hydrates from on
+// first run — departments can be added, renamed, recoloured and removed at
+// runtime, and every chart reads the live list rather than a hard-coded map.
+//
+// The hues are a categorical set: one colour per identity, assigned in fixed
+// order and never cycled. Greens, ambers and reds are deliberately absent —
+// those are reserved for state (good / warning / overdue), and a green bar on
+// a Gantt would read as "healthy" rather than as a department.
+export const pmsDepartmentsMock = [
+  { id: "dept-design", name: "Design", color: "#2563eb" },
+  { id: "dept-production", name: "Production", color: "#0d9488" },
+  { id: "dept-quality", name: "Quality", color: "#c026d3" },
+  { id: "dept-packaging", name: "Packaging", color: "#92400e" },
+  { id: "dept-installation", name: "Installation", color: "#5b21b6" },
+  { id: "dept-logistics", name: "Logistics", color: "#0284c7" },
+  { id: "dept-management", name: "Management", color: "#7c3aed" },
+  { id: "dept-procurement", name: "Procurement", color: "#86198f" },
 ];
+
+// Reserved state colours. Overdue is a condition, not an identity, so it can be
+// recoloured but never renamed, deleted or handed to a department.
+export const pmsStatusColorsMock = {
+  overdue: "#d03b3b",
+};
+
+// The seed names alone, for the handful of callers that only need the default
+// order. Anything rendering live data reads usePmsStore().departments instead.
+export const PMS_DEPARTMENTS = pmsDepartmentsMock.map((d) => d.name);
 
 export const PMS_DURATION_UNITS = ["Hours", "Days"];
 
@@ -1154,9 +1170,21 @@ export const pmsSettingsMock = {
   // Share of a stage's planned window that may elapse before it is flagged
   // At Risk — and only when completion is also under 50%.
   atRiskThresholdPct: 70,
-  workingHoursPerDay: 8,
+
+  // Global handoff policy. These apply on top of each stage template's own
+  // requiredApproval / requiredDocument flags: a template can demand more, but
+  // these floors cannot be skipped by forgetting to tick a box on a template.
   requireClientApprovalOnDesign: true,
   requireQaCertificate: true,
+
+  // Which confirmations surface as toasts.
+  notifications: {
+    enabled: true,
+    onAssignment: true,
+    onApproval: true,
+    onDelay: true,
+    onCompletion: true,
+  },
 
   // Concurrent open tasks each department can absorb, used as the denominator
   // for the dashboard's workload utilisation cards.

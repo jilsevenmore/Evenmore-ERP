@@ -95,7 +95,8 @@ export function LogDelayModal({ isOpen, onClose, row, mode = 'log' }) {
       }
       showToast(
         isResolve ? `Delay resolved on ${row.stageName}.` : isPlan ? 'Recovery plan updated.' : `Delay logged — ${category}.`,
-        isResolve ? 'success' : 'info'
+        isResolve ? 'success' : 'info',
+        'onDelay'
       );
       onClose?.();
     } catch (err) {

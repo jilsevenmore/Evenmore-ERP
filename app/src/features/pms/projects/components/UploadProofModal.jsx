@@ -65,7 +65,7 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
       project.projectManager
     );
 
-    showToast(`v${nextVersion}.0 uploaded.`);
+    showToast(`v${nextVersion}.0 uploaded.`, 'success', 'onApproval');
     onUploaded?.();
     onClose?.();
   }

@@ -17,6 +17,8 @@ import {
   stageConfigsMock,
   pmsEmployeesMock,
   pmsSettingsMock,
+  pmsDepartmentsMock,
+  pmsStatusColorsMock,
 } from "../data/mockPmsData";
 
 const LS = "pms_store_v1";
@@ -948,7 +950,7 @@ export function getProofWorkflowState(stage) {
  * hard (config-mandated) or advisory, so the dialog can explain precisely why
  * the confirm button is disabled instead of just greying it out.
  */
-export function validateStageHandoff(stage, config, now = Date.now()) {
+export function validateStageHandoff(stage, config, now = Date.now(), settings = null) {
   const blockers = [];
   if (!stage) return [{ code: "NO_STAGE", label: "Stage not found.", hard: true }];
 
@@ -994,12 +996,36 @@ export function validateStageHandoff(stage, config, now = Date.now()) {
     });
   }
 
-  if (config?.requiredApproval) {
-    const approved = (stage.approvals ?? []).some((a) => a.status === "Approved");
-    if (!approved) {
+  const hasApproval = (stage.approvals ?? []).some((a) => a.status === "Approved");
+
+  if (config?.requiredApproval && !hasApproval) {
+    blockers.push({
+      code: "NEEDS_APPROVAL",
+      label: "This stage requires an approved sign-off before handoff.",
+      hard: true,
+    });
+  }
+
+  // Global policy floors from PMS settings. A stage template can demand more,
+  // but these cannot be bypassed by leaving a box unticked on the template.
+  if (settings?.requireClientApprovalOnDesign && !config?.requiredApproval) {
+    const isDesign = stage.department === "Design";
+    const hasProof = (stage.documents ?? []).length > 0;
+    if (isDesign && hasProof && !hasApproval) {
       blockers.push({
-        code: "NEEDS_APPROVAL",
-        label: "This stage requires an approved sign-off before handoff.",
+        code: "POLICY_DESIGN_APPROVAL",
+        label: "Policy: design proofs need client approval before handoff.",
+        hard: true,
+      });
+    }
+  }
+
+  if (settings?.requireQaCertificate && !config?.requiredDocument) {
+    const isQuality = stage.department === "Quality";
+    if (isQuality && (stage.documents ?? []).length === 0) {
+      blockers.push({
+        code: "POLICY_QA_CERTIFICATE",
+        label: "Policy: quality stages need a QA certificate before handoff.",
         hard: true,
       });
     }
@@ -1007,6 +1033,255 @@ export function validateStageHandoff(stage, config, now = Date.now()) {
 
   void now;
   return blockers;
+}
+
+// ─── Department Catalogue ────────────────────────────────────────────
+//
+// Departments are data, not an enum: they are added, renamed, recoloured and
+// removed from PMS Settings, and every chart reads the live list. The colour a
+// department carries is its identity across the timeline and the pipeline, so
+// the catalogue is also the one place those hues are defined.
+
+/** Work with no department still has to draw as something. */
+export const DEPARTMENT_FALLBACK_COLOR = "#94a3b8";
+
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+/** Normalise "2563EB" or "#2563EB" to "#2563eb"; null when unusable. */
+export function normaliseHex(value) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  const hex = trimmed.startsWith("#") ? trimmed : `#${trimmed}`;
+  return HEX_RE.test(hex) ? hex.toLowerCase() : null;
+}
+
+function srgbToLinear(channel) {
+  const c = channel / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** sRGB hex → OKLab, the perceptually uniform space distances are measured in. */
+function hexToOklab(hex) {
+  const r = srgbToLinear(parseInt(hex.slice(1, 3), 16));
+  const g = srgbToLinear(parseInt(hex.slice(3, 5), 16));
+  const b = srgbToLinear(parseInt(hex.slice(5, 7), 16));
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+/**
+ * Perceptual distance between two colours (OKLab ×100) — the same scale the
+ * palette checks use. Below ~15 two colours are hard to separate even with full
+ * colour vision; below 10 they read as the same colour on a 14px Gantt bar.
+ */
+export const COLOR_CLASH_DISTANCE = 10;
+
+export function colorDistance(a, b) {
+  const ha = normaliseHex(a);
+  const hb = normaliseHex(b);
+  if (!ha || !hb) return Infinity;
+  const [l1, a1, b1] = hexToOklab(ha);
+  const [l2, a2, b2] = hexToOklab(hb);
+  return Math.hypot(l1 - l2, a1 - a2, b1 - b2) * 100;
+}
+
+/**
+ * Departments whose colour is too close to another identity — or to the
+ * reserved overdue red, where the confusion would be between a department and
+ * a warning. Returns { [departmentId]: { with, distance } }.
+ */
+export function findColorClashes(departments = [], statusColors = {}) {
+  const reserved = Object.entries(statusColors ?? {}).map(([key, color]) => ({
+    name: key === "overdue" ? "Overdue" : key,
+    color,
+  }));
+  const clashes = {};
+  for (const dept of departments) {
+    let nearest = null;
+    for (const other of [...departments.filter((d) => d.id !== dept.id), ...reserved]) {
+      const distance = colorDistance(dept.color, other.color);
+      if (distance < COLOR_CLASH_DISTANCE && (!nearest || distance < nearest.distance)) {
+        nearest = { with: other.name, distance: Math.round(distance * 10) / 10 };
+      }
+    }
+    if (nearest) clashes[dept.id] = nearest;
+  }
+  return clashes;
+}
+
+/**
+ * The categorical slots a new department draws from. Greens, ambers and reds
+ * are deliberately absent: those read as state (healthy / warning / overdue),
+ * never as identity.
+ */
+export const DEPARTMENT_COLOR_POOL = [
+  "#2563eb", "#0d9488", "#c026d3", "#92400e", "#5b21b6",
+  "#0284c7", "#7c3aed", "#86198f", "#1d4ed8", "#0f766e",
+  "#be185d", "#4f46e5", "#a21caf", "#78350f", "#6d28d9",
+];
+
+/**
+ * Pick the most distinct colour still available — the candidate furthest from
+ * every colour already in play, so nobody has to eyeball separation by hand.
+ */
+export function suggestDepartmentColor(departments = [], statusColors = {}, excludeId = null) {
+  const taken = [
+    ...departments.filter((d) => d.id !== excludeId).map((d) => d.color),
+    ...Object.values(statusColors ?? {}),
+  ];
+  let best = DEPARTMENT_COLOR_POOL[0];
+  let bestDistance = -1;
+  for (const candidate of DEPARTMENT_COLOR_POOL) {
+    const nearest = taken.length
+      ? Math.min(...taken.map((t) => colorDistance(candidate, t)))
+      : Infinity;
+    if (nearest > bestDistance) {
+      bestDistance = nearest;
+      best = candidate;
+    }
+  }
+  return best;
+}
+
+/** name → colour, for any chart drawing department identity. */
+export function buildDepartmentColorMap(departments = []) {
+  const map = {};
+  for (const dept of departments) {
+    map[dept.name] = normaliseHex(dept.color) ?? DEPARTMENT_FALLBACK_COLOR;
+  }
+  return map;
+}
+
+/** What a department currently drives — the delete confirmation depends on it. */
+export function computeDepartmentUsage(projects = [], stageConfigs = [], name) {
+  let projectCount = 0;
+  let stageCount = 0;
+  let activeStageCount = 0;
+  let openTaskCount = 0;
+  const templateCount = (stageConfigs ?? []).filter((c) => c.department === name).length;
+
+  for (const p of projects ?? []) {
+    let here = 0;
+    for (const stage of p.stages ?? []) {
+      if (stage.department === name) {
+        here += 1;
+        if (stage.status !== "Completed" && stage.status !== "Not Started") activeStageCount += 1;
+      }
+      for (const task of stage.tasks ?? []) {
+        const dept = task.department ?? stage.department;
+        if (dept === name && task.status !== "Completed") openTaskCount += 1;
+      }
+    }
+    if (here > 0) {
+      projectCount += 1;
+      stageCount += here;
+    }
+  }
+
+  return {
+    projectCount,
+    stageCount,
+    activeStageCount,
+    openTaskCount,
+    templateCount,
+    inUse: stageCount > 0 || templateCount > 0,
+  };
+}
+
+/** Validate a department draft before it reaches the store. */
+export function validateDepartment(draft = {}, existing = [], editingId = null) {
+  const errors = {};
+  const name = (draft.name ?? "").trim();
+
+  if (!name) {
+    errors.name = "Department name is required.";
+  } else if (name.length > 32) {
+    errors.name = "Keep the name under 32 characters.";
+  } else if (name.toLowerCase() === "unassigned") {
+    errors.name = '"Unassigned" is reserved for work with no department.';
+  } else if (
+    existing.some(
+      (d) => d.id !== editingId && (d.name ?? "").trim().toLowerCase() === name.toLowerCase()
+    )
+  ) {
+    errors.name = "Another department already uses this name.";
+  }
+
+  if (!normaliseHex(draft.color)) {
+    errors.color = "Pick a colour as a 6-digit hex value.";
+  }
+
+  return errors;
+}
+
+/**
+ * Rewrite every reference to a department name across stored data. A rename is
+ * only a rename if the work follows it: stages, tasks, delay attribution, stage
+ * templates and the capacity table all key off the name.
+ */
+function renameDepartmentIn(state, from, to) {
+  if (!from || !to || from === to) return null;
+
+  const projects = state.projects.map((p) => ({
+    ...p,
+    currentDepartment: p.currentDepartment === from ? to : p.currentDepartment,
+    stages: (p.stages ?? []).map((stage) => ({
+      ...stage,
+      department: stage.department === from ? to : stage.department,
+      tasks: (stage.tasks ?? []).map((task) =>
+        task.department === from ? { ...task, department: to } : task
+      ),
+      delayDetails:
+        stage.delayDetails && stage.delayDetails.responsibleDepartment === from
+          ? { ...stage.delayDetails, responsibleDepartment: to }
+          : stage.delayDetails,
+    })),
+  }));
+
+  const stageConfigs = state.stageConfigs.map((c) =>
+    c.department === from ? { ...c, department: to } : c
+  );
+
+  const capacity = { ...(state.settings.departmentCapacity ?? {}) };
+  if (from in capacity) {
+    const moved = Number(capacity[from]);
+    delete capacity[from];
+    // Merging into an existing target keeps the larger figure, so a rename can
+    // never quietly shrink a department's capacity.
+    capacity[to] = to in capacity ? Math.max(Number(capacity[to]), moved) : moved;
+  }
+
+  return { projects, stageConfigs, settings: { ...state.settings, departmentCapacity: capacity } };
+}
+
+/** Validate a settings draft before it reaches the store. */
+export function validateSettings(draft = {}) {
+  const errors = {};
+
+  const threshold = Number(draft.atRiskThresholdPct);
+  if (!Number.isFinite(threshold) || threshold < 10 || threshold > 100) {
+    errors.atRiskThresholdPct = "At-risk threshold must be between 10% and 100%.";
+  }
+
+  const fallback = Number(draft.defaultDepartmentCapacity);
+  if (!Number.isFinite(fallback) || fallback < 1) {
+    errors.defaultDepartmentCapacity = "Default capacity must be at least 1 task.";
+  }
+
+  for (const [dept, value] of Object.entries(draft.departmentCapacity ?? {})) {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 1) {
+      errors[`capacity.${dept}`] = `${dept} capacity must be at least 1 task.`;
+    }
+  }
+
+  return errors;
 }
 
 /** A completed stage's headline numbers, for the handoff summary panel. */
@@ -1286,6 +1561,8 @@ function persist(state) {
       JSON.stringify({
         projects: state.projects,
         stageConfigs: state.stageConfigs,
+        departments: state.departments,
+        statusColors: state.statusColors,
         employees: state.employees,
         settings: state.settings,
         currentUserId: state.currentUserId,
@@ -1349,6 +1626,8 @@ export const usePmsStore = create((set, get) => ({
   // ── State ──
   projects: seededProjects,
   stageConfigs: s?.stageConfigs ?? stageConfigsMock,
+  departments: s?.departments ?? pmsDepartmentsMock,
+  statusColors: s?.statusColors ?? pmsStatusColorsMock,
   employees: s?.employees ?? pmsEmployeesMock,
   settings: s?.settings ?? pmsSettingsMock,
   currentUserId: s?.currentUserId ?? DEFAULT_CURRENT_USER_ID,
@@ -1361,9 +1640,36 @@ export const usePmsStore = create((set, get) => ({
 
   // Transient UI state (not persisted)
   toast: null,
-  showToast: (msg, tone = 'success') =>
-    set({ toast: { msg, tone, id: Date.now().toString() } }),
+  /**
+   * Show a confirmation, unless the viewer has muted this category.
+   * `category` maps to a notifications flag in settings; an unknown category
+   * always shows, so a new call site is never silently swallowed.
+   */
+  showToast: (msg, tone = "success", category = null) => {
+    const notifications = get().settings?.notifications;
+    if (notifications && notifications.enabled === false) return;
+    if (category && notifications && notifications[category] === false) return;
+    set({ toast: { msg, tone, category, id: Date.now().toString() } });
+  },
   clearToast: () => set({ toast: null }),
+
+  /** Restore the shipped PMS settings without touching project data. */
+  resetSettings: () =>
+    set((st) => {
+      // The shipped capacities are keyed by the shipped department names; a
+      // catalogue that has moved on since then would otherwise collect entries
+      // for departments nobody can see or edit.
+      const live = new Set(st.departments.map((d) => d.name));
+      const departmentCapacity = Object.fromEntries(
+        Object.entries(pmsSettingsMock.departmentCapacity ?? {}).filter(([dept]) => live.has(dept))
+      );
+      const settings = { ...pmsSettingsMock, departmentCapacity };
+      const projects = st.projects.map((p) =>
+        recalcProject(p, Date.now(), settings.atRiskThresholdPct)
+      );
+      persist({ ...st, settings, projects });
+      return { settings, projects };
+    }),
 
   // ── Global recalculation ──
 
@@ -1385,6 +1691,8 @@ export const usePmsStore = create((set, get) => ({
           recalcProject(p, Date.now(), pmsSettingsMock.atRiskThresholdPct)
         ),
         stageConfigs: stageConfigsMock,
+        departments: pmsDepartmentsMock,
+        statusColors: pmsStatusColorsMock,
         employees: pmsEmployeesMock,
         settings: pmsSettingsMock,
       };
@@ -1403,6 +1711,121 @@ export const usePmsStore = create((set, get) => ({
       persist({ ...st, settings, projects });
       return { settings, projects };
     }),
+
+  // ── Department catalogue ──
+  //
+  // Unlike the rest of PMS Settings these actions commit immediately: a rename
+  // has to rewrite the stages, tasks and templates that point at the old name,
+  // which is not something to leave half-applied in a draft.
+
+  addDepartment: (draft) => {
+    const st = get();
+    const errors = validateDepartment(draft, st.departments);
+    if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+    const departments = [
+      ...st.departments,
+      {
+        id: uid("dept"),
+        name: draft.name.trim(),
+        color: normaliseHex(draft.color) ?? DEPARTMENT_FALLBACK_COLOR,
+      },
+    ];
+    persist({ ...st, departments });
+    set({ departments });
+    return { ok: true, errors: {} };
+  },
+
+  /** Rename and/or recolour a department, carrying every reference with it. */
+  updateDepartment: (id, patch) => {
+    const st = get();
+    const target = st.departments.find((d) => d.id === id);
+    if (!target) return { ok: false, errors: { name: "That department no longer exists." } };
+
+    const draft = { name: target.name, color: target.color, ...patch };
+    const errors = validateDepartment(draft, st.departments, id);
+    if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+    const nextName = draft.name.trim();
+    const departments = st.departments.map((d) =>
+      d.id === id ? { ...d, name: nextName, color: normaliseHex(draft.color) } : d
+    );
+    const cascade = renameDepartmentIn({ ...st, departments }, target.name, nextName) ?? {};
+    const next = { departments, ...cascade };
+    persist({ ...st, ...next });
+    set(next);
+    return { ok: true, errors: {}, renamed: nextName !== target.name };
+  },
+
+  /**
+   * Remove a department. One that is driving live work can only go if its work
+   * is reassigned — an orphaned department would leave stages pointing at a
+   * name no chart, filter or capacity figure knows about.
+   */
+  deleteDepartment: (id, { reassignTo = null } = {}) => {
+    const st = get();
+    const target = st.departments.find((d) => d.id === id);
+    if (!target) return { ok: false, reason: "NOT_FOUND" };
+    if (st.departments.length <= 1) {
+      return { ok: false, reason: "LAST_ONE", usage: computeDepartmentUsage(st.projects, st.stageConfigs, target.name) };
+    }
+
+    const usage = computeDepartmentUsage(st.projects, st.stageConfigs, target.name);
+    if (usage.inUse && !reassignTo) return { ok: false, reason: "IN_USE", usage };
+    if (reassignTo && !st.departments.some((d) => d.name === reassignTo && d.id !== id)) {
+      return { ok: false, reason: "BAD_TARGET", usage };
+    }
+
+    // Move the work first, then drop the name it used to point at.
+    const moved = usage.inUse ? renameDepartmentIn(st, target.name, reassignTo) : null;
+    const base = moved ?? { projects: st.projects, stageConfigs: st.stageConfigs, settings: st.settings };
+
+    const capacity = { ...(base.settings.departmentCapacity ?? {}) };
+    delete capacity[target.name];
+
+    const next = {
+      ...base,
+      settings: { ...base.settings, departmentCapacity: capacity },
+      departments: st.departments.filter((d) => d.id !== id),
+    };
+    persist({ ...st, ...next });
+    set(next);
+    return { ok: true, usage, reassignedTo: usage.inUse ? reassignTo : null };
+  },
+
+  /** Recolour a reserved state (overdue). States are never renamed or removed. */
+  setStatusColor: (key, color) => {
+    const hex = normaliseHex(color);
+    if (!hex) return { ok: false };
+    const st = get();
+    const statusColors = { ...st.statusColors, [key]: hex };
+    persist({ ...st, statusColors });
+    set({ statusColors });
+    return { ok: true };
+  },
+
+  /** What a department drives right now — for the delete confirmation. */
+  getDepartmentUsage: (name) =>
+    computeDepartmentUsage(get().projects, get().stageConfigs, name),
+
+  /**
+   * Restore the shipped catalogue. Refused while a custom department still
+   * holds work, because dropping it here would orphan those stages.
+   */
+  resetDepartments: () => {
+    const st = get();
+    const defaults = new Set(pmsDepartmentsMock.map((d) => d.name));
+    const stranded = st.departments
+      .filter((d) => !defaults.has(d.name))
+      .filter((d) => computeDepartmentUsage(st.projects, st.stageConfigs, d.name).inUse)
+      .map((d) => d.name);
+    if (stranded.length > 0) return { ok: false, reason: "IN_USE", stranded };
+
+    const next = { departments: pmsDepartmentsMock, statusColors: pmsStatusColorsMock };
+    persist({ ...st, ...next });
+    set(next);
+    return { ok: true };
+  },
 
   // ── Stage configuration templates ──
 
@@ -1971,7 +2394,7 @@ export const usePmsStore = create((set, get) => ({
     if (!stage) throw new Error(`Unknown stage ${stageId}`);
 
     const config = state.stageConfigs.find((c) => c.id === stage.stageConfigId);
-    const blockers = validateStageHandoff(stage, config);
+    const blockers = validateStageHandoff(stage, config, Date.now(), state.settings);
     const hardBlockers = blockers.filter((b) => b.hard);
     if (hardBlockers.length > 0 && !force) {
       const err = new Error(hardBlockers.map((b) => b.label).join(" "));

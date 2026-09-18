@@ -8,7 +8,7 @@ import {
   formatDuration,
   durationToMs,
 } from '../../../../stores/pmsStore';
-import { PMS_DEPARTMENTS, PMS_DURATION_UNITS } from '../../../../data/mockPmsData';
+import { PMS_DURATION_UNITS } from '../../../../data/mockPmsData';
 
 /**
  * AssignStageModal — assign a stage to a department, team and employee.
@@ -32,6 +32,7 @@ function toLocalInput(iso) {
 export function AssignStageModal({ isOpen, onClose, project, initialStageId = null }) {
   const employees = usePmsStore((s) => s.employees);
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
+  const departments = usePmsStore((s) => s.departments);
   const assignStage = usePmsStore((s) => s.assignStage);
   const showToast = usePmsStore((s) => s.showToast);
 
@@ -41,7 +42,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
   );
 
   const [stageId, setStageId] = useState('');
-  const [department, setDepartment] = useState('Design');
+  const [department, setDepartment] = useState('');
   const [userId, setUserId] = useState('');
   const [team, setTeam] = useState('');
   const [startAt, setStartAt] = useState(toLocalInput());
@@ -68,7 +69,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
     const predecessor = idx > 0 ? stages[idx - 1] : null;
 
     setStageId(first.id);
-    setDepartment(first.department ?? 'Design');
+    setDepartment(first.department ?? departments[0]?.name ?? '');
     setUserId(first.assignedUser?.id ?? '');
     setTeam(first.assignedTeam ?? '');
     setDuration(first.plannedDuration ?? 1);
@@ -81,7 +82,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
     setStatus('Assigned');
     setNotes('');
     setErrors({});
-  }, [isOpen, initialStageId, stages]);
+  }, [isOpen, initialStageId, stages, departments]);
 
   // Re-seed when the user picks a different stage mid-dialog.
   function pickStage(nextId) {
@@ -90,7 +91,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
     if (!s) return;
     const idx = stages.findIndex((x) => x.id === nextId);
     const predecessor = idx > 0 ? stages[idx - 1] : null;
-    setDepartment(s.department ?? 'Design');
+    setDepartment(s.department ?? departments[0]?.name ?? '');
     setUserId(s.assignedUser?.id ?? '');
     setTeam(s.assignedTeam ?? '');
     setDuration(s.plannedDuration ?? 1);
@@ -138,7 +139,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
       actor: project.projectManager,
     });
 
-    showToast(`${stage?.name ?? 'Stage'} assigned to ${employee?.name ?? (team.trim() || 'the team')}.`);
+    showToast(`${stage?.name ?? 'Stage'} assigned to ${employee?.name ?? (team.trim() || 'the team')}.`, 'success', 'onAssignment');
     onClose?.();
   }
 
@@ -206,7 +207,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
               value={department}
               onChange={(e) => { setDepartment(e.target.value); setUserId(''); }}
             >
-              {PMS_DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              {departments.map(({ id, name }) => <option key={id} value={name}>{name}</option>)}
             </select>
           </div>
 

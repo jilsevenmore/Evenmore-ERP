@@ -3,7 +3,7 @@ import { AlertCircle, Save } from 'lucide-react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
 import { usePmsStore, validateStageConfig } from '../../../../stores/pmsStore';
-import { PMS_DEPARTMENTS, PMS_DURATION_UNITS } from '../../../../data/mockPmsData';
+import { PMS_DURATION_UNITS } from '../../../../data/mockPmsData';
 
 /**
  * AddEditStageModal — the stage template builder.
@@ -52,6 +52,7 @@ function ToggleRow({ id, label, hint, checked, onChange }) {
 
 export function AddEditStageModal({ isOpen, onClose, stage = null }) {
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
+  const departments = usePmsStore((s) => s.departments);
   const addStageConfig = usePmsStore((s) => s.addStageConfig);
   const updateStageConfig = usePmsStore((s) => s.updateStageConfig);
   const showToast = usePmsStore((s) => s.showToast);
@@ -63,9 +64,13 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
   // Reload the form whenever the dialog opens or switches target.
   useEffect(() => {
     if (!isOpen) return;
-    setDraft(stage ? { ...BLANK, ...stage } : BLANK);
+    setDraft(
+      stage
+        ? { ...BLANK, ...stage }
+        : { ...BLANK, department: departments[0]?.name ?? BLANK.department }
+    );
     setErrors({});
-  }, [isOpen, stage]);
+  }, [isOpen, stage, departments]);
 
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -159,7 +164,7 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
               value={draft.department}
               onChange={(e) => set({ department: e.target.value })}
             >
-              {PMS_DEPARTMENTS.map((d) => (
+              {departments.map(({ name: d }) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>

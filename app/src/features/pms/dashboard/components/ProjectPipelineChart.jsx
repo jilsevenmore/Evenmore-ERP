@@ -9,17 +9,15 @@ import { EmptyStatePms } from '../../components/EmptyStatePms';
  * whether the company is running 4 projects or 400.
  */
 
-const DEPARTMENT_COLORS = {
-  Design: '#6366f1',
-  Production: '#1f6bff',
-  Quality: '#0d9488',
-  Packaging: '#a855f7',
-  Installation: '#ea580c',
-  Unassigned: '#94a3b8',
-};
+// A department wears one colour everywhere, so this reads the same catalogue
+// the Gantt does rather than keeping a second opinion about what Design looks
+// like. Work with no department keeps the neutral grey.
+const UNASSIGNED = '#94a3b8';
 
-export function ProjectPipelineChart({ rows = [] }) {
+export function ProjectPipelineChart({ rows = [], departments = [] }) {
   const total = rows.reduce((sum, r) => sum + r.count, 0);
+  const colors = {};
+  for (const dept of departments) colors[dept.name] = dept.color;
 
   return (
     <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs h-full">
@@ -39,7 +37,7 @@ export function ProjectPipelineChart({ rows = [] }) {
       ) : (
         <ul className="space-y-3.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
           {rows.map((row) => {
-            const color = DEPARTMENT_COLORS[row.department] ?? DEPARTMENT_COLORS.Unassigned;
+            const color = colors[row.department] ?? UNASSIGNED;
             return (
               <li key={row.department}>
                 <div className="flex items-center justify-between mb-1.5">

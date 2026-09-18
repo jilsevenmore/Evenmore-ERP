@@ -11,18 +11,10 @@ import { EmptyStatePms } from '../../components/EmptyStatePms';
  * warning never rests on colour alone.
  */
 
-const DEPARTMENT_HUES = {
-  Design: '#2a78d6',
-  Production: '#1c5cab',
-  Quality: '#5598e7',
-  Packaging: '#86b6ef',
-  Installation: '#3987e5',
-  Logistics: '#6da7ec',
-  Management: '#256abf',
-  Procurement: '#9ec5f4',
-};
-
-const OVERDUE = '#d03b3b';
+// Identity colours come from the department catalogue in PMS Settings, so a
+// renamed, recoloured or newly added department shows up here without a code
+// change. Anything the catalogue does not know about falls back to grey.
+const FALLBACK = '#94a3b8';
 
 function dayTicks(startMs, endMs, max = 8) {
   const span = endMs - startMs;
@@ -36,8 +28,15 @@ function dayTicks(startMs, endMs, max = 8) {
   return ticks;
 }
 
-export function TimelineGanttChart({ rows = [], window: win }) {
+export function TimelineGanttChart({
+  rows = [],
+  window: win,
+  departments = [],
+  overdueColor = '#d03b3b',
+}) {
   const [hover, setHover] = useState(null);
+  const hues = {};
+  for (const dept of departments) hues[dept.name] = dept.color;
 
   if (rows.length === 0) {
     return (
@@ -67,18 +66,18 @@ export function TimelineGanttChart({ rows = [], window: win }) {
 
       {/* Legend: identity is never colour-alone, so the hatch is named too. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-4 pb-3 border-b border-slate-100">
-        {Object.entries(DEPARTMENT_HUES)
-          .filter(([dept]) => rows.some((r) => r.bars.some((b) => b.department === dept)))
-          .map(([dept, hue]) => (
-            <span key={dept} className="inline-flex items-center gap-1.5 text-[10px] text-slate-600">
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: hue }} />
-              {dept}
+        {departments
+          .filter((dept) => rows.some((r) => r.bars.some((b) => b.department === dept.name)))
+          .map((dept) => (
+            <span key={dept.id} className="inline-flex items-center gap-1.5 text-[10px] text-slate-600">
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: dept.color }} />
+              {dept.name}
             </span>
           ))}
         <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-600">
           <span
             style={{
-              width: 10, height: 10, borderRadius: 3, background: OVERDUE,
+              width: 10, height: 10, borderRadius: 3, background: overdueColor,
               backgroundImage: 'repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 2px, transparent 2px 4px)',
             }}
           />
@@ -135,7 +134,7 @@ export function TimelineGanttChart({ rows = [], window: win }) {
                     {row.bars.map((bar) => {
                       const left = pct(bar.startMs);
                       const width = Math.max(1.2, pct(bar.endMs) - left);
-                      const hue = DEPARTMENT_HUES[bar.department] ?? '#94a3b8';
+                      const hue = hues[bar.department] ?? FALLBACK;
                       const isHovered = hover?.id === bar.id;
 
                       return (
@@ -153,7 +152,7 @@ export function TimelineGanttChart({ rows = [], window: win }) {
                             width: `${width}%`,
                             height: 14,
                             borderRadius: 4,
-                            background: bar.isOverdue ? OVERDUE : hue,
+                            background: bar.isOverdue ? overdueColor : hue,
                             // Texture doubles the overdue signal for CVD/print.
                             backgroundImage: bar.isOverdue
                               ? 'repeating-linear-gradient(45deg, rgba(255,255,255,.55) 0 2px, transparent 2px 4px)'
@@ -184,7 +183,7 @@ export function TimelineGanttChart({ rows = [], window: win }) {
             {new Date(hover.bar.startMs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} →{' '}
             {new Date(hover.bar.endMs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
           </span>
-          <span className="text-[10px] font-semibold" style={{ color: hover.bar.isOverdue ? OVERDUE : '#065f46' }}>
+          <span className="text-[10px] font-semibold" style={{ color: hover.bar.isOverdue ? overdueColor : '#065f46' }}>
             {hover.bar.status} · {hover.bar.completionPct}%
           </span>
         </div>

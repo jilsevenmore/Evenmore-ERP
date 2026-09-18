@@ -21,6 +21,8 @@ const EMPTY = { department: 'all', projectManagerId: 'all', status: 'all' };
 export default function TimelinePage() {
   const projects = usePmsStore((s) => s.projects);
   const employees = usePmsStore((s) => s.employees);
+  const departments = usePmsStore((s) => s.departments);
+  const statusColors = usePmsStore((s) => s.statusColors);
 
   const [filters, setFilters] = useState(EMPTY);
 
@@ -75,7 +77,12 @@ export default function TimelinePage() {
         totalCount={allRows.length}
       />
 
-      <TimelineGanttChart rows={visible} window={window} />
+      <TimelineGanttChart
+        rows={visible}
+        window={window}
+        departments={departments}
+        overdueColor={statusColors.overdue}
+      />
     </div>
   );
 }

@@ -51,7 +51,7 @@ export function CompleteProjectModal({ isOpen, onClose, project, onCompleted }) 
         { ...pm, name: signer.trim() || pm?.name },
         { force: override }
       );
-      showToast(`${project.id} signed off — ${metrics.totalDurationDays} day turnaround.`);
+      showToast(`${project.id} signed off — ${metrics.totalDurationDays} day turnaround.`, 'success', 'onCompletion');
       onCompleted?.(metrics);
       onClose?.();
     } catch (err) {

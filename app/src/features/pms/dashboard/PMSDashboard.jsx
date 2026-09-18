@@ -32,6 +32,7 @@ export default function PMSDashboard() {
   const navigate = useNavigate();
   const projects = usePmsStore((s) => s.projects);
   const settings = usePmsStore((s) => s.settings);
+  const departments = usePmsStore((s) => s.departments);
 
   const metrics = useMemo(() => computeDashboardMetrics(projects), [projects]);
   const pipeline = useMemo(() => computePipelineByDepartment(projects), [projects]);
@@ -80,7 +81,7 @@ export default function PMSDashboard() {
       <PMSKpiSection metrics={metrics} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ProjectPipelineChart rows={pipeline} />
+        <ProjectPipelineChart rows={pipeline} departments={departments} />
         <DepartmentWorkload rows={workload} />
       </div>
 

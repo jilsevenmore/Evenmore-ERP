@@ -57,7 +57,8 @@ export function ClientApprovalModal({ isOpen, onClose, project, stage, document:
       );
       showToast(
         isRevision ? `Revision requested on v${doc.version}.0.` : `v${doc.version}.0 approved by ${approverName.trim()}.`,
-        isRevision ? 'info' : 'success'
+        isRevision ? 'info' : 'success',
+        'onApproval'
       );
       onDecided?.(decision);
       onClose?.();
