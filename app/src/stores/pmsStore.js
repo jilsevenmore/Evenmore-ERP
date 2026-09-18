@@ -419,6 +419,69 @@ export function computeUpcomingDeadlines(projects = [], days = 7, now = Date.now
     .sort((a, b) => a.daysRemaining - b.daysRemaining);
 }
 
+// ─── Stage 6 Configurator Derivations ────────────────────────
+
+/**
+ * How many live projects and stage instances were spun up from a template.
+ *
+ * Instances copy the template's name, department and duration at creation, so
+ * removing a template never rewrites history — but an administrator should
+ * still see what a template is currently driving before deleting it.
+ */
+export function computeStageConfigUsage(projects = [], configId) {
+  let projectCount = 0;
+  let stageCount = 0;
+  let activeStageCount = 0;
+
+  for (const p of projects) {
+    let usedHere = 0;
+    for (const stage of p.stages ?? []) {
+      if (stage.stageConfigId !== configId) continue;
+      usedHere += 1;
+      if (stage.status !== "Completed" && stage.status !== "Not Started") {
+        activeStageCount += 1;
+      }
+    }
+    if (usedHere > 0) {
+      projectCount += 1;
+      stageCount += usedHere;
+    }
+  }
+
+  return { projectCount, stageCount, activeStageCount };
+}
+
+/** Validate a stage template before it reaches the store. */
+export function validateStageConfig(draft = {}, existing = [], editingId = null) {
+  const errors = {};
+  const name = (draft.name ?? "").trim();
+
+  if (!name) {
+    errors.name = "Stage name is required.";
+  } else if (
+    existing.some(
+      (c) => c.id !== editingId && (c.name ?? "").trim().toLowerCase() === name.toLowerCase()
+    )
+  ) {
+    errors.name = "Another stage already uses this name.";
+  }
+
+  if (!draft.department) errors.department = "Choose a responsible department.";
+
+  const duration = Number(draft.defaultDuration);
+  if (!Number.isFinite(duration) || duration <= 0) {
+    errors.defaultDuration = "Duration must be greater than zero.";
+  } else if (!Number.isInteger(duration)) {
+    errors.defaultDuration = "Duration must be a whole number.";
+  }
+
+  if (!["Hours", "Days"].includes(draft.durationUnit)) {
+    errors.durationUnit = "Unit must be Hours or Days.";
+  }
+
+  return errors;
+}
+
 // ─── Stage 5 Directory Derivations ───────────────────────────
 
 /** Next sequential project code for a year, e.g. "PRJ-2026-006". */
@@ -735,16 +798,24 @@ export const usePmsStore = create((set, get) => ({
 
   addStageConfig: (config) =>
     set((st) => {
+      // Append after the highest existing sequence rather than counting rows,
+      // so an add can never collide with an existing position.
+      const highest = st.stageConfigs.reduce(
+        (max, c) => Math.max(max, Number(c.sequence) || 0),
+        0
+      );
       const stageConfigs = [
         ...st.stageConfigs,
         {
           id: uid("stage-cfg"),
-          sequence: st.stageConfigs.length + 1,
+          description: "",
+          assignedRole: "",
           durationUnit: "Days",
           requiredApproval: false,
           requiredDocument: false,
           isActive: true,
           ...config,
+          sequence: highest + 1,
         },
       ];
       persist({ ...st, stageConfigs });
@@ -768,6 +839,19 @@ export const usePmsStore = create((set, get) => ({
       persist({ ...st, stageConfigs });
       return { stageConfigs };
     }),
+
+  /** Flip a template between Active and Inactive. */
+  toggleStageConfigActive: (id) =>
+    set((st) => {
+      const stageConfigs = st.stageConfigs.map((c) =>
+        c.id === id ? { ...c, isActive: !c.isActive } : c
+      );
+      persist({ ...st, stageConfigs });
+      return { stageConfigs };
+    }),
+
+  /** What a template is currently driving, for the delete confirmation. */
+  getStageConfigUsage: (id) => computeStageConfigUsage(get().projects, id),
 
   /** Move a template up (-1) or down (+1) in the execution order. */
   reorderStageConfig: (id, direction) =>

@@ -12,12 +12,19 @@
 
 // ─── Domain Enumerations ─────────────────────────────────────────────
 
+// Departments a stage template can be assigned to. The first five are the
+// operational departments the seed pipeline runs through; the last three come
+// from the Stage 6 configurator spec so an administrator can route a stage to
+// a support function without editing code.
 export const PMS_DEPARTMENTS = [
   "Design",
   "Production",
   "Quality",
   "Packaging",
   "Installation",
+  "Logistics",
+  "Management",
+  "Procurement",
 ];
 
 export const PMS_DURATION_UNITS = ["Hours", "Days"];
