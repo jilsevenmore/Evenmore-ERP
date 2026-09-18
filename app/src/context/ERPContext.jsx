@@ -3,6 +3,7 @@ import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuo
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES } from '../utils/currencyUtils';
 import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
+import { emitCrmEvent, CRM_EVENT_TYPES } from '../services/crmEventNotifications';
 const STORAGE_KEY = 'horizon_erp_v2_state';
 // ── [PHASE-2E.1] steel-category → HSN default map (Sweven fabrication master) ──
 //   Falls back to 7216 (angles/shapes/sections) unless the category matches a known steel family.
@@ -1925,6 +1926,11 @@ export const ERPProvider = ({ children, }) => {
         setQuotations(prev => prev.map(q => q.id === id ? { ...q, activity: [...(q.activity || []), event] } : q));
     };
     const syncQuotationShare = (id, share) => {
+        const current = quotations.find((q) => String(q.id) === String(id));
+        const viewedNow = [...(current?.activity || []), ...(share.events || [])].some((event) => event.type === 'Quotation Viewed');
+        const nextStatus = current && ['Draft', 'Sent', 'Viewed'].includes(current.status)
+            ? (share.decision || (viewedNow ? 'Viewed' : current.status))
+            : current?.status;
         setQuotations(prev => prev.map(q => {
             if (q.id !== id) return q;
             const events = new Map([...(q.activity || []), ...(share.events || [])].map(event => [event.id, event]));
@@ -1933,6 +1939,20 @@ export const ERPProvider = ({ children, }) => {
             return { ...q, share: { token: share.token, url: share.url, expiresAt: share.expiresAt, allowDownload: share.allowDownload, allowAcceptance: share.allowAcceptance, localOnly: share.localOnly }, activity,
                 status: ['Draft', 'Sent', 'Viewed'].includes(q.status) ? (share.decision || (viewed ? 'Viewed' : q.status)) : q.status };
         }));
+        if (current && current.status !== 'Viewed' && nextStatus === 'Viewed') {
+            emitCrmEvent({
+                type: CRM_EVENT_TYPES.QUOTATION_VIEWED,
+                entityType: 'quotation',
+                entityId: id,
+                payload: {
+                    quoteRef: current.quoteNumber,
+                    customerId: current.customerId,
+                    customerName: current.customer,
+                    dealId: current.dealId,
+                    path: current.dealId ? `/crm/deals?deal=${encodeURIComponent(current.dealId)}` : '/crm/quotations',
+                },
+            });
+        }
     };
     const convertQuotationToDeliveryChallan = (id) => {
         const quote = quotations.find(q => q.id === id);
@@ -1956,7 +1976,21 @@ export const ERPProvider = ({ children, }) => {
         return challan;
     };
     const updateQuotationStatus = (id, status) => {
+        const target = quotations.find((q) => String(q.id) === String(id));
         setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+        if (target && target.status !== 'Sent' && status === 'Sent') {
+            emitCrmEvent({
+                type: CRM_EVENT_TYPES.QUOTATION_SENT,
+                entityType: 'quotation',
+                entityId: id,
+                payload: {
+                    quoteRef: target.quoteNumber,
+                    customerId: target.customerId,
+                    customerName: target.customer,
+                    path: target.dealId ? `/crm/deals?deal=${encodeURIComponent(target.dealId)}` : '/crm/quotations',
+                },
+            });
+        }
     };
     const convertQuotationToSalesOrder = (quoteId) => {
         const quote = quotations.find((q) => q.id === quoteId);

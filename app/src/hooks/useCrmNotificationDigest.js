@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useERP } from '../context/ERPContext';
+import { loadEventNotifications, NOTIFICATION_EVENT } from '../services/crmEventNotifications';
 
 const CRM_EVENT = 'crm:data-updated';
 const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
 const LEAD_DETAIL_STORAGE_KEY = 'evenmore-crm-lead-details-v1';
 const TASK_ALLOCATION_STORAGE_KEY = 'crm-task-allocation-v1';
 const CRM_TASKS_STORAGE_KEY = 'evenmore-crm-tasks-v1';
+
+const EVENT_ENTITY_LABELS = {
+  lead: 'Lead',
+  task: 'Task',
+  'lead-task': 'Task',
+  quotation: 'Quotation',
+  contract: 'Contract',
+};
 
 function readStoredValue(key, fallback) {
   try {
@@ -22,7 +31,38 @@ function loadCrmSnapshot() {
     leadRows: readStoredValue(LEADS_STORAGE_KEY, []),
     leadDetails: readStoredValue(LEAD_DETAIL_STORAGE_KEY, {}),
     allocationTasks: readStoredValue(TASK_ALLOCATION_STORAGE_KEY, []),
+    eventItems: loadEventNotifications(),
   };
+}
+
+function formatEventTime(value, now) {
+  const parsed = parseCrmDate(value);
+  if (!parsed) return 'Recent';
+  const diffMs = now.getTime() - parsed.getTime();
+  if (diffMs < 0) return 'Recent';
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+function buildEventNotifications({ eventItems, now }) {
+  return (eventItems || [])
+    .filter((entry) => entry && entry.title)
+    .map((entry) => ({
+      id: `crm-event-${entry.id}`,
+      eventId: entry.id,
+      title: entry.title,
+      subtitle: EVENT_ENTITY_LABELS[entry.entityType] || 'CRM',
+      desc: entry.message || entry.title,
+      time: formatEventTime(entry.createdAt, now),
+      tone: 'info',
+      unread: entry.status !== 'read',
+      path: entry.path || '/crm',
+      bucket: 'crm-event',
+    }));
 }
 
 function parseCrmDate(value) {
@@ -243,12 +283,15 @@ function sortItems(items, now) {
   });
 }
 
-function buildCrmNotificationDigest({ leadRows, leadDetails, allocationTasks, quotations, deliveryChallans, now }) {
+function buildCrmNotificationDigest({ leadRows, leadDetails, allocationTasks, quotations, deliveryChallans, eventItems, now }) {
   const reminders = sortItems([
     ...buildLeadTaskReminders({ leadRows, leadDetails, now }),
     ...buildAllocationReminders({ allocationTasks, now }),
   ], now);
-  const notifications = buildWorkflowNotifications({ leadRows, quotations, deliveryChallans });
+  const notifications = [
+    ...buildEventNotifications({ eventItems, now }),
+    ...buildWorkflowNotifications({ leadRows, quotations, deliveryChallans }),
+  ];
   const urgentReminders = reminders.filter((item) => item.tone === 'overdue' || item.tone === 'today');
   const todayReminders = reminders.filter((item) => item.tone === 'today');
   const overdueReminders = reminders.filter((item) => item.tone === 'overdue');
@@ -277,11 +320,13 @@ export function useCrmNotificationDigest() {
     sync();
 
     window.addEventListener(CRM_EVENT, sync);
+    window.addEventListener(NOTIFICATION_EVENT, sync);
     window.addEventListener('focus', sync);
     const timer = window.setInterval(sync, 15000);
 
     return () => {
       window.removeEventListener(CRM_EVENT, sync);
+      window.removeEventListener(NOTIFICATION_EVENT, sync);
       window.removeEventListener('focus', sync);
       window.clearInterval(timer);
     };
@@ -294,6 +339,7 @@ export function useCrmNotificationDigest() {
       allocationTasks: snapshot.allocationTasks,
       quotations,
       deliveryChallans,
+      eventItems: snapshot.eventItems,
       now: new Date(),
     }),
     [deliveryChallans, quotations, snapshot]

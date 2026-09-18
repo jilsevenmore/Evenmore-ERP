@@ -65,6 +65,7 @@ import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { employeesMock } from '../../../data/hrms/mocks/data';
 import { LineItemEditor } from '../../../components/common/LineItemEditor';
 import { loadCrmTasks, saveCrmTasks, runLeadStageAutomation, TASK_SOURCE_AUTOMATION } from '../../../services/leadStageAutomation';
+import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
 import { useAppStore } from '../../../stores/appStore';
 import { completeTaskWithOutcome, NEXT_ACTION_LABELS, getLeadStageOrder } from '../../../services/taskCompletionService';
 import CompleteTaskModal from '../tasks/CompleteTaskModal';
@@ -1733,11 +1734,24 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       setTasks((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...nextTask } : t)));
       onActivity?.(`Task "${form.title.trim()}" updated`, '#1d6bff');
     } else {
+      const manualTask = { id: `lt-${Date.now()}`, ...nextTask };
       setTasks((prev) => [
-        { id: `lt-${Date.now()}`, ...nextTask },
+        manualTask,
         ...prev,
       ]);
       onActivity?.(`Task "${form.title.trim()}" added`, '#16a34a');
+      emitCrmEvent({
+        type: CRM_EVENT_TYPES.TASK_CREATED,
+        entityType: 'lead-task',
+        entityId: manualTask.id,
+        payload: {
+          title: manualTask.title,
+          ownerName: manualTask.assignee,
+          leadName: lead?.name,
+          leadId: lead?.id,
+          path: `/crm/leads/${lead?.id}`,
+        },
+      });
     }
     setIsModalOpen(false);
   }

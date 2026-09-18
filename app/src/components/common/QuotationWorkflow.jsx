@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { useERP } from '../../context/ERPContext';
 import { sharingRequest } from '../../services/quotationSharing';
 import { isPortableToken } from '../../services/localQuotationSharing';
+import { emitCrmEvent, CRM_EVENT_TYPES } from '../../services/crmEventNotifications';
 import { publicQuotation } from '../../utils/quotationDocument';
 
 export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMode = '' }) {
@@ -47,6 +48,17 @@ export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMod
       result = await sharingRequest(quotation.id, { quotation: publicQuotation(quotation, 'USD'), expiryDays: days, allowDownload });
     }
     setShare(result); syncQuotationShare(quotation.id, result);
+    emitCrmEvent({
+      type: CRM_EVENT_TYPES.QUOTATION_SENT,
+      entityType: 'quotation',
+      entityId: quotation.id,
+      payload: {
+        quoteRef: quotation.quoteNumber,
+        customerId: quotation.customerId,
+        customerName: quotation.customer,
+        path: quotation.dealId ? `/crm/deals?deal=${encodeURIComponent(quotation.dealId)}` : '/crm/quotations',
+      },
+    });
     try { await navigator.clipboard.writeText(result.url); }
     catch {
       setMode('share');

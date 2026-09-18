@@ -1,6 +1,7 @@
 import { convertLeadToDealIfNeeded } from './leadDealConversion.js';
 import { useAppStore } from '../stores/appStore';
 import { seedDemoDealTasks } from '../data/crm/mockDealTasks.js';
+import { emitCrmEvent, CRM_EVENT_TYPES } from './crmEventNotifications.js';
 
 /**
  * leadStageAutomation.js — CRM Lead Stage Task Automation Engine
@@ -294,9 +295,26 @@ export function loadCrmTasks() {
  * Save tasks to Task List
  */
 export function saveCrmTasks(tasks) {
+  const previousIds = new Set((loadCrmTasks() || []).map((entry) => String(entry?.id)));
   const success = writeJson(CRM_TASKS_STORAGE_KEY, tasks);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event(CRM_EVENT));
+  }
+  if (success) {
+    (tasks || [])
+      .filter((entry) => entry && !previousIds.has(String(entry.id)))
+      .forEach((entry) => emitCrmEvent({
+        type: CRM_EVENT_TYPES.TASK_CREATED,
+        entityType: 'task',
+        entityId: entry.id,
+        payload: {
+          title: entry.title,
+          ownerName: entry.owner,
+          leadName: entry.lead,
+          leadId: entry.leadId,
+          path: '/crm/tasks',
+        },
+      }));
   }
   return success;
 }

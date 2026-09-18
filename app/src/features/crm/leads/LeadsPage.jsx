@@ -18,6 +18,7 @@ import { Users, UserPlus, Clock, TrendingUp } from 'lucide-react';
 import { leads as seedLeads } from '../../../data/crm/mockLeads';
 import { exportToCSV } from '../../../services/exportUtils';
 import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
+import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
 
 const INITIAL_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const INITIAL_SORT = { field: '', direction: 'ascending' };
@@ -365,6 +366,17 @@ export default function LeadsPage() {
       } catch (err) {
         console.error('[CRM Automation] Error generating stage tasks for new lead:', err);
       }
+      emitCrmEvent({
+        type: CRM_EVENT_TYPES.LEAD_CREATED,
+        entityType: 'lead',
+        entityId: createdLead.id,
+        payload: {
+          leadRef: createdLead.leadNumber,
+          leadName: createdLead.name,
+          ownerName: createdLead.owner,
+          path: `/crm/leads/${createdLead.id}`,
+        },
+      });
     }
 
     setIsCreateLeadOpen(false);

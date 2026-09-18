@@ -1,5 +1,6 @@
 export { formatContractMoney, formatContractDate } from '../utils/contractFormatting.js';
 import { loadDeals, DEALS_STORAGE_KEY } from './dealService.js';
+import { emitCrmEvent, CRM_EVENT_TYPES } from './crmEventNotifications.js';
 
 export const CONTRACT_TYPES = [
   'Supply Agreement',
@@ -185,6 +186,19 @@ export function updateContract(dealId, contractId, patch = {}, { storage = local
   writeDeals(deals.map((item) => sameId(item.id, deal.id)
     ? { ...item, contracts: (item.contracts || []).map((entry) => sameId(entry.id, contractId) ? updated : entry) }
     : item), storage);
+  if (current.status !== 'Active' && updated.status === 'Active') {
+    emitCrmEvent({
+      type: CRM_EVENT_TYPES.CONTRACT_SIGNED,
+      entityType: 'contract',
+      entityId: updated.id,
+      payload: {
+        contractRef: updated.contractNumber,
+        customerName: updated.customer,
+        ownerName: deal.assignedUser || deal.owner,
+        path: `/crm/contracts/${updated.id}`,
+      },
+    });
+  }
   return enrich(deal, updated);
 }
 
