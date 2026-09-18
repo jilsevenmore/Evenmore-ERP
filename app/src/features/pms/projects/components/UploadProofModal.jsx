@@ -1,16 +1,26 @@
-import React, { useEffect, useState } from 'react';
-import { AlertCircle, Upload, Layers } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { AlertCircle, Upload, Layers, FileText, X, Paperclip } from 'lucide-react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
 import { usePmsStore, getLatestDocument } from '../../../../stores/pmsStore';
+import { makeFileKey, putProofFile, formatFileSize, previewKindFor } from '../../approval/proofFileStore';
 
 /**
  * UploadProofModal — register the next version of a design proof.
  *
- * There is no file storage here, so this captures the metadata a version record
- * needs. The version number is allocated by the store, never typed in, which is
- * what keeps the stack strictly non-overwriting.
+ * Pick the drawing off your device and it is stored for real (in IndexedDB, keyed
+ * by fileKey) so the viewer and any approval link show the actual document. The
+ * file is optional: a version can still be registered by name alone, which is how
+ * the seeded projects carry their history.
+ *
+ * The version number is allocated by the store, never typed in, which is what
+ * keeps the stack strictly non-overwriting.
  */
+
+/** Sensible ceiling for a drawing — keeps IndexedDB writes from stalling the UI. */
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
+
+const ACCEPTED = '.pdf,.png,.jpg,.jpeg,.webp,.svg,.dwg,.dxf,.step,.stp,.iges,.igs,.zip';
 
 const fieldClass =
   'w-full text-xs rounded-lg border border-[#dce5f4] bg-white px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400';
@@ -34,6 +44,10 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
   const [uploaderId, setUploaderId] = useState('');
   const [comments, setComments] = useState('');
   const [errors, setErrors] = useState({});
+  const [picked, setPicked] = useState(null);
+  const [dragging, setDragging] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -41,9 +55,33 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
     setUploaderId(stage?.assignedUser?.id ?? '');
     setComments('');
     setErrors({});
+    setPicked(null);
+    setDragging(false);
+    setSaving(false);
   }, [isOpen, project, stage, nextVersion]);
 
-  function handleSubmit(e) {
+  /** Take a File from the picker or a drop, and name the version after it. */
+  function acceptFile(file) {
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      setErrors((prev) => ({
+        ...prev,
+        file: `${file.name} is ${formatFileSize(file.size)} — the limit is ${formatFileSize(MAX_FILE_BYTES)}.`,
+      }));
+      return;
+    }
+    setPicked(file);
+    setFileName(file.name);
+    setErrors((prev) => ({ ...prev, file: undefined, fileName: undefined }));
+  }
+
+  function clearFile() {
+    setPicked(null);
+    setFileName(suggestName(project, stage, nextVersion));
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     const found = {};
     if (!fileName.trim()) found.fileName = 'A file name is required.';
@@ -51,21 +89,44 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
+    setSaving(true);
+
+    // Park the bytes first — a document that claims a file it cannot show is
+    // worse than one that falls back to the schematic preview.
+    let fileKey = null;
+    if (picked) {
+      const key = makeFileKey();
+      const stored = await putProofFile(key, picked);
+      if (!stored) {
+        setSaving(false);
+        setErrors({ file: 'The file could not be stored in this browser. Try again, or upload without attaching it.' });
+        return;
+      }
+      fileKey = key;
+    }
+
     const uploader = employees.find((emp) => emp.id === uploaderId);
     addDocument(
       project.id,
       stage.id,
       {
         fileName: fileName.trim(),
-        fileSize: `${(2 + Math.random() * 4).toFixed(1)} MB`,
+        fileSize: picked ? formatFileSize(picked.size) : `${(2 + Math.random() * 4).toFixed(1)} MB`,
         previewUrl: `/mock/pdf/${fileName.trim().toLowerCase()}`,
+        fileKey,
+        mimeType: picked?.type || null,
         uploadedBy: { id: uploader.id, name: uploader.name },
         comments: comments.trim(),
       },
       project.projectManager
     );
 
-    showToast(`v${nextVersion}.0 uploaded.`, 'success', 'onApproval');
+    setSaving(false);
+    showToast(
+      picked ? `v${nextVersion}.0 uploaded — ${picked.name} attached.` : `v${nextVersion}.0 uploaded.`,
+      'success',
+      'onApproval'
+    );
     onUploaded?.();
     onClose?.();
   }
@@ -80,8 +141,10 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
       subtitle={`${stage.name} — ${project.id}`}
       footer={
         <>
-          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="pms-upload-proof" icon={Upload}>Upload Version</Button>
+          <Button variant="secondary" type="button" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button type="submit" form="pms-upload-proof" icon={Upload} disabled={saving}>
+            {saving ? 'Uploading…' : 'Upload Version'}
+          </Button>
         </>
       }
     >

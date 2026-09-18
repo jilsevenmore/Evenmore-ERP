@@ -1,15 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import {
   ChevronLeft, ChevronRight, ZoomIn, ZoomOut, MessageSquare, Send, FileText,
+  ExternalLink, Download, Paperclip,
 } from 'lucide-react';
+import { useProofFile } from '../approval/useProofFile';
 
 /**
- * MockPdfViewer — stand-in proof renderer with a side-by-side comment stream.
+ * MockPdfViewer — proof renderer with a side-by-side comment stream.
  *
- * There is no backend and no real PDF, so the "pages" are drawn as a technical
- * sheet from the document's own metadata. Comments are local to the viewer
- * session: a proof's durable feedback is the revision reason captured by the
- * approval decision, which is what the designer actually acts on.
+ * When a version was uploaded from the user's device, the real file is rendered:
+ * images inline, PDFs through the browser's own viewer. Versions registered
+ * without a file fall back to a technical sheet drawn from the document's
+ * metadata, which is what the seeded projects carry.
+ *
+ * Comments are local to the viewer session: a proof's durable feedback is the
+ * revision reason captured by the approval decision, which is what the designer
+ * actually acts on.
  */
 
 function pageCountFor(doc) {
@@ -25,13 +31,18 @@ const SHEET_META = [
   ['Tolerance', '±0.1 mm'],
 ];
 
-export function MockPdfViewer({ document: doc, projectName, annotations = [], onAddAnnotation }) {
+export function MockPdfViewer({ document: doc, projectName, annotations = [], onAddAnnotation, readOnly = false }) {
   const [page, setPage] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [draft, setDraft] = useState('');
+  const { file, loading: fileLoading } = useProofFile(doc?.fileKey);
 
   const pages = useMemo(() => pageCountFor(doc), [doc]);
   const safePage = Math.min(page, pages);
+
+  // A real PDF brings its own pager and zoom, so the mock controls step aside.
+  const showSheetControls = !file || file.kind === 'image';
+  const showPageControls = !file;
 
   if (!doc) {
     return (
@@ -66,58 +77,141 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 shrink-0">
               v{doc.version}.0
             </span>
+            {file && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 shrink-0">
+                <Paperclip size={9} strokeWidth={2.5} /> Attached file
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.max(0.6, Math.round((z - 0.2) * 10) / 10))}
-              disabled={zoom <= 0.6}
-              aria-label="Zoom out"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ZoomOut size={13} />
-            </button>
-            <span className="text-[10px] font-semibold text-slate-500 w-9 text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.min(1.6, Math.round((z + 0.2) * 10) / 10))}
-              disabled={zoom >= 1.6}
-              aria-label="Zoom in"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ZoomIn size={13} />
-            </button>
+            {showSheetControls && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.max(0.6, Math.round((z - 0.2) * 10) / 10))}
+                  disabled={zoom <= 0.6}
+                  aria-label="Zoom out"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ZoomOut size={13} />
+                </button>
+                <span className="text-[10px] font-semibold text-slate-500 w-9 text-center">
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.min(1.6, Math.round((z + 0.2) * 10) / 10))}
+                  disabled={zoom >= 1.6}
+                  aria-label="Zoom in"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ZoomIn size={13} />
+                </button>
+              </>
+            )}
 
-            <span className="w-px h-4 bg-slate-200 mx-1" />
+            {showPageControls && (
+              <>
+                <span className="w-px h-4 bg-slate-200 mx-1" />
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Previous page"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-[10px] font-semibold text-slate-600" data-test="pdf-page">
+                  {safePage} / {pages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                  disabled={safePage >= pages}
+                  aria-label="Next page"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </>
+            )}
 
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-              aria-label="Previous page"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="text-[10px] font-semibold text-slate-600" data-test="pdf-page">
-              {safePage} / {pages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(pages, p + 1))}
-              disabled={safePage >= pages}
-              aria-label="Next page"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ChevronRight size={14} />
-            </button>
+            {file && (
+              <>
+                <span className="w-px h-4 bg-slate-200 mx-1" />
+                <a
+                  href={file.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open in a new tab"
+                  title="Open in a new tab"
+                  className="p-1 rounded text-slate-500 hover:bg-white"
+                >
+                  <ExternalLink size={13} />
+                </a>
+                <a
+                  href={file.url}
+                  download={file.fileName}
+                  aria-label="Download this file"
+                  title="Download this file"
+                  className="p-1 rounded text-slate-500 hover:bg-white"
+                >
+                  <Download size={13} />
+                </a>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Mock sheet */}
+        {/* Attached file — the real drawing the client is signing off on */}
+        {fileLoading && (
+          <div className="p-10 bg-slate-100 text-center" style={{ minHeight: 340 }}>
+            <p className="text-[11px] text-slate-500">Loading the attached file…</p>
+          </div>
+        )}
+
+        {!fileLoading && file && file.kind === 'pdf' && (
+          <div className="bg-slate-100" style={{ height: 420 }}>
+            <iframe
+              src={file.url}
+              title={`${doc.fileName} preview`}
+              className="w-full h-full border-0"
+            />
+          </div>
+        )}
+
+        {!fileLoading && file && file.kind === 'image' && (
+          <div className="p-5 bg-slate-100 flex justify-center overflow-auto" style={{ minHeight: 340 }}>
+            <img
+              src={file.url}
+              alt={`${doc.fileName} — design proof`}
+              className="bg-white border border-slate-300 shadow-sm object-contain"
+              style={{ width: 460 * zoom, maxWidth: '100%', transition: 'width 0.2s ease' }}
+            />
+          </div>
+        )}
+
+        {!fileLoading && file && file.kind === 'file' && (
+          <div className="p-10 bg-slate-100 text-center" style={{ minHeight: 340 }}>
+            <FileText size={26} className="text-slate-300 mx-auto mb-2" />
+            <p className="text-xs font-semibold text-slate-700">{file.fileName}</p>
+            <p className="text-[11px] text-slate-500 mt-1 mb-3">
+              This format cannot be previewed in the browser — download it to review.
+            </p>
+            <a
+              href={file.url}
+              download={file.fileName}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold rounded-lg bg-blue-600 text-white px-3 py-1.5"
+            >
+              <Download size={12} /> Download file
+            </a>
+          </div>
+        )}
+
+        {/* Schematic fallback for versions registered without a file */}
+        {!fileLoading && !file && (
         <div className="p-5 bg-slate-100 flex justify-center overflow-auto" style={{ minHeight: 340 }}>
           <div
             className="bg-white border border-slate-300 shadow-sm"
@@ -161,6 +255,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {/* Comment stream */}
@@ -168,7 +263,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
         <header className="flex items-center gap-1.5 px-3 py-2 border-b border-[#dce5f4]">
           <MessageSquare size={12} className="text-slate-400" />
           <span className="text-[11px] font-bold text-slate-700">Comments</span>
-          <span className="text-[10px] text-slate-400 ml-auto">page {safePage}</span>
+          {showPageControls && <span className="text-[10px] text-slate-400 ml-auto">page {safePage}</span>}
         </header>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
@@ -201,6 +296,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
           ))}
         </div>
 
+        {!readOnly && (
         <form onSubmit={submitComment} className="p-2.5 border-t border-[#dce5f4] flex gap-1.5">
           <input
             type="text"
@@ -219,6 +315,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
             <Send size={12} />
           </button>
         </form>
+        )}
       </aside>
     </div>
   );
