@@ -225,6 +225,7 @@ const NAV = [
           { label: 'Bulk', to: '/hrms/attendance/bulk' },
           { label: 'Requests', to: '/hrms/attendance/requests' },
           { label: 'Flexibility', to: '/hrms/attendance/flexibility' },
+          { label: "Today's Attendance", to: '/hrms/attendance/today' },
         ],
       },
       { label: 'Leave', icon: CalendarCheck, to: '/hrms/leave' },

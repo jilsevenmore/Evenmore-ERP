@@ -61,6 +61,20 @@ export const flexibilityDefaults = {
   earlyClockOutRequiresApproval: true,
   overtimeRequiresApproval: true
 };
+export const shiftTimings = [
+  { name: "General", start: "09:00", end: "18:00" },
+  { name: "Flexible", start: "09:00", end: "18:00" },
+  { name: "Night", start: "21:00", end: "06:00" }
+];
+export const attendanceMethods = ["WEB", "GEO", "WIFI", "BIOMETRIC"];
+export function getShiftTiming(shift) {
+  const key = String(shift || "General");
+  return shiftTimings.find((s) => s.name === key) || shiftTimings[0];
+}
+export function minutesOfTime(hhmm) {
+  const parts = String(hhmm || "00:00").split(":");
+  return parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+}
 export const auditMock = [
   { id: "A1", action: "Attendance Updated", who: "Priya Patel", target: "EMP1024", from: "09:15", to: "09:02", changedBy: "Ayesha Khan", reason: "Missed punch correction", at: "09 Sep 2026, 10:32 AM" },
   { id: "A2", action: "Request Submitted", who: "Marcus Chen", target: "REQ-1002", changedBy: "Marcus Chen", reason: "Personal appointment", at: "11 Oct 2024, 09:15 AM" },

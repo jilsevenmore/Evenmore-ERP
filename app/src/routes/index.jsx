@@ -43,6 +43,7 @@ const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsP
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
 const AttendanceOverview = lazy(() => import('../features/hrms/attendance/Overview'));
+const TodayAttendance = lazy(() => import('../features/hrms/attendance/Today'));
 const MarkAttendance = lazy(() => import('../features/hrms/attendance/MarkAttendance'));
 const IndividualAttendance = lazy(() => import('../features/hrms/attendance/IndividualAttendance'));
 const BulkAttendance = lazy(() => import('../features/hrms/attendance/BulkAttendance'));
@@ -316,6 +317,7 @@ const router = createBrowserRouter([
       { path: 'hrms/dashboard', element: <Page component={HRMSDashboard} /> },
       { path: 'hrms/employees', element: <Page component={Employees} /> },
       { path: 'hrms/attendance', element: <Page component={AttendanceOverview} /> },
+      { path: 'hrms/attendance/today', element: <Page component={TodayAttendance} /> },
       { path: 'hrms/attendance/mark', element: <Page component={MarkAttendance} /> },
       { path: 'hrms/attendance/individual', element: <Page component={IndividualAttendance} /> },
       { path: 'hrms/attendance/bulk', element: <Page component={BulkAttendance} /> },

@@ -3,8 +3,26 @@ import { Download, ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, 
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
+import { attendanceEmployees } from "../../../data/hrms/mocks/attendanceExtended";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+
+function formatClock(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const suffix = h >= 12 ? "PM" : "AM";
+  h = h % 12 || 12;
+  return `${h}:${m} ${suffix}`;
+}
+
+function durationLabel(minutes) {
+  if (minutes === null || minutes === undefined) return "—";
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+}
 
 const MOCK_ATTENDANCE = [
   {
@@ -108,12 +126,14 @@ const statusStyles = {
   WFH: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
   "Half Day": { background: "#f3e8ff", color: "#7e22ce", border: "#d8b4fe" },
   "On Leave": { background: "#eff6ff", color: "#2563eb", border: "#bfdbfe" },
+  "Early Out": { background: "#f3e8ff", color: "#7e22ce", border: "#d8b4fe" },
 };
 
 export default function AttendanceOverview() {
   const setToast = useAppStore((s) => s.setToast || s.showToast);
   const storeEmployees = useAppStore((s) => s.employees || []);
   const storeRecords = useAttendanceStore((s) => s.records);
+  const storePunchRecords = useAttendanceStore((s) => s.punchRecords);
   const addAttendanceRequest = useAttendanceStore((s) => s.addRequest);
   const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
 
@@ -134,22 +154,43 @@ export default function AttendanceOverview() {
 
   // Normalize attendance records for table display
   const combinedAttendance = useMemo(() => {
-    if (storeRecords && storeRecords.length > 0) {
-      return storeRecords.map((r) => ({
-        ...r,
-        img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
-        workHours: r.workHours || (r.checkIn && r.checkOut && r.checkIn !== "—" ? "08:30" : "—"),
-        shift: r.shift || "General",
-        location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
-        role: r.role || r.jobType || "Full-Time",
-      }));
-    }
-    return MOCK_ATTENDANCE.map((r) => ({
-      ...r,
-      location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
-      role: r.role || r.jobType || "Full-Time",
-    }));
-  }, [storeRecords]);
+    const base = storeRecords && storeRecords.length > 0
+      ? storeRecords.map((r) => ({
+          ...r,
+          img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+          workHours: r.workHours || (r.checkIn && r.checkOut && r.checkIn !== "—" ? "08:30" : "—"),
+          shift: r.shift || "General",
+          location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
+          role: r.role || r.jobType || "Full-Time",
+        }))
+      : MOCK_ATTENDANCE.map((r) => ({
+          ...r,
+          location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
+          role: r.role || r.jobType || "Full-Time",
+        }));
+
+    const rowsById = new Map(base.map((r) => [r.id, { ...r }]));
+    (storePunchRecords || []).forEach((p) => {
+      if (!p.employeeId || !p.punchIn) return;
+      const existing = rowsById.get(p.employeeId) || {
+        id: p.employeeId,
+        name: p.employeeName,
+        dept: attendanceEmployees.find((e) => e.id === p.employeeId)?.dept || "General",
+        img: attendanceEmployees.find((e) => e.id === p.employeeId)?.avatar || `https://i.pravatar.cc/100?u=${p.employeeId}`,
+        location: p.branch || "On-Site",
+        role: "Full-Time",
+      };
+      Object.assign(existing, {
+        checkIn: formatClock(p.punchIn),
+        checkOut: p.punchOut ? formatClock(p.punchOut) : "Ongoing",
+        workHours: p.punchOut ? durationLabel(p.workingMinutes) : "Ongoing",
+        shift: p.shift || existing.shift || "General",
+        status: p.earlyOutMinutes > 0 ? "Early Out" : p.status,
+      });
+      rowsById.set(existing.id, existing);
+    });
+    return [...rowsById.values()];
+  }, [storeRecords, storePunchRecords]);
 
   const filtered = useMemo(() => {
     return combinedAttendance.filter((item) => {
@@ -168,12 +209,13 @@ export default function AttendanceOverview() {
   // Dynamic live STATS
   const statsData = useMemo(() => {
     const total = combinedAttendance.length || 1;
-    const presentCount = combinedAttendance.filter((r) => r.status === "Present").length;
+    const presentCount = combinedAttendance.filter((r) => ["Present", "WFH", "Early Out"].includes(r.status)).length;
     const absentCount = combinedAttendance.filter((r) => r.status === "Absent").length;
     const lateCount = combinedAttendance.filter((r) => r.status === "Late").length;
     const leaveCount = combinedAttendance.filter((r) => r.status === "On Leave").length;
     const wfhCount = combinedAttendance.filter((r) => r.status === "WFH").length;
     const percent = Math.round((presentCount / total) * 100);
+    const otMinutes = (storePunchRecords || []).reduce((acc, p) => acc + (p.overtimeMinutes || 0), 0);
 
     return [
       { label: "PRESENT", val: String(presentCount), sub: `${percent}% of staff`, dotColor: "#22c55e" },
@@ -181,9 +223,9 @@ export default function AttendanceOverview() {
       { label: "LATE", val: String(lateCount), sub: "Grace 10 min", dotColor: "#f59e0b" },
       { label: "ON LEAVE", val: String(leaveCount), sub: "Approved leave", dotColor: "#3b82f6" },
       { label: "WFH", val: String(wfhCount), sub: "Remote active", dotColor: null },
-      { label: "OVERTIME", val: "18h", sub: "Today", dotColor: "#22c55e" },
+      { label: "OVERTIME", val: durationLabel(otMinutes), sub: "Web tracked", dotColor: "#22c55e" },
     ];
-  }, [combinedAttendance]);
+  }, [combinedAttendance, storePunchRecords]);
 
   const handleClearFilters = () => {
     setSearch("");
