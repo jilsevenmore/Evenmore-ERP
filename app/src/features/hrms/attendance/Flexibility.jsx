@@ -95,11 +95,7 @@ export default function Flexibility() {
         <nav className="flex items-center gap-1.5 text-[12.5px] text-slate-400 font-medium">
           <span className="hover:text-slate-700 cursor-pointer">Home</span>
           <ChevronRight size={13} className="text-slate-300" />
-          <span className="hover:text-slate-700 cursor-pointer">HRMS</span>
-          <ChevronRight size={13} className="text-slate-300" />
-          <span className="hover:text-slate-700 cursor-pointer">Attendance</span>
-          <ChevronRight size={13} className="text-slate-300" />
-          <span className="text-slate-800 font-semibold">Flexibility &amp; Policies</span>
+          <span className="text-slate-800 font-semibold">Attendance / Flexibility</span>
         </nav>
 
         <div className="flex flex-wrap items-center justify-between gap-4 mt-2">

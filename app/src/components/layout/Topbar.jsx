@@ -20,6 +20,7 @@ import {
   UserPlus,
   Layers,
   Inbox,
+  Fingerprint,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
@@ -34,6 +35,7 @@ const THEMES = [
 ];
 
 const QUICK_ACTIONS = [
+  { label: 'Punch In Attendance', path: '/hrms/attendance/today', icon: Fingerprint, color: 'text-emerald-600 bg-emerald-50' },
   { label: 'Create New Lead', path: '/crm/leads', icon: UserPlus, color: 'text-blue-500 bg-blue-50' },
   { label: 'Create Sales Order', path: '/sales/orders', icon: ShoppingCart, color: 'text-indigo-500 bg-indigo-50' },
   { label: 'Create Tax Invoice', path: '/sales/invoices', icon: Receipt, color: 'text-emerald-500 bg-emerald-50' },

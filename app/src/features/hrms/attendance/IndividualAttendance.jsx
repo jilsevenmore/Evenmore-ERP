@@ -1,8 +1,11 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ChevronRight, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
+import { attendanceEmployees } from "../../../data/hrms/mocks/attendanceExtended";
 import Modal from "../../../components/ui/Modal";
+import Pagination from "../../../components/ui/Pagination";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
@@ -47,6 +50,75 @@ const DEFAULT_EMPLOYEES = [
 
 const MONTHS = ["October", "September", "August", "July", "June", "May"];
 const YEARS = ["2024", "2023"];
+const MONTH_NUM = { January: 0, February: 1, March: 2, April: 3, May: 4, June: 5, July: 6, August: 7, September: 8, October: 9, November: 10, December: 11 };
+
+function hashSeed(str) {
+  let h = 0;
+  for (let i = 0; i < String(str).length; i++) {
+    h = (h * 31 + String(str).charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+// Deterministic per-employee monthly history so each employee opened from
+// Overview gets their own related attendance page (not the same static rows).
+function buildEmployeeRecords(empId, monthName, yearStr) {
+  const seed = hashSeed(empId || "EMP1024");
+  const monthIdx = MONTH_NUM[monthName] ?? 9;
+  const year = parseInt(yearStr, 10) || 2024;
+  const monthShort = String(monthName).slice(0, 3);
+  const rows = [];
+  for (let d = 1; d <= 10; d++) {
+    const r = (seed + d * 7) % 20;
+    let status = "Present";
+    if (r < 12) status = "Present";
+    else if (r < 14) status = "Late";
+    else if (r === 14) status = "WFH";
+    else if (r === 15) status = "Absent";
+    else if (r === 16) status = "Half Day";
+    else if (r === 17) status = "On Leave";
+    else status = "Present";
+
+    let checkIn = "09:02";
+    let checkOut = "18:04";
+    let workHours = "08:32";
+    let remarks = "—";
+    if (status === "Late") {
+      checkIn = (seed + d) % 2 === 0 ? "09:18" : "09:22";
+      checkOut = (seed + d) % 2 === 0 ? "18:04" : "18:00";
+      workHours = (seed + d) % 2 === 0 ? "08:32" : "08:08";
+      remarks = "Grace 10 min";
+    } else if (status === "Absent" || status === "On Leave") {
+      checkIn = "—";
+      checkOut = "—";
+      workHours = "—";
+      remarks = status === "On Leave" ? "Planned Annual" : "—";
+    } else if (status === "Half Day") {
+      checkIn = "09:42";
+      checkOut = "13:30";
+      workHours = "03:48";
+      remarks = "Personal";
+    } else if ((seed + d) % 2 === 1) {
+      checkIn = "09:00";
+      checkOut = "18:00";
+      workHours = "08:30";
+    }
+
+    const dt = new Date(year, monthIdx, d);
+    const day = isNaN(dt.getTime()) ? ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"][d % 7] : dt.toLocaleDateString("en-US", { weekday: "short" });
+    rows.push({
+      date: `${String(d).padStart(2, "0")} ${monthShort} ${year}`,
+      day,
+      checkIn,
+      checkOut,
+      workHours,
+      shift: d % 3 === 1 ? "Flexible" : "General",
+      status,
+      remarks,
+    });
+  }
+  return rows;
+}
 
 const SAMPLE_RECORDS = [
   { date: "01 Oct 2024", day: "Tue", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "Flexible", status: "Present", remarks: "—" },
@@ -75,6 +147,8 @@ export default function IndividualAttendance() {
   const storeEmployees = useAppStore((s) => s.employees || []);
   const storeRecords = useAttendanceStore((s) => s.records || []);
   const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const empParam = searchParams.get("emp");
 
   const employeesList = useMemo(() => {
     if (storeEmployees && storeEmployees.length > 0) {
@@ -88,17 +162,87 @@ export default function IndividualAttendance() {
         avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
       }));
     }
+    // Fall back to full directory so any employee clicked from Overview resolves,
+    // not just the 4 hard-coded defaults.
+    if (attendanceEmployees && attendanceEmployees.length > 0) {
+      return attendanceEmployees.map((e) => ({
+        id: e.id,
+        name: e.name,
+        designation: e.designation || "Employee",
+        dept: e.dept || "General",
+        manager: e.manager || "HR Manager",
+        status: e.status || "Active",
+        avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id}`,
+      }));
+    }
     return DEFAULT_EMPLOYEES;
   }, [storeEmployees]);
 
-  const [selectedEmpId, setSelectedEmpId] = useState(() => employeesList[0]?.id || "EMP1024");
+  const resolveInitialEmpId = () => {
+    if (empParam && employeesList.some((e) => e.id === empParam)) return empParam;
+    return employeesList[0]?.id || "EMP1024";
+  };
+
+  const [selectedEmpId, setSelectedEmpId] = useState(resolveInitialEmpId);
+  // Sync when navigating from Overview (e.g. /hrms/attendance/individual?emp=EMP1024)
+  useEffect(() => {
+    if (empParam && employeesList.some((e) => e.id === empParam)) {
+      setSelectedEmpId(empParam);
+    }
+  }, [empParam, employeesList]);
   const [selectedMonth, setSelectedMonth] = useState("October");
   const [selectedYear, setSelectedYear] = useState("2024");
   const [viewMode, setViewMode] = useState("Table");
 
-  const [records, setRecords] = useState(SAMPLE_RECORDS);
+  // Per-employee edits (keyed by emp id) layered over deterministic generated history
+  const [editedByEmp, setEditedByEmp] = useState({});
   const [editItem, setEditItem] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
+
+  const baseRecords = useMemo(
+    () => buildEmployeeRecords(selectedEmpId, selectedMonth, selectedYear),
+    [selectedEmpId, selectedMonth, selectedYear]
+  );
+
+  // Tie-in live store value (e.g. status changed from Overview) to this employee's latest row
+  const storeRec = useMemo(
+    () => (storeRecords || []).find((r) => r.id === selectedEmpId),
+    [storeRecords, selectedEmpId]
+  );
+
+  const records = useMemo(() => {
+    let rows = editedByEmp[selectedEmpId] || baseRecords;
+    if (storeRec && !editedByEmp[selectedEmpId]) {
+      rows = rows.map((row, idx) =>
+        idx === rows.length - 3
+          ? {
+              ...row,
+              checkIn: storeRec.checkIn ?? row.checkIn,
+              checkOut: storeRec.checkOut ?? row.checkOut,
+              workHours: storeRec.workHours ?? row.workHours,
+              shift: storeRec.shift ?? row.shift,
+              status: storeRec.status ?? row.status,
+            }
+          : row
+      );
+    }
+    return rows;
+  }, [editedByEmp, selectedEmpId, baseRecords, storeRec]);
+
+  // Pagination (table view)
+  const IND_PAGE_SIZE = 8;
+  const [indPage, setIndPage] = useState(1);
+  useEffect(() => {
+    setIndPage(1);
+  }, [selectedEmpId, selectedMonth, selectedYear]);
+  const indTotalPages = Math.max(1, Math.ceil(records.length / IND_PAGE_SIZE));
+  useEffect(() => {
+    if (indPage > indTotalPages) setIndPage(indTotalPages);
+  }, [indPage, indTotalPages]);
+  const paginatedRecords = useMemo(() => {
+    const start = (indPage - 1) * IND_PAGE_SIZE;
+    return records.slice(start, start + IND_PAGE_SIZE);
+  }, [records, indPage]);
 
   const currentEmp = useMemo(
     () => employeesList.find((e) => e.id === selectedEmpId) || employeesList[0] || DEFAULT_EMPLOYEES[0],
@@ -106,21 +250,25 @@ export default function IndividualAttendance() {
   );
 
   const stats = useMemo(() => {
+    const seed = hashSeed(selectedEmpId || "EMP1024");
     return {
       present: records.filter((r) => r.status === "Present").length,
       absent: records.filter((r) => r.status === "Absent").length,
       late: records.filter((r) => r.status === "Late").length,
       leave: records.filter((r) => r.status === "On Leave").length,
       wfh: records.filter((r) => r.status === "WFH").length,
-      overtime: "6h",
+      overtime: `${2 + (seed % 6)}h`,
     };
-  }, [records]);
+  }, [records, selectedEmpId]);
 
   const handleEditSave = () => {
     if (!editItem) return;
-    setRecords((prev) =>
-      prev.map((r) => (r.date === editItem.date ? { ...r, ...editItem } : r))
-    );
+    setEditedByEmp((prev) => ({
+      ...prev,
+      [selectedEmpId]: (prev[selectedEmpId] || baseRecords).map((r) =>
+        r.date === editItem.date ? { ...r, ...editItem } : r
+      ),
+    }));
     // If this date corresponds to the active record in store, sync it
     if (updateStoreRecord) {
       updateStoreRecord(selectedEmpId, {
@@ -158,7 +306,10 @@ export default function IndividualAttendance() {
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <select
             value={selectedEmpId}
-            onChange={(e) => setSelectedEmpId(e.target.value)}
+            onChange={(e) => {
+              setSelectedEmpId(e.target.value);
+              setSearchParams({ emp: e.target.value });
+            }}
             className="ind-select ind-select-emp"
           >
             {employeesList.map((e) => (
@@ -286,8 +437,8 @@ export default function IndividualAttendance() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r, i) => (
-                  <tr key={i}>
+                {paginatedRecords.map((r, i) => (
+                  <tr key={(indPage - 1) * IND_PAGE_SIZE + i}>
                     <td className="ind-date">{r.date}</td>
                     <td style={{ color: "#374151" }}>{r.day}</td>
                     <td className="ind-time">{r.checkIn}</td>
@@ -313,6 +464,9 @@ export default function IndividualAttendance() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div style={{ borderTop: "1px solid #f1f5f9", padding: "6px 20px 6px 8px", background: "#fff" }}>
+            <Pagination total={records.length} page={indPage} pageSize={IND_PAGE_SIZE} onChange={setIndPage} />
           </div>
         </div>
       ) : (

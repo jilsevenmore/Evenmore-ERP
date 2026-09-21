@@ -1,11 +1,15 @@
-import { useState, useMemo } from "react";
-import { Download, ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, MoreHorizontal, X, Check, Clock } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Download, ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, MoreHorizontal, X, Check, Clock, Eye, Pencil, UserCheck, UserX, FileText, FileSpreadsheet, FileDown } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { attendanceEmployees } from "../../../data/hrms/mocks/attendanceExtended";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import Pagination from "../../../components/ui/Pagination";
+
+const PAGE_SIZE = 8;
 
 function formatClock(iso) {
   if (!iso) return "—";
@@ -130,6 +134,7 @@ const statusStyles = {
 };
 
 export default function AttendanceOverview() {
+  const navigate = useNavigate();
   const setToast = useAppStore((s) => s.setToast || s.showToast);
   const storeEmployees = useAppStore((s) => s.employees || []);
   const storeRecords = useAttendanceStore((s) => s.records);
@@ -151,6 +156,43 @@ export default function AttendanceOverview() {
   const [regReason, setRegReason] = useState("");
   const [regIn, setRegIn] = useState("09:00");
   const [regOut, setRegOut] = useState("18:00");
+
+  // Actions dropdown state
+  const [openMenuId, setOpenMenuId] = useState(null);
+  const [viewRow, setViewRow] = useState(null);
+  const menuRef = useRef(null);
+
+  // Export format dropdown state
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const exportRef = useRef(null);
+
+  // Pagination
+  const [page, setPage] = useState(1);
+
+  // Close menus on outside click / Escape
+  useEffect(() => {
+    if (!openMenuId && !showExportMenu) return;
+    const onDocClick = (e) => {
+      const inRowMenu = menuRef.current && menuRef.current.contains(e.target);
+      const inExportMenu = exportRef.current && exportRef.current.contains(e.target);
+      if (!inRowMenu && !inExportMenu) {
+        setOpenMenuId(null);
+        setShowExportMenu(false);
+      }
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        setOpenMenuId(null);
+        setShowExportMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [openMenuId, showExportMenu]);
 
   // Normalize attendance records for table display
   const combinedAttendance = useMemo(() => {
@@ -206,6 +248,21 @@ export default function AttendanceOverview() {
     });
   }, [combinedAttendance, search, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
 
+  // Reset to first page when filters/data change; clamp if list shrinks
+  useEffect(() => {
+    setPage(1);
+  }, [search, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter, combinedAttendance.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
+
   // Dynamic live STATS
   const statsData = useMemo(() => {
     const total = combinedAttendance.length || 1;
@@ -237,18 +294,142 @@ export default function AttendanceOverview() {
     setRoleFilter("All");
   };
 
-  const handleExport = () => {
-    const header = "Employee ID,Name,Department,Check In,Check Out,Work Hours,Shift,Status";
-    const rows = filtered.map(
-      (r) => `"${r.id}","${r.name}","${r.dept}","${r.checkIn}","${r.checkOut}","${r.workHours}","${r.shift}","${r.status}"`
-    );
-    const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
+  const downloadBlob = (blob, filename) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `attendance-${dateVal}.csv`;
+    a.download = filename;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const escCsv = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const handleExportCsv = () => {
+    const header = ["Employee ID", "Name", "Department", "Check In", "Check Out", "Work Hours", "Shift", "Status"];
+    const lines = [
+      header.map(escCsv).join(","),
+      ...filtered.map((r) =>
+        [r.id, r.name, r.dept, r.checkIn, r.checkOut, r.workHours, r.shift, r.status].map(escCsv).join(",")
+      ),
+    ];
+    const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    downloadBlob(blob, `attendance-${dateVal}.csv`);
+    setToast(`Attendance exported as CSV (${filtered.length} rows).`);
+  };
+
+  const handleExportExcel = () => {
+    const escHtml = (v) =>
+      String(v ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    const cols = ["Employee ID", "Name", "Department", "Check In", "Check Out", "Work Hours", "Shift", "Status"];
+    const bodyRows = filtered
+      .map(
+        (r) =>
+          `<tr>${[r.id, r.name, r.dept, r.checkIn, r.checkOut, r.workHours, r.shift, r.status]
+            .map((c) => `<td>${escHtml(c)}</td>`)
+            .join("")}</tr>`
+      )
+      .join("");
+    const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table border="1"><thead><tr>${cols
+      .map((c) => `<th>${escHtml(c)}</th>`)
+      .join("")}</tr></thead><tbody>${bodyRows}</tbody></table></body></html>`;
+    const blob = new Blob(["\uFEFF" + html], { type: "application/vnd.ms-excel" });
+    downloadBlob(blob, `attendance-${dateVal}.xls`);
+    setToast(`Attendance exported as Excel (${filtered.length} rows).`);
+  };
+
+  const pdfEscape = (v) => String(v ?? "").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+
+  const handleExportPdf = () => {
+    // Minimal pure-JS PDF writer (no dependencies): A4 landscape, Helvetica, auto-paginated.
+    const cols = [
+      { label: "Employee ID", x: 40, w: 80 },
+      { label: "Name", x: 120, w: 120 },
+      { label: "Department", x: 240, w: 90 },
+      { label: "Check In", x: 330, w: 60 },
+      { label: "Check Out", x: 390, w: 65 },
+      { label: "Work Hours", x: 455, w: 70 },
+      { label: "Shift", x: 525, w: 70 },
+      { label: "Status", x: 595, w: 90 },
+    ];
+    const pageW = 842;
+    const pageH = 595;
+    const topY = 545;
+    const rowH = 18;
+    const rowsPerPage = 24;
+    const pages = [];
+    for (let i = 0; i < Math.max(filtered.length, 1); i += rowsPerPage) {
+      pages.push(filtered.slice(i, i + rowsPerPage));
+    }
+    const cellText = (t, x, y, size, bold) =>
+      `BT /${bold ? "F2" : "F1"} ${size} Tf ${x} ${y} Td (${pdfEscape(t).slice(0, 60)}) Tj ET`;
+    const contentStreams = pages.map((pageRows, pi) => {
+      let s = "";
+      s += `${cellText(`Attendance - ${dateVal}  (Page ${pi + 1}/${pages.length})`, 40, 570, 12, true)}\n`;
+      cols.forEach((c) => {
+        s += `${cellText(c.label, c.x, topY, 9, true)}\n`;
+      });
+      s += `0.8 0.8 0.8 RG 1 w 40 ${topY - 6} m 760 ${topY - 6} l S\n`;
+      pageRows.forEach((r, ri) => {
+        const y = topY - 22 - ri * rowH;
+        const vals = [r.id, r.name, r.dept, r.checkIn, r.checkOut, r.workHours, r.shift, r.status];
+        vals.forEach((v, ci) => {
+          s += `${cellText(v, cols[ci].x, y, 8, false)}\n`;
+        });
+      });
+      if (pageRows.length === 0) {
+        s += `${cellText("No attendance records found matching filters.", 40, topY - 24, 9, false)}\n`;
+      }
+      return s;
+    });
+
+    // Build PDF objects: catalog(1) pages(2) font(3,4) + per-page page+content objects
+    const objects = [];
+    objects[1] = `<< /Type /Catalog /Pages 2 0 R >>`;
+    objects[3] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`;
+    objects[4] = `<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>`;
+    let nextId = 5;
+    const pageIds = [];
+    const contentIds = [];
+    contentStreams.forEach(() => {
+      pageIds.push(nextId++);
+      contentIds.push(nextId++);
+    });
+    objects[2] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;
+    contentStreams.forEach((stream, i) => {
+      const len = new TextEncoder().encode(stream).length;
+      objects[contentIds[i]] = `<< /Length ${len} >>\nstream\n${stream}endstream`;
+      objects[pageIds[i]] =
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageW} ${pageH}] ` +
+        `/Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentIds[i]} 0 R >>`;
+    });
+    const maxId = nextId - 1;
+    let pdf = `%PDF-1.4\n`;
+    const offsets = [0];
+    for (let id = 1; id <= maxId; id++) {
+      offsets[id] = new TextEncoder().encode(pdf).length;
+      pdf += `${id} 0 obj\n${objects[id]}\nendobj\n`;
+    }
+    const xrefPos = new TextEncoder().encode(pdf).length;
+    pdf += `xref\n0 ${maxId + 1}\n0000000000 65535 f \n`;
+    for (let id = 1; id <= maxId; id++) {
+      pdf += `${String(offsets[id]).padStart(10, "0")} 00000 n \n`;
+    }
+    pdf += `trailer\n<< /Size ${maxId + 1} /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
+    const blob = new Blob([new TextEncoder().encode(pdf)], { type: "application/pdf" });
+    downloadBlob(blob, `attendance-${dateVal}.pdf`);
+    setToast(`Attendance exported as PDF (${filtered.length} rows).`);
+  };
+
+  const handleExport = (format) => {
+    if (format === "excel") return handleExportExcel();
+    if (format === "pdf") return handleExportPdf();
+    return handleExportCsv();
   };
 
   const handleRegularizeSubmit = () => {
@@ -267,16 +448,43 @@ export default function AttendanceOverview() {
     setRegReason("");
   };
 
-  const handleQuickStatus = (row) => {
+  const handleQuickStatus = (row, nextStatus) => {
+    // Explicit status set from the Actions menu. Falls back to cycling when no target given.
     const cycle = ["Present", "Late", "Half Day", "WFH", "On Leave", "Absent"];
-    const currIdx = cycle.indexOf(row.status);
-    const nextStatus = cycle[(currIdx + 1) % cycle.length];
+    let target = nextStatus;
+    if (!target) {
+      const currIdx = cycle.indexOf(row.status);
+      target = cycle[(currIdx + 1) % cycle.length];
+    }
     updateStoreRecord(row.id, {
-      status: nextStatus,
-      checkIn: nextStatus === "Absent" || nextStatus === "On Leave" ? "—" : row.checkIn === "—" ? "09:00" : row.checkIn,
-      checkOut: nextStatus === "Absent" || nextStatus === "On Leave" ? "—" : row.checkOut === "—" ? "18:00" : row.checkOut,
+      status: target,
+      checkIn: target === "Absent" || target === "On Leave" ? "—" : row.checkIn === "—" ? "09:00" : row.checkIn,
+      checkOut: target === "Absent" || target === "On Leave" ? "—" : row.checkOut === "—" ? "18:00" : row.checkOut,
+      workHours:
+        target === "Absent" || target === "On Leave"
+          ? "—"
+          : row.workHours === "—"
+            ? "08:30"
+            : row.workHours,
     });
-    setToast(`${row.name}'s status updated to ${nextStatus}.`);
+    setToast(`${row.name}'s status updated to ${target}.`);
+    setOpenMenuId(null);
+  };
+
+  const handleRegularizeFor = (row) => {
+    setRegEmp(row.name);
+    setRegDate(dateVal);
+    setOpenMenuId(null);
+    setShowRegModal(true);
+  };
+
+  const handleViewDetails = (row) => {
+    setViewRow(row);
+    setOpenMenuId(null);
+  };
+
+  const handleEmployeeClick = (row) => {
+    navigate(`/hrms/attendance/individual?emp=${encodeURIComponent(row.id)}`);
   };
 
   return (
@@ -298,9 +506,57 @@ export default function AttendanceOverview() {
           <p className="att-sub">Daily tracking, attendance status, regularization, shifts and overtime.</p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <button type="button" onClick={handleExport} className="att-export-btn">
-            <Download size={15} /> Export
-          </button>
+          <div className="att-actions-wrap" ref={showExportMenu ? exportRef : null}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowExportMenu(!showExportMenu);
+              }}
+              className="att-export-btn"
+              aria-haspopup="menu"
+              aria-expanded={showExportMenu}
+            >
+              <Download size={15} /> Export <ChevronDown size={14} />
+            </button>
+            {showExportMenu && (
+              <div className="att-menu att-export-menu" role="menu">
+                <button
+                  type="button"
+                  className="att-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExport("csv");
+                  }}
+                >
+                  <FileText size={14} /> CSV (.csv)
+                </button>
+                <button
+                  type="button"
+                  className="att-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExport("excel");
+                  }}
+                >
+                  <FileSpreadsheet size={14} /> Excel (.xls)
+                </button>
+                <button
+                  type="button"
+                  className="att-menu-item"
+                  role="menuitem"
+                  onClick={() => {
+                    setShowExportMenu(false);
+                    handleExport("pdf");
+                  }}
+                >
+                  <FileDown size={14} /> PDF (.pdf)
+                </button>
+              </div>
+            )}
+          </div>
           <button type="button" onClick={() => setShowRegModal(true)} className="att-reg-btn">
             Regularize Attendance
           </button>
@@ -447,9 +703,6 @@ export default function AttendanceOverview() {
           <button type="button" onClick={handleClearFilters} className="att-btn-outline">
             Clear Filters
           </button>
-          <button type="button" onClick={handleExport} className="att-btn-outline">
-            Export
-          </button>
         </div>
       </div>
 
@@ -471,12 +724,26 @@ export default function AttendanceOverview() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((row) => (
+              {paginated.map((row) => (
                 <tr key={row.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <img src={row.img} alt={row.name} className="att-avatar" loading="lazy" />
-                      <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>{row.name}</span>
+                      <img
+                        src={row.img}
+                        alt={row.name}
+                        className="att-avatar att-avatar-clickable"
+                        loading="lazy"
+                        onClick={() => handleEmployeeClick(row)}
+                        title={`View ${row.name}'s attendance`}
+                      />
+                      <button
+                        type="button"
+                        className="att-emp-link"
+                        onClick={() => handleEmployeeClick(row)}
+                        title={`View ${row.name}'s attendance`}
+                      >
+                        {row.name}
+                      </button>
                     </div>
                   </td>
                   <td className="att-id">{row.id}</td>
@@ -493,14 +760,47 @@ export default function AttendanceOverview() {
                     </span>
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="att-dots-btn"
-                      onClick={() => handleQuickStatus(row)}
-                      title="Toggle / update attendance status"
+                    <div
+                      className="att-actions-wrap"
+                      ref={openMenuId === row.id ? menuRef : null}
                     >
-                      <MoreHorizontal size={17} />
-                    </button>
+                      <button
+                        type="button"
+                        className="att-dots-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === row.id ? null : row.id);
+                        }}
+                        title="Row actions"
+                        aria-haspopup="menu"
+                        aria-expanded={openMenuId === row.id}
+                      >
+                        <MoreHorizontal size={17} />
+                      </button>
+                      {openMenuId === row.id && (
+                        <div className="att-menu" role="menu">
+                          <button type="button" className="att-menu-item" onClick={() => handleViewDetails(row)} role="menuitem">
+                            <Eye size={14} /> View Details
+                          </button>
+                          <button type="button" className="att-menu-item" onClick={() => handleRegularizeFor(row)} role="menuitem">
+                            <Pencil size={14} /> Regularize
+                          </button>
+                          <div className="att-menu-sep" />
+                          <button type="button" className="att-menu-item" onClick={() => handleQuickStatus(row, "Present")} role="menuitem">
+                            <UserCheck size={14} /> Mark Present
+                          </button>
+                          <button type="button" className="att-menu-item" onClick={() => handleQuickStatus(row, "Late")} role="menuitem">
+                            <Clock size={14} /> Mark Late
+                          </button>
+                          <button type="button" className="att-menu-item" onClick={() => handleQuickStatus(row, "WFH")} role="menuitem">
+                            <Check size={14} /> Mark WFH
+                          </button>
+                          <button type="button" className="att-menu-item att-menu-danger" onClick={() => handleQuickStatus(row, "Absent")} role="menuitem">
+                            <UserX size={14} /> Mark Absent
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -513,6 +813,9 @@ export default function AttendanceOverview() {
               )}
             </tbody>
           </table>
+        </div>
+        <div className="att-pagination-footer">
+          <Pagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onChange={setPage} />
         </div>
       </div>
 
@@ -589,6 +892,56 @@ export default function AttendanceOverview() {
         </div>
       </Modal>
 
+      {/* View Details Modal */}
+      <Modal
+        isOpen={Boolean(viewRow)}
+        onClose={() => setViewRow(null)}
+        title={viewRow ? `Attendance — ${viewRow.name}` : "Attendance Details"}
+        footer={
+          <>
+            <button type="button" className="btn-outline" onClick={() => setViewRow(null)}>
+              Close
+            </button>
+            {viewRow && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  const row = viewRow;
+                  setViewRow(null);
+                  handleRegularizeFor(row);
+                }}
+              >
+                Regularize
+              </button>
+            )}
+          </>
+        }
+      >
+        {viewRow && (
+          <div style={{ display: "grid", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <img src={viewRow.img} alt={viewRow.name} style={{ width: 44, height: 44, borderRadius: 999, objectFit: "cover" }} />
+              <div>
+                <div style={{ fontWeight: 700, color: "#111827" }}>{viewRow.name}</div>
+                <div style={{ fontSize: 12.5, color: "#6b7280" }}>{viewRow.id} • {viewRow.dept}</div>
+              </div>
+              <span className="att-status" style={{ marginLeft: "auto", ...statusStyles[viewRow.status] }}>
+                {viewRow.status}
+              </span>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, fontSize: 13, color: "#334155" }}>
+              <div><strong>Check In:</strong> {viewRow.checkIn}</div>
+              <div><strong>Check Out:</strong> {viewRow.checkOut}</div>
+              <div><strong>Work Hours:</strong> {viewRow.workHours}</div>
+              <div><strong>Shift:</strong> {viewRow.shift}</div>
+              <div><strong>Date:</strong> {dateVal}</div>
+              <div><strong>Location:</strong> {viewRow.location || "—"}</div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       <style>{`
         .att-mgmt-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
         .att-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
@@ -643,12 +996,24 @@ export default function AttendanceOverview() {
         .att-table td { padding: 14px 20px; vertical-align: middle; }
 
         .att-avatar { width: 32px; height: 32px; border-radius: 999px; object-fit: cover; }
+        .att-avatar-clickable { cursor: pointer; }
+        .att-avatar-clickable:hover { opacity: 0.85; }
+        .att-emp-link { border: none; background: transparent; padding: 0; font-weight: 600; color: #111827; white-space: nowrap; font-size: 13.5px; cursor: pointer; }
+        .att-emp-link:hover { color: #1d4ed8; text-decoration: underline; }
         .att-id { font-family: inherit; font-size: 12.5px; color: #6b7280; white-space: nowrap; }
         .att-time { font-family: inherit; font-size: 13px; font-weight: 500; color: #334155; white-space: nowrap; }
         .att-shift-pill { display: inline-block; font-size: 12px; font-weight: 500; color: #374151; background: #f3f4f6; border-radius: 999px; padding: 3px 12px; white-space: nowrap; }
         .att-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 13px; border: 1px solid; white-space: nowrap; }
-        .att-dots-btn { border: none; background: transparent; color: #6b7280; cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center; }
-        .att-dots-btn:hover { color: #111827; background: #f1f5f9; }
+        .att-dots-btn { border: 1px solid transparent; background: #f8fafc; color: #6b7280; cursor: pointer; padding: 5px 7px; border-radius: 8px; display: grid; place-items: center; }
+        .att-dots-btn:hover { color: #111827; background: #eef2f7; border-color: #e2e8f0; }
+        .att-actions-wrap { position: relative; display: inline-block; }
+        .att-menu { position: absolute; right: 0; top: calc(100% + 6px); min-width: 180px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; box-shadow: 0 12px 28px rgba(15,23,42,0.12); padding: 6px; z-index: 50; }
+        .att-menu-item { display: flex; align-items: center; gap: 8px; width: 100%; border: none; background: transparent; text-align: left; font-size: 13px; font-weight: 500; color: #334155; padding: 8px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap; }
+        .att-menu-item:hover { background: #f1f5f9; color: #0f172a; }
+        .att-menu-danger { color: #dc2626; }
+        .att-menu-danger:hover { background: #fef2f2; color: #b91c1c; }
+        .att-menu-sep { height: 1px; background: #f1f5f9; margin: 5px 4px; }
+        .att-pagination-footer { border-top: 1px solid #f1f5f9; padding: 6px 20px 6px 8px; background: #fff; }
 
         @media (max-width: 1200px) {
           .att-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

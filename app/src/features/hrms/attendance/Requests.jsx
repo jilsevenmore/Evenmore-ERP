@@ -1,8 +1,9 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
+import Pagination from "../../../components/ui/Pagination";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
@@ -198,6 +199,20 @@ export default function Requests() {
       return true;
     });
   }, [requestsList, tab, search, deptFilter, typeFilter, statusFilter]);
+
+  const REQ_PAGE_SIZE = 8;
+  const [reqPage, setReqPage] = useState(1);
+  useEffect(() => {
+    setReqPage(1);
+  }, [tab, search, deptFilter, typeFilter, statusFilter, requestsList.length]);
+  const reqTotalPages = Math.max(1, Math.ceil(filtered.length / REQ_PAGE_SIZE));
+  useEffect(() => {
+    if (reqPage > reqTotalPages) setReqPage(reqTotalPages);
+  }, [reqPage, reqTotalPages]);
+  const paginatedRequests = useMemo(() => {
+    const start = (reqPage - 1) * REQ_PAGE_SIZE;
+    return filtered.slice(start, start + REQ_PAGE_SIZE);
+  }, [filtered, reqPage]);
 
   const countForTab = (t) => {
     if (t === "All") return requestsList.length;
@@ -441,7 +456,7 @@ export default function Requests() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {paginatedRequests.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <button
@@ -520,6 +535,9 @@ export default function Requests() {
               )}
             </tbody>
           </table>
+        </div>
+        <div style={{ borderTop: "1px solid #f1f5f9", padding: "6px 20px 6px 8px", background: "#fff" }}>
+          <Pagination total={filtered.length} page={reqPage} pageSize={REQ_PAGE_SIZE} onChange={setReqPage} />
         </div>
       </div>
 

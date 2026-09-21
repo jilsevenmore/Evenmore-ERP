@@ -4,6 +4,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { attendanceEmployees, getShiftTiming, minutesOfTime } from "../../../data/hrms/mocks/attendanceExtended";
 import Modal from "../../../components/ui/Modal";
+import Pagination from "../../../components/ui/Pagination";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -132,6 +133,20 @@ export default function Today() {
       .filter((r) => r.employeeId === selectedEmpId)
       .sort((a, b) => `${b.date} ${b.punchIn || ""}`.localeCompare(`${a.date} ${a.punchIn || ""}`));
   }, [punchRecords, selectedEmpId]);
+
+  const TDY_PAGE_SIZE = 8;
+  const [tdyPage, setTdyPage] = useState(1);
+  useEffect(() => {
+    setTdyPage(1);
+  }, [selectedEmpId, punchRecords.length]);
+  const tdyTotalPages = Math.max(1, Math.ceil(history.length / TDY_PAGE_SIZE));
+  useEffect(() => {
+    if (tdyPage > tdyTotalPages) setTdyPage(tdyTotalPages);
+  }, [tdyPage, tdyTotalPages]);
+  const paginatedHistory = useMemo(() => {
+    const start = (tdyPage - 1) * TDY_PAGE_SIZE;
+    return history.slice(start, start + TDY_PAGE_SIZE);
+  }, [history, tdyPage]);
 
   const handlePunchIn = () => {
     if (!currentEmp) return;
@@ -367,7 +382,7 @@ export default function Today() {
               </tr>
             </thead>
             <tbody>
-              {history.map((r) => (
+              {paginatedHistory.map((r) => (
                 <tr key={r.id}>
                   <td className="tdy-date">{formatDate(r.date)}</td>
                   <td className="tdy-time">{formatClock(r.punchIn)}</td>
@@ -394,6 +409,9 @@ export default function Today() {
               )}
             </tbody>
           </table>
+        </div>
+        <div style={{ borderTop: "1px solid #f1f5f9", padding: "6px 20px 6px 8px", background: "#fff" }}>
+          <Pagination total={history.length} page={tdyPage} pageSize={TDY_PAGE_SIZE} onChange={setTdyPage} />
         </div>
       </div>
 

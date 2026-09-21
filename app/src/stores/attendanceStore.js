@@ -44,19 +44,19 @@ export const useAttendanceStore = create((set, get) => ({
   saveDailyAttendance: (date, updatedRecords) => set((s) => {
     const otherRecords = s.records.filter((r) => r.date !== date);
     const combined = [...updatedRecords, ...otherRecords];
-    saveState(s, s.punchRecords);
+    saveState({ ...s, records: combined }, s.punchRecords);
     return { records: combined };
   }),
 
   updateRecord: (id, patch) => set((s) => {
     const recs = s.records.map((r) => r.id === id ? { ...r, ...patch } : r);
-    saveState(s, s.punchRecords);
+    saveState({ ...s, records: recs }, s.punchRecords);
     return { records: recs };
   }),
 
   bulkUpdate: (ids, status) => set((s) => {
     const recs = s.records.map((r) => ids.includes(r.id) ? { ...r, status } : r);
-    saveState(s, s.punchRecords);
+    saveState({ ...s, records: recs }, s.punchRecords);
     return { records: recs };
   }),
 
@@ -68,7 +68,7 @@ export const useAttendanceStore = create((set, get) => ({
       ...r,
     };
     const reqs = [newReq, ...s.requests];
-    saveState(s, s.punchRecords);
+    saveState({ ...s, requests: reqs }, s.punchRecords);
     return { requests: reqs };
   }),
 
@@ -97,17 +97,17 @@ export const useAttendanceStore = create((set, get) => ({
       });
     }
 
-    saveState(s, s.punchRecords);
+    saveState({ ...s, requests: reqs, records: updatedRecords }, s.punchRecords);
     return { requests: reqs, records: updatedRecords };
   }),
 
   saveFlexibility: (p) => set((s) => {
-    saveState(s, s.punchRecords);
+    saveState({ ...s, flexibility: p }, s.punchRecords);
     return { flexibility: p };
   }),
 
   setRole: (role) => set((s) => {
-    saveState(s, s.punchRecords);
+    saveState({ ...s, role }, s.punchRecords);
     return { role };
   }),
 

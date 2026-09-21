@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
-import { Search, ShoppingCart, Truck, Receipt, Package, Users, Building2, FileSpreadsheet, ArrowRight, FileText, BarChart3, X, Layers, Sparkles, } from 'lucide-react';
+import { Search, ShoppingCart, Truck, Receipt, Package, Users, Building2, FileSpreadsheet, ArrowRight, FileText, BarChart3, X, Layers, Sparkles, CalendarCheck, } from 'lucide-react';
 export const CommandPalette = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
     const { items, customers, vendors, salesOrders, purchaseOrders, invoices, deliveryChallans, proformaInvoices = [] } = useERP();
@@ -50,6 +50,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         { label: 'Purchase Bills & AP', path: '/purchase/bills', icon: FileSpreadsheet, category: 'Navigation' },
         { label: 'Parties Directory', path: '/parties', icon: Building2, category: 'Navigation' },
         { label: 'HRMS Employees', path: '/hrms/employees', icon: Users, category: 'Navigation' },
+        { label: 'Attendance', path: '/hrms/attendance', icon: CalendarCheck, category: 'Navigation' },
         { label: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: 'Navigation' },
     ].filter((n) => !cleanQuery || n.label.toLowerCase().includes(cleanQuery));
     const matchedItems = items
