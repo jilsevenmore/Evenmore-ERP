@@ -215,6 +215,20 @@ const NAV = [
     children: [
       { label: 'Dashboard', icon: Home, to: '/hrms/dashboard' },
       { label: 'Employees', icon: Users, to: '/hrms/employees' },
+      {
+        label: 'Attendance',
+        icon: CalendarCheck,
+        defaultOpen: false,
+        children: [
+          { label: 'Overview', to: '/hrms/attendance', dot: true },
+          { label: 'Mark Attendance', to: '/hrms/attendance/mark' },
+          { label: 'Individual', to: '/hrms/attendance/individual' },
+          { label: 'Bulk', to: '/hrms/attendance/bulk' },
+          { label: 'Requests', to: '/hrms/attendance/requests' },
+          { label: 'Flexibility', to: '/hrms/attendance/flexibility' },
+          { label: "Today's Attendance", to: '/hrms/attendance/today' },
+        ],
+      },
       { label: 'Leave', icon: CalendarCheck, to: '/hrms/leave' },
       { label: 'Payroll', icon: Receipt, to: '/hrms/payroll' },
       {
@@ -266,20 +280,6 @@ const NAV = [
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
       { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
       // { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' }, // Hidden: HRMS Setup commented out
-    ],
-  },
-
-  {
-    label: 'Attendance',
-    icon: CalendarCheck,
-    children: [
-      { label: 'Overview', icon: CalendarCheck, to: '/hrms/attendance' },
-      { label: 'Mark Attendance', icon: Check, to: '/hrms/attendance/mark' },
-      { label: 'Individual', icon: User, to: '/hrms/attendance/individual' },
-      { label: 'Bulk', icon: Users, to: '/hrms/attendance/bulk' },
-      { label: 'Requests', icon: FileText, to: '/hrms/attendance/requests' },
-      { label: 'Flexibility', icon: Sliders, to: '/hrms/attendance/flexibility' },
-      { label: "Today's Attendance", icon: Clock, to: '/hrms/attendance/today' },
     ],
   },
 
