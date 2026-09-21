@@ -1101,6 +1101,147 @@ export function validateStageConfig(draft = {}, existing = [], editingId = null)
   return errors;
 }
 
+// ─── Department catalogue ────────────────────────────────────
+//
+// A department is referenced by *name* from three places — a project's
+// `currentDepartment`, each runtime stage, and each stage template — so renaming
+// or removing one has to carry every reference with it. These helpers are what
+// the catalogue actions below are built from.
+
+/** Used when a department is created without a colour. */
+export const DEPARTMENT_FALLBACK_COLOR = "#64748b";
+
+/**
+ * `#abc` / `abc123` / `#ABC123` → `#abc123`, or null when it is not a colour.
+ * Returning null rather than a default lets the caller decide whether an
+ * unreadable value is a validation error or simply absent.
+ */
+export function normaliseHex(value) {
+  const raw = String(value ?? "").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(raw)) {
+    return `#${raw.split("").map((c) => c + c).join("").toLowerCase()}`;
+  }
+  if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw.toLowerCase()}`;
+  return null;
+}
+
+/**
+ * Check a department draft. Returns `{}` when it is fine, otherwise a map of
+ * field → message, in the shape the modals render.
+ *
+ * `editingId` excludes the row being edited from the duplicate-name check, so
+ * renaming a department to its own name is not an error.
+ */
+export function validateDepartment(draft = {}, existing = [], editingId = null) {
+  const errors = {};
+  const name = (draft.name ?? "").trim();
+
+  if (!name) {
+    errors.name = "Department name is required.";
+  } else if (
+    existing.some(
+      (d) => d.id !== editingId && (d.name ?? "").trim().toLowerCase() === name.toLowerCase()
+    )
+  ) {
+    errors.name = "Another department already uses this name.";
+  }
+
+  if (draft.color !== undefined && draft.color !== "" && !normaliseHex(draft.color)) {
+    errors.color = "Use a hex colour such as #1f6bff.";
+  }
+
+  return errors;
+}
+
+/**
+ * What a department is currently driving. The delete confirmation shows these
+ * counts, and `inUse` is what decides whether the work has to be reassigned
+ * before the department can go.
+ */
+export function computeDepartmentUsage(projects = [], stageConfigs = [], name) {
+  const target = String(name ?? "").trim().toLowerCase();
+  const matches = (value) => String(value ?? "").trim().toLowerCase() === target;
+
+  let projectCount = 0;
+  let stageCount = 0;
+
+  projects.forEach((project) => {
+    let touched = matches(project.currentDepartment);
+    (project.stages ?? []).forEach((stage) => {
+      if (matches(stage.department)) {
+        stageCount += 1;
+        touched = true;
+      }
+    });
+    if (touched) projectCount += 1;
+  });
+
+  const templateCount = stageConfigs.filter((c) => matches(c.department)).length;
+
+  return {
+    name,
+    projects: projectCount,
+    stages: stageCount,
+    templates: templateCount,
+    inUse: projectCount > 0 || stageCount > 0 || templateCount > 0,
+  };
+}
+
+/**
+ * Rewrite every reference to `fromName` as `toName`, across projects, their
+ * stages, the stage templates and the capacity map.
+ *
+ * Returns `null` when nothing referenced the old name, so a caller can tell a
+ * rename that moved work from one that did not.
+ */
+export function renameDepartmentIn(state, fromName, toName) {
+  const from = String(fromName ?? "").trim().toLowerCase();
+  const to = String(toName ?? "").trim();
+  if (!from || !to) return null;
+
+  const matches = (value) => String(value ?? "").trim().toLowerCase() === from;
+  let changed = false;
+
+  const projects = (state.projects ?? []).map((project) => {
+    const stages = (project.stages ?? []).map((stage) => (
+      matches(stage.department) ? { ...stage, department: to } : stage
+    ));
+    const stagesChanged = stages.some((stage, i) => stage !== (project.stages ?? [])[i]);
+    const headerChanged = matches(project.currentDepartment);
+    if (!stagesChanged && !headerChanged) return project;
+    changed = true;
+    return {
+      ...project,
+      currentDepartment: headerChanged ? to : project.currentDepartment,
+      stages,
+    };
+  });
+
+  const stageConfigs = (state.stageConfigs ?? []).map((config) => {
+    if (!matches(config.department)) return config;
+    changed = true;
+    return { ...config, department: to };
+  });
+
+  const capacity = { ...(state.settings?.departmentCapacity ?? {}) };
+  const oldKey = Object.keys(capacity).find((key) => matches(key));
+  if (oldKey !== undefined) {
+    const value = capacity[oldKey];
+    delete capacity[oldKey];
+    // A rename onto an existing department keeps that department's own capacity.
+    if (capacity[to] === undefined) capacity[to] = value;
+    changed = true;
+  }
+
+  if (!changed) return null;
+
+  return {
+    projects,
+    stageConfigs,
+    settings: { ...state.settings, departmentCapacity: capacity },
+  };
+}
+
 // ─── Stage 5 Directory Derivations ───────────────────────────
 
 /** Next sequential project code for a year, e.g. "PRJ-2026-006". */

@@ -5,7 +5,6 @@ import Topbar from './Topbar';
 import { CommandPalette } from '../common/CommandPalette';
 import { FloatingSupportModal } from '../common/FloatingSupportModal';
 import { useAppStore } from '../../stores/appStore';
-import { useProofApprovalSync } from '../../features/pms/approval/useProofApprovalSync';
 import { useModuleHydration } from '../../hooks/useModuleHydration';
 
 // ERP-only UI scope: graph.json global-shell guidance applied purely as a
@@ -24,9 +23,6 @@ export default function MainLayout() {
 
   // Fill the module stores from the API for this session.
   useModuleHydration();
-
-  // Pick up design approvals taken in a client's approval-link tab.
-  useProofApprovalSync();
 
   // Global keydown for Ctrl+K / Cmd+K
   useEffect(() => {

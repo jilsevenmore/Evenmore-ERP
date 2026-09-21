@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, Save } from 'lucide-react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
@@ -52,6 +52,13 @@ function ToggleRow({ id, label, hint, checked, onChange }) {
 
 export function AddEditStageModal({ isOpen, onClose, stage = null }) {
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
+  // Selected as the stored array, then mapped — a selector that builds a new
+  // array on every call never lets React see the state settle.
+  const departments = usePmsStore((st) => st.departments);
+  const departmentNames = useMemo(
+    () => departments.map((d) => d.name),
+    [departments],
+  );
   const addStageConfig = usePmsStore((s) => s.addStageConfig);
   const updateStageConfig = usePmsStore((s) => s.updateStageConfig);
   const showToast = usePmsStore((s) => s.showToast);
@@ -159,7 +166,7 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
               value={draft.department}
               onChange={(e) => set({ department: e.target.value })}
             >
-              {PMS_DEPARTMENTS.map((d) => (
+              {departmentNames.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}
             </select>

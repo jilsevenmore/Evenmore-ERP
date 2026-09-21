@@ -32,6 +32,13 @@ function toLocalInput(iso) {
 export function AssignStageModal({ isOpen, onClose, project, initialStageId = null }) {
   const employees = usePmsStore((s) => s.employees);
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
+  // Selected as the stored array, then mapped — a selector that builds a new
+  // array on every call never lets React see the state settle.
+  const departments = usePmsStore((st) => st.departments);
+  const departmentNames = useMemo(
+    () => departments.map((d) => d.name),
+    [departments],
+  );
   const assignStage = usePmsStore((s) => s.assignStage);
   const showToast = usePmsStore((s) => s.showToast);
 
@@ -206,7 +213,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
               value={department}
               onChange={(e) => { setDepartment(e.target.value); setUserId(''); }}
             >
-              {PMS_DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+              {departmentNames.map((d) => <option key={d} value={d}>{d}</option>)}
             </select>
           </div>
 
