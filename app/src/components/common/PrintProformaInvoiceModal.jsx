@@ -16,7 +16,8 @@ export const PrintProformaInvoiceModal = ({
   const companyAddress = companyProfile?.address || 'Corporate Towers, Sector 62, Electronic City • Bengaluru, Karnataka 560100';
   const phone = companyProfile?.phone || '+91 80 4920 1100';
   const companyStateCode = (gstin || '').slice(0, 2).toUpperCase();
-  const posRaw = String(proforma.placeOfSupplyState || proforma.placeOfSupply || proforma.billingAddress?.state || '');
+  // Same as PrintInvoiceModal: evaluated while `proforma` is still null.
+  const posRaw = String(proforma?.placeOfSupplyState || proforma?.placeOfSupply || proforma?.billingAddress?.state || '');
   const posMatch = posRaw.match(/(\d{2})/);
   const posStateCode = posMatch ? posMatch[1] : posRaw.slice(0, 2).toUpperCase();
   const hasStates = Boolean(companyStateCode && posStateCode);

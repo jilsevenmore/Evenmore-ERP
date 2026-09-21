@@ -104,9 +104,9 @@ export function LegacyCompanyPolicyPage() {
 
   const filtered = policies.filter((p) => {
     const matchesSearch =
-      p.title.toLowerCase().includes(search.toLowerCase()) ||
-      p.id.toLowerCase().includes(search.toLowerCase()) ||
-      p.author.toLowerCase().includes(search.toLowerCase());
+      String(p.title ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(p.id ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(p.author ?? '').toLowerCase().includes(search.toLowerCase());
     const matchesCat = categoryFilter === "All" || p.category === categoryFilter;
     return matchesSearch && matchesCat;
   });

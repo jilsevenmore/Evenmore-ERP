@@ -77,7 +77,7 @@ export function UploadProofModal({ isOpen, onClose, project, stage, onUploaded }
       isOpen={isOpen}
       onClose={onClose}
       title={`Upload Version ${nextVersion}.0`}
-      subtitle={`${stage.name} — ${project.id}`}
+      subtitle={`${stage.name} — ${project.code || project.id}`}
       footer={
         <>
           <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>

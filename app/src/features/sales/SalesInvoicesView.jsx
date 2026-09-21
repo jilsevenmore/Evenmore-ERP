@@ -391,10 +391,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const effectiveFilter = (filterText || globalSearch).toLowerCase().trim();
     const filteredInvoices = invoices.filter((inv) => {
         const matchesSearch = !effectiveFilter || (
-            inv.invoiceNumber.toLowerCase().includes(effectiveFilter) ||
-            inv.customer.toLowerCase().includes(effectiveFilter) ||
-            (inv.linkedSo && inv.linkedSo.toLowerCase().includes(effectiveFilter)) ||
-            (inv.status && inv.status.toLowerCase().includes(effectiveFilter))
+            String(inv.invoiceNumber ?? '').toLowerCase().includes(effectiveFilter) ||
+            String(inv.customer ?? '').toLowerCase().includes(effectiveFilter) ||
+            (inv.linkedSo && String(inv.linkedSo ?? '').toLowerCase().includes(effectiveFilter)) ||
+            (inv.status && String(inv.status ?? '').toLowerCase().includes(effectiveFilter))
         );
 
         if (!matchesSearch) return false;

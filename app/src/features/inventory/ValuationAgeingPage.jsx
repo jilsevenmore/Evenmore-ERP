@@ -172,8 +172,8 @@ export const ValuationAgeingPage = () => {
           </button>))}
       </div>
 
-      <DataTable title="Inventory Aging Valuation Ledger" columns={columns} data={filteredData} keyExtractor={(r) => r.id} searchPlaceholder="Filter SKU, description, or bucket..." searchFilter={(r, term) => r.sku.toLowerCase().includes(term) ||
-            r.name.toLowerCase().includes(term) ||
-            r.agingBucket.toLowerCase().includes(term)}/>
+      <DataTable title="Inventory Aging Valuation Ledger" columns={columns} data={filteredData} keyExtractor={(r) => r.id} searchPlaceholder="Filter SKU, description, or bucket..." searchFilter={(r, term) => String(r.sku ?? '').toLowerCase().includes(term) ||
+            String(r.name ?? '').toLowerCase().includes(term) ||
+            String(r.agingBucket ?? '').toLowerCase().includes(term)}/>
     </div>);
 };

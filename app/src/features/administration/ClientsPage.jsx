@@ -3,6 +3,7 @@ import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { adminSync, describeError } from '../../services/adminSync';
 import {
   Users,
   UserCheck,
@@ -48,7 +49,6 @@ import {
   Layers,
 } from 'lucide-react';
 
-const STORAGE_KEY = 'evenmore_admin_clients_v2';
 const CLIENTS_PER_PAGE = 12;
 
 const AVATAR_PRESETS = [
@@ -66,282 +66,10 @@ const AVATAR_PRESETS = [
   'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
 ];
 
-const INITIAL_CLIENTS = [
-  {
-    id: 'clt-1',
-    name: 'Jayesh Patil',
-    email: 'jayesh@gmail.com',
-    phone: '+91 98765 43210',
-    location: 'Surat, India',
-    company: 'Patil Enterprise Pvt Ltd',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    tags: ['VIP', 'Regular'],
-    deals: 3,
-    projects: 1,
-    lastActivity: '15 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '98%',
-    category: 'VIP',
-    notes: ['Met regarding annual machine servicing contract.', 'Preferred contact time is morning 10 AM.'],
-    activeDeals: [
-      { id: 'd-101', name: 'Annual Fiber Laser Upgrade', value: '₹ 14,50,000', stage: 'Negotiation' },
-      { id: 'd-102', name: 'Spare Parts Procurement', value: '₹ 3,20,000', stage: 'Proposal Sent' },
-      { id: 'd-103', name: 'AMC Maintenance Contract', value: '₹ 2,00,000', stage: 'Closed Won' },
-    ],
-    activeProjects: [
-      { id: 'p-201', name: 'Surat Plant Machine Installation', status: 'In Progress', progress: 75 },
-    ],
-  },
-  {
-    id: 'clt-2',
-    name: 'Rohit Kumar',
-    email: 'rohit@example.com',
-    phone: '+91 81234 56789',
-    location: 'Mumbai, India',
-    company: 'Rohit Tooling Solutions',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    tags: ['New', 'Follow-up'],
-    deals: 1,
-    projects: 0,
-    lastActivity: '14 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '92%',
-    category: 'New',
-    notes: ['Inquired for CNC Router 1325 model.'],
-    activeDeals: [
-      { id: 'd-104', name: 'CNC Router Machinery Purchase', value: '₹ 8,90,000', stage: 'Demo Scheduled' },
-    ],
-    activeProjects: [],
-  },
-  {
-    id: 'clt-3',
-    name: 'Sarah Johnson',
-    email: 'sarah@example.com',
-    phone: '+1 512-555-0187',
-    location: 'Texas, USA',
-    company: 'Apex Precision USA Inc',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    tags: ['International', 'High Potential'],
-    deals: 5,
-    projects: 2,
-    lastActivity: '14 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '99%',
-    category: 'VIP',
-    notes: ['Export order requirements shared with shipping team.'],
-    activeDeals: [
-      { id: 'd-105', name: 'High-Power Laser Cutting Rig', value: '$ 45,000', stage: 'Contract Signed' },
-      { id: 'd-106', name: 'Optics & Lens Spares Pack', value: '$ 6,400', stage: 'Delivered' },
-    ],
-    activeProjects: [
-      { id: 'p-202', name: 'USA Custom CNC Rig Assembly', status: 'In Progress', progress: 85 },
-      { id: 'p-203', name: 'Firmware Calibration & Testing', status: 'Completed', progress: 100 },
-    ],
-  },
-  {
-    id: 'clt-4',
-    name: 'Dr. Deepan',
-    email: 'deepan@example.com',
-    phone: '+91 90909 87878',
-    location: 'Chennai, India',
-    company: 'Apollo Care Labs',
-    avatar: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=150&auto=format&fit=crop&q=80',
-    tags: ['Doctor', 'Repeat Client'],
-    deals: 2,
-    projects: 1,
-    lastActivity: '13 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '96%',
-    category: 'Doctors',
-    notes: ['Medical optics equipment calibration requested.'],
-    activeDeals: [
-      { id: 'd-107', name: 'Endoscopy Precision Kit', value: '₹ 18,50,000', stage: 'Invoicing' },
-      { id: 'd-108', name: 'Sterilization Chamber Setup', value: '₹ 4,20,000', stage: 'Delivered' },
-    ],
-    activeProjects: [
-      { id: 'p-204', name: 'Chennai Hospital Lab Integration', status: 'In Progress', progress: 60 },
-    ],
-  },
-  {
-    id: 'clt-5',
-    name: 'Utsav Sir',
-    email: 'utsav@example.com',
-    phone: '+91 98765 22233',
-    location: 'Ahmedabad, India',
-    company: 'Utsav Automation Works',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    tags: ['Regular', 'Local'],
-    deals: 0,
-    projects: 0,
-    lastActivity: '12 Sep 2025',
-    loginEnabled: false,
-    status: 'Active',
-    satisfaction: '90%',
-    category: 'Regular',
-    notes: ['Discussing upcoming automation workshop needs.'],
-    activeDeals: [],
-    activeProjects: [],
-  },
-  {
-    id: 'clt-6',
-    name: 'Vruti Lakhani',
-    email: 'vruti@example.com',
-    phone: '+91 99123 44556',
-    location: 'Surat, India',
-    company: 'Lakhani Diamond Jewels',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    tags: ['Jewelry Designer', 'Active'],
-    deals: 1,
-    projects: 3,
-    lastActivity: '12 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '100%',
-    category: 'VIP',
-    notes: ['Micro diamond laser cutting machine operational.'],
-    activeDeals: [
-      { id: 'd-109', name: 'Jewelry Laser Marker 50W', value: '₹ 6,50,000', stage: 'Closed Won' },
-    ],
-    activeProjects: [
-      { id: 'p-205', name: 'Surat Studio CAD Machine Setup', status: 'Completed', progress: 100 },
-      { id: 'p-206', name: 'Operator Training Program', status: 'In Progress', progress: 90 },
-      { id: 'p-207', name: 'Dust Extraction System', status: 'In Progress', progress: 40 },
-    ],
-  },
-  {
-    id: 'clt-7',
-    name: 'Ankur Jain (Freelancer)',
-    email: 'ankur@example.com',
-    phone: '+91 97123 99887',
-    location: 'Jaipur, India',
-    company: 'Jain Engineering Freelance',
-    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    tags: ['Freelancer', 'Potential'],
-    deals: 0,
-    projects: 0,
-    lastActivity: '11 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '88%',
-    category: 'Leads',
-    notes: ['Interested in referral partner program.'],
-    activeDeals: [],
-    activeProjects: [],
-  },
-  {
-    id: 'clt-8',
-    name: 'Dr. Nikhil Patil',
-    email: 'nikhil@example.com',
-    phone: '+91 98234 77665',
-    location: 'Pune, India',
-    company: 'Patil Multispecialty Hospital',
-    avatar: 'https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=150&auto=format&fit=crop&q=80',
-    tags: ['Doctor', 'Active'],
-    deals: 2,
-    projects: 0,
-    lastActivity: '11 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '95%',
-    category: 'Doctors',
-    notes: ['Reviewing endoscopy surgical tools catalog.'],
-    activeDeals: [
-      { id: 'd-110', name: 'Laparoscopic Tower Integration', value: '₹ 22,00,000', stage: 'Negotiation' },
-      { id: 'd-111', name: 'Display Monitors (Medical Grade)', value: '₹ 5,80,000', stage: 'Closed Won' },
-    ],
-    activeProjects: [],
-  },
-  {
-    id: 'clt-9',
-    name: 'Hey World',
-    email: 'hey@example.com',
-    phone: '+91 91234 55667',
-    location: 'Bangalore, India',
-    company: 'Hey World Technologies',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-    tags: ['Lead', 'New'],
-    deals: 0,
-    projects: 0,
-    lastActivity: '10 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '90%',
-    category: 'Leads',
-    notes: ['Lead submitted through web inquiry form.'],
-    activeDeals: [],
-    activeProjects: [],
-  },
-  {
-    id: 'clt-10',
-    name: 'Test Client 1',
-    email: 'test1@example.com',
-    phone: '+91 99887 66554',
-    location: 'Delhi, India',
-    company: 'Alpha Quality Testing Hub',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-    tags: ['Testing', 'Inactive'],
-    deals: 0,
-    projects: 0,
-    lastActivity: '09 Sep 2025',
-    loginEnabled: false,
-    status: 'Inactive',
-    satisfaction: '80%',
-    category: 'Testing',
-    notes: ['Staging account for system validation.'],
-    activeDeals: [],
-    activeProjects: [],
-  },
-  {
-    id: 'clt-11',
-    name: 'Test Client 2',
-    email: 'test2@example.com',
-    phone: '+91 99887 66555',
-    location: 'Delhi, India',
-    company: 'Beta Test Lab Services',
-    avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
-    tags: ['Testing', 'Inactive'],
-    deals: 0,
-    projects: 0,
-    lastActivity: '08 Sep 2025',
-    loginEnabled: false,
-    status: 'Inactive',
-    satisfaction: '82%',
-    category: 'Testing',
-    notes: ['Integration sandbox client.'],
-    activeDeals: [],
-    activeProjects: [],
-  },
-  {
-    id: 'clt-12',
-    name: 'Pooja Verma',
-    email: 'pooja.verma@example.com',
-    phone: '+91 98321 09876',
-    location: 'Kolkata, India',
-    company: 'Verma Industrial Spares',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-    tags: ['VIP', 'Active'],
-    deals: 4,
-    projects: 2,
-    lastActivity: '15 Sep 2025',
-    loginEnabled: true,
-    status: 'Active',
-    satisfaction: '97%',
-    category: 'VIP',
-    notes: ['Supplying steel fabrication laser cut parts.'],
-    activeDeals: [
-      { id: 'd-112', name: 'Laser Bed Expansion Pack', value: '₹ 7,40,000', stage: 'Delivered' },
-      { id: 'd-113', name: 'CNC Spindle Assembly Kit', value: '₹ 3,90,000', stage: 'Invoicing' },
-    ],
-    activeProjects: [
-      { id: 'p-208', name: 'Kolkata Warehouse Stocking', status: 'Completed', progress: 100 },
-      { id: 'p-209', name: 'On-site Maintenance Routine', status: 'In Progress', progress: 50 },
-    ],
-  },
-];
+/** Lower-cased text, safe on a field the server left unset. */
+function text(value) {
+  return String(value ?? '').toLowerCase();
+}
 
 function getInitials(name = '') {
   const parts = name.trim().split(/\s+/);
@@ -426,22 +154,16 @@ function ClientAvatar({ client, size = 'md', className = '' }) {
 }
 
 export function ClientsPage() {
-  const [clients, setClients] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return INITIAL_CLIENTS;
-  });
+  // Tenants, from /admin/clients/.
+  const [clients, setClients] = useState([]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
-    } catch (e) {}
-  }, [clients]);
+    let cancelled = false;
+    adminSync.pull('clients').then((rows) => {
+      if (!cancelled && rows) setClients(rows);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -510,20 +232,20 @@ export function ClientsPage() {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !q ||
-        c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q) ||
-        c.phone.toLowerCase().includes(q) ||
-        (c.company && c.company.toLowerCase().includes(q)) ||
-        c.location.toLowerCase().includes(q);
+        text(c.name).includes(q) ||
+        text(c.email).includes(q) ||
+        text(c.phone).includes(q) ||
+        text(c.company).includes(q) ||
+        text(c.location).includes(q);
 
       const matchesCategory =
         selectedCategory === 'All' ||
-        (c.category && c.category.toLowerCase() === selectedCategory.toLowerCase()) ||
+        (c.category && String(c.category ?? '').toLowerCase() === selectedCategory.toLowerCase()) ||
         (c.tags && c.tags.some((t) => t.toLowerCase() === selectedCategory.toLowerCase()));
 
       const matchesStatus =
         selectedStatus === 'All' ||
-        (c.status && c.status.toLowerCase() === selectedStatus.toLowerCase());
+        (c.status && String(c.status ?? '').toLowerCase() === selectedStatus.toLowerCase());
 
       const matchesLocation =
         selectedLocation === 'All' || c.location === selectedLocation;
@@ -542,27 +264,25 @@ export function ClientsPage() {
     return filteredClients.slice(start, start + CLIENTS_PER_PAGE);
   }, [filteredClients, currentPage]);
 
-  const handleSaveClient = (clientData) => {
-    if (editingClient) {
-      setClients((prev) =>
-        prev.map((c) => (c.id === editingClient.id ? { ...c, ...clientData } : c))
-      );
-      showNotification(`Client "${clientData.name}" updated successfully!`);
-    } else {
-      const newClient = {
-        id: `clt-${Date.now()}`,
-        deals: 0,
-        projects: 0,
-        lastActivity: 'Just now',
-        status: 'Active',
-        satisfaction: '95%',
-        notes: [],
-        activeDeals: [],
-        activeProjects: [],
-        ...clientData,
-      };
-      setClients((prev) => [newClient, ...prev]);
-      showNotification(`New client "${newClient.name}" created successfully!`);
+  const handleSaveClient = async (clientData) => {
+    try {
+      if (editingClient) {
+        setClients((prev) =>
+          prev.map((c) => (c.id === editingClient.id ? { ...c, ...clientData } : c))
+        );
+        const saved = await adminSync.update('clients', editingClient.id, clientData);
+        if (saved) setClients((prev) => prev.map((c) => (c.id === saved.id ? saved : c)));
+        showNotification(`Client "${clientData.name}" updated successfully!`);
+      } else {
+        const created = await adminSync.create('clients', clientData);
+        if (created) {
+          setClients((prev) => [created, ...prev]);
+          showNotification(`New client "${created.name}" created successfully!`);
+        }
+      }
+    } catch (err) {
+      showNotification(`Client not saved — ${describeError(err)}`);
+      return;
     }
     setIsCreateModalOpen(false);
     setEditingClient(null);
@@ -571,6 +291,8 @@ export function ClientsPage() {
   const handleDeleteClient = () => {
     if (!clientToDelete) return;
     setClients((prev) => prev.filter((c) => c.id !== clientToDelete.id));
+    adminSync.remove('clients', clientToDelete.id)
+      .catch((err) => showNotification(`Client not deleted — ${describeError(err)}`));
     showNotification(`Client "${clientToDelete.name}" deleted.`);
     setClientToDelete(null);
   };
@@ -580,6 +302,8 @@ export function ClientsPage() {
     setClients((prev) =>
       prev.map((c) => (c.id === client.id ? { ...c, loginEnabled: updatedStatus } : c))
     );
+    adminSync.update('clients', client.id, { loginEnabled: updatedStatus })
+      .catch((err) => showNotification(`Login access not saved — ${describeError(err)}`));
     setOpenMenuClientId(null);
     showNotification(
       `Login access for ${client.name} is now ${updatedStatus ? 'Enabled' : 'Disabled'}.`

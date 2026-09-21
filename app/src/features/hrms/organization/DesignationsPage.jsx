@@ -26,9 +26,9 @@ export function DesignationsPage() {
 
   const filtered = designations.filter(
     (d) =>
-      d.title.toLowerCase().includes(q.toLowerCase()) ||
-      d.department.toLowerCase().includes(q.toLowerCase()) ||
-      d.level.toLowerCase().includes(q.toLowerCase())
+      String(d.title ?? '').toLowerCase().includes(q.toLowerCase()) ||
+      String(d.department ?? '').toLowerCase().includes(q.toLowerCase()) ||
+      String(d.level ?? '').toLowerCase().includes(q.toLowerCase())
   );
 
   function handleCreate(e) {

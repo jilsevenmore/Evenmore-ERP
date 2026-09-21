@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
+import RequireAuth from './RequireAuth';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { PageLoadingSkeleton } from '../components/common/PageLoadingSkeleton';
 
@@ -185,16 +186,34 @@ function RootErrorBoundary() {
 }
 
 const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotationPage'));
+const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 
 const router = createBrowserRouter([
-  { path: '/quote/:quotationNumber/:secureToken', element: <Page component={PublicQuotationPage} /> },
+  // ── Authentication ────────────────────────────────────────
   {
-    path: '/',
-    element: <MainLayout />,
+    path: '/login',
+    element: <Page component={LoginPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // ── Client-facing design approval link ────────────────────
+  // Deliberately outside MainLayout: the recipient is a customer, not a user of
+  // the ERP, so the page carries no sidebar, topbar or internal navigation.
+  {
+    path: '/pms/approve/:token',
+    element: <Page component={PMSClientProofApprovalPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // ── Protected Application Shell (Guarded by RequireAuth) ─
+  {
+    element: <RequireAuth />,
     errorElement: <RootErrorBoundary />,
     children: [
-      // Root redirect
-      { index: true, element: <Navigate to="/dashboard" replace /> },
+      {
+        path: '/',
+        element: <MainLayout />,
+        children: [
+          // Root redirect
+          { index: true, element: <Navigate to="/dashboard" replace /> },
 
       // ── Main Dashboard ─────────────────────────────────────
       { path: 'dashboard', element: <Page component={DashboardPage} /> },
@@ -393,6 +412,8 @@ const router = createBrowserRouter([
 
       // ── Catch-all ─────────────────────────────────────────
       { path: '*', element: <Navigate to="/dashboard" replace /> },
+    ],
+  },
     ],
   },
 ]);

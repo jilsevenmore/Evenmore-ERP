@@ -4,6 +4,14 @@ import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
+  adminSync,
+  activateUser,
+  deactivateUser,
+  setUserPermissions,
+  pullPermissionCatalogue,
+  describeError,
+} from '../../services/adminSync';
+import {
   Users,
   UserCheck,
   UserX,
@@ -36,531 +44,61 @@ import {
 } from 'lucide-react';
 
 const USERS_PER_PAGE = 16;
-const STORAGE_KEY = 'evenmore_admin_users_v2';
 
-// ── Initial Mock Users (Matching Screenshot Exactly) ─────────
-const INITIAL_USERS = [
-  {
-    id: 'usr-1',
-    name: 'Priya Patel',
-    email: 'priya@imtendoscopy.com',
-    phone: '+91 98765 43210',
-    role: 'Accountant',
-    department: 'Accounts',
-    status: 'Active',
-    joinedDate: '03 Sep 2026',
-    joinedFull: '03 September 2026',
-    lastLogin: '10 Sep 2026, 10:31 AM',
-    employeeId: 'EMP0012',
-    location: 'Mumbai, India',
-    reportingManager: 'Jayesh Nair',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Manage Deals', 'Create Tasks', 'View Reports', 'General Ledger', 'Cash & Bank'],
-  },
-  {
-    id: 'usr-2',
-    name: 'Hetal Patel',
-    email: 'hetal@imtendoscopy.com',
-    phone: '+91 98765 43211',
-    role: 'Tele Caller Executive',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '20 Aug 2026',
-    joinedFull: '20 August 2026',
-    lastLogin: '14 Sep 2026, 04:15 PM',
-    employeeId: 'EMP0014',
-    location: 'Ahmedabad, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks', 'Manage Deals', 'Log Calls'],
-  },
-  {
-    id: 'usr-3',
-    name: 'Jayesh Nair',
-    email: 'jayeshnair@imtendoscopy.com',
-    phone: '+91 98765 43212',
-    role: 'HR Manager',
-    department: 'HR',
-    status: 'Active',
-    joinedDate: '08 Sep 2026',
-    joinedFull: '08 September 2026',
-    lastLogin: '15 Sep 2026, 09:20 AM',
-    employeeId: 'EMP0003',
-    location: 'Mumbai, India',
-    reportingManager: 'Sarah Mitchell',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Manage Employees', 'Approve Leave', 'Process Payroll', 'Manage Recruitment'],
-  },
-  {
-    id: 'usr-4',
-    name: 'Rohit M Shreshth',
-    email: 'rohitshreshth@imtendoscopy.com',
-    phone: '+91 98765 43213',
-    role: 'Tele sales coordinator',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '29 Jun 2026',
-    joinedFull: '29 June 2026',
-    lastLogin: '15 Sep 2026, 10:05 AM',
-    employeeId: 'EMP0018',
-    location: 'Pune, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks', 'Manage Deals', 'View Reports'],
-  },
-  {
-    id: 'usr-5',
-    name: 'Chetan Chaudhari',
-    email: 'chetanchaudhari@imtendoscopy.com',
-    phone: '+91 98765 43214',
-    role: 'Relation ship manager',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '15 Sep 2026',
-    joinedFull: '15 September 2026',
-    lastLogin: '15 Sep 2026, 11:00 AM',
-    employeeId: 'EMP0021',
-    location: 'Surat, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Manage Deals', 'Create Quotations', 'Customer 360'],
-  },
-  {
-    id: 'usr-6',
-    name: 'Anuska',
-    email: 'anuska@imtendoscopy.com',
-    phone: '+91 98765 43215',
-    role: 'Tele Caller Executive',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '19 Aug 2026',
-    joinedFull: '19 August 2026',
-    lastLogin: '14 Sep 2026, 05:40 PM',
-    employeeId: 'EMP0015',
-    location: 'Delhi, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks', 'Manage Deals', 'Log Calls'],
-  },
-  {
-    id: 'usr-7',
-    name: 'Neel Subhaya',
-    email: 'neelsubhaya@imtendoscopy.com',
-    phone: '+91 98765 43216',
-    role: 'Sales support execut.',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '15 Sep 2026',
-    joinedFull: '15 September 2026',
-    lastLogin: '15 Sep 2026, 08:50 AM',
-    employeeId: 'EMP0022',
-    location: 'Rajkot, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Quotations', 'Track Orders', 'Create Tasks'],
-  },
-  {
-    id: 'usr-8',
-    name: 'Prashant Dudhagara',
-    email: 'prashantdudhagara@imtendoscopy.com',
-    phone: '+91 98765 43217',
-    role: 'Sales support execut.',
-    department: 'Sales',
-    status: 'Inactive',
-    joinedDate: '15 Sep 2026',
-    joinedFull: '15 September 2026',
-    lastLogin: '10 Sep 2026, 02:15 PM',
-    employeeId: 'EMP0023',
-    location: 'Rajkot, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks'],
-  },
-  {
-    id: 'usr-9',
-    name: 'Utsav Faldu',
-    email: 'utsavfaldu@imtendoscopy.com',
-    phone: '+91 98765 43218',
-    role: 'Sales support execut.',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '15 Sep 2026',
-    joinedFull: '15 September 2026',
-    lastLogin: '15 Sep 2026, 09:45 AM',
-    employeeId: 'EMP0024',
-    location: 'Jamnagar, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks', 'Manage Deals', 'View Reports'],
-  },
-  {
-    id: 'usr-10',
-    name: 'Jenil Khachariya',
-    email: 'jenilkhachariya@imtendoscopy.com',
-    phone: '+91 98765 43219',
-    role: 'Sales support execut.',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '15 Sep 2026',
-    joinedFull: '15 September 2026',
-    lastLogin: '15 Sep 2026, 10:10 AM',
-    employeeId: 'EMP0025',
-    location: 'Surat, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks', 'Track Orders'],
-  },
-  {
-    id: 'usr-11',
-    name: 'Chirag',
-    email: 'chirag@imtendoscopy.com',
-    phone: '+91 98765 43220',
-    role: 'Driver',
-    department: 'Logistics',
-    status: 'Active',
-    joinedDate: '15 Sep 2026',
-    joinedFull: '15 September 2026',
-    lastLogin: '15 Sep 2026, 07:30 AM',
-    employeeId: 'EMP0026',
-    location: 'Mumbai, India',
-    reportingManager: 'Chen Li',
-    avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Delivery Challans', 'View Routes', 'Update Delivery Status'],
-  },
-  {
-    id: 'usr-12',
-    name: 'Dhaval',
-    email: 'dhaval@imtendoscopy.com',
-    phone: '+91 98765 43221',
-    role: 'Accountant',
-    department: 'Accounts',
-    status: 'Inactive',
-    joinedDate: '01 Aug 2026',
-    joinedFull: '01 August 2026',
-    lastLogin: '28 Aug 2026, 06:10 PM',
-    employeeId: 'EMP0011',
-    location: 'Mumbai, India',
-    reportingManager: 'James Wilson',
-    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Cash & Bank', 'General Ledger', 'Invoices'],
-  },
-  {
-    id: 'usr-13',
-    name: 'Mahesh Kubawat',
-    email: 'maheshkubawat@imtendoscopy.com',
-    phone: '+91 98765 43222',
-    role: 'Area sales manager',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '15 Sep 2026',
-    joinedFull: '15 September 2026',
-    lastLogin: '15 Sep 2026, 11:15 AM',
-    employeeId: 'EMP0008',
-    location: 'Vadodara, India',
-    reportingManager: 'David Park',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Manage Team Leads', 'Approve Discounts', 'Manage Deals', 'View Reports', 'Allocate Tasks'],
-  },
-  {
-    id: 'usr-14',
-    name: 'Vruti Lakhani',
-    email: 'vrutilakhani@imtendoscopy.com',
-    phone: '+91 98765 43223',
-    role: 'CIW',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '21 Aug 2026',
-    joinedFull: '21 August 2026',
-    lastLogin: '14 Sep 2026, 03:25 PM',
-    employeeId: 'EMP0016',
-    location: 'Ahmedabad, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Customer Interaction', 'Lead Verification', 'Create Tasks'],
-  },
-  {
-    id: 'usr-15',
-    name: 'Hemanshi Ramani',
-    email: 'hemanshiramani@imtendoscopy.com',
-    phone: '+91 98765 43224',
-    role: 'DIC',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '19 Aug 2026',
-    joinedFull: '19 August 2026',
-    lastLogin: '15 Sep 2026, 09:15 AM',
-    employeeId: 'EMP0017',
-    location: 'Rajkot, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Deal Coordination', 'Follow-ups', 'View Leads', 'Task Management'],
-  },
-  {
-    id: 'usr-16',
-    name: 'Test',
-    email: 'test@gmail.com',
-    phone: '+91 98765 43225',
-    role: 'Employee',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '09 Sep 2026',
-    joinedFull: '09 September 2026',
-    lastLogin: '12 Sep 2026, 01:10 PM',
-    employeeId: 'EMP0020',
-    location: 'Mumbai, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks'],
-  },
-  {
-    id: 'usr-17',
-    name: 'Sarah Mitchell',
-    email: 'sarah.mitchell@imtendoscopy.com',
-    phone: '+91 98765 43226',
-    role: 'Super Administrator',
-    department: 'Executive',
-    status: 'Active',
-    joinedDate: '10 Jan 2026',
-    joinedFull: '10 January 2026',
-    lastLogin: '15 Sep 2026, 11:45 AM',
-    employeeId: 'EMP0001',
-    location: 'Headquarters, Mumbai',
-    reportingManager: 'Board of Directors',
-    avatar: 'https://images.unsplash.com/photo-1580894732444-8ecded7900cd?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Full Access', 'System Administration', 'User Management', 'Roles & RBAC', 'All Reports'],
-  },
-  {
-    id: 'usr-18',
-    name: 'David Park',
-    email: 'david.park@imtendoscopy.com',
-    phone: '+91 98765 43227',
-    role: 'Sales & CRM Manager',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '15 Feb 2026',
-    joinedFull: '15 February 2026',
-    lastLogin: '15 Sep 2026, 10:40 AM',
-    employeeId: 'EMP0002',
-    location: 'Mumbai, India',
-    reportingManager: 'Sarah Mitchell',
-    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Manage Leads', 'Approve Deals', 'Sales Pipeline', 'Team Allocation', 'Sales Reports'],
-  },
-  {
-    id: 'usr-19',
-    name: 'Ayesha Khan',
-    email: 'ayesha.khan@imtendoscopy.com',
-    phone: '+91 98765 43228',
-    role: 'HR Director',
-    department: 'HR',
-    status: 'Active',
-    joinedDate: '01 Mar 2026',
-    joinedFull: '01 March 2026',
-    lastLogin: '14 Sep 2026, 06:10 PM',
-    employeeId: 'EMP0004',
-    location: 'Delhi, India',
-    reportingManager: 'Sarah Mitchell',
-    avatar: 'https://images.unsplash.com/photo-1573496799652-408c2ac9fe98?w=150&auto=format&fit=crop&q=80',
-    permissions: ['HRMS Complete', 'Payroll Approval', 'Appraisals', 'Organizational Chart'],
-  },
-  {
-    id: 'usr-20',
-    name: 'James Wilson',
-    email: 'james.wilson@imtendoscopy.com',
-    phone: '+91 98765 43229',
-    role: 'Finance Head',
-    department: 'Accounts',
-    status: 'Active',
-    joinedDate: '12 Jan 2026',
-    joinedFull: '12 January 2026',
-    lastLogin: '15 Sep 2026, 11:20 AM',
-    employeeId: 'EMP0005',
-    location: 'Mumbai, India',
-    reportingManager: 'Sarah Mitchell',
-    avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Financial Reports', 'General Ledger', 'Tax Compliance', 'Bank Accounts', 'Audit Logs'],
-  },
-  {
-    id: 'usr-21',
-    name: 'Chen Li',
-    email: 'chen.li@imtendoscopy.com',
-    phone: '+91 98765 43230',
-    role: 'Warehouse Head',
-    department: 'Logistics',
-    status: 'Active',
-    joinedDate: '20 Mar 2026',
-    joinedFull: '20 March 2026',
-    lastLogin: '15 Sep 2026, 08:15 AM',
-    employeeId: 'EMP0006',
-    location: 'Bhiwandi Warehouse',
-    reportingManager: 'Sarah Mitchell',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Inventory Management', 'Stock Transfers', 'Delivery Challans', 'Valuation & Audit'],
-  },
-  {
-    id: 'usr-22',
-    name: 'Elena Rostova',
-    email: 'elena.rostova@imtendoscopy.com',
-    phone: '+91 98765 43231',
-    role: 'Relation ship manager',
-    department: 'Sales',
-    status: 'Inactive',
-    joinedDate: '05 May 2026',
-    joinedFull: '05 May 2026',
-    lastLogin: '28 Aug 2026, 10:15 AM',
-    employeeId: 'EMP0019',
-    location: 'Goa, India',
-    reportingManager: 'David Park',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Manage Deals'],
-  },
-  {
-    id: 'usr-23',
-    name: 'Karan Verma',
-    email: 'karan.verma@imtendoscopy.com',
-    phone: '+91 98765 43232',
-    role: 'Accountant',
-    department: 'Accounts',
-    status: 'Active',
-    joinedDate: '10 Jun 2026',
-    joinedFull: '10 June 2026',
-    lastLogin: '15 Sep 2026, 09:30 AM',
-    employeeId: 'EMP0013',
-    location: 'Mumbai, India',
-    reportingManager: 'James Wilson',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    permissions: ['Cash & Bank', 'General Ledger', 'Invoices', 'Payment In'],
-  },
-  {
-    id: 'usr-24',
-    name: 'Pooja Sharma',
-    email: 'pooja.sharma@imtendoscopy.com',
-    phone: '+91 98765 43233',
-    role: 'Tele Caller Executive',
-    department: 'Sales',
-    status: 'Active',
-    joinedDate: '15 Jul 2026',
-    joinedFull: '15 July 2026',
-    lastLogin: '15 Sep 2026, 10:20 AM',
-    employeeId: 'EMP0016',
-    location: 'Delhi, India',
-    reportingManager: 'Mahesh Kubawat',
-    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
-    permissions: ['View Leads', 'Create Tasks', 'Manage Deals'],
-  },
-];
-
-// ── Role Badge Style Helper ─────────────────────────────────
-function getRoleBadgeStyle(role = '') {
-  const r = role.toLowerCase();
-  if (r.includes('accountant') || r.includes('finance')) {
-    return 'bg-[#e0f2fe] text-[#0284c7] border-[#bae6fd]';
-  }
-  if (r.includes('tele caller') || r.includes('ciw')) {
-    return 'bg-[#ccfbf1] text-[#0d9488] border-[#99f6e4]';
-  }
-  if (r.includes('hr') || r.includes('dic') || r.includes('support')) {
-    return 'bg-[#ede9fe] text-[#7c3aed] border-[#ddd6fe]';
-  }
-  if (r.includes('tele sales') || r.includes('coordinator')) {
-    return 'bg-[#e0f2fe] text-[#0369a1] border-[#bae6fd]';
-  }
-  if (r.includes('relation') || r.includes('relationship')) {
-    return 'bg-[#ffedd5] text-[#c2410c] border-[#fed7aa]';
-  }
-  if (r.includes('driver') || r.includes('logistics')) {
-    return 'bg-[#cffafe] text-[#0891b2] border-[#a5f3fc]';
-  }
-  if (r.includes('area sales') || r.includes('manager')) {
-    return 'bg-[#dbeafe] text-[#1d4ed8] border-[#bfdbfe]';
-  }
-  if (r.includes('super admin') || r.includes('administrator')) {
-    return 'bg-[#f3e8ff] text-[#9333ea] border-[#e9d5ff]';
-  }
-  return 'bg-[#f1f5f9] text-[#475569] border-[#e2e8f0]';
+/**
+ * Case-insensitive contains, safe on a field the server left unset — a user can
+ * exist before they have been given a role, a department or an employee number.
+ */
+function matches(value, query) {
+  if (!query) return false;
+  return String(value || '').toLowerCase().includes(query);
 }
 
-const ALL_PERMISSION_MODULES = [
-  {
-    module: 'CRM & Leads',
-    actions: [
-      { id: 'view_leads', label: 'View Leads' },
-      { id: 'create_leads', label: 'Create Leads' },
-      { id: 'edit_leads', label: 'Edit Leads' },
-      { id: 'delete_leads', label: 'Delete Leads' },
-      { id: 'manage_deals', label: 'Manage Deals' },
-      { id: 'export_leads', label: 'Export Leads' },
-    ],
-  },
-  {
-    module: 'Sales & Invoicing',
-    actions: [
-      { id: 'view_quotations', label: 'View Quotations' },
-      { id: 'create_quotations', label: 'Create Quotations' },
-      { id: 'create_invoices', label: 'Create Invoices' },
-      { id: 'approve_discounts', label: 'Approve Discounts' },
-      { id: 'payment_in', label: 'Record Payments' },
-    ],
-  },
-  {
-    module: 'Purchase & Procurement',
-    actions: [
-      { id: 'view_po', label: 'View Purchase Orders' },
-      { id: 'create_po', label: 'Create Purchase Orders' },
-      { id: 'approve_po', label: 'Approve Bills' },
-      { id: 'manage_vendors', label: 'Manage Vendors' },
-    ],
-  },
-  {
-    module: 'Inventory & Warehouse',
-    actions: [
-      { id: 'view_stock', label: 'View Stock Position' },
-      { id: 'create_transfers', label: 'Stock Transfers' },
-      { id: 'delivery_challans', label: 'Delivery Challans' },
-      { id: 'audit_reconcile', label: 'Month-End Audit' },
-    ],
-  },
-  {
-    module: 'Accounts & Finance',
-    actions: [
-      { id: 'cash_bank', label: 'Cash & Bank' },
-      { id: 'general_ledger', label: 'General Ledger' },
-      { id: 'financial_reports', label: 'Financial Reports' },
-    ],
-  },
-  {
-    module: 'HRMS & Staff',
-    actions: [
-      { id: 'view_attendance', label: 'Mark Attendance' },
-      { id: 'approve_leaves', label: 'Approve Leaves' },
-      { id: 'process_payroll', label: 'Process Payroll' },
-      { id: 'recruitment', label: 'Recruitment & Interviews' },
-    ],
-  },
+/**
+ * Tailwind classes for a role chip. The colour is derived from the role name so
+ * a role added on the server gets a stable chip without a frontend change.
+ */
+const ROLE_BADGE_STYLES = [
+  'bg-blue-50 text-blue-700 border-blue-200',
+  'bg-violet-50 text-violet-700 border-violet-200',
+  'bg-emerald-50 text-emerald-700 border-emerald-200',
+  'bg-amber-50 text-amber-700 border-amber-200',
+  'bg-rose-50 text-rose-700 border-rose-200',
+  'bg-cyan-50 text-cyan-700 border-cyan-200',
+  'bg-indigo-50 text-indigo-700 border-indigo-200',
 ];
 
+function getRoleBadgeStyle(role) {
+  const key = String(role || '');
+  if (!key) return 'bg-slate-100 text-slate-600 border-slate-200';
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  return ROLE_BADGE_STYLES[Math.abs(hash) % ROLE_BADGE_STYLES.length];
+}
+
 export function UsersPage() {
-  // ── Load / Save Users ────────────────────────────────────────
-  const [users, setUsers] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return INITIAL_USERS;
-  });
+  // ── Users, from /admin/users/ ────────────────────────────────
+  const [users, setUsers] = useState([]);
+
+  // The permission catalogue the server will actually enforce.
+  const [permissionModules, setPermissionModules] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    pullPermissionCatalogue().then((modules) => {
+      if (!cancelled && modules) setPermissionModules(modules);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [users]);
+    let cancelled = false;
+    adminSync.pull('users').then((rows) => {
+      if (cancelled || !rows) return;
+      setUsers(rows);
+      setSelectedUserId((current) => current || rows[0]?.id || null);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // ── State for Filter & Search ────────────────────────────────
   const [searchQuery, setSearchQuery] = useState('');
@@ -619,7 +157,7 @@ export function UsersPage() {
   }, [users]);
 
   const uniqueDepartments = useMemo(() => {
-    const set = new Set(users.map((u) => u.department));
+    const set = new Set(users.map((u) => u.department).filter(Boolean));
     return ['All Departments', ...Array.from(set)];
   }, [users]);
 
@@ -629,11 +167,11 @@ export function UsersPage() {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !q ||
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        u.role.toLowerCase().includes(q) ||
-        u.department.toLowerCase().includes(q) ||
-        (u.employeeId && u.employeeId.toLowerCase().includes(q));
+        matches(u.name, q) ||
+        matches(u.email, q) ||
+        matches(u.role, q) ||
+        matches(u.department, q) ||
+        matches(u.employeeId, q);
 
       const matchesRole = selectedRole === 'All Roles' || u.role === selectedRole;
       const matchesDept = selectedDepartment === 'All Departments' || u.department === selectedDepartment;
@@ -660,9 +198,9 @@ export function UsersPage() {
     const inactive = users.filter((u) => u.status === 'Inactive').length;
     const admins = users.filter(
       (u) =>
-        u.role.toLowerCase().includes('admin') ||
-        u.role.toLowerCase().includes('director') ||
-        u.department.toLowerCase().includes('executive')
+        matches(u.role, 'admin') ||
+        matches(u.role, 'director') ||
+        matches(u.department, 'executive')
     ).length;
     return { total, active, inactive, admins };
   }, [users]);
@@ -698,29 +236,30 @@ export function UsersPage() {
     setIsCreateModalOpen(true);
   };
 
-  const handleCreateSubmit = (e) => {
+  const handleCreateSubmit = async (e) => {
     e.preventDefault();
     if (!userForm.name || !userForm.email) return;
 
-    const newUser = {
-      id: `usr-${Date.now()}`,
-      name: userForm.name,
-      email: userForm.email,
-      phone: userForm.phone || '+91 98765 00000',
-      role: userForm.role,
-      department: userForm.department,
-      status: userForm.status,
-      joinedDate: '15 Sep 2026',
-      joinedFull: '15 September 2026',
-      lastLogin: 'Just now',
-      employeeId: userForm.employeeId || `EMP00${users.length + 1}`,
-      location: userForm.location || 'Mumbai, India',
-      reportingManager: userForm.reportingManager || 'Jayesh Nair',
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userForm.name)}&background=1f6bff&color=fff&size=150`,
-      permissions: userForm.permissions || ['View Leads', 'Manage Deals', 'Create Tasks'],
-    };
+    let newUser;
+    try {
+      newUser = await adminSync.create('users', {
+        name: userForm.name,
+        email: userForm.email,
+        phone: userForm.phone,
+        roleId: userForm.roleId,
+        department: userForm.department,
+        status: userForm.status,
+        employeeId: userForm.employeeId,
+        location: userForm.location,
+        reportingManager: userForm.reportingManager,
+      });
+    } catch (err) {
+      showNotification(`User not created — ${describeError(err)}`);
+      return;
+    }
+    if (!newUser) return;
 
-    setUsers([newUser, ...users]);
+    setUsers((prev) => [newUser, ...prev]);
     setSelectedUserId(newUser.id);
     setIsCreateModalOpen(false);
     showNotification(`User "${newUser.name}" successfully created!`);
@@ -749,25 +288,23 @@ export function UsersPage() {
     e.preventDefault();
     if (!userToModify) return;
 
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userToModify.id
-          ? {
-              ...u,
-              name: userForm.name,
-              email: userForm.email,
-              phone: userForm.phone,
-              role: userForm.role,
-              department: userForm.department,
-              status: userForm.status,
-              employeeId: userForm.employeeId,
-              location: userForm.location,
-              reportingManager: userForm.reportingManager,
-              permissions: userForm.permissions,
-            }
-          : u
-      )
-    );
+    const updates = {
+      name: userForm.name,
+      email: userForm.email,
+      phone: userForm.phone,
+      roleId: userForm.roleId,
+      department: userForm.department,
+      status: userForm.status,
+      employeeId: userForm.employeeId,
+      location: userForm.location,
+      reportingManager: userForm.reportingManager,
+    };
+    setUsers((prev) => prev.map((u) => (u.id === userToModify.id ? { ...u, ...updates } : u)));
+    adminSync.update('users', userToModify.id, updates)
+      .then((saved) => {
+        if (saved) setUsers((prev) => prev.map((u) => (u.id === saved.id ? saved : u)));
+      })
+      .catch((err) => showNotification(`Change not saved — ${describeError(err)}`));
     setIsEditModalOpen(false);
     showNotification(`User details updated for "${userForm.name}"!`);
   };
@@ -779,6 +316,9 @@ export function UsersPage() {
     setUsers((prev) =>
       prev.map((u) => (u.id === target.id ? { ...u, status: newStatus } : u))
     );
+    // Activation is its own endpoint: it also ends the user's open sessions.
+    (newStatus === 'Active' ? activateUser(target.id) : deactivateUser(target.id))
+      .catch((err) => showNotification(`Status not saved — ${describeError(err)}`));
     showNotification(`User "${target.name}" is now marked as ${newStatus}.`);
   };
 
@@ -792,6 +332,8 @@ export function UsersPage() {
   const confirmDeleteUser = () => {
     if (!userToModify) return;
     setUsers((prev) => prev.filter((u) => u.id !== userToModify.id));
+    adminSync.remove('users', userToModify.id)
+      .catch((err) => showNotification(`User not deleted — ${describeError(err)}`));
     setIsDeleteModalOpen(false);
     if (selectedUserId === userToModify.id) {
       const remaining = users.filter((u) => u.id !== userToModify.id);
@@ -845,6 +387,8 @@ export function UsersPage() {
         u.id === userToModify.id ? { ...u, permissions: userForm.permissions } : u
       )
     );
+    setUserPermissions(userToModify.id, userForm.permissions)
+      .catch((err) => showNotification(`Permissions not saved — ${describeError(err)}`));
     setIsPermissionsModalOpen(false);
     showNotification(`Permissions updated for "${userToModify.name}".`);
   };
@@ -1684,7 +1228,7 @@ export function UsersPage() {
             </div>
 
             <div className="space-y-4 my-5 text-xs">
-              {ALL_PERMISSION_MODULES.map((group) => (
+              {permissionModules.map((group) => (
                 <div key={group.module} className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/40">
                   <h4 className="font-bold text-slate-800 mb-2.5 flex items-center gap-2">
                     <ShieldCheck size={14} className="text-[#1f6bff]" />

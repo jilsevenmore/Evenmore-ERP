@@ -408,7 +408,7 @@ export const WarrantyListPage = () => {
                             it.name?.toLowerCase().includes(t) ||
                             it.sku?.toLowerCase().includes(t) ||
                             (it.serialNumbers && it.serialNumbers.some((s) => s.toLowerCase().includes(t))) ||
-                            (it.serialNumber && it.serialNumber.toLowerCase().includes(t))
+                            (it.serialNumber && String(it.serialNumber ?? '').toLowerCase().includes(t))
                     );
                     return cardMatch || custMatch || dcMatch || itemMatch;
                 }}

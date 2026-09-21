@@ -152,8 +152,8 @@ export default function Leave() {
     if (!form.delegateSearch) return [];
     return employees
       .filter((e) =>
-        e.name.toLowerCase().includes(form.delegateSearch.toLowerCase()) &&
-        e.name.toLowerCase() !== form.employeeName.toLowerCase()
+        String(e.name ?? '').toLowerCase().includes(String(form.delegateSearch ?? '').toLowerCase()) &&
+        String(e.name ?? '').toLowerCase() !== String(form.employeeName ?? '').toLowerCase()
       )
       .slice(0, 5);
   }, [employees, form.delegateSearch, form.employeeName]);
@@ -272,7 +272,7 @@ export default function Leave() {
     approveLeave(leaveItem.id, chosenDelegate);
 
     const matchingEmp = employees.find(
-      (e) => e.name.toLowerCase() === leaveItem.employee.toLowerCase()
+      (e) => String(e.name ?? '').toLowerCase() === String(leaveItem.employee ?? '').toLowerCase()
     );
     if (matchingEmp && updateAttendanceRecord) {
       updateAttendanceRecord(matchingEmp.id, { status: "On Leave" });

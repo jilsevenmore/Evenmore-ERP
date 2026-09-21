@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { pushHrmsSettings, pullHrmsSettings } from "../../../services/hrmsSync";
+import { pullAuditTrail } from "../../../services/auditTrail";
 import {
   Users,
   UserCheck,
@@ -160,7 +162,6 @@ const INITIAL_SCHEDULE = [
   },
 ];
 
-const ACTIVITY_KEY = "hrms_recent_activity_v1";
 
 const MODULE_META = {
   "Leave Management": { Icon: Plane, bg: "#fef3c7", fg: "#b45309" },
@@ -172,7 +173,6 @@ const MODULE_META = {
   System: { Icon: Zap, bg: "#f1f5f9", fg: "#475569" },
 };
 
-const REQUEST_TYPES_KEY = "hrms_quick_request_types_v2";
 
 const DEFAULT_REQUEST_TYPES = [
   "Casual Leave",
@@ -194,9 +194,9 @@ const DEFAULT_REQUEST_TYPES = [
 
 function loadRequestTypes() {
   try {
-    const raw = localStorage.getItem(REQUEST_TYPES_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
+    const stored = null; // replaced by the tenant setting once it loads
+    if (stored) {
+      const parsed = stored;
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
   } catch {}
@@ -235,33 +235,15 @@ function timeAgo(ts) {
   return new Date(ts).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-function seedActivities() {
-  const now = Date.now();
-  const min = 60 * 1000;
-  return [
-    { id: "a1", actor: "Priya Patel", action: "requested 3 days annual leave.", module: "Leave Management", ts: now - 12 * min, read: false },
-    { id: "a2", actor: "Liam Cooper", action: "submitted Q3 evaluation.", module: "Performance", ts: now - 45 * min, read: false },
-    { id: "a3", actor: "Samantha Reed", action: "New hire badge created.", module: "HR Admin", ts: now - 2 * 60 * min, read: true },
-    { id: "a4", actor: "Financial Ops", action: "Payroll batch verified.", module: "Payroll Core", ts: now - 3 * 60 * min, read: true },
-  ];
-}
-
+/**
+ * The activity strip is the audit trail (`GET /audit/`), not a local log — an
+ * action taken by a colleague has to show up here too.
+ */
 function loadActivities() {
-  try {
-    const raw = localStorage.getItem(ACTIVITY_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length) return parsed;
-    }
-  } catch {}
-  return seedActivities();
+  return [];
 }
 
-const ACTIVITY = seedActivities().map((a) => ({
-  name: a.actor,
-  text: a.action,
-  when: `${timeAgo(a.ts)} · ${a.module}`,
-}));
+const ACTIVITY = [];
 
 const badgeStyles = {
   green: { background: "#dcfce7", color: "#15803d" },
@@ -370,10 +352,13 @@ export default function HRMSDashboard() {
     );
   }, [requestTypes, requestSearch]);
 
+  // The request catalogue is a tenant setting (`/hrms/settings/`), so the menu
+  // is the same for everyone raising a request.
   useEffect(() => {
-    try {
-      localStorage.setItem(REQUEST_TYPES_KEY, JSON.stringify(requestTypes));
-    } catch {}
+    if (requestTypes.length === 0) return;
+    pushHrmsSettings({ quickRequestTypes: requestTypes }).catch((err) => {
+      console.warn("[HRMS] request types not saved:", err?.message || err);
+    });
   }, [requestTypes]);
 
   // Recent Activity — working, minimal, user-friendly
@@ -384,10 +369,20 @@ export default function HRMSDashboard() {
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activities.slice(0, 50)));
-    } catch {}
-  }, [activities]);
+    let cancelled = false;
+    pullAuditTrail({ limit: 50 }).then((rows) => {
+      if (cancelled || !rows) return;
+      setActivities(rows.map((row) => ({
+        id: row.id,
+        actor: row.actorName || row.actor || 'System',
+        action: row.description || row.action || '',
+        module: row.entityType || 'System',
+        ts: Date.parse(row.createdAt || row.at) || Date.now(),
+        read: false,
+      })));
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Re-render relative timestamps every minute
   useEffect(() => {
@@ -424,7 +419,7 @@ export default function HRMSDashboard() {
   const removeActivity = (id) => setActivities((prev) => prev.filter((a) => a.id !== id));
   const clearActivities = () => setActivities([]);
   const resetActivities = () => {
-    const seed = seedActivities();
+    const seed = [];
     setActivities(seed);
     setActivityTab("All");
     setActivityQuery("");

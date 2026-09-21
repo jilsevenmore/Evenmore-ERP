@@ -154,8 +154,8 @@ export default function AttendanceOverview() {
   const filtered = useMemo(() => {
     return combinedAttendance.filter((item) => {
       const matchSearch =
-        item.name.toLowerCase().includes(search.toLowerCase()) ||
-        (item.id && item.id.toLowerCase().includes(search.toLowerCase()));
+        String(item.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (item.id && String(item.id ?? '').toLowerCase().includes(search.toLowerCase()));
       const matchDept = deptFilter === "All" || item.dept === deptFilter;
       const matchStatus = statusFilter === "All" || item.status === statusFilter;
       const matchShift = shiftFilter === "All" || item.shift === shiftFilter;

@@ -1,4 +1,5 @@
 import { buildDeal, loadDeals, DEALS_STORAGE_KEY } from './dealService.js';
+import { crmStorage } from './crmStorage.js';
 
 const DETAIL_KEY = 'evenmore-crm-lead-details-v1';
 const normalize = (value) => String(value ?? '').trim().toLowerCase();
@@ -6,7 +7,7 @@ const sameId = (a, b) => a != null && b != null && String(a) === String(b);
 
 // The setup screen identifies its built-in Won stage by ld-7; stage tasks use won.
 // Keep that identity when an administrator renames the stage.
-export function isWonLeadStage(targetStage, fallbackStages, storage = localStorage) {
+export function isWonLeadStage(targetStage, fallbackStages, storage = crmStorage) {
   const config = JSON.parse(storage.getItem('evenmore-crm-stages-v1') || 'null');
   const stages = Array.isArray(config?.leadStages) ? config.leadStages : fallbackStages;
   const stage = stages.find((item) => item && item.status !== 'Inactive' &&
@@ -16,7 +17,7 @@ export function isWonLeadStage(targetStage, fallbackStages, storage = localStora
 
 // Synchronous read/check/write keeps repeated automation calls idempotent in this app.
 // Relationship and activity live in the existing per-lead detail record.
-export function convertLeadToDealIfNeeded(lead, { targetStage = lead?.status, stages = [], storage = localStorage } = {}) {
+export function convertLeadToDealIfNeeded(lead, { targetStage = lead?.status, stages = [], storage = crmStorage } = {}) {
   if (!lead || lead.id == null || lead.id === '') throw new Error('Lead ID is required for conversion.');
   if (!isWonLeadStage(targetStage, stages, storage)) return null;
   const deals = loadDeals(storage);

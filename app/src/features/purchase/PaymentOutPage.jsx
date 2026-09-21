@@ -278,10 +278,10 @@ export const PaymentOutPage = () => {
         </div>
       </div>
 
-      <DataTable title="Vendor Disbursement Vouchers" columns={columns} data={paymentOuts} keyExtractor={(p) => p.id} searchPlaceholder="Search voucher #, vendor, or bill..." searchFilter={(p, term) => p.voucherNumber.toLowerCase().includes(term) ||
-            p.vendor.toLowerCase().includes(term) ||
-            (p.billNumber && p.billNumber.toLowerCase().includes(term)) ||
-            (p.reference && p.reference.toLowerCase().includes(term))}/>
+      <DataTable title="Vendor Disbursement Vouchers" columns={columns} data={paymentOuts} keyExtractor={(p) => p.id} searchPlaceholder="Search voucher #, vendor, or bill..." searchFilter={(p, term) => String(p.voucherNumber ?? '').toLowerCase().includes(term) ||
+            String(p.vendor ?? '').toLowerCase().includes(term) ||
+            (p.billNumber && String(p.billNumber ?? '').toLowerCase().includes(term)) ||
+            (p.reference && String(p.reference ?? '').toLowerCase().includes(term))}/>
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs">

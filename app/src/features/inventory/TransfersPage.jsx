@@ -130,9 +130,9 @@ export const TransfersPage = () => {
         <StatCard label="Active Facilities" value={`${locations.length} Warehouses`} icon={MapPin} subtext="Main, Bay A, Bay B" />
       </div>
 
-      <DataTable title="Inter-Facility Stock Transfer Log" columns={columns} data={transfers} keyExtractor={(t) => t.id} searchPlaceholder="Search transfer #, source, or destination..." searchFilter={(t, term) => t.transferNumber.toLowerCase().includes(term) ||
-            t.sourceLocation.toLowerCase().includes(term) ||
-            t.destLocation.toLowerCase().includes(term)}/>
+      <DataTable title="Inter-Facility Stock Transfer Log" columns={columns} data={transfers} keyExtractor={(t) => t.id} searchPlaceholder="Search transfer #, source, or destination..." searchFilter={(t, term) => String(t.transferNumber ?? '').toLowerCase().includes(term) ||
+            String(t.sourceLocation ?? '').toLowerCase().includes(term) ||
+            String(t.destLocation ?? '').toLowerCase().includes(term)}/>
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">

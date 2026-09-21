@@ -1,21 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { X, Crosshair, Clock3, Pencil, Trash2 } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
+import { useLeadDetailStore } from "../../../stores/leadDetailStore";
+import { deleteLeadNote, updateLeadNote } from "../../../services/crmSync";
 
-const STORAGE_KEY = "evenmore-crm-lead-notes-v1";
 
-function loadAll() {
-  try {
-    if (typeof localStorage === "undefined") return {};
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed;
-  } catch {
-    return {};
-  }
-}
 
 function formatDay(value) {
   try {
@@ -28,7 +17,13 @@ function formatDay(value) {
 }
 
 export default function NotesDrawer({ lead, isOpen, onClose }) {
-  const [store, setStore] = useState(loadAll);
+  // Notes live at `/crm/leads/{id}/notes/`; the drawer reads and writes them
+  // through the per-lead section store the detail view also uses.
+  const leadId = lead?.id;
+  const storedNotes = useLeadDetailStore((s) => s.byLead[String(leadId || "")]?.notes);
+  const loadDetail = useLeadDetailStore((s) => s.load);
+  const addDetail = useLeadDetailStore((s) => s.add);
+  const refreshSection = useLeadDetailStore((s) => s.refreshSection);
   const [draft, setDraft] = useState("");
   const [editing, setEditing] = useState(false);
   const [sortMode, setSortMode] = useState("last");
@@ -36,13 +31,8 @@ export default function NotesDrawer({ lead, isOpen, onClose }) {
   const [editText, setEditText] = useState("");
 
   useEffect(() => {
-    try {
-      if (typeof localStorage === "undefined") return;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-    } catch {
-      return;
-    }
-  }, [store]);
+    if (isOpen && leadId) loadDetail(leadId);
+  }, [isOpen, leadId, loadDetail]);
 
   useEffect(() => {
     setDraft("");
@@ -53,39 +43,36 @@ export default function NotesDrawer({ lead, isOpen, onClose }) {
 
   const notes = useMemo(() => {
     if (!lead) return [];
-    const list = Array.isArray(store[String(lead.id)]) ? store[String(lead.id)] : [];
-    const sorted = [...list].sort((a, b) => {
+    const sorted = [...(storedNotes || [])].sort((a, b) => {
       const at = new Date(a.createdAt).getTime() || 0;
       const bt = new Date(b.createdAt).getTime() || 0;
       return sortMode === "first" ? bt - at : at - bt;
     });
     return sorted;
-  }, [store, lead, sortMode]);
+  }, [storedNotes, lead, sortMode]);
 
   if (!isOpen || !lead) return null;
 
-  function saveNote() {
+  async function saveNote() {
     const text = draft.trim();
     if (!text) return;
-    const item = {
-      id: `n-${Date.now()}`,
-      text,
-      createdAt: new Date().toISOString(),
-      by: lead.owner || "You"
-    };
-    setStore((prev) => ({
-      ...prev,
-      [String(lead.id)]: [...(Array.isArray(prev[String(lead.id)]) ? prev[String(lead.id)] : []), item]
-    }));
+    try {
+      await addDetail(lead.id, "notes", { text, body: text });
+    } catch (err) {
+      console.warn("[CRM] note not saved:", err?.message || err);
+      return;
+    }
     setDraft("");
     setEditing(false);
   }
 
-  function removeNote(id) {
-    setStore((prev) => ({
-      ...prev,
-      [String(lead.id)]: (Array.isArray(prev[String(lead.id)]) ? prev[String(lead.id)] : []).filter((n) => n.id !== id)
-    }));
+  async function removeNote(id) {
+    try {
+      await deleteLeadNote(lead.id, id);
+      await refreshSection(lead.id, "notes");
+    } catch (err) {
+      console.warn("[CRM] note not deleted:", err?.message || err);
+    }
   }
 
   function startEdit(note) {
@@ -93,15 +80,15 @@ export default function NotesDrawer({ lead, isOpen, onClose }) {
     setEditText(note.text);
   }
 
-  function saveEdit() {
+  async function saveEdit() {
     const text = editText.trim();
     if (!text) return;
-    setStore((prev) => ({
-      ...prev,
-      [String(lead.id)]: (Array.isArray(prev[String(lead.id)]) ? prev[String(lead.id)] : []).map((n) =>
-        n.id === editId ? { ...n, text } : n
-      )
-    }));
+    try {
+      await updateLeadNote(lead.id, editId, { text, body: text });
+      await refreshSection(lead.id, "notes");
+    } catch (err) {
+      console.warn("[CRM] note not saved:", err?.message || err);
+    }
     setEditId(null);
     setEditText("");
   }

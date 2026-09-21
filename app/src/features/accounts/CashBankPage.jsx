@@ -212,8 +212,8 @@ export const CashBankPage = () => {
         </div>
       )}
 
-      <DataTable title="Bank & Cash Register" data={bankAccounts} columns={columns} keyExtractor={(a) => a.id} searchPlaceholder="Search bank accounts..." searchFilter={(a, term) => a.bankName.toLowerCase().includes(term) ||
-            a.accountNumber.toLowerCase().includes(term) ||
+      <DataTable title="Bank & Cash Register" data={bankAccounts} columns={columns} keyExtractor={(a) => a.id} searchPlaceholder="Search bank accounts..." searchFilter={(a, term) => String(a.bankName ?? '').toLowerCase().includes(term) ||
+            String(a.accountNumber ?? '').toLowerCase().includes(term) ||
             (a.accountType || '').toLowerCase().includes(term)}/>
 
       {isModalOpen && (<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">

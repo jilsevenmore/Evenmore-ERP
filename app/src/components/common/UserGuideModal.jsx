@@ -220,12 +220,12 @@ export const UserGuideModal = ({ isOpen, onClose }) => {
     const term = searchTerm.toLowerCase();
     return GUIDE_MODULES.filter(
       (m) =>
-        m.title.toLowerCase().includes(term) ||
-        m.summary.toLowerCase().includes(term) ||
+        String(m.title ?? '').toLowerCase().includes(term) ||
+        String(m.summary ?? '').toLowerCase().includes(term) ||
         m.sections.some(
           (s) =>
-            s.heading.toLowerCase().includes(term) ||
-            s.content.toLowerCase().includes(term)
+            String(s.heading ?? '').toLowerCase().includes(term) ||
+            String(s.content ?? '').toLowerCase().includes(term)
         ) ||
         m.tips.some((t) => t.toLowerCase().includes(term))
     );

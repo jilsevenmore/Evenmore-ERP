@@ -111,7 +111,7 @@ export default function DelayDashboardPage() {
           >
             <option value="all">All projects</option>
             {options.projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.id} — {p.label}</option>
+              <option key={p.id} value={p.id}>{p.code || p.id} — {p.label}</option>
             ))}
           </select>
 

@@ -18,7 +18,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
     // Global keydown for Ctrl+K
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+            if ((e.ctrlKey || e.metaKey) && String(e.key ?? '').toLowerCase() === 'k') {
                 e.preventDefault();
                 if (isOpen)
                     onClose();
@@ -51,11 +51,11 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         { label: 'Parties Directory', path: '/parties', icon: Building2, category: 'Navigation' },
         { label: 'HRMS Employees', path: '/hrms/employees', icon: Users, category: 'Navigation' },
         { label: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: 'Navigation' },
-    ].filter((n) => !cleanQuery || n.label.toLowerCase().includes(cleanQuery));
+    ].filter((n) => !cleanQuery || String(n.label ?? '').toLowerCase().includes(cleanQuery));
     const matchedItems = items
-        .filter((i) => i.name.toLowerCase().includes(cleanQuery) ||
-        i.sku.toLowerCase().includes(cleanQuery) ||
-        (i.category && i.category.toLowerCase().includes(cleanQuery)))
+        .filter((i) => String(i.name ?? '').toLowerCase().includes(cleanQuery) ||
+        String(i.sku ?? '').toLowerCase().includes(cleanQuery) ||
+        (i.category && String(i.category ?? '').toLowerCase().includes(cleanQuery)))
         .slice(0, 4)
         .map((i) => ({
         label: `[${i.sku}] ${i.name}`,
@@ -65,9 +65,9 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         category: 'Inventory Items',
     }));
     const matchedCustomers = customers
-        .filter((c) => c.name.toLowerCase().includes(cleanQuery) ||
-        c.code.toLowerCase().includes(cleanQuery) ||
-        (c.city && c.city.toLowerCase().includes(cleanQuery)))
+        .filter((c) => String(c.name ?? '').toLowerCase().includes(cleanQuery) ||
+        String(c.code ?? '').toLowerCase().includes(cleanQuery) ||
+        (c.city && String(c.city ?? '').toLowerCase().includes(cleanQuery)))
         .slice(0, 3)
         .map((c) => ({
         label: c.name,
@@ -77,8 +77,8 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         category: 'Customers',
     }));
     const matchedVendors = vendors
-        .filter((v) => v.name.toLowerCase().includes(cleanQuery) ||
-        v.code.toLowerCase().includes(cleanQuery))
+        .filter((v) => String(v.name ?? '').toLowerCase().includes(cleanQuery) ||
+        String(v.code ?? '').toLowerCase().includes(cleanQuery))
         .slice(0, 3)
         .map((v) => ({
         label: v.name,
@@ -88,8 +88,8 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         category: 'Suppliers & Vendors',
     }));
     const matchedSalesOrders = salesOrders
-        .filter((o) => o.orderNumber.toLowerCase().includes(cleanQuery) ||
-        o.customer.toLowerCase().includes(cleanQuery))
+        .filter((o) => String(o.orderNumber ?? '').toLowerCase().includes(cleanQuery) ||
+        String(o.customer ?? '').toLowerCase().includes(cleanQuery))
         .slice(0, 3)
         .map((o) => ({
         label: `${o.orderNumber} - ${o.customer}`,
@@ -111,8 +111,8 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         category: 'Proforma Invoices',
     }));
     const matchedInvoices = invoices
-        .filter((inv) => inv.invoiceNumber.toLowerCase().includes(cleanQuery) ||
-        inv.customer.toLowerCase().includes(cleanQuery))
+        .filter((inv) => String(inv.invoiceNumber ?? '').toLowerCase().includes(cleanQuery) ||
+        String(inv.customer ?? '').toLowerCase().includes(cleanQuery))
         .slice(0, 3)
         .map((inv) => ({
         label: `${inv.invoiceNumber} - ${inv.customer}`,

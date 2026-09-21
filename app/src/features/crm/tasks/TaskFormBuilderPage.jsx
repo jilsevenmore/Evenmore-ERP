@@ -1,21 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import LeadFormBuilder from '../leads/LeadFormBuilder';
 import { createFieldFromType } from '../../../data/crm/leadFormSchema';
+import { useCrmStore } from '../../../stores/crmStore';
+import { loadForms, saveForms, findForm, TASK_FORM } from '../../../services/crmForms';
 
-const STORAGE_KEY = 'leadTaskFormsV1';
 
-function getStoredTaskForms() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch { /* ignore */ }
-  return [];
-}
+
 
 function taskFormToSections(form) {
   if (form?.sections && Array.isArray(form.sections) && form.sections.length > 0) return form.sections;
@@ -38,10 +30,11 @@ export default function TaskFormBuilderPage() {
   const [searchParams] = useSearchParams();
   const formId = searchParams.get('formId') || '';
 
-  const [currentForm] = useState(() => {
-    const forms = getStoredTaskForms();
-    return forms.find((f) => f.id === formId) || forms[0] || null;
-  });
+  const storeForms = useCrmStore((s) => s.forms);
+  const currentForm = useMemo(
+    () => (formId ? findForm(formId) : null) || loadForms(TASK_FORM)[0] || null,
+    [formId, storeForms],
+  );
 
   const [sections, setSections] = useState(() => {
     if (!currentForm) return [{ id: 'task-information', title: 'Task Information', fields: [] }];
@@ -57,19 +50,19 @@ export default function TaskFormBuilderPage() {
   // Single source of truth: persist every sections change (add/edit/delete/reorder)
   useEffect(() => {
     if (!currentForm?.id) return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const forms = raw !== null ? JSON.parse(raw) : [];
-      if (!Array.isArray(forms)) return;
-      const fieldNames = sections.flatMap((s) => (s.fields || []).map((f) => f.label));
-      const updated = forms.map((f) =>
-        f.id === currentForm.id
-          ? { ...f, sections, fields: fieldNames, lastUpdated: new Date().toLocaleDateString('en-GB') }
-          : f
-      );
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch { /* ignore */ }
+    persistSections();
   }, [sections, currentForm?.id]);
+
+  function persistSections() {
+    if (!currentForm?.id) return;
+    const fieldNames = sections.flatMap((sec) => (sec.fields || []).map((f) => f.label));
+    const updated = loadForms(TASK_FORM).map((f) =>
+      f.id === currentForm.id
+        ? { ...f, sections, fields: fieldNames, lastUpdated: new Date().toLocaleDateString('en-GB') }
+        : f
+    );
+    saveForms(updated, TASK_FORM);
+  }
 
   function updateField(fieldId, updates) {
     setSections((cur) =>
@@ -165,16 +158,7 @@ export default function TaskFormBuilderPage() {
   }
 
   function handleSave() {
-    if (currentForm?.id) {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        const forms = raw !== null ? JSON.parse(raw) : [];
-        if (Array.isArray(forms)) {
-          const fieldNames = sections.flatMap((s) => (s.fields || []).map((f) => f.label));
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(forms.map((f) => f.id === currentForm.id ? { ...f, sections, fields: fieldNames, lastUpdated: new Date().toLocaleDateString('en-GB') } : f)));
-        }
-      } catch { }
-    }
+    persistSections();
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -256,7 +240,7 @@ export default function TaskFormBuilderPage() {
                         </span>
                         <input
                           type="text"
-                          placeholder={f.placeholder || `Enter ${f.label.toLowerCase()}`}
+                          placeholder={f.placeholder || `Enter ${String(f.label ?? '').toLowerCase()}`}
                           readOnly
                           className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500"
                         />

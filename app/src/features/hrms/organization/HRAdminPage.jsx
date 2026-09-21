@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { hrmsSync } from '../../../services/hrmsSync';
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,
@@ -59,223 +60,6 @@ import GenerateOfferModal from "./GenerateOfferModal";
 import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
-// ── Initial Mock Data ──────────────────────────────────────────
-
-const INITIAL_TEAMS = [
-  { id: "T-01", name: "Engineering Leads", lead: "David Park", members: 18, approver: "Sarah Mitchell", dept: "Engineering" },
-  { id: "T-02", name: "People Operations & Talent", lead: "Ayesha Khan", members: 6, approver: "Ayesha Khan", dept: "HR" },
-  { id: "T-03", name: "Finance & Accounting", lead: "James Wilson", members: 8, approver: "James Wilson", dept: "Finance" },
-  { id: "T-04", name: "Product & UI/UX", lead: "Marcus Chen", members: 12, approver: "David Park", dept: "Design" },
-];
-
-const INITIAL_APPROVAL_CHAINS = [
-  { id: "AC-01", module: "Leave Management", tier1: "Direct Line Manager", tier2: "HR Operations Lead", tier3: "HR Director", autoEscalateDays: 3, status: "Active" },
-  { id: "AC-02", module: "Attendance Regularization", tier1: "Immediate Supervisor", tier2: "Department Head", tier3: "—", autoEscalateDays: 2, status: "Active" },
-  { id: "AC-03", module: "Asset Allocation", tier1: "IT Stock Manager", tier2: "Operations Lead", tier3: "Finance Approver", autoEscalateDays: 4, status: "Active" },
-  { id: "AC-04", module: "Payroll & Compensation Revisions", tier1: "HR Director", tier2: "Chief Financial Officer (CFO)", tier3: "Managing Director", autoEscalateDays: 5, status: "Active" },
-];
-
-const INITIAL_TERMINATIONS = [
-  {
-    id: "TRM-101",
-    employee: "Vikram Malhotra",
-    employeeId: "EMP-1088",
-    dept: "Engineering",
-    role: "Backend Engineer",
-    terminationType: "Involuntary (Performance)",
-    noticeDate: "2024-09-15",
-    exitDate: "2024-10-15",
-    severance: "1 Month Gross",
-    status: "In Exit Clearance",
-    reason: "Consistent shortfall in quarterly KPI goals following PIP.",
-  },
-  {
-    id: "TRM-102",
-    employee: "Ananya Deshmukh",
-    employeeId: "EMP-1052",
-    dept: "Sales & Marketing",
-    role: "Senior Account Exec",
-    terminationType: "Contract Non-Renewal",
-    noticeDate: "2024-09-01",
-    exitDate: "2024-09-30",
-    severance: "Standard Terms",
-    status: "Completed",
-    reason: "End of 1-year enterprise regional expansion contract.",
-  },
-  {
-    id: "TRM-103",
-    employee: "Rahul Mehra",
-    employeeId: "EMP-1077",
-    dept: "Operations",
-    role: "Logistics Coordinator",
-    terminationType: "Disciplinary / Breach",
-    noticeDate: "2024-10-02",
-    exitDate: "2024-10-05",
-    severance: "None (Cause)",
-    status: "Completed",
-    reason: "Gross violation of data confidentiality and NDA policy.",
-  },
-];
-
-const INITIAL_OFFERS = [
-  {
-    id: "OFF-101",
-    candidateId: "CAND-008",
-    candidateName: "Liam Cooper",
-    email: "liam.cooper@email.com",
-    position: "Senior Backend Developer",
-    jobType: "Full-time",
-    dept: "Engineering",
-    salary: "$105,000 / annum",
-    location: "New York HQ",
-    workMode: "Hybrid",
-    sentDate: "2024-09-20",
-    joiningDate: "2024-10-15",
-    expiryDate: "2024-10-01",
-    reportingManager: "David Park (CTO)",
-    probationPeriod: "3 Months",
-    status: "Accepted",
-  },
-  {
-    id: "OFF-102",
-    candidateId: "CAND-005",
-    candidateName: "Tariq Al-Mansoor",
-    email: "tariq@email.com",
-    position: "HR Operations Lead",
-    jobType: "Full-time",
-    dept: "HR",
-    salary: "$95,000 / annum",
-    location: "Dubai Office",
-    workMode: "On-site",
-    sentDate: "2024-09-25",
-    joiningDate: "2024-11-01",
-    expiryDate: "2024-10-15",
-    reportingManager: "Sarah Mitchell (CEO)",
-    probationPeriod: "3 Months",
-    status: "Pending",
-  },
-  {
-    id: "OFF-103",
-    candidateId: "CAND-003",
-    candidateName: "Chen Li",
-    email: "chen.li@email.com",
-    position: "Software Engineer Intern",
-    jobType: "Internship",
-    dept: "Engineering",
-    salary: "₹50,000 / month",
-    location: "Mumbai Hub",
-    workMode: "Hybrid",
-    sentDate: "2024-09-28",
-    joiningDate: "2024-10-25",
-    expiryDate: "2024-10-12",
-    reportingManager: "David Park (CTO)",
-    probationPeriod: "None",
-    status: "Pending",
-  },
-];
-
-const INITIAL_RESIGNATIONS = [
-  {
-    id: "RSG-201",
-    employee: "Rohan Varma",
-    employeeId: "EMP-1044",
-    dept: "Design",
-    role: "Senior UI Designer",
-    submittedDate: "2024-10-01",
-    lastWorkingDay: "2024-11-30",
-    noticePeriod: "60 Days",
-    handoverTo: "Marcus Chen",
-    reason: "Pursuing higher education / Master's degree overseas.",
-    status: "Approved & Serving Notice",
-  },
-  {
-    id: "RSG-202",
-    employee: "Pooja Hegde",
-    employeeId: "EMP-1061",
-    dept: "HR",
-    role: "Talent Recruiter",
-    submittedDate: "2024-10-08",
-    lastWorkingDay: "2024-12-08",
-    noticePeriod: "60 Days",
-    handoverTo: "Ayesha Khan",
-    reason: "Relocation to family residence in Pune.",
-    status: "Pending Manager Review",
-  },
-  {
-    id: "RSG-203",
-    employee: "Devansh Nair",
-    employeeId: "EMP-1039",
-    dept: "Engineering",
-    role: "DevOps Engineer",
-    submittedDate: "2024-09-10",
-    lastWorkingDay: "2024-10-10",
-    noticePeriod: "30 Days (Waived 30d)",
-    handoverTo: "Liam Cooper",
-    reason: "Accepted role closer to home with shorter commute.",
-    status: "Clearance in Progress",
-  },
-];
-
-const INITIAL_COMPLAINTS = [
-  {
-    id: "CMP-301",
-    complainant: "Confidential (Anonymous)",
-    against: "Engineering Lead",
-    category: "Workplace Harassment / POSH",
-    priority: "High",
-    filedOn: "2024-10-04",
-    assignedInvestigator: "Ayesha Khan (HR Director)",
-    status: "Under Investigation",
-    summary: "Hostile communication and unfair allocation of sprint workloads during team syncs.",
-  },
-  {
-    id: "CMP-302",
-    complainant: "Siddharth Rao",
-    against: "Finance Operations Team",
-    category: "Reimbursement & Payroll Delay",
-    priority: "Medium",
-    filedOn: "2024-10-07",
-    assignedInvestigator: "James Wilson (CFO)",
-    status: "Resolved",
-    summary: "Q3 client travel allowance claim delayed past standard 14-day SLA cutoff.",
-  },
-  {
-    id: "CMP-303",
-    complainant: "Neha Sharma",
-    against: "Facilities / IT Infrastructure",
-    category: "Physical Workplace Environment",
-    priority: "Low",
-    filedOn: "2024-10-09",
-    assignedInvestigator: "Adarsh Gupta",
-    status: "Open",
-    summary: "Ergonomic chair and dual-monitor setup requisition pending for 3 weeks.",
-  },
-];
-
-const INITIAL_HOLIDAYS = [
-  { id: "HOL-01", name: "New Year's Day", date: "2024-01-01", day: "Monday", type: "National Gazetted", appliesTo: "All Locations", status: "Past" },
-  { id: "HOL-02", name: "Republic Day", date: "2024-01-26", day: "Friday", type: "National Gazetted", appliesTo: "India Hubs", status: "Past" },
-  { id: "HOL-03", name: "Holi (Festival of Colours)", date: "2024-03-25", day: "Monday", type: "Restricted / Optional", appliesTo: "India Hubs", status: "Past" },
-  { id: "HOL-04", name: "Independence Day", date: "2024-08-15", day: "Thursday", type: "National Gazetted", appliesTo: "India Hubs", status: "Past" },
-  { id: "HOL-05", name: "Gandhi Jayanti", date: "2024-10-02", day: "Wednesday", type: "National Gazetted", appliesTo: "All Locations", status: "Past" },
-  { id: "HOL-06", name: "Dussehra (Vijayadashami)", date: "2024-10-12", day: "Saturday", type: "Regional Holiday", appliesTo: "India Hubs", status: "Upcoming" },
-  { id: "HOL-07", name: "Diwali / Deepavali", date: "2024-10-31", day: "Thursday", type: "National Gazetted", appliesTo: "All Locations", status: "Upcoming" },
-  { id: "HOL-08", name: "Guru Nanak Jayanti", date: "2024-11-15", day: "Friday", type: "Restricted / Optional", appliesTo: "India Hubs", status: "Upcoming" },
-  { id: "HOL-09", name: "Christmas Day", date: "2024-12-25", day: "Wednesday", type: "National Gazetted", appliesTo: "All Locations", status: "Upcoming" },
-];
-
-const ALL_DEPARTMENTS_CONFIG = [
-  { name: "Engineering", code: "ENG-01", head: "David Park", role: "VP of Engineering" },
-  { name: "Sales & CRM", code: "SAL-02", head: "Alex Rivera", role: "Head of Revenue & CRM" },
-  { name: "Human Resources", code: "HR-03", head: "Ayesha Khan", role: "People Operations Director" },
-  { name: "Finance", code: "FIN-04", head: "James Wilson", role: "CFO & Finance Head" },
-  { name: "Operations", code: "OPS-05", head: "Adarsh Gupta", role: "Head of Operations Admin" },
-  { name: "Marketing", code: "MKT-06", head: "Elena Rostova", role: "Head of Brand Strategy" },
-  { name: "Design", code: "DSN-07", head: "Marcus Chen", role: "Design Systems Lead" },
-  { name: "Warehouse & Inventory", code: "LOG-08", head: "Chen Li", role: "Logistics & Stock Manager" },
-  { name: "Executive", code: "EXE-09", head: "Sarah Mitchell", role: "Chief Executive Officer" },
-];
-
 export default function HRAdminPage({ defaultTab }) {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees || []);
@@ -310,13 +94,29 @@ export default function HRAdminPage({ defaultTab }) {
   const payrollEmployees = usePayrollStore((s) => s.employees || []);
 
   // Core Data Lists
-  const [teams, setTeams] = useState(INITIAL_TEAMS);
-  const [approvalChains, setApprovalChains] = useState(INITIAL_APPROVAL_CHAINS);
-  const [terminations, setTerminations] = useState(INITIAL_TERMINATIONS);
-  const [offersList, setOffersList] = useState(INITIAL_OFFERS);
-  const [resignations, setResignations] = useState(INITIAL_RESIGNATIONS);
-  const [complaints, setComplaints] = useState(INITIAL_COMPLAINTS);
-  const [holidays, setHolidays] = useState(INITIAL_HOLIDAYS);
+  // Teams, approval chains and terminations are HRMS collections.
+  const [departmentsConfig, setDepartmentsConfig] = useState([]);
+  const [teams, setTeams] = useState([]);
+  const [approvalChains, setApprovalChains] = useState([]);
+  const [terminations, setTerminations] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    hrmsSync.pullMany(['teams', 'approvalChains', 'terminations', 'complaints', 'departments'])
+      .then((rows) => {
+        if (cancelled) return;
+        if (rows.teams) setTeams(rows.teams);
+        if (rows.approvalChains) setApprovalChains(rows.approvalChains);
+        if (rows.terminations) setTerminations(rows.terminations);
+        if (rows.complaints) setComplaints(rows.complaints);
+        if (rows.departments) setDepartmentsConfig(rows.departments);
+      });
+    return () => { cancelled = true; };
+  }, []);
+  const [offersList, setOffersList] = useState([]);
+  const [resignations, setResignations] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [holidays, setHolidays] = useState([]);
 
   // Search & Filters for each tab
   const [search, setSearch] = useState("");
@@ -774,7 +574,7 @@ export default function HRAdminPage({ defaultTab }) {
     {
       id: "working-days",
       label: "Work Schedule",
-      count: `${ALL_DEPARTMENTS_CONFIG.length} Depts`,
+      count: `${departmentsConfig.length} Depts`,
       subtext: "Days & daily hours",
       icon: CalendarCheck,
       iconColor: "text-emerald-700",
@@ -1169,7 +969,7 @@ export default function HRAdminPage({ defaultTab }) {
               <span className="text-[12.5px] font-bold text-slate-800">Departmental Squad List</span>
               <span className="text-[11.5px] text-muted">
                 Showing {teams.filter((t) => {
-                  const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.lead.toLowerCase().includes(search.toLowerCase()) || t.id.toLowerCase().includes(search.toLowerCase()) || t.dept.toLowerCase().includes(search.toLowerCase());
+                  const matchSearch = !search || String(t.name ?? '').toLowerCase().includes(search.toLowerCase()) || String(t.lead ?? '').toLowerCase().includes(search.toLowerCase()) || String(t.id ?? '').toLowerCase().includes(search.toLowerCase()) || String(t.dept ?? '').toLowerCase().includes(search.toLowerCase());
                   const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
                   return matchSearch && matchDept;
                 }).length} of {teams.length} teams
@@ -1194,10 +994,10 @@ export default function HRAdminPage({ defaultTab }) {
                     .filter((t) => {
                       const matchSearch =
                         !search ||
-                        t.name.toLowerCase().includes(search.toLowerCase()) ||
-                        t.lead.toLowerCase().includes(search.toLowerCase()) ||
-                        t.id.toLowerCase().includes(search.toLowerCase()) ||
-                        t.dept.toLowerCase().includes(search.toLowerCase());
+                        String(t.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                        String(t.lead ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                        String(t.id ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                        String(t.dept ?? '').toLowerCase().includes(search.toLowerCase());
                       const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
                       return matchSearch && matchDept;
                     })
@@ -1261,10 +1061,10 @@ export default function HRAdminPage({ defaultTab }) {
               {teams.filter((t) => {
                 const matchSearch =
                   !search ||
-                  t.name.toLowerCase().includes(search.toLowerCase()) ||
-                  t.lead.toLowerCase().includes(search.toLowerCase()) ||
-                  t.id.toLowerCase().includes(search.toLowerCase()) ||
-                  t.dept.toLowerCase().includes(search.toLowerCase());
+                  String(t.name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                  String(t.lead ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                  String(t.id ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                  String(t.dept ?? '').toLowerCase().includes(search.toLowerCase());
                 const matchDept = teamDeptFilter === "all" || t.dept === teamDeptFilter;
                 return matchSearch && matchDept;
               }).length === 0 && (
@@ -1359,10 +1159,10 @@ export default function HRAdminPage({ defaultTab }) {
                     .filter((c) => {
                       const matchSearch =
                         !search ||
-                        c.module.toLowerCase().includes(search.toLowerCase()) ||
-                        c.tier1.toLowerCase().includes(search.toLowerCase()) ||
-                        c.tier2.toLowerCase().includes(search.toLowerCase()) ||
-                        c.tier3.toLowerCase().includes(search.toLowerCase());
+                        String(c.module ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                        String(c.tier1 ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                        String(c.tier2 ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                        String(c.tier3 ?? '').toLowerCase().includes(search.toLowerCase());
                       const matchStatus =
                         chainStatusFilter === "all" || c.status === chainStatusFilter;
                       return matchSearch && matchStatus;
@@ -2145,7 +1945,7 @@ export default function HRAdminPage({ defaultTab }) {
               <div>
                 <h4 className="font-bold text-[14px] text-slate-900">Department Working Days Policy</h4>
                 <p className="text-[12px] text-muted">
-                  Configured across {ALL_DEPARTMENTS_CONFIG.length} operational departments. Controls salary per-day rates and absent day deductions in Payroll.
+                  Configured across {departmentsConfig.length} operational departments. Controls salary per-day rates and absent day deductions in Payroll.
                 </p>
               </div>
             </div>
@@ -2216,7 +2016,7 @@ export default function HRAdminPage({ defaultTab }) {
             <div className="bg-white border border-bdr rounded-xl p-3.5 shadow-xs flex items-center justify-between">
               <div>
                 <div className="text-[11.5px] font-medium text-muted">Configured Departments</div>
-                <div className="text-[20px] font-bold text-slate-900 mt-0.5">{ALL_DEPARTMENTS_CONFIG.length} Departments</div>
+                <div className="text-[20px] font-bold text-slate-900 mt-0.5">{departmentsConfig.length} Departments</div>
               </div>
               <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-200">
                 <Building2 size={18} />
@@ -2285,12 +2085,12 @@ export default function HRAdminPage({ defaultTab }) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/60">
-                  {ALL_DEPARTMENTS_CONFIG.map((dept) => {
+                  {departmentsConfig.map((dept) => {
                     const currentDays = getDepartmentDays(departmentWorkingDays, dept.name);
                     const currentHours = getDepartmentHours(departmentWorkingHours, dept.name);
                     const staffCount = payrollEmployees.filter(
                       (e) =>
-                        e.department?.toLowerCase() === dept.name.toLowerCase() ||
+                        e.department?.toLowerCase() === String(dept.name ?? '').toLowerCase() ||
                         (dept.name === "Human Resources" && e.department?.toLowerCase() === "hr") ||
                         (dept.name === "Sales & CRM" && e.department?.toLowerCase().includes("sales")) ||
                         (dept.name === "Warehouse & Inventory" && e.department?.toLowerCase().includes("warehouse"))

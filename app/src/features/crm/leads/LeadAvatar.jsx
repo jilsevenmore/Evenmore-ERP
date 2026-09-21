@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { initials } from '../../../data/crm/mockLeads';
+import { initials } from '../../../services/crmSync';
 
 export default function LeadAvatar({ lead, className = "", style }) {
   const [hasError, setHasError] = useState(false);

@@ -1,53 +1,59 @@
 import { create } from "zustand";
-import {
-  jobsMock,
-  candidatesMock,
-  interviewsMock,
-  offersMock,
-  questionsMock,
-} from "../data/hrms/data/recruitmentData";
+import { writeThrough, pullTracked } from "../services/hrmsSync";
 
-const LS = "hrms_recruitment_v1";
 
-function load() {
-  try {
-    const v = localStorage.getItem(LS);
-    if (v) return JSON.parse(v);
-  } catch {}
-  return null;
-}
 
-const s = load();
-
+/**
+ * Every action hands the whole recruitment state here after changing part of
+ * it. Each collection is written through to its own endpoint; `writeThrough`
+ * works out which rows are new, changed or gone, so a change to jobs does not
+ * touch candidates.
+ */
 function persist(state) {
-  try {
-    localStorage.setItem(
-      LS,
-      JSON.stringify({
-        jobs: state.jobs,
-        candidates: state.candidates,
-        interviews: state.interviews,
-        offers: state.offers,
-        questions: state.questions,
-        onboardedMap: state.onboardedMap,
-        verifiedDocsMap: state.verifiedDocsMap,
-      })
-    );
-  } catch {}
+  writeThrough("jobs", state.jobs);
+  writeThrough("candidates", state.candidates);
+  writeThrough("interviews", state.interviews);
+  writeThrough("offers", state.offers);
+  writeThrough("recruitmentQuestions", state.questions);
 }
 
 export const useRecruitmentStore = create((set) => ({
-  jobs: s?.jobs ?? jobsMock,
-  candidates: s?.candidates ?? candidatesMock,
-  interviews: s?.interviews ?? interviewsMock,
-  offers: s?.offers ?? offersMock,
-  questions: s?.questions ?? questionsMock,
-  onboardedMap: s?.onboardedMap ?? { "CAND-008": true },
-  verifiedDocsMap: s?.verifiedDocsMap ?? { "CAND-008": true },
+  jobs: [],
+  candidates: [],
+  interviews: [],
+  offers: [],
+  questions: [],
+  onboardedMap: {},
+  verifiedDocsMap: {},
 
   toast: null,
   showToast: (msg) => set({ toast: { msg, id: Date.now().toString() } }),
   clear: () => set({ toast: null }),
+
+  /** Load the recruitment pipeline from the API. */
+  hydrate: async () => {
+    const rows = await Promise.all([
+      pullTracked("jobs"),
+      pullTracked("candidates"),
+      pullTracked("interviews"),
+      pullTracked("offers"),
+      pullTracked("recruitmentQuestions"),
+    ]);
+    set((s) => ({
+      jobs: rows[0] || s.jobs,
+      candidates: rows[1] || s.candidates,
+      interviews: rows[2] || s.interviews,
+      offers: rows[3] || s.offers,
+      questions: rows[4] || s.questions,
+    }));
+    return rows;
+  },
+
+  /** Empty on sign-out so the next user sees nothing of the previous one. */
+  clearData: () => set({
+    jobs: [], candidates: [], interviews: [], offers: [], questions: [],
+    onboardedMap: {}, verifiedDocsMap: {},
+  }),
 
   // ─── JOBS ──────────────────────────────────────────
   addJob: (j) =>

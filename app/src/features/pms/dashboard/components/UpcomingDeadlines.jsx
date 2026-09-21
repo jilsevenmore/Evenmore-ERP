@@ -57,7 +57,7 @@ export function UpcomingDeadlines({ rows = [], windowDays = 7 }) {
                       to={`/pms/projects/${row.id}`}
                       className="text-xs font-bold text-slate-800 hover:text-blue-600 hover:underline"
                     >
-                      {row.id}
+                      {row.code || row.id}
                     </Link>
                     <div className="text-[11px] text-slate-500 truncate" title={row.productName}>
                       {row.customerName} · {row.productName}

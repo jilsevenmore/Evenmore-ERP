@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import InfoBanner from "../common/InfoBanner";
 import StageTasksGuideModal from "./StageTasksGuideModal";
+import { useCrmStore } from "../../../stores/crmStore";
+import { syncCollection } from "../../../services/crmCollections";
 
 const STAGE_THEMES = [
   {
@@ -94,151 +96,20 @@ function getDynamicTaskOptions() {
   return DEFAULT_TASK_OPTIONS;
 }
 
-const INITIAL_STAGES = [
-  {
-    id: "new",
-    name: "New Lead",
-    tasks: [
-      {
-        id: 1,
-        name: "Call",
-        description: "Initial call to understand requirements",
-        role: "Tele Caller Executive",
-        department: "Any",
-        order: 0,
-        required: true,
-        autoCreate: true,
-        repeats: 14,
-        dueIn: 0,
-      },
-    ],
-  },
-  {
-    id: "details",
-    name: "Details Collected",
-    tasks: [
-      {
-        id: 2,
-        name: "Send email",
-        description: "Share company brochure",
-        role: "Sales Support Executive",
-        department: "Any",
-        order: 1,
-        required: true,
-        autoCreate: true,
-        repeats: 6,
-        dueIn: 0,
-      },
-    ],
-  },
-  {
-    id: "quotation",
-    name: "Quotation Shared",
-    tasks: [
-      {
-        id: 3,
-        name: "Send quotation",
-        description: "Share quotation with client",
-        role: "BDE",
-        department: "Any",
-        order: 1,
-        required: true,
-        autoCreate: true,
-        repeats: 10,
-        dueIn: 1,
-      },
-      {
-        id: 4,
-        name: "Schedule demo",
-        description: "Arrange product demo",
-        role: "Area Sales Manager",
-        department: "Any",
-        order: 2,
-        required: true,
-        autoCreate: true,
-        repeats: 6,
-        dueIn: 2,
-      },
-    ],
-  },
-  {
-    id: "demo",
-    name: "Demo Pending",
-    tasks: [
-      {
-        id: 5,
-        name: "Client meeting",
-        description: "Meeting at client office",
-        role: "Sales Support Executive",
-        department: "Any",
-        order: 1,
-        required: false,
-        autoCreate: true,
-        repeats: 6,
-        dueIn: 3,
-      },
-    ],
-  },
-  {
-    id: "done",
-    name: "Demo Done",
-    tasks: [],
-  },
-  {
-    id: "negotiation",
-    name: "Negotiation",
-    tasks: [
-      {
-        id: 6,
-        name: "Negotiate pricing",
-        description: "Confirm commercial terms",
-        role: "BDE",
-        department: "Any",
-        order: 1,
-        required: true,
-        autoCreate: false,
-        repeats: 3,
-        dueIn: 2,
-      },
-    ],
-  },
-  {
-    id: "won",
-    name: "Won",
-    tasks: [],
-  },
-  {
-    id: "lost",
-    name: "Lost",
-    tasks: [],
-  },
-];
-
-const EMPTY_MASTER_TASK = {
-  name: "",
-  role: "Tele Caller Executive",
-  priority: "Medium",
-  dueIn: 0,
-  time: "",
-  department: "Any",
-  repeats: 6,
-  form: "None",
-  description: "",
-};
-
-const STORAGE_KEY = 'leadStageTasksV1';
+// Which pipeline the screen is looking at is a view preference, not data.
 const PIPELINE_KEY = 'leadStageTasksPipelineV1';
 
-function getStoredStages() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch { /* ignore */ }
-  return INITIAL_STAGES;
-}
+/** A blank stage task, as the "add task" form opens it. */
+const EMPTY_MASTER_TASK = {
+  name: '',
+  description: '',
+  role: '',
+  department: '',
+  priority: 'Medium',
+  dueIn: 1,
+  autoCreate: true,
+  isActive: true,
+};
 
 function getStoredPipeline() {
   try {
@@ -247,8 +118,27 @@ function getStoredPipeline() {
   return 'Sales';
 }
 
+/**
+ * The screen renders a stage with its tasks nested. The API keeps them apart
+ * (`/crm/stages/` and `/crm/stage-tasks/`), so they are joined here.
+ */
+function stagesWithTasks(stages, stageTasks) {
+  return stages.map((stage) => ({
+    ...stage,
+    tasks: stageTasks
+      .filter((task) => task.stageId === stage.id)
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)),
+  }));
+}
+
 export default function LeadStageTasks({ leadForms = [] }) {
-  const [stages, setStages] = useState(getStoredStages);
+  const storeStages = useCrmStore((s) => s.stages);
+  const storeStageTasks = useCrmStore((s) => s.stageTasks);
+  const [stages, setStages] = useState([]);
+
+  useEffect(() => {
+    setStages(stagesWithTasks(storeStages, storeStageTasks));
+  }, [storeStages, storeStageTasks]);
   const [openStages, setOpenStages] = useState([]);
   const [isTaskRolesOpen, setIsTaskRolesOpen] = useState(false);
   const [pipeline, setPipeline] = useState(getStoredPipeline);
@@ -260,11 +150,15 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const taskOptions = useMemo(() => getDynamicTaskOptions(), []);
 
 
+  // An edit anywhere in the tree is written back as the flat task collection
+  // the API stores, with each task carrying the stage it belongs to.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stages));
-    } catch { /* ignore */ }
-  }, [stages]);
+    if (stages.length === 0) return;
+    const flat = stages.flatMap((stage) =>
+      (stage.tasks || []).map((task, index) => ({ ...task, stageId: stage.id, order: index + 1 }))
+    );
+    syncCollection('stageTasks', flat, storeStageTasks);
+  }, [stages, storeStageTasks]);
 
   useEffect(() => {
     try {
@@ -272,11 +166,12 @@ export default function LeadStageTasks({ leadForms = [] }) {
     } catch { /* ignore */ }
   }, [pipeline]);
 
+  /** Re-read the configured stages and their tasks from the server. */
   function resetToDefaults() {
-    setStages(INITIAL_STAGES);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_STAGES));
-    } catch { /* ignore */ }
+    const store = useCrmStore.getState();
+    Promise.all([store.refresh('stages'), store.refresh('stageTasks')]).catch((err) => {
+      console.warn('[CRM] could not reload stage tasks:', err?.message || err);
+    });
   }
 
   function getDraft(stageId) {

@@ -187,8 +187,8 @@ export default function Requests() {
       if (
         search &&
         !(
-          r.employee.toLowerCase().includes(search.toLowerCase()) ||
-          r.id.toLowerCase().includes(search.toLowerCase())
+          String(r.employee ?? '').toLowerCase().includes(search.toLowerCase()) ||
+          String(r.id ?? '').toLowerCase().includes(search.toLowerCase())
         )
       )
         return false;

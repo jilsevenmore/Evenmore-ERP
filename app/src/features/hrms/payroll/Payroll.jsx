@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Building2,
@@ -33,7 +33,6 @@ import {
   DEFAULT_DEPARTMENT_WORKING_DAYS,
   DEFAULT_DEPARTMENT_WORKING_HOURS,
   WORKFLOW_STAGES,
-  OWN_SALARY_HISTORY,
 } from "../../../stores/payrollStore";
 import {
   calculateSalaryComponents,
@@ -352,7 +351,16 @@ export default function Payroll() {
     runPayrollForAll,
     updateEmployeePayroll,
     addStructure,
+    ownHistory: ownSalaryHistory = [],
+    loadOwnHistory,
   } = usePayrollStore();
+
+  // The "My Salary" tab shows this user's own payslips, read by employee id.
+  useEffect(() => {
+    if (currentUser?.employeeId || currentUser?.id) {
+      loadOwnHistory?.(currentUser.employeeId || currentUser.id);
+    }
+  }, [currentUser?.employeeId, currentUser?.id, loadOwnHistory]);
 
   // Primary 4 views: 'overall' | 'department' | 'employee' | 'own'
   const [activeTab, setActiveTab] = useState("overall");
@@ -387,13 +395,13 @@ export default function Payroll() {
   const [editDeductions, setEditDeductions] = useState(0);
 
   // Switcher for Own Salary perspective
-  const [activeOwnUser, setActiveOwnUser] = useState(currentUser.name || "Adarsh Gupta");
+  const [activeOwnUser, setActiveOwnUser] = useState(currentUser?.name || "Adarsh Gupta");
 
   // Dynamic calculations with approved leaves & attendance integration
   const computedEmployeePayrolls = useMemo(() => {
     return payrollEmployees.map((p) => {
       const empLeaves = storeLeaves.filter(
-        (l) => l.employee?.toLowerCase() === p.name.toLowerCase() && l.status?.includes("Approved")
+        (l) => l.employee?.toLowerCase() === String(p.name ?? '').toLowerCase() && l.status?.includes("Approved")
       );
       const leaveDays = empLeaves.reduce((sum, l) => sum + (Number(l.days) || 1), 0);
 
@@ -508,9 +516,9 @@ export default function Payroll() {
     return computedEmployeePayrolls.filter((p) => {
       const q = empSearch.toLowerCase();
       const matchSearch =
-        p.name.toLowerCase().includes(q) ||
-        p.role.toLowerCase().includes(q) ||
-        p.empId.toLowerCase().includes(q);
+        String(p.name ?? '').toLowerCase().includes(q) ||
+        String(p.role ?? '').toLowerCase().includes(q) ||
+        String(p.empId ?? '').toLowerCase().includes(q);
       const matchDept = deptFilter === "All" || p.department === deptFilter;
       const matchStatus = statusFilter === "All" || p.status === statusFilter;
       return matchSearch && matchDept && matchStatus;
@@ -521,7 +529,7 @@ export default function Payroll() {
   const ownRecord = useMemo(() => {
     return (
       computedEmployeePayrolls.find(
-        (p) => p.name.toLowerCase() === activeOwnUser.toLowerCase()
+        (p) => String(p.name ?? '').toLowerCase() === activeOwnUser.toLowerCase()
       ) || computedEmployeePayrolls[0]
     );
   }, [computedEmployeePayrolls, activeOwnUser]);
@@ -1483,7 +1491,7 @@ export default function Payroll() {
           <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
             <div className="flex items-center gap-4">
               <div className="w-14 h-14 rounded-2xl bg-navy/5 text-navy border border-navy/15 flex items-center justify-center font-bold text-[18px]">
-                {currentUser.initials || "AG"}
+                {currentUser?.initials || "AG"}
               </div>
               <div>
                 <div className="flex items-center gap-2">
@@ -1552,9 +1560,9 @@ export default function Payroll() {
                 onChange={(e) => setActiveOwnUser(e.target.value)}
                 className="h-8 px-2.5 bg-off border border-bdr rounded-lg font-medium text-slate-900 focus:outline-none focus:border-navy cursor-pointer"
               >
-                <option value={currentUser.name}>{currentUser.name} (You)</option>
+                <option value={currentUser?.name}>{currentUser?.name} (You)</option>
                 {payrollEmployees
-                  .filter((p) => p.name !== currentUser.name)
+                  .filter((p) => p.name !== currentUser?.name)
                   .map((p) => (
                     <option key={p.id} value={p.name}>
                       {p.name} ({p.department})
@@ -1773,7 +1781,7 @@ export default function Payroll() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-bdr/40">
-                  {OWN_SALARY_HISTORY.map((h, i) => (
+                  {ownSalaryHistory.map((h, i) => (
                     <tr key={h.slipNo || i} className="hover:bg-slate-50/60 transition">
                       <td className="py-3 px-5 font-medium text-slate-900">{h.month}</td>
                       <td className="py-3 px-5 font-mono text-[12px] text-slate-500">{h.slipNo}</td>

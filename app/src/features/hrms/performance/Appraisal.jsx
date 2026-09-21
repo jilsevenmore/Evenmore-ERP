@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useAppStore } from "../../../stores/appStore";
 import { usePerformanceStore, getRatingScaleTier, calculateWeightedScore } from "../../../stores/performanceStore";
-import { ratingScales } from "../../../data/hrms/data/performanceMockData";
+import { RATING_SCALES as ratingScales } from "../../../services/performanceScales";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { FilterBar } from "../../../components/hrms/FilterBar";
 import { StatusBadge } from "../../../components/hrms/StatusBadge";
@@ -116,9 +116,9 @@ export default function Appraisal() {
 
       // Role filter simulation
       if (role === "Employee") {
-        if (r.employee.toLowerCase() !== simulatedEmployeeName.toLowerCase()) return false;
+        if (String(r.employee ?? '').toLowerCase() !== simulatedEmployeeName.toLowerCase()) return false;
       } else if (role === "Manager") {
-        if (r.reviewer.toLowerCase() !== simulatedManagerName.toLowerCase()) return false;
+        if (String(r.reviewer ?? '').toLowerCase() !== simulatedManagerName.toLowerCase()) return false;
       }
 
       if (search && !`${r.employee} ${r.cycle} ${r.reviewer} ${r.department}`.toLowerCase().includes(search.toLowerCase())) return false;

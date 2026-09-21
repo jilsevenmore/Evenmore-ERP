@@ -51,7 +51,7 @@ export function CompleteProjectModal({ isOpen, onClose, project, onCompleted }) 
         { ...pm, name: signer.trim() || pm?.name },
         { force: override }
       );
-      showToast(`${project.id} signed off — ${metrics.totalDurationDays} day turnaround.`);
+      showToast(`${project.code || project.id} signed off — ${metrics.totalDurationDays} day turnaround.`, 'success', 'onCompletion');
       onCompleted?.(metrics);
       onClose?.();
     } catch (err) {
@@ -64,7 +64,7 @@ export function CompleteProjectModal({ isOpen, onClose, project, onCompleted }) 
       isOpen={isOpen}
       onClose={onClose}
       title="Complete Project"
-      subtitle={`${project.id} — ${project.customerName}`}
+      subtitle={`${project.code || project.id} — ${project.customerName}`}
       footer={
         <>
           <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>

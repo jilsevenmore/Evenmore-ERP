@@ -91,8 +91,8 @@ export const CreateWarrantyCardModal = ({
             const mi = masterItems.find(
                 (m) =>
                     m.id === line.itemId ||
-                    (line.itemSku && m.sku?.toLowerCase() === line.itemSku.toLowerCase()) ||
-                    (line.sku && m.sku?.toLowerCase() === line.sku.toLowerCase())
+                    (line.itemSku && m.sku?.toLowerCase() === String(line.itemSku ?? '').toLowerCase()) ||
+                    (line.sku && m.sku?.toLowerCase() === String(line.sku ?? '').toLowerCase())
             );
 
             const defaultPeriod = mi?.warrantyPeriod ?? 3;

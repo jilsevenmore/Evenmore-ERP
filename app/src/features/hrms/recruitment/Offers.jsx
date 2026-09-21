@@ -97,7 +97,7 @@ export default function Offers() {
       candidateName: offerItem.candidateName,
       email:
         cand?.email ||
-        `${offerItem.candidateName.toLowerCase().replace(/\s+/g, ".")}@example.com`,
+        `${String(offerItem.candidateName ?? '').toLowerCase().replace(/\s+/g, ".")}@example.com`,
       position: offerItem.position,
       jobType: offerItem.jobType || "Full-time",
       dept: offerItem.position?.includes("Design")

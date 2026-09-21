@@ -11,7 +11,10 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
     const companyAddress = companyProfile?.address || '742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134';
     const phone = companyProfile?.phone || '+1 (800) 555-0199';
     const companyStateCode = (gstin || '').slice(0, 2).toUpperCase();
-    const posRaw = String(invoice.placeOfSupplyState || invoice.placeOfSupply || invoice.shippingState || '');
+    // The modal stays mounted with `invoice={null}` while closed, and this runs
+    // above the `if (!isOpen || !invoice)` return — the hook below has to keep
+    // its unconditional call site, so read defensively rather than moving it.
+    const posRaw = String(invoice?.placeOfSupplyState || invoice?.placeOfSupply || invoice?.shippingState || '');
     const posMatch = posRaw.match(/(\d{2})/);
     const posStateCode = posMatch ? posMatch[1] : posRaw.slice(0, 2).toUpperCase();
     const hasStates = Boolean(companyStateCode && posStateCode);

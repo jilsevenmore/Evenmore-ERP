@@ -97,7 +97,7 @@ export default function MyTasksPage() {
         title="My Tasks"
         subtitle={
           currentUser
-            ? `Everything assigned to ${currentUser.name} across all active projects.`
+            ? `Everything assigned to ${currentUser?.name} across all active projects.`
             : 'Your tasks across all active projects.'
         }
       />

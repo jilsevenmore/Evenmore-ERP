@@ -21,11 +21,11 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
         if (!searchTerm.trim())
             return true;
         const term = searchTerm.toLowerCase();
-        return (r.product.toLowerCase().includes(term) ||
-            r.requestedBy.toLowerCase().includes(term) ||
-            r.zone.toLowerCase().includes(term) ||
-            r.requestNumber.toLowerCase().includes(term) ||
-            r.sku.toLowerCase().includes(term));
+        return (String(r.product ?? '').toLowerCase().includes(term) ||
+            String(r.requestedBy ?? '').toLowerCase().includes(term) ||
+            String(r.zone ?? '').toLowerCase().includes(term) ||
+            String(r.requestNumber ?? '').toLowerCase().includes(term) ||
+            String(r.sku ?? '').toLowerCase().includes(term));
     });
     const handleApprove = (id) => {
         onRequestUpdate(id, 'Approved');

@@ -335,7 +335,7 @@ export const CategoriesPage = () => {
         data={displayCategories}
         keyExtractor={(c) => c.id}
         searchPlaceholder="Filter category name or code..."
-        searchFilter={(c, term) => c.name.toLowerCase().includes(term) || c.code.toLowerCase().includes(term)}
+        searchFilter={(c, term) => String(c.name ?? '').toLowerCase().includes(term) || String(c.code ?? '').toLowerCase().includes(term)}
       />
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">

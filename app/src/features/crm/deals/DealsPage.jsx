@@ -38,7 +38,8 @@ import {
   Info,
 } from 'lucide-react';
 
-import { DEALS_STORAGE_KEY as STORAGE_KEY, loadDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
+import { loadDeals, saveDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
+import { useCrmStore } from '../../../stores/crmStore';
 
 const STAGES = ['Draft', 'Sent', 'Open', 'Won', 'Lost'];
 const PRODUCTS = ['All Products', 'Diamond Jewelry', 'Gold Ornaments', 'Silver Collection', 'Laser Machine', 'CNC Spindle', 'AMC Service'];
@@ -121,19 +122,15 @@ function formatStageSummary(totalAmount, count) {
 }
 
 export default function DealsPage() {
-  const [deals, setDeals] = useState(() => {
-    try { return loadDeals(); } catch { return []; }
-  });
+  const storeDeals = useCrmStore((s) => s.deals);
+  const [deals, setDeals] = useState([]);
 
+  useEffect(() => { setDeals(storeDeals); }, [storeDeals]);
+
+  // Anything the board changed is written back to `/crm/deals/`.
   useEffect(() => {
-    try {
-      loadDeals(); // Do not overwrite malformed saved data with an empty display fallback.
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(deals));
-    } catch (error) {
-      console.error('[CRM Deals] Persistence failed:', error);
-      setToastMessage('Deals could not be loaded or saved. Existing saved data has been preserved.');
-    }
-  }, [deals]);
+    if (deals.length > 0 || storeDeals.length > 0) saveDeals(deals);
+  }, [deals, storeDeals]);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedDealId = searchParams.get('deal');
@@ -469,15 +466,12 @@ export default function DealsPage() {
       )}
 
       {linkedDealId ? <DealDetailView key={linkedDealId} deal={deals.find((item) => String(item.id) === linkedDealId)} onEdit={handleOpenEditModal} onNotify={showNotification} onDelete={setDealToDelete} onUpdate={(patch) => {
-        const current = loadDeals();
-        const updated = current.map((item) => String(item.id) === linkedDealId ? { ...item, ...patch } : item);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        const updated = loadDeals().map((item) => String(item.id) === linkedDealId ? { ...item, ...patch } : item);
         setDeals(updated);
         window.dispatchEvent(new Event('crm:data-updated'));
       }} onDuplicate={(deal) => {
         const copy = buildDeal({ name: `${deal.name} (copy)`, client: deal.client, phone: deal.phone, price: deal.price, product: deal.product, products: deal.products, source: deal.source, assignedUser: deal.assignedUser, team: deal.team, description: deal.description, stage: 'Draft', createdAt: new Date().toISOString() }, `dl-${crypto.randomUUID()}`);
         const updated = [copy, ...loadDeals()];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
         setDeals(updated);
         setSearchParams({ deal: copy.id });
         showNotification('Deal duplicated as a new draft.');

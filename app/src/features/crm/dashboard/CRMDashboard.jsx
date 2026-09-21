@@ -2,14 +2,15 @@ import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Users, UserPlus, Clock, TrendingUp, TrendingDown, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
-import { leads, initials } from "../../../data/crm/mockLeads";
+import { useCrmStore } from "../../../stores/crmStore";
+import { initials, describeError } from "../../../services/crmSync";
 import { useERP } from "../../../context/ERPContext";
 import { useAppStore } from "../../../stores/appStore";
 import { CRM_TEAM_MEMBERS } from "../../../services/leadStageAutomation";
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from "../../../services/taskCompletionService";
 import CompleteTaskModal from "../tasks/CompleteTaskModal";
 import CreateLeadModal from "../leads/CreateLeadModal";
-import { runLeadStageAutomation, LEADS_STORAGE_KEY } from "../../../services/leadStageAutomation";
+import { runLeadStageAutomation } from "../../../services/leadStageAutomation";
 const DEAL_STORAGE_KEY = "crm-deals-v1";
 const TASK_STORAGE_KEY = "crm-tasks-v1";
 const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
@@ -17,27 +18,11 @@ const SOURCE_COLORS = ["#2f6fed", "#7c3aed", "#f59e0b", "#10b981", "#ec4899", "#
 const AVATAR_COLORS = ["#2f6fed", "#7c3aed", "#059669", "#ea580c", "#db2777", "#0891b2", "#4f46e5"];
 const PIPELINE_BG = ["#eef4ff", "#f5f0ff", "#fff7e8", "#eef4ff", "#ecfdf5"];
 const PIPELINE_FG = ["#2f6fed", "#7c3aed", "#b45309", "#2f6fed", "#059669"];
-function seedDeals() {
-  return [
-    { id: "dl-1", name: "amitbhai_001", phone: "+919876543210", price: 100000, client: "Amit Bhai", product: "Product A", stage: "Draft", source: "Website", assignedUser: "Mr. Kamlesh Dhumadiya", pipeline: "Sales", labels: [], notes: "", tasks: "0/0", items: 0, users: 0, createdAt: "2026-05-10T10:00:00" },
-    { id: "dl-2", name: "Rohit", phone: "+919876543211", price: 500000, client: "Rohit Sharma", product: "Product B", stage: "Draft", source: "Referral", assignedUser: "Jayesh Nair", pipeline: "Sales", labels: [], notes: "", tasks: "0/0", items: 0, users: 0, createdAt: "2026-05-12T10:00:00" },
-    { id: "dl-3", name: "Deal Alpha", phone: "+919876543212", price: 750000, client: "Alpha Corp", product: "Product A", stage: "Draft", source: "Cold Call", assignedUser: "Anuska", pipeline: "Sales", labels: [], notes: "", tasks: "1/3", items: 2, users: 1, createdAt: "2026-04-08T10:00:00" },
-    { id: "dl-4", name: "Deal Beta", phone: "+919876543213", price: 1200000, client: "Beta Ltd", product: "Service C", stage: "Draft", source: "Website", assignedUser: "Mr. Kamlesh Dhumadiya", pipeline: "Sales", labels: [], notes: "", tasks: "2/5", items: 1, users: 2, createdAt: "2026-03-15T10:00:00" },
-    { id: "dl-5", name: "Deal Gamma", phone: "+919876543214", price: 1500000, client: "Gamma Inc", product: "Product B", stage: "Draft", source: "Referral", assignedUser: "Jayesh Nair", pipeline: "Sales", labels: [], notes: "", tasks: "0/2", items: 0, users: 0, createdAt: "2026-02-20T10:00:00" },
-    { id: "dl-6", name: "Deal Delta", phone: "+919876543215", price: 11123, client: "Delta Co", product: "Product A", stage: "Draft", source: "Website", assignedUser: "Anuska", pipeline: "Sales", labels: [], notes: "", tasks: "0/0", items: 0, users: 0, createdAt: "2026-01-11T10:00:00" }
-  ];
+/** Lower-cased text, safe on a field the server left unset. */
+function text(value) {
+  return String(value ?? '').toLowerCase();
 }
-function loadDeals() {
-  try {
-    const raw = localStorage.getItem(DEAL_STORAGE_KEY);
-    if (!raw) return seedDeals();
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return seedDeals();
-    return parsed.map((d) => ({ labels: [], pipeline: "Sales", notes: "", ...d }));
-  } catch {
-    return seedDeals();
-  }
-}
+
 function splitLeadName(full) {
   const text = full || "";
   const open = text.indexOf("(");
@@ -60,26 +45,6 @@ function normalizeTask(t) {
     status: t.status,
     owner: t.owner
   };
-}
-function baseTasks() {
-  return [
-    { id: "TSK-001", title: "Follow up on Enterprise Quote", lead: "Sarah Jenkins (Acme Corp)", owner: "Alex Rivera", dueDate: "2026-09-12", priority: "High", status: "In Progress" },
-    { id: "TSK-002", title: "Schedule product demo call", lead: "Michael Chang (TechFlow)", owner: "Elena Rostova", dueDate: "2026-09-10", priority: "Urgent", status: "Open" },
-    { id: "TSK-003", title: "Send revised contract terms", lead: "David Ross (Global Logistics)", owner: "Alex Rivera", dueDate: "2026-09-15", priority: "Medium", status: "Waiting" },
-    { id: "TSK-004", title: "Prepare onboarding requirements", lead: "Amanda Lee (Apex Innovations)", owner: "Sarah Chen", dueDate: "2026-09-08", priority: "High", status: "Completed" },
-    { id: "TSK-005", title: "Review custom billing setup", lead: "Robert Miller (Vanguard Systems)", owner: "Elena Rostova", dueDate: "2026-09-18", priority: "Low", status: "Open" }
-  ];
-}
-function loadTasks() {
-  try {
-    const raw = localStorage.getItem(TASK_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch {
-  }
-  return baseTasks().map(normalizeTask);
 }
 function avatarColor(name) {
   let h = 0;
@@ -116,68 +81,53 @@ function formatShortINR(value) {
 export default function DashboardView() {
   const { invoices, quotations, salesOrders, paymentIns, formatCurrency, getInvoiceOutstanding } = useERP();
   const currentUser = useAppStore((s) => s.currentUser);
-  const [deals, setDeals] = useState(loadDeals);
-  const [tasks, setTasks] = useState(loadTasks);
+  const leads = useCrmStore((s) => s.leads);
+  const deals = useCrmStore((s) => s.deals);
+  const tasks = useCrmStore((s) => s.tasks);
+  const createLead = useCrmStore((s) => s.createLead);
+  const completeCrmTask = useCrmStore((s) => s.completeTask);
+  const firstStageId = useCrmStore((s) => (
+    [...s.stages]
+      .filter((stage) => stage.isActive !== false)
+      .sort((a, b) => (Number(a.order ?? a.sequence) || 0) - (Number(b.order ?? b.sequence) || 0))[0]?.id
+  ));
   const [tab, setTab] = useState("All");
   const [query, setQuery] = useState("");
   const [completeTarget, setCompleteTarget] = useState(null);
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
 
-  function handleCreateLead(data) {
+  async function handleCreateLead(data) {
     try {
-      const raw = localStorage.getItem(LEADS_STORAGE_KEY);
-      const current = raw ? JSON.parse(raw) : leads;
-      const nextId = current.reduce((max, l) => Math.max(max, Number(l.id) || 0), 0) + 1;
-      const count = String(nextId + 184).padStart(8, '0');
-      const newLead = {
-        id: nextId,
+      const newLead = await createLead({
+        // The server requires the lead to enter the pipeline at a stage.
+        stageId: data.stageId || firstStageId,
         name: data.leadName || 'Untitled Lead',
         company: data.company || '',
         phone: data.phone || '',
         email: data.email || '',
-        status: 'New',
-        source: data.source || 'Website',
-        owner: data.owner || 'Drashti Evenmore',
-        createdOn: data.createdOn ? new Date(data.createdOn).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
+        ownerId: data.ownerId || undefined,
+        sourceId: data.sourceId || undefined,
+        industryId: data.industryId || undefined,
         jobTitle: data.titleValue || '',
-        industry: data.industry || '',
-        products: data.products || [],
-        assignedUsers: data.leadUsers || [],
-        photo: data.photoPreview || '',
-        leadCode: `LD-${count}`,
-      };
-      const updated = [newLead, ...current];
-      localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(updated));
-      try {
-        runLeadStageAutomation(newLead, 'New');
-      } catch (err) {
-        console.error(err);
+        createdOn: data.createdOn || undefined,
+      });
+      if (newLead) {
+        try {
+          runLeadStageAutomation(newLead, 'New');
+        } catch (err) {
+          console.error(err);
+        }
       }
-    } catch (e) {
-      console.error('Error creating lead:', e);
+    } catch (err) {
+      console.error('Error creating lead:', describeError(err));
     }
     setIsCreateLeadOpen(false);
   }
-  const firstName = (currentUser?.name || "Hiti").split(" ")[0];
+  const firstName = (currentUser?.name || "").split(" ")[0];
   const hour = new Date().getHours();
   const greet = hour < 12 ? "Good Morning" : hour < 17 ? "Good Afternoon" : "Good Evening";
   const todayStr = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short", year: "numeric" });
   const todayISO = new Date().toISOString().slice(0, 10);
-  useEffect(() => {
-    const syncDeals = () => setDeals(loadDeals());
-    window.addEventListener("storage", syncDeals);
-    window.addEventListener("focus", syncDeals);
-    return () => {
-      window.removeEventListener("storage", syncDeals);
-      window.removeEventListener("focus", syncDeals);
-    };
-  }, []);
-  useEffect(() => {
-    try {
-      localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(tasks));
-    } catch {
-    }
-  }, [tasks]);
   const totalLeads = leads.length;
   const activeLeads = leads.filter((l) => l.status !== "Lost Lead").length;
   const newLeads = leads.filter((l) => l.status === "New").length;
@@ -243,7 +193,7 @@ export default function DashboardView() {
   const filtered = tasks.filter((t) => {
     const okTab = tab === "All" || bucket(t) === tab;
     const q = query.trim().toLowerCase();
-    const okQ = !q || t.title.toLowerCase().includes(q) || t.lead.toLowerCase().includes(q) || t.owner.toLowerCase().includes(q);
+    const okQ = !q || text(t.title).includes(q) || text(t.lead).includes(q) || text(t.owner).includes(q);
     return okTab && okQ;
   });
   const completeTask = (t) => {
@@ -252,45 +202,9 @@ export default function DashboardView() {
   };
   async function handleComplete(outcome, nextAction) {
     if (!completeTarget) return { ok: false, message: "No task selected." };
-    const lead = resolveLeadForTask(completeTarget);
-    const completedBy = currentUser?.name || CRM_TEAM_MEMBERS[0]?.name || "CRM User";
-    const result = completeTaskWithOutcome({
-      task: completeTarget,
-      lead,
-      outcome,
-      nextAction,
-      completedBy,
-    });
-    const targetId = completeTarget.id;
-    setTasks((p) => {
-      const updated = p.map((t) =>
-        t.id === targetId
-          ? {
-              ...t,
-              status: "Completed",
-              completionOutcome: outcome,
-              nextAction,
-              completedAt: new Date().toISOString().slice(0, 10),
-              completedBy,
-            }
-          : t
-      );
-      if (result.ok && result.createdTask && !updated.some((t) => String(t.id) === String(result.createdTask.id))) {
-        updated.unshift({
-          id: result.createdTask.id,
-          title: result.createdTask.title,
-          lead: result.createdTask.lead,
-          company: "",
-          due: result.createdTask.dueDate || result.createdTask.dueAt || "",
-          dueDate: result.createdTask.dueDate || result.createdTask.dueAt || "",
-          priority: result.createdTask.priority || "Medium",
-          status: result.createdTask.status || "Open",
-          owner: result.createdTask.owner,
-        });
-      }
-      return updated;
-    });
-    return result;
+    // `POST /crm/tasks/{id}/complete/` closes the task and, where the stage
+    // rules call for it, creates the follow-up or advances the lead.
+    return completeTaskWithOutcome({ task: completeTarget, outcome, nextAction });
   }
   const handleCompleteSuccess = () => setCompleteTarget(null);
   const recent = leads.slice(0, 5);

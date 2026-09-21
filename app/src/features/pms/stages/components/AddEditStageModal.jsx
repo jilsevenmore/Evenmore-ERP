@@ -3,7 +3,7 @@ import { AlertCircle, Save } from 'lucide-react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
 import { usePmsStore, validateStageConfig } from '../../../../stores/pmsStore';
-import { PMS_DEPARTMENTS, PMS_DURATION_UNITS } from '../../../../data/mockPmsData';
+import { PMS_DURATION_UNITS } from '../../../../services/pmsSync';
 
 /**
  * AddEditStageModal — the stage template builder.

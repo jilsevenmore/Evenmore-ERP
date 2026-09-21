@@ -10,7 +10,7 @@ function ColumnSelect({ options, value, onChange }) {
   const filteredOptions = useMemo(() => {
     const searchText = query.trim().toLowerCase();
     if (!searchText) return options;
-    return options.filter((option) => option.label.toLowerCase().includes(searchText));
+    return options.filter((option) => String(option.label ?? '').toLowerCase().includes(searchText));
   }, [options, query]);
 
   useEffect(() => {

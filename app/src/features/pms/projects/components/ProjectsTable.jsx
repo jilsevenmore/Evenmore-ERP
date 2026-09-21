@@ -64,7 +64,7 @@ export function ProjectsTable({
           className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap"
           onClick={(e) => e.stopPropagation()}
         >
-          {row.id}
+          {row.code || row.id}
         </Link>
       ),
     },

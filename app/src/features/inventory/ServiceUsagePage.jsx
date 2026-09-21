@@ -82,10 +82,10 @@ export const ServiceUsagePage = () => {
         </Button>
       </div>
 
-      <DataTable title="Field Service Part Logs" columns={columns} data={serviceUsages} keyExtractor={(s) => s.id} searchPlaceholder="Search ticket #, tech, or SKU..." searchFilter={(s, term) => s.ticketNumber.toLowerCase().includes(term) ||
-            s.technician.toLowerCase().includes(term) ||
-            s.sku.toLowerCase().includes(term) ||
-            s.purpose.toLowerCase().includes(term)}/>
+      <DataTable title="Field Service Part Logs" columns={columns} data={serviceUsages} keyExtractor={(s) => s.id} searchPlaceholder="Search ticket #, tech, or SKU..." searchFilter={(s, term) => String(s.ticketNumber ?? '').toLowerCase().includes(term) ||
+            String(s.technician ?? '').toLowerCase().includes(term) ||
+            String(s.sku ?? '').toLowerCase().includes(term) ||
+            String(s.purpose ?? '').toLowerCase().includes(term)}/>
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
           <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">

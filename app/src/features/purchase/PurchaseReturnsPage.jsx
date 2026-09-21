@@ -263,10 +263,10 @@ export const PurchaseReturnsPage = () => {
             Create Debit Note
           </Button>}/>
 
-      <DataTable title="Vendor Return Debit Notes" columns={columns} data={purchaseReturns} keyExtractor={(r) => r.id} searchPlaceholder="Search debit note # or vendor..." searchFilter={(r, term) => r.debitNoteNumber.toLowerCase().includes(term) ||
-            r.vendor.toLowerCase().includes(term) ||
-            (r.billRef && r.billRef.toLowerCase().includes(term)) ||
-            r.reason.toLowerCase().includes(term)}/>
+      <DataTable title="Vendor Return Debit Notes" columns={columns} data={purchaseReturns} keyExtractor={(r) => r.id} searchPlaceholder="Search debit note # or vendor..." searchFilter={(r, term) => String(r.debitNoteNumber ?? '').toLowerCase().includes(term) ||
+            String(r.vendor ?? '').toLowerCase().includes(term) ||
+            (r.billRef && String(r.billRef ?? '').toLowerCase().includes(term)) ||
+            String(r.reason ?? '').toLowerCase().includes(term)}/>
 
       {/* Create Debit Note Modal */}
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">

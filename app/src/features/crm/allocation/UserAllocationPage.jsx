@@ -5,6 +5,11 @@ import PageHeader from '../../../components/ui/PageHeader';
 import { useERP } from '../../../context/ERPContext';
 import UserLocationTracking from './UserLocationTracking';
 
+/** Lower-cased text, safe on a field the server left unset. */
+function text(value) {
+  return String(value ?? '').toLowerCase();
+}
+
 export default function UserAllocationPage() {
   const { formatCurrency } = useERP();
   const [teamMembers, setTeamMembers] = useState([
@@ -79,9 +84,9 @@ export default function UserAllocationPage() {
 
   const filtered = teamMembers.filter(
     (m) =>
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.role.toLowerCase().includes(search.toLowerCase()) ||
-      m.email.toLowerCase().includes(search.toLowerCase())
+      text(m.name).includes(search.toLowerCase()) ||
+      text(m.role).includes(search.toLowerCase()) ||
+      text(m.email).includes(search.toLowerCase())
   );
 
   const handleAddMember = (e) => {

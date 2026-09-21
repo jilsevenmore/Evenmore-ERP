@@ -195,9 +195,9 @@ export function OrgChartPage() {
     if (!q.trim()) return true;
     const term = q.toLowerCase();
     return (
-      person.name.toLowerCase().includes(term) ||
-      person.role.toLowerCase().includes(term) ||
-      person.department.toLowerCase().includes(term)
+      String(person.name ?? '').toLowerCase().includes(term) ||
+      String(person.role ?? '').toLowerCase().includes(term) ||
+      String(person.department ?? '').toLowerCase().includes(term)
     );
   }, [q]);
 

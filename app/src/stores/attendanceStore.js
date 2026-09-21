@@ -1,47 +1,47 @@
 import { create } from "zustand";
-import { attendanceRequestsMock, dailyRecords, flexibilityDefaults } from "../data/hrms/mocks/attendanceExtended";
-const LS_K = "hrms_attendance_v1";
-function load() {
-  try {
-    const v = localStorage.getItem(LS_K);
-    if (v) return JSON.parse(v);
-  } catch {
-  }
-  return null;
-}
-const saved = load();
+import { writeThrough, pullTracked, pullFlexibility, pushFlexibility } from "../services/hrmsSync";
 export const useAttendanceStore = create((set, get) => ({
-  records: saved?.records ?? dailyRecords,
-  requests: saved?.requests ?? attendanceRequestsMock,
-  flexibility: saved?.flexibility ?? flexibilityDefaults,
-  role: saved?.role ?? "HR",
+  /** Load this module's collections from the API. */
+  hydrate: async () => {
+    const rows = await Promise.all([
+      pullTracked("attendance"),
+      pullTracked("attendanceRegularizations"),
+      pullFlexibility(),
+    ]);
+    set((s) => ({
+      records: rows[0] || s.records,
+      requests: rows[1] || s.requests,
+      flexibility: rows[2] || s.flexibility,
+    }));
+    return rows;
+  },
+
+  /** Empty on sign-out so the next user sees nothing of the previous one. */
+  clear: () => set({ records: [], requests: [] }),
+
+  records: [],
+  requests: [],
+  // Grace periods and the like are tenant settings the server owns.
+  flexibility: {},
+  role: "HR",
 
   saveDailyAttendance: (date, updatedRecords) => set((s) => {
     // Merge or replace records matching this date or employee ID
     const otherRecords = s.records.filter((r) => r.date !== date);
     const combined = [...updatedRecords, ...otherRecords];
-    localStorage.setItem(
-      LS_K,
-      JSON.stringify({ records: combined, requests: s.requests, flexibility: s.flexibility, role: s.role })
-    );
+    writeThrough("attendance", combined);
     return { records: combined };
   }),
 
   updateRecord: (id, patch) => set((s) => {
     const recs = s.records.map((r) => r.id === id ? { ...r, ...patch } : r);
-    localStorage.setItem(
-      LS_K,
-      JSON.stringify({ records: recs, requests: s.requests, flexibility: s.flexibility, role: s.role })
-    );
+    writeThrough("attendance", recs);
     return { records: recs };
   }),
 
   bulkUpdate: (ids, status) => set((s) => {
     const recs = s.records.map((r) => ids.includes(r.id) ? { ...r, status } : r);
-    localStorage.setItem(
-      LS_K,
-      JSON.stringify({ records: recs, requests: s.requests, flexibility: s.flexibility, role: s.role })
-    );
+    writeThrough("attendance", recs);
     return { records: recs };
   }),
 
@@ -53,10 +53,7 @@ export const useAttendanceStore = create((set, get) => ({
       ...r,
     };
     const reqs = [newReq, ...s.requests];
-    localStorage.setItem(
-      LS_K,
-      JSON.stringify({ records: s.records, requests: reqs, flexibility: s.flexibility, role: s.role })
-    );
+    writeThrough("attendanceRegularizations", reqs);
     return { requests: reqs };
   }),
 
@@ -70,7 +67,7 @@ export const useAttendanceStore = create((set, get) => ({
       updatedRecords = s.records.map((rec) => {
         const matches =
           (targetReq.employeeId && rec.id === targetReq.employeeId) ||
-          (rec.name && targetReq.employee && rec.name.toLowerCase() === targetReq.employee.toLowerCase());
+          (rec.name && targetReq.employee && String(rec.name ?? '').toLowerCase() === String(targetReq.employee ?? '').toLowerCase());
 
         if (matches) {
           return {
@@ -85,26 +82,17 @@ export const useAttendanceStore = create((set, get) => ({
       });
     }
 
-    localStorage.setItem(
-      LS_K,
-      JSON.stringify({ records: updatedRecords, requests: reqs, flexibility: s.flexibility, role: s.role })
-    );
+    writeThrough("attendance", updatedRecords);
     return { requests: reqs, records: updatedRecords };
   }),
 
-  saveFlexibility: (p) => set((s) => {
-    localStorage.setItem(
-      LS_K,
-      JSON.stringify({ records: s.records, requests: s.requests, flexibility: p, role: s.role })
-    );
-    return { flexibility: p };
-  }),
+  saveFlexibility: (flexibility) => {
+    set({ flexibility });
+    pushFlexibility(flexibility).catch((err) => {
+      console.warn("[HRMS] flexibility not saved:", err?.message || err);
+    });
+  },
 
-  setRole: (role) => set((s) => {
-    localStorage.setItem(
-      LS_K,
-      JSON.stringify({ records: s.records, requests: s.requests, flexibility: s.flexibility, role })
-    );
-    return { role };
-  })
+  // Which view the screen shows (HR vs employee); a UI choice, not stored data.
+  setRole: (role) => set({ role })
 }));

@@ -5,7 +5,6 @@ import QRCode from 'qrcode';
 import { Button } from '../ui/Button';
 import { useERP } from '../../context/ERPContext';
 import { sharingRequest } from '../../services/quotationSharing';
-import { isPortableToken } from '../../services/localQuotationSharing';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../../services/crmEventNotifications';
 import { publicQuotation } from '../../utils/quotationDocument';
 
@@ -32,11 +31,11 @@ export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMod
   const refresh = () => run(async () => { const result = await sharingRequest(quotation.id); setShare(result); setAllowDownload(result.allowDownload); syncQuotationShare(quotation.id, result); });
   const openShare = () => {
     setMode('share');
-    if (!share || !isPortableToken(share.token)) publish();
+    if (!share) publish();
     else refresh();
   };
   const publish = () => run(async () => {
-    const result = await sharingRequest(quotation.id, { quotation: publicQuotation(quotation, 'USD'), expiryDays: days, allowDownload });
+    const result = await sharingRequest(quotation.id, { expiryDays: days, allowDownload });
     setShare(result); syncQuotationShare(quotation.id, result);
     showToast('Quotation preview link generated.');
   });
@@ -44,8 +43,8 @@ export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMod
     let result;
     try { result = await sharingRequest(quotation.id); }
     catch (err) { if (err.status !== 404) throw err; }
-    if (!result || !isPortableToken(result.token) || Date.parse(result.expiresAt) <= Date.now()) {
-      result = await sharingRequest(quotation.id, { quotation: publicQuotation(quotation, 'USD'), expiryDays: days, allowDownload });
+    if (!result || Date.parse(result.expiresAt) <= Date.now()) {
+      result = await sharingRequest(quotation.id, { expiryDays: days, allowDownload });
     }
     setShare(result); syncQuotationShare(quotation.id, result);
     emitCrmEvent({

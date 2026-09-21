@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
 import { usePmsStore, nextProjectId } from '../../../../stores/pmsStore';
-import { mockSalesOrders } from '../../../../data/erp/mockData';
+import { useERP } from '../../../../context/ERPContext';
 import { formatCurrency } from '../../../../utils/currencyUtils';
 import { AlertCircle, Link2, PackageCheck } from 'lucide-react';
 
 /**
  * CreateProjectModal — turns a confirmed CRM/ERP sales order into a project.
  *
- * Orders come from the real ERP mock (data/erp/mockData → mockSalesOrders), and
+ * Orders come from the ERP sales orders the server returned, and
  * any order already linked to a project is excluded so the same order cannot be
  * converted twice. Selecting an order auto-fills customer, product and value.
  */
@@ -32,6 +32,8 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
   const employees = usePmsStore((s) => s.employees);
   const createProjectFromOrder = usePmsStore((s) => s.createProjectFromOrder);
   const showToast = usePmsStore((s) => s.showToast);
+  // The sales orders a project can be created from, as the server returned them.
+  const { salesOrders = [] } = useERP() || {};
 
   const activeConfigs = useMemo(
     () => stageConfigs.filter((c) => c.isActive).sort((a, b) => a.sequence - b.sequence),
@@ -48,12 +50,12 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
       if (p.crmOrderId) linkedBy.set(p.crmOrderId, p.id);
     }
     return {
-      availableOrders: mockSalesOrders.filter((o) => !linkedBy.has(o.orderNumber)),
-      linkedOrders: mockSalesOrders
+      availableOrders: salesOrders.filter((o) => !linkedBy.has(o.orderNumber)),
+      linkedOrders: salesOrders
         .filter((o) => linkedBy.has(o.orderNumber))
         .map((o) => ({ ...o, linkedProjectId: linkedBy.get(o.orderNumber) })),
     };
-  }, [projects]);
+  }, [projects, salesOrders]);
 
   const [orderNumber, setOrderNumber] = useState('');
   const [managerId, setManagerId] = useState('');
@@ -87,7 +89,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
     onClose?.();
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     const nextErrors = {};
@@ -98,7 +100,9 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
     if (Object.keys(nextErrors).length > 0) return;
 
     const manager = managers.find((m) => m.id === managerId);
-    const id = createProjectFromOrder({
+    let id;
+    try {
+      id = await createProjectFromOrder({
       order: selectedOrder,
       projectManager: {
         id: manager.id,
@@ -108,9 +112,13 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
       },
       priority,
       startDate: new Date(`${startDate}T09:00:00`).toISOString(),
-      stageConfigIds: selectedConfigIds,
-      specifications,
-    });
+        stageConfigIds: selectedConfigIds,
+        specifications,
+      });
+    } catch (err) {
+      setErrors({ order: err?.message || 'The project could not be created.' });
+      return;
+    }
 
     showToast(`${id} created from ${selectedOrder.orderNumber}.`);
     reset();

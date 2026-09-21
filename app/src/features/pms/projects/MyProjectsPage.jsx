@@ -46,7 +46,7 @@ export default function MyProjectsPage() {
         title="My Projects"
         subtitle={
           currentUser
-            ? `Projects where ${currentUser.name} is the assigned project manager.`
+            ? `Projects where ${currentUser?.name} is the assigned project manager.`
             : 'Projects assigned to you as project manager.'
         }
       />

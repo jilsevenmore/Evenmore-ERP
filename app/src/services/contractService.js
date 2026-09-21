@@ -1,5 +1,6 @@
 export { formatContractMoney, formatContractDate } from '../utils/contractFormatting.js';
 import { loadDeals, DEALS_STORAGE_KEY } from './dealService.js';
+import { crmStorage } from './crmStorage.js';
 import { emitCrmEvent, CRM_EVENT_TYPES } from './crmEventNotifications.js';
 
 export const CONTRACT_TYPES = [
@@ -85,7 +86,7 @@ function enrich(deal, contract) {
   };
 }
 
-export function loadContracts(storage = localStorage) {
+export function loadContracts(storage = crmStorage) {
   const deals = loadDeals(storage);
   let sequence = 0;
   deals.forEach((deal) => (deal.contracts || []).forEach((contract) => {
@@ -109,7 +110,7 @@ export function loadContracts(storage = localStorage) {
   return flat.sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
 }
 
-export function findContract(contractId, storage = localStorage) {
+export function findContract(contractId, storage = crmStorage) {
   const deals = loadDeals(storage);
   for (const deal of deals) {
     const contract = (deal.contracts || []).find((item) => sameId(item.id, contractId));
@@ -123,7 +124,7 @@ function writeDeals(deals, storage) {
   notifyUpdated();
 }
 
-export function createContract(input = {}, { storage = localStorage } = {}) {
+export function createContract(input = {}, { storage = crmStorage } = {}) {
   const deals = loadDeals(storage);
   const deal = deals.find((item) => sameId(item.id, input.dealId));
   if (!deal) throw new Error('Select a deal for this contract.');
@@ -161,7 +162,7 @@ export function createContract(input = {}, { storage = localStorage } = {}) {
   return enrich(deal, contract);
 }
 
-export function updateContract(dealId, contractId, patch = {}, { storage = localStorage } = {}) {
+export function updateContract(dealId, contractId, patch = {}, { storage = crmStorage } = {}) {
   const deals = loadDeals(storage);
   const deal = deals.find((item) => sameId(item.id, dealId));
   if (!deal) throw new Error('Deal was not found.');
@@ -202,7 +203,7 @@ export function updateContract(dealId, contractId, patch = {}, { storage = local
   return enrich(deal, updated);
 }
 
-export function deleteContract(dealId, contractId, { storage = localStorage } = {}) {
+export function deleteContract(dealId, contractId, { storage = crmStorage } = {}) {
   const deals = loadDeals(storage);
   const deal = deals.find((item) => sameId(item.id, dealId));
   if (!deal) throw new Error('Deal was not found.');
@@ -214,7 +215,7 @@ export function deleteContract(dealId, contractId, { storage = localStorage } = 
   return removed;
 }
 
-export function appendDealActivity(dealId, title, actor = 'CRM User', { storage = localStorage } = {}) {
+export function appendDealActivity(dealId, title, actor = 'CRM User', { storage = crmStorage } = {}) {
   const deals = loadDeals(storage);
   const deal = deals.find((item) => sameId(item.id, dealId));
   if (!deal) return;
@@ -225,7 +226,7 @@ export function appendDealActivity(dealId, title, actor = 'CRM User', { storage 
   writeDeals(deals.map((item) => sameId(item.id, deal.id) ? { ...item, activities: [activity, ...(item.activities || [])] } : item), storage);
 }
 
-export function addDealActivity(dealId, entry = {}, { storage = localStorage } = {}) {
+export function addDealActivity(dealId, entry = {}, { storage = crmStorage } = {}) {
   const deals = loadDeals(storage);
   const deal = deals.find((item) => sameId(item.id, dealId));
   if (!deal) throw new Error('Deal was not found.');

@@ -31,6 +31,11 @@ const generalLedgerGuide = {
         'All system actions automatically balance Debits and Credits to maintain strict accounting compliance.',
     ],
 };
+/** Lower-cased text, safe on a field the server left unset. */
+function text(value) {
+  return String(value ?? '').toLowerCase();
+}
+
 export const GeneralLedgerPage = () => {
     const { journalEntries, addJournalEntry, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
@@ -153,10 +158,10 @@ export const GeneralLedgerPage = () => {
         </div>
       </div>
 
-      <DataTable title="Journal Ledger Postings" columns={columns} data={journalEntries} keyExtractor={(e) => e.id} searchPlaceholder="Filter journal ref, account, or narrative..." searchFilter={(e, term) => e.entryNumber.toLowerCase().includes(term) ||
-            e.description.toLowerCase().includes(term) ||
-            e.debitAccount.toLowerCase().includes(term) ||
-            e.creditAccount.toLowerCase().includes(term)}/>
+      <DataTable title="Journal Ledger Postings" columns={columns} data={journalEntries} keyExtractor={(e) => e.id} searchPlaceholder="Filter journal ref, account, or narrative..." searchFilter={(e, term) => text(e.entryNumber).includes(term) ||
+            text(e.description).includes(term) ||
+            text(e.debitAccount).includes(term) ||
+            text(e.creditAccount).includes(term)}/>
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
           <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">

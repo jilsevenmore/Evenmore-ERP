@@ -1,10 +1,11 @@
 import { loadDeals, DEALS_STORAGE_KEY } from './dealService.js';
+import { crmStorage } from './crmStorage.js';
 
 export const PROJECTS_STORAGE_KEY = 'evenmore-crm-projects-v1';
 const DETAILS_KEY = 'evenmore-crm-lead-details-v1';
 const sameId = (a, b) => a != null && b != null && String(a) === String(b);
 
-export function loadProjects(storage = localStorage) {
+export function loadProjects(storage = crmStorage) {
   const value = JSON.parse(storage.getItem(PROJECTS_STORAGE_KEY) || '[]');
   if (!Array.isArray(value)) throw new Error('Saved project data is invalid.');
   let sequence = Math.max(0, ...value.map((project) => Number(/^P-(\d+)$/.exec(project.projectNumber || '')?.[1]) || 0));
@@ -18,7 +19,7 @@ export function loadProjects(storage = localStorage) {
   return numbered;
 }
 
-export function findDealProject(deal, storage = localStorage) {
+export function findDealProject(deal, storage = crmStorage) {
   const projects = loadProjects(storage);
   const byDeal = projects.find((project) => sameId(project.sourceDealId, deal?.id));
   if (deal?.projectId != null) {
@@ -67,7 +68,7 @@ export function projectDefaults(deal) {
   };
 }
 
-export function createProjectFromDeal(dealId, input = {}, { storage = localStorage, actor = 'CRM User' } = {}) {
+export function createProjectFromDeal(dealId, input = {}, { storage = crmStorage, actor = 'CRM User' } = {}) {
   if (dealId == null || dealId === '') throw new Error('Deal ID is required.');
   const deals = loadDeals(storage);
   const deal = deals.find((item) => sameId(item.id, dealId));
@@ -134,7 +135,7 @@ export function createProjectFromDeal(dealId, input = {}, { storage = localStora
   return { project, created: !existing };
 }
 
-export function createStandaloneProject(input = {}, { storage = localStorage } = {}) {
+export function createStandaloneProject(input = {}, { storage = crmStorage } = {}) {
   const name = String(input.name ?? '').trim();
   if (!name) throw new Error('Project name is required.');
   const customer = String(input.customer ?? input.client ?? '').trim();
@@ -168,7 +169,7 @@ export function createStandaloneProject(input = {}, { storage = localStorage } =
   return project;
 }
 
-export function updateProject(projectId, patch = {}, { storage = localStorage } = {}) {
+export function updateProject(projectId, patch = {}, { storage = crmStorage } = {}) {
   const projects = loadProjects(storage);
   const index = projects.findIndex((item) => sameId(item.id, projectId));
   if (index === -1) throw new Error('Project was not found.');
@@ -191,7 +192,7 @@ export function updateProject(projectId, patch = {}, { storage = localStorage } 
   return updated;
 }
 
-export function deleteProject(projectId, { storage = localStorage } = {}) {
+export function deleteProject(projectId, { storage = crmStorage } = {}) {
   const projects = loadProjects(storage);
   const project = projects.find((item) => sameId(item.id, projectId));
   if (!project) throw new Error('Project was not found.');

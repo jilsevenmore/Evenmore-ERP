@@ -16,7 +16,8 @@ import {
   ArrowRight,
   TrendingUp,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  Plus
 } from "lucide-react";
 
 export default function Recruitment() {

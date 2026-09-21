@@ -105,7 +105,7 @@ export function StageHandoffModal({ isOpen, onClose, project, stageId, onHandedO
       isOpen={isOpen}
       onClose={onClose}
       title="Stage Handoff"
-      subtitle={`${project.id} — ${stage.name}`}
+      subtitle={`${project.code || project.id} — ${stage.name}`}
       size="lg"
       footer={
         <>

@@ -8,7 +8,7 @@ import {
   formatDuration,
   durationToMs,
 } from '../../../../stores/pmsStore';
-import { PMS_DEPARTMENTS, PMS_DURATION_UNITS } from '../../../../data/mockPmsData';
+import { PMS_DURATION_UNITS } from '../../../../services/pmsSync';
 
 /**
  * AssignStageModal — assign a stage to a department, team and employee.
@@ -149,7 +149,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
       isOpen={isOpen}
       onClose={onClose}
       title="Assign Stage"
-      subtitle={`${project.id} — ${project.customerName}`}
+      subtitle={`${project.code || project.id} — ${project.customerName}`}
       size="lg"
       footer={
         <>

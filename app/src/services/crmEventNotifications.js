@@ -1,4 +1,6 @@
 import { useAppStore } from '../stores/appStore';
+import { api } from './api';
+import { isBackendEnabled, rowsOf } from './resourceSync';
 import { loadDeals } from './dealService';
 
 export const CRM_EVENT_TYPES = {
@@ -21,29 +23,35 @@ export const NOTIFICATION_CHANNELS = {
 
 export const NOTIFICATION_EVENT = 'crm:notifications-updated';
 
-const STORAGE_KEY = 'evenmore-crm-event-notifications-v1';
 const SYNC_EVENT = 'crm:data-updated';
-const MAX_STORED = 100;
+
+/**
+ * The notification feed is the server's (`GET /notifications/`): it is raised
+ * from the change itself, so every recipient sees it and it survives a reload.
+ * This module keeps the last read in memory for the bell menu to render
+ * synchronously, and refreshes it whenever something changes.
+ */
+let feed = [];
 
 function readStore() {
-  try {
-    if (typeof localStorage === 'undefined') return [];
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return feed;
 }
 
-function writeStore(items) {
-  try {
-    if (typeof localStorage === 'undefined') return false;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_STORED)));
-    return true;
-  } catch {
-    return false;
+/** `GET /notifications/` — the current feed for the signed-in user. */
+export async function refreshNotifications() {
+  if (!isBackendEnabled()) {
+    feed = [];
+    signalUpdate();
+    return feed;
   }
+  try {
+    const body = await api.get('/notifications/', { query: { limit: 100 } });
+    feed = rowsOf(body);
+  } catch (err) {
+    console.warn('[CRM] notifications unavailable:', err?.message || err);
+  }
+  signalUpdate();
+  return feed;
 }
 
 function signalUpdate() {
@@ -164,8 +172,9 @@ function buildContent(type, payload = {}) {
 const inAppProvider = {
   channel: 'in_app',
   deliver(record) {
-    const stored = readStore();
-    writeStore([record, ...stored]);
+    // The server raises and stores the notification; this only puts it in front
+    // of the viewer straight away, before the next refresh confirms it.
+    feed = [record, ...readStore()];
     return { delivered: true, channel: 'in_app', status: 'DELIVERED' };
   },
 };
@@ -206,40 +215,16 @@ export function dispatchNotification(record, channels = ['in_app']) {
   return results;
 }
 
-export function emitCrmEvent({ type, entityType, entityId, actorId, payload = {} } = {}) {
-  try {
-    if (!type || !Object.values(CRM_EVENT_TYPES).includes(type)) return false;
-    if (entityId === undefined || entityId === null || entityId === '') return false;
-    const eventKey = String(payload.eventKey || `${type}:${entityType || 'record'}:${entityId}`);
-    const stored = readStore();
-    if (stored.some((entry) => entry.eventKey === eventKey)) return false;
-    const recipients = resolveRecipients(type, payload).filter(Boolean);
-    if (recipients.length === 0) return false;
-    const content = buildContent(type, payload);
-    const timestamp = new Date().toISOString();
-    const records = recipients.map((recipient, index) => ({
-      id: `crm-ev-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${index}`,
-      eventKey: recipients.length > 1 ? `${eventKey}:${index}` : eventKey,
-      eventType: type,
-      recipientId: recipient.id,
-      recipientName: recipient.name,
-      entityType: entityType || 'record',
-      entityId: String(entityId),
-      actorId: actorId || '',
-      title: content.title,
-      message: content.message,
-      path: defaultPath(type, entityId, payload),
-      channel: 'in_app',
-      status: 'unread',
-      createdAt: timestamp,
-      readAt: null,
-    }));
-    for (const record of records) dispatchNotification(record, ['in_app']);
-    signalUpdate();
-    return true;
-  } catch {
-    return false;
-  }
+/**
+ * The server raises the notification when the underlying record changes, so
+ * there is nothing to create here. Callers still announce the event, and that
+ * is taken as a cue to re-read the feed.
+ */
+export function emitCrmEvent({ type, entityId } = {}) {
+  if (!type || !Object.values(CRM_EVENT_TYPES).includes(type)) return false;
+  if (entityId === undefined || entityId === null || entityId === '') return false;
+  refreshNotifications();
+  return true;
 }
 
 export function loadEventNotifications() {
@@ -247,15 +232,27 @@ export function loadEventNotifications() {
 }
 
 export function markEventNotificationRead(id) {
-  try {
-    const stored = readStore();
-    const next = stored.map((entry) => entry.id === id && entry.status !== 'read'
-      ? { ...entry, status: 'read', readAt: new Date().toISOString() }
-      : entry);
-    writeStore(next);
-    signalUpdate();
-    return true;
-  } catch {
-    return false;
+  feed = feed.map((entry) => (entry.id === id && entry.status !== 'read'
+    ? { ...entry, status: 'read', readAt: new Date().toISOString() }
+    : entry));
+  signalUpdate();
+  // Read state belongs to the user, not the tab.
+  if (isBackendEnabled()) {
+    api.post(`/notifications/${id}/read/`, {}).catch((err) => {
+      console.warn('[CRM] notification not marked read:', err?.message || err);
+    });
   }
+  return true;
+}
+
+/** `POST /notifications/read-all/` — clears the bell in one go. */
+export function markAllNotificationsRead() {
+  feed = feed.map((entry) => ({ ...entry, status: 'read', readAt: entry.readAt || new Date().toISOString() }));
+  signalUpdate();
+  if (isBackendEnabled()) {
+    api.post('/notifications/read-all/', {})
+      .then(refreshNotifications)
+      .catch((err) => console.warn('[CRM] notifications not cleared:', err?.message || err));
+  }
+  return true;
 }

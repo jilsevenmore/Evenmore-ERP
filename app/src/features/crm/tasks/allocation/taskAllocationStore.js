@@ -1,123 +1,81 @@
-const STORAGE_KEY = 'crm-task-allocation-v1';
+import { useCrmStore } from '../../../../stores/crmStore';
+import { isServerId } from '../../../../services/resourceSync';
 
-export const DEPARTMENTS = ['Sales and Marketing', 'HR Department'];
-export const EMPLOYEES = [
-  { name: 'test', department: 'Sales and Marketing' },
-  { name: 'Jayesh Nair', department: 'HR Department' },
-  { name: 'Anuska', department: 'Sales and Marketing' },
-  { name: 'Jenil Khachariya', department: 'Sales and Marketing' },
-  { name: 'Vruti Lakhani', department: 'HR Department' },
-  { name: 'Hemanshi Ramani', department: 'HR Department' },
-  { name: 'company', department: 'HR Department' },
-];
+/** Who can be allocated work, and the departments they sit in — from the roster. */
+export function loadEmployees() {
+  return useCrmStore.getState().teamMembers;
+}
+
+export function loadDepartments() {
+  const seen = new Set();
+  loadEmployees().forEach((m) => { if (m.department) seen.add(m.department); });
+  return [...seen];
+}
+
+/**
+ * Kept as named exports because the allocation screens read them directly.
+ * Both are live reads of the roster rather than a fixed list of colleagues.
+ */
+export const EMPLOYEES = new Proxy([], {
+  get(_t, prop) {
+    const rows = loadEmployees();
+    const value = rows[prop];
+    return typeof value === 'function' ? value.bind(rows) : value;
+  },
+  ownKeys: () => Reflect.ownKeys(loadEmployees()),
+  getOwnPropertyDescriptor: (_t, prop) =>
+    Reflect.getOwnPropertyDescriptor(loadEmployees(), prop),
+});
+
+export const DEPARTMENTS = new Proxy([], {
+  get(_t, prop) {
+    const rows = loadDepartments();
+    const value = rows[prop];
+    return typeof value === 'function' ? value.bind(rows) : value;
+  },
+  ownKeys: () => Reflect.ownKeys(loadDepartments()),
+  getOwnPropertyDescriptor: (_t, prop) =>
+    Reflect.getOwnPropertyDescriptor(loadDepartments(), prop),
+});
 export const PRIORITIES = ['Low', 'Medium', 'High'];
 export const STATUSES = ['Pending', 'In Progress', 'Completed'];
 
-function seedTasks() {
-  return [
-    {
-      id: 'ta-1',
-      title: 'gffvgh',
-      department: 'Sales and Marketing',
-      assignee: 'test',
-      assignedBy: 'test',
-      priority: 'Medium',
-      deadline: null,
-      status: 'In Progress',
-      description: '',
-      fileName: '',
-      audit: [
-        { text: 'test changed status to In Progress', at: '2026-09-07T10:49:00' },
-        { text: 'test assigned this to test', at: '2026-08-26T11:35:00' },
-      ],
-    },
-    {
-      id: 'ta-2',
-      title: 'xyz',
-      department: 'Sales and Marketing',
-      assignee: 'test',
-      assignedBy: 'test',
-      priority: 'Medium',
-      deadline: '2026-08-25T15:49:00',
-      status: 'Completed',
-      description: '',
-      fileName: '',
-      audit: [{ text: 'test assigned this to test', at: '2026-08-25T15:00:00' }],
-    },
-    {
-      id: 'ta-3',
-      title: 'demo unit coll',
-      department: 'HR Department',
-      assignee: 'Jayesh Nair',
-      assignedBy: 'company',
-      priority: 'High',
-      deadline: '2026-08-25T14:55:00',
-      status: 'Pending',
-      description: '',
-      fileName: '',
-      audit: [{ text: 'company assigned this to Jayesh Nair', at: '2026-08-25T14:00:00' }],
-    },
-    {
-      id: 'ta-4',
-      title: 'Prepare Purchase Orders',
-      department: 'HR Department',
-      assignee: 'Jayesh Nair',
-      assignedBy: 'Vruti Lakhani',
-      priority: 'High',
-      deadline: '2026-08-19T18:00:00',
-      status: 'Completed',
-      description: '',
-      fileName: '',
-      audit: [{ text: 'Vruti Lakhani assigned this to Jayesh Nair', at: '2026-08-19T17:00:00' }],
-    },
-    {
-      id: 'ta-5',
-      title: 'KINDLLY DO THESE MANY CALLS',
-      department: 'Sales and Marketing',
-      assignee: 'Anuska',
-      assignedBy: 'Hemanshi Ramani',
-      priority: 'High',
-      deadline: '2026-08-19T14:36:00',
-      status: 'Completed',
-      description: '',
-      fileName: '',
-      audit: [{ text: 'Hemanshi Ramani assigned this to Anuska', at: '2026-08-19T13:00:00' }],
-    },
-    {
-      id: 'ta-6',
-      title: 'SEND ME THE SALARY SLIP',
-      department: 'HR Department',
-      assignee: 'Jayesh Nair',
-      assignedBy: 'Hemanshi Ramani',
-      priority: 'High',
-      deadline: '2026-08-19T13:34:00',
-      status: 'Pending',
-      description: '',
-      fileName: '',
-      audit: [{ text: 'Hemanshi Ramani assigned this to Jayesh Nair', at: '2026-08-19T13:00:00' }],
-    },
-  ];
-}
-
+/** The allocations the CRM store is holding, from `/crm/task-allocations/`. */
 export function loadAllocationTasks() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return seedTasks();
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return seedTasks();
-    return parsed;
-  } catch {
-    return seedTasks();
-  }
+  return useCrmStore.getState().taskAllocations;
 }
 
+/**
+ * Persist the allocation list a screen just produced. Rows the server has not
+ * seen are created, rows that changed are patched, rows that went are deleted.
+ */
 export function saveAllocationTasks(tasks) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    window.dispatchEvent(new Event('crm:data-updated'));
-  } catch {
-    return;
-  }
+  const store = useCrmStore.getState();
+  const previous = store.taskAllocations;
+  const before = new Map(previous.map((t) => [String(t.id), t]));
+  const after = new Set((tasks || []).map((t) => String(t.id)));
+
+  (tasks || []).forEach((task) => {
+    if (!task) return;
+    const existing = before.get(String(task.id));
+    if (!existing) {
+      store.createRecord('taskAllocations', task).catch(reportFailure);
+    } else if (isServerId(task.id) && JSON.stringify(existing) !== JSON.stringify(task)) {
+      store.updateRecord('taskAllocations', task.id, task).catch(reportFailure);
+    }
+  });
+
+  previous.forEach((task) => {
+    if (!after.has(String(task.id)) && isServerId(task.id)) {
+      store.deleteRecord('taskAllocations', task.id).catch(reportFailure);
+    }
+  });
+
+  window.dispatchEvent(new Event('crm:data-updated'));
+}
+
+function reportFailure(err) {
+  console.warn('[CRM] allocation not saved:', err?.message || err);
 }
 
 export function formatDeadline(value) {

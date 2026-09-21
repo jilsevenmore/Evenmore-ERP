@@ -1,7 +1,7 @@
 import React from 'react';
 import { Building2, Package, User, CalendarDays } from 'lucide-react';
 import { formatCurrency } from '../../../../utils/currencyUtils';
-import { mockCustomers } from '../../../../data/erp/mockData';
+import { useERP } from '../../../../context/ERPContext';
 
 /**
  * ProjectInfoTab — order context for the project.
@@ -46,7 +46,9 @@ function stamp(value) {
 }
 
 export function ProjectInfoTab({ project, meta }) {
-  const customer = mockCustomers.find((c) => c.id === project.crmCustomerId) ?? null;
+  // The party behind the project, from the customers the server returned.
+  const { customers = [] } = useERP() || {};
+  const customer = customers.find((c) => c.id === project.crmCustomerId) ?? null;
   const details = project.productDetails ?? {};
 
   return (

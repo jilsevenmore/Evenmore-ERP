@@ -92,10 +92,10 @@ export const LocationsPage = () => {
         </Button>
       </div>
 
-      <DataTable title="Warehouse Facilities & Zones" columns={columns} data={locations} keyExtractor={(l) => l.id} searchPlaceholder="Search location code, zone name, or manager..." searchFilter={(l, term) => l.code.toLowerCase().includes(term) ||
-            l.name.toLowerCase().includes(term) ||
-            l.manager.toLowerCase().includes(term) ||
-            l.type.toLowerCase().includes(term)}/>
+      <DataTable title="Warehouse Facilities & Zones" columns={columns} data={locations} keyExtractor={(l) => l.id} searchPlaceholder="Search location code, zone name, or manager..." searchFilter={(l, term) => String(l.code ?? '').toLowerCase().includes(term) ||
+            String(l.name ?? '').toLowerCase().includes(term) ||
+            String(l.manager ?? '').toLowerCase().includes(term) ||
+            String(l.type ?? '').toLowerCase().includes(term)}/>
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
           <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">

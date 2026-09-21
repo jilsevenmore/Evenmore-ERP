@@ -26,42 +26,41 @@ import {
   Layers
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
+import { useCrmStore } from '../../../stores/crmStore';
+import { isServerId } from '../../../services/resourceSync';
 
-const STORAGE_KEY = 'evenmore-crm-stages-v1';
-const BANNER_KEY = 'evenmore-crm-stages-banner-v1';
+/**
+ * Write a reordered / edited pipeline back. Rows the server has not seen are
+ * created, changed rows are patched and removed rows are deleted, so a drag or
+ * a rename is saved without the screen having to know about HTTP.
+ */
+function syncStages(key, next, previous) {
+  const store = useCrmStore.getState();
+  const before = new Map(previous.map((row) => [String(row.id), row]));
+  const after = new Set(next.map((row) => String(row.id)));
 
-const DEFAULT_LEADS = [
-  { id: 'ld-1', name: 'New Lead', status: 'Active', count: 125, icon: 'user', bg: '#e8f1ff', fg: '#2563eb' },
-  { id: 'ld-2', name: 'Details collected', status: 'Active', count: 98, icon: 'file', bg: '#f1eaff', fg: '#7c3aed' },
-  { id: 'ld-3', name: 'Quotation shared', status: 'Active', count: 76, icon: 'filecheck', bg: '#fef3d8', fg: '#d97706' },
-  { id: 'ld-4', name: 'Demo pending', status: 'Active', count: 54, icon: 'clock', bg: '#ffe8e0', fg: '#ea580c' },
-  { id: 'ld-5', name: 'Demo Done', status: 'Active', count: 42, icon: 'check', bg: '#e3f7ec', fg: '#16a34a' },
-  { id: 'ld-6', name: 'Negotiation', status: 'Active', count: 28, icon: 'chat', bg: '#efe6ff', fg: '#7c3aed' },
-  { id: 'ld-7', name: 'Won', status: 'Active', count: 210, icon: 'trophy', bg: '#e3f7ec', fg: '#16a34a' },
-  { id: 'ld-8', name: 'Lost', status: 'Active', count: 36, icon: 'lost', bg: '#ffe4e4', fg: '#dc2626' },
-  { id: 'ld-9', name: 'Future', status: 'Inactive', count: 12, icon: 'future', bg: '#eef2f7', fg: '#64748b' }
-];
+  next.forEach((row, index) => {
+    const withOrder = { ...row, order: index + 1 };
+    const existing = before.get(String(row.id));
+    if (!existing) {
+      store.createRecord(key, withOrder).catch(warn);
+    } else if (isServerId(row.id) && JSON.stringify({ ...existing, order: index + 1 }) !== JSON.stringify(withOrder)) {
+      store.updateRecord(key, row.id, withOrder).catch(warn);
+    }
+  });
 
-const DEFAULT_DEALS = [
-  { id: 'dl-1', name: 'Draft', status: 'Active', count: 4, pipeline: 'Sales', icon: 'file', bg: '#eef2f7', fg: '#475569' },
-  { id: 'dl-2', name: 'Sent', status: 'Active', count: 12, pipeline: 'Sales', icon: 'send', bg: '#e8f1ff', fg: '#2563eb' },
-  { id: 'dl-3', name: 'Open', status: 'Active', count: 8, pipeline: 'Sales', icon: 'clock', bg: '#fef3d8', fg: '#d97706' },
-  { id: 'dl-4', name: 'Revised', status: 'Active', count: 3, pipeline: 'Sales', icon: 'refresh', bg: '#efe6ff', fg: '#7c3aed' },
-  { id: 'dl-5', name: 'Declined', status: 'Active', count: 1, pipeline: 'Sales', icon: 'lost', bg: '#ffe4e4', fg: '#dc2626' }
-];
-
-function readStored() {
-  try {
-    if (typeof localStorage === 'undefined') return null;
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.leadStages) || !Array.isArray(parsed.dealStages)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
+  previous.forEach((row) => {
+    if (!after.has(String(row.id)) && isServerId(row.id)) {
+      store.deleteRecord(key, row.id).catch(warn);
+    }
+  });
 }
+
+function warn(err) {
+  console.warn('[CRM] stage not saved:', err?.message || err);
+}
+
+const BANNER_KEY = 'evenmore-crm-stages-banner-v1';
 
 function LeadStageIcon({ icon, bg, fg }) {
   const size = 14;
@@ -105,8 +104,15 @@ function StatusPill({ status, onToggle }) {
 }
 
 export default function CRMSystemSetupPage() {
-  const [leadStages, setLeadStages] = useState(() => readStored()?.leadStages || DEFAULT_LEADS);
-  const [dealStages, setDealStages] = useState(() => readStored()?.dealStages || DEFAULT_DEALS);
+  // The two pipelines are server configuration (`/crm/stages/`, `/crm/deal-stages/`),
+  // because the automation that creates stage tasks runs against them.
+  const storeLeadStages = useCrmStore((s) => s.stages);
+  const storeDealStages = useCrmStore((s) => s.dealStages);
+  const [leadStages, setLeadStages] = useState([]);
+  const [dealStages, setDealStages] = useState([]);
+
+  useEffect(() => { setLeadStages(storeLeadStages); }, [storeLeadStages]);
+  useEffect(() => { setDealStages(storeDealStages); }, [storeDealStages]);
   const [leadQuery, setLeadQuery] = useState('');
   const [leadFilter, setLeadFilter] = useState('All');
   const [dealQuery, setDealQuery] = useState('');
@@ -126,14 +132,14 @@ export default function CRMSystemSetupPage() {
   const [dragLead, setDragLead] = useState(null);
   const [dragDeal, setDragDeal] = useState(null);
 
+  // Edits are written back to the pipelines they came from.
   useEffect(() => {
-    try {
-      if (typeof localStorage === 'undefined') return;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ leadStages, dealStages }));
-    } catch {
-      return;
-    }
-  }, [leadStages, dealStages]);
+    if (leadStages.length > 0) syncStages('stages', leadStages, storeLeadStages);
+  }, [leadStages, storeLeadStages]);
+
+  useEffect(() => {
+    if (dealStages.length > 0) syncStages('dealStages', dealStages, storeDealStages);
+  }, [dealStages, storeDealStages]);
 
   const leadActive = useMemo(() => leadStages.filter((s) => s.status === 'Active').length, [leadStages]);
   const leadInactive = leadStages.length - leadActive;
@@ -143,7 +149,7 @@ export default function CRMSystemSetupPage() {
   const visibleLeads = useMemo(() => {
     return leadStages.filter((s) => {
       if (leadFilter !== 'All' && s.status !== leadFilter) return false;
-      if (leadQuery && !s.name.toLowerCase().includes(leadQuery.toLowerCase())) return false;
+      if (leadQuery && !String(s.name ?? '').toLowerCase().includes(leadQuery.toLowerCase())) return false;
       return true;
     });
   }, [leadStages, leadQuery, leadFilter]);
@@ -151,7 +157,7 @@ export default function CRMSystemSetupPage() {
   const visibleDeals = useMemo(() => {
     return dealStages.filter((s) => {
       if (dealFilter !== 'All' && s.status !== dealFilter) return false;
-      if (dealQuery && !s.name.toLowerCase().includes(dealQuery.toLowerCase())) return false;
+      if (dealQuery && !String(s.name ?? '').toLowerCase().includes(dealQuery.toLowerCase())) return false;
       return true;
     });
   }, [dealStages, dealQuery, dealFilter]);

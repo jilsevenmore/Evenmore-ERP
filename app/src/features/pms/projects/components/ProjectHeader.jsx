@@ -76,7 +76,7 @@ export function ProjectHeader({
         <ChevronRight size={12} className="text-slate-300" />
         <Link to="/pms/projects" className="text-blue-600 hover:underline">Projects</Link>
         <ChevronRight size={12} className="text-slate-300" />
-        <span className="text-slate-600 font-semibold">{project.id}</span>
+        <span className="text-slate-600 font-semibold">{project.code || project.id}</span>
       </nav>
 
       <div className="flex flex-col lg:flex-row lg:items-center gap-5">
@@ -84,7 +84,7 @@ export function ProjectHeader({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight">{project.id}</h2>
+            <h2 className="text-2xl font-black text-slate-800 tracking-tight">{project.code || project.id}</h2>
             <StageStatusBadge status={project.status} />
             <span
               className="text-[10px] font-bold px-2 py-0.5 rounded-full"

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { NavLink, Link, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   Home,
   LayoutGrid,
@@ -58,6 +58,7 @@ import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useERP } from '../../context/ERPContext';
 import { UserGuideModal } from '../common/UserGuideModal';
+import { clearStoredAuth } from '../../utils/authUtils';
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -342,7 +343,7 @@ function filterNavTree(items, query) {
   const q = query.toLowerCase().trim();
 
   function filterItem(item) {
-    const labelMatch = item.label.toLowerCase().includes(q);
+    const labelMatch = String(item.label ?? '').toLowerCase().includes(q);
 
     if (item.children) {
       const filteredChildren = item.children
@@ -535,6 +536,7 @@ function ExpandableRow({ item, depth = 0, badges = {} }) {
 
 // ── Sidebar ─────────────────────────────────────────────────
 export default function Sidebar() {
+  const navigate = useNavigate();
   const sidebarWidth = useAppStore((s) => s.sidebarWidth) ?? 280;
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
   const currentUser = useAppStore((s) => s.currentUser);
@@ -697,14 +699,14 @@ export default function Sidebar() {
         >
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs ring-1 ring-white/20">
-              {currentUser?.initials || 'AG'}
+              {currentUser?.initials || '—'}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-white truncate leading-tight">
-                {currentUser?.name || 'Adarsh Gupta'}
+                {currentUser?.name || 'Signed out'}
               </p>
               <p className="text-[10px] text-slate-400 truncate leading-tight mt-0.5">
-                {currentUser?.role || 'Operations Admin'}
+                {currentUser?.role || ''}
               </p>
             </div>
           </div>
@@ -720,20 +722,20 @@ export default function Sidebar() {
             {/* User Profile Header */}
             <div className="flex items-center gap-3 pb-3 border-b border-white/10 mb-2.5">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-md ring-2 ring-white/20">
-                {currentUser?.initials || 'AG'}
+                {currentUser?.initials || '—'}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-1">
-                  <p className="text-xs font-bold truncate text-white">{currentUser?.name || 'Adarsh Gupta'}</p>
+                  <p className="text-xs font-bold truncate text-white">{currentUser?.name || 'Signed out'}</p>
                   <span className="flex items-center gap-1 text-[9px] font-semibold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded-full border border-emerald-500/20 shrink-0">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     Online
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-300 truncate">{currentUser?.email || 'admin@evenmore.io'}</p>
+                <p className="text-[10px] text-slate-300 truncate">{currentUser?.email || ''}</p>
                 <div className="mt-1">
                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/10 text-blue-300 border border-white/10">
-                    {currentUser?.role || 'Operations Admin'}
+                    {currentUser?.role || ''}
                   </span>
                 </div>
               </div>
@@ -806,6 +808,25 @@ export default function Sidebar() {
                 <BookOpen size={13} className="text-amber-400 group-hover:scale-110 transition-transform" />
                 <span className="text-[11px] font-medium">Interactive User Guides</span>
               </button>
+
+              {/* Sign Out / Switch User Button in Person Profile */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  clearStoredAuth();
+                  navigate('/login');
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-rose-500/15 text-rose-300 hover:text-rose-200 transition text-left cursor-pointer group mt-1"
+              >
+                <div className="flex items-center gap-2.5">
+                  <LogOut size={13} className="text-rose-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-medium">Log Out / Switch Account</span>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 font-medium">
+                  Login
+                </span>
+              </button>
             </div>
 
             {/* Footer / Session */}
@@ -815,10 +836,11 @@ export default function Sidebar() {
                 type="button"
                 onClick={() => {
                   setIsProfileOpen(false);
-                  alert('Session secured. Active demo user signed in.');
+                  clearStoredAuth();
+                  navigate('/login');
                 }}
-                className="hover:text-rose-400 flex items-center gap-1 cursor-pointer transition"
-                title="Lock Session"
+                className="hover:text-rose-400 flex items-center gap-1 cursor-pointer transition text-slate-300"
+                title="Lock Session & Return to Login"
               >
                 <Lock size={10} />
                 <span>Lock</span>

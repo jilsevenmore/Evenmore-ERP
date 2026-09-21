@@ -122,9 +122,9 @@ export const ExpensesPage = () => {
         <StatCard label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} subtext="Logistics, Facilities, Admin" />
       </div>
 
-      <DataTable title="Operational Overheads & Disbursed Vouchers" columns={columns} data={expenses} keyExtractor={(e) => e.id} searchPlaceholder="Search payee, voucher #, or category..." searchFilter={(e, term) => e.expenseNumber.toLowerCase().includes(term) ||
-            e.payee.toLowerCase().includes(term) ||
-            e.category.toLowerCase().includes(term)}/>
+      <DataTable title="Operational Overheads & Disbursed Vouchers" columns={columns} data={expenses} keyExtractor={(e) => e.id} searchPlaceholder="Search payee, voucher #, or category..." searchFilter={(e, term) => String(e.expenseNumber ?? '').toLowerCase().includes(term) ||
+            String(e.payee ?? '').toLowerCase().includes(term) ||
+            String(e.category ?? '').toLowerCase().includes(term)}/>
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
           <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">

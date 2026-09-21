@@ -58,7 +58,7 @@ export const DeliveryChallansPage = () => {
             const deliveredQty = Number(it.deliveredQty ?? 0);
             const remainingQty = Math.max(0, orderedQty - deliveredQty);
             const defaultDispatchQty = remainingQty > 0 ? remainingQty : 0;
-            const mi = masterItems.find((m) => m.id === it.itemId || (it.itemSku && m.sku?.toLowerCase() === it.itemSku.toLowerCase()) || (it.sku && m.sku?.toLowerCase() === it.sku.toLowerCase()));
+            const mi = masterItems.find((m) => m.id === it.itemId || (it.itemSku && m.sku?.toLowerCase() === String(it.itemSku ?? '').toLowerCase()) || (it.sku && m.sku?.toLowerCase() === String(it.sku ?? '').toLowerCase()));
             const isSerial = mi?.trackingMode === 'Serial';
             const availableSerials = isSerial ? (mi.serialNumbers || []) : [];
             return {
@@ -443,10 +443,10 @@ export const DeliveryChallansPage = () => {
             Issue Delivery Challan
           </Button>}/>
 
-      <DataTable title="Active Dispatch Consignments" columns={columns} data={deliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => c.challanNumber.toLowerCase().includes(term) ||
-            (c.salesOrderNumber && c.salesOrderNumber.toLowerCase().includes(term)) ||
-            c.customer.toLowerCase().includes(term) ||
-            (c.transporter && c.transporter.toLowerCase().includes(term))}/>
+      <DataTable title="Active Dispatch Consignments" columns={columns} data={deliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
+            (c.salesOrderNumber && String(c.salesOrderNumber ?? '').toLowerCase().includes(term)) ||
+            String(c.customer ?? '').toLowerCase().includes(term) ||
+            (c.transporter && String(c.transporter ?? '').toLowerCase().includes(term))}/>
 
       {/* Create Logistics Challan Modal */}
       {showAddModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
@@ -543,7 +543,7 @@ export const DeliveryChallansPage = () => {
                           </td>
                         </tr>) : (lineItems.map((item, idx) => {
                         const stock = item.itemId ? calculateItemStock(item.itemId) : { available: 10 };
-                        const mi = masterItems.find((m) => m.id === item.itemId || (item.itemSku && m.sku?.toLowerCase() === item.itemSku.toLowerCase()) || (item.sku && m.sku?.toLowerCase() === item.sku.toLowerCase()));
+                        const mi = masterItems.find((m) => m.id === item.itemId || (item.itemSku && m.sku?.toLowerCase() === String(item.itemSku ?? '').toLowerCase()) || (item.sku && m.sku?.toLowerCase() === String(item.sku ?? '').toLowerCase()));
                         const isShort = stock.available < item.qty;
                         const isOverLimit = item.qty > (item.remainingQty ?? 9999);
                         return (

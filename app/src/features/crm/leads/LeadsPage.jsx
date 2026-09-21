@@ -14,8 +14,10 @@ import DeleteLeadModal from './DeleteLeadModal';
 import LeadGuideModal from './LeadGuideModal';
 import InfoBanner from '../common/InfoBanner';
 import { useNavigate } from 'react-router-dom';
+import { useAppStore } from '../../../stores/appStore';
 import { Users, UserPlus, Clock, TrendingUp } from 'lucide-react';
-import { leads as seedLeads } from '../../../data/crm/mockLeads';
+import { useCrmStore } from '../../../stores/crmStore';
+import { describeError } from '../../../services/crmSync';
 import { exportToCSV } from '../../../services/exportUtils';
 import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
@@ -109,23 +111,22 @@ function getSortValue(lead, field) {
   return String(lead[field] ?? '').toLowerCase();
 }
 
-const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
-
-function loadStoredLeads() {
-  try {
-    const raw = localStorage.getItem(LEADS_STORAGE_KEY);
-    if (!raw) return seedLeads;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) return seedLeads;
-    return parsed;
-  } catch {
-    return seedLeads;
-  }
-}
-
 export default function LeadsPage() {
   const navigate = useNavigate();
-  const [leadRows, setLeadRows] = useState(loadStoredLeads);
+  const leadRows = useCrmStore((s) => s.leads);
+  const crmLoading = useCrmStore((s) => s.status.loading);
+  const crmError = useCrmStore((s) => s.status.error);
+  const createLeadRecord = useCrmStore((s) => s.createLead);
+  const updateLeadRecord = useCrmStore((s) => s.updateLead);
+  const deleteLeadRecord = useCrmStore((s) => s.deleteLead);
+  const deleteLeadRecords = useCrmStore((s) => s.deleteLeads);
+  const toggleLeadPin = useCrmStore((s) => s.toggleLeadPin);
+  const showToast = useAppStore((s) => s.showToast);
+  const firstStageId = useCrmStore((s) => (
+    [...s.stages]
+      .filter((stage) => stage.isActive !== false)
+      .sort((a, b) => (Number(a.order ?? a.sequence) || 0) - (Number(b.order ?? b.sequence) || 0))[0]?.id
+  ));
   const [activeTab, setActiveTab] = useState('All Leads');
   const [selected, setSelected] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -143,7 +144,6 @@ export default function LeadsPage() {
   const [noteTarget, setNoteTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [bulkDeleteTargets, setBulkDeleteTargets] = useState([]);
-  const [pinnedLeadIds, setPinnedLeadIds] = useState([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const selectedLeads = useMemo(
@@ -159,7 +159,7 @@ export default function LeadsPage() {
       if (appliedFilters.sources.length > 0 && !appliedFilters.sources.includes(l.source)) return false;
       if (appliedFilters.search) {
         const h = `${l.name} ${l.company} ${l.email} ${l.phone}`.toLowerCase();
-        if (!h.includes(appliedFilters.search.toLowerCase())) return false;
+        if (!h.includes(String(appliedFilters.search ?? '').toLowerCase())) return false;
       }
       return true;
     });
@@ -171,17 +171,13 @@ export default function LeadsPage() {
       const bv = getSortValue(b, appliedSort.field);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
-      return a.id - b.id;
+      return String(a.id).localeCompare(String(b.id));
     });
   }, [activeTab, appliedFilters, appliedSort, leadRows]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leadRows));
-      window.dispatchEvent(new Event('crm:data-updated'));
-    } catch {
-      return;
-    }
+    // Other CRM views listen for this to re-read what the server now holds.
+    window.dispatchEvent(new Event('crm:data-updated'));
   }, [leadRows]);
 
   useEffect(() => {
@@ -198,10 +194,11 @@ export default function LeadsPage() {
     setPage(1);
   }
 
-  function updateLead(id, updates) {
-    setLeadRows((current) => {
-      const oldLead = current.find((l) => l.id === id);
-      const updatedLead = oldLead ? { ...oldLead, ...updates } : null;
+  async function updateLead(id, updates) {
+    const oldLead = leadRows.find((l) => l.id === id);
+    try {
+      const saved = await updateLeadRecord(id, updates);
+      const updatedLead = { ...(oldLead || {}), ...updates, ...(saved || {}) };
       if (oldLead && updates?.status && updates.status !== oldLead.status) {
         try {
           runLeadStageAutomation(updatedLead, updates.status, { previousStage: oldLead.status });
@@ -209,8 +206,9 @@ export default function LeadsPage() {
           console.error('[CRM Automation] Error in updateLead automation:', e);
         }
       }
-      return current.map((lead) => (lead.id === id ? { ...lead, ...updates } : lead));
-    });
+    } catch (err) {
+      showToast?.(`Lead not saved — ${describeError(err)}`);
+    }
   }
 
   const toggleOne = (id) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id]);
@@ -319,46 +317,31 @@ export default function LeadsPage() {
     return String(value);
   }
 
-  function handleCreateLead(formData) {
+  async function handleCreateLead(formData) {
     const data = formData ?? {};
+    // The server owns the id, the lead number and the stage defaults, so the
+    // payload carries only what the user actually typed.
     let createdLead = null;
-    setLeadRows((current) => {
-      const nextId = current.reduce((max, lead) => Math.max(max, lead.id), 0) + 1;
-      const count = String(nextId + 184).padStart(8, '0');
-      const nextLead = {
-        id: nextId,
+    try {
+      createdLead = await createLeadRecord({
+        // A lead has to enter the pipeline somewhere; the first configured
+        // stage is where the automation expects it to start.
+        stageId: data.stageId || firstStageId,
         name: data.leadName || 'Untitled Lead',
         company: data.company || '',
         phone: data.phone || '',
         email: data.email || '',
-        status: 'New',
-        owner: data.owner || 'David Patel',
-        ownerAvatar: 'https://i.pravatar.cc/160?img=68',
-        createdOn: formatDisplayDate(data.createdOn),
-        source: data.source || 'Website',
-        city: '',
-        state: '',
-        country: 'India',
-        amount: 0,
-        leadNumber: `L${count}`,
-        mapX: 50,
-        mapY: 50,
-        avatarColor: '#2F6FED',
-        photo: data.photoPreview || '',
+        ownerId: data.ownerId || undefined,
+        sourceId: data.sourceId || undefined,
+        industryId: data.industryId || undefined,
         jobTitle: data.titleValue || '',
-        industry: data.industry || '',
-        productsCount: (data.products ?? []).length,
-        sourcesCount: 1,
-        filesCount: 0,
-        openTasksCount: 0,
-        callsCount: 0,
-        estimatesCount: 0,
-        deliveryChallansCount: 0,
-        salesInvoicesCount: 0,
-      };
-      createdLead = nextLead;
-      return [nextLead, ...current];
-    });
+        createdOn: data.createdOn || undefined,
+        country: 'India',
+      });
+    } catch (err) {
+      showToast?.(`Lead not created — ${describeError(err)}`);
+      return;
+    }
 
     if (createdLead) {
       try {
@@ -415,35 +398,53 @@ export default function LeadsPage() {
     setSelected([]);
   }
 
-  function deleteLead(id) {
-    setLeadRows((current) => current.filter((lead) => lead.id !== id));
+  async function deleteLead(id) {
+    try {
+      await deleteLeadRecord(id);
+    } catch (err) {
+      showToast?.(`Lead not deleted — ${describeError(err)}`);
+      return;
+    }
     setSelected((current) => current.filter((selectedId) => selectedId !== id));
-    setPinnedLeadIds((current) => current.filter((pinnedId) => pinnedId !== id));
     closeDeleteLead();
   }
 
-  function deleteAllLeads(leadsToDelete) {
-    const ids = new Set(leadsToDelete.map((lead) => lead.id));
-    setLeadRows((current) => current.filter((lead) => !ids.has(lead.id)));
-    setSelected((current) => current.filter((id) => !ids.has(id)));
-    setPinnedLeadIds((current) => current.filter((id) => !ids.has(id)));
+  async function deleteAllLeads(leadsToDelete) {
+    const ids = leadsToDelete.map((lead) => lead.id);
+    try {
+      await deleteLeadRecords(ids);
+    } catch (err) {
+      showToast?.(`Leads not deleted — ${describeError(err)}`);
+      return;
+    }
+    setSelected((current) => current.filter((id) => !ids.includes(id)));
     closeDeleteLead();
   }
 
-  function pinLead(lead) {
-    if (!lead) return;
-    setPinnedLeadIds((current) => (current.includes(lead.id) ? current : [...current, lead.id]));
+  async function pinLead(lead) {
+    if (!lead || lead.isPinned) return;
+    try {
+      await toggleLeadPin(lead.id);
+    } catch (err) {
+      showToast?.(`Pin not saved — ${describeError(err)}`);
+      return;
+    }
     setSelected((current) => current.filter((id) => id !== lead.id));
     closeDeleteLead();
   }
 
-  function togglePinLead(lead) {
+  const pinnedLeadIds = useMemo(
+    () => leadRows.filter((lead) => lead.isPinned).map((lead) => lead.id),
+    [leadRows],
+  );
+
+  async function togglePinLead(lead) {
     if (!lead) return;
-    setPinnedLeadIds((current) => (
-      current.includes(lead.id)
-        ? current.filter((pinnedId) => pinnedId !== lead.id)
-        : [...current, lead.id]
-    ));
+    try {
+      await toggleLeadPin(lead.id);
+    } catch (err) {
+      showToast?.(`Pin not saved — ${describeError(err)}`);
+    }
   }
 
   const recordActionLead = selectedLeads.length === 1 ? selectedLeads[0] : null;

@@ -12,14 +12,24 @@
  */
 
 import { create } from "zustand";
-import {
-  projectsMock,
-  stageConfigsMock,
-  pmsEmployeesMock,
-  pmsSettingsMock,
-} from "../data/mockPmsData";
+import * as pmsApi from "../services/pmsSync";
+import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
 
-const LS = "pms_store_v1";
+/**
+ * Defaults used only until `hydrate()` has answered — never as data. The server
+ * owns projects, stages, departments and settings (api.md §10); these are the
+ * shapes the selectors read while the first request is in flight.
+ */
+const EMPTY_SETTINGS = {
+  atRiskThresholdPct: 70,
+  requireClientApprovalOnDesign: true,
+  requireQaCertificate: true,
+  notifications: { enabled: true, onDelay: true, onApproval: true, onAssignment: true, onCompletion: true },
+  defaultDepartmentCapacity: 20,
+  departmentCapacity: {},
+  statusColors: {},
+  delayCategories: [],
+};
 
 // ─── Time Primitives ─────────────────────────────────────────────────
 
@@ -1247,7 +1257,7 @@ export function getProjectFilterOptions(projects = []) {
     customers: sorted(customers),
     departments: sorted(departments),
     stageNames: sorted(stageNames),
-    managers: [...managers.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    managers: [...managers.values()].sort((a, b) => String(a.name ?? '').localeCompare(String(b.name ?? ''))),
   };
 }
 
@@ -1267,40 +1277,44 @@ export function getStageTiming(stage, now = Date.now()) {
   };
 }
 
-// ─── Persistence ─────────────────────────────────────────────────────
+// ─── Server round-trips ──────────────────────────────────────────────
 
-function load() {
-  try {
-    const v = localStorage.getItem(LS);
-    if (v) return JSON.parse(v);
-  } catch {
-    /* corrupt or unavailable storage — fall back to seed data */
-  }
-  return null;
+/**
+ * Local state is optimistic; the server is authoritative. Every mutator applies
+ * its change immediately so the board does not stutter, then calls this with
+ * the request that owns the rule. Whatever the server returns replaces the
+ * optimistic project; a rejection re-reads the project so the screen shows what
+ * actually happened rather than a change that was refused.
+ */
+function pushProject(projectId, request) {
+  if (!isBackendEnabled() || !request) return Promise.resolve(null);
+  return Promise.resolve()
+    .then(request)
+    .then(async (result) => {
+      const project = result?.project || (result?.id && result?.stages ? result : null);
+      const fresh = project || (await pmsApi.pullProject(projectId));
+      if (fresh) applyServerProject(fresh);
+      return result;
+    })
+    .catch(async (err) => {
+      console.warn("[PMS] change not saved:", describeError(err));
+      const fresh = await pmsApi.pullProject(projectId);
+      if (fresh) applyServerProject(fresh);
+      usePmsStore.getState().showToast(`Not saved — ${describeError(err)}`, "error");
+      return null;
+    });
 }
 
-function persist(state) {
-  try {
-    localStorage.setItem(
-      LS,
-      JSON.stringify({
-        projects: state.projects,
-        stageConfigs: state.stageConfigs,
-        employees: state.employees,
-        settings: state.settings,
-        currentUserId: state.currentUserId,
-      })
-    );
-  } catch {
-    /* quota or private mode — state stays in memory only */
-  }
+/** Drop the server's copy of a project into state, recalculated. */
+function applyServerProject(project) {
+  usePmsStore.setState((st) => ({
+    projects: st.projects.some((p) => p.id === project.id)
+      ? st.projects.map((p) => (p.id === project.id
+        ? recalcProject(project, Date.now(), st.settings.atRiskThresholdPct)
+        : p))
+      : [recalcProject(project, Date.now(), st.settings.atRiskThresholdPct), ...st.projects],
+  }));
 }
-
-// Demo persona backing the "My Projects" / "My Tasks" workspaces until real
-// auth is wired in. Swap via setCurrentUserId.
-const DEFAULT_CURRENT_USER_ID = "EMP-PM-01";
-
-const s = load();
 
 // ─── ID & Log Helpers ────────────────────────────────────────────────
 
@@ -1335,35 +1349,103 @@ function applyToProject(state, projectId, mutator, activity) {
       : mutated;
     return recalcProject(withLog, now, threshold);
   });
-  persist({ ...state, projects });
   return { projects };
 }
 
 // ─── Store ───────────────────────────────────────────────────────────
 
-const seededProjects = (s?.projects ?? projectsMock).map((p) =>
-  recalcProject(p, Date.now(), (s?.settings ?? pmsSettingsMock).atRiskThresholdPct)
-);
-
 export const usePmsStore = create((set, get) => ({
   // ── State ──
-  projects: seededProjects,
-  stageConfigs: s?.stageConfigs ?? stageConfigsMock,
-  employees: s?.employees ?? pmsEmployeesMock,
-  settings: s?.settings ?? pmsSettingsMock,
-  currentUserId: s?.currentUserId ?? DEFAULT_CURRENT_USER_ID,
+  projects: [],
+  stageConfigs: [],
+  departments: [],
+  statusColors: {},
+  employees: [],
+  settings: EMPTY_SETTINGS,
+  // Set from the signed-in user once the session resolves.
+  currentUserId: null,
 
-  setCurrentUserId: (userId) =>
-    set((st) => {
-      persist({ ...st, currentUserId: userId });
-      return { currentUserId: userId };
-    }),
+  status: { loading: false, loaded: false, error: null, lastSyncAt: null },
+
+  setCurrentUserId: (currentUserId) => set({ currentUserId }),
 
   // Transient UI state (not persisted)
   toast: null,
   showToast: (msg, tone = 'success') =>
     set({ toast: { msg, tone, id: Date.now().toString() } }),
   clearToast: () => set({ toast: null }),
+
+  /**
+   * Load PMS from the API. Projects arrive with their stages nested, so every
+   * board, timeline and delay view reads the same server state.
+   */
+  hydrate: async ({ force = false } = {}) => {
+    if (!isBackendEnabled()) {
+      set({
+        projects: [], stageConfigs: [], departments: [], employees: [],
+        statusColors: {}, settings: EMPTY_SETTINGS,
+        status: { loading: false, loaded: false, error: null, lastSyncAt: null },
+      });
+      return null;
+    }
+    if (get().status.loading) return null;
+    if (get().status.loaded && !force) return null;
+
+    set((st) => ({ status: { ...st.status, loading: true, error: null } }));
+    try {
+      const [projects, stageConfigs, departments, settings, employees] = await Promise.all([
+        pmsApi.pullProjects(),
+        pmsSync.pull("stageConfigs"),
+        pmsSync.pull("departments"),
+        pmsApi.pullSettings(),
+        pmsApi.pullEmployees(),
+      ]);
+
+      const nextSettings = settings || get().settings || EMPTY_SETTINGS;
+      const threshold = nextSettings.atRiskThresholdPct;
+      const now = Date.now();
+
+      set((st) => ({
+        projects: projects ? projects.map((p) => recalcProject(p, now, threshold)) : st.projects,
+        stageConfigs: stageConfigs || st.stageConfigs,
+        departments: departments || st.departments,
+        employees: employees || st.employees,
+        settings: nextSettings,
+        statusColors: nextSettings.statusColors || st.statusColors,
+        status: { loading: false, loaded: true, error: null, lastSyncAt: new Date().toISOString() },
+      }));
+      return true;
+    } catch (err) {
+      set((st) => ({ status: { ...st.status, loading: false, error: describeError(err) } }));
+      return null;
+    }
+  },
+
+  /** Re-read one project — after an action whose effects the server computed. */
+  refreshProject: async (projectId) => {
+    const fresh = await pmsApi.pullProject(projectId);
+    if (fresh) applyServerProject(fresh);
+    return fresh;
+  },
+
+  /** Empty on sign-out so the next user never sees the previous one's board. */
+  clear: () => set({
+    projects: [], stageConfigs: [], departments: [], employees: [],
+    statusColors: {}, settings: EMPTY_SETTINGS, currentUserId: null,
+    status: { loading: false, loaded: false, error: null, lastSyncAt: null },
+  }),
+
+  /** Re-read the tenant's saved settings, discarding unsaved edits. */
+  resetSettings: async () => {
+    const settings = await pmsApi.pullSettings();
+    if (!settings) return null;
+    set((st) => ({
+      settings,
+      statusColors: settings.statusColors || st.statusColors,
+      projects: st.projects.map((p) => recalcProject(p, Date.now(), settings.atRiskThresholdPct)),
+    }));
+    return settings;
+  },
 
   // ── Global recalculation ──
 
@@ -1373,36 +1455,156 @@ export const usePmsStore = create((set, get) => ({
       const threshold = st.settings.atRiskThresholdPct;
       const now = Date.now();
       const projects = st.projects.map((p) => recalcProject(p, now, threshold));
-      persist({ ...st, projects });
       return { projects };
     }),
 
-  /** Discard local changes and reload the seed data. */
-  resetPmsData: () =>
-    set((st) => {
-      const next = {
-        projects: projectsMock.map((p) =>
-          recalcProject(p, Date.now(), pmsSettingsMock.atRiskThresholdPct)
-        ),
-        stageConfigs: stageConfigsMock,
-        employees: pmsEmployeesMock,
-        settings: pmsSettingsMock,
-      };
-      persist({ ...st, ...next });
-      return next;
-    }),
+  /** Discard anything local and re-read everything from the server. */
+  resetPmsData: () => get().hydrate({ force: true }),
 
   // ── Settings ──
 
-  updateSettings: (patch) =>
+  updateSettings: (patch) => {
     set((st) => {
       const settings = { ...st.settings, ...patch };
       const projects = st.projects.map((p) =>
         recalcProject(p, Date.now(), settings.atRiskThresholdPct)
       );
-      persist({ ...st, settings, projects });
       return { settings, projects };
-    }),
+    });
+    // The thresholds drive the server's own at-risk and overdue maths, so they
+    // have to live there, not in this tab.
+    pmsApi.pushSettings(get().settings).catch((err) => {
+      console.warn("[PMS] settings not saved:", describeError(err));
+    });
+    return get().settings;
+  },
+
+  // ── Department catalogue ──
+  //
+  // Unlike the rest of PMS Settings these actions commit immediately: a rename
+  // has to rewrite the stages, tasks and templates that point at the old name,
+  // which is not something to leave half-applied in a draft.
+
+  addDepartment: (draft) => {
+    const st = get();
+    const errors = validateDepartment(draft, st.departments);
+    if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+    const optimistic = {
+      id: uid("dept"),
+      name: draft.name.trim(),
+      color: normaliseHex(draft.color) ?? DEPARTMENT_FALLBACK_COLOR,
+    };
+    set({ departments: [...st.departments, optimistic] });
+
+    pmsSync.create("departments", optimistic)
+      .then((saved) => {
+        if (!saved) return;
+        set((cur) => ({
+          departments: cur.departments.map((d) => (d.id === optimistic.id ? saved : d)),
+        }));
+      })
+      .catch((err) => {
+        console.warn("[PMS] department not created:", describeError(err));
+        set((cur) => ({ departments: cur.departments.filter((d) => d.id !== optimistic.id) }));
+      });
+
+    return { ok: true, errors: {} };
+  },
+
+  /** Rename and/or recolour a department, carrying every reference with it. */
+  updateDepartment: (id, patch) => {
+    const st = get();
+    const target = st.departments.find((d) => d.id === id);
+    if (!target) return { ok: false, errors: { name: "That department no longer exists." } };
+
+    const draft = { name: target.name, color: target.color, ...patch };
+    const errors = validateDepartment(draft, st.departments, id);
+    if (Object.keys(errors).length > 0) return { ok: false, errors };
+
+    const nextName = draft.name.trim();
+    const departments = st.departments.map((d) =>
+      d.id === id ? { ...d, name: nextName, color: normaliseHex(draft.color) } : d
+    );
+    const cascade = renameDepartmentIn({ ...st, departments }, target.name, nextName) ?? {};
+    set({ departments, ...cascade });
+
+    // The rename cascades through stages and templates server-side too, so the
+    // projects are re-read rather than trusting the local cascade.
+    pmsSync.update("departments", id, { name: nextName, color: normaliseHex(draft.color) })
+      .then(() => (nextName !== target.name ? get().hydrate({ force: true }) : null))
+      .catch((err) => console.warn("[PMS] department not saved:", describeError(err)));
+
+    return { ok: true, errors: {}, renamed: nextName !== target.name };
+  },
+
+  /**
+   * Remove a department. One that is driving live work can only go if its work
+   * is reassigned — an orphaned department would leave stages pointing at a
+   * name no chart, filter or capacity figure knows about.
+   */
+  deleteDepartment: (id, { reassignTo = null } = {}) => {
+    const st = get();
+    const target = st.departments.find((d) => d.id === id);
+    if (!target) return { ok: false, reason: "NOT_FOUND" };
+    if (st.departments.length <= 1) {
+      return { ok: false, reason: "LAST_ONE", usage: computeDepartmentUsage(st.projects, st.stageConfigs, target.name) };
+    }
+
+    const usage = computeDepartmentUsage(st.projects, st.stageConfigs, target.name);
+    if (usage.inUse && !reassignTo) return { ok: false, reason: "IN_USE", usage };
+    if (reassignTo && !st.departments.some((d) => d.name === reassignTo && d.id !== id)) {
+      return { ok: false, reason: "BAD_TARGET", usage };
+    }
+
+    // Move the work first, then drop the name it used to point at.
+    const moved = usage.inUse ? renameDepartmentIn(st, target.name, reassignTo) : null;
+    const base = moved ?? { projects: st.projects, stageConfigs: st.stageConfigs, settings: st.settings };
+
+    const capacity = { ...(base.settings.departmentCapacity ?? {}) };
+    delete capacity[target.name];
+
+    const next = {
+      ...base,
+      settings: { ...base.settings, departmentCapacity: capacity },
+      departments: st.departments.filter((d) => d.id !== id),
+    };
+    set(next);
+
+    pmsSync.remove("departments", id)
+      .then(() => (usage.inUse ? get().hydrate({ force: true }) : null))
+      .catch((err) => {
+        console.warn("[PMS] department not deleted:", describeError(err));
+        get().hydrate({ force: true });
+      });
+
+    return { ok: true, usage, reassignedTo: usage.inUse ? reassignTo : null };
+  },
+
+  /** Recolour a reserved state (overdue). States are never renamed or removed. */
+  setStatusColor: (key, color) => {
+    const hex = normaliseHex(color);
+    if (!hex) return { ok: false };
+    const st = get();
+    const statusColors = { ...st.statusColors, [key]: hex };
+    set({ statusColors });
+    pmsApi.pushSettings({ ...st.settings, statusColors }).catch((err) => {
+      console.warn("[PMS] status colour not saved:", describeError(err));
+    });
+    return { ok: true };
+  },
+
+  /** What a department drives right now — for the delete confirmation. */
+  getDepartmentUsage: (name) =>
+    computeDepartmentUsage(get().projects, get().stageConfigs, name),
+
+  /** Re-read the department catalogue from the server. */
+  resetDepartments: async () => {
+    const departments = await pmsSync.pull("departments");
+    if (!departments) return { ok: false, reason: "UNAVAILABLE", stranded: [] };
+    set({ departments });
+    return { ok: true };
+  },
 
   // ── Stage configuration templates ──
 
@@ -1428,7 +1630,18 @@ export const usePmsStore = create((set, get) => ({
           sequence: highest + 1,
         },
       ];
-      persist({ ...st, stageConfigs });
+      const created = stageConfigs[stageConfigs.length - 1];
+      pmsSync.create("stageConfigs", created)
+        .then((saved) => {
+          if (!saved) return;
+          set((cur) => ({
+            stageConfigs: cur.stageConfigs.map((c) => (c.id === created.id ? saved : c)),
+          }));
+        })
+        .catch((err) => {
+          console.warn("[PMS] stage template not created:", describeError(err));
+          set((cur) => ({ stageConfigs: cur.stageConfigs.filter((c) => c.id !== created.id) }));
+        });
       return { stageConfigs };
     }),
 
@@ -1437,7 +1650,8 @@ export const usePmsStore = create((set, get) => ({
       const stageConfigs = st.stageConfigs.map((c) =>
         c.id === id ? { ...c, ...patch } : c
       );
-      persist({ ...st, stageConfigs });
+      pmsSync.update("stageConfigs", id, patch)
+        .catch((err) => console.warn("[PMS] stage template not saved:", describeError(err)));
       return { stageConfigs };
     }),
 
@@ -1446,7 +1660,11 @@ export const usePmsStore = create((set, get) => ({
       const stageConfigs = st.stageConfigs
         .filter((c) => c.id !== id)
         .map((c, i) => ({ ...c, sequence: i + 1 }));
-      persist({ ...st, stageConfigs });
+      pmsSync.remove("stageConfigs", id)
+        .catch((err) => {
+          console.warn("[PMS] stage template not deleted:", describeError(err));
+          get().hydrate({ force: true });
+        });
       return { stageConfigs };
     }),
 
@@ -1456,7 +1674,8 @@ export const usePmsStore = create((set, get) => ({
       const stageConfigs = st.stageConfigs.map((c) =>
         c.id === id ? { ...c, isActive: !c.isActive } : c
       );
-      persist({ ...st, stageConfigs });
+      pmsSync.act("stageConfigs", id, "toggle-active", {})
+        .catch((err) => console.warn("[PMS] stage template not toggled:", describeError(err)));
       return { stageConfigs };
     }),
 
@@ -1472,7 +1691,8 @@ export const usePmsStore = create((set, get) => ({
       if (idx === -1 || target < 0 || target >= ordered.length) return {};
       [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
       const stageConfigs = ordered.map((c, i) => ({ ...c, sequence: i + 1 }));
-      persist({ ...st, stageConfigs });
+      pmsSync.act("stageConfigs", null, "reorder", { ids: stageConfigs.map((c) => c.id) })
+        .catch((err) => console.warn("[PMS] order not saved:", describeError(err)));
       return { stageConfigs };
     }),
 
@@ -1507,7 +1727,17 @@ export const usePmsStore = create((set, get) => ({
         ),
       ];
       const projects = [created, ...st.projects];
-      persist({ ...st, projects });
+      pmsSync.create("projects", created)
+        .then((saved) => {
+          if (!saved) return;
+          set((cur) => ({
+            projects: cur.projects.map((p) => (p.id === id ? { ...saved, stages: saved.stages || [] } : p)),
+          }));
+        })
+        .catch((err) => {
+          console.warn("[PMS] project not created:", describeError(err));
+          set((cur) => ({ projects: cur.projects.filter((p) => p.id !== id) }));
+        });
       return { projects };
     }),
 
@@ -1519,7 +1749,7 @@ export const usePmsStore = create((set, get) => ({
    * stage template in "Not Started", and logs the Project Created audit entry.
    * Returns the new project id so the caller can navigate to it.
    */
-  createProjectFromOrder: ({
+  createProjectFromOrder: async ({
     order,
     projectManager,
     priority = "Medium",
@@ -1530,91 +1760,43 @@ export const usePmsStore = create((set, get) => ({
     if (!order) throw new Error("A CRM order is required to create a project.");
     if (!projectManager) throw new Error("A project manager is required.");
 
-    const state = get();
-    const id = nextProjectId(state.projects);
-    const start = startDate || new Date().toISOString();
-
-    const configs = state.stageConfigs
-      .filter((c) => c.isActive && (!stageConfigIds || stageConfigIds.includes(c.id)))
-      .sort((a, b) => a.sequence - b.sequence);
-
-    const stages = configs.map((c, i) => ({
-      id: uid("stg-inst"),
-      stageConfigId: c.id,
-      name: c.name,
-      sequence: i + 1,
-      department: c.department,
-      assignedTeam: null,
-      assignedUser: null,
-      completionPct: 0,
-      plannedDuration: c.defaultDuration,
-      durationUnit: c.durationUnit,
-      startDateTime: null,
-      expectedCompletionDateTime: null,
-      actualCompletionDateTime: null,
-      status: "Not Started",
-      tasks: [],
-      documents: [],
-      approvals: [],
-    }));
-
-    const project = recalcProject(
-      {
-        id,
-        crmOrderId: order.orderNumber ?? order.id,
-        crmCustomerId: order.customerId ?? null,
-        customerName: order.customer ?? "",
-        productDetails: {
-          productName: order.items?.[0]?.description ?? order.customer ?? "Order items",
-          orderValue: order.total ?? order.amount ?? 0,
-          quantity: order.itemsCount ?? order.items?.length ?? 1,
-          specifications,
-        },
-        projectManager,
-        currentStageId: stages[0]?.id ?? null,
-        currentDepartment: stages[0]?.department ?? "Design",
-        priority,
-        overallCompletionPct: 0,
-        startDate: start,
-        expectedCompletionDate: null,
-        actualCompletionDate: null,
-        status: "Draft",
-        stages,
-        activityLog: [
-          makeActivity(
-            "PROJECT_CREATED",
-            "Project",
-            id,
-            `Project created from sales order ${order.orderNumber ?? order.id} for ${order.customer ?? "customer"}.`,
-            projectManager
-          ),
-        ],
-      },
-      Date.now(),
-      state.settings.atRiskThresholdPct
-    );
-
-    set((st) => {
-      const projects = [project, ...st.projects];
-      persist({ ...st, projects });
-      return { projects };
+    // `POST /pms/projects/from-order/` allocates the sequential project code,
+    // copies the order's commercial detail and instantiates the chosen stage
+    // templates in one write (api.md §10.2), so none of that is done here.
+    const created = await pmsApi.createProjectFromOrder({
+      orderId: order.id ?? order.orderNumber,
+      orderNumber: order.orderNumber ?? order.id,
+      projectManagerId: projectManager.id,
+      priority,
+      startDate: startDate || new Date().toISOString(),
+      stageConfigIds,
+      specifications,
     });
 
-    return id;
+    const project = created?.project || created;
+    if (!project?.id) throw new Error("The server did not return the new project.");
+
+    const full = (await pmsApi.pullProject(project.id)) || project;
+    applyServerProject(full);
+    return full.code || full.id;
   },
 
-  updateProject: (projectId, patch) =>
-    set((st) => applyToProject(st, projectId, (p) => ({ ...p, ...patch }))),
+  updateProject: (projectId, patch) => {
+    set((st) => applyToProject(st, projectId, (p) => ({ ...p, ...patch })));
+    pushProject(projectId, () => pmsSync.update("projects", projectId, patch));
+  },
 
-  deleteProject: (projectId) =>
-    set((st) => {
-      const projects = st.projects.filter((p) => p.id !== projectId);
-      persist({ ...st, projects });
-      return { projects };
-    }),
+  deleteProject: (projectId) => {
+    const previous = get().projects;
+    set({ projects: previous.filter((p) => p.id !== projectId) });
+    pmsSync.remove("projects", projectId).catch((err) => {
+      console.warn("[PMS] project not deleted:", describeError(err));
+      set({ projects: previous });
+    });
+  },
 
   /** Build a project's runtime stages from the active templates. */
-  applyStageTemplate: (projectId, configIds = null) =>
+  applyStageTemplate: (projectId, configIds = null) => {
     set((st) => {
       const configs = st.stageConfigs
         .filter((c) => c.isActive && (!configIds || configIds.includes(c.id)))
@@ -1652,7 +1834,10 @@ export const usePmsStore = create((set, get) => ({
           `${configs.length} stages applied from the template library.`
         )
       );
-    }),
+    });
+    // The server instantiates the templates, so its stage ids are the real ones.
+    pushProject(projectId, () => pmsApi.applyStageTemplate(projectId, configIds ? { stageConfigIds: configIds } : {}));
+  },
 
   /**
    * Close a project — the Stage 12 sign-off.
@@ -1717,6 +1902,15 @@ export const usePmsStore = create((set, get) => ({
       )
     );
 
+    // `POST /pms/projects/{id}/complete/` writes the sign-off record and the
+    // completion metrics; `force` is passed through so the server logs that the
+    // closure was deliberate.
+    pushProject(projectId, () => pmsApi.completeProject(projectId, {
+      signedOffById: actor?.id,
+      signedOffBy: actor?.name,
+      force,
+    }));
+
     return metrics;
   },
 
@@ -1745,7 +1939,8 @@ export const usePmsStore = create((set, get) => ({
       actor = null,
       injectTask = true,
     } = {}
-  ) =>
+  ) => {
+   
     set((st) => {
       const project = st.projects.find((p) => p.id === projectId);
       const target = project?.stages.find((s2) => s2.id === stageId);
@@ -1826,13 +2021,16 @@ export const usePmsStore = create((set, get) => ({
         }),
         assignment
       );
-    }),
+    });
+    // Assignment is a server action: it notifies the assignee and re-times the stage.
+    pushProject(projectId, () => pmsApi.assignStage(projectId, stageId, { assignedUserId: assignedUser?.id, assignedTeam, department, plannedDuration, durationUnit, startDateTime, status, notes }));
+  },
 
   /**
    * Start a stage: stamps the start time (first start only) and moves it to
    * In Progress, which is what makes the expected-completion clock run.
    */
-  startStage: (projectId, stageId, actor) =>
+  startStage: (projectId, stageId, actor) => {
     set((st) =>
       applyToProject(
         st,
@@ -1854,9 +2052,12 @@ export const usePmsStore = create((set, get) => ({
         }),
         makeActivity("STAGE_STARTED", "Stage", stageId, "Stage started.", actor)
       )
-    ),
+    );
+    // The server stamps the real start time and moves the project pointer.
+    pushProject(projectId, () => pmsApi.startStage(projectId, stageId));
+  },
 
-  updateStage: (projectId, stageId, patch) =>
+  updateStage: (projectId, stageId, patch) => {
     set((st) =>
       applyToProject(st, projectId, (p) => ({
         ...p,
@@ -1864,10 +2065,12 @@ export const usePmsStore = create((set, get) => ({
           stage.id === stageId ? { ...stage, ...patch } : stage
         ),
       }))
-    ),
+    );
+    pushProject(projectId, () => pmsApi.patchStage(projectId, stageId, patch));
+  },
 
   /** Set a stage's own progress. Ignored once the stage has tasks driving it. */
-  setStageProgress: (projectId, stageId, pct) =>
+  setStageProgress: (projectId, stageId, pct) => {
     set((st) =>
       applyToProject(st, projectId, (p) => ({
         ...p,
@@ -1875,9 +2078,11 @@ export const usePmsStore = create((set, get) => ({
           stage.id === stageId ? { ...stage, completionPct: clampPct(pct) } : stage
         ),
       }))
-    ),
+    );
+    pushProject(projectId, () => pmsApi.setStageProgress(projectId, stageId, { completionPct: clampPct(pct) }));
+  },
 
-  setStageStatus: (projectId, stageId, status, actor) =>
+  setStageStatus: (projectId, stageId, status, actor) => {
     set((st) =>
       applyToProject(
         st,
@@ -1899,10 +2104,12 @@ export const usePmsStore = create((set, get) => ({
         }),
         makeActivity("STAGE_STATUS_CHANGED", "Stage", stageId, `Stage marked ${status}.`, actor)
       )
-    ),
+    );
+    pushProject(projectId, () => pmsApi.setStageStatus(projectId, stageId, { status }));
+  },
 
   /** Complete a stage and advance the project pointer to the next one. */
-  completeStageAndAdvance: (projectId, stageId, actor) =>
+  completeStageAndAdvance: (projectId, stageId, actor) => {
     set((st) =>
       applyToProject(
         st,
@@ -1946,7 +2153,10 @@ export const usePmsStore = create((set, get) => ({
           actor
         )
       )
-    ),
+    );
+    // Advancing is the server's call: it owns the stage order and the rollup.
+    pushProject(projectId, () => pmsApi.completeStage(projectId, stageId));
+  },
 
   /**
    * Hand a completed stage to the next department — the Stage 8 protocol:
@@ -2036,6 +2246,14 @@ export const usePmsStore = create((set, get) => ({
       )
     );
 
+    // The server re-checks the handoff prerequisites and notifies the next
+    // department, so the local pointer move is only the optimistic half.
+    pushProject(projectId, () => pmsApi.handoffStage(projectId, stageId, {
+      recipientId: recipient?.id,
+      notes,
+      force,
+    }));
+
     return nextStage?.id ?? null;
   },
 
@@ -2090,10 +2308,11 @@ export const usePmsStore = create((set, get) => ({
         })()
       )
     );
+    pushProject(projectId, () => pmsApi.logDelay(projectId, stageId, delayDetails));
   },
 
   /** Revise the recovery plan without clearing the delay. */
-  updateRecoveryPlan: (projectId, stageId, { expectedRecoveryDate, resolutionNotes, category, responsibleUser } = {}, actor = null) =>
+  updateRecoveryPlan: (projectId, stageId, { expectedRecoveryDate, resolutionNotes, category, responsibleUser } = {}, actor = null) => {
     set((st) => {
       const before = st.projects
         .find((p) => p.id === projectId)
@@ -2137,10 +2356,12 @@ export const usePmsStore = create((set, get) => ({
           return entry;
         })()
       );
-    }),
+    });
+    pushProject(projectId, () => pmsApi.updateRecoveryPlan(projectId, stageId, { expectedRecoveryDate, resolutionNotes, category, responsibleUser }));
+  },
 
   /** Clear a delay and return the stage to the running pipeline. */
-  resolveDelay: (projectId, stageId, resolutionNotes = "", actor = null) =>
+  resolveDelay: (projectId, stageId, resolutionNotes = "", actor = null) => {
     set((st) =>
       applyToProject(
         st,
@@ -2170,11 +2391,14 @@ export const usePmsStore = create((set, get) => ({
           return entry;
         })()
       )
-    ),
+    );
+    pushProject(projectId, () => pmsApi.resolveDelay(projectId, stageId, { resolutionNotes }));
+  },
 
   // ── Tasks ──
 
-  addTask: (projectId, stageId, task) =>
+  addTask: (projectId, stageId, task) => {
+   
     set((st) =>
       applyToProject(st, projectId, (p) => ({
         ...p,
@@ -2199,9 +2423,12 @@ export const usePmsStore = create((set, get) => ({
               }
         ),
       }))
-    ),
+    );
+    pushProject(projectId, () => pmsApi.addTask(projectId, stageId, task));
+  },
 
-  updateTask: (projectId, stageId, taskId, patch, actor = null) =>
+  updateTask: (projectId, stageId, taskId, patch, actor = null) => {
+   
     set((st) => {
       // Capture the previous percentage so the audit trail can record the
       // before → after the spec asks for.
@@ -2257,9 +2484,12 @@ export const usePmsStore = create((set, get) => ({
               }
         ),
       }), activity);
-    }),
+    });
+    pushProject(projectId, () => pmsApi.patchTask(projectId, stageId, taskId, patch));
+  },
 
-  deleteTask: (projectId, stageId, taskId) =>
+  deleteTask: (projectId, stageId, taskId) => {
+   
     set((st) =>
       applyToProject(st, projectId, (p) => ({
         ...p,
@@ -2269,12 +2499,15 @@ export const usePmsStore = create((set, get) => ({
             : { ...stage, tasks: stage.tasks.filter((t) => t.id !== taskId) }
         ),
       }))
-    ),
+    );
+    pushProject(projectId, () => pmsApi.deleteTask(projectId, stageId, taskId));
+  },
 
   // ── Design documents & versioning ──
 
   /** Upload a proof. Version auto-increments from the stage's existing stack. */
-  addDocument: (projectId, stageId, doc, actor) =>
+  addDocument: (projectId, stageId, doc, actor) => {
+   
     set((st) =>
       applyToProject(
         st,
@@ -2311,7 +2544,9 @@ export const usePmsStore = create((set, get) => ({
           actor
         )
       )
-    ),
+    );
+    pushProject(projectId, () => pmsApi.addDocument(projectId, stageId, doc));
+  },
 
   /**
    * Send a proof out for sign-off — the "Send to Client" step.
@@ -2320,7 +2555,8 @@ export const usePmsStore = create((set, get) => ({
    * Under Review, so the proofing centre can tell "not circulated yet" apart
    * from "waiting on the client".
    */
-  requestApproval: (projectId, stageId, documentId, { approverType = "Client", approverName, actor = null } = {}) =>
+  requestApproval: (projectId, stageId, documentId, { approverType = "Client", approverName, actor = null } = {}) => {
+   
     set((st) => {
       const project = st.projects.find((p) => p.id === projectId);
       const stage = project?.stages.find((s2) => s2.id === stageId);
@@ -2362,7 +2598,9 @@ export const usePmsStore = create((set, get) => ({
           actor
         )
       );
-    }),
+    });
+    pushProject(projectId, () => pmsApi.requestApproval(projectId, stageId, documentId, { approverType, approverName }));
+  },
 
   /**
    * Record a decision on a proof.
@@ -2455,6 +2693,16 @@ export const usePmsStore = create((set, get) => ({
         })()
       )
     );
+
+    // The decision is the client's answer on a shared proof, so it has to be
+    // recorded server-side where the approval link can see it.
+    pushProject(projectId, () => pmsApi.decideDocument(projectId, stageId, documentId, {
+      decision,
+      comments,
+      revisionReason,
+      approverName,
+      approverType,
+    }));
   },
 
   // ── Audit trail ──

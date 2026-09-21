@@ -49,7 +49,7 @@ export const RelatedDocumentsCard = ({ documents, title = 'Connected Transaction
                       ${doc.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                     {doc.status && (<p className="text-[10px] font-medium text-slate-500 flex items-center justify-end gap-1">
-                        {doc.status.toLowerCase() === 'paid' || doc.status.toLowerCase() === 'delivered' ? (<CheckCircle className="w-3 h-3 text-emerald-500 inline"/>) : (<Clock className="w-3 h-3 text-amber-500 inline"/>)}
+                        {String(doc.status ?? '').toLowerCase() === 'paid' || String(doc.status ?? '').toLowerCase() === 'delivered' ? (<CheckCircle className="w-3 h-3 text-emerald-500 inline"/>) : (<Clock className="w-3 h-3 text-amber-500 inline"/>)}
                         {doc.status}
                       </p>)}
                   </div>)}

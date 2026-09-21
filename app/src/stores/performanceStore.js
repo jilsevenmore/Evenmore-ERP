@@ -1,26 +1,10 @@
 import { create } from "zustand";
-import {
-  cyclesMock,
-  appraisalsMock,
-  indicatorsMock,
-  kpisMock,
-  ratingScales,
-} from "../data/hrms/data/performanceMockData";
+import { writeThrough, pullTracked } from "../services/hrmsSync";
+import { RATING_SCALES } from "../services/performanceScales";
 import { useAppStore } from "./appStore";
 
-const LS_KEY = "hrms_performance_v1";
 
-function loadState() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (err) {
-    console.error("Failed to load performance store from localStorage", err);
-  }
-  return null;
-}
 
-const saved = loadState();
 
 export function calculateWeightedScore(kpiResults, defaultRating = 4.0) {
   if (!kpiResults || kpiResults.length === 0) {
@@ -48,23 +32,43 @@ export function calculateWeightedScore(kpiResults, defaultRating = 4.0) {
 
 export function getRatingScaleTier(rating) {
   const r = Number(rating) || 0;
-  for (const tier of ratingScales) {
+  for (const tier of RATING_SCALES) {
     if (r >= tier.minScore) return tier;
   }
-  return ratingScales[ratingScales.length - 1];
+  return RATING_SCALES[RATING_SCALES.length - 1];
 }
 
 export const usePerformanceStore = create((set, get) => ({
-  cycles: saved?.cycles ?? cyclesMock,
-  activeCycleId: saved?.activeCycleId ?? "CYC-2024-Q4",
-  appraisals: saved?.appraisals ?? appraisalsMock,
-  indicators: saved?.indicators ?? indicatorsMock,
-  kpis: saved?.kpis ?? kpisMock,
+  /** Load this module's collections from the API. */
+  hydrate: async () => {
+    const rows = await Promise.all([
+      pullTracked("cycles"),
+      pullTracked("appraisals"),
+      pullTracked("indicators"),
+      pullTracked("kpis"),
+    ]);
+    set((s) => ({
+      cycles: rows[0] || s.cycles,
+      appraisals: rows[1] || s.appraisals,
+      indicators: rows[2] || s.indicators,
+      kpis: rows[3] || s.kpis,
+    }));
+    return rows;
+  },
+
+  /** Empty on sign-out so the next user sees nothing of the previous one. */
+  clear: () => set({ cycles: [], appraisals: [], indicators: [], kpis: [] }),
+
+  cycles: [],
+  activeCycleId: "CYC-2024-Q4",
+  appraisals: [],
+  indicators: [],
+  kpis: [],
 
   // Role Simulation ('HR' | 'Manager' | 'Employee')
-  role: saved?.role ?? "HR",
-  simulatedEmployeeName: saved?.simulatedEmployeeName ?? "Priya Patel",
-  simulatedManagerName: saved?.simulatedManagerName ?? "David Park",
+  role: "HR",
+  simulatedEmployeeName: "Priya Patel",
+  simulatedManagerName: "David Park",
 
   setRole: (role) => {
     set({ role });
@@ -86,25 +90,17 @@ export const usePerformanceStore = create((set, get) => ({
     get().persist();
   },
 
+  /**
+   * Every action calls this after changing part of the state. Each collection
+   * is written through to its own endpoint; `writeThrough` works out which rows
+   * are new, changed or gone.
+   */
   persist: () => {
     const s = get();
-    try {
-      localStorage.setItem(
-        LS_KEY,
-        JSON.stringify({
-          cycles: s.cycles,
-          activeCycleId: s.activeCycleId,
-          appraisals: s.appraisals,
-          indicators: s.indicators,
-          kpis: s.kpis,
-          role: s.role,
-          simulatedEmployeeName: s.simulatedEmployeeName,
-          simulatedManagerName: s.simulatedManagerName,
-        })
-      );
-    } catch (e) {
-      console.error("Error saving performance store", e);
-    }
+    writeThrough("cycles", s.cycles);
+    writeThrough("appraisals", s.appraisals);
+    writeThrough("indicators", s.indicators);
+    writeThrough("kpis", s.kpis);
   },
 
   // ── Cycle Management ──────────────────────────────────────────
@@ -488,7 +484,7 @@ export const usePerformanceStore = create((set, get) => ({
     try {
       const appStore = useAppStore.getState();
       const employees = appStore.employees || [];
-      const emp = employees.find((e) => e.name.toLowerCase() === target.employee.toLowerCase());
+      const emp = employees.find((e) => String(e.name ?? '').toLowerCase() === String(target.employee ?? '').toLowerCase());
       if (emp && appStore.updateEmployee) {
         appStore.updateEmployee(emp.id, {
           performanceRating: `${target.rating.toFixed(1)} / 5`,
@@ -505,7 +501,7 @@ export const usePerformanceStore = create((set, get) => ({
     try {
       const appStore = useAppStore.getState();
       const employees = appStore.employees || [];
-      const emp = employees.find((e) => e.name.toLowerCase() === target.employee.toLowerCase());
+      const emp = employees.find((e) => String(e.name ?? '').toLowerCase() === String(target.employee ?? '').toLowerCase());
       if (emp && appStore.updateEmployee) {
         appStore.updateEmployee(emp.id, {
           performanceRating: `${target.rating.toFixed(1)} / 5`,

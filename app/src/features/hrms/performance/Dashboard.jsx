@@ -77,11 +77,11 @@ export default function Dashboard() {
     let list = appraisals;
     if (role === "Employee") {
       list = appraisals.filter(
-        (a) => a.employee.toLowerCase() === simulatedEmployeeName.toLowerCase()
+        (a) => String(a.employee ?? '').toLowerCase() === simulatedEmployeeName.toLowerCase()
       );
     } else if (role === "Manager") {
       list = appraisals.filter(
-        (a) => a.reviewer.toLowerCase() === simulatedManagerName.toLowerCase()
+        (a) => String(a.reviewer ?? '').toLowerCase() === simulatedManagerName.toLowerCase()
       );
     }
 

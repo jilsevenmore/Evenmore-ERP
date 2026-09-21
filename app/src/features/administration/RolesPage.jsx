@@ -3,6 +3,7 @@ import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { adminSync, duplicateRole, describeError } from '../../services/adminSync';
 import {
   Users,
   Shield,
@@ -33,7 +34,6 @@ import {
   Edit2,
 } from 'lucide-react';
 
-const STORAGE_KEY = 'evenmore_admin_roles_v2';
 const ROLES_PER_PAGE = 10;
 
 const DEFAULT_MODULE_PERMISSIONS = {
@@ -224,270 +224,6 @@ const DEFAULT_MODULE_PERMISSIONS = {
   ],
 };
 
-const INITIAL_ROLES = [
-  {
-    id: 'rol-1',
-    code: 'EM',
-    name: 'Employee',
-    description: 'General staff access',
-    usersCount: 24,
-    badgeColor: 'bg-blue-100 text-blue-700',
-    selectedPermissions: [
-      'show_crm_dashboard',
-      'show_templates_menu',
-      'create_lead',
-      'view_lead',
-      'move_lead',
-      'manage_pipeline',
-      'edit_pipeline',
-      'view_task',
-      'create_task',
-      'edit_task',
-      'assign_task',
-      'view_staff',
-      'view_projects',
-      'mark_attendance',
-      'apply_leave',
-      'view_own_payslip',
-      'menu_crm',
-      'menu_hrms',
-    ],
-  },
-  {
-    id: 'rol-2',
-    code: 'AC',
-    name: 'Accountant',
-    description: 'Finance and accounting',
-    usersCount: 8,
-    badgeColor: 'bg-slate-200 text-slate-700',
-    selectedPermissions: [
-      'show_account_dashboard',
-      'view_bank_accounts',
-      'manage_journal_entries',
-      'view_ledger',
-      'view_financial_reports',
-      'reconcile_bank',
-      'generate_payroll',
-      'menu_accounts',
-      'export_excel',
-    ],
-  },
-  {
-    id: 'rol-3',
-    code: 'BD',
-    name: 'BDE',
-    description: 'Business development',
-    usersCount: 6,
-    badgeColor: 'bg-sky-100 text-sky-700',
-    selectedPermissions: [
-      'show_crm_dashboard',
-      'create_lead',
-      'view_lead',
-      'edit_lead',
-      'move_lead',
-      'manage_pipeline',
-      'view_task',
-      'create_task',
-      'menu_crm',
-    ],
-  },
-  {
-    id: 'rol-4',
-    code: 'TS',
-    name: 'Tele Sales Coordinator',
-    description: 'Tele calling and lead management',
-    usersCount: 5,
-    badgeColor: 'bg-purple-100 text-purple-700',
-    selectedPermissions: [
-      'show_crm_dashboard',
-      'create_lead',
-      'view_lead',
-      'move_lead',
-      'view_task',
-      'create_task',
-      'assign_task',
-      'menu_crm',
-    ],
-  },
-  {
-    id: 'rol-5',
-    code: 'AS',
-    name: 'Area Sales Manager',
-    description: 'Area sales and team',
-    usersCount: 4,
-    badgeColor: 'bg-pink-100 text-pink-700',
-    selectedPermissions: [
-      'show_crm_dashboard',
-      'create_lead',
-      'view_lead',
-      'edit_lead',
-      'delete_lead',
-      'move_lead',
-      'manage_pipeline',
-      'create_pipeline',
-      'edit_pipeline',
-      'view_task',
-      'create_task',
-      'edit_task',
-      'assign_task',
-      'manage_task_allocation',
-      'menu_crm',
-      'menu_sales',
-    ],
-  },
-  {
-    id: 'rol-6',
-    code: 'HR',
-    name: 'HR Manager',
-    description: 'Human resource management',
-    usersCount: 3,
-    badgeColor: 'bg-rose-100 text-rose-700',
-    selectedPermissions: [
-      'show_hrm_dashboard',
-      'view_staff',
-      'create_staff',
-      'edit_staff',
-      'mark_attendance',
-      'view_team_attendance',
-      'apply_leave',
-      'approve_leave',
-      'regularize_attendance',
-      'generate_payroll',
-      'edit_salary_structure',
-      'approve_payroll',
-      'menu_hrms',
-    ],
-  },
-  {
-    id: 'rol-7',
-    code: 'RM',
-    name: 'Relationship Manager',
-    description: 'Client relationship management',
-    usersCount: 3,
-    badgeColor: 'bg-amber-100 text-amber-700',
-    selectedPermissions: [
-      'show_crm_dashboard',
-      'view_lead',
-      'edit_lead',
-      'move_lead',
-      'manage_pipeline',
-      'view_task',
-      'create_task',
-      'menu_crm',
-    ],
-  },
-  {
-    id: 'rol-8',
-    code: 'BO',
-    name: 'Business Operation Executive',
-    description: 'Operations and purchase',
-    usersCount: 4,
-    badgeColor: 'bg-cyan-100 text-cyan-800',
-    selectedPermissions: [
-      'view_projects',
-      'create_project',
-      'edit_project',
-      'view_task',
-      'create_task',
-      'edit_task',
-      'menu_purchase',
-      'menu_inventory',
-    ],
-  },
-  {
-    id: 'rol-9',
-    code: 'OA',
-    name: 'Office Assistant',
-    description: 'Administrative support',
-    usersCount: 3,
-    badgeColor: 'bg-red-100 text-red-700',
-    selectedPermissions: [
-      'view_task',
-      'create_task',
-      'mark_attendance',
-      'apply_leave',
-      'view_own_payslip',
-      'menu_hrms',
-    ],
-  },
-  {
-    id: 'rol-10',
-    code: 'SS',
-    name: 'Sales Support Executive',
-    description: 'Sales and customer support',
-    usersCount: 4,
-    badgeColor: 'bg-indigo-100 text-indigo-700',
-    selectedPermissions: [
-      'show_crm_dashboard',
-      'create_lead',
-      'view_lead',
-      'move_lead',
-      'view_task',
-      'create_task',
-      'menu_crm',
-    ],
-  },
-  {
-    id: 'rol-11',
-    code: 'DR',
-    name: 'Driver',
-    description: 'Logistics and delivery',
-    usersCount: 2,
-    badgeColor: 'bg-teal-100 text-teal-700',
-    selectedPermissions: [
-      'view_task',
-      'mark_attendance',
-      'apply_leave',
-      'view_own_payslip',
-    ],
-  },
-  {
-    id: 'rol-12',
-    code: 'WM',
-    name: 'Warehouse Manager',
-    description: 'Inventory and stock audits',
-    usersCount: 3,
-    badgeColor: 'bg-blue-100 text-blue-800',
-    selectedPermissions: [
-      'view_task',
-      'create_task',
-      'edit_task',
-      'menu_inventory',
-      'export_excel',
-    ],
-  },
-  {
-    id: 'rol-13',
-    code: 'FH',
-    name: 'Finance Head',
-    description: 'Accounts, taxation and reporting',
-    usersCount: 2,
-    badgeColor: 'bg-emerald-100 text-emerald-800',
-    selectedPermissions: [
-      'show_account_dashboard',
-      'view_bank_accounts',
-      'manage_journal_entries',
-      'view_ledger',
-      'view_financial_reports',
-      'reconcile_bank',
-      'approve_payroll',
-      'menu_accounts',
-      'export_excel',
-      'view_audit_logs',
-    ],
-  },
-  {
-    id: 'rol-14',
-    code: 'SA',
-    name: 'Super Administrator',
-    description: 'Unrestricted enterprise control',
-    usersCount: 2,
-    badgeColor: 'bg-purple-200 text-purple-900',
-    selectedPermissions: Object.values(DEFAULT_MODULE_PERMISSIONS)
-      .flatMap((groups) => groups.flatMap((g) => g.permissions.map((p) => p.id))),
-  },
-];
-
 const MODULE_TABS = [
   'Staff',
   'CRM',
@@ -498,6 +234,11 @@ const MODULE_TABS = [
   'Menu Access',
   'Other Modules',
 ];
+
+/** Lower-cased text, safe on a field the server left unset. */
+function text(value) {
+  return String(value ?? '').toLowerCase();
+}
 
 function getGroupIcon(type) {
   switch (type) {
@@ -527,24 +268,22 @@ function getGroupIcon(type) {
 }
 
 export function RolesPage() {
-  const [roles, setRoles] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch (e) {}
-    return INITIAL_ROLES;
-  });
+  // Roles and the permission catalogue both come from the server, so the
+  // checkbox tree can only offer permissions the API will actually enforce.
+  const [roles, setRoles] = useState([]);
+  const [selectedRoleId, setSelectedRoleId] = useState(null);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(roles));
-    } catch (e) {}
-  }, [roles]);
-
-  const [selectedRoleId, setSelectedRoleId] = useState('rol-1');
+    let cancelled = false;
+    adminSync.pull('roles').then((rows) => {
+      if (cancelled || !rows) return;
+      // The editor reads `selectedPermissions`; the API calls them `permissions`.
+      const mapped = rows.map((r) => ({ ...r, selectedPermissions: r.permissions || [] }));
+      setRoles(mapped);
+      setSelectedRoleId((current) => current || mapped[0]?.id || null);
+    });
+    return () => { cancelled = true; };
+  }, []);
   const [activeTab, setActiveTab] = useState('CRM');
   const [roleSearchQuery, setRoleSearchQuery] = useState('');
   const [permissionSearchQuery, setPermissionSearchQuery] = useState('');
@@ -590,9 +329,9 @@ export function RolesPage() {
       const q = roleSearchQuery.trim().toLowerCase();
       if (!q) return true;
       return (
-        r.name.toLowerCase().includes(q) ||
-        r.description.toLowerCase().includes(q) ||
-        r.code.toLowerCase().includes(q)
+        text(r.name).includes(q) ||
+        text(r.description).includes(q) ||
+        String(r.code ?? '').toLowerCase().includes(q)
       );
     });
   }, [roles, roleSearchQuery]);
@@ -632,9 +371,9 @@ export function RolesPage() {
     return groups
       .map((g) => {
         const matchingPermissions = g.permissions.filter((p) =>
-          p.label.toLowerCase().includes(q)
+          String(p.label ?? '').toLowerCase().includes(q)
         );
-        if (matchingPermissions.length > 0 || g.name.toLowerCase().includes(q)) {
+        if (matchingPermissions.length > 0 || String(g.name ?? '').toLowerCase().includes(q)) {
           return {
             ...g,
             permissions: matchingPermissions.length > 0 ? matchingPermissions : g.permissions,
@@ -706,18 +445,17 @@ export function RolesPage() {
       return;
     }
 
+    const name = editingRoleName.trim();
     setRoles((prev) =>
       prev.map((r) =>
         r.id === activeRole.id
-          ? {
-              ...r,
-              name: editingRoleName.trim(),
-              selectedPermissions: editingPermissions,
-            }
+          ? { ...r, name, selectedPermissions: editingPermissions }
           : r
       )
     );
-    showNotification(`Role "${editingRoleName.trim()}" updated successfully!`);
+    adminSync.update('roles', activeRole.id, { name, permissions: editingPermissions })
+      .catch((err) => showNotification(`Role not saved — ${describeError(err)}`));
+    showNotification(`Role "${name}" updated successfully!`);
   };
 
   const handleCancelChanges = () => {
@@ -728,22 +466,21 @@ export function RolesPage() {
     }
   };
 
-  const handleDuplicateRole = (targetRole) => {
+  const handleDuplicateRole = async (targetRole) => {
     if (!targetRole) return;
-    const duplicatedRole = {
-      id: `rol-${Date.now()}`,
-      code: (targetRole.code + '2').slice(0, 3).toUpperCase(),
-      name: `${targetRole.name} (Copy)`,
-      description: targetRole.description || 'Custom user role',
-      usersCount: 0,
-      badgeColor: 'bg-indigo-100 text-indigo-700',
-      selectedPermissions: [...(targetRole.selectedPermissions || [])],
-    };
-
-    setRoles((prev) => [duplicatedRole, ...prev]);
-    setSelectedRoleId(duplicatedRole.id);
     setOpenMenuRoleId(null);
-    showNotification(`Role "${targetRole.name}" duplicated successfully!`);
+    try {
+      // `POST /admin/roles/{id}/duplicate/` copies the permission set and
+      // allocates a code that does not collide with an existing role.
+      const copy = await duplicateRole(targetRole.id);
+      if (!copy) return;
+      const mapped = { ...copy, selectedPermissions: copy.permissions || [] };
+      setRoles((prev) => [mapped, ...prev]);
+      setSelectedRoleId(mapped.id);
+      showNotification(`Role "${targetRole.name}" duplicated successfully!`);
+    } catch (err) {
+      showNotification(`Role not duplicated — ${describeError(err)}`);
+    }
   };
 
   const handleDeleteRole = () => {
@@ -757,6 +494,8 @@ export function RolesPage() {
     }
 
     setRoles((prev) => prev.filter((r) => r.id !== target.id));
+    adminSync.remove('roles', target.id)
+      .catch((err) => showNotification(`Role not deleted — ${describeError(err)}`));
     setIsDeleteModalOpen(false);
     const remaining = roles.filter((r) => r.id !== target.id);
     if (remaining.length > 0 && selectedRoleId === target.id) {
@@ -766,29 +505,23 @@ export function RolesPage() {
     showNotification(`Role "${target.name}" was deleted.`);
   };
 
-  const handleCreateNewRole = (name, description) => {
+  const handleCreateNewRole = async (name, description) => {
     if (!name.trim()) return;
-    const code = name
-      .split(' ')
-      .map((w) => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase() || 'RO';
-
-    const newRole = {
-      id: `rol-${Date.now()}`,
-      code,
-      name: name.trim(),
-      description: description.trim() || 'Custom user role',
-      usersCount: 0,
-      badgeColor: 'bg-blue-100 text-blue-700',
-      selectedPermissions: [],
-    };
-
-    setRoles([newRole, ...roles]);
-    setSelectedRoleId(newRole.id);
-    setIsCreateModalOpen(false);
-    showNotification(`New role "${newRole.name}" created!`);
+    try {
+      const created = await adminSync.create('roles', {
+        name: name.trim(),
+        description: description.trim() || undefined,
+        permissions: [],
+      });
+      if (!created) return;
+      const mapped = { ...created, selectedPermissions: created.permissions || [] };
+      setRoles((prev) => [mapped, ...prev]);
+      setSelectedRoleId(mapped.id);
+      setIsCreateModalOpen(false);
+      showNotification(`New role "${mapped.name}" created!`);
+    } catch (err) {
+      showNotification(`Role not created — ${describeError(err)}`);
+    }
   };
 
   return (

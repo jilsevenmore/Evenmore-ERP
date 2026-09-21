@@ -268,8 +268,8 @@ export const PurchaseOrdersPage = () => {
         <StatCard label="Fulfilled & Billed" value={`${receivedPoCount} Received`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
       </div>
 
-      <DataTable title="Supplier Purchase Orders" columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder="Search PO # or vendor..." searchFilter={(p, term) => p.poNumber.toLowerCase().includes(term) ||
-            p.vendor.toLowerCase().includes(term)}/>
+      <DataTable title="Supplier Purchase Orders" columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder="Search PO # or vendor..." searchFilter={(p, term) => String(p.poNumber ?? '').toLowerCase().includes(term) ||
+            String(p.vendor ?? '').toLowerCase().includes(term)}/>
 
       {/* Create PO Modal */}
       {showAddModal && (

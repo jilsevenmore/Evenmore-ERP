@@ -2,42 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Pencil, Trash2, CalendarDays, PhoneCall, MapPinned, X, ChevronDown, LayoutGrid, Rows3 } from 'lucide-react';
 import InfoBanner from '../common/InfoBanner';
+import { useCrmStore } from '../../../stores/crmStore';
+import { loadForms, saveForms, TASK_FORM } from '../../../services/crmForms';
 
-const STORAGE_KEY = 'leadTaskFormsV1';
-
-const DEFAULT_FORMS = [
-  {
-    id: 'task-form-calling',
-    title: 'Calling',
-    description: 'No description provided',
-    fields: [
-      'Call', '2nd Call', '3rd Call', '4th Call', '5th Call', '6th Call', '7th Call', '8th Call', '9th Call', '10th Call', '11th Call', '12th Call', '13th Call', '14th Call',
-    ],
-    lastUpdated: '07/08/2026',
-    status: 'ACTIVE',
-    iconName: 'call',
-  },
-  {
-    id: 'task-form-visit',
-    title: 'Visit Data',
-    description: 'No description provided',
-    fields: ['Quotation', 'Demo', 'pending'],
-    lastUpdated: '16/04/2026',
-    status: 'ACTIVE',
-    iconName: 'visit',
-  },
-];
-
-function getStoredForms() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch { /* ignore */ }
-  return DEFAULT_FORMS;
-}
 
 function iconFor(name) {
   return name === 'visit' ? MapPinned : PhoneCall;
@@ -52,7 +19,9 @@ function parseDateValue(dateString) {
 
 export default function TaskFormPage() {
   const navigate = useNavigate();
-  const [forms, setForms] = useState(getStoredForms);
+  const storeForms = useCrmStore((s) => s.forms);
+  const [forms, setForms] = useState([]);
+  useEffect(() => { setForms(loadForms(TASK_FORM)); }, [storeForms]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formName, setFormName] = useState('');
@@ -62,11 +31,10 @@ export default function TaskFormPage() {
   const [sortOrder, setSortOrder] = useState('Newest First');
   const [viewMode, setViewMode] = useState('grid');
 
+  // Task forms are the same server collection as lead forms, tagged by kind.
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(forms));
-    } catch { /* ignore */ }
-  }, [forms]);
+    if (forms.length > 0 || storeForms.length > 0) saveForms(forms, TASK_FORM);
+  }, [forms, storeForms]);
 
   function openCreateModal() {
     setEditingId(null);
