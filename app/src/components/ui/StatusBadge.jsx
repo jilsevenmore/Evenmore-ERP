@@ -74,6 +74,19 @@ const STATUS_MAP = {
   // Valuation
   'Posted': 'badge-green',
   'Voided': 'badge-red',
+
+  // Vendor Portal & Progress Tracking
+  'Awaiting Approval': 'badge-yellow',
+  'Partially Completed': 'badge-yellow',
+  'Delayed': 'badge-red',
+  'At Risk': 'badge-orange',
+  'On Track': 'badge-green',
+  'Started': 'badge-blue',
+  'Shared': 'badge-blue',
+  'Unshared': 'badge-gray',
+  'Enabled': 'badge-green',
+  'Disabled': 'badge-red',
+  'Paused': 'badge-orange',
 };
 
 export function StatusBadge({ status, className = '' }) {

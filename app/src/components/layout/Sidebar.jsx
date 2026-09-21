@@ -51,12 +51,13 @@ import {
   TreePine,
   BookOpen,
   Check,
-  Clock,
   LogOut,
   Lock,
+  ExternalLink,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
+import { useVendorStore } from '../../stores/vendorStore';
 import { useERP } from '../../context/ERPContext';
 import { UserGuideModal } from '../common/UserGuideModal';
 
@@ -155,6 +156,20 @@ const NAV = [
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
       { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },
       { label: 'Expenses', icon: Landmark, to: '/purchase/expenses' },
+      { label: 'Vendors & Portal Access', icon: Building2, to: '/purchase/vendors' },
+    ],
+  },
+
+  {
+    label: 'Vendor Outsourcing',
+    icon: Layers,
+    badgeKey: 'vendorApprovals',
+    badgeColor: '#f59e0b',
+    children: [
+      { label: 'Progress Tracking', icon: BarChart3, to: '/vendors/progress', badgeKey: 'vendorApprovals', badgeColor: '#f59e0b' },
+      { label: 'Vendor Directory & Access', icon: Users, to: '/purchase/vendors' },
+      { label: 'Process Templates', icon: Sliders, to: '/settings/vendor-templates' },
+      { label: 'Launch Vendor Portal ↗', icon: ExternalLink, to: '/vendor/login' },
     ],
   },
 
@@ -569,7 +584,14 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  let badges = { zone: 0, faulty: 0, ...pmsBadges };
+  const vendorOrders = useVendorStore((s) => s.orders);
+  const vendorApprovalsCount = useMemo(() => {
+    return (vendorOrders || []).reduce((acc, order) => {
+      return acc + (order.stages || []).filter((stg) => stg.status === 'Submitted').length;
+    }, 0);
+  }, [vendorOrders]);
+
+  let badges = { zone: 0, faulty: 0, vendorApprovals: vendorApprovalsCount, ...pmsBadges };
   try {
     const erp = useERP();
     if (erp) {

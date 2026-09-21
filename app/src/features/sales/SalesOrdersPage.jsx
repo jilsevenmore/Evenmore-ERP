@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban } from 'lucide-react';
+import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban, Share2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -12,6 +12,8 @@ import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCa
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderModal';
+import { ShareOrderModal } from '../vendor/admin/components/ShareOrderModal';
+import { useVendorStore } from '../../stores/vendorStore';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -39,6 +41,8 @@ export const SalesOrdersPage = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [printSalesOrderTarget, setPrintSalesOrderTarget] = useState(null);
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
+    const [shareModalOrder, setShareModalOrder] = useState(null);
+    const vendorOrders = useVendorStore((s) => s.orders);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [deliveryDate, setDeliveryDate] = useState(() => addDaysISO(getCurrentISODate(), 10));
     const [lineItems, setLineItems] = useState([]);
@@ -365,6 +369,24 @@ export const SalesOrdersPage = () => {
                 <FileSpreadsheet size={13}/>
               </button>
             )}
+            {!isCancelled && (() => {
+              const isShared = (vendorOrders || []).some(
+                (vo) => vo.isShared !== false && (vo.salesOrderId === o.id || vo.orderNumber === o.orderNumber)
+              );
+              return (
+                <button
+                  onClick={() => setShareModalOrder(o)}
+                  className={`p-1 rounded-lg cursor-pointer transition-colors ${
+                    isShared
+                      ? 'text-indigo-600 bg-indigo-50/80 hover:bg-indigo-100 ring-1 ring-indigo-200'
+                      : 'text-muted hover:text-indigo-600 hover:bg-indigo-50'
+                  }`}
+                  title={isShared ? "Vendor Outsourcing Active (Click to manage)" : "Share / Outsource to Vendor Portal"}
+                >
+                  <Share2 size={13}/>
+                </button>
+              );
+            })()}
 
             {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
@@ -636,6 +658,17 @@ export const SalesOrdersPage = () => {
               <div className="flex items-center gap-2">
                 {selectedOrder.stage !== 'Cancelled' && (
                   <>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        const target = selectedOrder;
+                        setSelectedOrder(null);
+                        setShareModalOrder(target);
+                      }}
+                      className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    >
+                      <Share2 size={13} className="mr-1 text-indigo-600"/> Share with Vendor
+                    </Button>
                     <Button variant="outline" onClick={() => { handleGenerateProforma(selectedOrder); setSelectedOrder(null); }}>
                       <FileSpreadsheet size={13} className="mr-1 text-blue-600"/> Generate Proforma
                     </Button>
@@ -711,6 +744,13 @@ export const SalesOrdersPage = () => {
         isOpen={Boolean(printSalesOrderTarget)}
         onClose={() => setPrintSalesOrderTarget(null)}
         order={printSalesOrderTarget}
+      />
+
+      {/* Share with Vendor Outsourcing Modal */}
+      <ShareOrderModal
+        isOpen={Boolean(shareModalOrder)}
+        onClose={() => setShareModalOrder(null)}
+        initialSalesOrder={shareModalOrder}
       />
     </div>);
 };

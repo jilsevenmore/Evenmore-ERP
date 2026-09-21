@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
+import VendorLayout from '../components/layout/VendorLayout';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { PageLoadingSkeleton } from '../components/common/PageLoadingSkeleton';
 
@@ -141,6 +142,19 @@ const ClientsPage = lazy(() => import('../features/administration/ClientsPage'))
 // ── Main Dashboard (Lazy Loaded) ──────────────────────────────
 const DashboardPage = lazy(() => import('../features/sales/DashboardPage').then(m => ({ default: m.DashboardPage })));
 
+// ── Vendor Outsourcing Admin (Lazy Loaded) ────────────────────
+const AdminVendorProgressDashboard = lazy(() => import('../features/vendor/admin/AdminVendorProgressDashboard'));
+const ProcessTemplatesPage = lazy(() => import('../features/vendor/admin/ProcessTemplatesPage'));
+
+// ── Standalone Vendor Portal (Lazy Loaded) ────────────────────
+const VendorLoginPage = lazy(() => import('../features/vendor/portal/VendorLoginPage'));
+const VendorDashboardPage = lazy(() => import('../features/vendor/portal/VendorDashboardPage'));
+const VendorMyOrdersPage = lazy(() => import('../features/vendor/portal/VendorMyOrdersPage'));
+const VendorOrderDetailPage = lazy(() => import('../features/vendor/portal/VendorOrderDetailPage'));
+const VendorNotificationsPage = lazy(() => import('../features/vendor/portal/VendorNotificationsPage'));
+const VendorProfilePage = lazy(() => import('../features/vendor/portal/VendorProfilePage'));
+const VendorPerformancePage = lazy(() => import('../features/vendor/portal/VendorPerformancePage'));
+
 function Page({ component: Component, ...rest }) {
   return (
     <ErrorBoundary>
@@ -189,6 +203,23 @@ const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotation
 
 const router = createBrowserRouter([
   { path: '/quote/:quotationNumber/:secureToken', element: <Page component={PublicQuotationPage} /> },
+  { path: '/vendor/login', element: <Page component={VendorLoginPage} /> },
+  {
+    path: '/vendor',
+    element: <VendorLayout />,
+    errorElement: <RootErrorBoundary />,
+    children: [
+      { index: true, element: <Navigate to="/vendor/dashboard" replace /> },
+      { path: 'dashboard', element: <Page component={VendorDashboardPage} /> },
+      { path: 'orders', element: <Page component={VendorMyOrdersPage} /> },
+      { path: 'orders/:orderId', element: <Page component={VendorOrderDetailPage} /> },
+      { path: 'orders/:orderId/stages', element: <Page component={VendorOrderDetailPage} /> },
+      { path: 'notifications', element: <Page component={VendorNotificationsPage} /> },
+      { path: 'profile', element: <Page component={VendorProfilePage} /> },
+      { path: 'performance', element: <Page component={VendorPerformancePage} /> },
+      { path: '*', element: <Navigate to="/vendor/dashboard" replace /> },
+    ],
+  },
   {
     path: '/',
     element: <MainLayout />,
@@ -254,15 +285,19 @@ const router = createBrowserRouter([
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },
-      // [PHASE-4] DEAD ROUTE — `purchase/vendors` had no nav entry; parties live at `/parties`.
-      //   Restore if a dedicated vendor workspace is ever needed:
-      // { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
+      { path: 'purchase/vendors', element: <Page component={VendorsPage} /> },
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
       { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
       { path: 'purchase/returns', element: <Page component={PurchaseReturnsPage} /> },
       { path: 'purchase/payments', element: <Page component={PaymentOutPage} /> },
       { path: 'purchase/expenses', element: <Page component={ExpensesPage} /> },
+
+      // ── Vendor Outsourcing & Tracking (Admin) ──────────────
+      { path: 'vendors', element: <Navigate to="/purchase/vendors" replace /> },
+      { path: 'vendors/progress', element: <Page component={AdminVendorProgressDashboard} /> },
+      { path: 'vendors/templates', element: <Page component={ProcessTemplatesPage} /> },
+      { path: 'settings/vendor-templates', element: <Page component={ProcessTemplatesPage} /> },
 
       // ── Parties Directory ──────────────────────────────────
       { path: 'parties', element: <Page component={PartiesPage} /> },
