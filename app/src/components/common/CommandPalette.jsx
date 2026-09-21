@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
+import { useTranslation } from '../../i18n';
 import { Search, ShoppingCart, Truck, Receipt, Package, Users, Building2, FileSpreadsheet, ArrowRight, FileText, BarChart3, X, Layers, Sparkles, CalendarCheck, } from 'lucide-react';
 export const CommandPalette = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
+    const { t } = useTranslation();
     const { items, customers, vendors, salesOrders, purchaseOrders, invoices, deliveryChallans, proformaInvoices = [] } = useERP();
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -36,23 +38,24 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         return null;
     const cleanQuery = query.trim().toLowerCase();
     // Search results grouping
+    // Navigation labels are localized; business-data results below stay raw.
     const navigationItems = [
-        { label: 'Dashboard', path: '/dashboard', icon: BarChart3, category: 'Navigation' },
-        { label: 'CRM Leads', path: '/crm/leads', icon: Users, category: 'Navigation' },
-        { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart, category: 'Navigation' },
-        { label: 'Proforma Invoices', path: '/sales/proforma', icon: FileSpreadsheet, category: 'Navigation' },
-        { label: 'Delivery Challans', path: '/sales/delivery', icon: Truck, category: 'Navigation' },
-        { label: 'Sales Invoices', path: '/sales/invoices', icon: Receipt, category: 'Navigation' },
-        { label: 'Quotations & Estimates', path: '/sales/quotations', icon: FileText, category: 'Navigation' },
-        { label: 'Inventory Items', path: '/inventory/items', icon: Package, category: 'Navigation' },
-        { label: 'Stock Position', path: '/inventory/stock', icon: BarChart3, category: 'Navigation' },
-        { label: 'Purchase Orders', path: '/purchase/orders', icon: ShoppingCart, category: 'Navigation' },
-        { label: 'Purchase Bills & AP', path: '/purchase/bills', icon: FileSpreadsheet, category: 'Navigation' },
-        { label: 'Parties Directory', path: '/parties', icon: Building2, category: 'Navigation' },
-        { label: 'HRMS Employees', path: '/hrms/employees', icon: Users, category: 'Navigation' },
-        { label: 'Attendance', path: '/hrms/attendance', icon: CalendarCheck, category: 'Navigation' },
-        { label: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: 'Navigation' },
-    ].filter((n) => !cleanQuery || n.label.toLowerCase().includes(cleanQuery));
+        { label: t('navigation.dashboard'), en: 'Dashboard', path: '/dashboard', icon: BarChart3, category: t('palette.navigation') },
+        { label: t('navigation.leads'), en: 'CRM Leads', path: '/crm/leads', icon: Users, category: t('palette.navigation') },
+        { label: t('navigation.salesOrders'), en: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart, category: t('palette.navigation') },
+        { label: t('navigation.proformaInvoices'), en: 'Proforma Invoices', path: '/sales/proforma', icon: FileSpreadsheet, category: t('palette.navigation') },
+        { label: t('navigation.deliveryChallans'), en: 'Delivery Challans', path: '/sales/delivery', icon: Truck, category: t('palette.navigation') },
+        { label: t('navigation.salesInvoices'), en: 'Sales Invoices', path: '/sales/invoices', icon: Receipt, category: t('palette.navigation') },
+        { label: t('navigation.quotations'), en: 'Quotations & Estimates', path: '/sales/quotations', icon: FileText, category: t('palette.navigation') },
+        { label: t('navigation.itemsMaster'), en: 'Inventory Items', path: '/inventory/items', icon: Package, category: t('palette.navigation') },
+        { label: t('navigation.stockPosition'), en: 'Stock Position', path: '/inventory/stock', icon: BarChart3, category: t('palette.navigation') },
+        { label: t('navigation.purchaseOrders'), en: 'Purchase Orders', path: '/purchase/orders', icon: ShoppingCart, category: t('palette.navigation') },
+        { label: t('navigation.purchaseBills'), en: 'Purchase Bills & AP', path: '/purchase/bills', icon: FileSpreadsheet, category: t('palette.navigation') },
+        { label: t('navigation.parties'), en: 'Parties Directory', path: '/parties', icon: Building2, category: t('palette.navigation') },
+        { label: t('navigation.employees'), en: 'HRMS Employees', path: '/hrms/employees', icon: Users, category: t('palette.navigation') },
+        { label: t('navigation.attendance'), en: 'Attendance', path: '/hrms/attendance', icon: CalendarCheck, category: t('palette.navigation') },
+        { label: t('navigation.reports'), en: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: t('palette.navigation') },
+    ].filter((n) => !cleanQuery || n.label.toLowerCase().includes(cleanQuery) || (n.en && n.en.toLowerCase().includes(cleanQuery)));
     const matchedItems = items
         .filter((i) => i.name.toLowerCase().includes(cleanQuery) ||
         i.sku.toLowerCase().includes(cleanQuery) ||
@@ -159,12 +162,12 @@ export const CommandPalette = ({ isOpen, onClose }) => {
           <input ref={inputRef} type="text" value={query} onChange={(e) => {
             setQuery(e.target.value);
             setSelectedIndex(0);
-        }} onKeyDown={handleKeyDownList} placeholder="Type a command, SKU, customer, order #, or page..." className="w-full bg-transparent text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none"/>
+        }} onKeyDown={handleKeyDownList} placeholder={t("palette.commandPlaceholder")} className="w-full bg-transparent text-sm font-medium text-slate-800 placeholder-slate-400 focus:outline-none"/>
           <div className="flex items-center gap-1.5">
             <kbd className="px-2 py-0.5 text-[10px] font-mono font-semibold text-slate-500 bg-slate-200/80 rounded border border-slate-300">
               ESC
             </kbd>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer">
+            <button onClick={onClose} aria-label={t("palette.close")} className="p-1 text-slate-400 hover:text-slate-600 rounded cursor-pointer">
               <X size={16}/>
             </button>
           </div>
@@ -174,8 +177,8 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         <div className="overflow-y-auto p-2 space-y-1 divide-y divide-slate-100 flex-1 text-xs">
           {allResults.length === 0 ? (<div className="py-12 text-center text-slate-400 space-y-2">
               <Sparkles className="w-8 h-8 mx-auto text-slate-300"/>
-              <p className="font-semibold text-slate-600">No matching records found</p>
-              <p className="text-[11px] text-slate-400">Try searching for an SKU (e.g. &quot;SRV-001&quot;), Customer (e.g. &quot;Acme&quot;), or Page name.</p>
+              <p className="font-semibold text-slate-600">{t("palette.noResultsTitle")}</p>
+              <p className="text-[11px] text-slate-400">{t("palette.noResultsHint")}</p>
             </div>) : (allResults.map((res, index) => {
             const Icon = res.icon || Layers;
             const isSelected = index === selectedIndex;
@@ -208,11 +211,11 @@ export const CommandPalette = ({ isOpen, onClose }) => {
             <span>
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded mr-1">↑</kbd>
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded mr-1">↓</kbd>
-              Navigate
+              {t("palette.navigate")}
             </span>
             <span>
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded mr-1">↵</kbd>
-              Open
+              {t("palette.open")}
             </span>
           </div>
           <span className="font-semibold text-blue-600">Horizon Global Search</span>

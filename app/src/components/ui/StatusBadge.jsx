@@ -1,7 +1,75 @@
 /**
  * StatusBadge — maps ERP/HRMS/CRM status strings to CRM badge styles.
  * Consolidated from ERP StatusBadge.jsx
+ *
+ * Known predefined system statuses are localized via `status.*` keys.
+ * Any other value (user-entered / business data) is rendered unchanged.
  */
+import { useTranslation } from '../../i18n';
+
+const STATUS_I18N_KEY = {
+  'Draft': 'status.draft',
+  'Sent': 'status.sent',
+  'Viewed': 'status.viewed',
+  'Expired': 'status.expired',
+  'Accepted': 'status.accepted',
+  'Rejected': 'status.rejected',
+  'Invoiced': 'status.invoiced',
+  'Pending': 'status.pending',
+  'Paid': 'sales.paid',
+  'Partial': 'status.partial',
+  'Partially Paid': 'sales.partiallyPaid',
+  'Unpaid': 'sales.unpaid',
+  'Overdue': 'status.overdue',
+  'Confirmed': 'status.confirmed',
+  'Delivered': 'status.delivered',
+  'Cancelled': 'status.cancelled',
+  'Active': 'status.active',
+  'Inactive': 'status.inactive',
+  'Received': 'status.received',
+  'Ordered': 'status.ordered',
+  'Returned': 'status.returned',
+  'Requested': 'status.requested',
+  'In Transit': 'status.inTransit',
+  'Completed': 'status.completed',
+  'Reported': 'status.reported',
+  'Sent for Replacement': 'status.sentForReplacement',
+  'Replaced': 'status.replaced',
+  'Credited': 'status.credited',
+  'New': 'status.new',
+  'Contacted': 'status.contacted',
+  'Qualified': 'status.qualified',
+  'Converted': 'status.converted',
+  'Lost': 'status.lost',
+  'Nurturing': 'status.nurturing',
+  'Present': 'status.present',
+  'Absent': 'status.absent',
+  'Late': 'status.late',
+  'Half Day': 'status.halfDay',
+  'Leave': 'status.leave',
+  'Holiday': 'status.holiday',
+  'Pending Approval': 'status.pendingApproval',
+  'Rework': 'status.rework',
+  'Processed': 'status.processed',
+  'Processing': 'status.processing',
+  'Failed': 'status.failed',
+  'In Progress': 'status.inProgress',
+  'In Review': 'status.inReview',
+  'Submitted': 'status.submitted',
+  'Approved': 'status.approved',
+  'Archived': 'status.archived',
+  'Posted': 'status.posted',
+  'Voided': 'status.voided',
+  'Awaiting Approval': 'status.awaitingApproval',
+  'Partially Completed': 'status.partiallyCompleted',
+  'Delayed': 'status.delayed',
+  'At Risk': 'status.atRisk',
+  'On Track': 'status.onTrack',
+  'Started': 'status.started',
+  'Optimal': 'status.optimal',
+  'Low Stock': 'status.lowStock',
+  'Critical': 'status.critical',
+};
 
 const STATUS_MAP = {
   // ERP sales
@@ -89,11 +157,24 @@ const STATUS_MAP = {
   'Paused': 'badge-orange',
 };
 
-export function StatusBadge({ status, className = '' }) {
+/**
+ * Translate a predefined system status via `status.*` keys.
+ * Unknown / user-entered values are returned unchanged (business data safe).
+ */
+export function translateStatus(status, t) {
+  const key = STATUS_I18N_KEY[status];
+  if (key && typeof t === 'function') return t(key);
+  return status;
+}
+
+export function StatusBadge({ status, className = '' }) {  const { t } = useTranslation();
   const cls = STATUS_MAP[status] || 'badge-gray';
+  const key = STATUS_I18N_KEY[status];
+  // translate() falls back to English, then to a readable label — never undefined.
+  const label = key ? t(key) : status;
   return (
     <span className={`badge ${cls} ${className}`}>
-      {status}
+      {label}
     </span>
   );
 }

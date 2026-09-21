@@ -14,6 +14,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderModal';
 import { ShareOrderModal } from '../vendor/admin/components/ShareOrderModal';
 import { useVendorStore } from '../../stores/vendorStore';
+import { useTranslation } from '../../i18n';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -33,6 +34,7 @@ const salesOrderGuide = {
     workflow: ['Quotation Approved', 'Sales Order Confirmed', 'Proforma Issued (Optional)', 'Delivery Challan Dispatched', 'Sales Invoice Issued', 'Payment Receipt Settled'],
 };
 export const SalesOrdersPage = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
     const [stageFilter, setStageFilter] = useState('All');
@@ -288,7 +290,7 @@ export const SalesOrdersPage = () => {
     const columns = [
         {
             key: 'orderNumber',
-            header: 'Sales Order #',
+            header: t("sales.orderNumber"),
             width: '13%',
             render: (o) => (<button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
           <ShoppingCart size={13} className="text-muted"/> {o.orderNumber}
@@ -296,25 +298,25 @@ export const SalesOrdersPage = () => {
         },
         {
             key: 'customer',
-            header: 'Customer Account',
+            header: t("common.customer"),
             width: '20%',
             render: (o) => <span className="font-bold text-text">{o.customer}</span>,
         },
         {
             key: 'date',
-            header: 'SO Date',
+            header: t("common.date"),
             width: '11%',
             render: (o) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(o.date)}</span>,
         },
         {
             key: 'deliveryDate',
-            header: 'Target Delivery',
+            header: t("sales.dueDate"),
             width: '12%',
             render: (o) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(o.deliveryDate)}</span>,
         },
         {
             key: 'amount',
-            header: 'Order Value',
+            header: t("common.total"),
             align: 'right',
             width: '12%',
             render: (o) => (<span className="font-mono font-bold text-text whitespace-nowrap">
@@ -323,7 +325,7 @@ export const SalesOrdersPage = () => {
         },
         {
             key: 'stage',
-            header: 'Stage Lifecycle',
+            header: t("table.status"),
             align: 'center',
             width: '14%',
             render: (o) => {
@@ -345,14 +347,14 @@ export const SalesOrdersPage = () => {
         },
         {
             key: 'paymentStatus',
-            header: 'Payment Status',
+            header: t("sales.payment"),
             align: 'center',
             width: '10%',
             render: (o) => <StatusBadge status={o.paymentStatus || 'Unpaid'}/>,
         },
         {
             key: 'actions',
-            header: 'Actions / Lifecycle',
+            header: t("table.actions"),
             align: 'right',
             width: '18%',
             render: (o) => {
@@ -422,8 +424,8 @@ export const SalesOrdersPage = () => {
     const fulfilledOrdersCount = salesOrders.filter(o => o.stage === 'Invoiced').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Sales Orders" subtitle="Confirmed customer purchase agreements driving warehouse stock reservation, dispatch manifests, and automated invoicing." guide={salesOrderGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
-            Create Sales Order
+      <PageHeader title={t("navigation.salesOrders")} subtitle="Confirmed customer purchase agreements driving warehouse stock reservation, dispatch manifests, and automated invoicing." guide={salesOrderGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
+            {t("header.createSalesOrder")}
           </Button>}/>
 
       {/* Sales Orders KPI Stat Cards */}
@@ -443,7 +445,7 @@ export const SalesOrdersPage = () => {
           </button>))}
       </div>
 
-      <DataTable title="Sales Order Register" data={filteredOrders} columns={columns} keyExtractor={(o) => o.id} searchPlaceholder="Search order number or customer..."/>
+      <DataTable title={t("navigation.salesOrders")} data={filteredOrders} columns={columns} keyExtractor={(o) => o.id} searchPlaceholder={t("table.search")}/>
 
       {/* Create Modal */}
       {showAddModal && (
@@ -529,7 +531,7 @@ export const SalesOrdersPage = () => {
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
-                  Cancel
+                  {t("modal.cancel")}
                 </Button>
                 <Button type="submit">
                   Confirm & Create Order
@@ -592,12 +594,12 @@ export const SalesOrdersPage = () => {
                     <table className="w-full text-left text-xs text-slate-600">
                       <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[10px]">
                         <tr>
-                          <th className="py-2 px-3">Item / Description</th>
-                          <th className="py-2 px-3 text-center">Ordered</th>
-                          <th className="py-2 px-3 text-center">Delivered</th>
-                          <th className="py-2 px-3 text-center">Invoiced</th>
+                          <th className="py-2 px-3">{t("inventory.item")}</th>
+                          <th className="py-2 px-3 text-center">{t("status.ordered")}</th>
+                          <th className="py-2 px-3 text-center">{t("status.delivered")}</th>
+                          <th className="py-2 px-3 text-center">{t("status.invoiced")}</th>
                           <th className="py-2 px-3 text-center">Remaining to Deliver</th>
-                          <th className="py-2 px-3 text-right">Line Total</th>
+                          <th className="py-2 px-3 text-right">{t("common.total")}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
@@ -694,7 +696,7 @@ export const SalesOrdersPage = () => {
                   </>
                 )}
                 <Button variant="outline" onClick={() => setSelectedOrder(null)}>
-                  Close
+                  {t("modal.close")}
                 </Button>
               </div>
             </div>

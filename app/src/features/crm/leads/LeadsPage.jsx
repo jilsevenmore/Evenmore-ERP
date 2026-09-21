@@ -1,6 +1,7 @@
 import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from 'react';
 import PageHeader from '../../../components/ui/PageHeader';
+import { useTranslation } from '../../../i18n';
 import LeadsTabs from './LeadsTabs';
 import FilterPanel from './FilterPanel';
 import LeadsTable from './LeadsTable';
@@ -124,6 +125,7 @@ function loadStoredLeads() {
 }
 
 export default function LeadsPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [leadRows, setLeadRows] = useState(loadStoredLeads);
   const [activeTab, setActiveTab] = useState('All Leads');
@@ -463,7 +465,7 @@ export default function LeadsPage() {
   return (
     <>
       <PageHeader
-        title="Leads"
+        title={t("navigation.leads")}
         subtitle="Manage and track all your CRM leads."
         guide={leadsGuide}
         actions={
@@ -481,7 +483,7 @@ export default function LeadsPage() {
               </div>
             )}
             <button type="button" className="btn-primary btn-sm" onClick={openCreateLeadModal}>
-              + Create Lead
+              {t("header.createLead")}
             </button>
           </div>
         }

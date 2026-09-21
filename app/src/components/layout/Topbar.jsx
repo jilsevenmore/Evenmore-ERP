@@ -23,6 +23,8 @@ import {
   Fingerprint,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import LanguageSelector from '../common/LanguageSelector';
+import { useTranslation } from '../../i18n';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { markEventNotificationRead } from '../../services/crmEventNotifications';
@@ -34,14 +36,14 @@ const THEMES = [
   { id: 'emerald', name: 'Emerald Executive', icon: TreePine, desc: 'Fintech forest & gold prestige', color: '#10b981' },
 ];
 
-const QUICK_ACTIONS = [
-  { label: 'Punch In Attendance', path: '/hrms/attendance/today', icon: Fingerprint, color: 'text-emerald-600 bg-emerald-50' },
-  { label: 'Create New Lead', path: '/crm/leads', icon: UserPlus, color: 'text-blue-500 bg-blue-50' },
-  { label: 'Create Sales Order', path: '/sales/orders', icon: ShoppingCart, color: 'text-indigo-500 bg-indigo-50' },
-  { label: 'Create Tax Invoice', path: '/sales/invoices', icon: Receipt, color: 'text-emerald-500 bg-emerald-50' },
-  { label: 'New Purchase Bill', path: '/purchase/bills', icon: FilePlus, color: 'text-amber-500 bg-amber-50' },
-  { label: 'Register Trade Party', path: '/parties', icon: Building, color: 'text-purple-500 bg-purple-50' },
-  { label: 'Add Inventory Item', path: '/inventory/items/new', icon: Layers, color: 'text-rose-500 bg-rose-50' },
+const QUICK_ACTION_DEFS = [
+  { key: 'punchIn', path: '/hrms/attendance/today', icon: Fingerprint, color: 'text-emerald-600 bg-emerald-50' },
+  { key: 'createLead', path: '/crm/leads', icon: UserPlus, color: 'text-blue-500 bg-blue-50' },
+  { key: 'createSalesOrder', path: '/sales/orders', icon: ShoppingCart, color: 'text-indigo-500 bg-indigo-50' },
+  { key: 'createTaxInvoice', path: '/sales/invoices', icon: Receipt, color: 'text-emerald-500 bg-emerald-50' },
+  { key: 'newPurchaseBill', path: '/purchase/bills', icon: FilePlus, color: 'text-amber-500 bg-amber-50' },
+  { key: 'registerParty', path: '/parties', icon: Building, color: 'text-purple-500 bg-purple-50' },
+  { key: 'addItem', path: '/inventory/items/new', icon: Layers, color: 'text-rose-500 bg-rose-50' },
 ];
 
 const NOTIFICATIONS = [
@@ -56,6 +58,7 @@ export default function Topbar() {
   const { pathname } = useLocation();
   const globalSearch = useAppStore((s) => s.globalSearch);
   const setGlobalSearch = useAppStore((s) => s.setGlobalSearch);
+  const { t } = useTranslation();
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
   const theme = useAppStore((s) => s.theme) || 'light';
   const setTheme = useAppStore((s) => s.setTheme);
@@ -96,11 +99,14 @@ export default function Topbar() {
   const erpNotifications = useMemo(() => {
     const list = [];
     if (lowStockItems.length > 0) {
+      const first = lowStockItems[0]?.name || 'Item';
       list.push({
         id: 'low-stock-alert',
-        title: `Low Stock Alert (${lowStockItems.length} SKUs)`,
-        desc: `${lowStockItems[0]?.name || 'Item'} and ${lowStockItems.length - 1} other items are below safety stock.`,
-        time: 'Active',
+        title: t('header.lowStockAlert', { count: lowStockItems.length }),
+        desc: lowStockItems.length > 1
+          ? t('header.lowStockDesc', { name: first, rest: lowStockItems.length - 1 })
+          : t('header.lowStockSingleDesc', { name: first }),
+        time: t('common.active'),
         unread: true,
         path: '/inventory/items',
       });
@@ -108,9 +114,9 @@ export default function Topbar() {
     if (pendingZoneRequests.length > 0) {
       list.push({
         id: 'zone-request-alert',
-        title: `Pending Zone Requests (${pendingZoneRequests.length})`,
-        desc: `Technician part requests awaiting warehouse dispatch approval.`,
-        time: 'New',
+        title: t('header.zoneAlert', { count: pendingZoneRequests.length }),
+        desc: t('header.zoneDesc'),
+        time: t('header.new'),
         unread: true,
         path: '/inventory/zone-requests',
       });
@@ -118,9 +124,9 @@ export default function Topbar() {
     if (inTransitChallans.length > 0) {
       list.push({
         id: 'transit-challan-alert',
-        title: `In-Transit Deliveries (${inTransitChallans.length})`,
-        desc: `Shipments currently out for customer delivery.`,
-        time: 'In Route',
+        title: t('header.transitAlert', { count: inTransitChallans.length }),
+        desc: t('header.transitDesc'),
+        time: t('status.inTransit'),
         unread: false,
         path: '/sales/delivery',
       });
@@ -128,15 +134,15 @@ export default function Topbar() {
     if (overdueInvoices.length > 0) {
       list.push({
         id: 'overdue-inv-alert',
-        title: `Overdue Invoices (${overdueInvoices.length})`,
-        desc: `Customer receivables overdue for payment collection.`,
-        time: 'Urgent',
+        title: t('header.overdueAlert', { count: overdueInvoices.length }),
+        desc: t('header.overdueDesc'),
+        time: t('header.urgent'),
         unread: true,
         path: '/sales/invoices',
       });
     }
     return list.length > 0 ? list : NOTIFICATIONS;
-  }, [lowStockItems, pendingZoneRequests, inTransitChallans, overdueInvoices]);
+  }, [lowStockItems, pendingZoneRequests, inTransitChallans, overdueInvoices, t]);
 
   const [notifTab, setNotifTab] = useState('all'); // 'all' | 'crm' | 'erp'
 
@@ -166,7 +172,7 @@ export default function Topbar() {
         <Search size={15} className="top-search-ico shrink-0 text-muted" />
         <input
           type="text"
-          placeholder="Search records, contacts, deals... (Ctrl+K)"
+          placeholder={t("header.searchPlaceholder")}
           value={globalSearch}
           onChange={(e) => setGlobalSearch(e.target.value)}
           onClick={() => setCommandPaletteOpen(true)}
@@ -180,6 +186,7 @@ export default function Topbar() {
 
       {/* Right Actions Cluster */}
       <div className="flex items-center gap-2 shrink-0">
+        <LanguageSelector />
         {/* Theme Switcher Button & Dropdown */}
         <div className="relative" ref={themeRef}>
           <button
@@ -200,7 +207,7 @@ export default function Topbar() {
           {isThemeOpen && (
             <div className="top-dropdown-menu w-64 p-2 animate-in fade-in zoom-in-95 duration-150 shadow-xl">
               <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">
-                Select Theme Palette
+                {t("header.selectTheme")}
               </div>
               <div className="space-y-1">
                 {THEMES.map((t) => {
@@ -252,20 +259,20 @@ export default function Topbar() {
               setIsNotifOpen(false);
             }}
             className="h-9 px-3 rounded-xl bg-primary hover:bg-primary-hover text-white flex items-center gap-1.5 text-xs font-bold shadow-xs transition cursor-pointer"
-            aria-label="Quick Create Record"
-            title="Create New Record"
+            aria-label={t("header.quickCreate")}
+            title={t("header.createNewRecord")}
           >
             <Plus size={15} strokeWidth={2.5} />
-            <span className="hidden sm:inline">New</span>
+            <span className="hidden sm:inline">{t("header.new")}</span>
           </button>
 
           {isQuickAddOpen && (
             <div className="top-dropdown-menu w-56 p-2 animate-in fade-in zoom-in-95 duration-150 shadow-xl">
               <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">
-                Quick Actions
+                {t("header.quickActions")}
               </div>
               <div className="space-y-0.5">
-                {QUICK_ACTIONS.map((action, idx) => {
+                {QUICK_ACTION_DEFS.map((action, idx) => {
                   const Icon = action.icon;
                   return (
                     <button
@@ -280,7 +287,7 @@ export default function Topbar() {
                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${action.color}`}>
                         <Icon size={13} />
                       </div>
-                      <span>{action.label}</span>
+                      <span>{t(`header.${action.key}`)}</span>
                     </button>
                   );
                 })}
@@ -301,8 +308,8 @@ export default function Topbar() {
                 setIsQuickAddOpen(false);
               }}
               className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text flex items-center justify-center transition cursor-pointer relative shadow-2xs"
-              aria-label="Notifications & Reminders"
-              title="Notifications & Reminders"
+              aria-label={t("header.notificationsReminders")}
+              title={t("header.notificationsReminders")}
             >
               <Bell size={16} />
               {totalUnreadCount > 0 && (
@@ -317,16 +324,16 @@ export default function Topbar() {
                 {/* Header with Title & Unread Badge */}
                 <div className="flex items-center justify-between pb-2 border-b border-border">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs text-text">Notifications & Reminders</span>
+                    <span className="font-bold text-xs text-text">{t("header.notificationsReminders")}</span>
                     {totalUnreadCount > 0 && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-rose-500/10 text-rose-500 border border-rose-500/20">
-                        {totalUnreadCount} unread
+                        {totalUnreadCount} {t("header.unread")}
                       </span>
                     )}
                   </div>
                   {crmDigest.counts?.urgent > 0 && (
                     <span className="text-[10px] font-semibold text-rose-500">
-                      {crmDigest.counts.urgent} urgent
+                      {crmDigest.counts.urgent} {t("header.urgent")}
                     </span>
                   )}
                 </div>
@@ -342,7 +349,7 @@ export default function Topbar() {
                         : 'text-muted hover:text-text'
                     }`}
                   >
-                    All ({totalNotifCount})
+                    {t("header.all")} ({totalNotifCount})
                   </button>
                   <button
                     type="button"
@@ -353,7 +360,7 @@ export default function Topbar() {
                         : 'text-muted hover:text-text'
                     }`}
                   >
-                    CRM Tasks ({crmDigest.counts?.total || 0})
+                    {t("header.crmTasks")} ({crmDigest.counts?.total || 0})
                   </button>
                   <button
                     type="button"
@@ -364,7 +371,7 @@ export default function Topbar() {
                         : 'text-muted hover:text-text'
                     }`}
                   >
-                    ERP Alerts ({erpNotifications.length})
+                    {t("header.erpAlerts")} ({erpNotifications.length})
                   </button>
                 </div>
 
@@ -372,15 +379,15 @@ export default function Topbar() {
                 {(notifTab === 'all' || notifTab === 'crm') && (crmDigest.counts?.total > 0 || crmDigest.counts?.overdue > 0) && (
                   <div className="grid grid-cols-3 gap-1.5 mb-2.5">
                     <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-2 py-1.5 text-center">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-rose-500">Overdue</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-rose-500">{t("header.overdue")}</p>
                       <p className="mt-0.5 text-xs font-extrabold text-rose-600 dark:text-rose-400">{crmDigest.counts.overdue}</p>
                     </div>
                     <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-center">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500">Today</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500">{t("header.today")}</p>
                       <p className="mt-0.5 text-xs font-extrabold text-amber-600 dark:text-amber-400">{crmDigest.counts.today}</p>
                     </div>
                     <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-2 py-1.5 text-center">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-blue-500">All Tasks</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-blue-500">{t("header.allTasks")}</p>
                       <p className="mt-0.5 text-xs font-extrabold text-blue-600 dark:text-blue-400">{crmDigest.counts.total}</p>
                     </div>
                   </div>
@@ -393,7 +400,7 @@ export default function Topbar() {
                     <div>
                       {notifTab === 'all' && (
                         <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted">
-                          <span>Operational & Stock Alerts</span>
+                          <span>{t("header.operationalAlerts")}</span>
                           <span className="text-primary font-semibold">{erpNotifications.length}</span>
                         </div>
                       )}
@@ -425,13 +432,13 @@ export default function Topbar() {
                   {(notifTab === 'all' || notifTab === 'crm') && (
                     <div>
                       <div className="mb-1 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted">CRM Task Reminders</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted">{t("header.crmReminders")}</span>
                         <Link
                           to="/crm/tasks"
                           onClick={() => setIsNotifOpen(false)}
                           className="text-[10px] font-bold text-primary hover:underline"
                         >
-                          Open Tasks →
+                          {t("header.openTasks")} →
                         </Link>
                       </div>
                       <div className="space-y-1">
@@ -460,7 +467,7 @@ export default function Topbar() {
                           ))
                         ) : (
                           <div className="rounded-xl border border-border bg-soft px-3 py-2.5 text-[11px] text-muted text-center">
-                            No active CRM reminders pending.
+                            {t("header.noReminders")}
                           </div>
                         )}
                       </div>
@@ -470,7 +477,7 @@ export default function Topbar() {
                   {/* CRM WORKFLOW NOTIFICATIONS */}
                   {(notifTab === 'all' || notifTab === 'crm') && crmDigest.notifications?.length > 0 && (
                     <div>
-                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted">Workflow Updates</div>
+                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted">{t("header.workflowUpdates")}</div>
                       <div className="space-y-1">
                         {crmDigest.notifications.slice(0, 4).map((n) => (
                           <div
@@ -499,7 +506,7 @@ export default function Topbar() {
                   {/* EMPTY STATE */}
                   {totalNotifCount === 0 && (
                     <div className="py-6 text-center text-xs text-muted">
-                      All caught up! No active notifications or pending reminders.
+                      {t("header.allCaughtUp")}
                     </div>
                   )}
                 </div>
@@ -511,8 +518,8 @@ export default function Topbar() {
           <Link
             to="/hrms/attendance"
             className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="Calendar & Schedule"
-            title="Attendance & Schedule"
+            aria-label={t("navigation.attendance")}
+            title={t("navigation.attendance")}
           >
             <CalendarDays size={16} />
           </Link>
@@ -521,8 +528,8 @@ export default function Topbar() {
           <Link
             to="/crm/tasks"
             className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="Tasks & Activities"
-            title="Tasks & Activities"
+            aria-label={t("navigation.tasks")}
+            title={t("navigation.tasks")}
           >
             <Inbox size={16} />
           </Link>
@@ -531,8 +538,8 @@ export default function Topbar() {
           <Link
             to="/administration/settings"
             className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="System Settings"
-            title="System Settings"
+            aria-label={t("settings.settings")}
+            title={t("settings.settings")}
           >
             <Settings size={16} />
           </Link>

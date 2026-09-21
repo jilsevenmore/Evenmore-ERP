@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useTranslation } from '../../i18n';
 
 /**
  * Pagination — CRM-styled pagination bar.
@@ -13,6 +14,7 @@ export function Pagination({
   onChange,
   showTotalRecords = false,
 }) {
+  const { t } = useTranslation();
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const start = Math.min((page - 1) * pageSize + 1, total);
   const end = Math.min(page * pageSize, total);
@@ -32,11 +34,11 @@ export function Pagination({
     <div className="pagination">
       {showTotalRecords ? (
         <span className="pagination-total">
-          Total Records <strong>{total}</strong>
+          {t("pagination.totalRecords")} <strong>{total}</strong>
         </span>
       ) : (
         <span>
-          {total > 0 ? `${start}–${end} of ${total} records` : 'No records'}
+          {total > 0 ? `${start}–${end} ${t("pagination.ofRecords", { total })}` : t("pagination.noRecords")}
         </span>
       )}
 
@@ -46,9 +48,9 @@ export function Pagination({
           className="pager-btn pager-btn-nav"
           disabled={page <= 1}
           onClick={() => goTo(page - 1)}
-          aria-label="Previous page"
+          aria-label={t("pagination.prevPage")}
         >
-          Prev
+          {t("pagination.prev")}
         </button>
 
         {pages[0] > 1 && (
@@ -85,9 +87,9 @@ export function Pagination({
           className="pager-btn pager-btn-nav"
           disabled={page >= totalPages}
           onClick={() => goTo(page + 1)}
-          aria-label="Next page"
+          aria-label={t("pagination.nextPage")}
         >
-          Next
+          {t("pagination.next")}
         </button>
       </div>
     </div>

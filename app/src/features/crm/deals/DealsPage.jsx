@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 
 import { DEALS_STORAGE_KEY as STORAGE_KEY, loadDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
+import { useTranslation } from '../../../i18n';
 
 const STAGES = ['Draft', 'Sent', 'Open', 'Won', 'Lost'];
 const PRODUCTS = ['All Products', 'Diamond Jewelry', 'Gold Ornaments', 'Silver Collection', 'Laser Machine', 'CNC Spindle', 'AMC Service'];
@@ -121,6 +122,7 @@ function formatStageSummary(totalAmount, count) {
 }
 
 export default function DealsPage() {
+  const { t } = useTranslation();
   const [deals, setDeals] = useState(() => {
     try { return loadDeals(); } catch { return []; }
   });
@@ -487,15 +489,15 @@ export default function DealsPage() {
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1.5">
             <Link to="/dashboard" className="hover:text-blue-600 transition-colors font-medium">
-              Dashboard
+              {t("navigation.dashboard")}
             </Link>
             <span>&gt;</span>
-            <span className="text-slate-700 font-medium">Deals</span>
+            <span className="text-slate-700 font-medium">{t("navigation.deals")}</span>
             <span className="ml-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80 text-[11px] font-semibold">
               {filteredDeals.length} of {deals.length} deals
             </span>
           </div>
-          <h1 className="text-2xl font-bold text-[#0f172a] tracking-tight">Manage Deals</h1>
+          <h1 className="text-2xl font-bold text-[#0f172a] tracking-tight">{t("navigation.deals")}</h1>
           <p className="text-xs md:text-sm text-slate-500 mt-0.5">
             Track pipeline stages, deal values, conversion rates, and client opportunities.
           </p>
@@ -508,7 +510,7 @@ export default function DealsPage() {
             className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-colors cursor-pointer"
           >
             <Printer size={16} />
-            <span>Print</span>
+            <span>{t("common.print")}</span>
           </button>
 
           <button
@@ -605,7 +607,7 @@ export default function DealsPage() {
               }`}
             >
               <SlidersHorizontal size={14} />
-              <span>Filters</span>
+              <span>{t("common.filter")}</span>
               {activeFilterCount > 0 && (
                 <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-[#1f6bff]">
                   {activeFilterCount}
@@ -663,7 +665,7 @@ export default function DealsPage() {
         {showFilters && (
           <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Product</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{t("common.product")}</label>
               <div className="relative">
                 <Package size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <select
@@ -682,7 +684,7 @@ export default function DealsPage() {
             </div>
 
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Stage</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{t("crm.stage")}</label>
               <div className="relative">
                 <Flag size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <select
@@ -1021,11 +1023,11 @@ export default function DealsPage() {
                 <tr>
                   <th className="py-3.5 px-4">Deal Name</th>
                   <th className="py-3.5 px-4">Client</th>
-                  <th className="py-3.5 px-4">Product</th>
-                  <th className="py-3.5 px-4">Stage</th>
+                  <th className="py-3.5 px-4">{t("common.product")}</th>
+                  <th className="py-3.5 px-4">{t("crm.stage")}</th>
                   <th className="py-3.5 px-4 text-right">Value (₹)</th>
-                  <th className="py-3.5 px-4">Date</th>
-                  <th className="py-3.5 px-4 text-right">Actions</th>
+                  <th className="py-3.5 px-4">{t("table.date")}</th>
+                  <th className="py-3.5 px-4 text-right">{t("table.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

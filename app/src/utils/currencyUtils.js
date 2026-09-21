@@ -91,8 +91,7 @@ export function getCurrencySymbol(currencyStr = 'INR (₹)') {
   return getCurrencyConfig(currencyStr).symbol;
 }
 
-export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) {
-  const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) {  const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
   const config = getCurrencyConfig(currencyStr, options.customRates);
   const converted = num * config.rate;
   
@@ -106,6 +105,52 @@ export function formatCurrency(amount, currencyStr = 'INR (₹)', options = {}) 
     minimumFractionDigits: minDecimals,
     maximumFractionDigits: maxDecimals
   });
+
+  if (options.symbolSuffix) {
+    return `${isNegative ? '-' : ''}${formattedNumber} ${config.symbol}`;
+  }
+
+  return `${isNegative ? '-' : ''}${config.symbol}${formattedNumber}`;
+}
+
+// ── Locale-aware display (frontend i18n) ─────────────────────────────
+// Language and currency are separate settings: the currency (symbol/rate)
+// ALWAYS comes from `currencyStr` via getCurrencyConfig. Only the digit
+// grouping / numeral presentation follows the display language.
+// en → en-IN, hi → hi-IN, gu → gu-IN. Falls back to en-IN.
+export const DISPLAY_LOCALES = {
+  en: 'en-IN',
+  hi: 'hi-IN',
+  gu: 'gu-IN',
+};
+
+export function getDisplayLocale(lang = 'en') {
+  return DISPLAY_LOCALES[lang] || 'en-IN';
+}
+
+export function formatCurrencyLocalized(amount, currencyStr = 'INR (₹)', lang = 'en', options = {}) {
+  const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+  const config = getCurrencyConfig(currencyStr, options.customRates);
+  const converted = num * config.rate;
+
+  const minDecimals = options.minDecimals !== undefined ? options.minDecimals : (options.noDecimals ? 0 : 2);
+  const maxDecimals = options.maxDecimals !== undefined ? options.maxDecimals : (options.noDecimals ? 0 : 2);
+
+  const isNegative = converted < 0;
+  const absVal = Math.abs(converted);
+
+  let formattedNumber;
+  try {
+    formattedNumber = absVal.toLocaleString(getDisplayLocale(lang), {
+      minimumFractionDigits: minDecimals,
+      maximumFractionDigits: maxDecimals,
+    });
+  } catch {
+    formattedNumber = absVal.toLocaleString(config.locale, {
+      minimumFractionDigits: minDecimals,
+      maximumFractionDigits: maxDecimals,
+    });
+  }
 
   if (options.symbolSuffix) {
     return `${isNegative ? '-' : ''}${formattedNumber} ${config.symbol}`;

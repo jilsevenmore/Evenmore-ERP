@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button';
 import { Plus, ArrowLeftRight, CheckCircle2, User, X, Truck, MapPin, Clock } from 'lucide-react';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
+import { useTranslation } from '../../i18n';
 
 const transfersGuide = {
     title: 'Inter-Warehouse Stock Transfers',
@@ -24,6 +25,7 @@ const transfersGuide = {
 
 export const TransfersPage = () => {
     const { transfers, locations, addTransfer, updateTransferStatus } = useERP();
+    const { t } = useTranslation();
     const [showAddModal, setShowAddModal] = useState(false);
     const [sourceLocId, setSourceLocId] = useState(locations[0]?.id || '');
     const [destLocId, setDestLocId] = useState(locations[1]?.id || '');
@@ -73,7 +75,7 @@ export const TransfersPage = () => {
         },
         {
             key: 'date',
-            header: 'Movement Date',
+            header: t("table.date"),
             width: '12%',
             render: (t) => <span className="text-muted font-mono text-[11px]">{t.date}</span>,
         },
@@ -96,14 +98,14 @@ export const TransfersPage = () => {
         },
         {
             key: 'status',
-            header: 'Transfer Status',
+            header: t("table.status"),
             align: 'center',
             width: '10%',
             render: (t) => <StatusBadge status={t.status}/>,
         },
         {
             key: 'actions',
-            header: 'Intake Confirmation',
+            header: t("common.confirm"),
             align: 'right',
             width: '10%',
             render: (t) => t.status !== 'Received' ? (<button onClick={() => markReceived(t.id)} className="px-2.5 py-1 bg-primary text-white rounded text-[11px] font-semibold hover:bg-primary-hover cursor-pointer flex items-center gap-1 ml-auto shadow-2xs">
@@ -118,19 +120,19 @@ export const TransfersPage = () => {
     const receivedCount = transfers.filter(t => t.status === 'Received').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Stock Transfers & Relocation" subtitle="Inter-warehouse and inter-zone inventory shifts, internal transport manifests, and intake verification." guide={transfersGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
-            Initiate Stock Transfer
+      <PageHeader title={t("navigation.transfers")} subtitle="Inter-warehouse and inter-zone inventory shifts, internal transport manifests, and intake verification." guide={transfersGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+            {t("inventory.transfer")}
           </Button>}/>
 
       {/* Transfers KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Transfer Manifests" value={`${transfers.length} Moves`} icon={ArrowLeftRight} />
-        <StatCard label="In-Transit Active" value={`${inTransitCount} En Route`} icon={Truck} trend={{ positive: inTransitCount === 0, text: inTransitCount > 0 ? 'Awaiting intake' : 'All delivered' }} highlight={inTransitCount > 0} />
-        <StatCard label="Completed Intakes" value={`${receivedCount} Restocked`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
-        <StatCard label="Active Facilities" value={`${locations.length} Warehouses`} icon={MapPin} subtext="Main, Bay A, Bay B" />
+        <StatCard label={t("inventory.transfer")} value={`${transfers.length} Moves`} icon={ArrowLeftRight} />
+        <StatCard label={t("status.inTransit")} value={`${inTransitCount} En Route`} icon={Truck} trend={{ positive: inTransitCount === 0, text: inTransitCount > 0 ? 'Awaiting intake' : 'All delivered' }} highlight={inTransitCount > 0} />
+        <StatCard label={t("common.completed")} value={`${receivedCount} Restocked`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
+        <StatCard label={t("navigation.locations")} value={`${locations.length} Warehouses`} icon={MapPin} subtext="Main, Bay A, Bay B" />
       </div>
 
-      <DataTable title="Inter-Facility Stock Transfer Log" columns={columns} data={transfers} keyExtractor={(t) => t.id} searchPlaceholder="Search transfer #, source, or destination..." searchFilter={(t, term) => t.transferNumber.toLowerCase().includes(term) ||
+      <DataTable title={t("navigation.transfers")} columns={columns} data={transfers} keyExtractor={(t) => t.id} searchPlaceholder={t("table.search")} searchFilter={(t, term) => t.transferNumber.toLowerCase().includes(term) ||
             t.sourceLocation.toLowerCase().includes(term) ||
             t.destLocation.toLowerCase().includes(term)}/>
 
@@ -178,10 +180,10 @@ export const TransfersPage = () => {
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
-                  Cancel
+                  {t("modal.cancel")}
                 </button>
                 <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm">
-                  Post Transfer & Dispatch Stock
+                  {t("modal.submit")}
                 </button>
               </div>
             </form>

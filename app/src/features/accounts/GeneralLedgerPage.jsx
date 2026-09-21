@@ -4,6 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { Button } from '../../components/ui/Button';
 import { Plus, BookOpen, Scale, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { useTranslation } from '../../i18n';
 const generalLedgerGuide = {
     title: 'General Ledger & Journal Entries',
     subtitle: 'Double-entry accounting journal vouchers and Chart of Accounts postings',
@@ -33,6 +34,7 @@ const generalLedgerGuide = {
 };
 export const GeneralLedgerPage = () => {
     const { journalEntries, addJournalEntry, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { t } = useTranslation();
     const [showAddModal, setShowAddModal] = useState(false);
     const [description, setDescription] = useState('');
     const [debitAccount, setDebitAccount] = useState('1010 - Cash & Bank');
@@ -73,13 +75,13 @@ export const GeneralLedgerPage = () => {
         },
         {
             key: 'date',
-            header: 'Posting Date',
+            header: t("table.date"),
             width: '12%',
             render: (e) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(e.date)}</span>,
         },
         {
             key: 'description',
-            header: 'Transaction Narrative',
+            header: t("common.description"),
             width: '28%',
             render: (e) => (
               <div>
@@ -110,7 +112,7 @@ export const GeneralLedgerPage = () => {
         },
         {
             key: 'amount',
-            header: 'Entry Balance',
+            header: t("finance.balance"),
             align: 'right',
             width: '14%',
             render: (e) => (
@@ -121,8 +123,8 @@ export const GeneralLedgerPage = () => {
         },
     ];
     return (<div className="space-y-6">
-      <PageHeader title="General Ledger & Journal Entries" subtitle="Double-entry accounting journal vouchers, chart of accounts debit/credit postings, and audit trails." guide={generalLedgerGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
-            New Journal Voucher
+      <PageHeader title={t("navigation.generalLedger")} subtitle="Double-entry accounting journal vouchers, chart of accounts debit/credit postings, and audit trails." guide={generalLedgerGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+            {t("finance.journal")}
           </Button>}/>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -153,7 +155,7 @@ export const GeneralLedgerPage = () => {
         </div>
       </div>
 
-      <DataTable title="Journal Ledger Postings" columns={columns} data={journalEntries} keyExtractor={(e) => e.id} searchPlaceholder="Filter journal ref, account, or narrative..." searchFilter={(e, term) => e.entryNumber.toLowerCase().includes(term) ||
+      <DataTable title={t("finance.journal")} columns={columns} data={journalEntries} keyExtractor={(e) => e.id} searchPlaceholder={t("table.search")} searchFilter={(e, term) => e.entryNumber.toLowerCase().includes(term) ||
             e.description.toLowerCase().includes(term) ||
             e.debitAccount.toLowerCase().includes(term) ||
             e.creditAccount.toLowerCase().includes(term)}/>
@@ -208,10 +210,10 @@ export const GeneralLedgerPage = () => {
 
               <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3.5 py-1.5 border border-[#CED4DA] rounded text-slate-600 hover:bg-slate-100">
-                  Cancel
+                  {t("modal.cancel")}
                 </button>
                 <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded font-semibold">
-                  Post to General Ledger
+                  {t("modal.submit")}
                 </button>
               </div>
             </form>

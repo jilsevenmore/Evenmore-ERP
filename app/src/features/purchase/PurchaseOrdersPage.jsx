@@ -11,6 +11,7 @@ import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintPurchaseOrderModal } from '../../components/common/PrintPurchaseOrderModal';
+import { useTranslation } from '../../i18n';
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
     subtitle: 'Supplier procurement contracts driving inventory replenishment and vendor billing.',
@@ -27,6 +28,7 @@ const purchaseOrderGuide = {
     workflow: ['Auto-Generated / Draft PO', 'Issued to Vendor', 'Goods Intake & Vendor Bill', '3-Way Match Verified', 'Disbursement Settlement'],
 };
 export const PurchaseOrdersPage = () => {
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const { purchaseOrders, vendors, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
@@ -139,7 +141,7 @@ export const PurchaseOrdersPage = () => {
     const columns = [
         {
             key: 'poNumber',
-            header: 'PO Number',
+            header: t("purchase.purchaseOrder"),
             width: '13%',
             render: (p) => (<button onClick={() => setSelectedPo(p)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
           <ClipboardList size={13} className="text-muted"/> {p.poNumber}
@@ -147,13 +149,13 @@ export const PurchaseOrdersPage = () => {
         },
         {
             key: 'vendor',
-            header: 'Supplier / Vendor',
+            header: t("purchase.vendor"),
             width: '20%',
             render: (p) => <span className="font-bold text-text">{p.vendor}</span>,
         },
         {
             key: 'date',
-            header: 'PO Date',
+            header: t("common.date"),
             width: '10%',
             render: (p) => <span className="text-muted font-mono text-[11px] whitespace-nowrap">{formatDateDDMMYYYY(p.date)}</span>,
         },
@@ -165,7 +167,7 @@ export const PurchaseOrdersPage = () => {
         },
         {
             key: 'amount',
-            header: 'Total Order Value',
+            header: t("common.total"),
             align: 'right',
             width: '12%',
             render: (p) => (<span className="font-mono font-bold text-text whitespace-nowrap">
@@ -174,7 +176,7 @@ export const PurchaseOrdersPage = () => {
         },
         {
             key: 'status',
-            header: 'Fulfillment Status',
+            header: t("table.status"),
             align: 'center',
             width: '13%',
             render: (p) => {
@@ -193,7 +195,7 @@ export const PurchaseOrdersPage = () => {
         },
         {
             key: 'actions',
-            header: 'Actions / Intake',
+            header: t("table.actions"),
             align: 'right',
             width: '20%',
             render: (p) => {
@@ -256,8 +258,8 @@ export const PurchaseOrdersPage = () => {
     const receivedPoCount = purchaseOrders.filter(p => p.status === 'Received' || p.status === 'Billed').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Purchase Orders Management" subtitle="Issue procurement orders to suppliers for stock intake, manage component line items, and seamlessly convert to vendor bills." guide={purchaseOrderGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
-            Create Purchase Order
+      <PageHeader title={t("navigation.purchaseOrders")} subtitle="Issue procurement orders to suppliers for stock intake, manage component line items, and seamlessly convert to vendor bills." guide={purchaseOrderGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
+            {t("common.create")}
           </Button>}/>
 
       {/* Purchase Orders KPI Stat Cards */}
@@ -268,7 +270,7 @@ export const PurchaseOrdersPage = () => {
         <StatCard label="Fulfilled & Billed" value={`${receivedPoCount} Received`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
       </div>
 
-      <DataTable title="Supplier Purchase Orders" columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder="Search PO # or vendor..." searchFilter={(p, term) => p.poNumber.toLowerCase().includes(term) ||
+      <DataTable title={t("navigation.purchaseOrders")} columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder={t("table.search")} searchFilter={(p, term) => p.poNumber.toLowerCase().includes(term) ||
             p.vendor.toLowerCase().includes(term)}/>
 
       {/* Create PO Modal */}
@@ -345,7 +347,7 @@ export const PurchaseOrdersPage = () => {
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={handleCloseCreateModal} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer">
-                  Cancel
+                  {t("modal.cancel")}
                 </button>
                 <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm cursor-pointer">
                   Save & Issue Purchase Order
@@ -477,7 +479,7 @@ export const PurchaseOrdersPage = () => {
                         </span>
                       )}
                       <Button variant="outline" onClick={() => setSelectedPo(null)}>
-                        Close
+                        {t("modal.close")}
                       </Button>
                     </div>
                   </>

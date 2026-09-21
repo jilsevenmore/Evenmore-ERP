@@ -54,12 +54,158 @@ import {
   LogOut,
   Lock,
   ExternalLink,
+  Factory,
+  Flame,
+  DollarSign,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useVendorStore } from '../../stores/vendorStore';
 import { useERP } from '../../context/ERPContext';
 import { UserGuideModal } from '../common/UserGuideModal';
+import { useTranslation } from '../../i18n';
+import { useLanguageStore } from '../../stores/languageStore';
+
+// English visible label -> translation key. Routes/paths are never changed,
+// only the displayed label is resolved via t().
+const NAV_LABEL_KEYS = {
+  Dashboard: 'navigation.dashboard',
+  CRM: 'navigation.crm',
+  'CRM Dashboard': 'navigation.crmDashboard',
+  'CRM Reports': 'navigation.crmReports',
+  Leads: 'navigation.leads',
+  'Lead Create Form': 'navigation.leadCreateForm',
+  'Lead Tasks Master': 'navigation.leadTasksMaster',
+  'Lead Task Form': 'navigation.leadTaskForm',
+  'Lead Stage Tasks': 'navigation.leadStageTasks',
+  Tasks: 'navigation.tasks',
+  'Tasks List': 'navigation.tasksList',
+  'Task Allocation': 'navigation.taskAllocation',
+  'User Tracking': 'navigation.userTracking',
+  Deals: 'navigation.deals',
+  Projects: 'navigation.projects',
+  Contracts: 'navigation.contracts',
+  'CRM System Setup': 'navigation.crmSystemSetup',
+  'PMS (Projects)': 'navigation.pms',
+  'PMS Dashboard': 'navigation.pmsDashboard',
+  'All Projects': 'navigation.allProjects',
+  'My Projects': 'navigation.myProjects',
+  'My Tasks': 'navigation.myTasks',
+  'Dynamic Stages': 'navigation.dynamicStages',
+  'Timeline & Gantt': 'navigation.timelineGantt',
+  'Delay Center': 'navigation.delayCenter',
+  'PMS Reports': 'navigation.pmsReports',
+  'PMS Settings': 'navigation.pmsSettings',
+  Manufacturing: 'navigation.manufacturing',
+  'Manufacturing Dashboard': 'navigation.manufacturingDashboard',
+  'Manufacturing Projects': 'navigation.manufacturingProjects',
+  'BOM Version Control': 'navigation.bomVersionControl',
+  'Material Planning (MRP)': 'navigation.materialPlanning',
+  'Material Issue Slips': 'navigation.materialIssueSlips',
+  'Material Consumption': 'navigation.materialConsumption',
+  'Production Work Orders': 'navigation.productionWorkOrders',
+  'Labour Cost Capture': 'navigation.labourCostCapture',
+  'Production Costing': 'navigation.productionCosting',
+  'Batch Management': 'navigation.batchManagement',
+  'Project Profitability': 'navigation.projectProfitability',
+  'Packaging Manifests': 'navigation.packagingManifests',
+  'Dispatch & Shipping': 'navigation.dispatchShipping',
+  Sales: 'navigation.sales',
+  Estimates: 'navigation.estimates',
+  Quotations: 'navigation.quotations',
+  'Sales Orders': 'navigation.salesOrders',
+  'Proforma Invoices': 'navigation.proformaInvoices',
+  'Sales Invoices': 'navigation.salesInvoices',
+  'Delivery Challans': 'navigation.deliveryChallans',
+  'Warranty Cards': 'navigation.warrantyCards',
+  'Sales Returns': 'navigation.salesReturns',
+  'Payment In': 'navigation.paymentIn',
+  Purchase: 'navigation.purchase',
+  'Purchase Orders': 'navigation.purchaseOrders',
+  'Goods Receipt': 'navigation.goodsReceipt',
+  'Purchase Bills': 'navigation.purchaseBills',
+  'Purchase Returns': 'navigation.purchaseReturns',
+  'Payment Out': 'navigation.paymentOut',
+  Expenses: 'navigation.expenses',
+  'Vendors & Portal Access': 'navigation.vendorsPortalAccess',
+  'Vendor Outsourcing': 'navigation.vendorOutsourcing',
+  'Progress Tracking': 'navigation.progressTracking',
+  'Vendor Directory & Access': 'navigation.vendorDirectoryAccess',
+  'Process Templates': 'navigation.processTemplates',
+  'Launch Vendor Portal ↗': 'navigation.launchVendorPortal',
+  Parties: 'navigation.parties',
+  Inventory: 'navigation.inventory',
+  'Items Master': 'navigation.itemsMaster',
+  'All Items': 'navigation.allItems',
+  'Machine Master': 'navigation.machineMaster',
+  'Stock Inventory': 'navigation.stockInventory',
+  Categories: 'navigation.categories',
+  'All Categories': 'navigation.allCategories',
+  'Machine Categories': 'navigation.machineCategories',
+  'Stock Categories': 'navigation.stockCategories',
+  'Stock Position': 'navigation.stockPosition',
+  Transfers: 'navigation.transfers',
+  Locations: 'navigation.locations',
+  'Faulty Parts': 'navigation.faultyParts',
+  'Service Usage': 'navigation.serviceUsage',
+  'Zone Requests': 'navigation.zoneRequests',
+  'Valuation & Ageing': 'navigation.valuationAgeing',
+  'Month-End Audit': 'navigation.monthEndAudit',
+  Accounts: 'navigation.accounts',
+  'Cash / Bank': 'navigation.cashBank',
+  'General Ledger': 'navigation.generalLedger',
+  'Financial Reports': 'navigation.financialReports',
+  HRMS: 'navigation.hrms',
+  Employees: 'navigation.employees',
+  Attendance: 'navigation.attendance',
+  Overview: 'navigation.attendanceOverview',
+  'Mark Attendance': 'navigation.markAttendance',
+  Individual: 'navigation.individual',
+  Bulk: 'navigation.bulk',
+  Requests: 'navigation.requests',
+  Flexibility: 'navigation.flexibility',
+  "Today's Attendance": 'navigation.todaysAttendance',
+  Leave: 'navigation.leave',
+  Payroll: 'navigation.payroll',
+  Recruitment: 'navigation.recruitment',
+  Jobs: 'navigation.jobs',
+  Candidates: 'navigation.candidates',
+  Interviews: 'navigation.interviews',
+  Applications: 'navigation.applications',
+  Offers: 'navigation.offers',
+  Onboarding: 'navigation.onboarding',
+  Career: 'navigation.career',
+  'Custom Questions': 'navigation.customQuestions',
+  Performance: 'navigation.performance',
+  Indicators: 'navigation.indicators',
+  'KPI Data': 'navigation.kpiData',
+  Appraisal: 'navigation.appraisal',
+  'Appraisal Funnel': 'navigation.appraisalFunnel',
+  Training: 'navigation.training',
+  'HR Admin': 'navigation.hrAdmin',
+  'Asset Setup': 'navigation.assetSetup',
+  Documents: 'navigation.documents',
+  Organization: 'navigation.organization',
+  'Org Chart': 'navigation.orgChart',
+  Departments: 'navigation.departments',
+  Designations: 'navigation.designations',
+  'Company Policy': 'navigation.companyPolicy',
+  Calendar: 'navigation.calendar',
+  Reports: 'navigation.reports',
+  Administration: 'navigation.administration',
+  Users: 'navigation.users',
+  Roles: 'navigation.roles',
+  Clients: 'navigation.clients',
+};
+
+function localizeNavItems(items, t) {
+  return items.map((item) => {
+    const key = NAV_LABEL_KEYS[item.label];
+    const localized = { ...item, navKey: item.label, label: key ? t(key) : item.label };
+    if (item.children) localized.children = localizeNavItems(item.children, t);
+    return localized;
+  });
+}
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -126,6 +272,26 @@ const NAV = [
       { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
       { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
       { label: 'PMS Settings', icon: Settings, to: '/pms/settings' },
+    ],
+  },
+
+  {
+    label: 'Manufacturing',
+    icon: Factory,
+    children: [
+      { label: 'Manufacturing Dashboard', icon: Home, to: '/manufacturing' },
+      { label: 'Manufacturing Projects', icon: Layers, to: '/manufacturing/projects' },
+      { label: 'BOM Version Control', icon: Layers, to: '/manufacturing/bom' },
+      { label: 'Material Planning (MRP)', icon: Sliders, to: '/manufacturing/material-planning' },
+      { label: 'Material Issue Slips', icon: Boxes, to: '/manufacturing/material-issue' },
+      { label: 'Material Consumption', icon: Flame, to: '/manufacturing/material-consumption' },
+      { label: 'Production Work Orders', icon: Wrench, to: '/manufacturing/production' },
+      { label: 'Labour Cost Capture', icon: Users, to: '/manufacturing/labour' },
+      { label: 'Production Costing', icon: DollarSign, to: '/manufacturing/costing' },
+      { label: 'Batch Management', icon: Boxes, to: '/manufacturing/batches' },
+      { label: 'Project Profitability', icon: TrendingUp, to: '/manufacturing/profitability' },
+      { label: 'Packaging Manifests', icon: Package, to: '/manufacturing/packaging' },
+      { label: 'Dispatch & Shipping', icon: Truck, to: '/manufacturing/dispatch' },
     ],
   },
 
@@ -473,10 +639,10 @@ function SubList({ items, depth = 1, badges }) {
       {items.map((item) => {
         if (item.children) {
           return (
-            <ExpandableRow key={item.label} item={item} depth={depth} badges={badges} />
+            <ExpandableRow key={item.navKey || item.label} item={item} depth={depth} badges={badges} />
           );
         }
-        return <SubItem key={item.label} item={item} depth={depth} badges={badges} />;
+        return <SubItem key={item.navKey || item.label} item={item} depth={depth} badges={badges} />;
       })}
     </div>
   );
@@ -562,8 +728,11 @@ export default function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const profileRef = useRef(null);
   const dragRef = useRef({ dragging: false, startX: 0, startWidth: sidebarWidth });
+  const { t } = useTranslation();
+  const currentLanguage = useLanguageStore((s) => s.currentLanguage);
 
-  const filteredNav = useMemo(() => filterNavTree(NAV, searchQuery), [searchQuery]);
+  const localizedNav = useMemo(() => localizeNavItems(NAV, t), [t, currentLanguage]);
+  const filteredNav = useMemo(() => filterNavTree(localizedNav, searchQuery), [localizedNav, searchQuery]);
 
   // PMS live nav counters. Subscribe to stable slices and derive, so the
   // selector never hands useSyncExternalStore a fresh object each render.
@@ -695,7 +864,7 @@ export default function Sidebar() {
         <nav className="side-nav" aria-label="Primary navigation">
           {filteredNav.length > 0 ? (
             filteredNav.map((item) => (
-              <ExpandableRow key={item.label} item={item} depth={0} badges={badges} />
+              <ExpandableRow key={item.navKey || item.label} item={item} depth={0} badges={badges} />
             ))
           ) : (
             <div className="px-3 py-6 text-center text-xs text-slate-400">

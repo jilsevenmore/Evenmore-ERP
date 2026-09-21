@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useTranslation } from '../../i18n';
 
 /**
  * Drawer — CRM-styled sliding slide-over panel.
  * Props: isOpen, onClose, title, subtitle, children, footer, width ('md'|'lg'|'xl'|number)
  */
 export function Drawer({ isOpen, onClose, title, subtitle, children, footer, width = 540 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!isOpen) return;
     function handleKey(e) {
@@ -59,7 +61,7 @@ export function Drawer({ isOpen, onClose, title, subtitle, children, footer, wid
             type="button"
             className="modal-close"
             onClick={onClose}
-            aria-label="Close drawer"
+            aria-label={t("table.closeDrawer")}
             style={{
               width: 32,
               height: 32,

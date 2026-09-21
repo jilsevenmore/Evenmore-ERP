@@ -3,14 +3,16 @@ import { ChevronRight } from 'lucide-react';
 import { useLocation, Link } from 'react-router-dom';
 import { toTitleCase, safeString } from '../../utils/stringUtils';
 import { PageInfoButton } from './PageInfoButton';
+import { useTranslation } from '../../i18n';
 
 export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
   const location = useLocation();
+  const { t } = useTranslation();
 
   const pathname = safeString(location?.pathname, '/');
   const pathParts = pathname.split('/').filter(Boolean);
   const defaultBreadcrumbs = [
-    { label: 'Dashboard', path: '/' },
+    { label: t('navigation.dashboard'), path: '/' },
     ...pathParts.map((part, index) => ({
       label: toTitleCase(part, part),
       path: `/${pathParts.slice(0, index + 1).join('/')}`,
@@ -27,7 +29,7 @@ export function PageHeader({ title, subtitle, breadcrumb, guide, actions }) {
         <nav className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
           {activeBreadcrumb.map((bc, idx) => {
             const isLast = idx === activeBreadcrumb.length - 1;
-            const label = safeString(bc?.label || bc?.name, 'Section');
+            const label = safeString(bc?.label || bc?.name, t('table.section'));
             const targetPath = bc?.path || bc?.to || '#';
             return (
               <React.Fragment key={idx}>

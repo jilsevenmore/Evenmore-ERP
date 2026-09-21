@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '../../../../i18n';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
 
 /**
@@ -19,6 +20,7 @@ const DEPARTMENT_COLORS = {
 };
 
 export function ProjectPipelineChart({ rows = [] }) {
+  const { t } = useTranslation();
   const total = rows.reduce((sum, r) => sum + r.count, 0);
 
   return (
@@ -26,7 +28,7 @@ export function ProjectPipelineChart({ rows = [] }) {
       <header className="flex items-baseline justify-between mb-4">
         <h3 className="text-sm font-bold text-slate-800">Project Pipeline by Stage</h3>
         <span className="text-[11px] font-medium text-slate-400">
-          {total} active {total === 1 ? 'project' : 'projects'}
+          {total} active {total === 1 ? t('common.project') : t('pms.projects')}
         </span>
       </header>
 
@@ -47,7 +49,7 @@ export function ProjectPipelineChart({ rows = [] }) {
                   <span className="text-xs font-bold text-slate-800">
                     {row.count}
                     <span className="font-medium text-slate-400 ml-1">
-                      {row.count === 1 ? 'project' : 'projects'}
+                      {row.count === 1 ? t('common.project') : t('pms.projects')}
                     </span>
                   </span>
                 </div>

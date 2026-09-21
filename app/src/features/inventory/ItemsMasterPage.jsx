@@ -7,11 +7,13 @@ import { Button } from '../../components/ui/Button';
 import { Plus, MapPin, AlertTriangle, Layers, Tag, Zap, CheckCircle2, Upload, DollarSign, Boxes, Package, Cpu, QrCode } from 'lucide-react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { PageHeader } from '../../components/common/PageHeader';
+import { useTranslation } from '../../i18n';
 import { BarcodeLabelModal } from '../../components/common/BarcodeLabelModal';
 import { ImportModal } from '../../components/common/ImportModal';
 
 export const ItemsMasterPage = () => {
     const { items, itemParts = [], addInventoryItem, vendors, addPurchaseOrder, formatCurrency } = useERP();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     
@@ -94,7 +96,7 @@ export const ItemsMasterPage = () => {
     const columns = [
         {
             key: 'sku',
-            header: 'SKU / Model #',
+            header: t("inventory.sku"),
             width: '14%',
             render: (i) => (
               <div className="flex items-center gap-1.5 whitespace-nowrap">
@@ -111,7 +113,7 @@ export const ItemsMasterPage = () => {
         },
         {
             key: 'name',
-            header: 'Description & Taxonomy',
+            header: t("common.description"),
             width: '24%',
             render: (i) => {
               const machinePartsCount = i.itemKind === 'Machine'
@@ -144,7 +146,7 @@ export const ItemsMasterPage = () => {
         },
         {
             key: 'itemKind',
-            header: 'Item Type',
+            header: t("common.type"),
             align: 'center',
             width: '12%',
             render: (i) => {
@@ -194,7 +196,7 @@ export const ItemsMasterPage = () => {
         },
         {
             key: 'stock',
-            header: 'Live Stock Buffer',
+            header: t("inventory.availableStock"),
             align: 'center',
             width: '12%',
             render: (i) => {
@@ -234,14 +236,14 @@ export const ItemsMasterPage = () => {
         },
         {
             key: 'status',
-            header: 'Health Status',
+            header: t("table.status"),
             align: 'center',
             width: '10%',
             render: (i) => <StatusBadge status={i.status}/>,
         },
         {
             key: 'id',
-            header: 'Actions',
+            header: t("table.actions"),
             align: 'right',
             width: '8%',
             render: (i) => (
@@ -258,7 +260,7 @@ export const ItemsMasterPage = () => {
                   to={`/inventory/items/edit/${i.id}`}
                   className="px-2.5 py-1 rounded-lg bg-primary/10 border border-primary/20 text-primary hover:bg-primary/20 text-xs font-semibold transition inline-flex items-center shadow-2xs"
                 >
-                  Edit
+                  {t("common.edit")}
                 </Link>
               </div>
             ),
@@ -269,10 +271,10 @@ export const ItemsMasterPage = () => {
     const uniqueCategoriesCount = new Set(displayItems.map(i => i.category)).size;
 
     const pageTitle = isMachineView
-      ? 'Machine Master'
+      ? t("navigation.machineMaster")
       : isStockView
-      ? 'Stock Inventory'
-      : 'Items Master Catalog';
+      ? t("navigation.stockInventory")
+      : t("navigation.itemsMaster");
 
     const pageSubtitle = isMachineView
       ? 'Capital hardware machines, equipment consoles, and assembled systems with configurable BOM parts.'
@@ -309,20 +311,20 @@ export const ItemsMasterPage = () => {
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" icon={Upload} onClick={() => setIsImportOpen(true)}>
-              Import CSV
+              {t("common.import")}
             </Button>
             <Button
               variant="outline"
               icon={Layers}
               onClick={() => navigate(isMachineView ? '/inventory/categories/machines' : '/inventory/categories/stock')}
             >
-              {isMachineView ? 'Machine Categories' : 'Stock Categories'}
+              {isMachineView ? t("navigation.machineCategories") : t("navigation.stockCategories")}
             </Button>
             <Button
               icon={Plus}
               onClick={() => navigate(`/inventory/items/new?kind=${newItemKind}`)}
             >
-              {isMachineView ? 'Add New Machine' : 'Add New Stock Part'}
+              {t("header.addItem")}
             </Button>
           </div>
         }
@@ -338,7 +340,7 @@ export const ItemsMasterPage = () => {
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Boxes size={15} /> All Items ({items.length})
+          <Boxes size={15} /> {t("navigation.allItems")} ({items.length})
         </Link>
         <Link
           to="/inventory/items/machines"
@@ -348,7 +350,7 @@ export const ItemsMasterPage = () => {
               : 'text-slate-600 hover:text-slate-900'
           }`}
         >
-          <Cpu size={15} /> Machine Master ({items.filter((i) => i.itemKind === 'Machine').length})
+          <Cpu size={15} /> {t("navigation.machineMaster")} ({items.filter((i) => i.itemKind === 'Machine').length})
         </Link>
         <Link
           to="/inventory/items/stock"
@@ -364,10 +366,10 @@ export const ItemsMasterPage = () => {
 
       {/* Item Master KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label={isMachineView ? 'Total Machines' : 'Total Stock SKUs'} value={`${displayItems.length} SKUs`} icon={isMachineView ? Cpu : Package} />
-        <StatCard label="Total Asset Valuation" value={formatCurrency(Math.round(totalCatalogValue), { noDecimals: true })} icon={DollarSign} />
-        <StatCard label="Low Stock Alerts" value={`${lowStockItems.length} SKUs`} icon={AlertTriangle} trend={{ positive: lowStockItems.length === 0, text: lowStockItems.length > 0 ? 'Requires Reorder' : 'Healthy Buffers' }} highlight={lowStockItems.length > 0} />
-        <StatCard label="Categories Represented" value={`${uniqueCategoriesCount} Categories`} icon={Layers} subtext="Taxonomic Hierarchy" />
+        <StatCard label={isMachineView ? t("navigation.machineMaster") : t("dashboard.statSkusLive")} value={`${displayItems.length} SKUs`} icon={isMachineView ? Cpu : Package} />
+        <StatCard label={t("inventory.stockValue")} value={formatCurrency(Math.round(totalCatalogValue), { noDecimals: true })} icon={DollarSign} />
+        <StatCard label={t("dashboard.lowStockAlerts")} value={`${lowStockItems.length} SKUs`} icon={AlertTriangle} trend={{ positive: lowStockItems.length === 0, text: lowStockItems.length > 0 ? 'Requires Reorder' : 'Healthy Buffers' }} highlight={lowStockItems.length > 0} />
+        <StatCard label={t("navigation.categories")} value={`${uniqueCategoriesCount} Categories`} icon={Layers} subtext="Taxonomic Hierarchy" />
       </div>
 
       {/* 1-Click Smart Restock Banner */}
@@ -399,11 +401,11 @@ export const ItemsMasterPage = () => {
         </div>)}
 
       <DataTable
-        title={isMachineView ? 'Machine Equipment Registry' : 'Stock Inventory & Spare Parts'}
+        title={isMachineView ? t("navigation.machineMaster") : t("navigation.stockInventory")}
         columns={columns}
         data={displayItems}
         keyExtractor={(i) => i.id}
-        searchPlaceholder="Search by SKU, product name, or storage rack..."
+        searchPlaceholder={t("table.search")}
         searchFilter={(i, term) =>
           i.sku.toLowerCase().includes(term) ||
           i.name.toLowerCase().includes(term) ||

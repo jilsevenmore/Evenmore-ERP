@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../../../../i18n';
 import { DataTable } from '../../../../components/ui/DataTable';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { AlertTriangle, ArrowUpRight } from 'lucide-react';
@@ -20,12 +21,13 @@ const PRIORITY_TONES = {
 };
 
 export function DelayedProjectsTable({ rows = [] }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const columns = [
     {
       key: 'projectId',
-      label: 'Project',
+      label: t('common.project'),
       render: (_value, row) => (
         <div className="min-w-0">
           <div className="font-semibold text-slate-800 text-xs">{row.projectId}</div>
@@ -37,7 +39,7 @@ export function DelayedProjectsTable({ rows = [] }) {
     },
     {
       key: 'stageName',
-      label: 'Stage',
+      label: t('pms.stage'),
       render: (_value, row) => (
         <div className="min-w-0">
           <div className="text-xs text-slate-700 truncate max-w-[170px]">{row.stageName}</div>
@@ -47,12 +49,12 @@ export function DelayedProjectsTable({ rows = [] }) {
     },
     {
       key: 'status',
-      label: 'Status',
+      label: t('common.status'),
       render: (_value, row) => <StageStatusBadge status={row.status} size="sm" />,
     },
     {
       key: 'delayMs',
-      label: 'Overdue',
+      label: t('status.overdue'),
       render: (_value, row) => (
         <span className="inline-flex items-center gap-1 text-xs font-bold" style={{ color: '#9f1239' }}>
           <AlertTriangle size={12} strokeWidth={2.5} />
@@ -62,7 +64,7 @@ export function DelayedProjectsTable({ rows = [] }) {
     },
     {
       key: 'priority',
-      label: 'Priority',
+      label: t('pms.priority'),
       render: (_value, row) => {
         const tone = PRIORITY_TONES[row.priority] ?? PRIORITY_TONES.Low;
         return (
@@ -77,7 +79,7 @@ export function DelayedProjectsTable({ rows = [] }) {
     },
     {
       key: 'reason',
-      label: 'Reason',
+      label: t('form.reason'),
       render: (_value, row) => (
         <span
           className="text-[11px] text-slate-500 line-clamp-2 max-w-[220px] block"
@@ -89,7 +91,7 @@ export function DelayedProjectsTable({ rows = [] }) {
     },
     {
       key: 'owner',
-      label: 'Owner',
+      label: t('crm.owner'),
       render: (_value, row) => <span className="text-[11px] text-slate-600">{row.owner}</span>,
     },
     {
@@ -104,7 +106,7 @@ export function DelayedProjectsTable({ rows = [] }) {
           }}
           className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline"
         >
-          Open
+          {t('common.open')}
           <ArrowUpRight size={12} strokeWidth={2.5} />
         </button>
       ),

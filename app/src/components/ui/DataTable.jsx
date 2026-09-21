@@ -1,6 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { ArrowUpDown, MoreVertical, Search, Download } from 'lucide-react';
 import Pagination from './Pagination';
+import { useTranslation } from '../../i18n';
+
+const DEFAULT_SEARCH_PLACEHOLDER = 'Search…';
+const DEFAULT_EMPTY_TITLE = 'No records found';
+const DEFAULT_EMPTY_DESC = 'There are no records matching your current filter criteria.';
 
 /**
  * DataTable — Unified CRM/ERP/HRMS Data Table.
@@ -20,24 +25,31 @@ export function DataTable({
   onRowClick,
   actions,
   searchable = false,
-  searchPlaceholder = 'Search…',
+  searchPlaceholder = DEFAULT_SEARCH_PLACEHOLDER,
   searchFilter,
   emptyMessage,
-  emptyTitle = 'No records found',
-  emptyDesc = 'There are no records matching your current filter criteria.',
+  emptyTitle = DEFAULT_EMPTY_TITLE,
+  emptyDesc = DEFAULT_EMPTY_DESC,
   emptyAction,
   pageSize: initialPageSize = 5,
   pageSizeOptions = [5, 10, 20],
   action,
   exportable = true,
 }) {
+  const { t } = useTranslation();
+  // Localize component-owned defaults only; caller-provided strings
+  // (incl. business data) are rendered unchanged.
+  const resolvedSearchPlaceholder =
+    searchPlaceholder === DEFAULT_SEARCH_PLACEHOLDER ? t('table.search') : searchPlaceholder;
+  const resolvedEmptyTitle = emptyTitle === DEFAULT_EMPTY_TITLE ? t('table.emptyTitle') : emptyTitle;
+  const resolvedEmptyDesc = emptyDesc === DEFAULT_EMPTY_DESC ? t('table.emptyDesc') : emptyDesc;
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState('asc');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(initialPageSize);
 
-  const isSearchEnabled = searchable || !!searchFilter || searchPlaceholder !== 'Search…' || !!title;
+  const isSearchEnabled = searchable || !!searchFilter || searchPlaceholder !== DEFAULT_SEARCH_PLACEHOLDER || !!title;
 
   const safeData = useMemo(() => (Array.isArray(data) ? data : []), [data]);
 
@@ -198,7 +210,7 @@ export function DataTable({
                 <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
                 <input
                   type="text"
-                  placeholder={searchPlaceholder}
+                  placeholder={resolvedSearchPlaceholder}
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -212,7 +224,7 @@ export function DataTable({
               <button
                 type="button"
                 onClick={handleExportCSV}
-                title="Export Table to CSV"
+                title={t("table.exportCsv")}
                 className="p-1.5 border border-border hover:bg-card-hover rounded-xl text-muted hover:text-text cursor-pointer transition shadow-2xs flex items-center gap-1 text-xs shrink-0"
               >
                 <Download size={14} />
@@ -235,7 +247,7 @@ export function DataTable({
                     className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"
                     checked={allChecked}
                     onChange={toggleAll}
-                    aria-label="Select all"
+                    aria-label={t("pagination.selectAll")}
                   />
                 </th>
               )}
@@ -296,7 +308,7 @@ export function DataTable({
                         className="row-check rounded border-border text-primary focus:ring-primary cursor-pointer"
                         checked={isRowSelected}
                         onChange={() => toggleRow(rowId)}
-                        aria-label="Select row"
+                        aria-label={t("pagination.selectRow")}
                       />
                     </td>
                   )}
@@ -330,8 +342,8 @@ export function DataTable({
                   className="empty-row py-12 px-4 text-center"
                 >
                   <div className="flex flex-col items-center justify-center space-y-2">
-                    <p className="font-semibold text-text text-sm">{emptyMessage || emptyTitle}</p>
-                    <p className="text-xs text-muted max-w-sm">{emptyDesc}</p>
+                    <p className="font-semibold text-text text-sm">{emptyMessage || resolvedEmptyTitle}</p>
+                    <p className="text-xs text-muted max-w-sm">{resolvedEmptyDesc}</p>
                     {emptyAction && <div className="pt-2">{emptyAction}</div>}
                   </div>
                 </td>

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Users, UserPlus, Clock, TrendingUp, TrendingDown, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
 import { leads, initials } from "../../../data/crm/mockLeads";
 import { useERP } from "../../../context/ERPContext";
+import { useTranslation } from "../../../i18n";
 import { useAppStore } from "../../../stores/appStore";
 import { CRM_TEAM_MEMBERS } from "../../../services/leadStageAutomation";
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from "../../../services/taskCompletionService";
@@ -114,6 +115,7 @@ function formatShortINR(value) {
   return "Rs " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 }
 export default function DashboardView() {
+  const { t } = useTranslation();
   const { invoices, quotations, salesOrders, paymentIns, formatCurrency, getInvoiceOutstanding } = useERP();
   const currentUser = useAppStore((s) => s.currentUser);
   const [deals, setDeals] = useState(loadDeals);
@@ -240,6 +242,7 @@ export default function DashboardView() {
     Today: tasks.filter((t) => bucket(t) === "Today").length,
     Upcoming: tasks.filter((t) => bucket(t) === "Upcoming").length
   };
+  const tabLabels = { All: t("header.all"), Overdue: t("status.overdue"), Today: t("common.today"), Upcoming: "Upcoming" };
   const filtered = tasks.filter((t) => {
     const okTab = tab === "All" || bucket(t) === tab;
     const q = query.trim().toLowerCase();
@@ -350,7 +353,7 @@ export default function DashboardView() {
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Leads by Source</h3>
-            <span style={{ fontSize: 11, fontWeight: 700, border: "1px solid #e2e8f0", borderRadius: 8, padding: "4px 10px", color: "#475569" }}>This month</span>
+            <span style={{ fontSize: 11, fontWeight: 700, border: "1px solid #e2e8f0", borderRadius: 8, padding: "4px 10px", color: "#475569" }}>{t("dashboard.thisMonth")}</span>
           </div>
           <div style={{ display: "flex", gap: 14, alignItems: "center", marginTop: 8 }}>
             <div style={{ position: "relative", width: 150, height: 150, flexShrink: 0 }}>
@@ -380,17 +383,17 @@ export default function DashboardView() {
       </div>
       <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>My Tasks</h3>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>{t("navigation.myTasks")}</h3>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 6 }}>
               {["All", "Overdue", "Today", "Upcoming"].map((t) => (
                 <button key={t} type="button" onClick={() => setTab(t)} style={{ border: "1px solid", borderColor: tab === t ? "#2f6fed" : "#e2e8f0", background: tab === t ? "#eef4ff" : "#fff", color: tab === t ? "#2f6fed" : "#64748b", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700 }}>
-                  {t} ({counts[t]})
+                  {tabLabels[t]} ({counts[t]})
                 </button>
               ))}
             </div>
             <span style={{ display: "flex", alignItems: "center", gap: 6, border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", fontSize: 12, color: "#64748b" }}>
-              <Search size={14} /> <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tasks..." style={{ border: 0, outline: 0, fontSize: 12, width: 110 }} />
+              <Search size={14} /> <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("table.search")} style={{ border: 0, outline: 0, fontSize: 12, width: 110 }} />
             </span>
           </div>
         </div>
@@ -398,13 +401,13 @@ export default function DashboardView() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 900 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#94a3b8", fontSize: 11, textTransform: "uppercase", letterSpacing: 0.4 }}>
-                <th style={{ padding: "8px" }}>Task</th>
+                <th style={{ padding: "8px" }}>{t("crm.tasks")}</th>
                 <th style={{ padding: "8px" }}>Related Lead</th>
-                <th style={{ padding: "8px" }}>Due Date</th>
-                <th style={{ padding: "8px" }}>Priority</th>
-                <th style={{ padding: "8px" }}>Status</th>
-                <th style={{ padding: "8px" }}>Assigned To</th>
-                <th style={{ padding: "8px", textAlign: "right" }}>Action</th>
+                <th style={{ padding: "8px" }}>{t("pms.dueDate")}</th>
+                <th style={{ padding: "8px" }}>{t("form.priority")}</th>
+                <th style={{ padding: "8px" }}>{t("table.status")}</th>
+                <th style={{ padding: "8px" }}>{t("form.assignedTo")}</th>
+                <th style={{ padding: "8px", textAlign: "right" }}>{t("table.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -462,7 +465,7 @@ export default function DashboardView() {
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Recent Leads</h3>
-            <Link to="/crm/leads" style={{ fontSize: 12, fontWeight: 700, color: "#2f6fed" }}>View All</Link>
+            <Link to="/crm/leads" style={{ fontSize: 12, fontWeight: 700, color: "#2f6fed" }}>{t("common.viewAll")}</Link>
           </div>
           <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
             {recent.map((l) => {
@@ -503,7 +506,7 @@ export default function DashboardView() {
           </div>
         </div>
         <div style={{ background: "#fff", border: "1px solid #e6edf7", borderRadius: 14, padding: 16 }}>
-          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Quick Actions</h3>
+          <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>{t("header.quickActions")}</h3>
           <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals {invoices.length} invoices</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
             <button type="button" onClick={() => setIsCreateLeadOpen(true)} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
@@ -522,15 +525,15 @@ export default function DashboardView() {
               <span style={{ width: 34, height: 34, borderRadius: 10, background: "#ffeef4", color: "#f43f5e", display: "grid", placeItems: "center" }}><Phone size={17} /></span> Log Call
             </Link>
             <Link to="/sales/quotations" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><FileText size={17} /></span> Quotation
+              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><FileText size={17} /></span> {t("sales.quotation")}
             </Link>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
             <Link to="/crm/leads" style={{ flex: 1, textAlign: "center", background: "#0f1f3d", color: "#fff", borderRadius: 9, padding: "9px 0", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-              <Mail size={14} /> Email
+              <Mail size={14} /> {t("form.email")}
             </Link>
             <Link to="/crm/deals" style={{ flex: 1, textAlign: "center", background: "#fff", border: "1px solid #e2e8f0", color: "#0f1f3d", borderRadius: 9, padding: "9px 0", fontSize: 12, fontWeight: 800 }}>
-              Deals
+              {t("navigation.deals")}
             </Link>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Landmark, Plus, DollarSign, CheckCircle2, X } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { useTranslation } from '../../i18n';
 const cashBankGuide = {
     title: 'Cash & Bank Accounts (Treasury)',
     subtitle: 'Treasury liquidity monitoring, corporate banking, and automated reconciliation',
@@ -34,6 +35,7 @@ const cashBankGuide = {
 };
 export const CashBankPage = () => {
     const { bankAccounts, addBankAccount, addInterbankTransfer, transfers = [], formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { t } = useTranslation();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [showTransfer, setShowTransfer] = useState(false); // [PHASE-2E] inter-bank transfer panel
     const [transferFrom, setTransferFrom] = useState('');
@@ -70,7 +72,7 @@ export const CashBankPage = () => {
         </span>),
         },
         {
-            header: 'Ledger Balance',
+            header: t("finance.balance"),
             key: 'balance',
             align: 'right',
             render: (a) => (<span className="font-bold text-slate-900 font-mono text-sm">
@@ -86,7 +88,7 @@ export const CashBankPage = () => {
         </span>),
         },
         {
-            header: 'Status',
+            header: t("table.status"),
             key: 'status',
             align: 'center',
             render: () => (<span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
@@ -111,26 +113,26 @@ export const CashBankPage = () => {
         setIsModalOpen(false);
     };
     return (<div className="space-y-6">
-      <PageHeader title="Cash & Bank Accounts" subtitle="Real-time liquidity monitoring, treasury accounts, and automated statement reconciliation." guide={cashBankGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>
+      <PageHeader title={t("navigation.cashBank")} subtitle="Real-time liquidity monitoring, treasury accounts, and automated statement reconciliation." guide={cashBankGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>
             Add Bank Account
           </Button>}/>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Total Liquid Cash & Treasury" value={formatCurrency(totalLiquidity)} icon={DollarSign} highlight/>
-        <StatCard label="Operating Accounts" value={`${bankAccounts.length} Accounts`} icon={Landmark}/>
+        <StatCard label={t("dashboard.bankBalance")} value={formatCurrency(totalLiquidity)} icon={DollarSign} highlight/>
+        <StatCard label={t("finance.accounts")} value={`${bankAccounts.length} Accounts`} icon={Landmark}/>
         {/* [PHASE-2E] live treasury movements + open transfers */}
-        <StatCard label="Recent Transfers" value={`${transfers.length} Movements`} icon={CheckCircle2} subtext={transfers.length > 0 ? `Latest: ${transfers[0].transferNumber}` : 'No inter-bank movements yet'} />
+        <StatCard label={t("navigation.transfers")} value={`${transfers.length} Movements`} icon={CheckCircle2} subtext={transfers.length > 0 ? `Latest: ${transfers[0].transferNumber}` : 'No inter-bank movements yet'} />
       </div>
 
       {/* ── [PHASE-2E] Inter-Bank Transfer (treasury reshuffling, no P&L impact) ── */}
       <div className="bg-white border border-[#CED4DA] rounded-lg shadow-xs">
         <div className="px-5 py-4 border-b border-[#CED4DA] flex items-center justify-between">
           <div>
-            <h3 className="font-bold text-sm text-[#1F2E4A]">Inter-Bank Transfer</h3>
+            <h3 className="font-bold text-sm text-[#1F2E4A]">{t("finance.bankTransfer")}</h3>
             <p className="text-xs text-slate-500 mt-0.5">Move cash between company bank accounts. A mirrored journal entry is auto-posted; P&amp;L is unaffected.</p>
           </div>
           <button onClick={() => setShowTransfer(!showTransfer)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg cursor-pointer whitespace-nowrap transition">
-            {showTransfer ? 'Close' : 'New Transfer'}
+            {showTransfer ? t("common.close") : t("finance.bankTransfer")}
           </button>
         </div>
         {showTransfer && (
@@ -167,7 +169,7 @@ export const CashBankPage = () => {
                 }}
                 className="px-4 py-2 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 transition"
               >
-                Execute Transfer
+                {t("common.submit")}
               </button>
             </div>
             <div className="mt-3">
@@ -188,11 +190,11 @@ export const CashBankPage = () => {
               <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="py-2 px-3">Ref</th>
-                  <th className="py-2 px-3">Date</th>
+                  <th className="py-2 px-3">{t("table.date")}</th>
                   <th className="py-2 px-3">From</th>
                   <th className="py-2 px-3">To</th>
-                  <th className="py-2 px-3 text-right">Amount</th>
-                  <th className="py-2 px-3 text-center">Status</th>
+                  <th className="py-2 px-3 text-right">{t("common.amount")}</th>
+                  <th className="py-2 px-3 text-center">{t("table.status")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -212,7 +214,7 @@ export const CashBankPage = () => {
         </div>
       )}
 
-      <DataTable title="Bank & Cash Register" data={bankAccounts} columns={columns} keyExtractor={(a) => a.id} searchPlaceholder="Search bank accounts..." searchFilter={(a, term) => a.bankName.toLowerCase().includes(term) ||
+      <DataTable title={t("navigation.cashBank")} data={bankAccounts} columns={columns} keyExtractor={(a) => a.id} searchPlaceholder={t("table.search")} searchFilter={(a, term) => a.bankName.toLowerCase().includes(term) ||
             a.accountNumber.toLowerCase().includes(term) ||
             (a.accountType || '').toLowerCase().includes(term)}/>
 
@@ -249,9 +251,9 @@ export const CashBankPage = () => {
               </div>
               <div className="flex justify-end gap-3 pt-3 border-t border-[#CED4DA]">
                 <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>
-                  Cancel
+                  {t("modal.cancel")}
                 </Button>
-                <Button type="submit">Link Account</Button>
+                <Button type="submit">{t("modal.submit")}</Button>
               </div>
             </form>
           </div>

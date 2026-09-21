@@ -1,5 +1,6 @@
 import React from 'react';
 import { Users, Ban } from 'lucide-react';
+import { useTranslation } from '../../../../i18n';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
 
 /**
@@ -17,6 +18,7 @@ const LOAD_TONES = {
 };
 
 export function DepartmentWorkload({ rows = [] }) {
+  const { t } = useTranslation();
   return (
     <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs h-full">
       <header className="flex items-center justify-between mb-4">
@@ -56,7 +58,7 @@ export function DepartmentWorkload({ rows = [] }) {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[11px] font-medium text-slate-500">
-                      {row.openTasks}/{row.capacity} tasks
+                      {row.openTasks}/{row.capacity} {t('pms.tasks')}
                     </span>
                     <span
                       className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"

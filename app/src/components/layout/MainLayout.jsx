@@ -5,6 +5,8 @@ import Topbar from './Topbar';
 import { CommandPalette } from '../common/CommandPalette';
 import { FloatingSupportModal } from '../common/FloatingSupportModal';
 import { useAppStore } from '../../stores/appStore';
+import { localizeSystemMessage } from '../../i18n';
+import { useLanguageStore } from '../../stores/languageStore';
 
 // ERP-only UI scope: graph.json global-shell guidance applied purely as a
 // CSS class. CRM/HRMS routes never receive `erp-scope`, so their UI is
@@ -19,6 +21,9 @@ export default function MainLayout() {
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
   const { pathname } = useLocation();
   const isErpRoute = ERP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  // Global language drives system-feedback localization (toast). Known
+  // English system strings map to translation keys; anything else renders raw.
+  const currentLanguage = useLanguageStore((s) => s.currentLanguage);
 
   // Global keydown for Ctrl+K / Cmd+K
   useEffect(() => {
@@ -67,7 +72,7 @@ export default function MainLayout() {
       {/* Global Toast */}
       {toast && (
         <div className="toast">
-          {toast.msg}
+          {localizeSystemMessage(toast.msg, currentLanguage)}
         </div>
       )}
     </div>

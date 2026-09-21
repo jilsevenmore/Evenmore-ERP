@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus } from 'lucide-react';
+import { useTranslation } from '../../../i18n';
 import { PageHeader } from '../../../components/common/PageHeader';
 import { Button } from '../../../components/ui/Button';
 import {
@@ -29,6 +30,7 @@ const DEADLINE_WINDOW_DAYS = 7;
  * would hand useSyncExternalStore a new reference each render.
  */
 export default function PMSDashboard() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const projects = usePmsStore((s) => s.projects);
   const settings = usePmsStore((s) => s.settings);
@@ -68,7 +70,7 @@ export default function PMSDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="PMS Dashboard"
+        title={t('navigation.pmsDashboard')}
         subtitle="Executive overview of project health, department workload and delivery risk."
         actions={
           <Button icon={Plus} onClick={() => navigate('/pms/projects')}>

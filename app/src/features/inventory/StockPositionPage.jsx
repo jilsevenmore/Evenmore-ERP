@@ -6,9 +6,11 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Boxes, MapPin, Eye, ArrowLeftRight, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from '../../i18n';
 import { ItemStockDetailModal } from '../../components/common/ItemStockDetailModal';
 export const StockPositionPage = () => {
     const { items, calculateItemStock, formatCurrency } = useERP();
+    const { t } = useTranslation();
     const navigate = useNavigate();
     const [filterState, setFilterState] = useState('All');
     const [selectedItem, setSelectedItem] = useState(null);
@@ -50,7 +52,7 @@ export const StockPositionPage = () => {
     const columns = [
         {
             key: 'sku',
-            header: 'SKU Code',
+            header: t("inventory.sku"),
             width: '12%',
             render: (i) => (
               <button
@@ -63,7 +65,7 @@ export const StockPositionPage = () => {
         },
         {
             key: 'name',
-            header: 'Item Description',
+            header: t("common.description"),
             width: '22%',
             render: (i) => (
               <div>
@@ -92,7 +94,7 @@ export const StockPositionPage = () => {
         },
         {
             key: 'calculatedAvailable',
-            header: 'Available',
+            header: t("dashboard.available"),
             align: 'center',
             width: '11%',
             render: (i) => (
@@ -103,7 +105,7 @@ export const StockPositionPage = () => {
         },
         {
             key: 'calculatedReserved',
-            header: 'Sales Reserved',
+            header: t("inventory.reservedStock"),
             align: 'center',
             width: '11%',
             render: (i) => (
@@ -121,7 +123,7 @@ export const StockPositionPage = () => {
         },
         {
             key: 'totalValue',
-            header: 'Aggregate Asset Value',
+            header: t("inventory.stockValue"),
             align: 'right',
             width: '12%',
             render: (i) => {
@@ -135,7 +137,7 @@ export const StockPositionPage = () => {
         },
         {
             key: 'status',
-            header: 'Status',
+            header: t("table.status"),
             align: 'center',
             width: '10%',
             render: (i) => <StatusBadge status={i.status}/>,
@@ -145,7 +147,7 @@ export const StockPositionPage = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold text-[#1F2E4A] tracking-tight">
-            Stock Position & Movement Engine
+            {t("navigation.stockPosition")}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
             Dynamic inventory balance computed from verified physical movements, sales reservations, and RMA deductions.
@@ -157,7 +159,7 @@ export const StockPositionPage = () => {
             icon={ArrowLeftRight}
             onClick={() => navigate('/inventory/transfers')}
           >
-            Stock Transfers
+            {t("navigation.transfers")}
           </Button>
           <Button
             icon={ShoppingCart}
@@ -169,10 +171,10 @@ export const StockPositionPage = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <StatCard label="Total Tracked SKUs" value={items.length} icon={Boxes}/>
-        <StatCard label="Total Inventory Value" value={formatCurrency(Math.round(totalValue), { noDecimals: true })}/>
-        <StatCard label="Critical Depletions" value={criticalCount} trend={{ positive: false, text: 'Requires PO' }}/>
-        <StatCard label="Low Stock Warnings" value={lowCount} trend={{ positive: false, text: 'Nearing Reorder' }}/>
+        <StatCard label={t("dashboard.statSkusLive")} value={items.length} icon={Boxes}/>
+        <StatCard label={t("inventory.stockValue")} value={formatCurrency(Math.round(totalValue), { noDecimals: true })}/>
+        <StatCard label={t("status.critical")} value={criticalCount} trend={{ positive: false, text: 'Requires PO' }}/>
+        <StatCard label={t("dashboard.lowStockAlerts")} value={lowCount} trend={{ positive: false, text: 'Nearing Reorder' }}/>
       </div>
 
       {/* Filter tabs */}
@@ -184,7 +186,7 @@ export const StockPositionPage = () => {
           </button>))}
       </div>
 
-      <DataTable title="Physical Inventory & Stock Ledgers" columns={columns} data={filteredItems} keyExtractor={(i) => i.id} searchPlaceholder="Search SKU, item title or bin location..."/>
+      <DataTable title={t("navigation.stockInventory")} columns={columns} data={filteredItems} keyExtractor={(i) => i.id} searchPlaceholder={t("table.search")}/>
 
       {/* Item Stock Detail & Movement Modal */}
       {selectedItem && (<ItemStockDetailModal item={selectedItem} isOpen={!!selectedItem} onClose={() => setSelectedItem(null)}/>)}

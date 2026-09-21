@@ -1,6 +1,11 @@
 /**
  * Evenmore ERP — Statutory & Format Validation Utilities
+ *
+ * User-facing messages are localized via the frontend i18n store
+ * (non-hook `t`, resolved against the persisted language at call time).
+ * Codes/patterns (GSTIN, PAN, IFSC examples) stay unchanged.
  */
+import { t } from '../i18n';
 
 /**
  * Validates Indian 15-character GSTIN format
@@ -8,11 +13,11 @@
  * Example: 29AABCU8912E1ZB
  */
 export const validateGSTIN = (gstin) => {
-  if (!gstin) return { isValid: false, message: 'GSTIN is required' };
+  if (!gstin) return { isValid: false, message: t('validation.gstinRequired') };
   const clean = gstin.trim().toUpperCase();
   const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
   if (!gstinRegex.test(clean)) {
-    return { isValid: false, message: 'Invalid GSTIN format (e.g. 29AABCU8912E1ZB)' };
+    return { isValid: false, message: t('validation.invalidGSTIN') };
   }
   return { isValid: true, cleanValue: clean };
 };
@@ -23,11 +28,11 @@ export const validateGSTIN = (gstin) => {
  * Example: AABCU8912E
  */
 export const validatePAN = (pan) => {
-  if (!pan) return { isValid: false, message: 'PAN is required' };
+  if (!pan) return { isValid: false, message: t('validation.panRequired') };
   const clean = pan.trim().toUpperCase();
   const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
   if (!panRegex.test(clean)) {
-    return { isValid: false, message: 'Invalid PAN format (e.g. AABCU8912E)' };
+    return { isValid: false, message: t('validation.invalidPAN') };
   }
   return { isValid: true, cleanValue: clean };
 };
@@ -38,11 +43,11 @@ export const validatePAN = (pan) => {
  * Example: HDFC0001245
  */
 export const validateIFSC = (ifsc) => {
-  if (!ifsc) return { isValid: false, message: 'IFSC is required' };
+  if (!ifsc) return { isValid: false, message: t('validation.ifscRequired') };
   const clean = ifsc.trim().toUpperCase();
   const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
   if (!ifscRegex.test(clean)) {
-    return { isValid: false, message: 'Invalid IFSC format (e.g. HDFC0001245)' };
+    return { isValid: false, message: t('validation.invalidIFSC') };
   }
   return { isValid: true, cleanValue: clean };
 };
@@ -51,11 +56,11 @@ export const validateIFSC = (ifsc) => {
  * Validates Standard Email Address
  */
 export const validateEmail = (email) => {
-  if (!email) return { isValid: false, message: 'Email address is required' };
+  if (!email) return { isValid: false, message: t('validation.emailRequired') };
   const clean = email.trim().toLowerCase();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(clean)) {
-    return { isValid: false, message: 'Please enter a valid email address' };
+    return { isValid: false, message: t('validation.invalidEmail') };
   }
   return { isValid: true, cleanValue: clean };
 };
@@ -64,10 +69,10 @@ export const validateEmail = (email) => {
  * Validates 10-Digit Mobile Phone Number
  */
 export const validatePhone = (phone) => {
-  if (!phone) return { isValid: false, message: 'Phone number is required' };
+  if (!phone) return { isValid: false, message: t('validation.phoneRequired') };
   const clean = phone.replace(/[^0-9+]/g, '');
   if (clean.length < 10 || clean.length > 13) {
-    return { isValid: false, message: 'Phone number must be 10-12 digits' };
+    return { isValid: false, message: t('validation.invalidPhone') };
   }
   return { isValid: true, cleanValue: clean };
 };
@@ -76,11 +81,11 @@ export const validatePhone = (phone) => {
  * Validates 6-Digit Indian Pincode
  */
 export const validatePincode = (pincode) => {
-  if (!pincode) return { isValid: false, message: 'Postal Pincode is required' };
+  if (!pincode) return { isValid: false, message: t('validation.pincodeRequired') };
   const clean = String(pincode).trim();
   const pinRegex = /^[1-9][0-9]{5}$/;
   if (!pinRegex.test(clean)) {
-    return { isValid: false, message: 'Pincode must be 6 digits (e.g. 560100)' };
+    return { isValid: false, message: t('validation.invalidPincode') };
   }
   return { isValid: true, cleanValue: clean };
 };

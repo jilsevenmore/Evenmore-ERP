@@ -11,6 +11,7 @@ import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintQuotationModal } from '../../components/common/PrintQuotationModal';
+import { useTranslation } from '../../i18n';
 const quotationGuide = {
     title: 'Quotations & Estimates',
     subtitle: 'Commercial price proposals and direct 1-click conversion to Sales Orders.',
@@ -28,6 +29,7 @@ const quotationGuide = {
     workflow: ['Quotation Created', 'Customer Approval', 'Convert to Sales Order', 'Warehouse Dispatch', 'Invoiced'],
 };
 export const QuotationsPage = () => {
+    const { t } = useTranslation();
     const { customers, quotations, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
@@ -118,7 +120,7 @@ export const QuotationsPage = () => {
     };
     const columns = [
         {
-            header: 'Quote #',
+            header: t("sales.quotationNumber"),
             accessor: 'quoteNumber',
             width: '18%',
             render: (q) => (
@@ -131,7 +133,7 @@ export const QuotationsPage = () => {
             ),
         },
         {
-            header: 'Customer',
+            header: t("common.customer"),
             accessor: 'customer',
             width: '24%',
             render: (q) => (
@@ -142,7 +144,7 @@ export const QuotationsPage = () => {
             ),
         },
         {
-            header: 'Items',
+            header: t("inventory.item"),
             width: '14%',
             render: (q) => (
               <span className="text-xs text-muted">
@@ -151,7 +153,7 @@ export const QuotationsPage = () => {
             ),
         },
         {
-            header: 'Total Value',
+            header: t("common.total"),
             accessor: 'amount',
             align: 'right',
             width: '16%',
@@ -162,14 +164,14 @@ export const QuotationsPage = () => {
             ),
         },
         {
-            header: 'Status',
+            header: t("table.status"),
             accessor: 'status',
             align: 'center',
             width: '14%',
             render: (q) => <StatusBadge status={q.status}/>,
         },
         {
-            header: 'Actions',
+            header: t("table.actions"),
             align: 'right',
             width: '14%',
             render: (q) => (
@@ -236,8 +238,8 @@ export const QuotationsPage = () => {
         handleCloseCreateModal();
     };
     return (<div className="space-y-6">
-      <PageHeader title="Quotations & Estimates" subtitle="Generate pricing estimates and convert approved quotes directly into confirmed Sales Orders." guide={quotationGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
-            New Quotation
+      <PageHeader title={t("navigation.quotations")} subtitle="Generate pricing estimates and convert approved quotes directly into confirmed Sales Orders." guide={quotationGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
+            {t("header.new")}
           </Button>}/>
 
       {leadRequest && (
@@ -251,12 +253,12 @@ export const QuotationsPage = () => {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard label="Total Quotations" value={quotations.length} icon={FileText}/>
+        <StatCard label={t("dashboard.quotations")} value={quotations.length} icon={FileText}/>
         <StatCard label="Estimated Pipeline Value" value={formatCurrency(totalPipeline)}/>
         <StatCard label="Confirmed Conversion" value={`${quotations.filter((q) => q.status === 'Confirmed' || q.status === 'Invoiced').length} Quotes`} trend={{ positive: true, text: 'Direct SO conversion' }}/>
       </div>
 
-      <DataTable title="Quotation Register" data={quotations} columns={columns} keyExtractor={(q) => q.id} searchPlaceholder="Search quotations..." searchFilter={(q, term) => q.quoteNumber.toLowerCase().includes(term) ||
+      <DataTable title={t("navigation.quotations")} data={quotations} columns={columns} keyExtractor={(q) => q.id} searchPlaceholder={t("table.search")} searchFilter={(q, term) => q.quoteNumber.toLowerCase().includes(term) ||
             q.customer.toLowerCase().includes(term) ||
             q.status.toLowerCase().includes(term)}/>
 
@@ -337,7 +339,7 @@ export const QuotationsPage = () => {
               <label className="block font-semibold text-slate-700">Terms & Conditions<textarea rows="3" value={terms} onChange={event => setTerms(event.target.value)} placeholder="Payment terms, validity and delivery conditions" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
-                  Cancel
+                  {t("modal.cancel")}
                 </Button>
                 <Button type="submit">
                   Generate Quotation
@@ -410,7 +412,7 @@ export const QuotationsPage = () => {
                     Convert to Sales Order
                   </Button>)}
                 <Button variant="outline" onClick={() => setSelectedQuote(null)}>
-                  Close
+                  {t("modal.close")}
                 </Button>
               </div>
             </div>

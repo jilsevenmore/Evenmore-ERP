@@ -10,6 +10,7 @@ import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintBillModal } from '../../components/common/PrintBillModal';
+import { useTranslation } from '../../i18n';
 const purchaseBillGuide = {
     title: 'Purchase Bills & Accounts Payable',
     subtitle: 'Supplier invoice intake, 3-way matching audit, inventory replenishment, and disbursements.',

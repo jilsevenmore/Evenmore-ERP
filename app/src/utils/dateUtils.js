@@ -127,6 +127,29 @@ export function toDisplayDate(input) {
   return `${d}-${m}-${y}`;
 }
 
+// ── Locale-aware presentation (frontend i18n) ────────────────────────
+// Stored values are never changed — only the displayed string follows the
+// display language via Intl. en → en-IN, hi → hi-IN, gu → gu-IN.
+const DISPLAY_LOCALES = {
+  en: 'en-IN',
+  hi: 'hi-IN',
+  gu: 'gu-IN',
+};
+
+/** Presentation-only localized date, e.g. "21 Sep 2026" / "21 सित॰ 2026". */
+export function toDisplayDateLocalized(input, lang = 'en', options) {
+  const iso = toISODate(input);
+  if (!iso) return String(input || '');
+  const locale = DISPLAY_LOCALES[lang] || 'en-IN';
+  const d = new Date(`${iso}T00:00:00`);
+  if (isNaN(d.getTime())) return toDisplayDate(input);
+  try {
+    return new Intl.DateTimeFormat(locale, options || { day: 'numeric', month: 'short', year: 'numeric' }).format(d);
+  } catch {
+    return toDisplayDate(input);
+  }
+}
+
 /** Whole days between two dates (b - a). Uses ISO strings; safe for aging buckets. */
 export function daysBetween(a, b) {
   const aIso = toISODate(a);

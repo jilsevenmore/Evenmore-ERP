@@ -1,8 +1,10 @@
 import { StatCard } from '../../components/ui/StatCard';
-import { StatusBadge } from '../../components/ui/StatusBadge';
+import { StatusBadge, translateStatus } from '../../components/ui/StatusBadge';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Link } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
+import { useTranslation } from '../../i18n';
+import { toDisplayDateLocalized } from '../../utils/dateUtils';
 // ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
 // Before (kept for reference if the CRM dashboard panel is ever re-added):
 // import { dashboardData } from '../../data/crm/dashboardData';
@@ -53,6 +55,7 @@ const CARD_STYLES = {
 
 export const DashboardPage = () => {
   const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock } = useERP();
+  const { t, currentLanguage } = useTranslation();
   // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──
   // Before (kept for reference): dashboardData.leadsOverview, dashboardData.taskStatus drove
   //   the chart + donut. Now we chart invoice revenue over the last 6 months and show
@@ -75,18 +78,18 @@ export const DashboardPage = () => {
     .filter((inv) => monthKey(inv.date) === mk || monthKey(inv.dueDate) === mk)
     .reduce((sum, inv) => sum + (Number(inv.total ?? inv.amount) || 0), 0));
   const overview = {
-    headline: `${invoices.length} tax invoices booked across the last 6 months`,
-    period: 'Last 6 Months',
-    summary: 'Invoiced value trend by month. Filter or open Sales > Invoices for details.',
+    headline: t('dashboard.revenueHeadline', { count: invoices.length }),
+    period: t('dashboard.last6Months'),
+    summary: t('dashboard.revenueSummary'),
     series: last6Months.map((mk, i) => ({ month: mk.split('-')[1], value: revenueByMonth[i] })),
   };
   const chart = buildChart(revenueByMonth, 620, 260, 28);
   const invoiceStatusMap = {
-    Paid: { label: 'Paid', color: '#1bb878' },
-    Unpaid: { label: 'Unpaid', color: '#1f6bff' },
-    Overdue: { label: 'Overdue', color: '#ef9b06' },
-    Cancelled: { label: 'Cancelled', color: '#ef4444' },
-    Draft: { label: 'Draft', color: '#94a3b8' },
+    Paid: { label: t('sales.paid'), color: '#1bb878' },
+    Unpaid: { label: t('sales.unpaid'), color: '#1f6bff' },
+    Overdue: { label: t('status.overdue'), color: '#ef9b06' },
+    Cancelled: { label: t('common.cancelled'), color: '#ef4444' },
+    Draft: { label: t('common.draft'), color: '#94a3b8' },
   };
   const taskStatus = Object.entries(invoiceStatusMap)
     .map(([key, meta]) => ({
@@ -111,9 +114,9 @@ export const DashboardPage = () => {
   const recentActivity = invoices.slice(0, 3).map((inv) => ({
     icon: invoices.length ? 'check' : 'task',
     tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
-    title: inv.customer || 'Customer',
-    person: `${inv.invoiceNumber} • ${inv.status}`,
-    time: inv.date,
+    title: inv.customer || t('common.customer'),
+    person: `${inv.invoiceNumber} • ${translateStatus(inv.status, t)}`,
+    time: toDisplayDateLocalized(inv.date, currentLanguage),
   }));
   const enriched = items.map((itm) => {
     const calc = calculateItemStock(itm.id);
@@ -141,15 +144,15 @@ export const DashboardPage = () => {
   const modules = [
     // ── [PHASE-1-DASHBOARD] CRM module card now counts ERP quotations (was: leads) ──
     // Old: { label: 'CRM', desc: `${leads.length} Leads | Deals | Tasks`, ... count: leads.length, tag: 'Leads' }
-    { label: 'CRM', desc: `${quotations.length} Quotes | Deals | Tasks`, to: '/crm/dashboard', icon: Target, tone: 'blue', count: quotations.length, tag: 'Quotes' },
-    { label: 'Sales', desc: `${salesOrders.length} Orders | ${quotations.length} Quotes | ${invoices.length} Invoices`, to: '/sales/quotations', icon: TrendingUp, tone: 'green', count: salesOrders.length, tag: 'Orders' },
-    { label: 'Purchase', desc: `${purchaseOrders.length} Orders | ${purchaseBills.length} Bills`, to: '/purchase/orders', icon: Truck, tone: 'amber', count: purchaseOrders.length, tag: 'POs' },
-    { label: 'Inventory', desc: `${items.length} SKUs | ${lowStockItems.length} Low Stock`, to: '/inventory/items', icon: Package, tone: 'purple', count: items.length, tag: 'SKUs' },
-    { label: 'Parties', desc: `${parties.length} Parties | ${customers.length} Customers`, to: '/parties', icon: Building2, tone: 'teal', count: parties.length, tag: 'Parties' },
-    { label: 'Accounts', desc: `Bank $${Math.round(bankBalance).toLocaleString()} | ${invoices.length} Invoices`, to: '/accounts/cash-bank', icon: Wallet, tone: 'blue', count: bankAccounts.length, tag: 'Accounts' },
-    { label: 'HRMS', desc: 'Employees | Attendance | Payroll', to: '/hrms/dashboard', icon: UserCheck, tone: 'green', count: 48, tag: 'Staff' },
-    { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', count: 12, tag: 'Reports' },
-    { label: 'Administration', desc: 'Users | Roles | Settings', to: '/administration/users', icon: Shield, tone: 'amber', count: 3, tag: 'Admin' },
+    { label: t('navigation.crm'), desc: `${quotations.length} ${t('dashboard.tagQuotes')} | ${t('crm.deals')} | ${t('crm.tasks')}`, to: '/crm/dashboard', icon: Target, tone: 'blue', count: quotations.length, tag: t('dashboard.tagQuotes') },
+    { label: t('navigation.sales'), desc: `${salesOrders.length} ${t('dashboard.tagOrders')} | ${quotations.length} ${t('dashboard.tagQuotes')} | ${invoices.length} ${t('dashboard.linkInvoices')}`, to: '/sales/quotations', icon: TrendingUp, tone: 'green', count: salesOrders.length, tag: t('dashboard.tagOrders') },
+    { label: t('navigation.purchase'), desc: `${purchaseOrders.length} ${t('dashboard.tagOrders')} | ${purchaseBills.length} ${t('dashboard.linkInvoices')}`, to: '/purchase/orders', icon: Truck, tone: 'amber', count: purchaseOrders.length, tag: t('dashboard.tagPOs') },
+    { label: t('navigation.inventory'), desc: `${items.length} ${t('dashboard.tagSKUs')} | ${lowStockItems.length} ${t('dashboard.lowStock')}`, to: '/inventory/items', icon: Package, tone: 'purple', count: items.length, tag: t('dashboard.tagSKUs') },
+    { label: t('navigation.parties'), desc: `${parties.length} ${t('dashboard.tagParties')} | ${customers.length} ${t('crm.customers')}`, to: '/parties', icon: Building2, tone: 'teal', count: parties.length, tag: t('dashboard.tagParties') },
+    { label: t('navigation.accounts'), desc: `${t('finance.bank')} $${Math.round(bankBalance).toLocaleString()} | ${invoices.length} ${t('dashboard.linkInvoices')}`, to: '/accounts/cash-bank', icon: Wallet, tone: 'blue', count: bankAccounts.length, tag: t('dashboard.tagAccounts') },
+    { label: t('navigation.hrms'), desc: `${t('hr.employees')} | ${t('hr.attendance')} | ${t('hr.payroll')}`, to: '/hrms/dashboard', icon: UserCheck, tone: 'green', count: 48, tag: t('dashboard.tagStaff') },
+    { label: t('navigation.reports'), desc: `${t('navigation.sales')} | ${t('inventory.stock')} | ${t('navigation.financialReports')}`, to: '/reports', icon: PieChart, tone: 'pink', count: 12, tag: t('dashboard.tagReports') },
+    { label: t('navigation.administration'), desc: `${t('navigation.users')} | ${t('navigation.roles')} | ${t('common.settings')}`, to: '/administration/users', icon: Shield, tone: 'amber', count: 3, tag: t('dashboard.tagAdmin') },
   ];
 
   const fmt = (n) => Number(n || 0).toLocaleString();
@@ -157,21 +160,21 @@ export const DashboardPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Unified Business Dashboard"
-        subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration"
+        title={t("dashboard.unifiedTitle")}
+        subtitle={t("dashboard.unifiedSubtitle")}
         actions={
           <div className="flex items-center gap-2.5">
             <Link
               to="/crm/dashboard"
               className="px-3.5 py-2 bg-card border border-border hover:bg-soft text-text rounded-xl text-xs font-semibold shadow-2xs transition"
             >
-              CRM Dashboard
+              {t("dashboard.crmDashboard")}
             </Link>
             <Link
               to="/crm/leads"
               className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
             >
-              + New Lead
+              {t("dashboard.newLead")}
             </Link>
           </div>
         }
@@ -179,23 +182,23 @@ export const DashboardPage = () => {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* [PHASE-1-DASHBOARD] "Total Leads" stat card replaced with ERP Totals */}
         {/* Old: <StatCard label="Total Leads" value={fmt(leads.length + 238)} icon={Target} tone="blue" trend="12%" trendDirection="up" note="vs last month" /> */}
-        <StatCard label="Quotations" value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note="challans issued" />
-        <StatCard label="Sales Orders" value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note="order value" />
-        <StatCard label="Invoices Value" value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />
-        <StatCard label="Purchase Orders" value={fmt(purchaseOrders.length)} icon={ClipboardList} tone="amber" trend={`${fmt(Math.round(purchaseTotal / 1000))}k`} note="purchase value" />
-        <StatCard label="Stock Value" value={`₹${fmt(Math.round(totalStockValue))}`} icon={Package} tone="teal" trend={`${fmt(lowStockItems.length)}`} note="low stock" />
-        <StatCard label="Bank Balance" value={`₹${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note="net flow" />
+        <StatCard label={t("dashboard.quotations")} value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note={t("dashboard.challansIssued")} />
+        <StatCard label={t("dashboard.salesOrders")} value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note={t("dashboard.orderValue")} />
+        <StatCard label={t("dashboard.invoicesValue")} value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note={t("dashboard.invoices")} />
+        <StatCard label={t("dashboard.purchaseOrders")} value={fmt(purchaseOrders.length)} icon={ClipboardList} tone="amber" trend={`${fmt(Math.round(purchaseTotal / 1000))}k`} note={t("dashboard.purchaseValue")} />
+        <StatCard label={t("dashboard.stockValue")} value={`₹${fmt(Math.round(totalStockValue))}`} icon={Package} tone="teal" trend={`${fmt(lowStockItems.length)}`} note={t("dashboard.lowStock")} />
+        <StatCard label={t("dashboard.bankBalance")} value={`₹${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note={t("dashboard.netFlow")} />
       </div>
 
       {/* All Modules Directory Grid */}
       <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="font-bold text-text text-sm">All Enterprise Modules</h3>
-            <p className="text-[11px] text-muted">Direct single-click access across all unified modules</p>
+            <h3 className="font-bold text-text text-sm">{t("dashboard.allModules")}</h3>
+            <p className="text-[11px] text-muted">{t("dashboard.modulesAccessDesc")}</p>
           </div>
           <Link to="/reports" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-            <span>View Reports</span>
+            <span>{t("dashboard.viewReports")}</span>
             <ArrowRight size={13} />
           </Link>
         </div>
@@ -238,12 +241,12 @@ export const DashboardPage = () => {
           {/* ── [PHASE-1-DASHBOARD] was: {dashboardData.stats.map((stat) => {...})} ──
               CRM stat cards (leads/tasks pipeline) replaced with live ERP stats below. */}
           {[
-            { label: 'Invoices (PKG)', value: fmt(invoices.length), icon: 'file', tone: 'blue', trend: `${fmt(Math.round(invoiceTotal))}`, note: 'billed value' },
-            { label: 'SO Orders', value: fmt(salesOrders.length), icon: 'users', tone: 'green', trend: `${fmt(Math.round(salesTotal))}`, note: 'order value' },
-            { label: 'Purchase Bills', value: fmt(purchaseBills.length), icon: 'building', tone: 'amber', trend: `${fmt(Math.round(billTotal))}`, note: 'bill value' },
-            { label: 'Payments In', value: fmt(paymentIns.length), icon: 'check', tone: 'purple', trend: `${fmt(Math.round(paymentInTotal))}`, note: 'received' },
-            { label: 'Payments Out', value: fmt(paymentOuts.length), icon: 'users', tone: 'teal', trend: `${fmt(Math.round(paymentOutTotal))}`, note: 'paid' },
-            { label: 'Expenses', value: fmt(expenses.length), icon: 'bars', tone: 'pink', trend: `${fmt(Math.round(expenseTotal))}`, note: 'mt expense' },
+            { label: t('dashboard.statInvoicesPkg'), value: fmt(invoices.length), icon: 'file', tone: 'blue', trend: `${fmt(Math.round(invoiceTotal))}`, note: t('dashboard.billedValue') },
+            { label: t('dashboard.statSoOrders'), value: fmt(salesOrders.length), icon: 'users', tone: 'green', trend: `${fmt(Math.round(salesTotal))}`, note: t('dashboard.orderValue') },
+            { label: t('dashboard.statPurchaseBills'), value: fmt(purchaseBills.length), icon: 'building', tone: 'amber', trend: `${fmt(Math.round(billTotal))}`, note: t('dashboard.billValue') },
+            { label: t('dashboard.statPayIn'), value: fmt(paymentIns.length), icon: 'check', tone: 'purple', trend: `${fmt(Math.round(paymentInTotal))}`, note: t('dashboard.receivedNote') },
+            { label: t('dashboard.statPayOut'), value: fmt(paymentOuts.length), icon: 'users', tone: 'teal', trend: `${fmt(Math.round(paymentOutTotal))}`, note: t('dashboard.paidNote') },
+            { label: t('dashboard.statExpenses'), value: fmt(expenses.length), icon: 'bars', tone: 'pink', trend: `${fmt(Math.round(expenseTotal))}`, note: t('dashboard.mtExpense') },
           ].map((stat) => {
             const Icon = ICONS[stat.icon] || Users;
             const style = CARD_STYLES[stat.tone] || CARD_STYLES.blue;
@@ -272,9 +275,9 @@ export const DashboardPage = () => {
             <div className="dashboard-stat-top">
               <span className="dashboard-stat-icon" style={{ background: CARD_STYLES.green.bg, color: CARD_STYLES.green.fg }}><FileText size={24} /></span>
               {/* ── [PHASE-1-DASHBOARD] was: {fmt(quotations.length + 64)} — removed demo +64 offset ── */}
-              <div className="dashboard-stat-copy"><strong>{fmt(quotations.length)}</strong><span>Quotations</span></div>
+              <div className="dashboard-stat-copy"><strong>{fmt(quotations.length)}</strong><span>{t("dashboard.quotations")}</span></div>
             </div>
-            <small className="dashboard-stat-trend"><TrendingUp size={14} /><b>100%</b><em>live count</em></small>
+            <small className="dashboard-stat-trend"><TrendingUp size={14} /><b>100%</b><em>{t("dashboard.liveCount")}</em></small>
           </article>
           <article className="dashboard-stat">
             <div className="dashboard-stat-top">
@@ -283,13 +286,13 @@ export const DashboardPage = () => {
               </span>
               <div className="dashboard-stat-copy">
                 <strong>{fmt(items.length)}</strong>
-                <span>SKUs Live</span>
+                <span>{t("dashboard.statSkusLive")}</span>
               </div>
             </div>
             <small className="dashboard-stat-trend">
               <TrendingUp size={14} />
               <b>{fmt(lowStockItems.length)}</b>
-              <em>need reorder</em>
+              <em>{t("dashboard.needReorder")}</em>
             </small>
           </article>
         </div>
@@ -297,7 +300,7 @@ export const DashboardPage = () => {
         <div className="dashboard-main-grid">
           <section className="dashboard-panel dashboard-chart-card">
             <div className="panel-head panel-head-spread">
-              <div><h3>Revenue Overview</h3><p>{overview.headline}</p></div>
+              <div><h3>{t("dashboard.revenueOverview")}</h3><p>{overview.headline}</p></div>
               <button type="button" className="dashboard-filter-btn">{overview.period}</button>
             </div>
             <div className="chart-wrap">
@@ -329,17 +332,17 @@ export const DashboardPage = () => {
             </div>
             <p className="chart-note">{overview.summary}</p>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-              <Link to="/sales/quotes" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Quotes: {fmt(quotations.length)}</Link>
-              <Link to="/sales/invoices" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Invoices: {fmt(invoices.length)}</Link>
-              <Link to="/sales/challans" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Challans: {fmt(deliveryChallans.length)}</Link>
-              <Link to="/sales/orders" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition flex items-center justify-center gap-1.5"><Settings size={12} className="text-primary" /> Orders: {fmt(salesOrders.length)}</Link>
+              <Link to="/sales/quotes" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">{t("dashboard.linkQuotes")}: {fmt(quotations.length)}</Link>
+              <Link to="/sales/invoices" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">{t("dashboard.linkInvoices")}: {fmt(invoices.length)}</Link>
+              <Link to="/sales/challans" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">{t("dashboard.linkChallans")}: {fmt(deliveryChallans.length)}</Link>
+              <Link to="/sales/orders" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition flex items-center justify-center gap-1.5"><Settings size={12} className="text-primary" /> {t("dashboard.linkOrders")}: {fmt(salesOrders.length)}</Link>
             </div>
           </section>
 
           <section className="dashboard-panel dashboard-donut-card">
             <div className="panel-head panel-head-spread">
-              <div><h3>Invoice Status</h3><p>Billing distribution.</p></div>
-              <Link to="/sales/invoices" className="view-all-link">View All</Link>
+              <div><h3>{t("dashboard.invoiceStatus")}</h3><p>{t("dashboard.billingDist")}</p></div>
+              <Link to="/sales/invoices" className="view-all-link">{t("common.viewAll")}</Link>
             </div>
             <div className="donut-layout">
               <div className="donut-chart">
@@ -349,7 +352,7 @@ export const DashboardPage = () => {
                     <path key={item.key} d={item.path} stroke={item.color} strokeWidth="22" strokeLinecap="round" fill="none" />
                   ))}
                 </svg>
-                <div className="donut-center"><strong>{completedPct}%</strong><span>Paid</span></div>
+                <div className="donut-center"><strong>{completedPct}%</strong><span>{t("sales.paid")}</span></div>
               </div>
               <div className="donut-legend">
                 {/* ── [PHASE-1-DASHBOARD] was: dashboardData.taskStatus.map(...) — now ERP taskStatus ── */}
@@ -393,11 +396,11 @@ export const DashboardPage = () => {
         <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-text text-sm">Low-Stock Alerts</h3>
-              <p className="text-[11px] text-muted">Items below safety reorder threshold</p>
+              <h3 className="font-bold text-text text-sm">{t("dashboard.lowStockAlerts")}</h3>
+              <p className="text-[11px] text-muted">{t("dashboard.belowThreshold")}</p>
             </div>
             <Link to="/inventory/stock-position" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-              <span>View All</span>
+              <span>{t("common.viewAll")}</span>
               <ArrowRight size={13} />
             </Link>
           </div>
@@ -407,10 +410,10 @@ export const DashboardPage = () => {
               <thead>
                 <tr className="border-b border-border text-muted uppercase tracking-wider font-bold text-[10px]">
                   <th className="py-2.5 px-3">SKU</th>
-                  <th className="py-2.5 px-3">Product</th>
-                  <th className="py-2.5 px-3 text-center">Available</th>
-                  <th className="py-2.5 px-3 text-center">Status</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+                  <th className="py-2.5 px-3">{t("common.product")}</th>
+                  <th className="py-2.5 px-3 text-center">{t("dashboard.available")}</th>
+                  <th className="py-2.5 px-3 text-center">{t("table.status")}</th>
+                  <th className="py-2.5 px-3 text-right">{t("table.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
@@ -429,7 +432,7 @@ export const DashboardPage = () => {
                         to="/purchase/orders"
                         className="inline-flex items-center justify-center px-3 py-1 bg-primary text-white hover:bg-primary-hover rounded-lg text-[11px] font-semibold shadow-2xs transition"
                       >
-                        Order
+                        {t("dashboard.orderAction")}
                       </Link>
                     </td>
                   </tr>
@@ -437,7 +440,7 @@ export const DashboardPage = () => {
                 {lowStockItems.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-6 text-center text-muted">
-                      All inventory levels are healthy and stocked.
+                      {t("dashboard.allHealthy")}
                     </td>
                   </tr>
                 )}
@@ -447,17 +450,17 @@ export const DashboardPage = () => {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4 text-xs font-semibold">
             <Link to="/inventory/items" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition">
-              Items: {fmt(items.length)}
+              {t("dashboard.linkItems")}: {fmt(items.length)}
             </Link>
             <Link to="/inventory/transfers" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition">
-              Transfers: {fmt(transfers.length)}
+              {t("dashboard.linkTransfers")}: {fmt(transfers.length)}
             </Link>
             <Link to="/inventory/faulty-parts" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition">
-              Faulty: {fmt(openFaulty)}
+              {t("dashboard.linkFaulty")}: {fmt(openFaulty)}
             </Link>
             <Link to="/inventory/locations" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition flex items-center justify-center gap-1">
               <MapPin size={12} />
-              <span>Locations</span>
+              <span>{t("dashboard.linkLocations")}</span>
             </Link>
           </div>
         </div>
@@ -467,11 +470,11 @@ export const DashboardPage = () => {
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="font-bold text-text text-sm">Sales Snapshot</h3>
-                <p className="text-[11px] text-muted">Orders + Invoices + Challans</p>
+                <h3 className="font-bold text-text text-sm">{t("dashboard.salesSnapshot")}</h3>
+                <p className="text-[11px] text-muted">{t("dashboard.salesSnapDesc")}</p>
               </div>
               <Link to="/sales/orders" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                <span>View All</span>
+                <span>{t("common.viewAll")}</span>
                 <ArrowRight size={13} />
               </Link>
             </div>
@@ -491,11 +494,11 @@ export const DashboardPage = () => {
           <div>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h3 className="font-bold text-text text-sm">Purchase Snapshot</h3>
-                <p className="text-[11px] text-muted">POs + Bills + Expenses</p>
+                <h3 className="font-bold text-text text-sm">{t("dashboard.purchaseSnapshot")}</h3>
+                <p className="text-[11px] text-muted">{t("dashboard.purchaseSnapDesc")}</p>
               </div>
               <Link to="/purchase/orders" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                <span>View All</span>
+                <span>{t("common.viewAll")}</span>
                 <ArrowRight size={13} />
               </Link>
             </div>
@@ -513,19 +516,19 @@ export const DashboardPage = () => {
           </div>
           <div className="pt-3 border-t border-border grid grid-cols-2 gap-2 text-xs font-semibold">
             <Link to="/sales/invoices" className="px-3 py-2 rounded-xl bg-primary text-white text-center shadow-2xs hover:bg-primary/90 transition">
-              Invoices ₹{fmt(Math.round(invoiceTotal))}
+              {t("dashboard.linkInvoices")} ₹{fmt(Math.round(invoiceTotal))}
             </Link>
             <Link to="/purchase/bills" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              Bills ₹{fmt(Math.round(billTotal))}
+              {t("purchase.purchaseBill")} ₹{fmt(Math.round(billTotal))}
             </Link>
             <Link to="/sales/payments" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              PayIn ₹{fmt(Math.round(paymentInTotal))}
+              {t("dashboard.linkPayIn")} ₹{fmt(Math.round(paymentInTotal))}
             </Link>
             <Link to="/purchase/payments" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              PayOut ₹{fmt(Math.round(paymentOutTotal))}
+              {t("dashboard.linkPayOut")} ₹{fmt(Math.round(paymentOutTotal))}
             </Link>
             <Link to="/purchase/expenses" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center col-span-2 transition">
-              Expenses ₹{fmt(Math.round(expenseTotal))} • Challans {fmt(deliveryChallans.length)} • Returns {fmt(salesReturns.length)}
+              {t("dashboard.linkExpenses")} ₹{fmt(Math.round(expenseTotal))} • {t("dashboard.linkChallans")} {fmt(deliveryChallans.length)} • {t("dashboard.linkReturns")} {fmt(salesReturns.length)}
             </Link>
           </div>
         </div>
@@ -536,32 +539,32 @@ export const DashboardPage = () => {
         <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-bold text-text text-sm">Parties</h3>
-              <p className="text-[11px] text-muted">Customers + Vendors</p>
+              <h3 className="font-bold text-text text-sm">{t("navigation.parties")}</h3>
+              <p className="text-[11px] text-muted">{t("dashboard.partiesDesc")}</p>
             </div>
             <Link to="/parties" className="text-xs font-bold text-primary hover:underline">
-              View All
+              {t("common.viewAll")}
             </Link>
           </div>
           <div className="space-y-2 text-xs font-semibold">
             <Link to="/crm/customers" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold">
                 <Users size={14} className="text-primary" />
-                <span>Customers</span>
+                <span>{t("crm.customers")}</span>
               </span>
               <strong className="text-text">{fmt(customers.length)}</strong>
             </Link>
             <Link to="/parties" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold">
                 <Building2 size={14} className="text-primary" />
-                <span>Vendors</span>
+                <span>{t("common.vendorsLabel")}</span>
               </span>
               <strong className="text-text">{fmt(vendors.length)}</strong>
             </Link>
             <Link to="/parties" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold">
                 <BriefcaseBusiness size={14} className="text-primary" />
-                <span>All Parties</span>
+                <span>{t("dashboard.allParties")}</span>
               </span>
               <strong className="text-text">{fmt(parties.length)}</strong>
             </Link>
@@ -571,34 +574,34 @@ export const DashboardPage = () => {
         <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-bold text-text text-sm">Accounts</h3>
-              <p className="text-[11px] text-muted">Cash + Ledger + Reports</p>
+              <h3 className="font-bold text-text text-sm">{t("navigation.accounts")}</h3>
+              <p className="text-[11px] text-muted">{t("dashboard.accountsDesc")}</p>
             </div>
             <Link to="/accounts/cash-bank" className="text-xs font-bold text-primary hover:underline">
-              View All
+              {t("common.viewAll")}
             </Link>
           </div>
           <div className="space-y-2 text-xs font-semibold">
             <Link to="/accounts/cash-bank" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold text-text">
                 <Landmark size={14} className="text-primary" />
-                <span>Bank Balance</span>
+                <span>{t("dashboard.bankBalance")}</span>
               </span>
               <strong className="text-text font-mono font-bold">₹{fmt(Math.round(bankBalance))}</strong>
             </Link>
             <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold text-text">
                 <FileText size={14} className="text-primary" />
-                <span>General Ledger</span>
+                <span>{t("navigation.generalLedger")}</span>
               </span>
-              <span className="text-primary text-xs font-bold">Open →</span>
+              <span className="text-primary text-xs font-bold">{t("common.open")} →</span>
             </Link>
             <Link to="/accounts/reports" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold text-text">
                 <PieChart size={14} className="text-primary" />
-                <span>Financial Reports</span>
+                <span>{t("navigation.financialReports")}</span>
               </span>
-              <span className="text-primary text-xs font-bold">View →</span>
+              <span className="text-primary text-xs font-bold">{t("common.view")} →</span>
             </Link>
           </div>
         </div>
@@ -606,44 +609,44 @@ export const DashboardPage = () => {
         <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-bold text-text text-sm">HRMS + Admin</h3>
-              <p className="text-[11px] text-muted">People + Settings</p>
+              <h3 className="font-bold text-text text-sm">{t("dashboard.hrmsAdmin")}</h3>
+              <p className="text-[11px] text-muted">{t("dashboard.peopleSettings")}</p>
             </div>
             <Link to="/hrms/dashboard" className="text-xs font-bold text-primary hover:underline">
-              HRMS
+              {t("navigation.hrms")}
             </Link>
           </div>
           <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
             <Link to="/hrms/employees" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              Employees
+              {t("hr.employees")}
             </Link>
             <Link to="/hrms/attendance" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              Attendance
+              {t("hr.attendance")}
             </Link>
             <Link to="/hrms/leave" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              Leave
+              {t("hr.leave")}
             </Link>
             <Link to="/hrms/payroll" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              Payroll
+              {t("hr.payroll")}
             </Link>
             <Link to="/administration/users" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              Users
+              {t("navigation.users")}
             </Link>
             <Link to="/administration/settings" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
-              Settings
+              {t("common.settings")}
             </Link>
           </div>
           <div className="mt-3 flex items-center gap-2 text-xs font-semibold">
             <Link to="/crm/user-allocation" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
               <ListChecks size={13} className="text-primary" />
-              <span>Allocation</span>
+              <span>{t("navigation.taskAllocation")}</span>
             </Link>
             <Link to="/inventory/zone-requests" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
-              <span>Zone Requests ({pendingZoneReqs})</span>
+              <span>{t("navigation.zoneRequests")} ({pendingZoneReqs})</span>
             </Link>
             <Link to="/inventory/transfers" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
               <ArrowLeftRight size={13} className="text-primary" />
-              <span>Transfers ({pendingTransfers})</span>
+              <span>{t("navigation.transfers")} ({pendingTransfers})</span>
             </Link>
           </div>
         </div>

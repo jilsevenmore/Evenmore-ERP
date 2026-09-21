@@ -1,11 +1,13 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { useTranslation } from '../../i18n';
 
 /**
  * Modal — CRM-styled modal dialog.
  * Props: isOpen, onClose, title, children, footer, size ('md'|'lg'|'xl')
  */
 export function Modal({ isOpen, onClose, title, subtitle, children, footer, size = 'md' }) {
+  const { t } = useTranslation();
   // Close on Escape
   useEffect(() => {
     if (!isOpen) return;
@@ -36,7 +38,7 @@ export function Modal({ isOpen, onClose, title, subtitle, children, footer, size
               type="button"
               className="modal-close"
               onClick={onClose}
-              aria-label="Close modal"
+              aria-label={t("table.closeModal")}
             >
               <X size={18} />
             </button>

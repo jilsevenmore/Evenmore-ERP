@@ -40,6 +40,21 @@ const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDas
 const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
 const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
 
+// ── Manufacturing (Lazy Loaded) ─────────────────────────────
+const ManufacturingOverviewPage = lazy(() => import('../features/manufacturing/ManufacturingOverviewPage'));
+const ManufacturingProjectsPage = lazy(() => import('../features/manufacturing/ManufacturingProjectsPage'));
+const BomVersionsPage = lazy(() => import('../features/manufacturing/BomVersionsPage'));
+const MaterialPlanningPage = lazy(() => import('../features/manufacturing/MaterialPlanningPage'));
+const MaterialIssuePage = lazy(() => import('../features/manufacturing/MaterialIssuePage'));
+const MaterialConsumptionPage = lazy(() => import('../features/manufacturing/MaterialConsumptionPage'));
+const ProductionTasksPage = lazy(() => import('../features/manufacturing/ProductionTasksPage'));
+const LabourCostPage = lazy(() => import('../features/manufacturing/LabourCostPage'));
+const ProductionCostPage = lazy(() => import('../features/manufacturing/ProductionCostPage'));
+const BatchManagementPage = lazy(() => import('../features/manufacturing/BatchManagementPage'));
+const ProjectProfitabilityPage = lazy(() => import('../features/manufacturing/ProjectProfitabilityPage'));
+const PackagingPage = lazy(() => import('../features/manufacturing/PackagingPage'));
+const DispatchPage = lazy(() => import('../features/manufacturing/DispatchPage'));
+
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
@@ -269,6 +284,21 @@ const router = createBrowserRouter([
       { path: 'pms/delays', element: <Page component={PMSDelayDashboardPage} /> },
       { path: 'pms/reports', element: <Page component={PMSReportsPage} /> },
       { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
+
+      // ── Manufacturing ─────────────────────────────────────
+      { path: 'manufacturing', element: <Page component={ManufacturingOverviewPage} /> },
+      { path: 'manufacturing/projects', element: <Page component={ManufacturingProjectsPage} /> },
+      { path: 'manufacturing/bom', element: <Page component={BomVersionsPage} /> },
+      { path: 'manufacturing/material-planning', element: <Page component={MaterialPlanningPage} /> },
+      { path: 'manufacturing/material-issue', element: <Page component={MaterialIssuePage} /> },
+      { path: 'manufacturing/material-consumption', element: <Page component={MaterialConsumptionPage} /> },
+      { path: 'manufacturing/production', element: <Page component={ProductionTasksPage} /> },
+      { path: 'manufacturing/labour', element: <Page component={LabourCostPage} /> },
+      { path: 'manufacturing/costing', element: <Page component={ProductionCostPage} /> },
+      { path: 'manufacturing/batches', element: <Page component={BatchManagementPage} /> },
+      { path: 'manufacturing/profitability', element: <Page component={ProjectProfitabilityPage} /> },
+      { path: 'manufacturing/packaging', element: <Page component={PackagingPage} /> },
+      { path: 'manufacturing/dispatch', element: <Page component={DispatchPage} /> },
 
       // ── Sales ─────────────────────────────────────────────
       { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },

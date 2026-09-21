@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from '../../../../i18n';
 import { ActivityTimeline } from '../../components/ActivityTimeline';
 
 /**
@@ -10,15 +11,16 @@ import { ActivityTimeline } from '../../components/ActivityTimeline';
  * timeline would not need one.
  */
 export function RecentActivityFeed({ entries = [], limit = 8 }) {
+  const { t } = useTranslation();
   return (
     <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs h-full">
       <header className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold text-slate-800">Recent Project Activity</h3>
+        <h3 className="text-sm font-bold text-slate-800">{t('dashboard.recentActivity')}</h3>
         <Link
           to="/pms/projects"
           className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline"
         >
-          All projects
+          {t('navigation.allProjects')}
         </Link>
       </header>
 

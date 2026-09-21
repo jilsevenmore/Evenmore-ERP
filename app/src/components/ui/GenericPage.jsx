@@ -3,8 +3,10 @@
  * that haven't been fully migrated yet.
  */
 import PageHeader from '../../components/ui/PageHeader';
+import { useTranslation } from '../../i18n';
 
 export default function GenericPage({ title, subtitle, breadcrumb }) {
+  const { t } = useTranslation();
   return (
     <>
       <PageHeader
@@ -18,7 +20,7 @@ export default function GenericPage({ title, subtitle, breadcrumb }) {
             <span style={{ fontSize: '2.5rem' }}>🚧</span>
             <h3 style={{ margin: 0, color: '#294364', fontWeight: 700 }}>{title}</h3>
             <p style={{ margin: 0, color: '#7184a3', fontSize: '0.9rem', textAlign: 'center' }}>
-              {subtitle || 'This page is part of the unified application and will be fully implemented.'}
+              {subtitle || t('common.genericPageDesc')}
             </p>
           </div>
         </div>
