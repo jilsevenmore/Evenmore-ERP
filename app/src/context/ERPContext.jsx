@@ -7,6 +7,7 @@ import { emitCrmEvent, CRM_EVENT_TYPES } from '../services/crmEventNotifications
 import {
     isBackendEnabled,
     pullAll,
+    PULL_ORDER,
     pushCreate,
     pushUpdate,
     pushDelete,
@@ -28,6 +29,32 @@ function mapCategoryToHSN(category) {
     if (cat.includes('fabrication') || cat.includes('fabricated')) return '7308.90';
     return '7216.99';
 }
+/**
+ * The collections the server owns, and how long a failed pull is left alone
+ * before a read may ask for it again.
+ */
+const LAZY_COLLECTION_KEYS = new Set(PULL_ORDER);
+const RESOURCE_RETRY_MS = 15000;
+
+/**
+ * The value `useERP()` hands out: the context object, with a read of a
+ * server-owned collection also asking for that collection.
+ *
+ * This is the whole of the lazy loading contract. A screen that renders
+ * invoices destructures `invoices` and the request goes out; a screen that does
+ * not, never pays for them. Nothing in the reading component changes — the
+ * value arrives as an ordinary state update once the server answers, exactly as
+ * it did when every collection was pulled at boot.
+ */
+function lazyCollectionView(value, request) {
+    return new Proxy(value, {
+        get(target, key, receiver) {
+            if (typeof key === 'string' && LAZY_COLLECTION_KEYS.has(key)) request(key);
+            return Reflect.get(target, key, receiver);
+        },
+    });
+}
+
 const ERPContext = createContext(null);
 const normalizeProformaInvoices = (pis) => {
     if (!Array.isArray(pis)) return [];
@@ -124,12 +151,17 @@ export const ERPProvider = ({ children, }) => {
             .catch((err) => console.warn('Live forex rate sync:', err));
     }, []);
 
-    // ── Live backend synchronization ────────────────────────────────────────
+    // ── Live backend synchronization ────────────────────────────────────
     //
-    // Every collection the API covers is (re)loaded whenever a session appears:
-    // on mount if a token is already stored, and again on sign-in. A collection
-    // the server could not answer for is skipped rather than blanked, so a
-    // partial outage degrades to stale data instead of an empty screen.
+    // A collection is pulled the first time something reads it, not when the
+    // app boots: `useERP()` hands out a view that turns a read of `invoices`
+    // into a request for invoices (see `lazyCollectionView`). Opening a screen
+    // therefore costs the collections that screen shows, and the thirty
+    // requests the app used to fire before the first paint are gone.
+    //
+    // A collection the server could not answer for is skipped rather than
+    // blanked, so a partial outage degrades to stale data instead of an empty
+    // screen, and the failure is retried the next time something reads it.
     const syncSettersRef = useRef(null);
     syncSettersRef.current = {
         categories: setCategories,
@@ -152,39 +184,134 @@ export const ERPProvider = ({ children, }) => {
         paymentOuts: setPaymentOuts,
         purchaseReturns: setPurchaseReturns,
         expenses: setExpenses,
+        // Registry entries that used to be pulled and then thrown away for want
+        // of a setter. They now feed the screens that read them, on demand.
+        transfers: setTransfers,
+        serviceUsages: setServiceUsages,
+        valuationItems: setValuationItems,
+        monthEndAudits: setMonthEndAudits,
+        inventoryMovements: setInventoryMovements,
+        faultyParts: setFaultyParts,
+        zoneRequests: setZoneRequests,
+        bankAccounts: setBankAccounts,
+        journalEntries: setJournalEntries,
     };
 
     const [backendStatus, setBackendStatus] = useState({ connected: false, loading: false, lastSyncAt: null });
     const refreshInFlight = useRef(null);
+    // What each key has been through: loaded once, in flight now, queued for the
+    // next batch, or failed at a moment recent enough that reading it again
+    // should not hammer the server.
+    const loadedKeysRef = useRef(new Set());
+    const inFlightKeysRef = useRef(new Set());
+    const queuedKeysRef = useRef(new Set());
+    const failedKeysRef = useRef(new Map());
+    const flushHandleRef = useRef(null);
 
+    /** Pull `keys` together and hand each collection to its setter. */
+    const loadKeys = useCallback(async (keys) => {
+        if (!keys.length) return {};
+        keys.forEach((key) => inFlightKeysRef.current.add(key));
+        setBackendStatus((prev) => (prev.loading ? prev : { ...prev, loading: true }));
+        // `pullAll` keeps a few requests in flight at a time and leaves out
+        // whatever the server did not answer for.
+        const collections = await pullAll(keys);
+        keys.forEach((key) => {
+            inFlightKeysRef.current.delete(key);
+            if (key in collections) {
+                loadedKeysRef.current.add(key);
+                failedKeysRef.current.delete(key);
+                syncSettersRef.current[key]?.(collections[key]);
+            } else {
+                failedKeysRef.current.set(key, Date.now());
+            }
+        });
+        const answered = Object.keys(collections).length > 0;
+        setBackendStatus((prev) => ({
+            connected: prev.connected || answered,
+            loading: inFlightKeysRef.current.size > 0,
+            lastSyncAt: answered ? new Date().toISOString() : prev.lastSyncAt,
+        }));
+        return collections;
+    }, []);
+
+    /**
+     * Ask for a collection. This runs from the read itself, so it must be cheap,
+     * must never touch state synchronously (a read happens during render) and
+     * must collapse the twenty reads one page makes into a single batch.
+     */
+    const requestCollection = useCallback((key) => {
+        if (!isBackendEnabled()) return;
+        if (!syncSettersRef.current[key]) return;
+        if (loadedKeysRef.current.has(key)
+            || inFlightKeysRef.current.has(key)
+            || queuedKeysRef.current.has(key)) return;
+        const failedAt = failedKeysRef.current.get(key);
+        if (failedAt && Date.now() - failedAt < RESOURCE_RETRY_MS) return;
+
+        queuedKeysRef.current.add(key);
+        if (flushHandleRef.current) return;
+        // Out of the render pass, and late enough for the rest of this page's
+        // components to add their own keys to the same batch.
+        flushHandleRef.current = setTimeout(() => {
+            flushHandleRef.current = null;
+            const batch = [...queuedKeysRef.current];
+            queuedKeysRef.current.clear();
+            loadKeys(batch);
+        }, 0);
+    }, [loadKeys]);
+
+    /**
+     * Every collection the registry covers, whether or not a screen has read it.
+     *
+     * Lazy loading means "what is in memory" is "what has been looked at", which
+     * is right for a screen and wrong for a backup: the two callers below have
+     * to see the whole database, so they pull the rest first.
+     */
+    const loadAllCollections = useCallback(async () => {
+        if (!isBackendEnabled()) return {};
+        const missing = Object.keys(syncSettersRef.current)
+            .filter((key) => !loadedKeysRef.current.has(key));
+        return missing.length ? loadKeys(missing) : {};
+    }, [loadKeys]);
+
+    /** The tenant's currency and letterhead — one request, needed everywhere. */
+    const loadCompanyProfile = useCallback(async () => {
+        const profile = await pullCompanyProfile();
+        if (!profile) return null;
+        setCompanyProfileState((prev) => ({ ...prev, ...profile }));
+        // Amounts arrive already denominated in this currency, so it is the
+        // base every conversion is measured from (api.md §1.6).
+        setBaseCurrency(profile.currency);
+        setBackendStatus((prev) => (prev.connected ? prev : { ...prev, connected: true }));
+        return profile;
+    }, []);
+
+    /**
+     * Re-read everything this tab has on screen — the "Sync now" affordance and
+     * what a sign-in triggers. Collections nobody has looked at stay unloaded.
+     */
     const refreshFromBackend = useCallback(async () => {
         if (!isBackendEnabled()) {
             setBackendStatus({ connected: false, loading: false, lastSyncAt: null });
             return null;
         }
         // A second caller joins the read already running rather than starting
-        // another thirty requests. Mounting twice, a sign-in in another tab and
-        // a manual refresh can all arrive together.
+        // another round. Mounting twice, a sign-in in another tab and a manual
+        // refresh can all arrive together.
         if (refreshInFlight.current) return refreshInFlight.current;
-        setBackendStatus((prev) => ({ ...prev, loading: true }));
         const run = (async () => {
-            const [collections, profile] = await Promise.all([pullAll(), pullCompanyProfile()]);
-            Object.entries(collections).forEach(([key, rows]) => {
-                const setter = syncSettersRef.current[key];
-                if (setter) setter(rows);
-            });
-            if (profile) {
-                setCompanyProfileState((prev) => ({ ...prev, ...profile }));
-                // Amounts arrive already denominated in this currency, so it is
-                // the base every conversion is measured from (api.md §1.6).
-                setBaseCurrency(profile.currency);
-            }
-            const connected = Object.keys(collections).length > 0;
-            setBackendStatus({
-                connected,
-                loading: false,
-                lastSyncAt: connected ? new Date().toISOString() : null,
-            });
+            const keys = [...new Set([
+                ...loadedKeysRef.current,
+                ...inFlightKeysRef.current,
+                ...failedKeysRef.current.keys(),
+            ])];
+            loadedKeysRef.current.clear();
+            failedKeysRef.current.clear();
+            const [collections] = await Promise.all([
+                keys.length ? loadKeys(keys) : Promise.resolve({}),
+                loadCompanyProfile(),
+            ]);
             return collections;
         })();
 
@@ -194,20 +321,26 @@ export const ERPProvider = ({ children, }) => {
         } finally {
             refreshInFlight.current = null;
         }
-    }, []);
+    }, [loadKeys, loadCompanyProfile]);
 
     useEffect(() => {
         let cancelled = false;
-        const run = () => { if (!cancelled) refreshFromBackend(); };
-        run();
-        window.addEventListener('evenmore:authorized', run);
-        window.addEventListener('storage', run);
+        // On mount only the company profile is read: currency formatting and the
+        // letterhead are needed on every screen, and it is a single request.
+        // Every collection waits to be asked for.
+        if (isBackendEnabled()) loadCompanyProfile();
+
+        // A session change invalidates whatever this tab is holding.
+        const onSession = () => { if (!cancelled) refreshFromBackend(); };
+        window.addEventListener('evenmore:authorized', onSession);
+        window.addEventListener('storage', onSession);
         return () => {
             cancelled = true;
-            window.removeEventListener('evenmore:authorized', run);
-            window.removeEventListener('storage', run);
+            if (flushHandleRef.current) clearTimeout(flushHandleRef.current);
+            window.removeEventListener('evenmore:authorized', onSession);
+            window.removeEventListener('storage', onSession);
         };
-    }, [refreshFromBackend]);
+    }, [refreshFromBackend, loadCompanyProfile]);
 
     const setCurrency = (newCurr) => {
         setCurrencyState(newCurr);
@@ -4169,8 +4302,12 @@ export const ERPProvider = ({ children, }) => {
         });
     };
 
-    const exportDatabaseSnapshot = () => {
+    const exportDatabaseSnapshot = async () => {
         try {
+            // A backup is of the database, not of the screens this session
+            // happened to open, so anything still unloaded is pulled first.
+            const pulled = await loadAllCollections();
+            const all = (key, inMemory) => pulled[key] || inMemory;
             const snapshot = {
                 metadata: {
                     appName: 'Evenmore ERP',
@@ -4179,38 +4316,38 @@ export const ERPProvider = ({ children, }) => {
                     exportedDateFormatted: new Date().toLocaleString(),
                 },
                 data: {
-                    parties,
-                    customers,
-                    vendors,
-                    items,
-                    categories,
-                    units,
+                    parties: all('parties', parties),
+                    customers: all('customers', customers),
+                    vendors: all('vendors', vendors),
+                    items: all('items', items),
+                    categories: all('categories', categories),
+                    units: all('units', units),
                     categoryParts,
                     itemParts,
-                    estimates,
-                    quotations,
-                    salesOrders,
-                    proformaInvoices,
-                    deliveryChallans,
-                    invoices,
+                    estimates: all('estimates', estimates),
+                    quotations: all('quotations', quotations),
+                    salesOrders: all('salesOrders', salesOrders),
+                    proformaInvoices: all('proformaInvoices', proformaInvoices),
+                    deliveryChallans: all('deliveryChallans', deliveryChallans),
+                    invoices: all('invoices', invoices),
                     warranties,
-                    paymentIns,
-                    salesReturns,
-                    purchaseOrders,
-                    purchaseBills,
-                    purchaseReturns,
-                    paymentOuts,
-                    expenses,
-                    locations,
-                    transfers,
-                    serviceUsages,
-                    valuationItems,
-                    monthEndAudits,
-                    bankAccounts,
-                    journalEntries,
-                    inventoryMovements,
-                    faultyParts,
-                    zoneRequests,
+                    paymentIns: all('paymentIns', paymentIns),
+                    salesReturns: all('salesReturns', salesReturns),
+                    purchaseOrders: all('purchaseOrders', purchaseOrders),
+                    purchaseBills: all('purchaseBills', purchaseBills),
+                    purchaseReturns: all('purchaseReturns', purchaseReturns),
+                    paymentOuts: all('paymentOuts', paymentOuts),
+                    expenses: all('expenses', expenses),
+                    locations: all('locations', locations),
+                    transfers: all('transfers', transfers),
+                    serviceUsages: all('serviceUsages', serviceUsages),
+                    valuationItems: all('valuationItems', valuationItems),
+                    monthEndAudits: all('monthEndAudits', monthEndAudits),
+                    bankAccounts: all('bankAccounts', bankAccounts),
+                    journalEntries: all('journalEntries', journalEntries),
+                    inventoryMovements: all('inventoryMovements', inventoryMovements),
+                    faultyParts: all('faultyParts', faultyParts),
+                    zoneRequests: all('zoneRequests', zoneRequests),
                 },
             };
 
@@ -4288,7 +4425,7 @@ export const ERPProvider = ({ children, }) => {
      */
     const resetDatabaseToDefaults = async () => {
         try {
-            await refreshFromBackend();
+            await Promise.all([refreshFromBackend(), loadAllCollections()]);
             showToast('Reloaded every collection from the server.');
             return true;
         } catch (err) {
@@ -4298,7 +4435,7 @@ export const ERPProvider = ({ children, }) => {
         }
     };
 
-    return (<ERPContext.Provider value={{
+    return (<ERPContext.Provider value={lazyCollectionView({
             // Backend session state: `connected` once a pull has succeeded,
             // plus a manual re-pull for the "Sync now" affordance.
             backendStatus,
@@ -4465,7 +4602,7 @@ export const ERPProvider = ({ children, }) => {
             exportDatabaseSnapshot,
             importDatabaseSnapshot,
             resetDatabaseToDefaults,
-        }}>
+        }, requestCollection)}>
       {children}
       {/* Global Toast Banner */}
       {toastMessage && (

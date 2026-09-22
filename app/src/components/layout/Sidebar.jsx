@@ -57,6 +57,7 @@ import {
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useERP } from '../../context/ERPContext';
+import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
 import { clearStoredAuth } from '../../utils/authUtils';
 
@@ -552,8 +553,13 @@ export default function Sidebar() {
 
   // PMS live nav counters. Subscribe to stable slices and derive, so the
   // selector never hands useSyncExternalStore a fresh object each render.
-  const pmsProjects = usePmsStore((s) => s.projects);
-  const pmsCurrentUserId = usePmsStore((s) => s.currentUserId);
+  //
+  // `.raw` subscribes without pulling PMS: a badge in the sidebar must not be
+  // the reason every screen in the app loads the project list. `useModuleWhenIdle`
+  // asks for it once the browser has finished with the page the user opened.
+  const shellReady = useModuleWhenIdle('pms');
+  const pmsProjects = usePmsStore.raw((s) => s.projects);
+  const pmsCurrentUserId = usePmsStore.raw((s) => s.currentUserId);
   const pmsBadges = useMemo(
     () => computeNavBadges(pmsProjects, pmsCurrentUserId),
     [pmsProjects, pmsCurrentUserId]
@@ -572,7 +578,8 @@ export default function Sidebar() {
   let badges = { zone: 0, faulty: 0, ...pmsBadges };
   try {
     const erp = useERP();
-    if (erp) {
+    // Reading these is what loads them, so they wait for the same idle moment.
+    if (erp && shellReady) {
       badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0;
       badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
     }

@@ -24,6 +24,7 @@ import {
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
+import { useIdleReady } from '../../hooks/useIdleReady';
 import { markEventNotificationRead } from '../../services/crmEventNotifications';
 
 const THEMES = [
@@ -66,13 +67,18 @@ export default function Topbar() {
   const quickAddRef = useRef(null);
   const notifRef = useRef(null);
 
-  // Live ERP data for notifications
+  // Live ERP data for notifications.
+  //
+  // Reading a collection is what pulls it (`ERPContext`), and these four belong
+  // to the shell rather than to any one screen — so the alert list waits for an
+  // idle moment and the page the user opened gets the network first.
   const erp = useERP();
   const crmDigest = useCrmNotificationDigest();
-  const items = erp?.items;
-  const deliveryChallans = erp?.deliveryChallans;
-  const zoneRequests = erp?.zoneRequests;
-  const salesInvoices = erp?.invoices;
+  const alertsReady = useIdleReady();
+  const items = alertsReady ? erp?.items : undefined;
+  const deliveryChallans = alertsReady ? erp?.deliveryChallans : undefined;
+  const zoneRequests = alertsReady ? erp?.zoneRequests : undefined;
+  const salesInvoices = alertsReady ? erp?.invoices : undefined;
   const isCrmRoute = pathname === '/crm' || pathname.startsWith('/crm/');
 
   const lowStockItems = useMemo(() => {

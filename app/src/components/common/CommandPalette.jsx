@@ -2,9 +2,18 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { Search, ShoppingCart, Truck, Receipt, Package, Users, Building2, FileSpreadsheet, ArrowRight, FileText, BarChart3, X, Layers, Sparkles, } from 'lucide-react';
+/** What the palette searches while it is closed: nothing. */
+const NO_RECORDS = {
+    items: [], customers: [], vendors: [], salesOrders: [],
+    purchaseOrders: [], invoices: [], deliveryChallans: [], proformaInvoices: [],
+};
 export const CommandPalette = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
-    const { items, customers, vendors, salesOrders, purchaseOrders, invoices, deliveryChallans, proformaInvoices = [] } = useERP();
+    // The palette is mounted on every screen but searches only once it is open,
+    // and reading a collection is what loads it — so the eight collections it
+    // searches are pulled on the first Ctrl+K, not on every page.
+    const erp = useERP();
+    const { items, customers, vendors, salesOrders, purchaseOrders, invoices, deliveryChallans, proformaInvoices = [] } = isOpen ? erp : NO_RECORDS;
     const [query, setQuery] = useState('');
     const [selectedIndex, setSelectedIndex] = useState(0);
     const inputRef = useRef(null);

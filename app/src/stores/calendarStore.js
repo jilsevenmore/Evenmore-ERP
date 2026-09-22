@@ -1,10 +1,11 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_calendar_events_v2";
 
 
-export const useCalendarStore = create((set, get) => ({
+const useCalendarStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([
@@ -116,3 +117,6 @@ export const useCalendarStore = create((set, get) => ({
       .slice(0, limit);
   },
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const useCalendarStore = lazyStore(useCalendarStoreBase, "calendar");

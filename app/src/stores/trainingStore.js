@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 import { useCalendarStore } from "./calendarStore";
 
@@ -59,7 +60,7 @@ export const TRAINING_FUNNEL_STAGES = [
 
 
 
-export const useTrainingStore = create((set, get) => ({
+const useTrainingStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([
@@ -240,3 +241,6 @@ export const useTrainingStore = create((set, get) => ({
     set({ trainings: [], trainers: [] });
   },
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const useTrainingStore = lazyStore(useTrainingStoreBase, "training");

@@ -12,6 +12,7 @@
  */
 
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import * as pmsApi from "../services/pmsSync";
 import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
 
@@ -1507,7 +1508,7 @@ function applyToProject(state, projectId, mutator, activity) {
 
 // ─── Store ───────────────────────────────────────────────────────────
 
-export const usePmsStore = create((set, get) => ({
+const usePmsStoreBase = create((set, get) => ({
   // ── State ──
   projects: [],
   stageConfigs: [],
@@ -3078,3 +3079,6 @@ export function isProjectCreator(project, user) {
   if (!creatorId) return true;
   return String(creatorId) === String(user.id);
 }
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const usePmsStore = lazyStore(usePmsStoreBase, "pms");

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { lazyStoreForKeys } from "../services/lazyModules";
 import { hrmsSync } from "../services/hrmsSync";
 import * as hrmsApi from "../services/hrmsSync";
 
@@ -29,7 +30,7 @@ function loadTheme() {
   return "light";
 }
 
-export const useAppStore = create((set) => ({
+const useAppStoreBase = create((set) => ({
   // Theme state
   theme: loadTheme(),
   setTheme: (theme) => {
@@ -365,3 +366,31 @@ export const useAppStore = create((set) => ({
   setToast: (msg) => set({ toast: { id: Date.now().toString(), msg } }),
   clearToast: () => set({ toast: null }),
 }));
+
+/**
+ * The HRMS slice of this store — everything `hydrateHrms()` fills, plus the
+ * actions that write to it.
+ *
+ * `appStore` is read by every screen for the theme, the toast and the sidebar,
+ * so it cannot pull the HRMS collections just because it was touched. These
+ * keys are what marks a read as an HRMS read; see `services/lazyModules`.
+ */
+const HRMS_KEYS = [
+  "employees", "leaves", "attendance", "candidates", "encashments",
+  "compOffCredits", "carriedForwardLeaves", "sandwichRuleEnabled",
+  "maxCarryForwardDays", "hrmsStatus",
+  "hydrateHrms", "refreshHrms", "addEmployee", "deleteEmployee", "updateEmployee",
+  "updateEmployeeStatus", "addLeave", "updateLeaveStatus", "approveLeave",
+  "rejectLeave", "addAttendance", "moveCandidate", "requestEncashment",
+  "setEncashmentStatus", "approveEncashment", "rejectEncashment",
+  "requestCompOff", "setCompOffStatus", "approveCompOff", "rejectCompOff",
+  "toggleSandwichRule", "setMaxCarryForwardDays", "executeCarryForwardRollover",
+];
+
+// Reading any of those is what loads HRMS; reading the theme is not.
+export const useAppStore = lazyStoreForKeys(
+  useAppStoreBase,
+  "hrms",
+  HRMS_KEYS,
+  () => useAppStoreBase.getState().hydrateHrms?.(),
+);

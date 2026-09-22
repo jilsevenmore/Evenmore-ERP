@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useERP } from '../context/ERPContext';
+import { useIdleReady } from './useIdleReady';
 import { loadEventNotifications, NOTIFICATION_EVENT } from '../services/crmEventNotifications';
 
 const CRM_EVENT = 'crm:data-updated';
@@ -312,7 +313,12 @@ function buildCrmNotificationDigest({ leadRows, leadDetails, allocationTasks, qu
 }
 
 export function useCrmNotificationDigest() {
-  const { quotations, deliveryChallans } = useERP() || {};
+  // The digest hangs off the topbar on every screen, and reading a collection
+  // is what pulls it — so these two wait for an idle moment rather than
+  // competing with the page the user opened.
+  const erp = useERP() || {};
+  const digestReady = useIdleReady();
+  const { quotations, deliveryChallans } = digestReady ? erp : {};
   const [snapshot, setSnapshot] = useState(() => loadCrmSnapshot());
 
   useEffect(() => {

@@ -1,10 +1,11 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_documents_v2";
 
 
-export const useDocumentStore = create((set, get) => ({
+const useDocumentStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([
@@ -76,3 +77,6 @@ export const useDocumentStore = create((set, get) => ({
   /** Discard anything local and re-read the documents from the server. */
   resetToDefault: () => useDocumentStore.getState().hydrate()
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const useDocumentStore = lazyStore(useDocumentStoreBase, "documents");

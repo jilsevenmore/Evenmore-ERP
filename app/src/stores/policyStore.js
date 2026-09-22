@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 const POLICIES_STORAGE_KEY = "hrms_company_policies_v1";
@@ -6,7 +7,7 @@ const CATEGORIES_STORAGE_KEY = "hrms_policy_categories_v1";
 const ACKS_STORAGE_KEY = "hrms_policy_acknowledgements_v1";
 
 
-export const usePolicyStore = create((set, get) => ({
+const usePolicyStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([
@@ -358,3 +359,6 @@ export const usePolicyStore = create((set, get) => ({
     usePolicyStore.getState().hydrate();
   },
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const usePolicyStore = lazyStore(usePolicyStoreBase, "policy");

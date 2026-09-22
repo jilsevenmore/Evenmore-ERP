@@ -11,6 +11,7 @@
  * the row back rather than leaving a record that only exists in this tab.
  */
 import { create } from 'zustand';
+import { lazyStore } from '../services/lazyModules';
 import {
   crmSync,
   CRM_PULL_ORDER,
@@ -58,7 +59,7 @@ function countBy(rows, pick) {
   return [...counts.entries()].map(([label, count]) => ({ label, count }));
 }
 
-export const useCrmStore = create((set, get) => ({
+const useCrmStoreBase = create((set, get) => ({
   ...EMPTY,
 
   roster: {},
@@ -241,8 +242,6 @@ export const useCrmStore = create((set, get) => ({
   }),
 }));
 
-export default useCrmStore;
-
 // ── derived views the pages used to import as fixed arrays ──────────────────
 //
 // These are plain functions over a snapshot, called inside `useMemo`. As store
@@ -270,3 +269,7 @@ export function sourceFacetsFrom(leads = [], sources = []) {
   const byId = new Map(sources.map((s) => [s.id, s.name]));
   return countBy(leads, (l) => l.source || byId.get(l.sourceId));
 }
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const useCrmStore = lazyStore(useCrmStoreBase, "crm");
+export default useCrmStore;

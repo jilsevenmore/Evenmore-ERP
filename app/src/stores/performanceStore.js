@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 import { RATING_SCALES } from "../services/performanceScales";
 import { useAppStore } from "./appStore";
@@ -38,7 +39,7 @@ export function getRatingScaleTier(rating) {
   return RATING_SCALES[RATING_SCALES.length - 1];
 }
 
-export const usePerformanceStore = create((set, get) => ({
+const usePerformanceStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([
@@ -546,3 +547,6 @@ export const usePerformanceStore = create((set, get) => ({
     ];
   },
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const usePerformanceStore = lazyStore(usePerformanceStoreBase, "performance");

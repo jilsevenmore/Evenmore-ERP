@@ -1,6 +1,7 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked, pullFlexibility, pushFlexibility } from "../services/hrmsSync";
-export const useAttendanceStore = create((set, get) => ({
+const useAttendanceStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([
@@ -96,3 +97,6 @@ export const useAttendanceStore = create((set, get) => ({
   // Which view the screen shows (HR vs employee); a UI choice, not stored data.
   setRole: (role) => set({ role })
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const useAttendanceStore = lazyStore(useAttendanceStoreBase, "attendance");

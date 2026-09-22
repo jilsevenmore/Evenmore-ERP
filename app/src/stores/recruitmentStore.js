@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 
@@ -17,7 +18,7 @@ function persist(state) {
   writeThrough("recruitmentQuestions", state.questions);
 }
 
-export const useRecruitmentStore = create((set) => ({
+const useRecruitmentStoreBase = create((set) => ({
   jobs: [],
   candidates: [],
   interviews: [],
@@ -229,3 +230,6 @@ export const useRecruitmentStore = create((set) => ({
       return { verifiedDocsMap: nextMap };
     }),
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const useRecruitmentStore = lazyStore(useRecruitmentStoreBase, "recruitment");

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked, pullWorkingDays, pushWorkingDays, pullPayrollFor } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_payroll_store_v4";
@@ -83,7 +84,7 @@ function calcEmployeePayable(e) {
  * and approved server-side (api.md §11.6), so a locally invented run would be
  * a number nobody else could see.
  */
-export const usePayrollStore = create((set, get) => ({
+const usePayrollStoreBase = create((set, get) => ({
   employees: [],
   structures: [],
   workflowStep: "Draft",
@@ -371,3 +372,6 @@ export const usePayrollStore = create((set, get) => ({
   /** Discard anything local and re-read payroll from the server. */
   resetDefaults: () => usePayrollStore.getState().hydrate(),
 }));
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const usePayrollStore = lazyStore(usePayrollStoreBase, "payroll");

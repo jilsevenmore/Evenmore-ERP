@@ -1,7 +1,8 @@
 import { create } from "zustand";
+import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
-export const useAssetStore = create((set, get) => ({
+const useAssetStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([
@@ -221,3 +222,6 @@ export const useAssetStore = create((set, get) => ({
   resetDefaults: () => useAssetStore.getState().hydrate(),
 }));
 
+
+// Hydrated the first time a screen reads it, not at boot — services/lazyModules.
+export const useAssetStore = lazyStore(useAssetStoreBase, "assets");
