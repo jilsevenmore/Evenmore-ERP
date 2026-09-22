@@ -1,5 +1,8 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 import { useCalendarStore } from "./calendarStore";
 
@@ -58,6 +61,7 @@ export const TRAINING_FUNNEL_STAGES = [
   },
 ];
 
+<<<<<<< Updated upstream
 
 
 const useTrainingStoreBase = create((set, get) => ({
@@ -74,6 +78,24 @@ const useTrainingStoreBase = create((set, get) => ({
     return rows;
   },
 
+=======
+
+
+export const useTrainingStore = create((set, get) => ({
+  /** Load this module's collections from the API. */
+  hydrate: async () => {
+    const rows = await Promise.all([
+      pullTracked("trainings"),
+      pullTracked("trainers"),
+    ]);
+    set((s) => ({
+      trainings: rows[0] || s.trainings,
+      trainers: rows[1] || s.trainers,
+    }));
+    return rows;
+  },
+
+>>>>>>> Stashed changes
   /** Empty on sign-out so the next user sees nothing of the previous one. */
   clear: () => set({ trainings: [], trainers: [] }),
 

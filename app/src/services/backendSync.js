@@ -364,6 +364,7 @@ export const RESOURCES = {
     };
   })(),
   salesReturns: documentResource('/sales/returns/', { numberField: 'returnNumber' }),
+<<<<<<< Updated upstream
   warranties: {
     path: '/sales/warranties/',
     toApi: (w) => compact({
@@ -417,6 +418,8 @@ export const RESOURCES = {
       _synced: true,
     }),
   },
+=======
+>>>>>>> Stashed changes
 
   // Purchase pipeline (api.md §6) — same documents, `vendorId` on the wire.
   purchaseOrders: documentResource('/purchase/orders/', {
@@ -605,7 +608,11 @@ export const PULL_ORDER = [
   'categories', 'units', 'locations', 'items',
   'parties', 'customers', 'vendors',
   'estimates', 'quotations', 'salesOrders', 'proformaInvoices',
+<<<<<<< Updated upstream
   'deliveryChallans', 'invoices', 'paymentIns', 'salesReturns', 'warranties',
+=======
+  'deliveryChallans', 'invoices', 'paymentIns', 'salesReturns',
+>>>>>>> Stashed changes
   'purchaseOrders', 'purchaseBills', 'paymentOuts', 'purchaseReturns', 'expenses',
   'transfers', 'serviceUsages', 'valuationItems', 'monthEndAudits',
   'inventoryMovements', 'faultyParts', 'zoneRequests',

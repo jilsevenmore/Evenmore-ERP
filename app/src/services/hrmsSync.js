@@ -186,6 +186,7 @@ export const HRMS_RESOURCES = {
   policies: dated('/hrms/policies/', ['effectiveDate', 'publishedDate']),
   policyCategories: plain('/hrms/policy-categories/'),
 
+<<<<<<< Updated upstream
   assets: {
     path: '/hrms/assets/',
     toApi: (a) => compact({
@@ -210,6 +211,10 @@ export const HRMS_RESOURCES = {
       _synced: true,
     }),
   },
+=======
+  // ── assets ────────────────────────────────────────────────────────────────
+  assets: dated('/hrms/assets/', ['purchaseDate', 'warrantyExpiry']),
+>>>>>>> Stashed changes
   assetCategories: plain('/hrms/asset-categories/'),
   assetRequests: dated('/hrms/asset-requests/', ['requestDate']),
 

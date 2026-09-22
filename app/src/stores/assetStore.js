@@ -1,8 +1,14 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 const useAssetStoreBase = create((set, get) => ({
+=======
+import { writeThrough, pullTracked } from "../services/hrmsSync";
+
+export const useAssetStore = create((set, get) => ({
+>>>>>>> Stashed changes
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([

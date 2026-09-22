@@ -14,7 +14,10 @@
  */
 import { createSync, compact, mapWithLimit, isBackendEnabled, isServerId, describeError } from './resourceSync';
 import { api } from './api';
+<<<<<<< Updated upstream
 import { uploadFileToBackend } from './fileUploadService';
+=======
+>>>>>>> Stashed changes
 
 export { isBackendEnabled, isServerId, describeError };
 
@@ -260,6 +263,7 @@ export async function deleteTask(projectId, stageId, taskId) {
 
 export async function addDocument(projectId, stageId, payload) {
   if (!isBackendEnabled()) return null;
+<<<<<<< Updated upstream
   let fileId = payload?.fileId;
   if (!fileId) {
     const fallbackBlob = new Blob(
@@ -281,6 +285,9 @@ export async function addDocument(projectId, stageId, payload) {
   };
 
   return api.post(`${stagePath(projectId, stageId)}documents/`, backendPayload);
+=======
+  return api.post(`${stagePath(projectId, stageId)}documents/`, payload);
+>>>>>>> Stashed changes
 }
 
 export async function requestApproval(projectId, stageId, docId, payload = {}) {

@@ -1,3 +1,10 @@
+<<<<<<< Updated upstream
+=======
+import { convertLeadToDealIfNeeded } from './leadDealConversion.js';
+import { useAppStore } from '../stores/appStore';
+import { emitCrmEvent, CRM_EVENT_TYPES } from './crmEventNotifications.js';
+
+>>>>>>> Stashed changes
 /**
  * leadStageAutomation — stage rules, as the server runs them.
  *

@@ -1,5 +1,8 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 import { RATING_SCALES } from "../services/performanceScales";
 import { useAppStore } from "./appStore";
@@ -39,7 +42,11 @@ export function getRatingScaleTier(rating) {
   return RATING_SCALES[RATING_SCALES.length - 1];
 }
 
+<<<<<<< Updated upstream
 const usePerformanceStoreBase = create((set, get) => ({
+=======
+export const usePerformanceStore = create((set, get) => ({
+>>>>>>> Stashed changes
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([

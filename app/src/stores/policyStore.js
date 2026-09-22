@@ -1,5 +1,8 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 const POLICIES_STORAGE_KEY = "hrms_company_policies_v1";
@@ -7,7 +10,11 @@ const CATEGORIES_STORAGE_KEY = "hrms_policy_categories_v1";
 const ACKS_STORAGE_KEY = "hrms_policy_acknowledgements_v1";
 
 
+<<<<<<< Updated upstream
 const usePolicyStoreBase = create((set, get) => ({
+=======
+export const usePolicyStore = create((set, get) => ({
+>>>>>>> Stashed changes
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([

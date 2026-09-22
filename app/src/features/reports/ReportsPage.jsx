@@ -6,6 +6,7 @@ import { useERP } from '../../context/ERPContext';
 import { PageHeader } from '../../components/common/PageHeader';
 import { exportToCSV } from '../../services/exportUtils';
 import { toISODate, getCurrentISODate, daysBetween } from '../../utils/dateUtils';
+import { getInvoiceBillingLegs } from '../../utils/billingAllocation';
 const reportsGuide = {
     title: 'Financial & Inventory Analytics',
     subtitle: 'Executive audit reports, AR/AP aging schedules, stock valuation, and P&L summaries.',
@@ -63,6 +64,22 @@ export const ReportsPage = () => {
     const grossSales = invoices.reduce((sum, inv) => sum + (Number(inv.total ?? inv.amount) || 0), 0);
     const avgInvoiceValue = invoices.length > 0 ? grossSales / invoices.length : 0;
     const paidInvoicesCount = invoices.filter((inv) => inv.status === 'Paid').length;
+
+    // Billing allocation split — White (GST) vs Black (Non-GST), cancelled excluded.
+    const billingTotals = useMemo(() => {
+        let white = 0;
+        let black = 0;
+        let gst = 0;
+        (invoices || [])
+            .filter((inv) => inv.status !== 'Cancelled')
+            .forEach((inv) => {
+                const legs = getInvoiceBillingLegs(inv);
+                white += Number(legs.whiteBase) || 0;
+                black += Number(legs.blackBase) || 0;
+                gst += Number(legs.gstAmount) || 0;
+            });
+        return { white, black, gst, base: white + black };
+    }, [invoices]);
 
     // Top accounts by revenue
     const customerRevenueMap = invoices.reduce((acc, inv) => {
@@ -225,15 +242,23 @@ export const ReportsPage = () => {
             exportToCSV('Inventory_Valuation_Report', headers, rows);
         }
         else if (activeReport === 'sales') {
-            const headers = ['Invoice Number', 'Customer', 'Date', 'Due Date', 'Total', 'Status'];
-            const rows = invoices.map((inv) => [
-                inv.invoiceNumber,
-                inv.customer,
-                inv.date,
-                inv.dueDate,
-                (inv.total ?? inv.amount ?? 0).toFixed(2),
-                inv.status,
-            ]);
+            const headers = ['Invoice Number', 'Customer', 'Date', 'Due Date', 'Billing Type', 'Tax Treatment', 'White Base', 'Black Base', 'GST', 'Invoice Total', 'Status'];
+            const rows = invoices.map((inv) => {
+                const legs = getInvoiceBillingLegs(inv);
+                return [
+                    inv.invoiceNumber,
+                    inv.customer,
+                    inv.date,
+                    inv.dueDate,
+                    legs.type === 'BLACK' ? 'Black Billing' : legs.type === 'SPLIT' ? 'Split Billing' : 'White Billing',
+                    inv.taxTreatment || (legs.type === 'BLACK' ? 'NON_GST' : 'GST'),
+                    Number(legs.whiteBase || 0).toFixed(2),
+                    Number(legs.blackBase || 0).toFixed(2),
+                    Number(legs.gstAmount || 0).toFixed(2),
+                    Number(inv.total ?? inv.amount ?? 0).toFixed(2),
+                    inv.status,
+                ];
+            });
             exportToCSV('Sales_Invoices_Report', headers, rows);
         }
         else if (activeReport === 'purchases') {
@@ -354,6 +379,12 @@ export const ReportsPage = () => {
             <StatCard label="Gross Sales MTD" value={formatCurrency(grossSales)} icon={DollarSign} highlight/>
             <StatCard label="Avg Order / Invoice" value={formatCurrency(avgInvoiceValue)}/>
             <StatCard label="Invoices Settled" value={`${paidInvoicesCount} / ${invoices.length} Paid`} trend={{ positive: true, text: `${invoices.length} Total` }}/>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <StatCard label="White Billing (GST base)" value={formatCurrency(billingTotals.white)} />
+            <StatCard label="Black Billing (Non-GST)" value={formatCurrency(billingTotals.black)} />
+            <StatCard label="GST on White Billing" value={formatCurrency(billingTotals.gst)} />
+            <StatCard label="Total Base Billed" value={formatCurrency(billingTotals.base)} />
           </div>
           <div className="bg-white border border-[#CED4DA] rounded-lg p-5">
             <h3 className="font-bold text-sm text-[#1F2E4A] mb-3">Top Accounts by Revenue</h3>

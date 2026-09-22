@@ -1,11 +1,18 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_documents_v2";
 
 
+<<<<<<< Updated upstream
 const useDocumentStoreBase = create((set, get) => ({
+=======
+export const useDocumentStore = create((set, get) => ({
+>>>>>>> Stashed changes
   /** Load this module's collections from the API. */
   hydrate: async () => {
     const rows = await Promise.all([

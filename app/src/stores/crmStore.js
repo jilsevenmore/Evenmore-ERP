@@ -11,7 +11,10 @@
  * the row back rather than leaving a record that only exists in this tab.
  */
 import { create } from 'zustand';
+<<<<<<< Updated upstream
 import { lazyStore } from '../services/lazyModules';
+=======
+>>>>>>> Stashed changes
 import {
   crmSync,
   CRM_PULL_ORDER,
@@ -59,7 +62,11 @@ function countBy(rows, pick) {
   return [...counts.entries()].map(([label, count]) => ({ label, count }));
 }
 
+<<<<<<< Updated upstream
 const useCrmStoreBase = create((set, get) => ({
+=======
+export const useCrmStore = create((set, get) => ({
+>>>>>>> Stashed changes
   ...EMPTY,
 
   roster: {},
@@ -242,6 +249,11 @@ const useCrmStoreBase = create((set, get) => ({
   }),
 }));
 
+<<<<<<< Updated upstream
+=======
+export default useCrmStore;
+
+>>>>>>> Stashed changes
 // ── derived views the pages used to import as fixed arrays ──────────────────
 //
 // These are plain functions over a snapshot, called inside `useMemo`. As store
@@ -269,7 +281,10 @@ export function sourceFacetsFrom(leads = [], sources = []) {
   const byId = new Map(sources.map((s) => [s.id, s.name]));
   return countBy(leads, (l) => l.source || byId.get(l.sourceId));
 }
+<<<<<<< Updated upstream
 
 // Hydrated the first time a screen reads it, not at boot — services/lazyModules.
 export const useCrmStore = lazyStore(useCrmStoreBase, "crm");
 export default useCrmStore;
+=======
+>>>>>>> Stashed changes

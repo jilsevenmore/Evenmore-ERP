@@ -1,6 +1,10 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
+<<<<<<< Updated upstream
+=======
+import VendorLayout from '../components/layout/VendorLayout';
+>>>>>>> Stashed changes
 import RequireAuth from './RequireAuth';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { PageLoadingSkeleton } from '../components/common/PageLoadingSkeleton';
@@ -39,6 +43,24 @@ const PMSTimelinePage = lazy(() => import('../features/pms/timeline/TimelinePage
 const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDashboardPage'));
 const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
 const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
+<<<<<<< Updated upstream
+=======
+
+// ── Manufacturing (Lazy Loaded) ─────────────────────────────
+const ManufacturingOverviewPage = lazy(() => import('../features/manufacturing/ManufacturingOverviewPage'));
+const ManufacturingProjectsPage = lazy(() => import('../features/manufacturing/ManufacturingProjectsPage'));
+const BomVersionsPage = lazy(() => import('../features/manufacturing/BomVersionsPage'));
+const MaterialPlanningPage = lazy(() => import('../features/manufacturing/MaterialPlanningPage'));
+const MaterialIssuePage = lazy(() => import('../features/manufacturing/MaterialIssuePage'));
+const MaterialConsumptionPage = lazy(() => import('../features/manufacturing/MaterialConsumptionPage'));
+const ProductionTasksPage = lazy(() => import('../features/manufacturing/ProductionTasksPage'));
+const LabourCostPage = lazy(() => import('../features/manufacturing/LabourCostPage'));
+const ProductionCostPage = lazy(() => import('../features/manufacturing/ProductionCostPage'));
+const BatchManagementPage = lazy(() => import('../features/manufacturing/BatchManagementPage'));
+const ProjectProfitabilityPage = lazy(() => import('../features/manufacturing/ProjectProfitabilityPage'));
+const PackagingPage = lazy(() => import('../features/manufacturing/PackagingPage'));
+const DispatchPage = lazy(() => import('../features/manufacturing/DispatchPage'));
+>>>>>>> Stashed changes
 const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/ClientProofApprovalPage'));
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
@@ -196,10 +218,23 @@ const router = createBrowserRouter([
     element: <Page component={LoginPage} />,
     errorElement: <RootErrorBoundary />,
   },
+<<<<<<< Updated upstream
   // ── Client-facing design approval link ────────────────────
   // Deliberately outside MainLayout: the recipient is a customer, not a user of
   // the ERP, so the page carries no sidebar, topbar or internal navigation.
   {
+=======
+  // ── Authentication ────────────────────────────────────────
+  {
+    path: '/login',
+    element: <Page component={LoginPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // ── Client-facing design approval link ────────────────────
+  // Deliberately outside MainLayout: the recipient is a customer, not a user of
+  // the ERP, so the page carries no sidebar, topbar or internal navigation.
+  {
+>>>>>>> Stashed changes
     path: '/pms/approve/:token',
     element: <Page component={PMSClientProofApprovalPage} />,
     errorElement: <RootErrorBoundary />,

@@ -7,7 +7,10 @@ import { emitCrmEvent, CRM_EVENT_TYPES } from '../services/crmEventNotifications
 import {
     isBackendEnabled,
     pullAll,
+<<<<<<< Updated upstream
     PULL_ORDER,
+=======
+>>>>>>> Stashed changes
     pushCreate,
     pushUpdate,
     pushDelete,
@@ -29,6 +32,7 @@ function mapCategoryToHSN(category) {
     if (cat.includes('fabrication') || cat.includes('fabricated')) return '7308.90';
     return '7216.99';
 }
+<<<<<<< Updated upstream
 /**
  * The collections the server owns, and how long a failed pull is left alone
  * before a read may ask for it again.
@@ -55,6 +59,8 @@ function lazyCollectionView(value, request) {
     });
 }
 
+=======
+>>>>>>> Stashed changes
 const ERPContext = createContext(null);
 const normalizeProformaInvoices = (pis) => {
     if (!Array.isArray(pis)) return [];
@@ -151,6 +157,7 @@ export const ERPProvider = ({ children, }) => {
             .catch((err) => console.warn('Live forex rate sync:', err));
     }, []);
 
+<<<<<<< Updated upstream
     // ── Live backend synchronization ────────────────────────────────────
     //
     // A collection is pulled the first time something reads it, not when the
@@ -162,6 +169,14 @@ export const ERPProvider = ({ children, }) => {
     // A collection the server could not answer for is skipped rather than
     // blanked, so a partial outage degrades to stale data instead of an empty
     // screen, and the failure is retried the next time something reads it.
+=======
+    // ── Live backend synchronization ────────────────────────────────────────
+    //
+    // Every collection the API covers is (re)loaded whenever a session appears:
+    // on mount if a token is already stored, and again on sign-in. A collection
+    // the server could not answer for is skipped rather than blanked, so a
+    // partial outage degrades to stale data instead of an empty screen.
+>>>>>>> Stashed changes
     const syncSettersRef = useRef(null);
     syncSettersRef.current = {
         categories: setCategories,
@@ -184,6 +199,7 @@ export const ERPProvider = ({ children, }) => {
         paymentOuts: setPaymentOuts,
         purchaseReturns: setPurchaseReturns,
         expenses: setExpenses,
+<<<<<<< Updated upstream
         // Registry entries that used to be pulled and then thrown away for want
         // of a setter. They now feed the screens that read them, on demand.
         transfers: setTransfers,
@@ -195,10 +211,13 @@ export const ERPProvider = ({ children, }) => {
         zoneRequests: setZoneRequests,
         bankAccounts: setBankAccounts,
         journalEntries: setJournalEntries,
+=======
+>>>>>>> Stashed changes
     };
 
     const [backendStatus, setBackendStatus] = useState({ connected: false, loading: false, lastSyncAt: null });
     const refreshInFlight = useRef(null);
+<<<<<<< Updated upstream
     // What each key has been through: loaded once, in flight now, queued for the
     // next batch, or failed at a moment recent enough that reading it again
     // should not hammer the server.
@@ -291,12 +310,16 @@ export const ERPProvider = ({ children, }) => {
      * Re-read everything this tab has on screen — the "Sync now" affordance and
      * what a sign-in triggers. Collections nobody has looked at stay unloaded.
      */
+=======
+
+>>>>>>> Stashed changes
     const refreshFromBackend = useCallback(async () => {
         if (!isBackendEnabled()) {
             setBackendStatus({ connected: false, loading: false, lastSyncAt: null });
             return null;
         }
         // A second caller joins the read already running rather than starting
+<<<<<<< Updated upstream
         // another round. Mounting twice, a sign-in in another tab and a manual
         // refresh can all arrive together.
         if (refreshInFlight.current) return refreshInFlight.current;
@@ -312,6 +335,30 @@ export const ERPProvider = ({ children, }) => {
                 keys.length ? loadKeys(keys) : Promise.resolve({}),
                 loadCompanyProfile(),
             ]);
+=======
+        // another thirty requests. Mounting twice, a sign-in in another tab and
+        // a manual refresh can all arrive together.
+        if (refreshInFlight.current) return refreshInFlight.current;
+        setBackendStatus((prev) => ({ ...prev, loading: true }));
+        const run = (async () => {
+            const [collections, profile] = await Promise.all([pullAll(), pullCompanyProfile()]);
+            Object.entries(collections).forEach(([key, rows]) => {
+                const setter = syncSettersRef.current[key];
+                if (setter) setter(rows);
+            });
+            if (profile) {
+                setCompanyProfileState((prev) => ({ ...prev, ...profile }));
+                // Amounts arrive already denominated in this currency, so it is
+                // the base every conversion is measured from (api.md §1.6).
+                setBaseCurrency(profile.currency);
+            }
+            const connected = Object.keys(collections).length > 0;
+            setBackendStatus({
+                connected,
+                loading: false,
+                lastSyncAt: connected ? new Date().toISOString() : null,
+            });
+>>>>>>> Stashed changes
             return collections;
         })();
 
@@ -321,6 +368,7 @@ export const ERPProvider = ({ children, }) => {
         } finally {
             refreshInFlight.current = null;
         }
+<<<<<<< Updated upstream
     }, [loadKeys, loadCompanyProfile]);
 
     useEffect(() => {
@@ -341,6 +389,22 @@ export const ERPProvider = ({ children, }) => {
             window.removeEventListener('storage', onSession);
         };
     }, [refreshFromBackend, loadCompanyProfile]);
+=======
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const run = () => { if (!cancelled) refreshFromBackend(); };
+        run();
+        window.addEventListener('evenmore:authorized', run);
+        window.addEventListener('storage', run);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('evenmore:authorized', run);
+            window.removeEventListener('storage', run);
+        };
+    }, [refreshFromBackend]);
+>>>>>>> Stashed changes
 
     const setCurrency = (newCurr) => {
         setCurrencyState(newCurr);
@@ -928,6 +992,16 @@ export const ERPProvider = ({ children, }) => {
             shippingAddress,
             linkedSo: newInvoice.linkedSo || newInvoice.salesOrderId,
             salesOrderId: newInvoice.salesOrderId || newInvoice.linkedSo,
+            // Billing allocation passthrough (frontend-only White/Black split).
+            projectId: newInvoice.projectId || null,
+            billingType: newInvoice.billingType || newInvoice.billingMode || 'WHITE',
+            billingMode: newInvoice.billingMode || newInvoice.billingType || 'WHITE',
+            whiteAmount: newInvoice.whiteAmount ?? newInvoice.whiteBase ?? null,
+            blackAmount: newInvoice.blackAmount ?? newInvoice.blackBase ?? null,
+            whiteBase: newInvoice.whiteBase ?? newInvoice.whiteAmount ?? null,
+            blackBase: newInvoice.blackBase ?? newInvoice.blackAmount ?? null,
+            whiteGst: newInvoice.whiteGst ?? null,
+            taxTreatment: newInvoice.taxTreatment || ((newInvoice.billingType || newInvoice.billingMode) === 'BLACK' ? 'NON_GST' : 'GST'),
             proformaInvoiceId: newInvoice.proformaInvoiceId,
             linkedPi: newInvoice.linkedPi,
             date: formatDateDDMMYYYY(newInvoice.date || 'Today'),
@@ -4440,7 +4514,11 @@ export const ERPProvider = ({ children, }) => {
      */
     const resetDatabaseToDefaults = async () => {
         try {
+<<<<<<< Updated upstream
             await Promise.all([refreshFromBackend(), loadAllCollections()]);
+=======
+            await refreshFromBackend();
+>>>>>>> Stashed changes
             showToast('Reloaded every collection from the server.');
             return true;
         } catch (err) {
@@ -4450,7 +4528,11 @@ export const ERPProvider = ({ children, }) => {
         }
     };
 
+<<<<<<< Updated upstream
     return (<ERPContext.Provider value={lazyCollectionView({
+=======
+    return (<ERPContext.Provider value={{
+>>>>>>> Stashed changes
             // Backend session state: `connected` once a pull has succeeded,
             // plus a manual re-pull for the "Sync now" affordance.
             backendStatus,

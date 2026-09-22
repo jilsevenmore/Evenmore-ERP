@@ -102,6 +102,7 @@ function leadToApi(lead) {
 
 function dealFromApi(row) {
   return {
+<<<<<<< Updated upstream
     ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes', 'stage']),
     id: row.id,
     name: row.title || row.name,
@@ -113,6 +114,11 @@ function dealFromApi(row) {
     value: num(row.value ?? row.amount),
     expectedCloseDate: displayIn(row.expectedCloseDate || row.expected_close_date),
     date: displayIn(row.expectedCloseDate || row.expected_close_date || row.created_at),
+=======
+    ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes']),
+    expectedCloseDate: displayIn(row.expectedCloseDate),
+    value: num(row.value ?? row.amount),
+>>>>>>> Stashed changes
     _synced: true,
   };
 }
@@ -121,6 +127,7 @@ function dealToApi(deal) {
   return compact({
     title: deal.title || deal.name,
     leadId: deal.leadId || undefined,
+<<<<<<< Updated upstream
     customerId: deal.customerId || deal.partyId || undefined,
     stage: deal.stage || undefined,
     ownerId: deal.ownerId || undefined,
@@ -128,6 +135,15 @@ function dealToApi(deal) {
     currency: deal.currency || undefined,
     probability: deal.probability !== undefined ? num(deal.probability) : undefined,
     expectedCloseDate: isoOut(deal.expectedCloseDate || deal.date),
+=======
+    partyId: deal.partyId || deal.customerId || undefined,
+    stageId: deal.stageId || undefined,
+    ownerId: deal.ownerId || undefined,
+    value: deal.value !== undefined ? num(deal.value) : undefined,
+    currency: deal.currency || undefined,
+    probability: deal.probability !== undefined ? num(deal.probability) : undefined,
+    expectedCloseDate: isoOut(deal.expectedCloseDate),
+>>>>>>> Stashed changes
     status: deal.status || undefined,
     lostReasonId: deal.lostReasonId || undefined,
     notes: deal.notes || undefined,

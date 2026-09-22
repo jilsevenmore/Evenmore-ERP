@@ -1,5 +1,8 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 
@@ -18,7 +21,11 @@ function persist(state) {
   writeThrough("recruitmentQuestions", state.questions);
 }
 
+<<<<<<< Updated upstream
 const useRecruitmentStoreBase = create((set) => ({
+=======
+export const useRecruitmentStore = create((set) => ({
+>>>>>>> Stashed changes
   jobs: [],
   candidates: [],
   interviews: [],

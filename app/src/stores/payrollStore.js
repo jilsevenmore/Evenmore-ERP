@@ -1,5 +1,8 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import { writeThrough, pullTracked, pullWorkingDays, pushWorkingDays, pullPayrollFor } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_payroll_store_v4";
@@ -84,7 +87,11 @@ function calcEmployeePayable(e) {
  * and approved server-side (api.md §11.6), so a locally invented run would be
  * a number nobody else could see.
  */
+<<<<<<< Updated upstream
 const usePayrollStoreBase = create((set, get) => ({
+=======
+export const usePayrollStore = create((set, get) => ({
+>>>>>>> Stashed changes
   employees: [],
   structures: [],
   workflowStep: "Draft",

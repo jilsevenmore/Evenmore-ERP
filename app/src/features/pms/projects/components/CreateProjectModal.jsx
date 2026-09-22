@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
+import { BillingAllocationCard } from '../../../../components/common/BillingAllocationCard';
 import { usePmsStore, nextProjectId } from '../../../../stores/pmsStore';
 import { useERP } from '../../../../context/ERPContext';
 import { formatCurrency } from '../../../../utils/currencyUtils';
+import { BILLING_MODES, normalizeAllocation } from '../../../../utils/billingAllocation';
 import { AlertCircle, Link2, PackageCheck } from 'lucide-react';
 
 /**
@@ -56,6 +58,20 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
         .map((o) => ({ ...o, linkedProjectId: linkedBy.get(o.orderNumber) })),
     };
   }, [projects, salesOrders]);
+<<<<<<< Updated upstream
+=======
+
+  function distributeEvenly(ids) {
+    if (!ids || ids.length === 0) return {};
+    const equal = Math.floor(100 / ids.length);
+    const remainder = 100 - equal * ids.length;
+    const map = {};
+    ids.forEach((id, idx) => {
+      map[id] = idx === ids.length - 1 ? equal + remainder : equal;
+    });
+    return map;
+  }
+>>>>>>> Stashed changes
 
   function distributeEvenly(ids) {
     if (!ids || ids.length === 0) return {};
@@ -83,9 +99,27 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     distributeEvenly(activeConfigs.map((c) => c.id))
   );
   const [errors, setErrors] = useState({});
+  const [billing, setBilling] = useState({
+    mode: BILLING_MODES.SPLIT,
+    whiteAmount: '',
+    blackAmount: '',
+    gstRate: 18,
+  });
 
   const selectedOrder = availableOrders.find((o) => o.orderNumber === orderNumber) ?? null;
   const projectCode = useMemo(() => nextProjectId(projects), [projects]);
+  const orderValue = Number(selectedOrder?.total ?? selectedOrder?.amount ?? 0) || 0;
+  const billingAlloc = useMemo(
+    () =>
+      normalizeAllocation({
+        projectValue: orderValue,
+        whiteAmount: billing.whiteAmount === '' ? 0 : billing.whiteAmount,
+        blackAmount: billing.blackAmount === '' ? orderValue : billing.blackAmount,
+        gstRate: billing.gstRate ?? 18,
+        mode: orderValue > 0 ? billing.mode : BILLING_MODES.SPLIT,
+      }),
+    [orderValue, billing]
+  );
 
   const totalPercentage = useMemo(() => {
     return selectedConfigIds.reduce(
@@ -94,6 +128,16 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     );
   }, [selectedConfigIds, stagePercentages]);
 
+<<<<<<< Updated upstream
+  const totalPercentage = useMemo(() => {
+    return selectedConfigIds.reduce(
+      (acc, id) => acc + (Number(stagePercentages[id]) || 0),
+      0
+    );
+  }, [selectedConfigIds, stagePercentages]);
+
+=======
+>>>>>>> Stashed changes
   function toggleConfig(id) {
     setSelectedConfigIds((prev) => {
       const next = prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id];
@@ -124,6 +168,10 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     const defaultIds = activeConfigs.map((c) => c.id);
     setSelectedConfigIds(defaultIds);
     setStagePercentages(distributeEvenly(defaultIds));
+<<<<<<< Updated upstream
+=======
+    setBilling({ mode: BILLING_MODES.SPLIT, whiteAmount: '', blackAmount: '', gstRate: 18 });
+>>>>>>> Stashed changes
     setErrors({});
   }
 
@@ -142,6 +190,15 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     if (selectedConfigIds.length > 0 && Math.round(totalPercentage * 100) / 100 !== 100) {
       nextErrors.stages = `Total stage percentage must equal 100% (currently ${Math.round(totalPercentage * 100) / 100}%).`;
     }
+<<<<<<< Updated upstream
+=======
+    if (selectedOrder && billingAlloc.overBy > 0) {
+      nextErrors.billing = `Billing allocation exceeds project value by ${formatCurrency(billingAlloc.overBy)}.`;
+    }
+    if (selectedOrder && (!Number.isFinite(billingAlloc.whiteAmount) || !Number.isFinite(billingAlloc.blackAmount))) {
+      nextErrors.billing = 'Enter valid billing amounts.';
+    }
+>>>>>>> Stashed changes
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -164,6 +221,18 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
         stageConfigIds: selectedConfigIds,
         stageWeights,
         specifications,
+<<<<<<< Updated upstream
+=======
+        billing: {
+          mode: billingAlloc.mode,
+          whiteAmount: billingAlloc.whiteAmount,
+          blackAmount: billingAlloc.blackAmount,
+          gstRate: billingAlloc.gstRate,
+          gstAmount: billingAlloc.gstAmount,
+          whiteTotal: billingAlloc.whiteTotal,
+          blackTotal: billingAlloc.blackTotal,
+        },
+>>>>>>> Stashed changes
       });
     } catch (err) {
       setErrors({ order: err?.message || 'The project could not be created.' });
@@ -256,6 +325,18 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
                 </div>
               ))}
             </dl>
+          </div>
+        )}
+
+        {/* Billing allocation — White (GST) / Black (Non-GST) split */}
+        {selectedOrder && (
+          <div>
+            <BillingAllocationCard projectValue={orderValue} value={billing} onChange={setBilling} compact />
+            {errors.billing && (
+              <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
+                <AlertCircle size={11} /> {errors.billing}
+              </p>
+            )}
           </div>
         )}
 

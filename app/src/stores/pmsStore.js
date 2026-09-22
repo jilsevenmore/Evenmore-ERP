@@ -12,7 +12,10 @@
  */
 
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStore } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import * as pmsApi from "../services/pmsSync";
 import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
 
@@ -1508,7 +1511,11 @@ function applyToProject(state, projectId, mutator, activity) {
 
 // ─── Store ───────────────────────────────────────────────────────────
 
+<<<<<<< Updated upstream
 const usePmsStoreBase = create((set, get) => ({
+=======
+export const usePmsStore = create((set, get) => ({
+>>>>>>> Stashed changes
   // ── State ──
   projects: [],
   stageConfigs: [],
@@ -1911,6 +1918,7 @@ const usePmsStoreBase = create((set, get) => ({
     stageConfigIds = null,
     stageWeights = null,
     specifications = "",
+    billing = null,
   }) => {
     if (!order) throw new Error("A CRM order is required to create a project.");
     if (!projectManager) throw new Error("A project manager is required.");
@@ -1918,8 +1926,14 @@ const usePmsStoreBase = create((set, get) => ({
     // `POST /pms/projects/from-order/` allocates the sequential project code,
     // copies the order's commercial detail and instantiates the chosen stage
     // templates in one write (api.md §10.2), so none of that is done here.
+<<<<<<< Updated upstream
     const created = await pmsApi.createProjectFromOrder({
       salesOrderId: order.id ?? order.orderNumber,
+=======
+    // Billing allocation travels with the payload; the frontend also stamps it
+    // locally below so it works even when the server echoes without it.
+    const created = await pmsApi.createProjectFromOrder({
+>>>>>>> Stashed changes
       orderId: order.id ?? order.orderNumber,
       orderNumber: order.orderNumber ?? order.id,
       projectManagerId: projectManager.id,
@@ -1928,6 +1942,10 @@ const usePmsStoreBase = create((set, get) => ({
       stageConfigIds,
       stageWeights,
       specifications,
+<<<<<<< Updated upstream
+=======
+      billing,
+>>>>>>> Stashed changes
     });
 
     const project = created?.project || created;
@@ -1935,6 +1953,15 @@ const usePmsStoreBase = create((set, get) => ({
 
     const full = (await pmsApi.pullProject(project.id)) || project;
     applyServerProject(full);
+<<<<<<< Updated upstream
+=======
+    // Frontend-only billing allocation: keep White/Black split on the project
+    // even if the backend echoes the record without it.
+    if (billing) {
+      const targetId = full?.id || project?.id;
+      set((st) => applyToProject(st, targetId, (p) => ({ ...p, billing })));
+    }
+>>>>>>> Stashed changes
     return full.code || full.id;
   },
 
@@ -3080,6 +3107,9 @@ export function isProjectCreator(project, user) {
   if (!creatorId) return true;
   return String(creatorId) === String(user.id);
 }
+<<<<<<< Updated upstream
 
 // Hydrated the first time a screen reads it, not at boot — services/lazyModules.
 export const usePmsStore = lazyStore(usePmsStoreBase, "pms");
+=======
+>>>>>>> Stashed changes

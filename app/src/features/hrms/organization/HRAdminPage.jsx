@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect } from "react";
+<<<<<<< Updated upstream
 import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
+=======
+import { hrmsSync } from '../../../services/hrmsSync';
+>>>>>>> Stashed changes
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,

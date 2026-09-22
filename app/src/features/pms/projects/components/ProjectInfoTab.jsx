@@ -1,7 +1,24 @@
-import React from 'react';
-import { Building2, Package, User, CalendarDays } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Building2, Package, User, CalendarDays, ReceiptText, Pencil } from 'lucide-react';
 import { formatCurrency } from '../../../../utils/currencyUtils';
 import { useERP } from '../../../../context/ERPContext';
+<<<<<<< Updated upstream
+=======
+import { usePmsStore } from '../../../../stores/pmsStore';
+import { Modal } from '../../../../components/ui/Modal';
+import { Button } from '../../../../components/ui/Button';
+import { Badge } from '../../../../components/ui/Badge';
+import { BillingAllocationCard } from '../../../../components/common/BillingAllocationCard';
+import {
+  BILLING_TYPES,
+  billingModeLabel,
+  billingTypeLabel,
+  getInvoiceBillingLegs,
+  getProjectAllocation,
+  getProjectBillingStatus,
+  getProjectValue,
+} from '../../../../utils/billingAllocation';
+>>>>>>> Stashed changes
 
 /**
  * ProjectInfoTab — order context for the project.
@@ -47,9 +64,62 @@ function stamp(value) {
 
 export function ProjectInfoTab({ project, meta }) {
   // The party behind the project, from the customers the server returned.
+<<<<<<< Updated upstream
   const { customers = [] } = useERP() || {};
+=======
+  const { customers = [], invoices = [], salesOrders = [], paymentIns = [] } = useERP() || {};
+  const updateProject = usePmsStore((s) => s.updateProject);
+>>>>>>> Stashed changes
   const customer = customers.find((c) => c.id === project.crmCustomerId) ?? null;
   const details = project.productDetails ?? {};
+
+  const projectValue = getProjectValue(project);
+  const allocation = useMemo(() => getProjectAllocation(project), [project]);
+  const billingStatus = useMemo(
+    () => getProjectBillingStatus(project, invoices, salesOrders),
+    [project, invoices, salesOrders]
+  );
+  const [historyFilter, setHistoryFilter] = useState('All');
+  const [editOpen, setEditOpen] = useState(false);
+  const [draftBilling, setDraftBilling] = useState(null);
+
+  const canEditBilling = !['Completed', 'Cancelled', 'Closed'].includes(project.status);
+  const filteredHistory = useMemo(() => {
+    return billingStatus.invoices.filter((inv) => {
+      const legs = getInvoiceBillingLegs(inv);
+      if (historyFilter === 'White') return legs.type !== BILLING_TYPES.BLACK;
+      if (historyFilter === 'Black') return legs.type === BILLING_TYPES.BLACK;
+      return true;
+    });
+  }, [billingStatus.invoices, historyFilter]);
+
+  function openEdit() {
+    setDraftBilling({
+      mode: allocation.mode,
+      whiteAmount: allocation.whiteAmount,
+      blackAmount: allocation.blackAmount,
+      gstRate: allocation.gstRate,
+    });
+    setEditOpen(true);
+  }
+
+  function saveBilling() {
+    if (!draftBilling || !canEditBilling) {
+      setEditOpen(false);
+      return;
+    }
+    updateProject?.(project.id, { billing: { ...draftBilling } });
+    setEditOpen(false);
+  }
+
+  function paidFor(invoice) {
+    const total = Number(invoice.total ?? invoice.grandTotal ?? invoice.amount ?? 0) || 0;
+    const paid = (paymentIns || [])
+      .filter((p) => p.invoiceId === invoice.id || p.invoiceNumber === invoice.invoiceNumber)
+      .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+    const explicit = Number(invoice.paidAmount ?? invoice.amountPaid ?? 0) || 0;
+    return Math.min(total, Math.max(paid, explicit, invoice.status === 'Paid' ? total : 0));
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -132,6 +202,117 @@ export function ProjectInfoTab({ project, meta }) {
           <Row label="Stages" value={`${meta?.stageCount ?? 0} configured`} />
         </dl>
       </Card>
+
+      {/* Billing summary — White (GST) / Black (Non-GST) allocation */}
+      <Card
+        title="Billing Summary"
+        icon={ReceiptText}
+      >
+        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <Badge>{billingModeLabel(allocation.mode)}</Badge>
+          {canEditBilling && (
+            <button
+              type="button"
+              onClick={openEdit}
+              className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline cursor-pointer"
+            >
+              <Pencil size={11} /> Edit allocation
+            </button>
+          )}
+        </div>
+        <dl>
+          <Row label="Project Value" value={formatCurrency(projectValue)} mono />
+          <Row label="White Billing (GST)" value={formatCurrency(allocation.whiteAmount)} mono />
+          <Row label="Black Billing (Non-GST)" value={formatCurrency(allocation.blackAmount)} mono />
+          <Row label="GST Amount" value={formatCurrency(allocation.gstAmount)} mono />
+          <Row label="Base Amount Allocated" value={formatCurrency(allocation.allocated)} mono />
+          <Row label="White Billed" value={formatCurrency(billingStatus.whiteBilled)} mono />
+          <Row label="Black Billed" value={formatCurrency(billingStatus.blackBilled)} mono />
+          <Row label="Remaining Billable" value={formatCurrency(billingStatus.remaining)} mono />
+        </dl>
+        <p className="text-[10px] text-slate-400 mt-2">
+          GST applies only to the White leg. Black leg is non-taxable allocation and remains fully reported here.
+        </p>
+      </Card>
+
+      {/* Billing history across multiple invoices */}
+      <Card title="Billing History" icon={ReceiptText}>
+        <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+          {['All', 'White', 'Black'].map((f) => (
+            <button
+              key={f}
+              type="button"
+              onClick={() => setHistoryFilter(f)}
+              className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border cursor-pointer ${
+                historyFilter === f
+                  ? 'bg-[#1F2E4A] text-white border-[#1F2E4A]'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              {f === 'White' ? 'White Billing' : f === 'Black' ? 'Black Billing' : 'All'}
+            </button>
+          ))}
+          <span className="text-[10px] text-slate-400 ml-auto">
+            {billingStatus.consumed.length} billed · {billingStatus.invoices.length} records
+          </span>
+        </div>
+        {filteredHistory.length === 0 ? (
+          <p className="text-[11px] text-slate-400">No invoices recorded against this project yet.</p>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-0.5">
+            {filteredHistory.map((inv) => {
+              const legs = getInvoiceBillingLegs(inv);
+              const total = Number(inv.total ?? inv.grandTotal ?? inv.amount ?? 0) || 0;
+              const paid = paidFor(inv);
+              const outstanding = Math.max(0, total - paid);
+              return (
+                <div key={inv.id} className="rounded-lg border border-slate-200 px-3 py-2">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[11px] font-bold text-slate-800 font-mono">{inv.invoiceNumber}</span>
+                    <span className="flex items-center gap-1.5">
+                      <Badge>{billingTypeLabel(legs.type)}</Badge>
+                      <Badge>{inv.status}</Badge>
+                    </span>
+                  </div>
+                  <dl className="mt-1.5">
+                    <Row label="White Base" value={formatCurrency(legs.whiteBase)} mono />
+                    <Row label="Black Base" value={formatCurrency(legs.blackBase)} mono />
+                    <Row label="GST" value={formatCurrency(legs.gstAmount)} mono />
+                    <Row label="Invoice Total" value={formatCurrency(total)} mono />
+                    <Row
+                      label="Paid / Outstanding"
+                      value={`${formatCurrency(paid)} / ${formatCurrency(outstanding)}`}
+                      mono
+                    />
+                  </dl>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      {editOpen && (
+        <Modal
+          isOpen={editOpen}
+          onClose={() => setEditOpen(false)}
+          title="Edit Billing Allocation"
+          subtitle="Previously created invoices are never rewritten."
+          size="lg"
+          footer={
+            <>
+              <Button variant="secondary" onClick={() => setEditOpen(false)} type="button">
+                Cancel
+              </Button>
+              <Button onClick={saveBilling} type="button">
+                Save Allocation
+              </Button>
+            </>
+          }
+        >
+          <BillingAllocationCard projectValue={projectValue} value={draftBilling} onChange={setDraftBilling} compact />
+        </Modal>
+      )}
     </div>
   );
 }

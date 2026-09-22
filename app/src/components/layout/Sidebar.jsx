@@ -565,6 +565,8 @@ export default function Sidebar() {
     [pmsProjects, pmsCurrentUserId]
   );
 
+  
+
   useEffect(() => {
     function handleClickOutside(e) {
       if (profileRef.current && !profileRef.current.contains(e.target)) {

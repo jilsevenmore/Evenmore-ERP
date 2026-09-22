@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { usePmsStore } from '../../stores/pmsStore';
 import { StatCard } from '../../components/ui/StatCard';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -11,6 +12,14 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
+import {
+    BILLING_TYPES,
+    billingTypeLabel,
+    getInvoiceBillingLegs,
+    getProjectBillingStatus,
+    getProjectValue,
+    round2,
+} from '../../utils/billingAllocation';
 
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
@@ -81,6 +90,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [dueDate, setDueDate] = useState(() => addDaysISO(getCurrentISODate(), 30));
     const [notes, setNotes] = useState('');
     const [lineItems, setLineItems] = useState([]);
+    // Billing allocation (frontend-only White/Black split)
+    const [billingType, setBillingType] = useState(BILLING_TYPES.WHITE);
+    const [splitWhite, setSplitWhite] = useState('');
+    const [billingError, setBillingError] = useState('');
+    const pmsProjects = usePmsStore((s) => s.projects);
     const [billingAddress, setBillingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
     const [shippingAddress, setShippingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
     const [sameAsBilling, setSameAsBilling] = useState(true);
@@ -161,6 +175,9 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setLineItems([]);
         setSameAsBilling(true);
         setErrorMessage('');
+        setBillingType(BILLING_TYPES.WHITE);
+        setSplitWhite('');
+        setBillingError('');
         setShowCreateModal(true);
     };
 
@@ -177,8 +194,33 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setLineItems(inv.items || []);
         setSameAsBilling(false);
         setErrorMessage('');
+        const legs = getInvoiceBillingLegs(inv);
+        setBillingType(legs.type || BILLING_TYPES.WHITE);
+        setSplitWhite(legs.type === BILLING_TYPES.SPLIT ? String(legs.whiteBase ?? '') : '');
+        setBillingError('');
         setShowCreateModal(true);
     };
+
+    // Project linked via selected sales order (project.crmOrderId <-> SO).
+    const linkedProject = useMemo(() => {
+        if (linkedSoId === 'None') return null;
+        const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
+        if (!so) return null;
+        return (pmsProjects || []).find((p) => p.crmOrderId === so.orderNumber || p.crmOrderId === so.id) || null;
+    }, [linkedSoId, salesOrders, pmsProjects]);
+
+    const linkedBillingStatus = useMemo(() => {
+        if (!linkedProject) return null;
+        return getProjectBillingStatus(linkedProject, invoices, salesOrders);
+    }, [linkedProject, invoices, salesOrders]);
+
+    const formTaxable = useMemo(() => {
+        return (lineItems || []).reduce((sum, it) => {
+            const lineSub = Number(it.rate || 0) * Number(it.qty || 1);
+            const lineDisc = Number(it.discount || it.discountPercent || 0);
+            return sum + Math.max(0, lineSub - (lineSub * lineDisc) / 100);
+        }, 0);
+    }, [lineItems]);
 
     const handleSaveInvoice = (statusTarget) => {
         const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
@@ -227,8 +269,48 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             sgst = Math.round((totalTax - cgst) * 100) / 100;
         }
 
+        // Billing allocation legs — GST only on the white leg.
+        let whiteBase = round2(taxableAmount);
+        let blackBase = 0;
+        if (billingType === BILLING_TYPES.BLACK) {
+            whiteBase = 0;
+            blackBase = round2(taxableAmount);
+            totalTax = 0;
+            cgst = 0;
+            sgst = 0;
+            igst = 0;
+        } else if (billingType === BILLING_TYPES.SPLIT) {
+            const requested = splitWhite === '' ? taxableAmount : Number(splitWhite);
+            const clamped = Math.min(Math.max(0, Number.isFinite(requested) ? requested : 0), taxableAmount);
+            whiteBase = round2(clamped);
+            blackBase = round2(taxableAmount - whiteBase);
+            const avgRate = taxableAmount > 0 ? totalTax / taxableAmount : 0.18;
+            totalTax = round2(whiteBase * avgRate);
+            if (isInterState) {
+                igst = totalTax;
+                cgst = 0;
+                sgst = 0;
+            } else {
+                cgst = Math.round((totalTax / 2) * 100) / 100;
+                sgst = Math.round((totalTax - cgst) * 100) / 100;
+                igst = 0;
+            }
+        }
+
         const grandTotal = Math.round((taxableAmount + cgst + sgst + igst) * 100) / 100;
         const effectiveShipAddress = sameAsBilling ? billingAddress : shippingAddress;
+
+        // Prevent over-allocation against the linked project (cancelled invoices free up balance).
+        if (linkedBillingStatus && !editingDraftTarget) {
+            const newBase = round2(whiteBase + blackBase);
+            if (newBase - linkedBillingStatus.remaining > 0.01) {
+                setBillingError(
+                    `Exceeds remaining allocatable ${formatCurrency(linkedBillingStatus.remaining)} for project ${linkedProject.id}. Reduce the invoice base by ${formatCurrency(newBase - linkedBillingStatus.remaining)}.`
+                );
+                return;
+            }
+        }
+        setBillingError('');
 
         // Check if Delivery Challan exists for linked SO
         const hasChallan = Boolean(
@@ -255,6 +337,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 total: grandTotal,
                 grandTotal,
                 notes,
+                projectId: linkedProject?.id || editingDraftTarget.projectId || null,
+                billingType,
+                billingMode: billingType,
+                whiteAmount: whiteBase,
+                blackAmount: blackBase,
+                whiteBase,
+                blackBase,
+                whiteGst: billingType === BILLING_TYPES.BLACK ? 0 : totalTax,
+                taxTreatment: billingType === BILLING_TYPES.BLACK ? 'NON_GST' : 'GST',
             });
             setShowCreateModal(false);
             setEditingDraftTarget(null);
@@ -294,6 +385,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             balanceDue: isPaid ? 0 : grandTotal,
             notes,
             dispatchedViaChallan: hasChallan,
+            projectId: linkedProject?.id || null,
+            billingType,
+            billingMode: billingType,
+            whiteAmount: whiteBase,
+            blackAmount: blackBase,
+            whiteBase,
+            blackBase,
+            whiteGst: billingType === BILLING_TYPES.BLACK ? 0 : totalTax,
+            taxTreatment: billingType === BILLING_TYPES.BLACK ? 'NON_GST' : 'GST',
         };
 
         const created = onCreateInvoice(newInvoicePayload);
@@ -577,6 +677,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 <th className="py-3 px-6 whitespace-nowrap">Invoice #</th>
                                 <th className="py-3 px-6 whitespace-nowrap">Customer</th>
                                 <th className="py-3 px-6 whitespace-nowrap">Linked SO</th>
+                                <th className="py-3 px-6 whitespace-nowrap">Billing Type</th>
                                 <th className="py-3 px-6 whitespace-nowrap">Invoice Date</th>
                                 <th className="py-3 px-6 whitespace-nowrap">Status</th>
                                 <th className="py-3 px-6 text-right whitespace-nowrap">Total</th>
@@ -587,7 +688,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                         <tbody className="divide-y divide-slate-100 text-slate-700">
                             {paginatedInvoices.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="py-8 text-center text-slate-400">
+                                    <td colSpan={9} className="py-8 text-center text-slate-400">
                                         No sales invoices match the current filter.
                                     </td>
                                 </tr>
@@ -608,6 +709,17 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             </td>
                                             <td className="py-2.5 px-6 text-slate-500 font-mono text-[11px]">
                                                 {inv.linkedSo || '-'}
+                                            </td>
+                                            <td className="py-2.5 px-6">
+                                                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+                                                    (inv.billingType || inv.billingMode) === 'BLACK'
+                                                        ? 'bg-[#1F2E4A] text-white border-[#1F2E4A]'
+                                                        : (inv.billingType || inv.billingMode) === 'SPLIT'
+                                                            ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                                            : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                }`}>
+                                                    {(inv.billingType || inv.billingMode) === 'BLACK' ? 'Black (Non-GST)' : (inv.billingType || inv.billingMode) === 'SPLIT' ? 'Split' : 'White (GST)'}
+                                                </span>
                                             </td>
                                             <td className="py-2.5 px-6 text-slate-600 font-mono text-[11px]">
                                                 {formatDateDDMMYYYY(inv.date)}
@@ -746,6 +858,93 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     <label className="font-semibold text-slate-700">Payment Due Date</label>
                                     <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800"/>
                                 </div>
+                            </div>
+
+                            {/* BILLING ALLOCATION — White (GST) / Black (Non-GST) */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <h4 className="font-bold text-slate-800">Billing Type</h4>
+                                    <div className="flex items-center gap-1.5">
+                                        {[BILLING_TYPES.WHITE, BILLING_TYPES.BLACK, BILLING_TYPES.SPLIT].map((t) => (
+                                            <label
+                                                key={t}
+                                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-full border cursor-pointer ${
+                                                    billingType === t
+                                                        ? 'bg-[#1F2E4A] text-white border-[#1F2E4A]'
+                                                        : 'bg-white text-slate-600 border-slate-300'
+                                                }`}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    className="sr-only"
+                                                    checked={billingType === t}
+                                                    onChange={() => setBillingType(t)}
+                                                />
+                                                {t === BILLING_TYPES.WHITE ? 'White (GST)' : t === BILLING_TYPES.BLACK ? 'Black (Non-GST)' : 'Split'}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-500">
+                                    GST applies only to the White leg. Non-GST allocation must be used only where the applicable tax treatment permits it.
+                                </p>
+                                {linkedProject && linkedBillingStatus ? (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] bg-white rounded-lg border border-slate-200 p-2.5">
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 font-semibold uppercase">Project Value</p>
+                                            <p className="font-bold text-slate-800">{formatCurrency(getProjectValue(linkedProject))}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 font-semibold uppercase">Already Billed</p>
+                                            <p className="font-bold text-slate-800">
+                                                {formatCurrency(linkedBillingStatus.baseBilled)} <span className="font-normal text-slate-400">(W {formatCurrency(linkedBillingStatus.whiteBilled)} · B {formatCurrency(linkedBillingStatus.blackBilled)})</span>
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 font-semibold uppercase">Remaining</p>
+                                            <p className="font-bold text-emerald-700">{formatCurrency(linkedBillingStatus.remaining)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] text-slate-400 font-semibold uppercase">This Invoice Base</p>
+                                            <p className="font-bold text-slate-800">{formatCurrency(formTaxable)}</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-[10px] text-slate-400">
+                                        Link a sales order tied to a project to check available allocation. Cancelled invoices automatically return to remaining.
+                                    </p>
+                                )}
+                                {billingType === BILLING_TYPES.SPLIT && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        <div className="flex flex-col gap-1">
+                                            <label className="font-semibold text-slate-700">White portion (GST base)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                max={formTaxable}
+                                                step="any"
+                                                value={splitWhite}
+                                                onChange={(e) => setSplitWhite(e.target.value)}
+                                                placeholder={String(round2(formTaxable))}
+                                                className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                            <label className="font-semibold text-slate-700">Black portion (auto)</label>
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={formatCurrency(Math.max(0, formTaxable - (splitWhite === '' ? formTaxable : Number(splitWhite) || 0)))}
+                                                className="border border-slate-200 rounded-xl px-3 py-2 bg-slate-100 text-slate-700 font-medium"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                                {billingError && (
+                                    <p className="text-[11px] font-semibold text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
+                                        {billingError}
+                                    </p>
+                                )}
                             </div>
 
                             {/* BILL TO & SHIP TO ADDRESS SECTION */}
@@ -954,6 +1153,38 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             {/* Related Docs */}
                             <RelatedDocumentsCard documents={getInvoiceRelatedDocs(selectedInvoice)}/>
 
+                            {/* Billing allocation legs */}
+                            {(() => {
+                                const legs = getInvoiceBillingLegs(selectedInvoice);
+                                const outstanding = getInvoiceOutstanding(selectedInvoice.id);
+                                return (
+                                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-slate-400">Billing Type</p>
+                                            <p className="font-bold text-slate-800">{billingTypeLabel(legs.type)}</p>
+                                            <p className="text-[10px] text-slate-400">{selectedInvoice.taxTreatment === 'NON_GST' || legs.type === 'BLACK' ? 'Non-GST' : 'GST'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-slate-400">White Base</p>
+                                            <p className="font-bold text-slate-800 font-mono">{formatCurrency(legs.whiteBase)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-slate-400">Black Base</p>
+                                            <p className="font-bold text-slate-800 font-mono">{formatCurrency(legs.blackBase)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-slate-400">GST</p>
+                                            <p className="font-bold text-slate-800 font-mono">{formatCurrency(legs.gstAmount)}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-bold uppercase text-slate-400">Paid / Outstanding</p>
+                                            <p className="font-bold text-slate-800 font-mono">{formatCurrency(outstanding.paid)} / {formatCurrency(outstanding.balanceDue)}</p>
+                                            <p className="text-[10px] text-slate-400">{outstanding.status}</p>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
                             {/* Items */}
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between">
@@ -1083,6 +1314,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     {(!cancelModalTarget.dispatchedViaChallan) && (
                                         <li>Reverse inventory stock movement exactly once</li>
                                     )}
+                                    <li>Return the allocated White/Black base to the project's remaining billable amount (history kept)</li>
                                     <li>Mark invoice as <strong className="text-rose-600">Cancelled</strong></li>
                                 </ul>
                             </div>

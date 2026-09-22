@@ -1,5 +1,8 @@
 import { create } from "zustand";
+<<<<<<< Updated upstream
 import { lazyStoreForKeys } from "../services/lazyModules";
+=======
+>>>>>>> Stashed changes
 import { hrmsSync } from "../services/hrmsSync";
 import * as hrmsApi from "../services/hrmsSync";
 
@@ -30,7 +33,11 @@ function loadTheme() {
   return "light";
 }
 
+<<<<<<< Updated upstream
 const useAppStoreBase = create((set) => ({
+=======
+export const useAppStore = create((set) => ({
+>>>>>>> Stashed changes
   // Theme state
   theme: loadTheme(),
   setTheme: (theme) => {
