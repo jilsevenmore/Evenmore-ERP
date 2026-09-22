@@ -23,6 +23,8 @@ import {
   Fingerprint,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { useAttendanceStore } from '../../stores/attendanceStore';
+import { attendanceEmployees } from '../../data/hrms/mocks/attendanceExtended';
 import LanguageSelector from '../common/LanguageSelector';
 import { useTranslation } from '../../i18n';
 import { useERP } from '../../context/ERPContext';
@@ -37,7 +39,6 @@ const THEMES = [
 ];
 
 const QUICK_ACTION_DEFS = [
-  { key: 'punchIn', path: '/hrms/attendance/today', icon: Fingerprint, color: 'text-emerald-600 bg-emerald-50' },
   { key: 'createLead', path: '/crm/leads', icon: UserPlus, color: 'text-blue-500 bg-blue-50' },
   { key: 'createSalesOrder', path: '/sales/orders', icon: ShoppingCart, color: 'text-indigo-500 bg-indigo-50' },
   { key: 'createTaxInvoice', path: '/sales/invoices', icon: Receipt, color: 'text-emerald-500 bg-emerald-50' },
@@ -62,6 +63,12 @@ export default function Topbar() {
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
   const theme = useAppStore((s) => s.theme) || 'light';
   const setTheme = useAppStore((s) => s.setTheme);
+  const currentUser = useAppStore((s) => s.currentUser || {});
+  const storeEmployees = useAppStore((s) => s.employees || []);
+  const setToast = useAppStore((s) => s.setToast || s.showToast);
+  const punchRecords = useAttendanceStore((s) => s.punchRecords || []);
+  const attendancePunchIn = useAttendanceStore((s) => s.punchIn);
+  const attendancePunchOut = useAttendanceStore((s) => s.punchOut);
 
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -150,6 +157,78 @@ export default function Topbar() {
   const crmUnreadCount = crmDigest.counts?.unread || crmDigest.counts?.total || 0;
   const totalUnreadCount = erpUnreadCount + crmUnreadCount;
   const totalNotifCount = (crmDigest.reminders?.length || 0) + (crmDigest.notifications?.length || 0) + erpNotifications.length;
+
+  // ── Instant Punch In / Out (icon shortcut) ──
+  const currentEmp = useMemo(() => {
+    const map = new Map();
+    [...attendanceEmployees, ...storeEmployees].forEach((e) => {
+      if (!e || !e.id) return;
+      const ext = attendanceEmployees.find((x) => x.id === e.id);
+      map.set(e.id, {
+        id: e.id,
+        name: e.name,
+        shift: ext?.shift || e.shift || 'General',
+        location: e.location || ext?.location || null,
+      });
+    });
+    const list = [...map.values()];
+    if (list.length === 0) return null;
+    const matched = list.find(
+      (e) => e.name?.toLowerCase() === String(currentUser?.name || '').toLowerCase()
+    );
+    return matched || list[0];
+  }, [storeEmployees, currentUser]);
+
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+  }, []);
+
+  const todaySession = useMemo(
+    () => punchRecords.find((r) => r.employeeId === currentEmp?.id && r.date === todayIso) || null,
+    [punchRecords, currentEmp, todayIso]
+  );
+  const hasPunchedIn = Boolean(todaySession?.punchIn);
+  const hasPunchedOut = Boolean(todaySession?.punchOut);
+
+  const punchTitle = !hasPunchedIn
+    ? (t('header.punchIn') || 'Punch In')
+    : !hasPunchedOut
+      ? 'Punch Out'
+      : 'Attendance done for today';
+
+  const handlePunchClick = () => {
+    setIsThemeOpen(false);
+    setIsQuickAddOpen(false);
+    setIsNotifOpen(false);
+    // No redirect — stay on current page, only toast
+    if (!currentEmp) {
+      setToast?.('No employee found for Punch In.');
+      return;
+    }
+    if (!hasPunchedIn) {
+      attendancePunchIn({
+        employeeId: currentEmp.id,
+        employeeName: currentEmp.name,
+        date: todayIso,
+        shift: currentEmp.shift,
+        branch: currentEmp.location,
+      });
+      const now = new Date();
+      let h = now.getHours();
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      setToast?.(`Punch In Successful · ${h}:${m} ${suffix}`);
+    } else if (!hasPunchedOut) {
+      attendancePunchOut(currentEmp.id, { date: todayIso });
+      setToast?.('Punch Out Successful · Attendance record updated.');
+    } else {
+      setToast?.('Already Punched In for today.');
+    }
+  };
 
   // Close popovers on click outside
   useEffect(() => {
@@ -513,6 +592,25 @@ export default function Topbar() {
               </div>
             )}
           </div>
+
+          {/* Punch In / Out Shortcut — stays green while punched-in */}
+          <button
+            type="button"
+            onClick={handlePunchClick}
+            className="w-9 h-9 rounded-xl border flex items-center justify-center transition cursor-pointer relative shadow-2xs"
+            style={
+              hasPunchedIn && !hasPunchedOut
+                ? { background: '#10b981', borderColor: '#059669', color: '#ffffff' }
+                : { background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text)' }
+            }
+            aria-label={punchTitle}
+            title={punchTitle}
+          >
+            <Fingerprint size={16} color={hasPunchedIn && !hasPunchedOut ? '#ffffff' : 'currentColor'} />
+            {hasPunchedIn && !hasPunchedOut && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-300 rounded-full ring-2 ring-white animate-pulse" />
+            )}
+          </button>
 
           {/* Calendar Shortcut */}
           <Link
