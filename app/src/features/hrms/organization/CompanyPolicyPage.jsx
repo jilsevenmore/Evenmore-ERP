@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CompanyPolicyModule } from "../policy/CompanyPolicyModule";
 import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { usePolicyStore } from "../../../stores/policyStore";
 import {
   FileText,
   CheckCircle2,
@@ -88,10 +89,18 @@ const INITIAL_POLICIES = [
 
 export function LegacyCompanyPolicyPage() {
   const showToast = useAppStore((s) => s.showToast);
-  const [policies, setPolicies] = useState(INITIAL_POLICIES);
+  const storePolicies = usePolicyStore((s) => s.policies);
+  const [policies, setPolicies] = useState(() => (storePolicies && storePolicies.length > 0 ? storePolicies : INITIAL_POLICIES));
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [selectedPolicy, setSelectedPolicy] = useState(policies[0]);
+  const [selectedPolicy, setSelectedPolicy] = useState(() => (storePolicies && storePolicies.length > 0 ? storePolicies[0] : INITIAL_POLICIES[0]));
+
+  useEffect(() => {
+    if (storePolicies && storePolicies.length > 0) {
+      setPolicies(storePolicies);
+      setSelectedPolicy((prev) => storePolicies.find((p) => p.id === prev?.id) || storePolicies[0]);
+    }
+  }, [storePolicies]);
   const [acknowledgedMap, setAcknowledgedMap] = useState({ "POL-01": true });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newPolicy, setNewPolicy] = useState({

@@ -2,7 +2,7 @@ import DealDetailView from './DealDetailView';
 import CrmKpiCard from '../common/CrmKpiCard';
 import Modal from '../../../components/ui/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -36,10 +36,12 @@ import {
   SlidersHorizontal,
   Printer,
   Info,
+  ShoppingCart,
 } from 'lucide-react';
 
 import { loadDeals, saveDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
 import { useCrmStore } from '../../../stores/crmStore';
+import { useERP } from '../../../context/ERPContext';
 
 const STAGES = ['Draft', 'Sent', 'Open', 'Won', 'Lost'];
 const PRODUCTS = ['All Products', 'Diamond Jewelry', 'Gold Ornaments', 'Silver Collection', 'Laser Machine', 'CNC Spindle', 'AMC Service'];
@@ -122,6 +124,8 @@ function formatStageSummary(totalAmount, count) {
 }
 
 export default function DealsPage() {
+  const { addQuotation, addSalesOrder, customers } = useERP() || {};
+  const navigate = useNavigate();
   const storeDeals = useCrmStore((s) => s.deals);
   const [deals, setDeals] = useState([]);
 
@@ -447,6 +451,82 @@ export default function DealsPage() {
     );
     setOpenMenuDealId(null);
     showNotification(`Deal moved to ${targetStage}`);
+  };
+
+  const handleCreateErpQuotation = (deal) => {
+    const matchedCustomer = (customers || []).find((c) => 
+      c.name?.toLowerCase() === deal.client?.toLowerCase() ||
+      c.company?.toLowerCase() === deal.client?.toLowerCase()
+    ) || (customers || [])[0];
+
+    const dealAmount = Number(deal.price) || 0;
+    const items = [
+      {
+        id: `item-${Date.now()}-1`,
+        name: deal.product || deal.name || 'Custom Product / Service',
+        description: `Generated from CRM Deal: ${deal.name}`,
+        qty: 1,
+        rate: dealAmount,
+        amount: dealAmount,
+      }
+    ];
+
+    const quote = addQuotation?.({
+      customerId: matchedCustomer?.id,
+      customer: deal.client || matchedCustomer?.name || 'Acme Corp',
+      dealId: String(deal.id || ''),
+      dealName: deal.name || '',
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      validUntil: '30 Days',
+      amount: dealAmount,
+      status: 'Draft',
+      items,
+      notes: `Created from CRM Deal: ${deal.name} (${deal.stage || 'Draft'})`,
+    });
+
+    setOpenMenuDealId(null);
+    showNotification(`Quotation ${quote?.quoteNumber || ''} created in ERP!`);
+    if (quote?.id) {
+      navigate('/sales/quotations');
+    }
+  };
+
+  const handleCreateErpSalesOrder = (deal) => {
+    const matchedCustomer = (customers || []).find((c) => 
+      c.name?.toLowerCase() === deal.client?.toLowerCase() ||
+      c.company?.toLowerCase() === deal.client?.toLowerCase()
+    ) || (customers || [])[0];
+
+    const dealAmount = Number(deal.price) || 0;
+    const items = [
+      {
+        id: `item-${Date.now()}-1`,
+        name: deal.product || deal.name || 'Custom Product / Service',
+        description: `Generated from CRM Deal: ${deal.name}`,
+        qty: 1,
+        orderedQty: 1,
+        rate: dealAmount,
+        amount: dealAmount,
+      }
+    ];
+
+    const order = addSalesOrder?.({
+      customerId: matchedCustomer?.id,
+      customer: deal.client || matchedCustomer?.name || 'Acme Corp',
+      dealId: String(deal.id || ''),
+      dealName: deal.name || '',
+      amount: dealAmount,
+      stage: deal.stage === 'Won' ? 'Confirmed' : 'Draft',
+      status: deal.stage === 'Won' ? 'Confirmed' : 'Draft',
+      items,
+      notes: `Created from CRM Deal: ${deal.name}`,
+    });
+
+    setOpenMenuDealId(null);
+    showNotification(`Sales Order ${order?.orderNumber || ''} created in ERP!`);
+    if (order?.id) {
+      navigate('/sales/orders');
+    }
   };
 
   const toggleExpandColumn = (st) => {
@@ -919,6 +999,26 @@ export default function DealsPage() {
                                     ))}
                                   </div>
 
+                                  <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
+                                    ERP Conversion
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCreateErpQuotation(deal)}
+                                    className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <FileText size={12} className="text-blue-600" />
+                                    <span>Create Quotation</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCreateErpSalesOrder(deal)}
+                                    className="w-full px-3.5 py-1.5 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <ShoppingCart size={12} className="text-emerald-600" />
+                                    <span>Create Sales Order</span>
+                                  </button>
+
                                   <div className="my-1 border-t border-slate-100" />
 
                                   <button
@@ -1054,6 +1154,24 @@ export default function DealsPage() {
                     <td className="py-3.5 px-4 text-slate-500">{deal.date}</td>
                     <td className="py-3.5 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleCreateErpQuotation(deal)}
+                          className="p-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 cursor-pointer"
+                          title="Create Quotation in ERP"
+                          aria-label={`Create quotation for ${deal.name}`}
+                        >
+                          <FileText size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCreateErpSalesOrder(deal)}
+                          className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg border border-emerald-200 cursor-pointer"
+                          title="Create Sales Order in ERP"
+                          aria-label={`Create sales order for ${deal.name}`}
+                        >
+                          <ShoppingCart size={13} />
+                        </button>
                         <button
                           onClick={() => handleOpenDealDetail(deal)}
                           className="p-1.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 cursor-pointer"

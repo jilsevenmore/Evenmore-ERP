@@ -171,7 +171,9 @@ export default function MarkAttendance() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  // Sync rows if store records change externally
+  const storeEmployees = useAppStore((s) => s.employees);
+
+  // Sync rows if store records or employees change
   useEffect(() => {
     if (storeRecords && storeRecords.length > 0) {
       setRows((prev) => {
@@ -185,8 +187,26 @@ export default function MarkAttendance() {
           };
         });
       });
+    } else if (storeEmployees && storeEmployees.length > 0) {
+      setRows((prev) => {
+        return storeEmployees.map((emp, i) => {
+          const empId = emp.empId || emp.id || `EMP${1024 + i}`;
+          const existing = prev.find((p) => p.id === empId);
+          return {
+            id: empId,
+            name: emp.name,
+            dept: emp.department || 'Engineering',
+            checkIn: '09:00',
+            checkOut: '18:00',
+            status: 'Present',
+            remarks: existing ? existing.remarks : '',
+            checked: existing ? existing.checked : false,
+            avatar: emp.avatar || `https://i.pravatar.cc/100?u=${empId}`,
+          };
+        });
+      });
     }
-  }, [storeRecords]);
+  }, [storeRecords, storeEmployees]);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {

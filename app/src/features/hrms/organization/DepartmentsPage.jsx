@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import { Badge } from '../../../components/hrms/Badge';
 import Modal from '../../../components/ui/Modal';
 import PageInfoButton from '../../../components/common/PageInfoButton';
 import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
+import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import {
   Building2,
   Plus,
@@ -32,12 +33,27 @@ export function DepartmentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newDept, setNewDept] = useState({ name: '', head: 'David Park', budget: '$250,000' });
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const rows = await hrmsSync.pull('departments');
+        if (active && Array.isArray(rows) && rows.length > 0) {
+          setDepartments(rows);
+        }
+      } catch (err) {
+        console.warn('[DepartmentsPage] Failed to pull departments:', err);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   const filtered = departments.filter((d) =>
     String(d.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
     String(d.head ?? '').toLowerCase().includes(q.toLowerCase())
   );
 
-  function handleCreate(e) {
+  async function handleCreate(e) {
     e.preventDefault();
     if (!newDept.name.trim()) return;
     const created = {
@@ -52,6 +68,13 @@ export function DepartmentsPage() {
       status: 'Active',
     };
     setDepartments([created, ...departments]);
+    try {
+      if (isBackendEnabled()) {
+        await hrmsSync.create('departments', created);
+      }
+    } catch (err) {
+      console.warn('[DepartmentsPage] Failed to create department on server:', err);
+    }
     showToast(`Department "${newDept.name}" created successfully`);
     setIsModalOpen(false);
     setNewDept({ name: '', head: 'David Park', budget: '$250,000' });

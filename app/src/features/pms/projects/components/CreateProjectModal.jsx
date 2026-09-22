@@ -26,7 +26,7 @@ function todayLocalDate() {
   return d.toISOString().slice(0, 10);
 }
 
-export function CreateProjectModal({ isOpen, onClose, onCreated }) {
+export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNumber = '' }) {
   const projects = usePmsStore((s) => s.projects);
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
   const employees = usePmsStore((s) => s.employees);
@@ -68,7 +68,12 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
     return map;
   }
 
-  const [orderNumber, setOrderNumber] = useState('');
+  const [orderNumber, setOrderNumber] = useState(initialOrderNumber || '');
+  React.useEffect(() => {
+    if (initialOrderNumber && isOpen) {
+      setOrderNumber(initialOrderNumber);
+    }
+  }, [initialOrderNumber, isOpen]);
   const [managerId, setManagerId] = useState('');
   const [priority, setPriority] = useState('Medium');
   const [startDate, setStartDate] = useState(todayLocalDate());

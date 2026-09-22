@@ -56,6 +56,8 @@ export default function BulkAttendance() {
     return INITIAL_EMPLOYEES;
   });
 
+  const storeEmployees = useAppStore((s) => s.employees);
+
   useEffect(() => {
     if (storeRecords && storeRecords.length > 0) {
       setEmployees(
@@ -67,8 +69,18 @@ export default function BulkAttendance() {
           avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
         }))
       );
+    } else if (storeEmployees && storeEmployees.length > 0) {
+      setEmployees(
+        storeEmployees.map((emp, i) => ({
+          id: emp.empId || emp.id || `EMP${1024 + i}`,
+          name: emp.name,
+          dept: emp.department || "Engineering",
+          status: "Present",
+          avatar: emp.avatar || `https://i.pravatar.cc/100?u=${emp.id || emp.name}`,
+        }))
+      );
     }
-  }, [storeRecords]);
+  }, [storeRecords, storeEmployees]);
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState("Present");

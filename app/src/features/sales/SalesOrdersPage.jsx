@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban } from 'lucide-react';
+import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban, Layers } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -12,6 +12,8 @@ import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCa
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderModal';
+import { usePmsStore } from '../../stores/pmsStore';
+import { CreateProjectModal } from '../pms/projects/components/CreateProjectModal';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -33,6 +35,8 @@ const salesOrderGuide = {
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
     const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
+    const pmsProjects = usePmsStore((s) => s.projects || []);
+    const [pmsModalOrder, setPmsModalOrder] = useState(null);
     const [stageFilter, setStageFilter] = useState('All');
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -285,10 +289,27 @@ export const SalesOrdersPage = () => {
         {
             key: 'orderNumber',
             header: 'Sales Order #',
-            width: '13%',
-            render: (o) => (<button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
-          <ShoppingCart size={13} className="text-muted"/> {o.orderNumber}
-        </button>),
+            width: '14%',
+            render: (o) => {
+                const linkedPms = pmsProjects.find((p) => p.crmOrderId === o.orderNumber);
+                return (
+                  <div className="flex flex-col gap-1">
+                    <button onClick={() => setSelectedOrder(o)} className="font-mono font-bold text-primary hover:underline flex items-center gap-1.5 text-left cursor-pointer whitespace-nowrap">
+                      <ShoppingCart size={13} className="text-muted"/> {o.orderNumber}
+                    </button>
+                    {linkedPms && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); navigate(`/pms/projects/${linkedPms.id}`); }}
+                        className="font-mono text-[10px] font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 border border-violet-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit cursor-pointer transition-colors"
+                        title={`View linked PMS Project ${linkedPms.code} (${linkedPms.status || 'Active'})`}
+                      >
+                        <Layers size={10} /> {linkedPms.code} ({linkedPms.overallCompletionPct ?? 0}%)
+                      </button>
+                    )}
+                  </div>
+                );
+            },
         },
         {
             key: 'customer',
@@ -369,9 +390,20 @@ export const SalesOrdersPage = () => {
             {o.stage === 'Draft' && (<button onClick={() => advanceStage(o.id, 'Draft')} className="px-2.5 py-1 bg-primary text-white rounded-md text-xs font-semibold hover:bg-primary-hover cursor-pointer shadow-xs transition-colors whitespace-nowrap inline-flex items-center gap-1">
                 Confirm Order
               </button>)}
-            {o.stage === 'Confirmed' && (<button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
-                <Truck size={12}/> Issue Challan
-              </button>)}
+            {o.stage === 'Confirmed' && (<>
+                {!pmsProjects.some((p) => p.crmOrderId === o.orderNumber) && (
+                  <button
+                    onClick={() => setPmsModalOrder(o.orderNumber)}
+                    className="px-2 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
+                    title="Convert this Confirmed Sales Order into a PMS Production Project"
+                  >
+                    <Layers size={12}/> PMS Project
+                  </button>
+                )}
+                <button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
+                  <Truck size={12}/> Issue Challan
+                </button>
+              </>)}
             {(o.stage === 'Delivered' || o.stage === 'Dispatched') && (<button onClick={() => advanceStage(o.id, 'Delivered')} className="px-2.5 py-1 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
                 <Receipt size={12}/> Invoice
               </button>)}
@@ -711,6 +743,17 @@ export const SalesOrdersPage = () => {
         isOpen={Boolean(printSalesOrderTarget)}
         onClose={() => setPrintSalesOrderTarget(null)}
         order={printSalesOrderTarget}
+      />
+
+      {/* Connect with PMS: Create Production Project */}
+      <CreateProjectModal
+        isOpen={Boolean(pmsModalOrder)}
+        initialOrderNumber={pmsModalOrder || ''}
+        onClose={() => setPmsModalOrder(null)}
+        onCreated={(id) => {
+          setPmsModalOrder(null);
+          navigate(`/pms/projects/${id}`);
+        }}
       />
     </div>);
 };

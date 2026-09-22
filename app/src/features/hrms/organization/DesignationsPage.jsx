@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import Modal from '../../../components/ui/Modal';
 import PageInfoButton from '../../../components/common/PageInfoButton';
 import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
+import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Plus, Award, Search, Edit2, Trash2 } from 'lucide-react';
 
 const INITIAL_DESIGNATIONS = [
@@ -24,6 +25,21 @@ export function DesignationsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newDesig, setNewDesig] = useState({ title: '', level: 'L4', department: 'Engineering' });
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const rows = await hrmsSync.pull('designations');
+        if (active && Array.isArray(rows) && rows.length > 0) {
+          setDesignations(rows);
+        }
+      } catch (err) {
+        console.warn('[DesignationsPage] Failed to pull designations:', err);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   const filtered = designations.filter(
     (d) =>
       String(d.title ?? '').toLowerCase().includes(q.toLowerCase()) ||
@@ -31,20 +47,32 @@ export function DesignationsPage() {
       String(d.level ?? '').toLowerCase().includes(q.toLowerCase())
   );
 
-  function handleCreate(e) {
+  async function handleCreate(e) {
     e.preventDefault();
     if (!newDesig.title.trim()) return;
-    setDesignations([
-      { id: `DSG-0${designations.length + 1}`, ...newDesig, count: 0 },
-      ...designations,
-    ]);
+    const created = { id: `DSG-0${designations.length + 1}`, ...newDesig, count: 0 };
+    setDesignations([created, ...designations]);
+    try {
+      if (isBackendEnabled()) {
+        await hrmsSync.create('designations', created);
+      }
+    } catch (err) {
+      console.warn('[DesignationsPage] Failed to create designation on server:', err);
+    }
     showToast(`Designation "${newDesig.title}" created successfully`);
     setIsModalOpen(false);
     setNewDesig({ title: '', level: 'L4', department: 'Engineering' });
   }
 
-  function handleDelete(id, title) {
+  async function handleDelete(id, title) {
     setDesignations(designations.filter((x) => x.id !== id));
+    try {
+      if (isBackendEnabled()) {
+        await hrmsSync.remove('designations', id);
+      }
+    } catch (err) {
+      console.warn('[DesignationsPage] Failed to delete designation on server:', err);
+    }
     showToast(`Designation "${title}" removed`);
   }
 

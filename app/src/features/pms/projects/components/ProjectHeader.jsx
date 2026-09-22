@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { formatCurrency } from '../../../../utils/currencyUtils';
@@ -109,13 +109,17 @@ export function ProjectHeader({
           <dl className="flex flex-wrap items-center gap-x-5 gap-y-1 mt-2">
             {[
               ['Customer', project.customerName],
-              ['CRM Order', project.crmOrderId],
+              ['CRM Order', project.crmOrderId ? (
+                <Link to="/sales/orders" className="text-blue-600 hover:underline inline-flex items-center gap-1 font-mono">
+                  <ShoppingCart size={10} /> {project.crmOrderId}
+                </Link>
+              ) : '—'],
               ['Order Value', formatCurrency(project.productDetails?.orderValue ?? 0)],
               ['Current Stage', meta?.sequenceLabel ?? '—'],
             ].map(([k, v]) => (
               <div key={k} className="min-w-0">
                 <dt className="text-[10px] text-slate-400 font-medium">{k}</dt>
-                <dd className="text-[11px] font-semibold text-slate-700 truncate max-w-[220px]" title={String(v)}>
+                <dd className="text-[11px] font-semibold text-slate-700 truncate max-w-[220px]" title={typeof v === 'string' ? v : undefined}>
                   {v}
                 </dd>
               </div>
@@ -137,6 +141,25 @@ export function ProjectHeader({
           <Button size="sm" icon={CheckCircle2} onClick={onCompleteProject} disabled={isClosed}>
             {isClosed ? 'Completed' : 'Complete Project'}
           </Button>
+
+          {isClosed && (
+            <>
+              <Link
+                to="/sales/delivery"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors"
+                title="Generate Delivery Challan for dispatching completed project"
+              >
+                <Truck size={13} /> Issue Challan
+              </Link>
+              <Link
+                to="/sales/invoices"
+                className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg shadow-xs transition-colors"
+                title="Create Commercial Sales Invoice"
+              >
+                <Receipt size={13} /> Create Invoice
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </section>

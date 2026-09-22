@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../../../stores/appStore';
 import Modal from '../../../components/ui/Modal';
 import PageInfoButton from '../../../components/common/PageInfoButton';
 import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
+import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Plus, MapPin, Search, Edit2, Trash2, Globe, Building } from 'lucide-react';
 
 const INITIAL_LOCATIONS = [
@@ -19,25 +20,55 @@ export function LocationsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newLoc, setNewLoc] = useState({ name: '', address: '', timezone: 'EST • UTC-5', type: 'Branch' });
 
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const rows = await hrmsSync.pull('locations');
+        if (active && Array.isArray(rows) && rows.length > 0) {
+          setLocations(rows);
+        }
+      } catch (err) {
+        console.warn('[LocationsPage] Failed to pull locations:', err);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   const filtered = locations.filter((l) =>
     String(l.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
     String(l.address ?? '').toLowerCase().includes(q.toLowerCase())
   );
 
-  function handleCreate(e) {
+  async function handleCreate(e) {
     e.preventDefault();
     if (!newLoc.name.trim()) return;
+    const created = { id: `LOC-0${locations.length + 1}`, ...newLoc, count: 0 };
     setLocations([
       ...locations,
-      { id: `LOC-0${locations.length + 1}`, ...newLoc, count: 0 },
+      created,
     ]);
+    try {
+      if (isBackendEnabled()) {
+        await hrmsSync.create('locations', created);
+      }
+    } catch (err) {
+      console.warn('[LocationsPage] Failed to create location on server:', err);
+    }
     showToast(`Location "${newLoc.name}" added successfully`);
     setIsModalOpen(false);
     setNewLoc({ name: '', address: '', timezone: 'EST • UTC-5', type: 'Branch' });
   }
 
-  function handleDelete(id, name) {
+  async function handleDelete(id, name) {
     setLocations(locations.filter((x) => x.id !== id));
+    try {
+      if (isBackendEnabled()) {
+        await hrmsSync.remove('locations', id);
+      }
+    } catch (err) {
+      console.warn('[LocationsPage] Failed to delete location on server:', err);
+    }
     showToast(`Location "${name}" removed`);
   }
 
