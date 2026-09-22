@@ -142,19 +142,56 @@ export default function Topbar() {
     return list.length > 0 ? list : NOTIFICATIONS;
   }, [lowStockItems, pendingZoneRequests, inTransitChallans, overdueInvoices]);
 
-  const [notifTab, setNotifTab] = useState('all'); // 'all' | 'crm' | 'erp'
+  const [notifTab, setNotifTab] = useState('all'); // 'all' | 'erp' | 'crm_reminders' | 'crm_workflow' | 'crm'
+  const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
+  const sectionMenuRef = useRef(null);
+  const [openSections, setOpenSections] = useState({
+    erp: true,
+    crm: true,
+    workflow: true,
+  });
+  const [showAllReminders, setShowAllReminders] = useState(false);
+  const [showAllWorkflows, setShowAllWorkflows] = useState(false);
 
   const erpUnreadCount = useMemo(() => erpNotifications.filter((n) => n.unread).length, [erpNotifications]);
   const crmUnreadCount = crmDigest.counts?.unread || crmDigest.counts?.total || 0;
   const totalUnreadCount = erpUnreadCount + crmUnreadCount;
   const totalNotifCount = (crmDigest.reminders?.length || 0) + (crmDigest.notifications?.length || 0) + erpNotifications.length;
 
+  const notifSections = useMemo(() => [
+    { id: 'all', label: 'All Notification Sections', count: totalNotifCount },
+    { id: 'erp', label: 'Operational & Stock Alerts', count: erpNotifications.length },
+    { id: 'crm_reminders', label: 'CRM Task Reminders', count: crmDigest.reminders?.length || 0 },
+    { id: 'crm_workflow', label: 'Workflow Updates', count: crmDigest.notifications?.length || 0 },
+    { id: 'crm', label: 'CRM Tasks & Updates', count: crmDigest.counts?.total || 0 },
+  ], [totalNotifCount, erpNotifications.length, crmDigest]);
+
+  const activeSectionObj = notifSections.find((s) => s.id === notifTab) || notifSections[0];
+
+  const toggleSection = (key) => {
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const expandAllSections = () => {
+    setOpenSections({ erp: true, crm: true, workflow: true });
+  };
+
+  const collapseAllSections = () => {
+    setOpenSections({ erp: false, crm: false, workflow: false });
+  };
+
   // Close popovers on click outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (themeRef.current && !themeRef.current.contains(event.target)) setIsThemeOpen(false);
       if (quickAddRef.current && !quickAddRef.current.contains(event.target)) setIsQuickAddOpen(false);
-      if (notifRef.current && !notifRef.current.contains(event.target)) setIsNotifOpen(false);
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setIsNotifOpen(false);
+        setIsSectionMenuOpen(false);
+      }
+      if (sectionMenuRef.current && !sectionMenuRef.current.contains(event.target)) {
+        setIsSectionMenuOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -335,56 +372,94 @@ export default function Topbar() {
                   )}
                 </div>
 
-                {/* Tab Pill Switcher */}
-                <div className="flex items-center gap-1 p-1 mt-2 mb-2.5 rounded-xl bg-soft border border-border text-[11px] font-semibold">
+                {/* Section Selector Dropdown */}
+                <div className="relative mt-2 mb-2.5" ref={sectionMenuRef}>
                   <button
                     type="button"
-                    onClick={() => setNotifTab('all')}
-                    className={`flex-1 py-1 px-2 rounded-lg text-center transition cursor-pointer ${
-                      notifTab === 'all'
-                        ? 'bg-card text-text shadow-2xs font-bold border border-border'
-                        : 'text-muted hover:text-text'
-                    }`}
+                    onClick={() => setIsSectionMenuOpen(!isSectionMenuOpen)}
+                    className="w-full flex items-center justify-between py-1.5 px-3 rounded-xl bg-soft border border-border text-[11px] font-semibold text-text hover:bg-card hover:border-border transition cursor-pointer shadow-2xs"
                   >
-                    All ({totalNotifCount})
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="font-bold text-text truncate">{activeSectionObj.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-card border border-border text-primary">
+                        {activeSectionObj.count}
+                      </span>
+                      <ChevronDown size={13} className={`text-muted transition-transform duration-150 ${isSectionMenuOpen ? 'rotate-180 text-primary' : ''}`} />
+                    </div>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setNotifTab('crm')}
-                    className={`flex-1 py-1 px-2 rounded-lg text-center transition cursor-pointer ${
-                      notifTab === 'crm'
-                        ? 'bg-card text-text shadow-2xs font-bold border border-border'
-                        : 'text-muted hover:text-text'
-                    }`}
-                  >
-                    CRM Tasks ({crmDigest.counts?.total || 0})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNotifTab('erp')}
-                    className={`flex-1 py-1 px-2 rounded-lg text-center transition cursor-pointer ${
-                      notifTab === 'erp'
-                        ? 'bg-card text-text shadow-2xs font-bold border border-border'
-                        : 'text-muted hover:text-text'
-                    }`}
-                  >
-                    ERP Alerts ({erpNotifications.length})
-                  </button>
+
+                  {/* Dropdown Menu to view any/all notification sections */}
+                  {isSectionMenuOpen && (
+                    <div className="absolute top-full right-0 left-0 mt-1 p-1 rounded-xl bg-card border border-border shadow-xl z-30 space-y-0.5 animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-muted flex items-center justify-between">
+                        <span>Notification Sections</span>
+                        <div className="flex items-center gap-2 font-medium lowercase">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              expandAllSections();
+                            }}
+                            className="hover:text-primary transition cursor-pointer"
+                          >
+                            expand all
+                          </button>
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              collapseAllSections();
+                            }}
+                            className="hover:text-primary transition cursor-pointer"
+                          >
+                            collapse all
+                          </button>
+                        </div>
+                      </div>
+                      {notifSections.map((sec) => (
+                        <button
+                          key={sec.id}
+                          type="button"
+                          onClick={() => {
+                            setNotifTab(sec.id);
+                            setIsSectionMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] transition cursor-pointer ${
+                            notifTab === sec.id
+                              ? 'bg-primary/10 text-primary font-bold'
+                              : 'text-text hover:bg-soft font-medium'
+                          }`}
+                        >
+                          <span className="truncate">{sec.label}</span>
+                          <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${
+                            notifTab === sec.id
+                              ? 'bg-primary text-white border-primary'
+                              : 'bg-soft border-border text-muted'
+                          }`}>
+                            {sec.count}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {/* CRM Summary KPI Cards (Shown on 'all' and 'crm' tabs) */}
-                {(notifTab === 'all' || notifTab === 'crm') && (crmDigest.counts?.total > 0 || crmDigest.counts?.overdue > 0) && (
+                {/* CRM Summary KPI Cards (Shown on 'all', 'crm', and 'crm_reminders') */}
+                {(notifTab === 'all' || notifTab === 'crm' || notifTab === 'crm_reminders') && (crmDigest.counts?.total > 0 || crmDigest.counts?.overdue > 0) && (
                   <div className="grid grid-cols-3 gap-1.5 mb-2.5">
                     <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-2 py-1.5 text-center">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-rose-500">Overdue</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-rose-500">OVERDUE</p>
                       <p className="mt-0.5 text-xs font-extrabold text-rose-600 dark:text-rose-400">{crmDigest.counts.overdue}</p>
                     </div>
                     <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-2 py-1.5 text-center">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500">Today</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-500">TODAY</p>
                       <p className="mt-0.5 text-xs font-extrabold text-amber-600 dark:text-amber-400">{crmDigest.counts.today}</p>
                     </div>
                     <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-2 py-1.5 text-center">
-                      <p className="text-[9px] font-bold uppercase tracking-wider text-blue-500">All Tasks</p>
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-blue-500">ALL TASKS</p>
                       <p className="mt-0.5 text-xs font-extrabold text-blue-600 dark:text-blue-400">{crmDigest.counts.total}</p>
                     </div>
                   </div>
@@ -395,41 +470,61 @@ export default function Topbar() {
                   {/* ERP ALERTS SECTION */}
                   {(notifTab === 'all' || notifTab === 'erp') && erpNotifications.length > 0 && (
                     <div>
-                      {notifTab === 'all' && (
-                        <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted">
-                          <span>Operational & Stock Alerts</span>
-                          <span className="text-primary font-semibold">{erpNotifications.length}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('erp')}
+                        className="w-full mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted hover:text-text transition cursor-pointer"
+                      >
+                        <span>OPERATIONAL & STOCK ALERTS</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-primary font-semibold text-[10px]">{erpNotifications.length}</span>
+                          <ChevronDown
+                            size={11}
+                            className={`transition-transform duration-150 ${openSections.erp ? 'rotate-180' : ''}`}
+                          />
+                        </div>
+                      </button>
+                      {openSections.erp && (
+                        <div className="space-y-1">
+                          {erpNotifications.map((n) => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                if (n.path) navigate(n.path);
+                                setIsNotifOpen(false);
+                              }}
+                              className="p-2.5 rounded-xl border border-border transition cursor-pointer hover:bg-soft"
+                              style={{ background: n.unread ? 'var(--soft)' : 'var(--card)' }}
+                            >
+                              <div className="flex items-center justify-between text-[11px] font-semibold text-text gap-2">
+                                <span className="truncate">{n.title}</span>
+                                <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                                  {n.time}
+                                </span>
+                              </div>
+                              <p className="text-[11px] mt-1 leading-snug text-muted">{n.desc}</p>
+                            </div>
+                          ))}
                         </div>
                       )}
-                      <div className="space-y-1">
-                        {erpNotifications.map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={() => {
-                              if (n.path) navigate(n.path);
-                              setIsNotifOpen(false);
-                            }}
-                            className="p-2.5 rounded-xl border border-border transition cursor-pointer hover:bg-soft"
-                            style={{ background: n.unread ? 'var(--soft)' : 'var(--card)' }}
-                          >
-                            <div className="flex items-center justify-between text-[11px] font-semibold text-text gap-2">
-                              <span className="truncate">{n.title}</span>
-                              <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                                {n.time}
-                              </span>
-                            </div>
-                            <p className="text-[11px] mt-1 leading-snug text-muted">{n.desc}</p>
-                          </div>
-                        ))}
-                      </div>
                     </div>
                   )}
 
                   {/* CRM TASK REMINDERS SECTION */}
-                  {(notifTab === 'all' || notifTab === 'crm') && (
+                  {(notifTab === 'all' || notifTab === 'crm' || notifTab === 'crm_reminders') && (
                     <div>
-                      <div className="mb-1 flex items-center justify-between">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted">CRM Task Reminders</span>
+                      <div className="mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted">
+                        <button
+                          type="button"
+                          onClick={() => toggleSection('crm')}
+                          className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted hover:text-text transition cursor-pointer"
+                        >
+                          <span>CRM TASK REMINDERS</span>
+                          <ChevronDown
+                            size={11}
+                            className={`transition-transform duration-150 ${openSections.crm ? 'rotate-180' : ''}`}
+                          />
+                        </button>
                         <Link
                           to="/crm/tasks"
                           onClick={() => setIsNotifOpen(false)}
@@ -438,70 +533,110 @@ export default function Topbar() {
                           Open Tasks →
                         </Link>
                       </div>
-                      <div className="space-y-1">
-                        {crmDigest.reminders?.length > 0 ? (
-                          crmDigest.reminders.slice(0, 8).map((n) => (
-                            <div
-                              key={n.id}
-                              onClick={() => {
-                                if (n.path) navigate(n.path);
-                                setIsNotifOpen(false);
-                              }}
-                              className="rounded-xl border p-2.5 transition cursor-pointer hover:bg-soft"
-                              style={{
-                                background: n.tone === 'overdue' ? 'rgba(239, 68, 68, 0.08)' : n.tone === 'today' ? 'rgba(245, 158, 11, 0.08)' : 'var(--card)',
-                                borderColor: n.tone === 'overdue' ? 'rgba(239, 68, 68, 0.25)' : n.tone === 'today' ? 'rgba(245, 158, 11, 0.25)' : 'var(--border)',
-                              }}
-                            >
-                              <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-text">
-                                <span className="truncate">{n.title}</span>
-                                <span className="shrink-0 rounded-full bg-surface border border-border px-1.5 py-0.5 text-[9px] font-bold text-primary">
-                                  {n.time}
-                                </span>
-                              </div>
-                              <p className="mt-0.5 text-[10.5px] text-muted truncate">{n.subtitle} • {n.desc}</p>
+                      {openSections.crm && (
+                        <div className="space-y-1">
+                          {crmDigest.reminders?.length > 0 ? (
+                            <>
+                              {(showAllReminders ? crmDigest.reminders : crmDigest.reminders.slice(0, 8)).map((n) => (
+                                <div
+                                  key={n.id}
+                                  onClick={() => {
+                                    if (n.path) navigate(n.path);
+                                    setIsNotifOpen(false);
+                                  }}
+                                  className="rounded-xl border p-2.5 transition cursor-pointer hover:bg-soft"
+                                  style={{
+                                    background: n.tone === 'overdue' ? 'rgba(239, 68, 68, 0.08)' : n.tone === 'today' ? 'rgba(245, 158, 11, 0.08)' : 'var(--card)',
+                                    borderColor: n.tone === 'overdue' ? 'rgba(239, 68, 68, 0.25)' : n.tone === 'today' ? 'rgba(245, 158, 11, 0.25)' : 'var(--border)',
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-text">
+                                    <span className="truncate">{n.title}</span>
+                                    <span className="shrink-0 rounded-full bg-surface border border-border px-1.5 py-0.5 text-[9px] font-bold text-primary">
+                                      {n.time}
+                                    </span>
+                                  </div>
+                                  <p className="mt-0.5 text-[10.5px] text-muted truncate">{n.subtitle} • {n.desc}</p>
+                                </div>
+                              ))}
+                              {crmDigest.reminders.length > 8 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAllReminders(!showAllReminders)}
+                                  className="w-full py-1 text-[10px] font-semibold text-primary hover:underline text-center cursor-pointer"
+                                >
+                                  {showAllReminders ? 'Show fewer reminders' : `Show all ${crmDigest.reminders.length} reminders`}
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <div className="rounded-xl border border-border bg-soft px-3 py-2.5 text-[11px] text-muted text-center">
+                              No active CRM reminders pending.
                             </div>
-                          ))
-                        ) : (
-                          <div className="rounded-xl border border-border bg-soft px-3 py-2.5 text-[11px] text-muted text-center">
-                            No active CRM reminders pending.
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* CRM WORKFLOW NOTIFICATIONS */}
-                  {(notifTab === 'all' || notifTab === 'crm') && crmDigest.notifications?.length > 0 && (
+                  {(notifTab === 'all' || notifTab === 'crm' || notifTab === 'crm_workflow') && crmDigest.notifications?.length > 0 && (
                     <div>
-                      <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-muted">Workflow Updates</div>
-                      <div className="space-y-1">
-                        {crmDigest.notifications.slice(0, 4).map((n) => (
-                          <div
-                            key={n.id}
-                            onClick={() => {
-                              if (n.eventId) markEventNotificationRead(n.eventId);
-                              if (n.path) navigate(n.path);
-                              setIsNotifOpen(false);
-                            }}
-                            className="rounded-xl border border-border p-2.5 transition cursor-pointer hover:bg-soft"
-                            style={{ background: n.unread ? 'var(--soft)' : 'var(--card)' }}
-                          >
-                            <div className="flex items-center justify-between text-[11px] font-semibold text-text gap-2">
-                              <span className="truncate">{n.title}</span>
-                              <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-surface border border-border text-primary">
-                                {n.time}
-                              </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection('workflow')}
+                        className="w-full mb-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-muted hover:text-text transition cursor-pointer"
+                      >
+                        <span>WORKFLOW UPDATES</span>
+                        <div className="flex items-center gap-1.5">
+                          <ChevronDown
+                            size={11}
+                            className={`transition-transform duration-150 ${openSections.workflow ? 'rotate-180' : ''}`}
+                          />
+                        </div>
+                      </button>
+                      {openSections.workflow && (
+                        <div className="space-y-1">
+                          {(showAllWorkflows ? crmDigest.notifications : crmDigest.notifications.slice(0, 4)).map((n) => (
+                            <div
+                              key={n.id}
+                              onClick={() => {
+                                if (n.eventId) markEventNotificationRead(n.eventId);
+                                if (n.path) navigate(n.path);
+                                setIsNotifOpen(false);
+                              }}
+                              className="rounded-xl border border-border p-2.5 transition cursor-pointer hover:bg-soft"
+                              style={{ background: n.unread ? 'var(--soft)' : 'var(--card)' }}
+                            >
+                              <div className="flex items-center justify-between text-[11px] font-semibold text-text gap-2">
+                                <span className="truncate">{n.title}</span>
+                                <span className="shrink-0 text-[9px] font-semibold px-1.5 py-0.5 rounded bg-surface border border-border text-primary">
+                                  {n.time}
+                                </span>
+                              </div>
+                              <p className="text-[10.5px] mt-0.5 leading-snug text-muted">{n.desc}</p>
                             </div>
-                            <p className="text-[10.5px] mt-0.5 leading-snug text-muted">{n.desc}</p>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                          {crmDigest.notifications.length > 4 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAllWorkflows(!showAllWorkflows)}
+                              className="w-full py-1 text-[10px] font-semibold text-primary hover:underline text-center cursor-pointer"
+                            >
+                              {showAllWorkflows ? 'Show fewer updates' : `Show all ${crmDigest.notifications.length} updates`}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {/* EMPTY STATE */}
-                  {totalNotifCount === 0 && (
+                  {((notifTab === 'all' && totalNotifCount === 0) ||
+                    (notifTab === 'erp' && erpNotifications.length === 0) ||
+                    (notifTab === 'crm_reminders' && (crmDigest.reminders?.length || 0) === 0) ||
+                    (notifTab === 'crm_workflow' && (crmDigest.notifications?.length || 0) === 0) ||
+                    (notifTab === 'crm' && (crmDigest.counts?.total || 0) === 0 && (crmDigest.notifications?.length || 0) === 0)) && (
                     <div className="py-6 text-center text-xs text-muted">
                       All caught up! No active notifications or pending reminders.
                     </div>
