@@ -39,6 +39,7 @@ const PMSTimelinePage = lazy(() => import('../features/pms/timeline/TimelinePage
 const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDashboardPage'));
 const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
 const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
+const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/ClientProofApprovalPage'));
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
@@ -193,6 +194,14 @@ const router = createBrowserRouter([
   {
     path: '/login',
     element: <Page component={LoginPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // ── Client-facing design approval link ────────────────────
+  // Deliberately outside MainLayout: the recipient is a customer, not a user of
+  // the ERP, so the page carries no sidebar, topbar or internal navigation.
+  {
+    path: '/pms/approve/:token',
+    element: <Page component={PMSClientProofApprovalPage} />,
     errorElement: <RootErrorBoundary />,
   },
   // ── Protected Application Shell (Guarded by RequireAuth) ─

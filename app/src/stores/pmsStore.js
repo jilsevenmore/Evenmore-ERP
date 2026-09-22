@@ -102,9 +102,21 @@ export function computeStageCompletionPct(stage) {
   return clampPct(sum / tasks.length);
 }
 
-/** Project completion: mean of all stage completion percentages. */
+/** Project completion: weighted sum of stage completion percentages using stage weights (totaling 100%),
+ *  falling back to simple mean for legacy projects without configured weights. */
 export function computeProjectCompletionPct(stages = []) {
   if (stages.length === 0) return 0;
+  const totalWeight = stages.reduce(
+    (acc, s) => acc + (Number(s.percentage ?? s.weightPct ?? s.weight) || 0),
+    0
+  );
+  if (totalWeight > 0) {
+    const weightedSum = stages.reduce((acc, s) => {
+      const w = Number(s.percentage ?? s.weightPct ?? s.weight) || 0;
+      return acc + computeStageCompletionPct(s) * w;
+    }, 0);
+    return clampPct(weightedSum / totalWeight);
+  }
   const sum = stages.reduce((acc, s) => acc + computeStageCompletionPct(s), 0);
   return clampPct(sum / stages.length);
 }
@@ -1896,6 +1908,7 @@ export const usePmsStore = create((set, get) => ({
     priority = "Medium",
     startDate,
     stageConfigIds = null,
+    stageWeights = null,
     specifications = "",
   }) => {
     if (!order) throw new Error("A CRM order is required to create a project.");
@@ -1911,6 +1924,7 @@ export const usePmsStore = create((set, get) => ({
       priority,
       startDate: startDate || new Date().toISOString(),
       stageConfigIds,
+      stageWeights,
       specifications,
     });
 
@@ -1920,6 +1934,67 @@ export const usePmsStore = create((set, get) => ({
     const full = (await pmsApi.pullProject(project.id)) || project;
     applyServerProject(full);
     return full.code || full.id;
+  },
+
+  updateStagePercentages: async (projectId, stagePercentages) => {
+    const stageArray = Array.isArray(stagePercentages)
+      ? stagePercentages
+      : Object.entries(stagePercentages).map(([id, percentage]) => ({ id, percentage }));
+
+    set((st) =>
+      applyToProject(
+        st,
+        projectId,
+        (p) => {
+          const weightMap = new Map(
+            stageArray.map((s) => [s.id || s.stageId, Number(s.percentage ?? s.weightPct ?? s.weight) || 0])
+          );
+          const updatedStages = (p.stages || []).map((stage) => {
+            if (weightMap.has(stage.id)) {
+              const pct = weightMap.get(stage.id);
+              return { ...stage, percentage: pct, weightPct: pct };
+            }
+            return stage;
+          });
+          return {
+            ...p,
+            stages: updatedStages,
+          };
+        },
+        makeActivity(
+          "STAGES_CONFIGURED",
+          "Project",
+          projectId,
+          "Stage percentage weights updated."
+        )
+      )
+    );
+
+    try {
+      const saved = await pmsApi.updateStagePercentages(projectId, { stages: stageArray });
+      if (saved) {
+        applyServerProject(saved);
+      }
+    } catch (err) {
+      console.warn("[PMS] updateStagePercentages failed:", describeError(err));
+      const reverted = await pmsApi.pullProject(projectId);
+      if (reverted) applyServerProject(reverted);
+      throw err;
+    }
+  },
+
+  addDynamicStage: async (projectId, stageData, stagePercentages = null) => {
+    const payload = {
+      ...stageData,
+      stagePercentages,
+    };
+    const saved = await pmsApi.addStage(projectId, payload);
+    if (saved) {
+      const full = await pmsApi.pullProject(projectId);
+      if (full) applyServerProject(full);
+      return saved;
+    }
+    return null;
   },
 
   updateProject: (projectId, patch) => {
@@ -2991,3 +3066,15 @@ export const usePmsStore = create((set, get) => ({
     };
   },
 }));
+
+/**
+ * Check if the given user is the creator of the project.
+ * Allows superuser/admin by default, and defaults to true if project has no creator set (legacy projects).
+ */
+export function isProjectCreator(project, user) {
+  if (!project || !user) return false;
+  if (user.role === 'Admin' || user.role === 'Superadmin' || user.isSuperuser) return true;
+  const creatorId = project.createdBy?.id || project.createdById || project.createdBy;
+  if (!creatorId) return true;
+  return String(creatorId) === String(user.id);
+}

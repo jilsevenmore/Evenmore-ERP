@@ -57,21 +57,57 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
     };
   }, [projects, salesOrders]);
 
+  function distributeEvenly(ids) {
+    if (!ids || ids.length === 0) return {};
+    const equal = Math.floor(100 / ids.length);
+    const remainder = 100 - equal * ids.length;
+    const map = {};
+    ids.forEach((id, idx) => {
+      map[id] = idx === ids.length - 1 ? equal + remainder : equal;
+    });
+    return map;
+  }
+
   const [orderNumber, setOrderNumber] = useState('');
   const [managerId, setManagerId] = useState('');
   const [priority, setPriority] = useState('Medium');
   const [startDate, setStartDate] = useState(todayLocalDate());
   const [specifications, setSpecifications] = useState('');
   const [selectedConfigIds, setSelectedConfigIds] = useState(() => activeConfigs.map((c) => c.id));
+  const [stagePercentages, setStagePercentages] = useState(() =>
+    distributeEvenly(activeConfigs.map((c) => c.id))
+  );
   const [errors, setErrors] = useState({});
 
   const selectedOrder = availableOrders.find((o) => o.orderNumber === orderNumber) ?? null;
   const projectCode = useMemo(() => nextProjectId(projects), [projects]);
 
-  function toggleConfig(id) {
-    setSelectedConfigIds((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+  const totalPercentage = useMemo(() => {
+    return selectedConfigIds.reduce(
+      (acc, id) => acc + (Number(stagePercentages[id]) || 0),
+      0
     );
+  }, [selectedConfigIds, stagePercentages]);
+
+  function toggleConfig(id) {
+    setSelectedConfigIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id];
+      // Automatically rebalance percentages among active selections
+      setStagePercentages(distributeEvenly(next));
+      return next;
+    });
+  }
+
+  function handlePercentageChange(id, val) {
+    const num = val === '' ? '' : Math.max(0, Math.min(100, Number(val)));
+    setStagePercentages((prev) => ({
+      ...prev,
+      [id]: num,
+    }));
+  }
+
+  function handleDistributeEvenly() {
+    setStagePercentages(distributeEvenly(selectedConfigIds));
   }
 
   function reset() {
@@ -80,7 +116,9 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
     setPriority('Medium');
     setStartDate(todayLocalDate());
     setSpecifications('');
-    setSelectedConfigIds(activeConfigs.map((c) => c.id));
+    const defaultIds = activeConfigs.map((c) => c.id);
+    setSelectedConfigIds(defaultIds);
+    setStagePercentages(distributeEvenly(defaultIds));
     setErrors({});
   }
 
@@ -96,23 +134,30 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
     if (!selectedOrder) nextErrors.order = 'Select a CRM sales order.';
     if (!managerId) nextErrors.manager = 'Assign a project manager.';
     if (selectedConfigIds.length === 0) nextErrors.stages = 'Pick at least one stage.';
+    if (selectedConfigIds.length > 0 && Math.round(totalPercentage * 100) / 100 !== 100) {
+      nextErrors.stages = `Total stage percentage must equal 100% (currently ${Math.round(totalPercentage * 100) / 100}%).`;
+    }
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
     const manager = managers.find((m) => m.id === managerId);
     let id;
+    const stageWeights = Object.fromEntries(
+      selectedConfigIds.map((cid) => [cid, Number(stagePercentages[cid]) || 0])
+    );
     try {
       id = await createProjectFromOrder({
-      order: selectedOrder,
-      projectManager: {
-        id: manager.id,
-        name: manager.name,
-        email: manager.email,
-        avatar: manager.avatar,
-      },
-      priority,
-      startDate: new Date(`${startDate}T09:00:00`).toISOString(),
+        order: selectedOrder,
+        projectManager: {
+          id: manager.id,
+          name: manager.name,
+          email: manager.email,
+          avatar: manager.avatar,
+        },
+        priority,
+        startDate: new Date(`${startDate}T09:00:00`).toISOString(),
         stageConfigIds: selectedConfigIds,
+        stageWeights,
         specifications,
       });
     } catch (err) {
@@ -274,32 +319,81 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
 
         {/* Stage template picker */}
         <div>
-          <div className="flex items-center justify-between mb-1.5">
-            <span className={labelClass + ' mb-0'}>Stage Template</span>
-            <span className="text-[10px] text-slate-400">
-              {selectedConfigIds.length} of {activeConfigs.length} selected
-            </span>
-          </div>
-          <div className="rounded-lg border border-[#dce5f4] divide-y divide-slate-100 max-h-48 overflow-y-auto">
-            {activeConfigs.map((c) => (
-              <label
-                key={c.id}
-                className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-slate-50"
+          <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className={labelClass + ' mb-0'}>Stage Templates & Weights</span>
+              <span className="text-[10px] text-slate-400">
+                ({selectedConfigIds.length} of {activeConfigs.length} selected)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {selectedConfigIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDistributeEvenly}
+                  className="text-[10px] font-semibold text-blue-600 hover:underline"
+                >
+                  Distribute Evenly
+                </button>
+              )}
+              <span
+                className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                  Math.round(totalPercentage * 100) / 100 === 100
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                    : 'bg-rose-50 text-rose-700 border border-rose-200'
+                }`}
               >
-                <input
-                  type="checkbox"
-                  checked={selectedConfigIds.includes(c.id)}
-                  onChange={() => toggleConfig(c.id)}
-                  className="accent-blue-600"
-                />
-                <span className="text-[11px] font-semibold text-slate-700 flex-1 min-w-0 truncate">
-                  {c.sequence}. {c.name}
-                </span>
-                <span className="text-[10px] text-slate-400 shrink-0">
-                  {c.department} · {c.defaultDuration} {c.durationUnit}
-                </span>
-              </label>
-            ))}
+                Total: {Math.round(totalPercentage * 100) / 100}% / 100%
+              </span>
+            </div>
+          </div>
+          <div className="rounded-lg border border-[#dce5f4] divide-y divide-slate-100 max-h-56 overflow-y-auto">
+            {activeConfigs.map((c) => {
+              const isSelected = selectedConfigIds.includes(c.id);
+              return (
+                <div
+                  key={c.id}
+                  className={`flex items-center justify-between gap-2.5 px-3 py-2 ${
+                    isSelected ? 'bg-blue-50/30 hover:bg-blue-50/50' : 'hover:bg-slate-50'
+                  }`}
+                >
+                  <label className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleConfig(c.id)}
+                      className="accent-blue-600"
+                    />
+                    <span className="text-[11px] font-semibold text-slate-700 truncate">
+                      {c.sequence}. {c.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400 shrink-0 hidden sm:inline">
+                      {c.department}
+                    </span>
+                  </label>
+                  {isSelected ? (
+                    <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <span className="text-[10px] text-slate-400">Weight:</span>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="any"
+                        value={stagePercentages[c.id] ?? ''}
+                        onChange={(e) => handlePercentageChange(c.id, e.target.value)}
+                        className="w-16 text-right text-xs rounded-md border border-[#dce5f4] px-1.5 py-1 text-slate-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                        placeholder="0"
+                      />
+                      <span className="text-[11px] font-bold text-slate-500">%</span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 shrink-0">
+                      {c.defaultDuration} {c.durationUnit}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {errors.stages && (
             <p className="flex items-center gap-1 text-[11px] text-rose-600 mt-1.5">
@@ -307,8 +401,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreated }) {
             </p>
           )}
           <p className="text-[10px] text-slate-400 mt-1.5">
-            Every selected stage is initialised as “Not Started”, and creation is logged to the
-            project audit trail.
+            Stage percentage weights define overall project progress contribution and must total 100%.
           </p>
         </div>
       </form>

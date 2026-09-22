@@ -13,6 +13,7 @@ import {
 import { ProjectFilterBar } from './components/ProjectFilterBar';
 import { ProjectsTable } from './components/ProjectsTable';
 import { CreateProjectModal } from './components/CreateProjectModal';
+import { ConfigureStagePercentagesModal } from './components/ConfigureStagePercentagesModal';
 import { PmsToast } from '../components/PmsToast';
 
 /**
@@ -28,6 +29,7 @@ export default function ProjectsPage() {
 
   const [filters, setFilters] = useState(emptyProjectFilters);
   const [isCreateOpen, setCreateOpen] = useState(false);
+  const [configurePercentagesProject, setConfigurePercentagesProject] = useState(null);
 
   const options = useMemo(() => getProjectFilterOptions(projects), [projects]);
   const visible = useMemo(() => filterProjects(projects, filters), [projects, filters]);
@@ -72,6 +74,7 @@ export default function ProjectsPage() {
         }
         onQuickAssign={(row) => navigate(`/pms/projects/${row.id}`)}
         onLogDelay={(row) => navigate(`/pms/delays?project=${row.id}`)}
+        onConfigurePercentages={(row) => setConfigurePercentagesProject(row)}
       />
 
       <CreateProjectModal
@@ -81,6 +84,12 @@ export default function ProjectsPage() {
           setCreateOpen(false);
           navigate(`/pms/projects/${id}`);
         }}
+      />
+
+      <ConfigureStagePercentagesModal
+        isOpen={Boolean(configurePercentagesProject)}
+        project={configurePercentagesProject}
+        onClose={() => setConfigurePercentagesProject(null)}
       />
       <PmsToast />
     </div>

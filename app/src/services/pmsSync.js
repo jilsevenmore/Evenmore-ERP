@@ -42,7 +42,11 @@ export const PMS_RESOURCES = {
     fromApi: (row) => ({
       ...row,
       overallCompletionPct: num(row.overallCompletionPct),
-      stages: row.stages || [],
+      stages: (row.stages || []).map((s) => ({
+        ...s,
+        percentage: num(s.percentage ?? s.weightPct ?? s.weight ?? 0),
+        weightPct: num(s.percentage ?? s.weightPct ?? s.weight ?? 0),
+      })),
       activityLog: row.activityLog || [],
       _synced: true,
     }),
@@ -158,6 +162,11 @@ export async function applyStageTemplate(projectId, payload = {}) {
 export async function completeProject(projectId, payload = {}) {
   if (!isBackendEnabled()) return null;
   return api.post(`${projectPath(projectId)}complete/`, payload);
+}
+
+export async function updateStagePercentages(projectId, payload = {}) {
+  if (!isBackendEnabled()) return null;
+  return api.post(`${projectPath(projectId)}stage-percentages/`, payload);
 }
 
 // ── stage verbs ─────────────────────────────────────────────────────────────

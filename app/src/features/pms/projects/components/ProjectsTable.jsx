@@ -1,10 +1,11 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, UserPlus, AlertTriangle } from 'lucide-react';
+import { Eye, UserPlus, AlertTriangle, Percent } from 'lucide-react';
 import { DataTable } from '../../../../components/ui/DataTable';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { DynamicProgressBar } from '../../components/DynamicProgressBar';
-import { getProjectRowMeta } from '../../../../stores/pmsStore';
+import { getProjectRowMeta, isProjectCreator } from '../../../../stores/pmsStore';
+import { useAppStore } from '../../../../stores/appStore';
 import { formatCurrency } from '../../../../utils/currencyUtils';
 
 /**
@@ -45,11 +46,13 @@ export function ProjectsTable({
   projects = [],
   onQuickAssign,
   onLogDelay,
+  onConfigurePercentages,
   emptyTitle = 'No projects found',
   emptyDesc = 'No project matches the current filters.',
   emptyAction,
 }) {
   const navigate = useNavigate();
+  const currentUser = useAppStore((s) => s.currentUser);
 
   // Derive once per render so each column body stays a cheap lookup.
   const rows = projects.map((p) => ({ ...p, _meta: getProjectRowMeta(p) }));
@@ -236,36 +239,54 @@ export function ProjectsTable({
     {
       key: 'actions',
       label: 'Actions',
-      render: (_v, row) => (
-        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-          <button
-            type="button"
-            title="View details"
-            onClick={() => navigate(`/pms/projects/${row.id}`)}
-            className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50"
-          >
-            <Eye size={14} />
-          </button>
-          <button
-            type="button"
-            title="Quick assign current stage"
-            disabled={!onQuickAssign || !row._meta.currentStage}
-            onClick={() => onQuickAssign?.(row)}
-            className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <UserPlus size={14} />
-          </button>
-          <button
-            type="button"
-            title="Log delay"
-            disabled={!onLogDelay || !row._meta.currentStage}
-            onClick={() => onLogDelay?.(row)}
-            className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <AlertTriangle size={14} />
-          </button>
-        </div>
-      ),
+      render: (_v, row) => {
+        const isCreator = isProjectCreator(row, currentUser);
+        return (
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              title="View details"
+              onClick={() => navigate(`/pms/projects/${row.id}`)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+            >
+              <Eye size={14} />
+            </button>
+            <button
+              type="button"
+              title="Quick assign current stage"
+              disabled={!onQuickAssign || !row._meta.currentStage}
+              onClick={() => onQuickAssign?.(row)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <UserPlus size={14} />
+            </button>
+            <button
+              type="button"
+              title={
+                !isCreator
+                  ? 'Only the project creator can edit stage percentages'
+                  : row.status === 'Completed'
+                    ? 'Project is completed'
+                    : 'Configure stage percentages'
+              }
+              disabled={!onConfigurePercentages || !isCreator || row.status === 'Completed'}
+              onClick={() => onConfigurePercentages?.(row)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <Percent size={14} />
+            </button>
+            <button
+              type="button"
+              title="Log delay"
+              disabled={!onLogDelay || !row._meta.currentStage}
+              onClick={() => onLogDelay?.(row)}
+              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <AlertTriangle size={14} />
+            </button>
+          </div>
+        );
+      },
     },
   ];
 
