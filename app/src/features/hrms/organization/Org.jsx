@@ -1,13 +1,25 @@
 import { useState } from "react";
+import { useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
-import { departmentsMock } from "../../../data/hrms/mocks/data";
+import { hrmsSync } from "../../../services/hrmsSync";
 import { Badge } from "../../../components/hrms/Badge";
 export { OrgChart } from "./OrgChartPage";
 export function Departments() {
   const showToast = useAppStore((s) => s.showToast);
   const [q, setQ] = useState("");
   const [view, setView] = useState("table");
-  const filtered = departmentsMock.filter((d) => d.name.toLowerCase().includes(q.toLowerCase()));
+  const [departments, setDepartments] = useState([]);
+
+  // `/hrms/departments/` — the organisation's real structure.
+  useEffect(() => {
+    let cancelled = false;
+    hrmsSync.pull("departments").then((rows) => {
+      if (!cancelled && rows) setDepartments(rows);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const filtered = departments.filter((d) => String(d.name ?? '').toLowerCase().includes(q.toLowerCase()));
   return <div className="flex flex-col gap-6">
       <div className="flex flex-wrap justify-between gap-4"><div><h1 className="text-[24px] font-bold">Departments</h1><p className="text-[13px] text-muted">Manage organizational structure</p></div><button onClick={() => showToast("Add department")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Department</button></div>
       <div className="bg-white border border-bdr rounded-xl p-4 shadow-sm flex flex-wrap justify-between gap-3">

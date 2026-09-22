@@ -7,6 +7,8 @@ const STATUS_MAP = {
   // ERP sales
   'Draft': 'badge-gray',
   'Sent': 'badge-blue',
+  'Viewed': 'badge-cyan',
+  'Expired': 'badge-orange',
   'Accepted': 'badge-green',
   'Rejected': 'badge-red',
   'Invoiced': 'badge-purple',

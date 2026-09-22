@@ -386,7 +386,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             if (pickerCategory !== 'All' && it.category !== pickerCategory) return false;
             if (pickerSearch.trim()) {
                 const q = pickerSearch.toLowerCase().trim();
-                return it.name.toLowerCase().includes(q) || it.sku.toLowerCase().includes(q);
+                return String(it.name ?? '').toLowerCase().includes(q) || String(it.sku ?? '').toLowerCase().includes(q);
             }
             return true;
         });

@@ -260,20 +260,20 @@ export function CompanyPolicyModule({ forcedSection }) {
     if (newVersionPolicy) {
       createNewVersion(newVersionPolicy.id, {
         ...formFields,
-        author: currentUser.name,
+        author: currentUser?.name,
         approvalRequired: submitForApproval ? formFields.approvalRequired : false,
       });
       showToast?.(`Version ${formFields.version} created for "${formFields.name}"`);
     } else if (editingPolicy) {
       updatePolicy(editingPolicy.id, {
         ...formFields,
-        actor: currentUser.name,
+        actor: currentUser?.name,
       });
       showToast?.(`Policy "${formFields.name}" updated successfully`);
     } else {
       addPolicy({
         ...formFields,
-        author: currentUser.name,
+        author: currentUser?.name,
       }, submitForApproval);
       showToast?.(`Policy "${formFields.name}" ${submitForApproval ? "submitted for approval" : "saved as draft"}`);
     }
@@ -308,7 +308,7 @@ export function CompanyPolicyModule({ forcedSection }) {
   // Current user's pending acknowledgements
   const myPendingAcks = useMemo(() => {
     return acknowledgements.filter(
-      (a) => (a.employeeName === currentUser.name || a.employeeId === "EMP-USR") && a.status !== "Acknowledged"
+      (a) => (a.employeeName === currentUser?.name || a.employeeId === "EMP-USR") && a.status !== "Acknowledged"
     );
   }, [acknowledgements, currentUser]);
 
@@ -316,7 +316,7 @@ export function CompanyPolicyModule({ forcedSection }) {
   const userAckMap = useMemo(() => {
     const map = {};
     acknowledgements
-      .filter((a) => (a.employeeName === currentUser.name || a.employeeId === "EMP-USR") && a.status === "Acknowledged")
+      .filter((a) => (a.employeeName === currentUser?.name || a.employeeId === "EMP-USR") && a.status === "Acknowledged")
       .forEach((a) => {
         map[a.policyId] = true;
       });
@@ -336,11 +336,11 @@ export function CompanyPolicyModule({ forcedSection }) {
       const q = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !q ||
-        p.name.toLowerCase().includes(q) ||
-        p.id.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        p.ownerDept.toLowerCase().includes(q) ||
-        (p.summary && p.summary.toLowerCase().includes(q));
+        String(p.name ?? '').toLowerCase().includes(q) ||
+        String(p.id ?? '').toLowerCase().includes(q) ||
+        String(p.category ?? '').toLowerCase().includes(q) ||
+        String(p.ownerDept ?? '').toLowerCase().includes(q) ||
+        (p.summary && String(p.summary ?? '').toLowerCase().includes(q));
 
       // Category matching
       const matchesCat = categoryFilter === "All" || p.category === categoryFilter;
@@ -1184,7 +1184,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          approvePolicy(p.id, currentUser.name);
+                                          approvePolicy(p.id, currentUser?.name);
                                           showToast?.(`Approved and published policy ${p.name}`);
                                         }}
                                         className="w-7 h-7 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 grid place-items-center transition cursor-pointer"
@@ -1211,7 +1211,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        restorePolicy(p.id, currentUser.name);
+                                        restorePolicy(p.id, currentUser?.name);
                                         showToast?.(`Restored ${p.name} to Active status`);
                                       }}
                                       className="w-7 h-7 rounded-lg border border-bdr hover:bg-blue-50 text-muted hover:text-blue-600 grid place-items-center transition cursor-pointer"
@@ -1223,7 +1223,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        archivePolicy(p.id, currentUser.name);
+                                        archivePolicy(p.id, currentUser?.name);
                                         showToast?.(`Archived policy ${p.name}`);
                                       }}
                                       className="w-7 h-7 rounded-lg border border-bdr hover:bg-slate-100 text-muted hover:text-slate-700 grid place-items-center transition cursor-pointer"
@@ -1430,7 +1430,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                 </thead>
                 <tbody className="divide-y divide-bdr/50">
                   {acknowledgements.map((ack) => {
-                    const isCurrentUser = ack.employeeName === currentUser.name || ack.employeeId === "EMP-USR";
+                    const isCurrentUser = ack.employeeName === currentUser?.name || ack.employeeId === "EMP-USR";
                     return (
                       <tr key={ack.id} className="hover:bg-off/60 transition">
                         <td className="py-3.5 px-5 font-semibold text-slate-900">
@@ -1468,7 +1468,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                             <button
                               type="button"
                               onClick={() => {
-                                acknowledgePolicy(ack.policyId, currentUser.name, "EMP-USR", "Operations");
+                                acknowledgePolicy(ack.policyId, currentUser?.name, "EMP-USR", "Operations");
                                 showToast?.(`Acknowledged ${ack.policyName}`);
                               }}
                               className="px-3 py-1 rounded-lg bg-navy text-white text-[11.5px] font-bold hover:bg-navy/90 transition shadow-xs cursor-pointer"
@@ -1507,7 +1507,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                   <button
                     type="button"
                     onClick={() => {
-                      acknowledgePolicy(viewPolicy.id, currentUser.name, "EMP-USR", "Operations");
+                      acknowledgePolicy(viewPolicy.id, currentUser?.name, "EMP-USR", "Operations");
                       showToast?.(`Acknowledged policy ${viewPolicy.name}`);
                     }}
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[12.5px] font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
@@ -1934,7 +1934,7 @@ export function CompanyPolicyModule({ forcedSection }) {
               type="button"
               onClick={() => {
                 if (ackModalPolicy) {
-                  acknowledgePolicy(ackModalPolicy.id, currentUser.name, "EMP-USR", "Operations");
+                  acknowledgePolicy(ackModalPolicy.id, currentUser?.name, "EMP-USR", "Operations");
                   showToast?.(`You have acknowledged "${ackModalPolicy.name}"`);
                   setAckModalPolicy(null);
                 }
@@ -1958,7 +1958,7 @@ export function CompanyPolicyModule({ forcedSection }) {
               {ackModalPolicy.summary}
             </p>
             <div className="text-[11.5px] text-muted">
-              Signed by: <b>{currentUser.name}</b> (Operations Admin) on {new Date().toLocaleDateString()}
+              Signed by: <b>{currentUser?.name}</b> (Operations Admin) on {new Date().toLocaleDateString()}
             </div>
           </div>
         )}
@@ -1982,7 +1982,7 @@ export function CompanyPolicyModule({ forcedSection }) {
               type="button"
               onClick={() => {
                 if (rejectModalPolicy) {
-                  rejectPolicy(rejectModalPolicy.id, rejectReason, currentUser.name);
+                  rejectPolicy(rejectModalPolicy.id, rejectReason, currentUser?.name);
                   showToast?.(`Policy returned to Draft`);
                   setRejectModalPolicy(null);
                 }

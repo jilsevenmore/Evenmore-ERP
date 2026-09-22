@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { goalsMock } from "../../../data/hrms/data/performanceMockData";
+import { useState, useMemo, useEffect } from "react";
+import { hrmsSync } from "../../../services/hrmsSync";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { FilterBar } from "../../../components/hrms/FilterBar";
 import { StatusBadge } from "../../../components/hrms/StatusBadge";
@@ -13,7 +13,16 @@ import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 export default function GoalTracking() {
   const { showToast, employees } = useAppStore();
-  const [data, setData] = useState(goalsMock);
+  const [data, setData] = useState([]);
+
+  // Goals live in `/hrms/performance/goals/`.
+  useEffect(() => {
+    let cancelled = false;
+    hrmsSync.pull("goals").then((rows) => {
+      if (!cancelled && rows) setData(rows);
+    });
+    return () => { cancelled = true; };
+  }, []);
   const [search, setSearch] = useState("");
   const [employee, setEmployee] = useState("All");
   const [dept, setDept] = useState("All");

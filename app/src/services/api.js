@@ -1,13 +1,10 @@
 /**
- * Base API Client — Prepared for future backend integration.
- * Designed to seamlessly bridge frontend state with Django REST APIs.
- *
- * Hardened (logic-only, no UI change): timeout, retry, query builder,
- * structured ApiError, safe JSON parsing. Existing call signatures are
- * unchanged — `api.get/post/put/patch/delete` keep working as before.
+ * Base API Client — Bridges frontend state with Django REST APIs.
+ * Supports timeout, retry, query builder, JWT authentication, idempotency keys,
+ * structured ApiError, safe JSON parsing, and unauthorized session handling.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/+$/, '');
 const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 15000;
 
 export class ApiError extends Error {
@@ -34,17 +31,32 @@ export function buildQuery(params = {}) {
   return qs ? `?${qs}` : '';
 }
 
-function getAuthToken(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+export function getAuthToken(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
   try {
-    return storage?.getItem('auth_token') || '';
+    return storage?.getItem('evenmore_auth_token') || storage?.getItem('auth_token') || '';
   } catch {
     return '';
   }
 }
 
-async function fetchWithTimeout(url, config, timeoutMs) {
+export function clearAuthTokens(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
+  try {
+    storage?.removeItem('evenmore_auth_token');
+    storage?.removeItem('auth_token');
+    storage?.removeItem('evenmore_refresh_token');
+    storage?.removeItem('evenmore_token_expires_at');
+    storage?.removeItem('evenmore_saved_user');
+  } catch {}
+}
+
+async function fetchWithTimeout(url, config, timeoutMs, externalSignal) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (externalSignal) {
+    externalSignal.addEventListener('abort', () => controller.abort());
+  }
+
   try {
     return await fetch(url, { ...config, signal: controller.signal });
   } finally {
@@ -66,19 +78,45 @@ async function parseBodySafe(response) {
   }
 }
 
+function normalizeEndpoint(endpoint) {
+  if (!endpoint) return '/';
+  let ep = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  // Ensure trailing slash for DRF unless it has a query or extension
+  if (!ep.endsWith('/') && !ep.includes('?') && !ep.includes('.')) {
+    ep = `${ep}/`;
+  }
+  return ep;
+}
+
 export async function apiClient(
   endpoint,
-  { data, method = 'GET', headers = {}, timeoutMs = DEFAULT_TIMEOUT_MS, retries = 0, query = null, ...customConfig } = {},
+  {
+    data,
+    method = 'GET',
+    headers = {},
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    retries = 0,
+    query = null,
+    clearAuthOnUnauthorized = true,
+    idempotencyKey = null,
+    signal = null,
+    ...customConfig
+  } = {},
 ) {
   const token = getAuthToken();
-  const url = `${API_BASE_URL}${endpoint}${query ? buildQuery(query) : ''}`;
+  const normalizedEp = normalizeEndpoint(endpoint);
+  const url = `${API_BASE_URL}${normalizedEp}${query ? buildQuery(query) : ''}`;
+
+  const requestHeaders = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
+    ...headers,
+  };
+
   const config = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...headers,
-    },
+    headers: requestHeaders,
     ...customConfig,
   };
 
@@ -89,36 +127,38 @@ export async function apiClient(
   let attempt = 0;
   for (;;) {
     try {
-      const response = await fetchWithTimeout(url, config, timeoutMs);
-      if (response.status === 401) {
-        // Token invalid — clear it so the next backend-authenticated
-        // session starts clean. No redirect here (router owns navigation).
-        try {
-          localStorage.removeItem('auth_token');
-        } catch {
-          /* storage unavailable */
+      const response = await fetchWithTimeout(url, config, timeoutMs, signal);
+      if (response.status === 401 && clearAuthOnUnauthorized) {
+        clearAuthTokens();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('evenmore:unauthorized'));
         }
       }
+
       const result = await parseBodySafe(response);
       if (response.ok) {
         return result;
       }
+
       const message =
         (result && (result.message || result.detail || result.error)) ||
+        (result && typeof result === 'object' && Object.values(result)[0]?.[0]) ||
         `Request failed with status ${response.status}`;
-      throw new ApiError(message, { status: response.status, endpoint, payload: result });
+
+      throw new ApiError(message, { status: response.status, endpoint: normalizedEp, payload: result });
     } catch (err) {
       const retryable =
         err?.name === 'AbortError' ||
         (err instanceof ApiError && (err.status >= 500 || err.status === 429)) ||
         err instanceof TypeError;
+
       if (retryable && attempt < retries) {
         attempt += 1;
         await new Promise((r) => setTimeout(r, 300 * attempt));
         continue;
       }
       if (err instanceof ApiError) throw err;
-      throw new ApiError(err?.message || 'Network error occurred', { endpoint });
+      throw new ApiError(err?.message || 'Network error occurred', { endpoint: normalizedEp });
     }
   }
 }

@@ -208,7 +208,7 @@ export function DocumentsPage() {
   const [empCategoryFilter, setEmpCategoryFilter] = useState("All");
 
   // My Documents user override
-  const [myDocUser, setMyDocUser] = useState(currentUser.name || "Adarsh Gupta");
+  const [myDocUser, setMyDocUser] = useState(currentUser?.name || "Adarsh Gupta");
   const [myDocCategoryFilter, setMyDocCategoryFilter] = useState("All");
 
   // Modals state
@@ -247,9 +247,9 @@ export function DocumentsPage() {
     return documents.filter((d) => {
       const q = search.toLowerCase();
       const matchesSearch =
-        d.title.toLowerCase().includes(q) ||
-        d.employee.toLowerCase().includes(q) ||
-        d.id.toLowerCase().includes(q) ||
+        String(d.title ?? '').toLowerCase().includes(q) ||
+        String(d.employee ?? '').toLowerCase().includes(q) ||
+        String(d.id ?? '').toLowerCase().includes(q) ||
         (d.tags && d.tags.some((t) => t.toLowerCase().includes(q)));
 
       const matchesCat = categoryFilter === "All" || d.category === categoryFilter;
@@ -342,7 +342,7 @@ export function DocumentsPage() {
           status: "Valid",
           fileType: "PDF",
           fileSize: `${sizeInMb} MB`,
-          uploadedBy: currentUser.name,
+          uploadedBy: currentUser?.name,
           description: `Selected from device: ${file.name} (uploaded on ${new Date().toISOString().slice(0, 10)}).`,
           fileData: fileDataUrl,
           tags: [inferredCat, "Device Upload"],
@@ -903,9 +903,9 @@ export function DocumentsPage() {
               {employees
                 .filter(
                   (e) =>
-                    e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
-                    e.department.toLowerCase().includes(empSearch.toLowerCase()) ||
-                    e.designation.toLowerCase().includes(empSearch.toLowerCase())
+                    String(e.name ?? '').toLowerCase().includes(empSearch.toLowerCase()) ||
+                    String(e.department ?? '').toLowerCase().includes(empSearch.toLowerCase()) ||
+                    String(e.designation ?? '').toLowerCase().includes(empSearch.toLowerCase())
                 )
                 .map((emp) => {
                   const empDocCount = documents.filter((d) => d.employee === emp.name).length;
@@ -1184,7 +1184,7 @@ export function DocumentsPage() {
           <div className="bg-gradient-to-r from-navy/95 to-navy/80 text-white rounded-2xl p-6 shadow-md flex flex-wrap justify-between items-center gap-6">
             <div className="flex items-center gap-4.5">
               <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white text-[22px] font-bold shadow-inner">
-                {currentUser.initials || "AG"}
+                {currentUser?.initials || "AG"}
               </div>
               <div>
                 <div className="flex items-center gap-2.5">
@@ -1194,7 +1194,7 @@ export function DocumentsPage() {
                   </span>
                 </div>
                 <p className="text-[13px] text-white/80 mt-1">
-                  Role: {currentUser.role} • {currentUser.email}
+                  Role: {currentUser?.role} • {currentUser?.email}
                 </p>
                 <div className="flex items-center gap-3 mt-2 text-[12px] text-white/90">
                   <span className="inline-flex items-center gap-1">
@@ -1216,9 +1216,9 @@ export function DocumentsPage() {
                   onChange={(e) => setMyDocUser(e.target.value)}
                   className="bg-navy/80 text-white border-none rounded-lg px-2.5 py-1 text-[12px] font-semibold focus:outline-none cursor-pointer"
                 >
-                  <option value={currentUser.name}>{currentUser.name} (You)</option>
+                  <option value={currentUser?.name}>{currentUser?.name} (You)</option>
                   {employees
-                    .filter((e) => e.name !== currentUser.name)
+                    .filter((e) => e.name !== currentUser?.name)
                     .map((e) => (
                       <option key={e.id} value={e.name}>
                         {e.name}

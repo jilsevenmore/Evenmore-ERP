@@ -13,20 +13,8 @@ import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 
 function logLeadActivity(leadId, title, color) {
     if (!leadId || !title) return;
-    try {
-        const key = 'evenmore-crm-lead-details-v1';
-        const raw = localStorage.getItem(key);
-        const all = raw ? JSON.parse(raw) : {};
-        const lid = String(leadId);
-        const prev = all[lid] && Array.isArray(all[lid].activities) ? all[lid].activities : [];
-        all[lid] = {
-            ...(all[lid] || {}),
-            activities: [{ id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' }, ...prev],
-        };
-        localStorage.setItem(key, JSON.stringify(all));
-    } catch {
-        return;
-    }
+    // The lead timeline is written server-side from the change itself
+    // (`GET /crm/leads/{id}/timeline/`), so there is nothing to record here.
 }
 
 const estimateGuide = {
@@ -300,9 +288,9 @@ export const EstimatesPage = () => {
                 keyExtractor={(e) => e.id}
                 searchPlaceholder="Search estimates..."
                 searchFilter={(e, term) =>
-                    e.estimateNumber.toLowerCase().includes(term) ||
-                    e.customer.toLowerCase().includes(term) ||
-                    e.status.toLowerCase().includes(term)
+                    String(e.estimateNumber ?? '').toLowerCase().includes(term) ||
+                    String(e.customer ?? '').toLowerCase().includes(term) ||
+                    String(e.status ?? '').toLowerCase().includes(term)
                 }
             />
 

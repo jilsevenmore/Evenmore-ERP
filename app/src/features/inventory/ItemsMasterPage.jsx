@@ -405,10 +405,10 @@ export const ItemsMasterPage = () => {
         keyExtractor={(i) => i.id}
         searchPlaceholder="Search by SKU, product name, or storage rack..."
         searchFilter={(i, term) =>
-          i.sku.toLowerCase().includes(term) ||
-          i.name.toLowerCase().includes(term) ||
-          (i.category && i.category.toLowerCase().includes(term)) ||
-          (i.location && i.location.toLowerCase().includes(term))
+          String(i.sku ?? '').toLowerCase().includes(term) ||
+          String(i.name ?? '').toLowerCase().includes(term) ||
+          (i.category && String(i.category ?? '').toLowerCase().includes(term)) ||
+          (i.location && String(i.location ?? '').toLowerCase().includes(term))
         }
       />
 

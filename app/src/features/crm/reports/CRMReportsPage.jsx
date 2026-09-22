@@ -19,31 +19,8 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import { exportToCSV } from '../../../services/exportUtils';
 import { getLeadStageOrder, DEFAULT_STAGE_ORDER, loadLeadRows } from '../../../services/taskCompletionService';
-import { loadCrmTasks, LEADS_STORAGE_KEY, CRM_EVENT } from '../../../services/leadStageAutomation';
-import { leads as seedLeads } from '../../../data/crm/mockLeads';
-
-const DEALS_STORAGE_KEY = 'crm-deals-v1';
-
-const SEED_DEALS = [
-  { id: 'dl-1', name: 'amitbhai_001', client: 'Amit Bhai', product: 'Product A', price: 100000, stage: 'Draft', source: 'Website', assignedUser: 'Mr. Kamlesh Dhumadiya', createdAt: '2026-05-10T10:00:00' },
-  { id: 'dl-2', name: 'Rohit', client: 'Rohit Sharma', product: 'Product B', price: 500000, stage: 'Draft', source: 'Referral', assignedUser: 'Jayesh Nair', createdAt: '2026-05-12T10:00:00' },
-  { id: 'dl-3', name: 'Deal Alpha', client: 'Alpha Corp', product: 'Product A', price: 750000, stage: 'Draft', source: 'Cold Call', assignedUser: 'Anuska', createdAt: '2026-04-08T10:00:00' },
-  { id: 'dl-4', name: 'Deal Beta', client: 'Beta Ltd', product: 'Service C', price: 1200000, stage: 'Draft', source: 'Website', assignedUser: 'Mr. Kamlesh Dhumadiya', createdAt: '2026-03-15T10:00:00' },
-  { id: 'dl-5', name: 'Deal Gamma', client: 'Gamma Inc', product: 'Product B', price: 1500000, stage: 'Draft', source: 'Referral', assignedUser: 'Jayesh Nair', createdAt: '2026-02-20T10:00:00' },
-  { id: 'dl-6', name: 'Deal Delta', client: 'Delta Co', product: 'Product A', price: 11123, stage: 'Draft', source: 'Website', assignedUser: 'Anuska', createdAt: '2026-01-11T10:00:00' },
-];
-
-function readRows(key, fallback) {
-  try {
-    if (typeof localStorage === 'undefined') return fallback;
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
-}
+import { CRM_EVENT } from '../../../services/leadStageAutomation';
+import { useCrmStore } from '../../../stores/crmStore';
 
 function formatINR(value) {
   const n = Number(value) || 0;
@@ -236,12 +213,10 @@ export default function CRMReportsPage() {
     }, 300);
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const leads = useMemo(() => readRows(LEADS_STORAGE_KEY, seedLeads), [tick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tasks = useMemo(() => loadCrmTasks(), [tick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const deals = useMemo(() => readRows(DEALS_STORAGE_KEY, SEED_DEALS), [tick]);
+  // Reports run over exactly what the CRM screens are showing.
+  const leads = useCrmStore((s) => s.leads);
+  const tasks = useCrmStore((s) => s.tasks);
+  const deals = useCrmStore((s) => s.deals);
 
   const stageOrder = (() => {
     const order = getLeadStageOrder();

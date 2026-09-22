@@ -52,7 +52,7 @@ export default function Onboarding() {
       const newEmp = {
         id: `EMP${1035 + (employees.length % 50)}`,
         name: c.name,
-        email: c.email || `${c.name.toLowerCase().replace(/\s+/g, ".")}@company.com`,
+        email: c.email || `${String(c.name ?? '').toLowerCase().replace(/\s+/g, ".")}@company.com`,
         avatar: c.avatar || "https://i.pravatar.cc/100?img=15",
         img: c.avatar || "https://i.pravatar.cc/100?img=15",
         designation: c.position || "Software Engineer",

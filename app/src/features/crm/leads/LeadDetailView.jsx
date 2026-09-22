@@ -1,3 +1,4 @@
+import { findDealForLead } from '../../../services/dealService';
 import CrmKpiCard from '../common/CrmKpiCard';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
@@ -54,18 +55,22 @@ import {
   AlignRight,
   Link2,
   X,
+  Users,
 } from 'lucide-react';
 import LeadAvatar from './LeadAvatar';
 import LeadFormBuilder from './LeadFormBuilder';
 import { createFieldFromType } from '../../../data/crm/leadFormSchema';
 import { exportToCSV } from '../../../services/exportUtils';
 import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
-import { leads as seedLeads } from '../../../data/crm/mockLeads';
-import { employeesMock } from '../../../data/hrms/mocks/data';
+import { useCrmStore } from '../../../stores/crmStore';
+import { useLeadDetailStore, EMPTY_DETAIL } from '../../../stores/leadDetailStore';
+import { isServerId } from '../../../services/resourceSync';
+import { loadForms, saveForms, TASK_FORM } from '../../../services/crmForms';
 import { LineItemEditor } from '../../../components/common/LineItemEditor';
 import { loadCrmTasks, saveCrmTasks, runLeadStageAutomation, TASK_SOURCE_AUTOMATION } from '../../../services/leadStageAutomation';
+import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
 import { useAppStore } from '../../../stores/appStore';
-import { completeTaskWithOutcome, NEXT_ACTION_LABELS } from '../../../services/taskCompletionService';
+import { completeTaskWithOutcome, NEXT_ACTION_LABELS, getLeadStageOrder } from '../../../services/taskCompletionService';
 import CompleteTaskModal from '../tasks/CompleteTaskModal';
 
 const DETAIL_TABS = [
@@ -96,54 +101,37 @@ const DETAIL_TAB_ICONS = {
   Activity: Sparkles,
 };
 
-const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
-const LEAD_DETAIL_STORAGE_KEY = 'evenmore-crm-lead-details-v1';
-
-function readStoredJson(key, fallback) {
-  try {
-    if (typeof localStorage === 'undefined') return fallback;
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStoredJson(key, value) {
-  try {
-    if (typeof localStorage === 'undefined') return false;
-    localStorage.setItem(key, JSON.stringify(value));
-    window.dispatchEvent(new Event('crm:data-updated'));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function loadStoredLeadRows() {
-  const stored = readStoredJson(LEADS_STORAGE_KEY, null);
-  return Array.isArray(stored) && stored.length > 0 ? stored : seedLeads;
-}
-
-function loadStoredLeadDetails() {
-  const stored = readStoredJson(LEAD_DETAIL_STORAGE_KEY, {});
-  return stored && typeof stored === 'object' ? stored : {};
-}
-
+/**
+ * The drawer used to keep a lead and its sections in two localStorage blobs.
+ * Both now go to the API: the lead row through the CRM store, each section
+ * through its own sub-collection endpoint.
+ */
 function updateStoredLead(leadId, updates) {
   if (!leadId || !updates || Object.keys(updates).length === 0) return false;
-  const nextRows = loadStoredLeadRows().map((row) => (
-    String(row.id) === String(leadId) ? { ...row, ...updates } : row
-  ));
-  return writeStoredJson(LEADS_STORAGE_KEY, nextRows);
+  useCrmStore.getState().updateLead(leadId, updates).catch((err) => {
+    console.warn('[CRM] lead not saved:', err?.message || err);
+  });
+  return true;
 }
 
+/**
+ * Persist rows a tab just produced. Each key is a sub-collection, and only the
+ * rows the server has not seen are posted — the rest are already its own.
+ */
 function updateStoredLeadDetail(leadId, updates) {
   if (!leadId || !updates || Object.keys(updates).length === 0) return false;
-  const current = loadStoredLeadDetails();
-  const key = String(leadId);
-  current[key] = { ...(current[key] || {}), ...updates };
-  return writeStoredJson(LEAD_DETAIL_STORAGE_KEY, current);
+  const { add } = useLeadDetailStore.getState();
+  Object.entries(updates).forEach(([section, rows]) => {
+    if (!Array.isArray(rows)) return;
+    rows
+      .filter((row) => row && !row._synced && !isServerId(row.id))
+      .forEach((row) => {
+        add(leadId, section, row).catch((err) => {
+          console.warn(`[CRM] ${section} not saved:`, err?.message || err);
+        });
+      });
+  });
+  return true;
 }
 
 function limitItems(items, count) {
@@ -182,355 +170,121 @@ function statusClass(value) {
   return String(value || '').toLowerCase() === 'active' ? 'green' : 'amber';
 }
 
-function buildUsers() {
-  return [
-    { id: 1, initials: 'PP', name: 'Priya Patel', email: 'priya@company.com', role: 'Sales Executive', status: 'Active', bg: '#c084fc' },
-    { id: 2, initials: 'JN', name: 'Jayesh Nair', email: 'jayesh@company.com', role: 'Pre Sales', status: 'Active', bg: '#ca8a04' },
-    { id: 3, initials: 'CC', name: 'Chetan Chaudhari', email: 'chetan@company.com', role: 'Technical', status: 'Active', bg: '#3b82f6' },
-    { id: 4, initials: 'AS', name: 'Anuska Shah', email: 'anuska@company.com', role: 'Support', status: 'Inactive', bg: '#0d9488' },
-    { id: 5, initials: 'UF', name: 'Utsav Faldu', email: 'utsav@company.com', role: 'Manager', status: 'Active', bg: '#3b82f6' },
-  ];
-}
 
-function buildProducts(lead) {
-  const defaults = [
-    { id: 1, name: 'Endoscopy Machine', sku: 'END-001', price: 'Rs. 1,20,000', qty: 1, status: 'Active', image: '' },
-    { id: 2, name: 'Monitor 4K', sku: 'MON-004', price: 'Rs. 45,000', qty: 2, status: 'Active', image: '' },
-    { id: 3, name: 'Surgical Kit', sku: 'SK-010', price: 'Rs. 25,000', qty: 1, status: 'Draft', image: '' },
-  ];
-  return limitItems(defaults, lead?.productsCount);
-}
+// ── helpers the drawer's tabs share ─────────────────────────────────────────
 
-function buildLeadSources(lead) {
-  const defaults = [
-    {
-      id: 1,
-      source: lead?.source || 'Website',
-      sourceType: String(lead?.source || 'Website').toLowerCase(),
-      details: 'Contact Form (Homepage)',
-      date: '27/08/2026 01:42 PM',
-      createdBy: 'David Patel',
-      avatar: 'https://i.pravatar.cc/160?img=68',
-      color: '#10b981',
-      icon: 'globe',
-    },
-    {
-      id: 2,
-      source: 'Referral',
-      sourceType: 'referral',
-      details: 'Recommended by Priya Mehta',
-      date: '25/08/2026 11:20 AM',
-      createdBy: 'Priya Mehta',
-      avatar: 'https://i.pravatar.cc/160?img=47',
-      color: '#f59e0b',
-      icon: 'user',
-    },
-    {
-      id: 3,
-      source: 'Advertisement',
-      sourceType: 'ad',
-      details: 'Instagram Ads',
-      date: '20/08/2026 05:30 PM',
-      createdBy: 'Rohit Sharma',
-      avatar: 'https://i.pravatar.cc/160?img=15',
-      color: '#ec4899',
-      icon: 'megaphone',
-    },
-  ];
-  return limitItems(defaults, lead?.sourcesCount);
-}
+/** Lead source icons are stored by name and resolved to a component to render. */
+const SOURCE_ICONS = {
+  website: Globe,
+  email: Mail,
+  phone: Phone,
+  call: Phone,
+  referral: Users,
+  campaign: Megaphone,
+  exhibition: Building2,
+  default: Globe,
+};
 
-function sourceIconMap() {
-  return { globe: Globe, user: User, megaphone: Megaphone };
-}
-
-function resolveSourceIcon(icon) {
-  const map = sourceIconMap();
-  if (typeof icon === 'string') return map[icon] || Globe;
-  if (typeof icon === 'function') return icon;
-  if (icon && icon.$$typeof) return icon;
-  return Globe;
-}
-
-function sourceIconName(icon) {
+export function sourceIconName(icon) {
   if (typeof icon === 'string') return icon;
-  if (icon === User) return 'user';
-  if (icon === Megaphone) return 'megaphone';
-  return 'globe';
+  const match = Object.entries(SOURCE_ICONS).find(([, component]) => component === icon);
+  return match ? match[0] : 'default';
 }
 
-function buildLeadEmails() {  return [
-    {
-      id: 1,
-      subject: 'Product Inquiry',
-      date: '27/08/2026 01:45 PM',
-      person: 'Chirag Hirapara',
-      avatar: 'https://i.pravatar.cc/160?img=60',
-      status: 'Received',
-      statusColor: 'slate',
-    },
-    {
-      id: 2,
-      subject: 'Follow Up - Call Scheduled',
-      date: '27/08/2026 03:20 PM',
-      person: 'David Patel',
-      avatar: 'https://i.pravatar.cc/160?img=68',
-      status: 'Sent',
-      statusColor: 'green',
-    },
-    {
-      id: 3,
-      subject: 'Quotation Shared',
-      date: '26/08/2026 11:10 AM',
-      person: 'Priya Mehta',
-      avatar: 'https://i.pravatar.cc/160?img=47',
-      status: 'Sent',
-      statusColor: 'green',
-    },
-    {
-      id: 4,
-      subject: 'Re: Quotation',
-      date: '26/08/2026 02:35 PM',
-      person: 'Chirag Hirapara',
-      avatar: 'https://i.pravatar.cc/160?img=60',
-      status: 'Received',
-      statusColor: 'slate',
-    },
-    {
-      id: 5,
-      subject: 'Final Discussion',
-      date: '25/08/2026 04:12 PM',
-      person: 'Rohit Sharma',
-      avatar: 'https://i.pravatar.cc/160?img=15',
-      status: 'Sent',
-      statusColor: 'green',
-    },
-  ];
+export function resolveSourceIcon(icon) {
+  if (icon && typeof icon !== 'string') return icon;
+  return SOURCE_ICONS[String(icon || 'default').toLowerCase()] || SOURCE_ICONS.default;
 }
 
-function buildLeadTimeline() {
-  return [
-    {
-      id: 1,
-      type: 'sent',
-      title: 'Quotation Shared',
-      preview: 'Hi Chirag, Please find the attached quotation for the Endoscopy Machine. Let me know if you have any questions.',
-      date: '26/08/2026 11:10 AM',
-      author: 'Priya Mehta',
-      dotColor: '#10b981',
-    },
-    {
-      id: 2,
-      type: 'received',
-      title: 'Re: Quotation',
-      preview: 'Thanks for the quotation. Looks good. I would like to discuss the payment terms.',
-      date: '26/08/2026 02:35 PM',
-      author: 'Chirag Hirapara',
-      dotColor: '#64748b',
-    },
-    {
-      id: 3,
-      type: 'sent',
-      title: 'Follow Up - Call Scheduled',
-      preview: 'Hi Chirag, As discussed, we have scheduled a call tomorrow at 11 AM to finalize the order.',
-      date: '27/08/2026 03:20 PM',
-      author: 'David Patel',
-      dotColor: '#10b981',
-    },
-  ];
-}
+export const LEAD_TASK_PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'];
+export const LEAD_TASK_STATUS_OPTIONS = ['Open', 'In Progress', 'Waiting', 'Completed'];
 
-function buildSentFiles(lead) {
-  const company = lead?.company || 'Hirapara Industries';
-  const owner = lead?.owner || 'David Patel';
-  const defaults = [
-    { id: `file-${lead?.id || 0}-1`, type: 'image', name: `${company} Front Desk.jpg`, size: '2.4 MB', sentOn: 'Aug 26, 2026', sentBy: owner, preview: 'https://images.unsplash.com/photo-1519494080410-f9aa8f52f12e?auto=format&fit=crop&w=900&q=80', downloadUrl: 'https://images.unsplash.com/photo-1519494080410-f9aa8f52f12e?auto=format&fit=crop&w=1600&q=90', description: 'Shared for location confirmation.' },
-    { id: `file-${lead?.id || 0}-2`, type: 'document', name: `${company} Product Quotation.pdf`, size: '860 KB', sentOn: 'Aug 28, 2026', sentBy: owner, preview: '', downloadUrl: '', description: 'Final quotation document.' },
-  ];
-  return limitItems(defaults, lead?.filesCount);
-}
-
-function buildLeadTasks() {
-  return [
-    { id: 'lt-1', title: 'Final Meeting', stage: 'Negotiation', status: 'Due', priority: 'High', dueAt: '27/08/2026, 01:42 PM', process: 'Not Started', assignee: 'Utsav Faldu', description: 'Meet the client and finalize negotiation points.', proposalId: '', deliveryChallanId: '' },
-    { id: 'lt-2', title: 'Formal meeting', stage: 'Negotiation', status: 'Due', priority: 'Medium', dueAt: '27/08/2026, 01:42 PM', process: 'Not Started', assignee: 'Priya Patel', description: 'Formal client discussion for pricing alignment.', proposalId: '', deliveryChallanId: '' },
-    { id: 'lt-3', title: 'Demo pending', stage: 'Demo pending', status: 'Completed', priority: 'High', dueAt: '03/09/2026, 01:41 PM', process: 'Not Started', assignee: 'Utsav Faldu', description: '', proposalId: '', deliveryChallanId: '' },
-    { id: 'lt-4', title: 'Call', stage: 'New Lead', status: 'Completed', priority: 'Medium', dueAt: '27/08/2026, 01:16 PM', process: 'Not Started', assignee: 'David Patel', description: 'Initial qualification call.', proposalId: '', deliveryChallanId: '' },
-    { id: 'lt-5', title: 'Call', stage: 'Details collected', status: 'Completed', priority: 'Medium', dueAt: '27/08/2026, 01:20 PM', process: 'Not Started', assignee: 'Priya Patel', description: 'Follow-up call after collecting details.', proposalId: '', deliveryChallanId: '' },
-    { id: 'lt-6', title: 'Quotation', stage: 'Quotation shared', status: 'Completed', priority: 'Medium', dueAt: '30/08/2026, 01:20 PM', process: 'Not Started', assignee: 'David Patel', description: 'Share quotation and answer client questions.', proposalId: '', deliveryChallanId: '' },
-    { id: 'lt-7', title: 'Demo completed', stage: 'Demo Done', status: 'Completed', priority: 'Medium', dueAt: '30/08/2026, 01:41 PM', process: 'Not Started', assignee: 'Utsav Faldu', description: 'Demo completed successfully.', proposalId: '', deliveryChallanId: '' },
-  ];
-}
-
-const LEAD_TASK_STAGE_OPTIONS = ['New Lead', 'Details collected', 'Quotation shared', 'Demo pending', 'Demo Done', 'Negotiation', 'Won', 'Lost'];
-const LEAD_TASK_PRIORITY_OPTIONS = ['High', 'Medium', 'Low'];
-const LEAD_TASK_STATUS_OPTIONS = [
-  { value: 'Due', label: 'Pending' },
-  { value: 'Completed', label: 'Completed' },
-];
-
-function padTaskValue(value) {
-  return String(value).padStart(2, '0');
-}
-
-function parseLeadTaskDueAt(value) {
-  const text = String(value || '').trim();
-  if (!text) return { taskDate: '', taskTime: '' };
-
-  const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
-  if (isoMatch) {
-    return {
-      taskDate: `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`,
-      taskTime: `${isoMatch[4] || '09'}:${isoMatch[5] || '00'}`,
-    };
-  }
-
-  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:,\s*|\s+)(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
-  if (!match) return { taskDate: '', taskTime: '' };
-
-  const day = match[1];
-  const month = match[2];
-  const year = match[3];
-  let hour = Number(match[4]);
-  const minute = match[5];
-  const meridiem = String(match[6] || '').toUpperCase();
-
-  if (meridiem === 'PM' && hour < 12) hour += 12;
-  if (meridiem === 'AM' && hour === 12) hour = 0;
-
-  return {
-    taskDate: `${year}-${month}-${day}`,
-    taskTime: `${padTaskValue(hour)}:${minute}`,
-  };
-}
-
-function formatLeadTaskDueAt(taskDate, taskTime) {
-  if (!taskDate) return '';
-  const [year, month, day] = taskDate.split('-').map(Number);
-  const [hour = 9, minute = 0] = String(taskTime || '09:00').split(':').map(Number);
-  const date = new Date(year, (month || 1) - 1, day || 1, hour || 0, minute || 0);
-
-  if (Number.isNaN(date.getTime())) {
-    return `${padTaskValue(day || 1)}/${padTaskValue(month || 1)}/${year || new Date().getFullYear()}, ${taskTime || '09:00'}`;
-  }
-
-  return date.toLocaleString('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  });
-}
-
-function createLeadTaskForm(defaultAssignee = '') {
-  const now = new Date();
-  return {
-    defaultTask: 'custom',
-    title: '',
-    stage: 'New Lead',
-    priority: 'Low',
-    status: 'Due',
-    assignee: defaultAssignee,
-    description: '',
-    proposalId: '',
-    deliveryChallanId: '',
-    taskFormId: '',
-    customValues: {},
-    taskDate: `${now.getFullYear()}-${padTaskValue(now.getMonth() + 1)}-${padTaskValue(now.getDate())}`,
-    taskTime: `${padTaskValue(now.getHours())}:${padTaskValue(now.getMinutes())}`,
-  };
-}
-
-const TASK_FORM_STORAGE_KEY = 'leadTaskFormsV1';
-const TASK_FORM_FIELD_TYPES = ['Text', 'Single Line', 'Multi Line', 'Number', 'Email', 'Phone', 'Date', 'Dropdown', 'Multi Select', 'Checkbox', 'Radio', 'File Upload', 'Currency', 'User', 'Lookup'];
-
+/** The task form definitions, from `/crm/forms/`. */
 function getLeadTaskForms() {
-  try {
-    const raw = localStorage.getItem(TASK_FORM_STORAGE_KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch { }
-  return [
-    { id: 'task-form-calling', title: 'Calling', description: 'No description provided', fields: ['Call', '2nd Call', '3rd Call'], sections: [{ id: 'task-information', title: 'Task Information', fields: [{ id: 'cf-call-1', type: 'Single Line', label: 'Call Outcome', placeholder: 'Enter call outcome', required: false }] }], lastUpdated: '07/08/2026', status: 'ACTIVE', iconName: 'call' },
-    { id: 'task-form-visit', title: 'Visit Data', description: 'No description provided', fields: ['Quotation', 'Demo', 'pending'], sections: [{ id: 'task-information', title: 'Task Information', fields: [{ id: 'vf-visit-1', type: 'Single Line', label: 'Visit Purpose', placeholder: 'Enter visit purpose', required: true }] }], lastUpdated: '16/04/2026', status: 'ACTIVE', iconName: 'visit' },
-  ];
-}
-
-function getTaskFormFields(form) {
-  if (form?.sections && Array.isArray(form.sections) && form.sections.length > 0) {
-    return form.sections.flatMap((s) => s.fields || []);
-  }
-  return (Array.isArray(form?.fields) ? form.fields : []).map((name, i) => ({ id: `${form?.id || 'form'}-field-${i}`, type: 'Text', label: String(name), placeholder: `Enter ${String(name).toLowerCase()}`, required: false }));
+  return loadForms(TASK_FORM);
 }
 
 function saveLeadTaskForms(forms) {
-  try {
-    localStorage.setItem(TASK_FORM_STORAGE_KEY, JSON.stringify(forms));
-    return true;
-  } catch { return false; }
+  saveForms(forms, TASK_FORM);
 }
 
-function getMasterTaskOptions() {
-  try {
-    const raw = localStorage.getItem('leadMasterTasksV1');
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch { }
-  return [];
-}
-
-function loadLeadDetailState(lead) {
-  const stored = loadStoredLeadDetails()[String(lead?.id || '')] || {};
+function createLeadTaskForm(name, sections = []) {
   return {
-    users: Array.isArray(stored.users) ? stored.users : buildUsers(lead),
-    products: Array.isArray(stored.products) ? stored.products : buildProducts(lead),
-    sources: Array.isArray(stored.sources) ? stored.sources : buildLeadSources(lead),
-    emails: Array.isArray(stored.emails) ? stored.emails : buildLeadEmails(),
-    timeline: Array.isArray(stored.timeline) ? stored.timeline : buildLeadTimeline(),
-    files: Array.isArray(stored.files) ? stored.files : buildSentFiles(lead),
-    calls: Array.isArray(stored.calls) ? stored.calls : [],
-    tasks: Array.isArray(stored.tasks) ? stored.tasks : buildLeadTasks(),
-    activities: Array.isArray(stored.activities) ? stored.activities : null,
+    id: `task-form-${Date.now()}`,
+    title: String(name || 'Untitled form').trim(),
+    description: '',
+    sections,
+    fields: sections.flatMap((section) => (section.fields || []).map((field) => field.label)),
+    status: 'ACTIVE',
+    lastUpdated: new Date().toLocaleDateString('en-GB'),
   };
 }
 
-function buildDiscussionThreads(lead) {
-  const assignedUsers = buildUsers(lead).slice(0, 4);
-  const leadName = String(lead?.name || 'Lead').replace(' (Sample)', '');
-  return [
-    {
-      id: `lead-${lead?.id || 0}`,
-      kind: 'lead',
-      name: leadName,
-      subtitle: lead?.company,
-      badge: lead?.status,
-      time: 'Just now',
-      note: `Lead ${leadName} needs a final follow-up.`,
-      messages: [
-        { id: `lead-${lead?.id || 0}-1`, side: 'in', sender: leadName, body: `Hi team, please share the quotation for ${lead?.company}.`, time: '10:30 AM' },
-        { id: `lead-${lead?.id || 0}-2`, side: 'out', sender: 'You', body: 'Quotation draft is ready.', time: '10:42 AM' },
-      ],
-    },
-    ...assignedUsers.map((user, index) => ({
-      id: `user-${lead?.id || 0}-${user.id}`,
-      kind: 'user',
-      name: user.name,
-      subtitle: user.role,
-      badge: user.status,
-      color: user.color,
-      time: `${index + 1}:1${index} PM`,
-      note: `${user.name} is assigned for support on this lead.`,
-      messages: [
-        { id: `user-${lead?.id || 0}-${user.id}-1`, side: 'in', sender: user.name, body: `Checked the requirement. Will highlight use cases in the next call.`, time: `${index + 1}:1${index} PM` },
-      ],
-    })),
-  ];
+function getTaskFormFields(formId) {
+  const form = getLeadTaskForms().find((f) => String(f.id) === String(formId));
+  if (!form) return [];
+  if (Array.isArray(form.sections) && form.sections.length > 0) {
+    return form.sections.flatMap((section) => section.fields || []);
+  }
+  return (form.fields || []).map((label, index) => ({ id: `f-${index}`, label, type: 'text' }));
+}
+
+/** The master task templates a stage can draw on, from `/crm/master-tasks/`. */
+function getMasterTaskOptions() {
+  return useCrmStore.getState().masterTasks.map((task) => task.name || task.title).filter(Boolean);
+}
+
+/** `DD/MM/YYYY, hh:mm` — what the task rows render — and back again. */
+function parseLeadTaskDueAt(value) {
+  if (!value) return null;
+  const direct = Date.parse(value);
+  if (!Number.isNaN(direct)) return new Date(direct);
+  const match = String(value).match(/^(\d{2})\/(\d{2})\/(\d{4})(?:,?\s+(\d{1,2}):(\d{2}))?/);
+  if (!match) return null;
+  const [, dd, mm, yyyy, hh = '0', min = '0'] = match;
+  return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
+}
+
+function formatLeadTaskDueAt(value) {
+  const date = parseLeadTaskDueAt(value);
+  if (!date) return String(value || '');
+  return date.toLocaleString('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+}
+
+/**
+ * One lead's sections, as the server returned them. Anything the server has no
+ * rows for stays empty — the drawer shows an empty state instead of invented
+ * contacts, files or a fabricated timeline.
+ */
+function leadDetailState(detail) {
+  const stored = detail || EMPTY_DETAIL;
+  return {
+    users: stored.users || [],
+    products: stored.products || [],
+    sources: stored.sources || [],
+    emails: stored.emails || [],
+    timeline: stored.timeline || [],
+    files: stored.files || [],
+    calls: stored.calls || [],
+    notes: stored.notes || [],
+    threads: stored.threads || [],
+    tasks: stored.tasks || [],
+    activities: stored.activities || [],
+  };
+}
+
+/** Subscribe to one lead's sections and trigger the load on first use. */
+function useLeadDetailState(lead) {
+  const leadId = lead?.id;
+  const detail = useLeadDetailStore((s) => s.byLead[String(leadId || '')]);
+  const load = useLeadDetailStore((s) => s.load);
+  useEffect(() => {
+    if (leadId) load(leadId);
+  }, [leadId, load]);
+  return useMemo(() => leadDetailState(detail), [detail]);
 }
 
 function DiscussionAvatar({ thread, lead }) {
@@ -641,7 +395,7 @@ function metricCards(counts) {
 
 // ── 1. Sources & Emails Tab (Screenshot Focus) ────────────────
 function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
-  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const initialState = useLeadDetailState(lead);
   const [sources, setSources] = useState(() => initialState.sources);
   const [emails, setEmails] = useState(() => initialState.emails);
   const [timeline, setTimeline] = useState(() => initialState.timeline);
@@ -727,7 +481,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
     const added = {
       id: Date.now(),
       source: newSource.source,
-      sourceType: newSource.source.toLowerCase(),
+      sourceType: String(newSource.source ?? '').toLowerCase(),
       details: newSource.details,
       date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       createdBy: 'David Patel',
@@ -1098,7 +852,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
 // ── Files Tab ───────────────────────────────────────────────
 function FilesTab({ lead, onCountsChange, onActivity }) {
-  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const initialState = useLeadDetailState(lead);
   const [files, setFiles] = useState(() => initialState.files);
   const [fileSearch, setFileSearch] = useState('');
   const [fileType, setFileType] = useState('All');
@@ -1106,7 +860,7 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
 
   const visibleFiles = useMemo(() => files.filter((f) => {
     if (fileType !== 'All' && f.type !== fileType) return false;
-    if (fileSearch && !f.name.toLowerCase().includes(fileSearch.toLowerCase())) return false;
+    if (fileSearch && !String(f.name ?? '').toLowerCase().includes(fileSearch.toLowerCase())) return false;
     return true;
   }), [files, fileSearch, fileType]);
 
@@ -1217,7 +971,7 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
 }
 
 function CallsTab({ lead, onCountsChange, onActivity }) {
-  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const initialState = useLeadDetailState(lead);
   const [calls, setCalls] = useState(() => initialState.calls);
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -1229,7 +983,7 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
   const [duration, setDuration] = useState('');
   const [notes, setNotes] = useState('');
   const assigneeOptions = useMemo(() => {
-    const names = [lead?.owner, ...employeesMock.map((e) => e.name)].map((n) => String(n || '').trim()).filter(Boolean);
+    const names = [lead?.owner, ...useCrmStore.getState().teamMembers.map((e) => e.name)].map((n) => String(n || '').trim()).filter(Boolean);
     return [...new Set(names)];
   }, [lead?.owner]);
 
@@ -1474,7 +1228,7 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
 function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   const { quotations, deliveryChallans } = useERP() || {};
   const navigate = useNavigate();
-  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const initialState = useLeadDetailState(lead);
   const [tasks, setTasks] = useState(() => initialState.tasks);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -1490,7 +1244,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     const names = [
       lead?.owner,
       ...(initialState.users || []).map((user) => user.name),
-      ...employeesMock.map((employee) => employee.name),
+      ...useCrmStore.getState().teamMembers.map((member) => member.name),
       ...tasks.map((task) => task.assignee),
     ]
       .map((name) => String(name || '').trim())
@@ -1732,11 +1486,24 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       setTasks((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...nextTask } : t)));
       onActivity?.(`Task "${form.title.trim()}" updated`, '#1d6bff');
     } else {
+      const manualTask = { id: `lt-${Date.now()}`, ...nextTask };
       setTasks((prev) => [
-        { id: `lt-${Date.now()}`, ...nextTask },
+        manualTask,
         ...prev,
       ]);
       onActivity?.(`Task "${form.title.trim()}" added`, '#16a34a');
+      emitCrmEvent({
+        type: CRM_EVENT_TYPES.TASK_CREATED,
+        entityType: 'lead-task',
+        entityId: manualTask.id,
+        payload: {
+          title: manualTask.title,
+          ownerName: manualTask.assignee,
+          leadName: lead?.name,
+          leadId: lead?.id,
+          path: `/crm/leads/${lead?.id}`,
+        },
+      });
     }
     setIsModalOpen(false);
   }
@@ -2123,7 +1890,7 @@ function EstimatesTab({ lead, onCountsChange }) {
   const all = useEstimates();
   const { customers } = useERP() || {};
   const linked = useMemo(() => all.filter((e) => estimateMatchesLead(e, lead)), [all, lead]);
-  const storedProducts = useMemo(() => loadLeadDetailState(lead).products, [lead]);
+  const storedProducts = useLeadDetailState(lead).products;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [validUntil, setValidUntil] = useState('15 Days');
@@ -2310,7 +2077,7 @@ function quotationMatchesLead(q, lead) {
 function QuotationsTab({ lead, onActivity }) {
   const { quotations, customers, updateQuotationStatus, addQuotation } = useERP() || {};
   const linked = useMemo(() => (quotations || []).filter((q) => quotationMatchesLead(q, lead)), [quotations, lead]);
-  const storedProducts = useMemo(() => loadLeadDetailState(lead).products, [lead]);
+  const storedProducts = useLeadDetailState(lead).products;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCustomerId, setSelectedCustomerId] = useState((customers || [])[0]?.id || '');
   const [validUntil, setValidUntil] = useState('30 Days');
@@ -2373,8 +2140,7 @@ function QuotationsTab({ lead, onActivity }) {
   }
 
   function sendQuotation(q) {
-    updateQuotationStatus?.(q.id, 'Sent');
-    onActivity?.(`Quotation ${q.quoteNumber} sent to ${lead?.name || 'lead'}`, '#3b82f6');
+    window.location.assign(`/sales/quotations?quotationId=${encodeURIComponent(q.id)}&send=1`);
   }
 
   function quotationTone(status) {
@@ -2733,14 +2499,6 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
   );
 }
 
-function buildSeedActivities(lead) {
-  return [
-    { id: 'act-created', title: `Lead created from ${lead?.source || 'Website'}`, time: lead?.createdOn || 'Just now', color: '#3b82f6' },
-    { id: 'act-status', title: `Stage set to ${lead?.status || 'New'}`, time: lead?.createdOn || 'Just now', color: '#8b5cf6' },
-    { id: 'act-owner', title: `Assigned to ${lead?.owner || 'David Patel'}`, time: lead?.createdOn || 'Just now', color: '#10b981' },
-  ];
-}
-
 function ActivityTab({ lead, items }) {
   const entries = items ?? [];
   const allEstimates = useEstimates();
@@ -2751,6 +2509,7 @@ function ActivityTab({ lead, items }) {
     ...linkedEstimates.map((e) => ({ id: `sys-est-${e.id}`, title: `Estimate ${e.estimateNumber} • ${e.status}`, time: e.date || '', color: '#f59e0b' })),
     ...linkedQuotations.map((q) => ({ id: `sys-q-${q.id}`, title: `Quotation ${q.quoteNumber} • ${q.status}`, time: q.date || '', color: '#10b981' })),
   ];
+  systemEntries.push(...linkedQuotations.flatMap(q => (q.activity || []).map(event => ({ id: event.id, title: `${q.quoteNumber} ? ${event.type}`, time: event.timestamp, color: '#10b981' }))));
   const total = entries.length + systemEntries.length;
   return (
     <div className="card p-5 space-y-4">
@@ -2807,7 +2566,7 @@ function ActivityTab({ lead, items }) {
 
 // ── Discussion & Notes Tab ────────────────────────────────────
 function DiscussionNotesTab({ lead, onActivity }) {
-  const initialThreads = useMemo(() => buildDiscussionThreads(lead), [lead]);
+  const initialThreads = useLeadDetailState(lead).threads;
   const [threads, setThreads] = useState(initialThreads);
   const [selectedThreadId, setSelectedThreadId] = useState(initialThreads[0]?.id ?? null);
   const [messageDraft, setMessageDraft] = useState('');
@@ -3080,7 +2839,7 @@ function GeneralTab({ lead }) {
 
 // ── 3. Users | Products Tab ──────────────────────────────────
 function UsersProductsTab({ lead, onCountsChange, onActivity }) {
-  const initialState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const initialState = useLeadDetailState(lead);
   const [users, setUsers] = useState(() => initialState.users);
   const [products, setProducts] = useState(() => initialState.products);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
@@ -3106,7 +2865,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   }), [products, productSearch, productFilter]);
 
   const availableEmployees = useMemo(
-    () => employeesMock.filter((employee) => !users.some((user) => user.name === employee.name)),
+    () => useCrmStore.getState().teamMembers.filter((member) => !users.some((user) => user.name === member.name)),
     [users],
   );
 
@@ -3116,7 +2875,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   }, [lead?.id, users, products, users.length, products.length, onCountsChange]);
 
   function addUser() {
-    const employee = employeesMock.find((item) => item.id === selectedEmployeeId);
+    const employee = useCrmStore.getState().teamMembers.find((item) => item.id === selectedEmployeeId);
     if (!employee) return;
     setUsers((current) => [
       ...current,
@@ -3658,7 +3417,8 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
   const [viewLead, setViewLead] = useState(lead);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editForm, setEditForm] = useState(null);
-  const storedDetailState = useMemo(() => loadLeadDetailState(lead), [lead]);
+  const storedDetailState = useLeadDetailState(lead);
+  const storeLeads = useCrmStore((s) => s.leads);
   const [activeTab, setActiveTab] = useState('Users & Products');
   const { addCustomer, showToast } = useERP() || {};
   const [isConverted, setIsConverted] = useState(lead?.status === 'Converted');
@@ -3678,16 +3438,15 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     estimates: lead?.estimatesCount ?? 0,
     challans: lead?.deliveryChallansCount ?? 0,
   }));
-  const [activities, setActivities] = useState(() => (storedDetailState.activities || buildSeedActivities(lead)));
+  const [activities, setActivities] = useState(() => storedDetailState.activities || []);
+  const [convertedDeal, setConvertedDeal] = useState(() => findDealForLead(lead?.id));
 
   const logActivity = React.useCallback((title, color) => {
     if (!title) return;
     const entry = { id: `act-${Date.now()}`, title, time: 'Just now', color: color || '#3b82f6' };
-    setActivities((current) => {
-      const next = [entry, ...current];
-      updateStoredLeadDetail(viewLead?.id ?? lead?.id, { activities: next });
-      return next;
-    });
+    // The server records the activity from the change itself; this shows it
+    // immediately, and the next read of the timeline confirms it.
+    setActivities((current) => [entry, ...current.filter((item) => item.id !== entry.id)]);
   }, [viewLead?.id, lead?.id]);
 
   const updateDetailCounts = React.useCallback((counts) => {
@@ -3707,29 +3466,30 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     });
   }, [viewLead?.id, lead?.id, viewLead?.status, lead?.status, isConverted, detailCounts]);
 
+  // The lead row and its sections both live in the CRM stores now, so this only
+  // has to react to them rather than re-reading a browser cache.
   React.useEffect(() => {
-    function syncFromStore() {
-      const target = viewLead ?? lead;
-      if (!target?.id) return;
-      const fresh = loadLeadDetailState(target);
-      setActivities((current) => {
-        const incoming = fresh.activities || buildSeedActivities(target);
-        if (JSON.stringify(incoming) === JSON.stringify(current)) return current;
-        const seen = new Map(current.map((a) => [a.id, a]));
-        incoming.forEach((a) => seen.set(a.id, a));
-        return Array.from(seen.values());
-      });
-      const freshTasks = Array.isArray(fresh.tasks) ? fresh.tasks : [];
-      const openTasks = freshTasks.filter((t) => t.status !== 'Completed').length;
-      setDetailCounts((current) => (current.openTasks === openTasks ? current : { ...current, openTasks }));
+    const target = viewLead ?? lead;
+    if (!target?.id) return;
+    const freshLead = storeLeads.find((row) => String(row.id) === String(target.id));
+    if (freshLead) {
+      setViewLead((current) => (
+        JSON.stringify(current) === JSON.stringify(freshLead) ? current : freshLead
+      ));
     }
-    window.addEventListener('crm:data-updated', syncFromStore);
-    window.addEventListener('storage', syncFromStore);
-    return () => {
-      window.removeEventListener('crm:data-updated', syncFromStore);
-      window.removeEventListener('storage', syncFromStore);
-    };
-  }, [viewLead, lead]);
+    setConvertedDeal(findDealForLead(target.id));
+
+    const incoming = storedDetailState.activities || [];
+    setActivities((current) => {
+      if (JSON.stringify(incoming) === JSON.stringify(current)) return current;
+      const seen = new Map(current.map((a) => [a.id, a]));
+      incoming.forEach((a) => seen.set(a.id, a));
+      return Array.from(seen.values());
+    });
+
+    const openTasks = (storedDetailState.tasks || []).filter((t) => t.status !== 'Completed').length;
+    setDetailCounts((current) => (current.openTasks === openTasks ? current : { ...current, openTasks }));
+  }, [viewLead, lead, storeLeads, storedDetailState]);
 
   function openEditLead() {
     const source = viewLead ?? lead;
@@ -3856,6 +3616,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
   return (
     <div className="space-y-4">
+      <div className="card p-3 text-xs text-slate-600">
+        {convertedDeal ? <>Converted to Deal: {convertedDeal.id} <Link className="ml-2 text-blue-600 hover:underline" to={`/crm/deals?deal=${encodeURIComponent(convertedDeal.id)}`}>View Deal</Link></> : 'Not converted / No Deal'}
+      </div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
         <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <Link to="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
@@ -4059,13 +3822,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Lead Status
                 <select className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white" value={editForm.status} onChange={(e) => updateEditField('status', e.target.value)}>
-                  <option value="New">New</option>
-                  <option value="Contacted">Contacted</option>
-                  <option value="Qualified">Qualified</option>
-                  <option value="Proposal">Proposal</option>
-                  <option value="Converted">Converted</option>
-                  <option value="Lost">Lost</option>
-                  <option value="Lost Lead">Lost Lead</option>
+                  {Array.from(new Set([editForm.status, ...getLeadStageOrder()].filter(Boolean))).map((stage) => (
+                    <option key={stage} value={stage}>{stage}</option>
+                  ))}
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">

@@ -1928,7 +1928,7 @@ export const AddEditItemPage = () => {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {categoryCustomFields.map((field) => {
-                    const fieldKey = field.id || field.name.toLowerCase().replace(/\s+/g, '_');
+                    const fieldKey = field.id || String(field.name ?? '').toLowerCase().replace(/\s+/g, '_');
                     const val = customFieldValues[fieldKey] ?? customFieldValues[field.name] ?? '';
 
                     if ((field.type === 'dropdown' || field.type === 'select') && field.options && field.options.length > 0) {

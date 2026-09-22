@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, useRouteError } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout';
+import RequireAuth from './RequireAuth';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { PageLoadingSkeleton } from '../components/common/PageLoadingSkeleton';
 
@@ -18,10 +19,27 @@ const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage')
 const TaskFormPage = lazy(() => import('../features/crm/tasks/TaskFormPage'));
 const TaskFormBuilderPage = lazy(() => import('../features/crm/tasks/TaskFormBuilderPage'));
 const CRMDashboard = lazy(() => import('../features/crm/dashboard/CRMDashboard'));
+const ProjectsPage = lazy(() => import('../features/crm/projects/ProjectsPage'));
+const ContractsPage = lazy(() => import('../features/crm/contracts/ContractsPage'));
+const ContractDetailPage = lazy(() => import('../features/crm/contracts/ContractDetailPage'));
+const ProjectDetailPage = lazy(() => import('../features/crm/projects/ProjectDetailPage'));
 const DealsPage = lazy(() => import('../features/crm/deals/DealsPage'));
 const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAllocationPage'));
 const CRMSystemSetupPage = lazy(() => import('../features/crm/setup/CRMSystemSetupPage'));
 const CRMReportsPage = lazy(() => import('../features/crm/reports/CRMReportsPage'));
+
+// ── PMS — Project Management (Lazy Loaded) ───────────────────
+const PMSDashboard = lazy(() => import('../features/pms/dashboard/PMSDashboard'));
+const PMSProjectsPage = lazy(() => import('../features/pms/projects/ProjectsPage'));
+const PMSProjectDetailPage = lazy(() => import('../features/pms/projects/ProjectDetailPage'));
+const PMSMyProjectsPage = lazy(() => import('../features/pms/projects/MyProjectsPage'));
+const PMSMyTasksPage = lazy(() => import('../features/pms/tasks/MyTasksPage'));
+const PMSStageConfigPage = lazy(() => import('../features/pms/stages/StageConfigPage'));
+const PMSTimelinePage = lazy(() => import('../features/pms/timeline/TimelinePage'));
+const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDashboardPage'));
+const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
+const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
+const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/ClientProofApprovalPage'));
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
@@ -168,14 +186,35 @@ function RootErrorBoundary() {
   );
 }
 
+const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotationPage'));
+const LoginPage = lazy(() => import('../features/auth/LoginPage'));
+
 const router = createBrowserRouter([
+  // ── Authentication ────────────────────────────────────────
   {
-    path: '/',
-    element: <MainLayout />,
+    path: '/login',
+    element: <Page component={LoginPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // ── Client-facing design approval link ────────────────────
+  // Deliberately outside MainLayout: the recipient is a customer, not a user of
+  // the ERP, so the page carries no sidebar, topbar or internal navigation.
+  {
+    path: '/pms/approve/:token',
+    element: <Page component={PMSClientProofApprovalPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // ── Protected Application Shell (Guarded by RequireAuth) ─
+  {
+    element: <RequireAuth />,
     errorElement: <RootErrorBoundary />,
     children: [
-      // Root redirect
-      { index: true, element: <Navigate to="/dashboard" replace /> },
+      {
+        path: '/',
+        element: <MainLayout />,
+        children: [
+          // Root redirect
+          { index: true, element: <Navigate to="/dashboard" replace /> },
 
       // ── Main Dashboard ─────────────────────────────────────
       { path: 'dashboard', element: <Page component={DashboardPage} /> },
@@ -197,11 +236,27 @@ const router = createBrowserRouter([
       { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
       { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
       { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> },
+      { path: 'crm/projects', element: <Page component={ProjectsPage} /> },
+      { path: 'crm/contracts', element: <Page component={ContractsPage} /> },
+      { path: 'crm/contracts/:id', element: <Page component={ContractDetailPage} /> },
+      { path: 'crm/projects/:id', element: <Page component={ProjectDetailPage} /> },
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
       { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
       { path: 'crm/reports', element: <Page component={CRMReportsPage} /> },
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
+
+      // ── PMS — Project Management ──────────────────────────
+      { path: 'pms', element: <Page component={PMSDashboard} /> },
+      { path: 'pms/projects', element: <Page component={PMSProjectsPage} /> },
+      { path: 'pms/projects/:id', element: <Page component={PMSProjectDetailPage} /> },
+      { path: 'pms/my-projects', element: <Page component={PMSMyProjectsPage} /> },
+      { path: 'pms/my-tasks', element: <Page component={PMSMyTasksPage} /> },
+      { path: 'pms/stages', element: <Page component={PMSStageConfigPage} /> },
+      { path: 'pms/timeline', element: <Page component={PMSTimelinePage} /> },
+      { path: 'pms/delays', element: <Page component={PMSDelayDashboardPage} /> },
+      { path: 'pms/reports', element: <Page component={PMSReportsPage} /> },
+      { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
 
       // ── Sales ─────────────────────────────────────────────
       { path: 'sales', element: <Navigate to="/sales/quotations" replace /> },
@@ -358,6 +413,8 @@ const router = createBrowserRouter([
 
       // ── Catch-all ─────────────────────────────────────────
       { path: '*', element: <Navigate to="/dashboard" replace /> },
+    ],
+  },
     ],
   },
 ]);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Search, X, ChevronDown, ChevronRight } from "lucide-react";
-import { sourceFilters, statusFilters } from '../../../data/crm/mockLeads';
+import { useMemo } from 'react';
+import { useCrmStore, statusFacetsFrom, sourceFacetsFrom } from '../../../stores/crmStore';
 
 const SYSTEM_DEFINED_FILTERS = [
   "Activities",
@@ -66,6 +67,11 @@ export default function FilterPanel({
   onClear,
   onClose,
 }) {
+  // Facets reflect what is actually in the pipeline, not a fixed list.
+  const leads = useCrmStore((s) => s.leads);
+  const sources = useCrmStore((s) => s.sources);
+  const statusFacets = useMemo(() => statusFacetsFrom(leads), [leads]);
+  const sourceFacets = useMemo(() => sourceFacetsFrom(leads, sources), [leads, sources]);
   function handleClose() {
     if (typeof onClose === "function") {
       onClose();
@@ -114,14 +120,14 @@ export default function FilterPanel({
 
       <CheckboxSection
         title="Lead Status"
-        items={statusFilters}
+        items={statusFacets}
         selected={selectedStatuses}
         onToggle={onStatusChange}
       />
 
       <CheckboxSection
         title="Lead Source"
-        items={sourceFilters}
+        items={sourceFacets}
         selected={selectedSources}
         onToggle={onSourceChange}
         defaultOpen={false}

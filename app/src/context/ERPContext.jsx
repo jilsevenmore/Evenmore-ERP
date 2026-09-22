@@ -1,9 +1,19 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { mockCustomers, mockVendors, mockInventoryItems, mockCategories, mockQuotations, mockSalesOrders, mockDeliveryChallans, mockPaymentIns, mockSalesReturns, mockPurchaseOrders, mockPurchaseBills, mockPaymentOuts, mockPurchaseReturns, mockExpenses, mockLocations, mockTransfers, mockServiceUsages, mockValuationItems, mockMonthEndAudits, mockBankAccounts, initialFaultyParts, initialSalesInvoices, initialZoneRequests, mockInventoryMovements, mockParties, mockUnits, mockCategoryParts, mockItemParts, mockProformaInvoices, mockEstimates, mockWarrantyCards } from '../data/erp/mockData';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { publishEstimates } from '../services/estimateStore';
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
-import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES } from '../utils/currencyUtils';
+import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES, setBaseCurrency } from '../utils/currencyUtils';
 import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
-const STORAGE_KEY = 'horizon_erp_v2_state';
+import { emitCrmEvent, CRM_EVENT_TYPES } from '../services/crmEventNotifications';
+import {
+    isBackendEnabled,
+    pullAll,
+    pushCreate,
+    pushUpdate,
+    pushDelete,
+    pullCompanyProfile,
+    isServerId,
+    describeError,
+} from '../services/backendSync';
 // ── [PHASE-2E.1] steel-category → HSN default map (Sweven fabrication master) ──
 //   Falls back to 7216 (angles/shapes/sections) unless the category matches a known steel family.
 function mapCategoryToHSN(category) {
@@ -18,144 +28,7 @@ function mapCategoryToHSN(category) {
     if (cat.includes('fabrication') || cat.includes('fabricated')) return '7308.90';
     return '7216.99';
 }
-const initialJournalEntries = [
-    {
-        id: 'je-1',
-        entryNumber: 'JE-2026-081',
-        date: 'Oct 24, 2026',
-        description: 'Inventory Purchase - Cisco Catalyst Switches',
-        reference: 'BILL-2026-0190',
-        debitAccount: '1410 - Inventory Asset',
-        creditAccount: '2010 - Accounts Payable',
-        amount: 22200.0,
-        status: 'Posted',
-    },
-    {
-        id: 'je-2',
-        entryNumber: 'JE-2026-082',
-        date: 'Oct 25, 2026',
-        description: 'Client Invoice Settlement - Acme Corp',
-        reference: 'REC-2026-0051',
-        debitAccount: '1010 - Cash & Bank',
-        creditAccount: '1210 - Accounts Receivable',
-        amount: 5820.0,
-        status: 'Posted',
-    },
-    {
-        id: 'je-3',
-        entryNumber: 'JE-2026-083',
-        date: 'Oct 26, 2026',
-        description: 'Operating Freight Overheads',
-        reference: 'EXP-2026-051',
-        debitAccount: '5020 - Logistics & Freight Expense',
-        creditAccount: '1010 - Cash & Bank',
-        amount: 145.8,
-        status: 'Posted',
-    },
-];
 const ERPContext = createContext(null);
-const loadSavedState = () => {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (Array.isArray(parsed?.parties) && parsed.parties.length > 0) {
-                const existingNames = new Set(parsed.parties.map(p => (p.name || '').toLowerCase()));
-                const missingMockParties = mockParties.filter(mp => !existingNames.has((mp.name || '').toLowerCase()));
-                parsed.parties = [
-                    ...parsed.parties.map((p, idx) => {
-                        const fallback = mockParties.find(mp => mp.name?.toLowerCase() === (p.name || '').toLowerCase()) || mockParties[idx] || mockParties[0] || {};
-                        return {
-                            ...fallback,
-                            ...p,
-                            name: p.name || p.companyName || p.company || fallback.name || `Partner ${idx + 1}`,
-                        };
-                    }),
-                    ...missingMockParties,
-                ];
-            }
-            if (Array.isArray(parsed?.customers) && parsed.customers.length > 0) {
-                parsed.customers = parsed.customers.map((c, idx) => {
-                    const fallback = mockCustomers[idx] || mockCustomers[0] || {};
-                    return {
-                        ...fallback,
-                        ...c,
-                        name: c.name || fallback.name || `Customer ${idx + 1}`,
-                    };
-                });
-            }
-            if (Array.isArray(parsed?.vendors) && parsed.vendors.length > 0) {
-                parsed.vendors = parsed.vendors.map((v, idx) => {
-                    const fallback = mockVendors[idx] || mockVendors[0] || {};
-                    return {
-                        ...fallback,
-                        ...v,
-                        name: v.name || fallback.name || `Vendor ${idx + 1}`,
-                    };
-                });
-            }
-            if (Array.isArray(parsed?.proformaInvoices) && parsed.proformaInvoices.length > 0) {
-                const existingNumbers = new Set(parsed.proformaInvoices.map(p => (p.proformaNumber || '').toLowerCase()));
-                const missingMockPIs = mockProformaInvoices.filter(mp => !existingNumbers.has((mp.proformaNumber || '').toLowerCase()));
-                parsed.proformaInvoices = [...parsed.proformaInvoices, ...missingMockPIs];
-            }
-            if (Array.isArray(parsed?.estimates) && parsed.estimates.length > 0) {
-                const existingNumbers = new Set(parsed.estimates.map(e => (e.estimateNumber || '').toLowerCase()));
-                const missingMockEstimates = mockEstimates.filter(me => !existingNumbers.has((me.estimateNumber || '').toLowerCase()));
-                parsed.estimates = [...parsed.estimates, ...missingMockEstimates];
-            }
-            if (Array.isArray(parsed?.warranties) && parsed.warranties.length > 0) {
-                const existingNumbers = new Set(parsed.warranties.map(w => (w.cardNumber || '').toLowerCase()));
-                const missingMockWarranties = mockWarrantyCards.filter(mw => !existingNumbers.has((mw.cardNumber || '').toLowerCase()));
-                parsed.warranties = [...parsed.warranties, ...missingMockWarranties];
-            } else {
-                parsed.warranties = mockWarrantyCards;
-            }
-            // ── Date migration: normalize text dates into ISO (YYYY-MM-DD) ──
-            const migrateDateFields = (doc) => {
-                if (!doc || typeof doc !== 'object') return doc;
-                const next = { ...doc };
-                ['dueDate', 'expectedDate', 'deliveryDate', 'dispatchDate'].forEach((key) => {
-                    if (next[key] && typeof next[key] === 'string' && !/^\d{4}-\d{2}-\d{2}$/.test(next[key])) {
-                        const iso = toISODate(next[key]);
-                        if (iso) next[key] = iso;
-                    }
-                });
-                if (next.date && typeof next.date === 'string') {
-                    const iso = toISODate(next.date);
-                    if (iso && /^(Today|In\s+\d+\s*(day|month|week|year)s?\b|\d+\s*(day|month|week|year)s?\s*(from now|ago))/i.test(next.date)) next.date = iso;
-                }
-                return next;
-            };
-            ['invoices', 'proformaInvoices', 'salesOrders', 'deliveryChallans', 'purchaseOrders', 'purchaseBills', 'quotation', 'quotations', 'estimates'].forEach((slice) => {
-                if (Array.isArray(parsed?.[slice])) parsed[slice] = parsed[slice].map(migrateDateFields);
-            });
-
-            // ── Legacy backfill: GRN flag on old bills (post-GRN-split safe) ──
-            if (Array.isArray(parsed?.purchaseBills)) {
-                parsed.purchaseBills = parsed.purchaseBills.map((b) => ({
-                    ...b,
-                    goodsReceived: b.goodsReceived !== false,
-                }));
-            }
-
-            // ── Legacy backfill: paymentOuts typed as Final (advances migration safe) ──
-            if (Array.isArray(parsed?.paymentOuts)) {
-                parsed.paymentOuts = parsed.paymentOuts.map((p) => ({
-                    ...p,
-                    type: p.type || 'Final',
-                }));
-            }
-
-            return parsed;
-        }
-    }
-    catch (e) {
-        console.error('Failed to load state from localStorage', e);
-    }
-    return null;
-};
-
 const normalizeProformaInvoices = (pis) => {
     if (!Array.isArray(pis)) return [];
     return pis.map((pi) => {
@@ -186,37 +59,36 @@ const normalizeProformaInvoices = (pis) => {
 };
 
 export const ERPProvider = ({ children, }) => {
-    const initial = loadSavedState();
-    const [estimates, setEstimates] = useState(initial?.estimates || mockEstimates);
-    const [faultyParts, setFaultyParts] = useState(initial?.faultyParts || initialFaultyParts);
-    const [invoices, setInvoices] = useState(initial?.invoices || initialSalesInvoices);
-    const [proformaInvoices, setProformaInvoices] = useState(() => normalizeProformaInvoices(initial?.proformaInvoices || mockProformaInvoices));
-    const [zoneRequests, setZoneRequests] = useState(initial?.zoneRequests || initialZoneRequests);
-    const [customers, setCustomers] = useState(initial?.customers || mockCustomers);
-    const [vendors, setVendors] = useState(initial?.vendors || mockVendors);
-    const [parties, setParties] = useState(initial?.parties || mockParties);
-    const [units, setUnits] = useState(initial?.units || mockUnits);
-    const [categoryParts, setCategoryParts] = useState(initial?.categoryParts || mockCategoryParts);
-    const [itemParts, setItemParts] = useState(initial?.itemParts || mockItemParts);
-    const [items, setItems] = useState(initial?.items || mockInventoryItems);
-    const [categories, setCategories] = useState(initial?.categories || mockCategories);
-    const [quotations, setQuotations] = useState(initial?.quotations || mockQuotations);
-    const [salesOrders, setSalesOrders] = useState(initial?.salesOrders || mockSalesOrders);
-    const [deliveryChallans, setDeliveryChallans] = useState(initial?.deliveryChallans || mockDeliveryChallans);
-    const [paymentIns, setPaymentIns] = useState(initial?.paymentIns || mockPaymentIns);
-    const [salesReturns, setSalesReturns] = useState(initial?.salesReturns || mockSalesReturns);
-    const [purchaseOrders, setPurchaseOrders] = useState(initial?.purchaseOrders || mockPurchaseOrders);
-    const [purchaseBills, setPurchaseBills] = useState(initial?.purchaseBills || mockPurchaseBills);
-    const [paymentOuts, setPaymentOuts] = useState(initial?.paymentOuts || mockPaymentOuts);
-    const [purchaseReturns, setPurchaseReturns] = useState(initial?.purchaseReturns || mockPurchaseReturns);
-    const [expenses, setExpenses] = useState(initial?.expenses || mockExpenses);
-    const [locations, setLocations] = useState(initial?.locations || mockLocations);
-    const [transfers, setTransfers] = useState(initial?.transfers || mockTransfers);
-    const [serviceUsages, setServiceUsages] = useState(initial?.serviceUsages || mockServiceUsages);
-    const [valuationItems, setValuationItems] = useState(initial?.valuationItems || mockValuationItems);
-    const [monthEndAudits, setMonthEndAudits] = useState(initial?.monthEndAudits || mockMonthEndAudits);
-    const [bankAccounts, setBankAccounts] = useState(initial?.bankAccounts || mockBankAccounts);
-    const [journalEntries, setJournalEntries] = useState(initial?.journalEntries || initialJournalEntries);
+    const [estimates, setEstimates] = useState([]);
+    const [faultyParts, setFaultyParts] = useState([]);
+    const [invoices, setInvoices] = useState([]);
+    const [proformaInvoices, setProformaInvoices] = useState(() => normalizeProformaInvoices([]));
+    const [zoneRequests, setZoneRequests] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [vendors, setVendors] = useState([]);
+    const [parties, setParties] = useState([]);
+    const [units, setUnits] = useState([]);
+    const [categoryParts, setCategoryParts] = useState([]);
+    const [itemParts, setItemParts] = useState([]);
+    const [items, setItems] = useState([]);
+    const [categories, setCategories] = useState([]);
+    const [quotations, setQuotations] = useState([]);
+    const [salesOrders, setSalesOrders] = useState([]);
+    const [deliveryChallans, setDeliveryChallans] = useState([]);
+    const [paymentIns, setPaymentIns] = useState([]);
+    const [salesReturns, setSalesReturns] = useState([]);
+    const [purchaseOrders, setPurchaseOrders] = useState([]);
+    const [purchaseBills, setPurchaseBills] = useState([]);
+    const [paymentOuts, setPaymentOuts] = useState([]);
+    const [purchaseReturns, setPurchaseReturns] = useState([]);
+    const [expenses, setExpenses] = useState([]);
+    const [locations, setLocations] = useState([]);
+    const [transfers, setTransfers] = useState([]);
+    const [serviceUsages, setServiceUsages] = useState([]);
+    const [valuationItems, setValuationItems] = useState([]);
+    const [monthEndAudits, setMonthEndAudits] = useState([]);
+    const [bankAccounts, setBankAccounts] = useState([]);
+    const [journalEntries, setJournalEntries] = useState([]);
     // ── [PHASE-2C] QC quality standards master (steel: dimensional + weight + surface checks)
     //   Seed rows model Sweven's metal-intake checks; used to guide GRN QC review.
     const defaultQualityStandards = [
@@ -225,13 +97,13 @@ export const ERPProvider = ({ children, }) => {
         { id: 'qs-hr-sheet', name: 'HR Sheet / Coil', category: 'Flat Steel', checks: ['Gauge per IS 1079', 'Edges trimmed, no oil stains', 'Width tolerance ±2 mm', 'Weighed on receipt'], tolerancePct: 2, active: true },
         { id: 'qs-sq-pipe', name: 'Square Pipe – Structural', category: 'Structural Steel', checks: ['Section size per IS 4923', 'Wall thickness ±5%', 'Bend/straightness check', 'Weight variance within tolerance %'], tolerancePct: 2.5, active: true },
     ];
-    const [qualityStandards, setQualityStandards] = useState(initial?.qualityStandards || defaultQualityStandards);
-    const [inventoryMovements, setInventoryMovements] = useState(initial?.inventoryMovements || mockInventoryMovements);
-    const [warranties, setWarranties] = useState(initial?.warranties || mockWarrantyCards);
+    const [qualityStandards, setQualityStandards] = useState(defaultQualityStandards);
+    const [inventoryMovements, setInventoryMovements] = useState([]);
+    const [warranties, setWarranties] = useState([]);
     const [currency, setCurrencyState] = useState(() => {
-        return initial?.currency || localStorage.getItem('evenmore_currency') || 'INR (₹)';
+        return localStorage.getItem('evenmore_currency') || 'INR (₹)';
     });
-    const [companyProfile, setCompanyProfileState] = useState(initial?.companyProfile || {
+    const [companyProfile, setCompanyProfileState] = useState({
         // [PHASE-2E.1] Sweven demo company default — Maharashtra GSTIN so intra-state
         //   prints show CGST+SGST split and the letterhead carries GSTIN/PAN/address.
         //   Editable from Settings → Company Profile. Keep `name` aligned with app branding.
@@ -252,6 +124,91 @@ export const ERPProvider = ({ children, }) => {
             .catch((err) => console.warn('Live forex rate sync:', err));
     }, []);
 
+    // ── Live backend synchronization ────────────────────────────────────────
+    //
+    // Every collection the API covers is (re)loaded whenever a session appears:
+    // on mount if a token is already stored, and again on sign-in. A collection
+    // the server could not answer for is skipped rather than blanked, so a
+    // partial outage degrades to stale data instead of an empty screen.
+    const syncSettersRef = useRef(null);
+    syncSettersRef.current = {
+        categories: setCategories,
+        units: setUnits,
+        locations: setLocations,
+        items: setItems,
+        parties: setParties,
+        customers: setCustomers,
+        vendors: setVendors,
+        estimates: setEstimates,
+        quotations: setQuotations,
+        salesOrders: setSalesOrders,
+        proformaInvoices: setProformaInvoices,
+        deliveryChallans: setDeliveryChallans,
+        invoices: setInvoices,
+        paymentIns: setPaymentIns,
+        salesReturns: setSalesReturns,
+        purchaseOrders: setPurchaseOrders,
+        purchaseBills: setPurchaseBills,
+        paymentOuts: setPaymentOuts,
+        purchaseReturns: setPurchaseReturns,
+        expenses: setExpenses,
+    };
+
+    const [backendStatus, setBackendStatus] = useState({ connected: false, loading: false, lastSyncAt: null });
+    const refreshInFlight = useRef(null);
+
+    const refreshFromBackend = useCallback(async () => {
+        if (!isBackendEnabled()) {
+            setBackendStatus({ connected: false, loading: false, lastSyncAt: null });
+            return null;
+        }
+        // A second caller joins the read already running rather than starting
+        // another thirty requests. Mounting twice, a sign-in in another tab and
+        // a manual refresh can all arrive together.
+        if (refreshInFlight.current) return refreshInFlight.current;
+        setBackendStatus((prev) => ({ ...prev, loading: true }));
+        const run = (async () => {
+            const [collections, profile] = await Promise.all([pullAll(), pullCompanyProfile()]);
+            Object.entries(collections).forEach(([key, rows]) => {
+                const setter = syncSettersRef.current[key];
+                if (setter) setter(rows);
+            });
+            if (profile) {
+                setCompanyProfileState((prev) => ({ ...prev, ...profile }));
+                // Amounts arrive already denominated in this currency, so it is
+                // the base every conversion is measured from (api.md §1.6).
+                setBaseCurrency(profile.currency);
+            }
+            const connected = Object.keys(collections).length > 0;
+            setBackendStatus({
+                connected,
+                loading: false,
+                lastSyncAt: connected ? new Date().toISOString() : null,
+            });
+            return collections;
+        })();
+
+        refreshInFlight.current = run;
+        try {
+            return await run;
+        } finally {
+            refreshInFlight.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+        const run = () => { if (!cancelled) refreshFromBackend(); };
+        run();
+        window.addEventListener('evenmore:authorized', run);
+        window.addEventListener('storage', run);
+        return () => {
+            cancelled = true;
+            window.removeEventListener('evenmore:authorized', run);
+            window.removeEventListener('storage', run);
+        };
+    }, [refreshFromBackend]);
+
     const setCurrency = (newCurr) => {
         setCurrencyState(newCurr);
         try {
@@ -270,124 +227,107 @@ export const ERPProvider = ({ children, }) => {
 
     const currencySymbol = getCurrencySymbol(currency);
 
-    // Auto-save to localStorage
-    useEffect(() => {
-        try {
-            const stateToSave = {
-                estimates,
-                faultyParts,
-                invoices,
-                companyProfile,
-                zoneRequests,
-                customers,
-                vendors,
-                parties,
-                units,
-                categoryParts,
-                itemParts,
-                items,
-                categories,
-                quotations,
-                salesOrders,
-                proformaInvoices,
-                deliveryChallans,
-                paymentIns,
-                salesReturns,
-                purchaseOrders,
-                purchaseBills,
-                paymentOuts,
-                purchaseReturns,
-                expenses,
-                locations,
-                transfers,
-                serviceUsages,
-                valuationItems,
-                monthEndAudits,
-                bankAccounts,
-                journalEntries,
-                inventoryMovements,
-                warranties,
-                currency,
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
-        }
-        catch (e) {
-            console.error('Failed to save state to localStorage', e);
-        }
-    }, [
-        estimates,
-        faultyParts,
-        invoices,
-        companyProfile,
-        proformaInvoices,
-        zoneRequests,
-        customers,
-        vendors,
-        parties,
-        units,
-        categoryParts,
-        itemParts,
-        items,
-        categories,
-        quotations,
-        salesOrders,
-        deliveryChallans,
-        paymentIns,
-        salesReturns,
-        purchaseOrders,
-        purchaseBills,
-        paymentOuts,
-        purchaseReturns,
-        expenses,
-        locations,
-        transfers,
-        serviceUsages,
-        valuationItems,
-        monthEndAudits,
-        bankAccounts,
-        journalEntries,
-        inventoryMovements,
-        warranties,
-        currency,
-    ]);
+    // Nothing is cached in the browser: every collection above is the server's,
+    // re-read by `refreshFromBackend()` and kept current by the persist helpers.
     const showToast = (msg) => {
         setToastMessage(msg);
         setTimeout(() => {
             setToastMessage((prev) => (prev === msg ? null : prev));
         }, 3500);
     };
-    const resetDemoData = () => {
-        localStorage.removeItem(STORAGE_KEY);
-        setEstimates(mockEstimates);
-        setFaultyParts(initialFaultyParts);
-        setInvoices(initialSalesInvoices);
-        setProformaInvoices(mockProformaInvoices);
-        setZoneRequests(initialZoneRequests);
-        setCustomers(mockCustomers);
-        setVendors(mockVendors);
-        setItems(mockInventoryItems);
-        setCategories(mockCategories);
-        setQuotations(mockQuotations);
-        setSalesOrders(mockSalesOrders);
-        setDeliveryChallans(mockDeliveryChallans);
-        setPaymentIns(mockPaymentIns);
-        setSalesReturns(mockSalesReturns);
-        setPurchaseOrders(mockPurchaseOrders);
-        setPurchaseBills(mockPurchaseBills);
-        setPaymentOuts(mockPaymentOuts);
-        setPurchaseReturns(mockPurchaseReturns);
-        setExpenses(mockExpenses);
-        setLocations(mockLocations);
-        setTransfers(mockTransfers);
-        setServiceUsages(mockServiceUsages);
-        setValuationItems(mockValuationItems);
-        setMonthEndAudits(mockMonthEndAudits);
-        setBankAccounts(mockBankAccounts);
-        setJournalEntries(initialJournalEntries);
-        setInventoryMovements(mockInventoryMovements);
-        setWarranties(mockWarrantyCards);
-        showToast('Factory demo data restored successfully.');
+
+    // ── Write-through persistence ───────────────────────────────────────────
+    //
+    // The `add*` / `update*` functions below stay synchronous: callers rely on
+    // getting the new record back immediately, and the forms are built around
+    // that. So a write is applied to local state first and pushed in the
+    // background; when the server answers, its copy replaces the optimistic one
+    // in place. That matters beyond the id — the server allocates the document
+    // number and recomputes every total (api.md §1.7, §5.7), so the row the user
+    // ends up looking at is the row that is actually in the database.
+    //
+    // Without a session these are no-ops and the app behaves exactly as it did
+    // before, on local state alone.
+
+    /** Swap an optimistic record for the server's, matching on the local id. */
+    const reconcile = (setter, localId, serverRecord) => {
+        setter((prev) => prev.map((row) => (
+            row.id === localId ? { ...row, ...serverRecord, _synced: true } : row
+        )));
     };
+
+    /** Flag the row so the UI can show it never reached the database. */
+    const markSyncFailure = (setter, localId, err) => {
+        setter((prev) => prev.map((row) => (
+            row.id === localId ? { ...row, _synced: false, _syncError: describeError(err) } : row
+        )));
+    };
+
+    /**
+     * Persist a newly created record.
+     *
+     * @param key      resource name in `backendSync.RESOURCES`
+     * @param record   the record already pushed into local state
+     * @param setter   that collection's `setState`
+     * @param options  `also` — extra collections holding the same record under
+     *                 the same local id (a party is mirrored into `customers`
+     *                 or `vendors`), reconciled with the same server row.
+     */
+    const persistCreate = (key, record, setter, { also = [], onServer } = {}) => {
+        if (!isBackendEnabled() || !record?.id) return record;
+        pushCreate(key, record)
+            .then((serverRecord) => {
+                if (!serverRecord) return;
+                reconcile(setter, record.id, serverRecord);
+                also.forEach(({ setter: otherSetter, map }) => {
+                    reconcile(otherSetter, record.id, map ? map(serverRecord) : serverRecord);
+                });
+                onServer?.(serverRecord);
+            })
+            .catch((err) => {
+                console.warn(`[ERP] could not save ${key}:`, err);
+                markSyncFailure(setter, record.id, err);
+                also.forEach(({ setter: otherSetter }) => markSyncFailure(otherSetter, record.id, err));
+                showToast(`Saved locally only — ${describeError(err)}`);
+            });
+        return record;
+    };
+
+    /**
+     * Persist a field update. Skipped for records that only ever existed
+     * locally (a non-UUID id would 404).
+     */
+    const persistUpdate = (key, id, updates, setter) => {
+        if (!isBackendEnabled() || !isServerId(id)) return;
+        pushUpdate(key, id, updates)
+            .then((serverRecord) => {
+                if (serverRecord && setter) reconcile(setter, id, serverRecord);
+            })
+            .catch((err) => {
+                console.warn(`[ERP] could not update ${key}:`, err);
+                if (setter) markSyncFailure(setter, id, err);
+                showToast(`Change not saved to server — ${describeError(err)}`);
+            });
+    };
+
+    const persistDelete = (key, id) => {
+        if (!isBackendEnabled() || !isServerId(id)) return;
+        pushDelete(key, id).catch((err) => {
+            console.warn(`[ERP] could not delete ${key}:`, err);
+            showToast(`Delete not saved to server — ${describeError(err)}`);
+        });
+    };
+
+    /**
+     * Discard anything held locally and re-read every collection. What used to
+     * restore a shipped demo set now asks the server, which is the only place
+     * this data exists.
+     */
+    const resetDemoData = async () => {
+        await refreshFromBackend();
+        showToast('Reloaded from the server.');
+    };
+
     // ---------------- DOMAIN QUERIES ----------------
     const getItemMovements = (itemIdOrSku) => {
         return inventoryMovements.filter((m) => m.itemId === itemIdOrSku || m.itemSku?.toLowerCase() === itemIdOrSku.toLowerCase());
@@ -397,7 +337,7 @@ export const ERPProvider = ({ children, }) => {
         const targetId = item?.id || itemIdOrSku;
         const targetSku = item?.sku || itemIdOrSku;
         // Sum all movements for this item
-        const moves = inventoryMovements.filter((m) => m.itemId === targetId || (m.itemSku && m.itemSku.toLowerCase() === targetSku.toLowerCase()));
+        const moves = inventoryMovements.filter((m) => m.itemId === targetId || (m.itemSku && String(m.itemSku ?? '').toLowerCase() === targetSku.toLowerCase()));
         let netMovementQty = 0;
         moves.forEach((m) => {
             // [PHASE-2A] For weight-based items (steel by kg) prefer the weighed quantity —
@@ -434,7 +374,7 @@ export const ERPProvider = ({ children, }) => {
         };
     };
     const getCustomerLedger = (customerIdOrName) => {
-        const cust = customers.find((c) => c.id === customerIdOrName || c.name.toLowerCase() === customerIdOrName.toLowerCase());
+        const cust = customers.find((c) => c.id === customerIdOrName || String(c.name ?? '').toLowerCase() === customerIdOrName.toLowerCase());
         const custName = cust?.name || customerIdOrName;
         const entries = [];
         // 1. Invoices (Debit - increases customer balance / AR)
@@ -495,7 +435,7 @@ export const ERPProvider = ({ children, }) => {
         });
     };
     const getVendorLedger = (vendorIdOrName) => {
-        const vend = vendors.find((v) => v.id === vendorIdOrName || v.name.toLowerCase() === vendorIdOrName.toLowerCase());
+        const vend = vendors.find((v) => v.id === vendorIdOrName || String(v.name ?? '').toLowerCase() === vendorIdOrName.toLowerCase());
         const vendName = vend?.name || vendorIdOrName;
         const entries = [];
         // 1. Purchase Bills (Credit - increases AP liability)
@@ -558,11 +498,11 @@ export const ERPProvider = ({ children, }) => {
     const getInvoiceOutstanding = (invoiceIdOrNum) => {
         if (!invoiceIdOrNum) return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
         const query = String(invoiceIdOrNum).toLowerCase();
-        const inv = invoices.find((i) => i?.id === invoiceIdOrNum || (i?.invoiceNumber && i.invoiceNumber.toLowerCase() === query));
+        const inv = invoices.find((i) => i?.id === invoiceIdOrNum || (i?.invoiceNumber && String(i.invoiceNumber ?? '').toLowerCase() === query));
         if (!inv)
             return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
         // Sum all payments received for this invoice
-        const relatedPayments = paymentIns.filter((p) => p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && p.invoiceNumber.toLowerCase() === inv.invoiceNumber.toLowerCase()));
+        const relatedPayments = paymentIns.filter((p) => p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()));
         const paid = relatedPayments.reduce((acc, p) => acc + (p.amount || 0), 0) + (inv.paidAmount && relatedPayments.length === 0 ? inv.paidAmount : 0);
         const total = inv.total || 0;
         const balanceDue = Math.max(0, total - paid);
@@ -581,11 +521,11 @@ export const ERPProvider = ({ children, }) => {
     const getBillOutstanding = (billIdOrNum) => {
         if (!billIdOrNum) return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
         const query = String(billIdOrNum).toLowerCase();
-        const bill = purchaseBills.find((b) => b?.id === billIdOrNum || (b?.billNumber && b.billNumber.toLowerCase() === query));
+        const bill = purchaseBills.find((b) => b?.id === billIdOrNum || (b?.billNumber && String(b.billNumber ?? '').toLowerCase() === query));
         if (!bill)
             return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
-        const billNumLower = bill.billNumber ? bill.billNumber.toLowerCase() : '';
-        const relatedPayments = paymentOuts.filter((p) => p.billId === bill.id || (p.billNumber && billNumLower && p.billNumber.toLowerCase() === billNumLower));
+        const billNumLower = bill.billNumber ? String(bill.billNumber ?? '').toLowerCase() : '';
+        const relatedPayments = paymentOuts.filter((p) => p.billId === bill.id || (p.billNumber && billNumLower && String(p.billNumber ?? '').toLowerCase() === billNumLower));
         const paid = relatedPayments.reduce((acc, p) => acc + (p.amount || 0), 0) + (bill.paidAmount && relatedPayments.length === 0 ? bill.paidAmount : 0);
         const total = bill.total || bill.amount || 0;
         const balanceDue = Math.max(0, total - paid);
@@ -921,7 +861,7 @@ export const ERPProvider = ({ children, }) => {
 
             // Update customer outstanding balance
             if (invoice.customer) {
-                setCustomers((prev) => prev.map((c) => c.name.toLowerCase() === invoice.customer.toLowerCase() || (invoice.customerId && c.id === invoice.customerId)
+                setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === String(invoice.customer ?? '').toLowerCase() || (invoice.customerId && c.id === invoice.customerId)
                     ? { ...c, balance: c.balance + invoice.total }
                     : c));
             }
@@ -943,6 +883,12 @@ export const ERPProvider = ({ children, }) => {
         } else {
             showToast(`Draft Invoice ${invoice.invoiceNumber} saved.`);
         }
+
+        // The local posting above keeps the screen responsive; the server does
+        // the same work authoritatively — allocates INV-…, recomputes the
+        // totals, posts the SALE movements and the Dr Debtors / Cr Sales entry —
+        // and its reply replaces the optimistic row.
+        persistCreate('invoices', invoice, setInvoices);
 
         return invoice;
     };
@@ -1097,7 +1043,7 @@ export const ERPProvider = ({ children, }) => {
 
         // Update customer outstanding balance
         if (finalized.customer) {
-            setCustomers((prev) => prev.map((c) => c.name.toLowerCase() === finalized.customer.toLowerCase() || (finalized.customerId && c.id === finalized.customerId)
+            setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === String(finalized.customer ?? '').toLowerCase() || (finalized.customerId && c.id === finalized.customerId)
                 ? { ...c, balance: c.balance + finalized.total }
                 : c));
         }
@@ -1138,7 +1084,7 @@ export const ERPProvider = ({ children, }) => {
         if (inv.finalized !== false && inv.status !== 'Draft') {
             // Reversal of customer balance
             if (inv.customer) {
-                setCustomers((prev) => prev.map((c) => c.name.toLowerCase() === inv.customer.toLowerCase() || (inv.customerId && c.id === inv.customerId)
+                setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === String(inv.customer ?? '').toLowerCase() || (inv.customerId && c.id === inv.customerId)
                     ? { ...c, balance: Math.max(0, c.balance - inv.total) }
                     : c));
             }
@@ -1262,6 +1208,7 @@ export const ERPProvider = ({ children, }) => {
         const normalizedPI = normalizeProformaInvoices([newPI])[0];
         setProformaInvoices((prev) => [normalizedPI, ...prev]);
         showToast(`Proforma Invoice ${normalizedPI.proformaNumber} created.`);
+        persistCreate('proformaInvoices', normalizedPI, setProformaInvoices);
         return normalizedPI;
     };
 
@@ -1271,6 +1218,7 @@ export const ERPProvider = ({ children, }) => {
             const merged = { ...pi, ...updates };
             return normalizeProformaInvoices([merged])[0];
         }));
+        persistUpdate('proformaInvoices', id, updates, setProformaInvoices);
         showToast(`Proforma Invoice updated.`);
     };
 
@@ -1281,6 +1229,7 @@ export const ERPProvider = ({ children, }) => {
 
     const deleteProformaInvoice = (id) => {
         setProformaInvoices((prev) => prev.filter((pi) => pi.id !== id));
+        persistDelete('proformaInvoices', id);
         showToast(`Proforma Invoice deleted.`);
     };
 
@@ -1455,6 +1404,9 @@ export const ERPProvider = ({ children, }) => {
             });
         }
         showToast(`SKU ${newItem.sku} added to Master.`);
+        // Opening stock rides along on the create; after that `availableQty`
+        // comes off the movement ledger and is never written directly.
+        persistCreate('items', newItem, setItems);
         return newItem;
     };
     const updateInventoryItem = (id, updates) => {
@@ -1482,6 +1434,7 @@ export const ERPProvider = ({ children, }) => {
             };
             return updated;
         }));
+        persistUpdate('items', id, updates, setItems);
         showToast(`Item updated successfully.`);
     };
     const addSerialNumbers = (itemId, serials) => {
@@ -1516,6 +1469,32 @@ export const ERPProvider = ({ children, }) => {
             return item;
         }));
     };
+    /** The `customers` row for a party the server just returned. */
+    const partyAsCustomer = (party) => ({
+        id: party.id,
+        code: party.code,
+        name: party.name,
+        contactPerson: party.contacts?.[0]?.name || '',
+        email: party.email || '',
+        phone: party.phone || '',
+        balance: Number(party.balance) || 0,
+        creditLimit: Number(party.creditLimit) || 0,
+        status: party.status === 'Inactive' ? 'On Hold' : (party.status || 'Active'),
+    });
+
+    /** The `vendors` row for the same. */
+    const partyAsVendor = (party) => ({
+        id: party.id,
+        code: party.code,
+        name: party.name,
+        contactPerson: party.contacts?.[0]?.name || '',
+        email: party.email || '',
+        phone: party.phone || '',
+        balance: Number(party.balance) || 0,
+        paymentTerms: party.paymentTerms || 'Net 30',
+        status: party.status === 'Inactive' ? 'Inactive' : 'Active',
+    });
+
     const addParty = (p) => {
         const newParty = {
             id: p.id || `pty-${Date.now()}`,
@@ -1562,7 +1541,9 @@ export const ERPProvider = ({ children, }) => {
             status: p.status || 'Active',
         };
         setParties((prev) => [newParty, ...prev]);
-        // Also sync into customers / vendors state for backward compatibility
+        // Also sync into customers / vendors state for backward compatibility.
+        // `persist: false` on both: this party is a single row server-side and
+        // is posted once, below, not once per projection.
         if (newParty.type === 'Customer' || newParty.type === 'Both') {
             addCustomer({
                 id: newParty.id,
@@ -1574,7 +1555,7 @@ export const ERPProvider = ({ children, }) => {
                 balance: newParty.balance,
                 creditLimit: newParty.creditLimit ?? 50000,
                 status: newParty.status === 'Inactive' ? 'On Hold' : 'Active',
-            });
+            }, { persist: false });
         }
         if (newParty.type === 'Vendor' || newParty.type === 'Both') {
             addVendor({
@@ -1588,13 +1569,22 @@ export const ERPProvider = ({ children, }) => {
                 balance: newParty.balance,
                 paymentTerms: newParty.paymentTerms ?? 'Net 30',
                 status: newParty.status === 'Active' ? 'Active' : 'Inactive',
-            });
+            }, { persist: false });
         }
         showToast(`Party ${newParty.name} (${newParty.type}) registered.`);
+        // The server allocates the CUST-/VEND- code, so the row the user sees
+        // after the round trip carries the real one.
+        persistCreate('parties', newParty, setParties, {
+            also: [
+                { setter: setCustomers, map: partyAsCustomer },
+                { setter: setVendors, map: partyAsVendor },
+            ],
+        });
         return newParty;
     };
     const updateParty = (id, updates) => {
         setParties((prev) => prev.map((p) => (p.id === id || p.code === id ? { ...p, ...updates } : p)));
+        persistUpdate('parties', id, updates, setParties);
         showToast(`Party updated.`);
     };
     const addUnit = (u) => {
@@ -1605,6 +1595,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setUnits((prev) => [...prev, newUnit]);
         showToast(`Unit ${newUnit.label} added.`);
+        persistCreate('units', newUnit, setUnits);
         return newUnit;
     };
     const addCategoryPart = (part) => {
@@ -1692,7 +1683,7 @@ export const ERPProvider = ({ children, }) => {
         });
         showToast(`Stock for ${targetItem.sku} adjusted by ${diff > 0 ? '+' : ''}${diff} units.`);
     };
-    const addCustomer = (cust) => {
+    const addCustomer = (cust, { persist = true } = {}) => {
         const newCust = {
             id: cust.id || `cust-${Date.now()}`,
             code: cust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
@@ -1711,9 +1702,9 @@ export const ERPProvider = ({ children, }) => {
 
         // Synchronize automatically with Parties
         setParties((prev) => {
-            const exists = prev.some(p => p.id === newCust.id || p.code === newCust.code || (p.name && p.name.toLowerCase() === newCust.name.toLowerCase()));
+            const exists = prev.some(p => p.id === newCust.id || p.code === newCust.code || (p.name && String(p.name ?? '').toLowerCase() === String(newCust.name ?? '').toLowerCase()));
             if (exists) {
-                return prev.map(p => (p.id === newCust.id || p.code === newCust.code || (p.name && p.name.toLowerCase() === newCust.name.toLowerCase())) ? {
+                return prev.map(p => (p.id === newCust.id || p.code === newCust.code || (p.name && String(p.name ?? '').toLowerCase() === String(newCust.name ?? '').toLowerCase())) ? {
                     ...p,
                     name: newCust.name,
                     email: newCust.email || p.email,
@@ -1742,13 +1733,20 @@ export const ERPProvider = ({ children, }) => {
         });
 
         showToast(`Customer ${newCust.name} created and synced to Parties.`);
+        // `persist: false` when called from addParty, which posts the party itself.
+        if (persist) {
+            persistCreate('parties', { ...newCust, type: 'Customer' }, setParties, {
+                also: [{ setter: setCustomers, map: partyAsCustomer }],
+            });
+        }
         return newCust;
     };
     const updateCustomer = (id, updates) => {
         setCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
         setParties((prev) => prev.map((p) => (p.id === id || p.code === id ? { ...p, ...updates } : p)));
+        persistUpdate('customers', id, updates, setCustomers);
     };
-    const addVendor = (ven) => {
+    const addVendor = (ven, { persist = true } = {}) => {
         const newVendor = {
             id: ven.id || `ven-${Date.now()}`,
             code: ven.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
@@ -1768,9 +1766,9 @@ export const ERPProvider = ({ children, }) => {
 
         // Synchronize automatically with Parties
         setParties((prev) => {
-            const exists = prev.some(p => p.id === newVendor.id || p.code === newVendor.code || (p.name && p.name.toLowerCase() === newVendor.name.toLowerCase()));
+            const exists = prev.some(p => p.id === newVendor.id || p.code === newVendor.code || (p.name && String(p.name ?? '').toLowerCase() === String(newVendor.name ?? '').toLowerCase()));
             if (exists) {
-                return prev.map(p => (p.id === newVendor.id || p.code === newVendor.code || (p.name && p.name.toLowerCase() === newVendor.name.toLowerCase())) ? {
+                return prev.map(p => (p.id === newVendor.id || p.code === newVendor.code || (p.name && String(p.name ?? '').toLowerCase() === String(newVendor.name ?? '').toLowerCase())) ? {
                     ...p,
                     name: newVendor.name,
                     email: newVendor.email || p.email,
@@ -1800,11 +1798,17 @@ export const ERPProvider = ({ children, }) => {
         });
 
         showToast(`Vendor ${newVendor.name} added and synced to Parties.`);
+        if (persist) {
+            persistCreate('parties', { ...newVendor, type: 'Vendor' }, setParties, {
+                also: [{ setter: setVendors, map: partyAsVendor }],
+            });
+        }
         return newVendor;
     };
     const updateVendor = (id, updates) => {
         setVendors((prev) => prev.map((v) => (v.id === id ? { ...v, ...updates } : v)));
         setParties((prev) => prev.map((p) => (p.id === id || p.code === id ? { ...p, ...updates } : p)));
+        persistUpdate('vendors', id, updates, setVendors);
     };
     const addCategory = (cat) => {
         const newCat = {
@@ -1820,13 +1824,20 @@ export const ERPProvider = ({ children, }) => {
         };
         setCategories((prev) => [...prev, newCat]);
         showToast(`Category ${newCat.name} registered.`);
+        persistCreate('categories', newCat, setCategories);
         return newCat;
     };
     const updateCategory = (id, updates) => {
         setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+        persistUpdate('categories', id, updates, setCategories);
         showToast(`Category updated.`);
     };
     // ── ESTIMATES ACTIONS ──────────────────────────────────────────────
+    // The CRM screens read estimates through `services/estimateStore`.
+    useEffect(() => {
+        publishEstimates(estimates, { addEstimate, updateEstimate });
+    }, [estimates]);
+
     const addEstimate = (est) => {
         const estAmount = est.amount ||
             (est.items ? est.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
@@ -1847,6 +1858,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setEstimates((prev) => [newEst, ...prev]);
         showToast(`Estimate ${newEst.estimateNumber} created.`);
+        persistCreate('estimates', newEst, setEstimates);
         return newEst;
     };
     const updateEstimate = (id, updates) => {
@@ -1856,10 +1868,12 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: updates.billingAddress ? createAddressSnapshot(updates.billingAddress) : e.billingAddress,
             shippingAddress: updates.shippingAddress ? createAddressSnapshot(updates.shippingAddress) : e.shippingAddress,
         } : e)));
+        persistUpdate('estimates', id, updates, setEstimates);
         showToast(`Estimate updated.`);
     };
     const deleteEstimate = (id) => {
         setEstimates((prev) => prev.filter((e) => e.id !== id));
+        persistDelete('estimates', id);
         showToast(`Estimate deleted.`);
     };
     const convertEstimateToQuotation = (estimateId) => {
@@ -1890,12 +1904,17 @@ export const ERPProvider = ({ children, }) => {
     };
 
     const addQuotation = (quote) => {
-        const totalAmount = quote.amount ||
-            (quote.items ? quote.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+        const totalAmount = quote.amount ??
+            (quote.items ? quote.items.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) : 0);
         const defaultAddresses = resolvePartyAddresses(quote.customerId, quote.customer);
         const newQ = {
             id: quote.id || `q-${Date.now()}`,
             quoteNumber: quote.quoteNumber || `EST-2026-${String(quotations.length + 91).padStart(3, '0')}`,
+            dealId: quote.dealId,
+            dealReference: quote.dealReference,
+            terms: quote.terms,
+            termsAndConditions: quote.termsAndConditions,
+            freight: quote.freight,
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
@@ -1913,10 +1932,79 @@ export const ERPProvider = ({ children, }) => {
         };
         setQuotations((prev) => [newQ, ...prev]);
         showToast(`Quotation ${newQ.quoteNumber} issued.`);
+        persistCreate('quotations', newQ, setQuotations);
         return newQ;
     };
+    const recordQuotationActivity = (id, type) => {
+        const event = { id: crypto.randomUUID(), type, quotationId: id, timestamp: new Date().toISOString() };
+        setQuotations(prev => prev.map(q => q.id === id ? { ...q, activity: [...(q.activity || []), event] } : q));
+    };
+    const syncQuotationShare = (id, share) => {
+        const current = quotations.find((q) => String(q.id) === String(id));
+        const viewedNow = [...(current?.activity || []), ...(share.events || [])].some((event) => event.type === 'Quotation Viewed');
+        const nextStatus = current && ['Draft', 'Sent', 'Viewed'].includes(current.status)
+            ? (share.decision || (viewedNow ? 'Viewed' : current.status))
+            : current?.status;
+        setQuotations(prev => prev.map(q => {
+            if (q.id !== id) return q;
+            const events = new Map([...(q.activity || []), ...(share.events || [])].map(event => [event.id, event]));
+            const activity = [...events.values()].sort((a, b) => String(a.timestamp ?? '').localeCompare(String(b.timestamp ?? '')));
+            const viewed = activity.some(event => event.type === 'Quotation Viewed');
+            return { ...q, share: { token: share.token, url: share.url, expiresAt: share.expiresAt, allowDownload: share.allowDownload, allowAcceptance: share.allowAcceptance, localOnly: share.localOnly }, activity,
+                status: ['Draft', 'Sent', 'Viewed'].includes(q.status) ? (share.decision || (viewed ? 'Viewed' : q.status)) : q.status };
+        }));
+        if (current && current.status !== 'Viewed' && nextStatus === 'Viewed') {
+            emitCrmEvent({
+                type: CRM_EVENT_TYPES.QUOTATION_VIEWED,
+                entityType: 'quotation',
+                entityId: id,
+                payload: {
+                    quoteRef: current.quoteNumber,
+                    customerId: current.customerId,
+                    customerName: current.customer,
+                    dealId: current.dealId,
+                    path: current.dealId ? `/crm/deals?deal=${encodeURIComponent(current.dealId)}` : '/crm/quotations',
+                },
+            });
+        }
+    };
+    const convertQuotationToDeliveryChallan = (id) => {
+        const quote = quotations.find(q => q.id === id);
+        if (!quote) return;
+        const existing = deliveryChallans.find(dc => dc.sourceQuotationId === id);
+        if (existing) return existing;
+        if (['Rejected', 'Expired'].includes(quote.status) || !quote.items?.length) {
+            showToast('An active quotation with line items is required.');
+            return;
+        }
+        const challan = addDeliveryChallan({
+            sourceQuotationId: quote.id, sourceQuotationNumber: quote.quoteNumber,
+            customerId: quote.customerId, customer: quote.customer,
+            billingAddress: quote.billingAddress, shippingAddress: quote.shippingAddress,
+            leadId: quote.leadId, dealId: quote.dealId, status: 'Draft',
+            date: getCurrentDateFormatted(), dispatchDate: '', transporter: '', vehicleNo: '',
+            items: quote.items.map(item => ({ ...item })),
+        });
+        setQuotations(prev => prev.map(q => q.id === id ? { ...q, deliveryChallanId: challan.id,
+            activity: [...(q.activity || []), { id: crypto.randomUUID(), type: `Delivery challan ${challan.challanNumber} created`, quotationId: id, timestamp: new Date().toISOString() }] } : q));
+        return challan;
+    };
     const updateQuotationStatus = (id, status) => {
+        const target = quotations.find((q) => String(q.id) === String(id));
         setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+        if (target && target.status !== 'Sent' && status === 'Sent') {
+            emitCrmEvent({
+                type: CRM_EVENT_TYPES.QUOTATION_SENT,
+                entityType: 'quotation',
+                entityId: id,
+                payload: {
+                    quoteRef: target.quoteNumber,
+                    customerId: target.customerId,
+                    customerName: target.customer,
+                    path: target.dealId ? `/crm/deals?deal=${encodeURIComponent(target.dealId)}` : '/crm/quotations',
+                },
+            });
+        }
     };
     const convertQuotationToSalesOrder = (quoteId) => {
         const quote = quotations.find((q) => q.id === quoteId);
@@ -1959,6 +2047,11 @@ export const ERPProvider = ({ children, }) => {
             quotationNumber: quote.quoteNumber,
             sourceQuotationId: quote.id,
             sourceQuotationNumber: quote.quoteNumber,
+            dealId: quote.dealId,
+            dealReference: quote.dealReference,
+            terms: quote.terms,
+            termsAndConditions: quote.termsAndConditions,
+            freight: quote.freight,
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
@@ -2019,6 +2112,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setSalesOrders((prev) => [newOrder, ...prev]);
         showToast(`Sales Order ${newOrder.orderNumber} created.`);
+        persistCreate('salesOrders', newOrder, setSalesOrders);
         return newOrder;
     };
     const updateSalesOrderStage = (id, stage) => {
@@ -2206,6 +2300,9 @@ export const ERPProvider = ({ children, }) => {
         return createdInvoice;
     };
     const addDeliveryChallan = (challan) => {
+        const previous = challan.id ? deliveryChallans.find(dc => dc.id === challan.id) : null;
+        if (previous && previous.status !== 'Draft') return previous;
+
         const challanItems = challan.items || challan.lineItems || [];
         const defaultAddresses = resolvePartyAddresses(challan.customerId, challan.customer);
         const newChallan = {
@@ -2214,8 +2311,12 @@ export const ERPProvider = ({ children, }) => {
                 `DC-2026-${String(deliveryChallans.length + 80).padStart(3, '0')}`,
             salesOrderId: challan.salesOrderId,
             sourceSalesOrderId: challan.salesOrderId,
-            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || 'SO-2026-0102',
-            linkedSo: challan.salesOrderNumber || challan.linkedSo || 'SO-2026-0102',
+            sourceQuotationId: challan.sourceQuotationId,
+            sourceQuotationNumber: challan.sourceQuotationNumber,
+            leadId: challan.leadId,
+            dealId: challan.dealId,
+            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
+            linkedSo: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
             customerId: challan.customerId,
             customer: challan.customer || 'Acme Corp',
             billingAddress: createAddressSnapshot(challan.billingAddress) || defaultAddresses.billing,
@@ -2228,7 +2329,13 @@ export const ERPProvider = ({ children, }) => {
             items: challanItems,
             lineItems: challanItems,
         };
-        setDeliveryChallans((prev) => [newChallan, ...prev]);
+        setDeliveryChallans((prev) => previous ? prev.map(dc => dc.id === newChallan.id ? newChallan : dc) : [newChallan, ...prev]);
+
+        // Draft quotation conversions reserve no stock and have no fulfillment effects.
+        if (newChallan.status === 'Draft') {
+            showToast(`Draft delivery challan ${newChallan.challanNumber} created.`);
+            return newChallan;
+        }
 
         // Record SALE movement and handle serial numbers
         if (newChallan.items && newChallan.items.length > 0) {
@@ -2305,9 +2412,14 @@ export const ERPProvider = ({ children, }) => {
         }
 
         showToast(`Delivery Challan ${newChallan.challanNumber} issued.`);
+        persistCreate('deliveryChallans', newChallan, setDeliveryChallans);
         return newChallan;
     };
     const updateDeliveryChallanStatus = (id, status) => {
+        if (deliveryChallans.find(c => c.id === id)?.status === 'Draft') {
+            showToast('This challan is a draft. Dispatch must be prepared before delivery can be recorded.');
+            return;
+        }
         setDeliveryChallans((prev) => prev.map((c) => {
             if (c.id !== id)
                 return c;
@@ -2327,6 +2439,12 @@ export const ERPProvider = ({ children, }) => {
         const challan = deliveryChallans.find((c) => c.id === challanId);
         if (!challan) return { success: false, message: 'Challan not found.' };
         if (challan.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
+
+        if (challan.status === 'Draft') {
+            setDeliveryChallans(prev => prev.map(c => c.id === challanId ? { ...c, status: 'Cancelled' } : c));
+            showToast('Draft challan cancelled.');
+            return { success: true, message: 'Draft challan cancelled.' };
+        }
 
         // 1. Reverse stock movements and restore serial numbers
         if (challan.items && challan.items.length > 0) {
@@ -2484,7 +2602,7 @@ export const ERPProvider = ({ children, }) => {
         }
         // Adjust customer balance
         if (newPay.customer) {
-            setCustomers((prev) => prev.map((c) => c.name.toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
+            setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
                 ? { ...c, balance: Math.max(0, c.balance - payAmt) }
                 : c));
         }
@@ -2504,6 +2622,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setJournalEntries((prev) => [newJe, ...prev]);
         showToast(`Recorded receipt of ${formatCurrency(payAmt)} from ${newPay.customer}`);
+        persistCreate('paymentIns', newPay, setPaymentIns);
         return newPay;
     };
     const addSalesReturn = (ret) => {
@@ -2634,7 +2753,7 @@ export const ERPProvider = ({ children, }) => {
 
         // Reduce customer receivable balance
         if (newRet.customer) {
-            setCustomers((prev) => prev.map((c) => c.name.toLowerCase() === newRet.customer?.toLowerCase() || (newRet.customerId && c.id === newRet.customerId)
+            setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newRet.customer?.toLowerCase() || (newRet.customerId && c.id === newRet.customerId)
                 ? { ...c, balance: Math.max(0, c.balance - totalAmount) }
                 : c));
         }
@@ -2653,6 +2772,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setJournalEntries((prev) => [newJe, ...prev]);
         showToast(`Credit Note ${newRet.returnNumber} issued for ${formatCurrency(totalAmount)}.`);
+        persistCreate('salesReturns', newRet, setSalesReturns);
         return newRet;
     };
 
@@ -2687,7 +2807,7 @@ export const ERPProvider = ({ children, }) => {
 
         // 2. Reverse customer receivable balance adjustment
         if (sr.customer) {
-            setCustomers((prev) => prev.map((c) => c.name.toLowerCase() === sr.customer.toLowerCase() || (sr.customerId && c.id === sr.customerId)
+            setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === String(sr.customer ?? '').toLowerCase() || (sr.customerId && c.id === sr.customerId)
                 ? { ...c, balance: c.balance + sr.amount }
                 : c));
         }
@@ -2735,6 +2855,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setPurchaseOrders((prev) => [newPo, ...prev]);
         showToast(`Purchase Order ${newPo.poNumber} saved.`);
+        persistCreate('purchaseOrders', newPo, setPurchaseOrders);
         return newPo;
     };
     const updatePurchaseOrderStatus = (id, status) => {
@@ -2817,6 +2938,7 @@ export const ERPProvider = ({ children, }) => {
             return;
         }
         setPurchaseOrders((prev) => prev.filter((p) => p.id !== id));
+        persistDelete('purchaseOrders', id);
         showToast(`Draft Purchase Order ${po.poNumber || ''} deleted.`);
     };
     const convertPurchaseOrderToBill = (poId) => {
@@ -3067,6 +3189,7 @@ export const ERPProvider = ({ children, }) => {
             });
         }
         showToast(`Vendor Bill ${newBill.billNumber} recorded.`);
+        persistCreate('purchaseBills', newBill, setPurchaseBills);
         return newBill;
     };
     const cancelPurchaseBill = (billId) => {
@@ -3402,6 +3525,7 @@ export const ERPProvider = ({ children, }) => {
         } else {
             showToast(`Disbursed ${formatCurrency(payAmt)} to ${newPay.vendor}`);
         }
+        persistCreate('paymentOuts', newPay, setPaymentOuts);
         return newPay;
     };
     // ── [PHASE-2D] Vendor / PO advance balance ──
@@ -3547,7 +3671,7 @@ export const ERPProvider = ({ children, }) => {
             if (idx === toIdx) return { ...a, balance: Math.round((a.balance + amt) * 100) / 100 };
             return a;
         }));
-        const trNum = transfer.transferNumber || `TR-2026-${String((initial?.transfers?.length || 0) + 30 + transfers.length).padStart(3, '0')}`;
+        const trNum = transfer.transferNumber || `TR-2026-${String((undefined?.length || 0) + 30 + transfers.length).padStart(3, '0')}`;
         const newTr = {
             id: `tr-${Date.now()}`,
             transferNumber: trNum,
@@ -3582,7 +3706,7 @@ export const ERPProvider = ({ children, }) => {
         { id: 'bud-freight', name: 'Freight & Logistics', category: 'Logistics', annualAmount: 720000, account: '5050 - Freight', active: true },
         { id: 'bud-office', name: 'Office & Admin Supplies', category: 'Admin', annualAmount: 120000, account: '5060 - Office Supplies', active: true },
     ];
-    const [budgets, setBudgets] = useState(initial?.budgets || defaultBudgets);
+    const [budgets, setBudgets] = useState(defaultBudgets);
     const addBudget = (b) => {
         const newB = { id: b.id || `bud-${Date.now()}`, name: b.name || 'New Budget', category: b.category || 'General', annualAmount: Number(b.annualAmount) || 0, account: b.account || '5xxx - Expense', active: b.active !== false };
         setBudgets((prev) => [newB, ...prev]);
@@ -3683,7 +3807,7 @@ export const ERPProvider = ({ children, }) => {
             });
         }
         else if (newDebit.itemSku || newDebit.itemId) {
-            const targetItem = items.find((i) => (newDebit.itemId && i.id === newDebit.itemId) || (newDebit.itemSku && i.sku?.toLowerCase() === newDebit.itemSku.toLowerCase()));
+            const targetItem = items.find((i) => (newDebit.itemId && i.id === newDebit.itemId) || (newDebit.itemSku && i.sku?.toLowerCase() === String(newDebit.itemSku ?? '').toLowerCase()));
             if (targetItem) {
                 recordMovement({
                     itemId: targetItem.id,
@@ -3715,6 +3839,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setJournalEntries((prev) => [newJe, ...prev]);
         showToast(`Debit Note ${newDebit.debitNoteNumber} issued.`);
+        persistCreate('purchaseReturns', newDebit, setPurchaseReturns);
         return newDebit;
     };
     const cancelPurchaseReturn = (returnId) => {
@@ -3805,6 +3930,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setJournalEntries((prev) => [newJe, ...prev]);
         showToast(`Expense voucher ${newExp.expenseNumber} recorded.`);
+        persistCreate('expenses', newExp, setExpenses);
         return newExp;
     };
     const addLocation = (loc) => {
@@ -3819,6 +3945,7 @@ export const ERPProvider = ({ children, }) => {
         };
         setLocations((prev) => [...prev, newLoc]);
         showToast(`Location ${newLoc.name} established.`);
+        persistCreate('locations', newLoc, setLocations);
         return newLoc;
     };
     const addTransfer = (tr) => {
@@ -4146,7 +4273,6 @@ export const ERPProvider = ({ children, }) => {
             if (Array.isArray(payload.faultyParts)) setFaultyParts(payload.faultyParts);
             if (Array.isArray(payload.zoneRequests)) setZoneRequests(payload.zoneRequests);
 
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
             showToast('ERP Database restored successfully from backup.');
             return true;
         } catch (err) {
@@ -4156,52 +4282,27 @@ export const ERPProvider = ({ children, }) => {
         }
     };
 
-    const resetDatabaseToDefaults = () => {
+    /**
+     * Re-read every collection from the server, discarding anything this tab
+     * was holding. There is no local factory set to fall back to any more.
+     */
+    const resetDatabaseToDefaults = async () => {
         try {
-            localStorage.removeItem(STORAGE_KEY);
-            setParties(mockParties);
-            setCustomers(mockCustomers);
-            setVendors(mockVendors);
-            setItems(mockInventoryItems);
-            setCategories(mockCategories);
-            setUnits(mockUnits);
-            setCategoryParts(mockCategoryParts);
-            setItemParts(mockItemParts);
-            setEstimates(mockEstimates);
-            setQuotations(mockQuotations);
-            setSalesOrders(mockSalesOrders);
-            setProformaInvoices(mockProformaInvoices);
-            setDeliveryChallans(mockDeliveryChallans);
-            setInvoices(initialSalesInvoices);
-            setWarranties(mockWarrantyCards);
-            setPaymentIns(mockPaymentIns);
-            setSalesReturns(mockSalesReturns);
-            setPurchaseOrders(mockPurchaseOrders);
-            setPurchaseBills(mockPurchaseBills);
-            setPurchaseReturns(mockPurchaseReturns);
-            setPaymentOuts(mockPaymentOuts);
-            setExpenses(mockExpenses);
-            setLocations(mockLocations);
-            setTransfers(mockTransfers);
-            setServiceUsages(mockServiceUsages);
-            setValuationItems(mockValuationItems);
-            setMonthEndAudits(mockMonthEndAudits);
-            setBankAccounts(mockBankAccounts);
-            setJournalEntries(initialJournalEntries);
-            setInventoryMovements(mockInventoryMovements);
-            setFaultyParts(initialFaultyParts);
-            setZoneRequests(initialZoneRequests);
-
-            showToast('ERP data reset to factory initial state.');
+            await refreshFromBackend();
+            showToast('Reloaded every collection from the server.');
             return true;
         } catch (err) {
             console.error('Failed to reset data:', err);
-            showToast('Failed to reset demo data.');
+            showToast('Could not reload from the server.');
             return false;
         }
     };
 
     return (<ERPContext.Provider value={{
+            // Backend session state: `connected` once a pull has succeeded,
+            // plus a manual re-pull for the "Sync now" affordance.
+            backendStatus,
+            refreshFromBackend,
             warranties,
             addWarrantyCard,
             updateWarrantyCard,
@@ -4309,6 +4410,9 @@ export const ERPProvider = ({ children, }) => {
             updateCategory,
             addQuotation,
             updateQuotationStatus,
+            recordQuotationActivity,
+            syncQuotationShare,
+            convertQuotationToDeliveryChallan,
             convertQuotationToSalesOrder,
             addSalesOrder,
             updateSalesOrderStage,

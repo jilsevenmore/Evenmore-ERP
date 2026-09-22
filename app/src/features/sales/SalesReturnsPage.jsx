@@ -95,7 +95,7 @@ export const SalesReturnsPage = () => {
             const returnableQty = Math.max(0, invoicedQty - prevReturned);
 
             // Find serials if serialized item
-            const mi = masterItems.find((m) => m.id === it.itemId || (it.sku && m.sku?.toLowerCase() === it.sku.toLowerCase()) || (it.itemSku && m.sku?.toLowerCase() === it.itemSku.toLowerCase()));
+            const mi = masterItems.find((m) => m.id === it.itemId || (it.sku && m.sku?.toLowerCase() === String(it.sku ?? '').toLowerCase()) || (it.itemSku && m.sku?.toLowerCase() === String(it.itemSku ?? '').toLowerCase()));
             const isSerial = mi?.trackingMode === 'Serial' || Boolean(it.serialNumbers?.length || it.selectedSerials?.length);
 
             // Serials originally dispatched on this invoice line
@@ -396,10 +396,10 @@ export const SalesReturnsPage = () => {
                 keyExtractor={(r) => r.id}
                 searchPlaceholder="Search return #, customer, invoice, or reason..."
                 searchFilter={(r, term) =>
-                    r.returnNumber.toLowerCase().includes(term) ||
-                    r.customer.toLowerCase().includes(term) ||
-                    (r.invoiceRef && r.invoiceRef.toLowerCase().includes(term)) ||
-                    (r.reason && r.reason.toLowerCase().includes(term))
+                    String(r.returnNumber ?? '').toLowerCase().includes(term) ||
+                    String(r.customer ?? '').toLowerCase().includes(term) ||
+                    (r.invoiceRef && String(r.invoiceRef ?? '').toLowerCase().includes(term)) ||
+                    (r.reason && String(r.reason ?? '').toLowerCase().includes(term))
                 }
             />
 

@@ -6,8 +6,6 @@ import DataTable from '../../../components/ui/DataTable';
 import StatusBadge from '../../../components/ui/StatusBadge';
 import StatCard from '../../../components/ui/StatCard';
 import {
-  loadCrmTasks,
-  saveCrmTasks,
   CRM_EVENT,
   TASK_SOURCE_AUTOMATION,
   CRM_TEAM_MEMBERS,
@@ -15,6 +13,8 @@ import {
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from '../../../services/taskCompletionService';
 import CompleteTaskModal from './CompleteTaskModal';
 import { useAppStore } from '../../../stores/appStore';
+import { useCrmStore } from '../../../stores/crmStore';
+import { describeError } from '../../../services/crmSync';
 
 const ASSIGNEE_OPTIONS = [
   'Unassigned',
@@ -28,7 +28,8 @@ const STATUS_OPTIONS = ['Open', 'In Progress', 'Waiting', 'Completed'];
 
 export default function TasksPage() {
   const currentUser = useAppStore((s) => s.currentUser);
-  const [tasks, setTasks] = useState(loadCrmTasks);
+  const tasks = useCrmStore((s) => s.tasks);
+  const updateTask = useCrmStore((s) => s.updateTask);
   const [activeStatus, setActiveStatus] = useState('All');
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('dueDate');
@@ -48,18 +49,6 @@ export default function TasksPage() {
   const [completeTarget, setCompleteTarget] = useState(null);
   const [successToast, setSuccessToast] = useState('');
 
-  // Keep synced across events
-  useEffect(() => {
-    function handleSync() {
-      setTasks(loadCrmTasks());
-    }
-    window.addEventListener(CRM_EVENT, handleSync);
-    window.addEventListener('storage', handleSync);
-    return () => {
-      window.removeEventListener(CRM_EVENT, handleSync);
-      window.removeEventListener('storage', handleSync);
-    };
-  }, []);
 
   const stats = [
     { label: 'Total Tasks', value: tasks.length.toString(), icon: 'file', tone: 'blue' },
@@ -70,11 +59,14 @@ export default function TasksPage() {
 
   function toggleComplete(task) {
     if (task.status === 'Completed') {
-      const updated = tasks.map((t) =>
-        t.id === task.id ? { ...t, status: 'Open', completionOutcome: undefined, nextAction: undefined, completedAt: undefined, completedBy: undefined } : t
-      );
-      setTasks(updated);
-      saveCrmTasks(updated);
+      // Re-opening is an ordinary edit; completing goes through the modal so
+      // the server can apply the outcome and next action.
+      updateTask(task.id, {
+        status: 'Open',
+        outcome: null,
+        nextAction: null,
+        completionNote: null,
+      }).catch((err) => console.warn('[CRM] task not reopened:', describeError(err)));
       return;
     }
     const lead = resolveLeadForTask(task);
@@ -83,15 +75,12 @@ export default function TasksPage() {
 
   async function handleComplete(outcome, nextAction, note) {
     if (!completeTarget?.task) return { ok: false, message: 'No task selected.' };
-    const result = completeTaskWithOutcome({
+    const result = await completeTaskWithOutcome({
       task: completeTarget.task,
-      lead: completeTarget.lead,
       outcome,
       nextAction,
       note,
-      completedBy: currentUser?.name || CRM_TEAM_MEMBERS[0]?.name || 'CRM User',
     });
-    setTasks(loadCrmTasks());
     if (result.ok !== false) {
       setSuccessToast(result.message || 'Task completed successfully.');
       window.setTimeout(() => setSuccessToast(''), 2500);
@@ -122,22 +111,14 @@ export default function TasksPage() {
     e.preventDefault();
     if (!editingTask) return;
 
-    const nextOwner = editForm.owner || 'Unassigned';
-    const updated = tasks.map((t) => {
-      if (t.id !== editingTask.id) return t;
-      return {
-        ...t,
-        title: editForm.title.trim() || t.title,
-        owner: nextOwner,
-        dueDate: editForm.dueDate || t.dueDate,
-        priority: editForm.priority,
-        status: editForm.status,
-        warning: nextOwner !== 'Unassigned' ? null : t.warning,
-      };
-    });
+    updateTask(editingTask.id, {
+      title: editForm.title.trim() || editingTask.title,
+      assigneeId: editForm.assigneeId || editingTask.assigneeId,
+      dueDate: editForm.dueDate || editingTask.dueDate,
+      priority: editForm.priority,
+      status: editForm.status,
+    }).catch((err) => console.warn('[CRM] task not saved:', describeError(err)));
 
-    setTasks(updated);
-    saveCrmTasks(updated);
     closeEditModal();
   }
 
@@ -156,10 +137,10 @@ export default function TasksPage() {
       const q = search.trim().toLowerCase();
       const matchesSearch =
         !q ||
-        (t.title && t.title.toLowerCase().includes(q)) ||
-        (t.lead && t.lead.toLowerCase().includes(q)) ||
-        (t.owner && t.owner.toLowerCase().includes(q)) ||
-        (t.source && t.source.toLowerCase().includes(q));
+        (t.title && String(t.title ?? '').toLowerCase().includes(q)) ||
+        (t.lead && String(t.lead ?? '').toLowerCase().includes(q)) ||
+        (t.owner && String(t.owner ?? '').toLowerCase().includes(q)) ||
+        (t.source && String(t.source ?? '').toLowerCase().includes(q));
       return matchesStatus && matchesSearch;
     });
 

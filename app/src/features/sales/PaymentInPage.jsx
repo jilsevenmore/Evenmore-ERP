@@ -150,10 +150,10 @@ export const PaymentInPage = () => {
         <StatCard label="Bank & Wire Transfers" value={`${wireCount} Settlements`} icon={CheckCircle2} subtext="Direct Treasury intake" />
       </div>
 
-      <DataTable title="Cleared Customer Collections" columns={columns} data={paymentIns} keyExtractor={(p) => p.id} searchPlaceholder="Search receipt #, customer, or invoice..." searchFilter={(p, term) => p.receiptNumber.toLowerCase().includes(term) ||
-            p.customer.toLowerCase().includes(term) ||
-            (p.invoiceNumber && p.invoiceNumber.toLowerCase().includes(term)) ||
-            (p.reference && p.reference.toLowerCase().includes(term))}/>
+      <DataTable title="Cleared Customer Collections" columns={columns} data={paymentIns} keyExtractor={(p) => p.id} searchPlaceholder="Search receipt #, customer, or invoice..." searchFilter={(p, term) => String(p.receiptNumber ?? '').toLowerCase().includes(term) ||
+            String(p.customer ?? '').toLowerCase().includes(term) ||
+            (p.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase().includes(term)) ||
+            (p.reference && String(p.reference ?? '').toLowerCase().includes(term))}/>
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs">

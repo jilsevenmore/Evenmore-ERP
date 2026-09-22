@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useCrmStore } from '../../../stores/crmStore';
 import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X } from "lucide-react";
 
 const PRODUCT_OPTIONS = [
@@ -9,13 +10,10 @@ const PRODUCT_OPTIONS = [
   "Ventilator",
 ];
 
-const USER_OPTIONS = [
-  "Drashti Evenmore",
-  "Amit Shah",
-  "Rohit Sharma",
-  "Priya Mehta",
-  "Vanshi Rao",
-];
+/** Who a lead can be assigned to, from `/crm/team-roster/`. */
+function useUserOptions() {
+  return useCrmStore((s) => s.teamMembers);
+}
 
 function MultiValueSelect({ label, placeholder, options, values, onChange }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -135,10 +133,14 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   const [company, setCompany] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [source, setSource] = useState("");
+  const [sourceId, setSourceId] = useState("");
   const [titleValue, setTitleValue] = useState("");
   const [industry, setIndustry] = useState("");
-  const [owner, setOwner] = useState("");
+
+  // The lookups the form offers, as configured on the server.
+  const sources = useCrmStore((s) => s.sources);
+  const userOptions = useUserOptions();
+  const [ownerId, setOwnerId] = useState("");
   const [createdOn, setCreatedOn] = useState("");
   const [taskDate, setTaskDate] = useState("");
   const [taskTime, setTaskTime] = useState("");
@@ -152,10 +154,10 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
     company.trim() !== "" &&
     email.trim() !== "" &&
     phone.trim() !== "" &&
-    source.trim() !== "" &&
+    sourceId !== "" &&
     titleValue.trim() !== "" &&
     industry.trim() !== "" &&
-    owner.trim() !== "";
+    ownerId !== "";
 
   useEffect(() => {
     if (!isOpen) {
@@ -166,10 +168,10 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
       setCompany("");
       setEmail("");
       setPhone("");
-      setSource("");
+      setSourceId("");
       setTitleValue("");
       setIndustry("");
-      setOwner("");
+      setOwnerId("");
       setCreatedOn("");
       setTaskDate("");
       setTaskTime("");
@@ -210,10 +212,13 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
       company,
       email,
       phone,
-      source,
+      // The API records the lookup ids; the labels are only for display.
+      sourceId,
+      source: sources.find((option) => option.id === sourceId)?.name || "",
       titleValue,
       industry,
-      owner,
+      ownerId,
+      owner: userOptions.find((member) => member.id === ownerId)?.name || "",
       createdOn,
       taskDate,
       taskTime,
@@ -309,11 +314,11 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
 
           <label className="lead-create-field">
             <span>Lead Source</span>
-            <select value={source} onChange={(event) => setSource(event.target.value)}>
-              <option value="" disabled>Select source</option>
-              <option>Cold Call</option>
-              <option>Advertisement</option>
-              <option>Partner</option>
+            <select value={sourceId} onChange={(event) => setSourceId(event.target.value)}>
+              <option value="">Select source</option>
+              {sources.map((option) => (
+                <option key={option.id} value={option.id}>{option.name}</option>
+              ))}
             </select>
           </label>
 
@@ -329,10 +334,11 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
 
           <label className="lead-create-field">
             <span>Lead Owner *</span>
-            <select value={owner} onChange={(event) => setOwner(event.target.value)}>
-              <option value="" disabled>Select User</option>
-              <option>David Patel</option>
-              <option>Priya Mehta</option>
+            <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
+              <option value="">Select User</option>
+              {userOptions.map((member) => (
+                <option key={member.id} value={member.id}>{member.name}</option>
+              ))}
             </select>
           </label>
 
@@ -357,7 +363,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
           <MultiValueSelect
             label="Lead Users"
             placeholder="Select Users"
-            options={USER_OPTIONS}
+            options={userOptions.map((member) => member.name)}
             values={leadUsers}
             onChange={setLeadUsers}
           />

@@ -33,8 +33,8 @@ export function DepartmentsPage() {
   const [newDept, setNewDept] = useState({ name: '', head: 'David Park', budget: '$250,000' });
 
   const filtered = departments.filter((d) =>
-    d.name.toLowerCase().includes(q.toLowerCase()) ||
-    d.head.toLowerCase().includes(q.toLowerCase())
+    String(d.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
+    String(d.head ?? '').toLowerCase().includes(q.toLowerCase())
   );
 
   function handleCreate(e) {

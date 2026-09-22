@@ -6,7 +6,8 @@ import {
   LayoutGrid,
   SquareChartGantt,
 } from "lucide-react";
-import { tabs } from '../../../data/crm/mockLeads';
+import { useMemo } from 'react';
+import { useCrmStore, leadTabsFrom } from '../../../stores/crmStore';
 import SortPopover from "./SortPopover";
 import RecordActionPanel from "./RecordActionPanel";
 
@@ -47,6 +48,10 @@ export default function LeadsTabs({
   onDeleteRecord,
   onPrint,
 }) {
+  // One tab per configured stage, counted from the leads the server returned.
+  const leads = useCrmStore((s) => s.leads);
+  const stages = useCrmStore((s) => s.stages);
+  const tabs = useMemo(() => leadTabsFrom(leads, stages), [leads, stages]);
   const hasRecordAction = Boolean(recordActionLead) || recordActionLeads.length > 0;
   return (
     <div className="leads-toolbar-wrap">

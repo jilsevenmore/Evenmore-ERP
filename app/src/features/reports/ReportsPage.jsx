@@ -72,7 +72,7 @@ export const ReportsPage = () => {
     }, {});
     const topAccounts = Object.entries(customerRevenueMap)
         .map(([name, revenue]) => {
-            const customerObj = customers.find((c) => c.name.toLowerCase() === name.toLowerCase());
+            const customerObj = customers.find((c) => String(c.name ?? '').toLowerCase() === name.toLowerCase());
             return {
                 name,
                 revenue,

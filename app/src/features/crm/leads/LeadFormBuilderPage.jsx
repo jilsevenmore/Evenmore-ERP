@@ -1,43 +1,30 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import LeadFormBuilder from './LeadFormBuilder';
 import { createFieldFromType, defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
-
-function getStoredForms() {
-  try {
-    const raw = localStorage.getItem('dynamicLeadForms');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch {
-  }
-  return [
-    {
-      id: 'lead-form-default',
-      name: 'LEAD CREATE FORM',
-      description: 'No description provided',
-      createdOn: '13/04/2026',
-      sections: defaultLeadFormSections,
-    },
-  ];
-}
+import { useCrmStore } from '../../../stores/crmStore';
+import { loadForms, saveForms, findForm, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
 export default function LeadFormBuilderPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const formId = searchParams.get('formId') || localStorage.getItem('activeLeadFormId') || 'lead-form-default';
+  const formId = searchParams.get('formId') || getActiveFormId() || null;
 
-  const [currentForm] = useState(() => {
-    const forms = getStoredForms();
-    return forms.find((f) => f.id === formId) || forms[0];
-  });
+  // The form being edited, from `/crm/forms/`.
+  const storeForms = useCrmStore((s) => s.forms);
+  const currentForm = useMemo(
+    () => (formId ? findForm(formId) : null) || loadForms(LEAD_FORM)[0] || null,
+    [formId, storeForms],
+  );
 
-  const [leadFormSections, setLeadFormSections] = useState(() => {
-    return currentForm?.sections || defaultLeadFormSections;
-  });
+  const [leadFormSections, setLeadFormSections] = useState(
+    () => currentForm?.sections || defaultLeadFormSections,
+  );
+
+  // A form loaded after the first render replaces the blank starting point.
+  useEffect(() => {
+    if (currentForm?.sections) setLeadFormSections(currentForm.sections);
+  }, [currentForm]);
 
   const [selectedBuilderFieldId, setSelectedBuilderFieldId] = useState(() => {
     const emailField = leadFormSections.flatMap((s) => s.fields).find((f) => f.id === 'email');
@@ -157,27 +144,22 @@ export default function LeadFormBuilderPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   function openLeadCreateForm() {
-    try {
-      localStorage.setItem('leadFormSections_v2', JSON.stringify(leadFormSections));
-      localStorage.setItem('leadFormSections', JSON.stringify(leadFormSections));
-    } catch {
-    }
+    // Save first, so the capture page renders what is on screen here.
+    persistSections();
     navigate('/crm/leads/create-form');
   }
 
+  function persistSections() {
+    const forms = loadForms(LEAD_FORM);
+    const targetId = currentForm?.id || formId;
+    const updated = forms.some((f) => f.id === targetId)
+      ? forms.map((f) => (f.id === targetId ? { ...f, sections: leadFormSections } : f))
+      : [...forms, { id: targetId, name: 'Lead create form', sections: leadFormSections }];
+    saveForms(updated, LEAD_FORM);
+  }
+
   function saveLeadForm() {
-    try {
-      const forms = getStoredForms();
-      const updatedForms = forms.map((f) =>
-        f.id === (currentForm?.id || formId)
-          ? { ...f, sections: leadFormSections }
-          : f
-      );
-      localStorage.setItem('dynamicLeadForms', JSON.stringify(updatedForms));
-      localStorage.setItem('leadFormSections_v2', JSON.stringify(leadFormSections));
-      localStorage.setItem('leadFormSections', JSON.stringify(leadFormSections));
-    } catch {
-    }
+    persistSections();
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);

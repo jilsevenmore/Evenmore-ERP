@@ -65,9 +65,34 @@ try {
   }
 } catch (e) {}
 
+// ── Base currency ────────────────────────────────────────────────────────────
+//
+// The rate tables below are quoted against USD, which was right while every
+// amount came from USD-denominated mock data. Amounts now come from the API,
+// and api.md §1.6 is explicit that money arrives as a plain number already in
+// the tenant's own currency — so converting it against USD would multiply every
+// figure on screen by the USD→INR rate. `baseCurrency` is that tenant currency;
+// conversions are `target / base`, which makes the common case (display the
+// tenant's own currency) exactly 1.
+let baseCurrency = 'INR';
+
+/** Set from `companyProfile.currency` once the profile loads. */
+export function setBaseCurrency(code) {
+  const key = String(code || '').toUpperCase().slice(0, 3);
+  if (CURRENCY_CONFIGS[key]) baseCurrency = key;
+}
+
+export function getBaseCurrency() {
+  return baseCurrency;
+}
+
+/** The rate for `code`, preferring a freshly fetched table. */
+function rateFor(code, customRates) {
+  return (customRates && customRates[code]) || CURRENCY_CONFIGS[code]?.rate || 1;
+}
+
 export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null) {
-  if (!currencyStr) return CURRENCY_CONFIGS.INR;
-  const str = String(currencyStr).toUpperCase();
+  const str = String(currencyStr || baseCurrency).toUpperCase();
   let config = CURRENCY_CONFIGS.USD;
 
   if (str.includes('INR') || str.includes('₹') || str.includes('RUPEE')) {
@@ -84,7 +109,8 @@ export function getCurrencyConfig(currencyStr = 'INR (₹)', customRates = null)
     if (customRates?.CAD) config.rate = customRates.CAD;
   }
 
-  return config;
+  // Re-base: the stored amount is in `baseCurrency`, not USD.
+  return { ...config, rate: config.rate / rateFor(baseCurrency, customRates) };
 }
 
 export function getCurrencySymbol(currencyStr = 'INR (₹)') {

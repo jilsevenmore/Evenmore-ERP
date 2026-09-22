@@ -17,11 +17,11 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
         if (!searchTerm.trim())
             return true;
         const term = searchTerm.toLowerCase();
-        return (p.product.toLowerCase().includes(term) ||
-            p.vendor.toLowerCase().includes(term) ||
-            p.rmaNumber.toLowerCase().includes(term) ||
-            p.serialNumber.toLowerCase().includes(term) ||
-            p.status.toLowerCase().includes(term));
+        return (String(p.product ?? '').toLowerCase().includes(term) ||
+            String(p.vendor ?? '').toLowerCase().includes(term) ||
+            String(p.rmaNumber ?? '').toLowerCase().includes(term) ||
+            String(p.serialNumber ?? '').toLowerCase().includes(term) ||
+            String(p.status ?? '').toLowerCase().includes(term));
     });
     const selectedPart = parts.find((p) => p.id === selectedPartId) || parts[0] || null;
     const handleMarkAsShipped = (partId) => {

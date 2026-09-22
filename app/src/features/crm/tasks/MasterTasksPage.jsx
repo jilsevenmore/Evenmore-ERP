@@ -24,8 +24,9 @@ import {
 
 import MasterTasksGuideModal from './MasterTasksGuideModal';
 import InfoBanner from '../common/InfoBanner';
+import { useCrmStore } from '../../../stores/crmStore';
+import { syncCollection } from '../../../services/crmCollections';
 
-const STORAGE_KEY = 'leadMasterTasksV1';
 
 const ROLES = ['Tele Caller Executive', 'Sales Support Executive', 'BDE', 'Area Sales Manager'];
 const DEPARTMENTS = ['Sales', 'Support', 'Marketing'];
@@ -55,6 +56,11 @@ const ICON_STYLE = {
   quotation: 'bg-amber-50 text-amber-600',
 };
 
+/** Lower-cased text, safe on a field the server left unset. */
+function text(value) {
+  return String(value ?? '').toLowerCase();
+}
+
 function iconFor(key) {
   if (key === 'demo') return Monitor;
   if (key === 'pending') return Clock;
@@ -64,27 +70,7 @@ function iconFor(key) {
   return Phone;
 }
 
-function seedTasks() {
-  return [
-    { id: 'mt-1', order: 1, name: 'Call', icon: 'call', stages: ['New Lead', 'Details Collected'], role: 'Tele Caller Executive', department: 'Sales', priority: 'High', dueIn: 0, status: 'Active' },
-    { id: 'mt-2', order: 2, name: 'Demo completed', icon: 'demo', stages: ['Demo Done', 'Won'], role: 'Sales Support Executive', department: 'Sales', priority: 'Medium', dueIn: 1, status: 'Active' },
-    { id: 'mt-3', order: 3, name: 'Demo pending', icon: 'pending', stages: ['Demo Pending', 'Negotiation'], role: 'Sales Support Executive', department: 'Sales', priority: 'Medium', dueIn: 2, status: 'Active' },
-    { id: 'mt-4', order: 4, name: 'Final Meeting', icon: 'meeting', stages: ['Negotiation', 'Won'], role: 'Area Sales Manager', department: 'Sales', priority: 'High', dueIn: 3, status: 'Active' },
-    { id: 'mt-5', order: 5, name: 'Formal meeting', icon: 'formal', stages: ['Negotiation'], role: 'BDE', department: 'Sales', priority: 'Medium', dueIn: 3, status: 'Active' },
-    { id: 'mt-6', order: 6, name: 'Quotation', icon: 'quotation', stages: ['Quotation Shared', 'Negotiation'], role: 'BDE', department: 'Sales', priority: 'Low', dueIn: 1, status: 'Active' },
-  ];
-}
 
-function loadTasks() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) return parsed;
-    }
-  } catch { }
-  return seedTasks();
-}
 
 const EMPTY_FORM = {
   name: '',
@@ -99,7 +85,11 @@ const EMPTY_FORM = {
 
 export default function MasterTasksPage() {
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState(loadTasks);
+  // Master task templates live at `/crm/master-tasks/`; the automation that
+  // generates a lead's stage tasks reads the same rows.
+  const storeTasks = useCrmStore((s) => s.masterTasks);
+  const [tasks, setTasks] = useState([]);
+  useEffect(() => { setTasks(storeTasks); }, [storeTasks]);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [deptFilter, setDeptFilter] = useState('All');
@@ -119,10 +109,10 @@ export default function MasterTasksPage() {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-    } catch { }
-  }, [tasks]);
+    if (tasks.length > 0 || storeTasks.length > 0) {
+      syncCollection('masterTasks', tasks, storeTasks);
+    }
+  }, [tasks, storeTasks]);
 
   useEffect(() => {
     setPage(1);
@@ -154,15 +144,15 @@ export default function MasterTasksPage() {
       if (statusFilter !== 'All' && t.status !== statusFilter) return false;
       if (!q) return true;
       return (
-        t.name.toLowerCase().includes(q) ||
-        t.role.toLowerCase().includes(q) ||
-        t.department.toLowerCase().includes(q) ||
+        text(t.name).includes(q) ||
+        text(t.role).includes(q) ||
+        text(t.department).includes(q) ||
         (t.stages || []).join(' ').toLowerCase().includes(q)
       );
     });
     const sorted = [...out].sort((a, b) => {
       let cmp = 0;
-      if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
+      if (sortKey === 'name') cmp = String(a.name ?? '').localeCompare(String(b.name ?? ''));
       else cmp = (a.order || 0) - (b.order || 0);
       return sortDir === 'asc' ? cmp : -cmp;
     });

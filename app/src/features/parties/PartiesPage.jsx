@@ -357,9 +357,9 @@ export default function PartiesPage() {
         keyExtractor={(p) => p.id}
         searchPlaceholder="Filter by name, code, GSTIN, or phone..."
         searchFilter={(p, term) =>
-          p.name.toLowerCase().includes(term) ||
-          p.code.toLowerCase().includes(term) ||
-          (p.gstin && p.gstin.toLowerCase().includes(term)) ||
+          String(p.name ?? '').toLowerCase().includes(term) ||
+          String(p.code ?? '').toLowerCase().includes(term) ||
+          (p.gstin && String(p.gstin ?? '').toLowerCase().includes(term)) ||
           (p.phone && p.phone.includes(term))
         }
       />

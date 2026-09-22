@@ -349,9 +349,9 @@ export const PurchaseBillsPage = () => {
         <StatCard label="Active Bills" value={`${purchaseBills.length} Bills`} icon={FileText} subtext={`${unpaidBillsCount} awaiting payment`} />
       </div>
 
-      <DataTable title="Accounts Payable Bills" columns={columns} data={purchaseBills} keyExtractor={(b) => b.id} searchPlaceholder="Search bill #, PO, or vendor..." searchFilter={(b, term) => b.billNumber.toLowerCase().includes(term) ||
+      <DataTable title="Accounts Payable Bills" columns={columns} data={purchaseBills} keyExtractor={(b) => b.id} searchPlaceholder="Search bill #, PO, or vendor..." searchFilter={(b, term) => String(b.billNumber ?? '').toLowerCase().includes(term) ||
             (b.poRef || b.linkedPo || '').toLowerCase().includes(term) ||
-            b.vendor.toLowerCase().includes(term)}/>
+            String(b.vendor ?? '').toLowerCase().includes(term)}/>
 
       {/* Enter Bill Modal */}
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">

@@ -197,7 +197,7 @@ function FieldPreview({
               className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-700 appearance-none pr-8 cursor-pointer focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
               <option value="" disabled>
-                {field.placeholder || `Select ${field.label.toLowerCase()}`}
+                {field.placeholder || `Select ${String(field.label ?? '').toLowerCase()}`}
               </option>
               {previewOptions.map((option) => (
                 <option key={option} value={option}>
@@ -209,7 +209,7 @@ function FieldPreview({
           </div>
         ) : (
           <div className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 flex items-center justify-between text-xs text-slate-400 shadow-2xs pointer-events-none">
-            <span className="truncate mr-2">{field.placeholder || `Enter ${field.label.toLowerCase()}`}</span>
+            <span className="truncate mr-2">{field.placeholder || `Enter ${String(field.label ?? '').toLowerCase()}`}</span>
             <Icon size={14} className="text-slate-400 shrink-0" />
           </div>
         )}

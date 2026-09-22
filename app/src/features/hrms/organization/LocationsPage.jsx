@@ -20,8 +20,8 @@ export function LocationsPage() {
   const [newLoc, setNewLoc] = useState({ name: '', address: '', timezone: 'EST • UTC-5', type: 'Branch' });
 
   const filtered = locations.filter((l) =>
-    l.name.toLowerCase().includes(q.toLowerCase()) ||
-    l.address.toLowerCase().includes(q.toLowerCase())
+    String(l.name ?? '').toLowerCase().includes(q.toLowerCase()) ||
+    String(l.address ?? '').toLowerCase().includes(q.toLowerCase())
   );
 
   function handleCreate(e) {

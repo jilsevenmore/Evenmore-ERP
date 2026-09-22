@@ -1,35 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import LeadFormsManager from '../leads/LeadFormsManager';
 import LeadGuideModal from '../leads/LeadGuideModal';
 import { defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
-
-function getStoredForms() {
-  try {
-    const raw = localStorage.getItem('dynamicLeadForms');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
-      }
-    }
-  } catch {
-  }
-  return [
-    {
-      id: 'lead-form-default',
-      name: 'LEAD CREATE FORM',
-      description: 'No description provided',
-      createdOn: '13/04/2026',
-      sections: defaultLeadFormSections,
-    },
-  ];
-}
+import { useCrmStore } from '../../../stores/crmStore';
+import { loadForms, saveForms, setActiveFormId, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
 export default function LeadFormsPage() {
   const navigate = useNavigate();
-  const [leadForms, setLeadForms] = useState(getStoredForms);
+  // Forms live at `/crm/forms/`, so a form designed here is the form the
+  // capture page renders for everyone.
+  const storeForms = useCrmStore((s) => s.forms);
+  const [leadForms, setLeadForms] = useState([]);
+  useEffect(() => { setLeadForms(loadForms(LEAD_FORM)); }, [storeForms]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [formName, setFormName] = useState('');
@@ -59,35 +43,22 @@ export default function LeadFormsPage() {
     };
 
     const updated = [...leadForms, newForm];
-    try {
-      localStorage.setItem('dynamicLeadForms', JSON.stringify(updated));
-      localStorage.setItem('activeLeadFormId', newId);
-    } catch {
-    }
-
+    saveForms(updated, LEAD_FORM);
+    setActiveFormId(newId);
     setLeadForms(updated);
     setIsModalOpen(false);
     navigate(`/crm/leads/form-builder?formId=${newId}`);
   }
 
   function handleEditForm(formId) {
-    try {
-      localStorage.setItem('activeLeadFormId', formId);
-    } catch {
-    }
+    setActiveFormId(formId);
     navigate(`/crm/leads/form-builder?formId=${formId}`);
   }
 
   function handleDeleteForm(formId) {
     const updated = leadForms.filter((f) => f.id !== formId);
-    try {
-      localStorage.setItem('dynamicLeadForms', JSON.stringify(updated));
-      const activeId = localStorage.getItem('activeLeadFormId');
-      if (activeId === formId) {
-        localStorage.removeItem('activeLeadFormId');
-      }
-    } catch {
-    }
+    saveForms(updated, LEAD_FORM);
+    if (getActiveFormId() === formId) setActiveFormId(null);
     setLeadForms(updated);
   }
 

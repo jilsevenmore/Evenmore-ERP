@@ -5,8 +5,6 @@ import { Link } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 // ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
 // Before (kept for reference if the CRM dashboard panel is ever re-added):
-// import { dashboardData } from '../../data/crm/dashboardData';
-// import { leads } from '../../data/crm/mockLeads';
 // Reason: the ERP dashboard should compute from live ERP state (invoices, paymentIns,
 //   purchaseBills, items, calculateItemStock), not from static CRM fixture data.
 // import { toISODate, getCurrentISODate } from '../../utils/dateUtils';

@@ -1,81 +1,38 @@
 import { useSyncExternalStore } from 'react';
 
-const KEY = 'evenmore-estimates-v1';
-
-const SEED = [
-  {
-    id: 'est-1',
-    estimateNumber: 'EST-2026-001',
-    customerId: '',
-    customer: 'Acme Corp',
-    leadId: '',
-    leadName: '',
-    date: 'Oct 20, 2026',
-    validUntil: '15 Days',
-    amount: 4800,
-    status: 'Sent',
-    items: [{ id: 'li-1', description: 'Discovery & site survey', qty: 1, rate: 4800, amount: 4800 }],
-  },
-  {
-    id: 'est-2',
-    estimateNumber: 'EST-2026-002',
-    customerId: '',
-    customer: 'Globex Ltd',
-    leadId: '',
-    leadName: '',
-    date: 'Oct 22, 2026',
-    validUntil: '15 Days',
-    amount: 12500,
-    status: 'Draft',
-    items: [{ id: 'li-2', description: 'Pilot hardware bundle', qty: 1, rate: 12500, amount: 12500 }],
-  },
-];
-
-function readStored() {
-  try {
-    if (typeof localStorage === 'undefined') return SEED;
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return SEED;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : SEED;
-  } catch {
-    return SEED;
-  }
-}
-
-let cache = readStored();
 const listeners = new Set();
 
 function emit() {
   listeners.forEach((fn) => {
     try {
       fn();
-    } catch {
-      return;
+    } catch (err) {
+      console.error('[Estimates] subscriber failed:', err);
     }
   });
 }
 
+/**
+ * Estimates are an ERP collection (`/sales/estimates/`), held in ERPContext and
+ * kept current by its persist helpers. This module is the small view of them
+ * the CRM screens import — it exists so those screens do not each have to reach
+ * into the ERP context.
+ */
 export function getEstimates() {
-  return cache;
+  return erpBridge.estimates;
 }
 
-export function setEstimates(next) {
-  cache = Array.isArray(next) ? next : [];
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(KEY, JSON.stringify(cache));
-  } catch {
-    return;
-  }
-  emit();
+export function setEstimates() {
+  // Estimates are written through ERPContext, which owns the API round-trip.
+  console.warn('[Estimates] setEstimates is a no-op: use the ERP context helpers.');
 }
 
 export function addEstimate(entry) {
-  setEstimates([entry, ...getEstimates()]);
+  return erpBridge.addEstimate?.(entry);
 }
 
 export function updateEstimate(id, updates) {
-  setEstimates(getEstimates().map((e) => (e.id === id ? { ...e, ...updates } : e)));
+  return erpBridge.updateEstimate?.(id, updates);
 }
 
 export function subscribeEstimates(fn) {
@@ -87,6 +44,19 @@ export function subscribeEstimates(fn) {
 
 export function useEstimates() {
   return useSyncExternalStore(subscribeEstimates, getEstimates);
+}
+
+/**
+ * ERPContext publishes its estimate collection and helpers here on mount, which
+ * keeps this module free of a React dependency on the provider.
+ */
+const erpBridge = { estimates: [], addEstimate: null, updateEstimate: null };
+
+export function publishEstimates(estimates, helpers = {}) {
+  erpBridge.estimates = Array.isArray(estimates) ? estimates : [];
+  erpBridge.addEstimate = helpers.addEstimate || null;
+  erpBridge.updateEstimate = helpers.updateEstimate || null;
+  emit();
 }
 
 export function estimateMatchesLead(estimate, lead) {

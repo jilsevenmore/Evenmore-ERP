@@ -167,8 +167,8 @@ export const MonthEndAuditPage = () => {
         </div>
       </div>
 
-      <DataTable title="Physical vs Book Count Audit Schedule" columns={columns} data={auditItems} keyExtractor={(a) => a.id} searchPlaceholder="Filter SKU or location..." searchFilter={(a, term) => a.sku.toLowerCase().includes(term) ||
-            a.name.toLowerCase().includes(term) ||
-            a.location.toLowerCase().includes(term)}/>
+      <DataTable title="Physical vs Book Count Audit Schedule" columns={columns} data={auditItems} keyExtractor={(a) => a.id} searchPlaceholder="Filter SKU or location..." searchFilter={(a, term) => String(a.sku ?? '').toLowerCase().includes(term) ||
+            String(a.name ?? '').toLowerCase().includes(term) ||
+            String(a.location ?? '').toLowerCase().includes(term)}/>
     </div>);
 };

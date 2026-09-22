@@ -1,6 +1,7 @@
+import { useState, useEffect } from "react";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useNavigate } from "react-router-dom";
-import { funnelData } from "../../../data/hrms/data/recruitmentData";
+import { pullRecruitmentFunnel } from "../../../services/hrmsSync";
 import PageHeader from "../../../components/ui/PageHeader";
 import { Button } from "../../../components/hrms/Button";
 import {
@@ -14,6 +15,17 @@ import {
 } from "lucide-react";
 
 export default function RecruitmentFunnel() {
+  // `/hrms/recruitment/funnel/` counts each stage server-side.
+  const [funnelData, setFunnelData] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    pullRecruitmentFunnel().then((rows) => {
+      if (cancelled || !rows) return;
+      setFunnelData(Array.isArray(rows) ? rows : rows.stages || []);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const candidates = useRecruitmentStore((s) => s.candidates);
   const navigate = useNavigate();
 

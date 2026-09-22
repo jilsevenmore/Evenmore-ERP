@@ -1,3 +1,4 @@
+import { QuotationWorkflow } from '../../components/common/QuotationWorkflow';
 import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
@@ -27,41 +28,60 @@ const quotationGuide = {
     workflow: ['Quotation Created', 'Customer Approval', 'Convert to Sales Order', 'Warehouse Dispatch', 'Invoiced'],
 };
 export const QuotationsPage = () => {
-    const { customers, quotations, addQuotation, convertQuotationToSalesOrder, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { customers, quotations, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
-    const leadRequest = location.state && location.state.fromLead ? location.state : null;
+    const leadRequest = location.state && (location.state.fromLead || location.state.fromDeal) ? location.state : null;
     const autoOpened = React.useRef(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [selectedQuote, setSelectedQuote] = useState(null);
+    const [selectedQuoteTarget, setSelectedQuote] = useState(null);
+    const selectedQuote = quotations.find(q => q.id === selectedQuoteTarget?.id) || selectedQuoteTarget;
     const [printQuotationTarget, setPrintQuotationTarget] = useState(null);
+    const openedPrintRequest = React.useRef('');
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [validUntil, setValidUntil] = useState('In 30 days');
+    const [quoteDate, setQuoteDate] = useState(new Date().toLocaleDateString('en-CA'));
+    const [dealReference, setDealReference] = useState('');
+    const [terms, setTerms] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const [autoPOState, setAutoPOState] = useState({ isOpen: false, item: null, deficitQty: 0 });
 
     React.useEffect(() => {
         if (!leadRequest || autoOpened.current) return;
         autoOpened.current = true;
-        const match = customers.find((c) => c.name === leadRequest.company) || customers[0];
-        if (match) setSelectedCustomerId(match.id);
+        const match = customers.find((c) => c.id === leadRequest.customerId || c.name === leadRequest.company) || (!leadRequest.fromDeal ? customers[0] : null);
+        setSelectedCustomerId(match?.id || '');
+        if (leadRequest.fromDeal) setDealReference(leadRequest.dealReference || leadRequest.dealId);
         if (Array.isArray(leadRequest.items) && leadRequest.items.length > 0) {
             setLineItems(leadRequest.items.map((it, i) => ({
                 id: `li-${Date.now()}-${i}`,
-                description: it.name,
-                qty: 1,
+                description: it.description || it.name,
+                qty: it.qty ?? 1,
                 rate: it.rate || 0,
-                amount: it.rate || 0,
+                amount: (it.qty ?? 1) * (it.rate || 0),
             })));
         }
         setIsModalOpen(true);
     }, [leadRequest, customers]);
+    React.useEffect(() => {
+        const quoteId = location.state?.quotationId || new URLSearchParams(location.search).get('quotationId');
+        if (quoteId) setSelectedQuote(quotations.find(q => q.id === quoteId) || null);
+        const request = `${location.key}:${quoteId}`;
+        const quote = quotations.find(q => q.id === quoteId);
+        if (quote && new URLSearchParams(location.search).get('print') === 'true' && openedPrintRequest.current !== request) {
+            openedPrintRequest.current = request;
+            setPrintQuotationTarget(quote);
+        }
+    }, [location.state, location.search, location.key, quotations]);
     const totalPipeline = quotations.reduce((sum, q) => sum + (q.amount || 0), 0);
 
     const handleOpenCreateModal = () => {
         setSelectedCustomerId(customers[0]?.id || '');
         setValidUntil('In 30 days');
+        setQuoteDate(new Date().toLocaleDateString('en-CA'));
+        setDealReference('');
+        setTerms('');
         setLineItems([]);
         setIsFullscreen(false);
         setIsModalOpen(true);
@@ -71,6 +91,9 @@ export const QuotationsPage = () => {
         setIsModalOpen(false);
         setSelectedCustomerId(customers[0]?.id || '');
         setValidUntil('In 30 days');
+        setQuoteDate(new Date().toLocaleDateString('en-CA'));
+        setDealReference('');
+        setTerms('');
         setLineItems([]);
         setIsFullscreen(false);
     };
@@ -84,6 +107,8 @@ export const QuotationsPage = () => {
     const handleCloneQuote = (quote) => {
         setSelectedCustomerId(quote.customerId || customers[0]?.id || '');
         setValidUntil(quote.validUntil || 'In 30 days');
+        setDealReference(quote.dealReference || '');
+        setTerms(quote.termsAndConditions || quote.terms || '');
         setLineItems((quote.items || []).map((it) => ({
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -191,16 +216,20 @@ export const QuotationsPage = () => {
     ];
     const handleCreate = (e) => {
         e.preventDefault();
-        const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
-        const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
+        const cust = customers.find((c) => c.id === selectedCustomerId);
+        if (!cust) return;
+        const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
         addQuotation({
             customerId: cust?.id,
             customer: cust?.name || 'Acme Corp',
             leadId: leadRequest?.leadId || '',
             leadName: leadRequest?.leadName || '',
-            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            dealId: leadRequest?.fromDeal ? leadRequest.dealId : undefined,
+            date: quoteDate,
+            dealReference,
+            terms,
             validUntil: validUntil || '30 Days',
-            amount: computedTotal > 0 ? computedTotal : 1500,
+            amount: computedTotal,
             status: 'Draft',
             items: lineItems,
         });
@@ -215,7 +244,7 @@ export const QuotationsPage = () => {
         <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs">
           <FileText size={15} className="text-blue-600 shrink-0" />
           <span className="text-slate-700">
-            Creating quotation for lead <strong className="text-slate-900">{leadRequest.leadName}</strong>
+            Creating quotation for {leadRequest.fromDeal ? 'deal' : 'lead'} <strong className="text-slate-900">{leadRequest.fromDeal ? leadRequest.dealReference : leadRequest.leadName}</strong>
             {leadRequest.company && <span> • {leadRequest.company}</span>}
           </span>
         </div>
@@ -227,9 +256,9 @@ export const QuotationsPage = () => {
         <StatCard label="Confirmed Conversion" value={`${quotations.filter((q) => q.status === 'Confirmed' || q.status === 'Invoiced').length} Quotes`} trend={{ positive: true, text: 'Direct SO conversion' }}/>
       </div>
 
-      <DataTable title="Quotation Register" data={quotations} columns={columns} keyExtractor={(q) => q.id} searchPlaceholder="Search quotations..." searchFilter={(q, term) => q.quoteNumber.toLowerCase().includes(term) ||
-            q.customer.toLowerCase().includes(term) ||
-            q.status.toLowerCase().includes(term)}/>
+      <DataTable title="Quotation Register" data={quotations} columns={columns} keyExtractor={(q) => q.id} searchPlaceholder="Search quotations..." searchFilter={(q, term) => String(q.quoteNumber ?? '').toLowerCase().includes(term) ||
+            String(q.customer ?? '').toLowerCase().includes(term) ||
+            String(q.status ?? '').toLowerCase().includes(term)}/>
 
       {isModalOpen && (<div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-4'}`}>
           <div className={`bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
@@ -260,6 +289,7 @@ export const QuotationsPage = () => {
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
                   <select required value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
+                    <option value="" disabled>Select a customer account</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
@@ -267,7 +297,7 @@ export const QuotationsPage = () => {
                     ))}
                   </select>
                   {(() => {
-                    const cust = customers.find(c => c.id === selectedCustomerId) || customers[0];
+                    const cust = customers.find(c => c.id === selectedCustomerId);
                     if (!cust) return null;
                     return (
                       <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
@@ -292,6 +322,7 @@ export const QuotationsPage = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><label className="font-semibold text-slate-700">Quote Date<input required type="date" value={quoteDate} onChange={event => setQuoteDate(event.target.value)} className="block mt-1 w-full p-2 border border-slate-300 rounded"/></label><label className="font-semibold text-slate-700">Deal Reference (optional)<input value={dealReference} onChange={event => setDealReference(event.target.value)} placeholder="Existing deal reference" className="block mt-1 w-full p-2 border border-slate-300 rounded"/></label></div>
               <div>
                 <label className="font-semibold text-slate-700 block mb-2">Quotation Line Items</label>
                 <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" onRequestPO={(item, deficitQty) => {
@@ -303,6 +334,7 @@ export const QuotationsPage = () => {
             }}/>
               </div>
 
+              <label className="block font-semibold text-slate-700">Terms & Conditions<textarea rows="3" value={terms} onChange={event => setTerms(event.target.value)} placeholder="Payment terms, validity and delivery conditions" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
                   Cancel
@@ -345,6 +377,11 @@ export const QuotationsPage = () => {
             </div>
 
             <div className="space-y-6 mt-4 overflow-y-auto pr-1 flex-1">
+              <QuotationWorkflow key={selectedQuote.id} quotation={selectedQuote} initialMode={(location.state?.sendQuotation || new URLSearchParams(location.search).has('send')) ? 'send' : ''} onDownload={() => setPrintQuotationTarget(selectedQuote)} onChallan={() => {
+                const challan = convertQuotationToDeliveryChallan(selectedQuote.id);
+                if (challan) navigate('/sales/delivery', { state: { challanId: challan.id } });
+              }}/>
+
               <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div>
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Client Account</span>
@@ -385,6 +422,7 @@ export const QuotationsPage = () => {
         isOpen={Boolean(printQuotationTarget)}
         onClose={() => setPrintQuotationTarget(null)}
         quotation={printQuotationTarget}
+        onPrint={() => recordQuotationActivity(printQuotationTarget.id, 'PDF print requested')}
       />
     </div>);
 };

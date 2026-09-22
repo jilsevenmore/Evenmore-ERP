@@ -24,6 +24,7 @@ import {
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
+import { markEventNotificationRead } from '../../services/crmEventNotifications';
 
 const THEMES = [
   { id: 'light', name: 'Enterprise Light', icon: Sun, desc: 'Clean high-contrast corporate palette', color: '#1f6bff' },
@@ -473,6 +474,7 @@ export default function Topbar() {
                           <div
                             key={n.id}
                             onClick={() => {
+                              if (n.eventId) markEventNotificationRead(n.eventId);
                               if (n.path) navigate(n.path);
                               setIsNotifOpen(false);
                             }}

@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { questionsMock } from "../../../data/hrms/data/recruitmentData";
+import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/hrms/Button";
-import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../../../components/ui/PageHeader";
