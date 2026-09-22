@@ -4214,6 +4214,7 @@ export const ERPProvider = ({ children, }) => {
             newCard.coverageStatus = calculateWarrantyCoverageStatus(newCard.startDate, newCard.expiryDate, newCard.documentStatus);
         }
         setWarranties((prev) => [newCard, ...prev]);
+        persistCreate('warranties', newCard, setWarranties);
         showToast(`Warranty Card ${newCard.cardNumber} saved.`);
         return newCard;
     };
@@ -4231,19 +4232,24 @@ export const ERPProvider = ({ children, }) => {
             }
             return updated;
         }));
+        persistUpdate('warranties', id, updates, setWarranties);
         showToast('Warranty Card updated successfully.');
     };
 
     const cancelWarrantyCard = (id, reason = '') => {
+        const updates = {
+            documentStatus: 'Cancelled',
+            coverageStatus: 'Cancelled',
+            cancellationReason: reason,
+        };
         setWarranties((prev) => prev.map((w) => {
             if (w.id !== id && w.cardNumber !== id) return w;
             return {
                 ...w,
-                documentStatus: 'Cancelled',
-                coverageStatus: 'Cancelled',
-                cancellationReason: reason || w.cancellationReason,
+                ...updates,
             };
         }));
+        persistUpdate('warranties', id, updates, setWarranties);
         showToast('Warranty Card marked as Void / Cancelled.');
     };
 
@@ -4252,34 +4258,43 @@ export const ERPProvider = ({ children, }) => {
     };
 
     const suspendWarrantyCard = (id, reason = '') => {
+        const updates = {
+            coverageStatus: 'Suspended',
+            documentStatus: 'Suspended',
+            suspendReason: reason || 'Temporarily suspended on hold',
+        };
         setWarranties((prev) => prev.map((w) => {
             if (w.id !== id && w.cardNumber !== id) return w;
             return {
                 ...w,
-                coverageStatus: 'Suspended',
-                documentStatus: 'Suspended',
-                suspendReason: reason || 'Temporarily suspended on hold',
+                ...updates,
             };
         }));
+        persistUpdate('warranties', id, updates, setWarranties);
         showToast('Warranty coverage paused / suspended.');
     };
 
     const resumeWarrantyCard = (id) => {
+        const updates = {
+            documentStatus: 'Generated',
+            suspendReason: undefined,
+        };
         setWarranties((prev) => prev.map((w) => {
             if (w.id !== id && w.cardNumber !== id) return w;
             const updated = {
                 ...w,
-                documentStatus: 'Generated',
-                suspendReason: undefined,
+                ...updates,
             };
             updated.coverageStatus = calculateWarrantyCoverageStatus(updated.startDate, updated.expiryDate, updated.documentStatus);
             return updated;
         }));
+        persistUpdate('warranties', id, updates, setWarranties);
         showToast('Warranty coverage resumed to Active.');
     };
 
     const deleteWarrantyCard = (id) => {
         setWarranties((prev) => prev.filter((w) => w.id !== id && w.cardNumber !== id));
+        persistDelete('warranties', id);
         showToast('Warranty draft deleted.');
     };
 

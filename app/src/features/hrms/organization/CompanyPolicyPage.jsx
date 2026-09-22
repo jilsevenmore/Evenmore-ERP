@@ -125,10 +125,23 @@ export function LegacyCompanyPolicyPage() {
     showToast(`Policy ${id} acknowledged successfully!`);
   };
 
+  const addPolicy = usePolicyStore((s) => s.addPolicy);
+
   const handleCreatePolicy = (e) => {
     e.preventDefault();
     if (!newPolicy.title) return;
-    const created = {
+    const added = addPolicy ? addPolicy({
+      name: newPolicy.title,
+      title: newPolicy.title,
+      category: newPolicy.category,
+      ownerDept: newPolicy.dept,
+      dept: newPolicy.dept,
+      version: newPolicy.version,
+      content: newPolicy.content,
+      status: "Published",
+      author: "Adarsh Gupta",
+    }) : null;
+    const created = added || {
       id: `POL-0${policies.length + 1}`,
       ...newPolicy,
       status: "Published",
@@ -137,11 +150,11 @@ export function LegacyCompanyPolicyPage() {
       ackedCount: 1,
       totalCount: 1248,
     };
-    setPolicies([created, ...policies]);
+    setPolicies((prev) => [created, ...prev]);
     setSelectedPolicy(created);
     setIsModalOpen(false);
     setNewPolicy({ title: "", category: "Workplace", version: "v1.0", dept: "All Staff", content: "" });
-    showToast(`Policy "${created.title}" published`);
+    showToast(`Policy "${created.title || created.name}" published`);
   };
 
   const currentAcked = acknowledgedMap[selectedPolicy.id];

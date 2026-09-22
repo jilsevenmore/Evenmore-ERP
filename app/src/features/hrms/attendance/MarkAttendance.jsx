@@ -225,8 +225,24 @@ export default function MarkAttendance() {
     setRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
+  function formatAttendanceRows(targetRows) {
+    return targetRows.map((r) => {
+      const emp = (storeEmployees || []).find(
+        (e) => e.empId === r.id || e.id === r.id || e.name === r.name
+      );
+      return {
+        ...r,
+        employeeId: emp?.id || r.id,
+        date: date,
+        checkIn: r.checkIn ? (r.checkIn.includes('T') ? r.checkIn : `${date}T${r.checkIn.length === 5 ? r.checkIn + ':00' : r.checkIn}`) : null,
+        checkOut: r.checkOut ? (r.checkOut.includes('T') ? r.checkOut : `${date}T${r.checkOut.length === 5 ? r.checkOut + ':00' : r.checkOut}`) : null,
+      };
+    });
+  }
+
   function handleSave() {
-    saveDailyAttendance(date, rows);
+    const formatted = formatAttendanceRows(rows);
+    saveDailyAttendance(date, formatted);
     setToast(`Attendance saved for ${rows.length} employees on ${date}`);
   }
 
@@ -410,7 +426,8 @@ export default function MarkAttendance() {
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => {
           const selectedIds = rows.filter((r) => r.checked).map((r) => r.id);
-          saveDailyAttendance(date, rows);
+          const formatted = formatAttendanceRows(rows);
+          saveDailyAttendance(date, formatted);
           setConfirmOpen(false);
           setToast(`Attendance saved for ${selectedIds.length || rows.length} employees`);
         }}

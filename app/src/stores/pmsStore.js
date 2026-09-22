@@ -1919,6 +1919,7 @@ const usePmsStoreBase = create((set, get) => ({
     // copies the order's commercial detail and instantiates the chosen stage
     // templates in one write (api.md §10.2), so none of that is done here.
     const created = await pmsApi.createProjectFromOrder({
+      salesOrderId: order.id ?? order.orderNumber,
       orderId: order.id ?? order.orderNumber,
       orderNumber: order.orderNumber ?? order.id,
       projectManagerId: projectManager.id,

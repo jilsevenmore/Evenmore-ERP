@@ -1,15 +1,22 @@
 import React, { useMemo, useState } from 'react';
 import {
-  ChevronLeft, ChevronRight, ZoomIn, ZoomOut, MessageSquare, Send, FileText,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
+  ZoomOut,
+  MessageSquare,
+  Send,
+  FileText,
+  Image as ImageIcon,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
 
 /**
- * MockPdfViewer — stand-in proof renderer with a side-by-side comment stream.
+ * MockPdfViewer — proof renderer with photo/PDF support and comment stream.
  *
- * There is no backend and no real PDF, so the "pages" are drawn as a technical
- * sheet from the document's own metadata. Comments are local to the viewer
- * session: a proof's durable feedback is the revision reason captured by the
- * approval decision, which is what the designer actually acts on.
+ * Renders real uploaded photos and PDFs when available from user uploads,
+ * or gracefully displays a technical schematic blueprint for simulated mock proofs.
  */
 
 function pageCountFor(doc) {
@@ -33,6 +40,41 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
   const pages = useMemo(() => pageCountFor(doc), [doc]);
   const safePage = Math.min(page, pages);
 
+  const fileSource =
+    doc?.fileData ||
+    (doc?.previewUrl && !doc.previewUrl.startsWith('/mock/') ? doc.previewUrl : null);
+  const hasRealFile = Boolean(fileSource);
+  const isImage =
+    doc?.fileType?.startsWith('image/') ||
+    doc?.fileData?.startsWith('data:image/') ||
+    /\.(png|jpe?g|webp|gif|svg)($|\?)/i.test(doc?.fileName || '') ||
+    /\.(png|jpe?g|webp|gif|svg)($|\?)/i.test(fileSource || '');
+  const isPdf =
+    doc?.fileType === 'application/pdf' ||
+    doc?.fileData?.startsWith('data:application/pdf') ||
+    /\.pdf($|\?)/i.test(doc?.fileName || '') ||
+    /\.pdf($|\?)/i.test(fileSource || '');
+
+  function handleOpenExternal() {
+    if (!fileSource) return;
+    const win = window.open();
+    if (win) {
+      if (isImage) {
+        win.document.write(`
+          <!DOCTYPE html>
+          <html>
+            <head><title>${doc.fileName}</title></head>
+            <body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;overflow:auto;">
+              <img src="${fileSource}" alt="${doc.fileName}" style="max-width:96%;max-height:96vh;object-fit:contain;box-shadow:0 10px 30px rgba(0,0,0,0.5);border-radius:6px;" />
+            </body>
+          </html>
+        `);
+      } else {
+        win.location.href = fileSource;
+      }
+    }
+  }
+
   if (!doc) {
     return (
       <div className="rounded-xl border border-dashed border-[#dce5f4] bg-[#f6f9ff] p-10 text-center">
@@ -55,112 +97,185 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-4">
       {/* Preview pane */}
-      <div className="rounded-xl border border-[#dce5f4] bg-white overflow-hidden">
+      <div className="rounded-xl border border-[#dce5f4] bg-white overflow-hidden flex flex-col">
         {/* Toolbar */}
         <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-[#dce5f4] bg-[#f6f9ff] flex-wrap">
           <div className="flex items-center gap-1.5 min-w-0">
-            <FileText size={13} className="text-slate-400 shrink-0" />
+            {isImage ? (
+              <ImageIcon size={13} className="text-blue-500 shrink-0" />
+            ) : (
+              <FileText size={13} className={isPdf ? 'text-rose-500 shrink-0' : 'text-slate-400 shrink-0'} />
+            )}
             <span className="text-[11px] font-semibold text-slate-700 truncate" title={doc.fileName}>
               {doc.fileName}
             </span>
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 shrink-0">
               v{doc.version}.0
             </span>
+            {hasRealFile && (
+              <span
+                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
+                  isImage
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-rose-100 text-rose-700'
+                }`}
+              >
+                {isImage ? 'Photo' : 'PDF'}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.max(0.6, Math.round((z - 0.2) * 10) / 10))}
-              disabled={zoom <= 0.6}
-              aria-label="Zoom out"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ZoomOut size={13} />
-            </button>
-            <span className="text-[10px] font-semibold text-slate-500 w-9 text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.min(1.6, Math.round((z + 0.2) * 10) / 10))}
-              disabled={zoom >= 1.6}
-              aria-label="Zoom in"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ZoomIn size={13} />
-            </button>
+            {(!hasRealFile || isImage) && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.max(0.6, Math.round((z - 0.2) * 10) / 10))}
+                  disabled={zoom <= 0.6}
+                  aria-label="Zoom out"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ZoomOut size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom(1)}
+                  aria-label="Reset zoom"
+                  className="text-[10px] font-semibold text-slate-500 hover:text-blue-600 px-1 py-0.5 rounded"
+                  title="Click to reset zoom"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom((z) => Math.min(2.0, Math.round((z + 0.2) * 10) / 10))}
+                  disabled={zoom >= 2.0}
+                  aria-label="Zoom in"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ZoomIn size={13} />
+                </button>
+              </>
+            )}
 
-            <span className="w-px h-4 bg-slate-200 mx-1" />
+            {!hasRealFile && (
+              <>
+                <span className="w-px h-4 bg-slate-200 mx-1" />
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage <= 1}
+                  aria-label="Previous page"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-[10px] font-semibold text-slate-600" data-test="pdf-page">
+                  {safePage} / {pages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
+                  disabled={safePage >= pages}
+                  aria-label="Next page"
+                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </>
+            )}
 
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={safePage <= 1}
-              aria-label="Previous page"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ChevronLeft size={14} />
-            </button>
-            <span className="text-[10px] font-semibold text-slate-600" data-test="pdf-page">
-              {safePage} / {pages}
-            </span>
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(pages, p + 1))}
-              disabled={safePage >= pages}
-              aria-label="Next page"
-              className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-            >
-              <ChevronRight size={14} />
-            </button>
+            {hasRealFile && (
+              <>
+                <span className="w-px h-4 bg-slate-200 mx-1" />
+                <a
+                  href={fileSource}
+                  download={doc.fileName}
+                  className="p-1 rounded text-slate-500 hover:bg-white hover:text-blue-600 transition-colors"
+                  title="Download to PC"
+                >
+                  <Download size={13} />
+                </a>
+                <button
+                  type="button"
+                  onClick={handleOpenExternal}
+                  className="p-1 rounded text-slate-500 hover:bg-white hover:text-blue-600 transition-colors"
+                  title="Open full preview in new tab"
+                >
+                  <ExternalLink size={13} />
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Mock sheet */}
-        <div className="p-5 bg-slate-100 flex justify-center overflow-auto" style={{ minHeight: 340 }}>
-          <div
-            className="bg-white border border-slate-300 shadow-sm"
-            style={{
-              width: 460 * zoom,
-              minHeight: 300 * zoom,
-              transition: 'width 0.2s ease',
-              padding: 16 * zoom,
-            }}
-          >
-            <div className="border-2 border-slate-800 h-full flex flex-col" style={{ minHeight: 268 * zoom }}>
-              <div className="border-b-2 border-slate-800 px-3 py-2 text-center">
-                <p className="font-bold text-slate-800 tracking-wide" style={{ fontSize: 11 * zoom }}>
-                  TECHNICAL BLUEPRINT — {(projectName ?? 'ASSEMBLY').toUpperCase()}
-                </p>
-              </div>
+        {/* Content Viewer: Real Photo, Real PDF, or Fallback Blueprint */}
+        {hasRealFile && isImage ? (
+          <div className="p-6 bg-slate-900/5 flex items-center justify-center overflow-auto min-h-[380px] max-h-[580px]">
+            <img
+              src={fileSource}
+              alt={doc.fileName}
+              className="max-w-full rounded-lg shadow-sm border border-slate-200 object-contain transition-transform duration-150"
+              style={{
+                transform: `scale(${zoom})`,
+                transformOrigin: 'center center',
+              }}
+            />
+          </div>
+        ) : hasRealFile && isPdf ? (
+          <div className="w-full bg-slate-100 min-h-[480px] h-[58vh] overflow-hidden">
+            <iframe
+              src={fileSource}
+              title={doc.fileName}
+              className="w-full h-full border-0"
+            />
+          </div>
+        ) : (
+          /* Mock sheet fallback */
+          <div className="p-5 bg-slate-100 flex justify-center overflow-auto" style={{ minHeight: 340 }}>
+            <div
+              className="bg-white border border-slate-300 shadow-sm"
+              style={{
+                width: 460 * zoom,
+                minHeight: 300 * zoom,
+                transition: 'width 0.2s ease',
+                padding: 16 * zoom,
+              }}
+            >
+              <div className="border-2 border-slate-800 h-full flex flex-col" style={{ minHeight: 268 * zoom }}>
+                <div className="border-b-2 border-slate-800 px-3 py-2 text-center">
+                  <p className="font-bold text-slate-800 tracking-wide" style={{ fontSize: 11 * zoom }}>
+                    TECHNICAL BLUEPRINT — {(projectName ?? 'ASSEMBLY').toUpperCase()}
+                  </p>
+                </div>
 
-              <div className="flex-1 flex items-center justify-center p-4">
-                {/* A deliberately schematic drawing, not a fake screenshot. */}
-                <svg viewBox="0 0 200 120" style={{ width: 240 * zoom, height: 144 * zoom }} role="img" aria-label="Schematic drawing">
-                  <rect x="20" y="20" width="160" height="80" fill="none" stroke="#334155" strokeWidth="2" />
-                  <rect x="34" y="34" width="60" height="52" fill="none" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
-                  <circle cx="140" cy="46" r="8" fill="none" stroke="#334155" strokeWidth="1.5" />
-                  <circle cx="140" cy="76" r="8" fill="none" stroke="#334155" strokeWidth="1.5" />
-                  <line x1="20" y1="110" x2="180" y2="110" stroke="#64748b" strokeWidth="0.8" />
-                  <text x="100" y="117" textAnchor="middle" fontSize="7" fill="#64748b">2200 mm</text>
-                  <text x="46" y="64" fontSize="7" fill="#94a3b8">PANEL {safePage}</text>
-                </svg>
-              </div>
+                <div className="flex-1 flex items-center justify-center p-4">
+                  {/* A deliberately schematic drawing, not a fake screenshot. */}
+                  <svg viewBox="0 0 200 120" style={{ width: 240 * zoom, height: 144 * zoom }} role="img" aria-label="Schematic drawing">
+                    <rect x="20" y="20" width="160" height="80" fill="none" stroke="#334155" strokeWidth="2" />
+                    <rect x="34" y="34" width="60" height="52" fill="none" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
+                    <circle cx="140" cy="46" r="8" fill="none" stroke="#334155" strokeWidth="1.5" />
+                    <circle cx="140" cy="76" r="8" fill="none" stroke="#334155" strokeWidth="1.5" />
+                    <line x1="20" y1="110" x2="180" y2="110" stroke="#64748b" strokeWidth="0.8" />
+                    <text x="100" y="117" textAnchor="middle" fontSize="7" fill="#64748b">2200 mm</text>
+                    <text x="46" y="64" fontSize="7" fill="#94a3b8">PANEL {safePage}</text>
+                  </svg>
+                </div>
 
-              <div className="border-t-2 border-slate-800 px-3 py-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
-                {SHEET_META.map(([k, v]) => (
-                  <span key={k} className="text-slate-600" style={{ fontSize: 8 * zoom }}>
-                    <strong>{k}:</strong> {v}
+                <div className="border-t-2 border-slate-800 px-3 py-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
+                  {SHEET_META.map(([k, v]) => (
+                    <span key={k} className="text-slate-600" style={{ fontSize: 8 * zoom }}>
+                      <strong>{k}:</strong> {v}
+                    </span>
+                  ))}
+                  <span className="text-slate-400 ml-auto" style={{ fontSize: 8 * zoom }}>
+                    Sheet {safePage} of {pages}
                   </span>
-                ))}
-                <span className="text-slate-400 ml-auto" style={{ fontSize: 8 * zoom }}>
-                  Sheet {safePage} of {pages}
-                </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Comment stream */}

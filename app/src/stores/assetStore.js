@@ -35,9 +35,8 @@ const useAssetStoreBase = create((set, get) => ({
       dept: assetData.dept || "General",
       status: assetData.status || (assetData.assignedTo && assetData.assignedTo !== "IT Stock Reserve" ? "Assigned" : "Available"),
       condition: assetData.condition || "Excellent",
-      purchaseDate: assetData.purchaseDate || today,
-      purchaseCost: assetData.purchaseCost || "—",
-      warrantyExpiry: assetData.warrantyExpiry || "—",
+      purchaseCost: (assetData.purchaseCost && assetData.purchaseCost !== "—") ? assetData.purchaseCost : null,
+      warrantyExpiry: (assetData.warrantyExpiry && assetData.warrantyExpiry !== "—") ? assetData.warrantyExpiry : null,
       notes: assetData.notes || "",
       history: [
         {

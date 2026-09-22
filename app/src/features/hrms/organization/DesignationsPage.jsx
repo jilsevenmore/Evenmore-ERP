@@ -54,7 +54,10 @@ export function DesignationsPage() {
     setDesignations([created, ...designations]);
     try {
       if (isBackendEnabled()) {
-        await hrmsSync.create('designations', created);
+        const saved = await hrmsSync.create('designations', created);
+        if (saved?.id) {
+          setDesignations((prev) => prev.map((d) => (d.id === created.id ? saved : d)));
+        }
       }
     } catch (err) {
       console.warn('[DesignationsPage] Failed to create designation on server:', err);

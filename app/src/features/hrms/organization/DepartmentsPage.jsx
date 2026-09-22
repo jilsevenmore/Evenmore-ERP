@@ -70,7 +70,10 @@ export function DepartmentsPage() {
     setDepartments([created, ...departments]);
     try {
       if (isBackendEnabled()) {
-        await hrmsSync.create('departments', created);
+        const saved = await hrmsSync.create('departments', created);
+        if (saved?.id) {
+          setDepartments((prev) => prev.map((d) => (d.id === created.id ? saved : d)));
+        }
       }
     } catch (err) {
       console.warn('[DepartmentsPage] Failed to create department on server:', err);

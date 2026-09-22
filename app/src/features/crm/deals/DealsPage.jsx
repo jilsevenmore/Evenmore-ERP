@@ -398,31 +398,37 @@ export default function DealsPage() {
     const avatarColor = getAvatarColorFromName(formState.client);
 
     if (editingDeal) {
+      const updatedFields = {
+        name: formState.name.trim(),
+        title: formState.name.trim(),
+        price: priceNum,
+        value: priceNum,
+        client: formState.client.trim(),
+        initials,
+        avatarColor,
+        phone: formState.phone.trim(),
+        product: formState.product,
+        stage: formState.stage,
+        source: formState.source,
+        assignedUser: formState.assignedUser,
+        date: formState.date || editingDeal.date,
+        tag: formState.tag || editingDeal.tag,
+      };
       setDeals((prev) =>
         prev.map((d) =>
           d.id === editingDeal.id
-            ? {
-                ...d,
-                name: formState.name.trim(),
-                price: priceNum,
-                client: formState.client.trim(),
-                initials,
-                avatarColor: d.avatarColor || avatarColor,
-                phone: formState.phone.trim(),
-                product: formState.product,
-                stage: formState.stage,
-                source: formState.source,
-                assignedUser: formState.assignedUser,
-                date: formState.date || d.date,
-                tag: formState.tag || d.tag,
-              }
+            ? { ...d, ...updatedFields }
             : d
         )
       );
+      useCrmStore.getState().updateRecord('deals', editingDeal.id, updatedFields).catch(console.warn);
       showNotification(`Deal "${formState.name.trim()}" updated successfully!`);
     } else {
       const newDeal = buildDeal(formState);
       setDeals((prev) => [newDeal, ...prev]);
+      useCrmStore.getState().createRecord('deals', newDeal).catch((err) => {
+        console.warn('[CRM Deals] Server save error:', err);
+      });
       showNotification(`New deal "${newDeal.name}" added!`);
     }
 
@@ -432,7 +438,11 @@ export default function DealsPage() {
 
   const handleDeleteDeal = () => {
     if (!dealToDelete) return;
-    setDeals((prev) => prev.filter((d) => d.id !== dealToDelete.id));
+    const targetId = dealToDelete.id;
+    setDeals((prev) => prev.filter((d) => d.id !== targetId));
+    useCrmStore.getState().deleteRecord('deals', targetId).catch((err) => {
+      console.warn('[CRM Deals] Server delete error:', err);
+    });
     showNotification(`Deal "${dealToDelete.name}" deleted.`);
     setDealToDelete(null);
   };
@@ -450,6 +460,9 @@ export default function DealsPage() {
       )
     );
     setOpenMenuDealId(null);
+    useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage }).catch((err) => {
+      console.warn('[CRM Deals] Server stage update error:', err);
+    });
     showNotification(`Deal moved to ${targetStage}`);
   };
 

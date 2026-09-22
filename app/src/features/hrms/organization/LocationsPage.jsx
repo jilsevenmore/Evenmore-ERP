@@ -50,7 +50,10 @@ export function LocationsPage() {
     ]);
     try {
       if (isBackendEnabled()) {
-        await hrmsSync.create('locations', created);
+        const saved = await hrmsSync.create('locations', created);
+        if (saved?.id) {
+          setLocations((prev) => prev.map((l) => (l.id === created.id ? saved : l)));
+        }
       }
     } catch (err) {
       console.warn('[LocationsPage] Failed to create location on server:', err);

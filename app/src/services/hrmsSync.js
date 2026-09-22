@@ -186,8 +186,30 @@ export const HRMS_RESOURCES = {
   policies: dated('/hrms/policies/', ['effectiveDate', 'publishedDate']),
   policyCategories: plain('/hrms/policy-categories/'),
 
-  // ── assets ────────────────────────────────────────────────────────────────
-  assets: dated('/hrms/assets/', ['purchaseDate', 'warrantyExpiry']),
+  assets: {
+    path: '/hrms/assets/',
+    toApi: (a) => compact({
+      name: a.name,
+      categoryId: a.categoryId || undefined,
+      employeeId: a.employeeId || undefined,
+      serialNumber: a.serialNumber || undefined,
+      condition: a.condition || undefined,
+      status: a.status || undefined,
+      location: a.location || undefined,
+      notes: a.notes || undefined,
+      purchaseDate: isoOut(a.purchaseDate),
+      warrantyExpiry: isoOut(a.warrantyExpiry),
+      purchaseCost: (a.purchaseCost != null && a.purchaseCost !== '—' && !isNaN(Number(String(a.purchaseCost).replace(/[^0-9.-]+/g, ''))))
+        ? Number(String(a.purchaseCost).replace(/[^0-9.-]+/g, ''))
+        : null,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      purchaseDate: displayIn(row.purchaseDate),
+      warrantyExpiry: displayIn(row.warrantyExpiry),
+      _synced: true,
+    }),
+  },
   assetCategories: plain('/hrms/asset-categories/'),
   assetRequests: dated('/hrms/asset-requests/', ['requestDate']),
 

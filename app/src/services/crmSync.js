@@ -102,9 +102,17 @@ function leadToApi(lead) {
 
 function dealFromApi(row) {
   return {
-    ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes']),
-    expectedCloseDate: displayIn(row.expectedCloseDate),
+    ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes', 'stage']),
+    id: row.id,
+    name: row.title || row.name,
+    title: row.title || row.name,
+    client: row.customerName || row.client || '',
+    customerId: row.customerId || undefined,
+    stage: row.stage || 'Draft',
+    price: num(row.value ?? row.amount),
     value: num(row.value ?? row.amount),
+    expectedCloseDate: displayIn(row.expectedCloseDate || row.expected_close_date),
+    date: displayIn(row.expectedCloseDate || row.expected_close_date || row.created_at),
     _synced: true,
   };
 }
@@ -113,13 +121,13 @@ function dealToApi(deal) {
   return compact({
     title: deal.title || deal.name,
     leadId: deal.leadId || undefined,
-    partyId: deal.partyId || deal.customerId || undefined,
-    stageId: deal.stageId || undefined,
+    customerId: deal.customerId || deal.partyId || undefined,
+    stage: deal.stage || undefined,
     ownerId: deal.ownerId || undefined,
-    value: deal.value !== undefined ? num(deal.value) : undefined,
+    value: deal.value !== undefined ? num(deal.value) : (deal.price !== undefined ? num(deal.price) : undefined),
     currency: deal.currency || undefined,
     probability: deal.probability !== undefined ? num(deal.probability) : undefined,
-    expectedCloseDate: isoOut(deal.expectedCloseDate),
+    expectedCloseDate: isoOut(deal.expectedCloseDate || deal.date),
     status: deal.status || undefined,
     lostReasonId: deal.lostReasonId || undefined,
     notes: deal.notes || undefined,

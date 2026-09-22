@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { hrmsSync } from '../../../services/hrmsSync';
+import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Link, useSearchParams } from "react-router-dom";
 import {
   ShieldCheck,
@@ -247,6 +247,9 @@ export default function HRAdminPage({ defaultTab }) {
             : t
         )
       );
+      if (isBackendEnabled()) {
+        hrmsSync.update('teams', editingTeam.id, newTeam).catch(console.warn);
+      }
       showToast(`Team "${newTeam.name}" updated successfully`);
     } else {
       const created = {
@@ -255,6 +258,13 @@ export default function HRAdminPage({ defaultTab }) {
         members: Number(newTeam.members) || 1,
       };
       setTeams([...teams, created]);
+      if (isBackendEnabled()) {
+        hrmsSync.create('teams', created).then((saved) => {
+          if (saved?.id) {
+            setTeams((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
+          }
+        }).catch(console.warn);
+      }
       showToast(`Team "${created.name}" created successfully`);
     }
     setIsTeamModalOpen(false);
@@ -264,6 +274,9 @@ export default function HRAdminPage({ defaultTab }) {
   const handleDeleteTeam = (id, name) => {
     if (window.confirm(`Are you sure you want to remove team "${name}"?`)) {
       setTeams((prev) => prev.filter((t) => t.id !== id));
+      if (isBackendEnabled()) {
+        hrmsSync.remove('teams', id).catch(console.warn);
+      }
       showToast(`Team "${name}" removed`);
     }
   };
@@ -296,6 +309,9 @@ export default function HRAdminPage({ defaultTab }) {
       setApprovalChains((prev) =>
         prev.map((c) => (c.id === editingChain.id ? { ...c, ...newChain } : c))
       );
+      if (isBackendEnabled()) {
+        hrmsSync.update('approvalChains', editingChain.id, newChain).catch(console.warn);
+      }
       showToast(`Approval chain for "${newChain.module}" updated`);
     } else {
       const created = {
@@ -304,6 +320,13 @@ export default function HRAdminPage({ defaultTab }) {
         status: newChain.status || "Active",
       };
       setApprovalChains([...approvalChains, created]);
+      if (isBackendEnabled()) {
+        hrmsSync.create('approvalChains', created).then((saved) => {
+          if (saved?.id) {
+            setApprovalChains((prev) => prev.map((c) => (c.id === created.id ? saved : c)));
+          }
+        }).catch(console.warn);
+      }
       showToast(`Approval chain for "${created.module}" configured`);
     }
     setIsChainModalOpen(false);
@@ -315,6 +338,9 @@ export default function HRAdminPage({ defaultTab }) {
       prev.map((c) => {
         if (c.id !== id) return c;
         const next = c.status === "Active" ? "Inactive" : "Active";
+        if (isBackendEnabled()) {
+          hrmsSync.update('approvalChains', id, { status: next }).catch(console.warn);
+        }
         showToast(`Workflow status for ${c.module} set to ${next}`);
         return { ...c, status: next };
       })
@@ -324,6 +350,9 @@ export default function HRAdminPage({ defaultTab }) {
   const handleDeleteChain = (id, module) => {
     if (window.confirm(`Remove approval workflow for "${module}"?`)) {
       setApprovalChains((prev) => prev.filter((c) => c.id !== id));
+      if (isBackendEnabled()) {
+        hrmsSync.remove('approvalChains', id).catch(console.warn);
+      }
       showToast(`Approval chain for "${module}" removed`);
     }
   };
@@ -339,6 +368,13 @@ export default function HRAdminPage({ defaultTab }) {
       createdAt: new Date().toISOString().split("T")[0],
     };
     setTerminations([created, ...terminations]);
+    if (isBackendEnabled()) {
+      hrmsSync.create('terminations', created).then((saved) => {
+        if (saved?.id) {
+          setTerminations((prev) => prev.map((t) => (t.id === created.id ? saved : t)));
+        }
+      }).catch(console.warn);
+    }
     setIsTerminationModalOpen(false);
     setActiveTerminationLetter(created);
     setIsTerminationLetterModalOpen(true);
@@ -363,6 +399,9 @@ export default function HRAdminPage({ defaultTab }) {
     setTerminations((prev) =>
       prev.map((t) => (t.id === updated.id ? updated : t))
     );
+    if (isBackendEnabled()) {
+      hrmsSync.update('terminations', updated.id, updated).catch(console.warn);
+    }
     setActiveTerminationLetter(updated);
     showToast(`Termination letter & record updated`);
   };
@@ -372,6 +411,9 @@ export default function HRAdminPage({ defaultTab }) {
       prev.map((t) => {
         if (t.id !== id) return t;
         const nextStatus = t.status === "Completed" ? "In Exit Clearance" : "Completed";
+        if (isBackendEnabled()) {
+          hrmsSync.update('terminations', id, { status: nextStatus }).catch(console.warn);
+        }
         showToast(`Termination status set to ${nextStatus}`);
         return { ...t, status: nextStatus };
       })
@@ -412,6 +454,13 @@ export default function HRAdminPage({ defaultTab }) {
       status: "Pending Manager Review",
     };
     setResignations([created, ...resignations]);
+    if (isBackendEnabled()) {
+      hrmsSync.create('resignations', created).then((saved) => {
+        if (saved?.id) {
+          setResignations((prev) => prev.map((r) => (r.id === created.id ? saved : r)));
+        }
+      }).catch(console.warn);
+    }
     setIsResignationModalOpen(false);
 
     updateEmployeeStatus?.(created.employee, "Notice Period");
@@ -435,11 +484,16 @@ export default function HRAdminPage({ defaultTab }) {
       prev.map((r) => {
         if (r.id !== id) return r;
         const next =
-          r.status.includes("Pending")
-            ? "Approved & Serving Notice"
-            : r.status.includes("Approved")
-            ? "Clearance in Progress"
-            : "Approved & Serving Notice";
+          r.status === "Pending Manager Review"
+            ? "Exit Interview Scheduled"
+            : r.status === "Exit Interview Scheduled"
+            ? "Clearance In Progress"
+            : r.status === "Clearance In Progress"
+            ? "Relieved & Completed"
+            : "Pending Manager Review";
+        if (isBackendEnabled()) {
+          hrmsSync.update('resignations', id, { status: next }).catch(console.warn);
+        }
         showToast(`Resignation status updated to ${next}`);
         return { ...r, status: next };
       })
@@ -449,15 +503,21 @@ export default function HRAdminPage({ defaultTab }) {
   // ── Complaint / Grievance Handlers ─────────────────────────
   const handleCreateComplaint = (e) => {
     e.preventDefault();
-    if (!newComplaint.summary) return;
+    if (!newComplaint.complainant || !newComplaint.against) return;
     const created = {
-      id: `CMP-${300 + complaints.length + 1}`,
+      id: `GRV-${300 + complaints.length + 1}`,
       ...newComplaint,
-      complainant: newComplaint.complainant || "Anonymous",
       filedOn: "2024-10-11",
       status: "Open",
     };
     setComplaints([created, ...complaints]);
+    if (isBackendEnabled()) {
+      hrmsSync.create('complaints', created).then((saved) => {
+        if (saved?.id) {
+          setComplaints((prev) => prev.map((c) => (c.id === created.id ? saved : c)));
+        }
+      }).catch(console.warn);
+    }
     setIsComplaintModalOpen(false);
     setNewComplaint({
       complainant: "",
@@ -480,6 +540,9 @@ export default function HRAdminPage({ defaultTab }) {
             : c.status === "Under Investigation"
             ? "Resolved"
             : "Open";
+        if (isBackendEnabled()) {
+          hrmsSync.update('complaints', id, { status: next }).catch(console.warn);
+        }
         showToast(`Grievance ${c.id} marked as ${next}`);
         return { ...c, status: next };
       })
@@ -513,6 +576,9 @@ export default function HRAdminPage({ defaultTab }) {
       setHolidays((prev) =>
         prev.map((h) => (h.id === editingHoliday.id ? { ...h, ...newHoliday } : h))
       );
+      if (isBackendEnabled()) {
+        hrmsSync.update('holidays', editingHoliday.id, newHoliday).catch(console.warn);
+      }
       showToast(`Holiday "${newHoliday.name}" updated`);
     } else {
       const created = {
@@ -521,6 +587,13 @@ export default function HRAdminPage({ defaultTab }) {
         status: "Upcoming",
       };
       setHolidays([...holidays, created]);
+      if (isBackendEnabled()) {
+        hrmsSync.create('holidays', created).then((saved) => {
+          if (saved?.id) {
+            setHolidays((prev) => prev.map((h) => (h.id === created.id ? saved : h)));
+          }
+        }).catch(console.warn);
+      }
 
       addCalendarEvent?.({
         id: `EV-HOL-${Date.now()}`,
@@ -546,6 +619,9 @@ export default function HRAdminPage({ defaultTab }) {
   const handleDeleteHoliday = (id, name) => {
     if (window.confirm(`Remove holiday "${name}"?`)) {
       setHolidays((prev) => prev.filter((h) => h.id !== id));
+      if (isBackendEnabled()) {
+        hrmsSync.remove('holidays', id).catch(console.warn);
+      }
       showToast(`Holiday "${name}" removed`);
     }
   };

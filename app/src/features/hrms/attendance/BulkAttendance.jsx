@@ -5,6 +5,7 @@ import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { bulkAttendance, isBackendEnabled } from "../../../services/hrmsSync";
 
 const INITIAL_EMPLOYEES = [
   { id: "EMP1024", name: "Priya Patel", dept: "Engineering", status: "Present", avatar: "https://randomuser.me/api/portraits/women/44.jpg" },
@@ -130,12 +131,33 @@ export default function BulkAttendance() {
     setConfirmOpen(true);
   }
 
-  function handleConfirmSave() {
+  async function handleConfirmSave() {
     const idsArray = Array.from(selectedIds);
     setEmployees((prev) =>
       prev.map((e) => (selectedIds.has(e.id) ? { ...e, status: bulkStatus } : e))
     );
     bulkUpdateStore(idsArray, bulkStatus);
+
+    if (isBackendEnabled()) {
+      const recordsToPush = idsArray.map((id) => {
+        const emp = (storeEmployees || []).find(
+          (e) => e.empId === id || e.id === id || e.name === id
+        );
+        return {
+          employeeId: emp?.id || id,
+          date,
+          status: bulkStatus,
+          checkIn: `${date}T09:00:00`,
+          checkOut: `${date}T18:00:00`,
+        };
+      });
+      try {
+        await bulkAttendance(recordsToPush);
+      } catch (err) {
+        console.warn('[BulkAttendance] Failed to push bulk records to server:', err);
+      }
+    }
+
     setToast(`Bulk attendance saved as "${bulkStatus}" for ${idsArray.length} employees on ${date}`);
     setConfirmOpen(false);
     setSelectedIds(new Set());

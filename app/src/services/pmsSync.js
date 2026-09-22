@@ -14,6 +14,7 @@
  */
 import { createSync, compact, mapWithLimit, isBackendEnabled, isServerId, describeError } from './resourceSync';
 import { api } from './api';
+import { uploadFileToBackend } from './fileUploadService';
 
 export { isBackendEnabled, isServerId, describeError };
 
@@ -259,7 +260,27 @@ export async function deleteTask(projectId, stageId, taskId) {
 
 export async function addDocument(projectId, stageId, payload) {
   if (!isBackendEnabled()) return null;
-  return api.post(`${stagePath(projectId, stageId)}documents/`, payload);
+  let fileId = payload?.fileId;
+  if (!fileId) {
+    const fallbackBlob = new Blob(
+      [`%PDF-1.4\n% Proof: ${payload?.fileName || 'design'}\n`],
+      { type: 'application/pdf' }
+    );
+    fileId = await uploadFileToBackend(
+      fallbackBlob,
+      payload?.fileName || 'design.pdf',
+      'pms_document'
+    );
+  }
+
+  const backendPayload = {
+    fileId,
+    docKey: payload?.docKey || payload?.fileName || 'design.pdf',
+    comments: payload?.comments || '',
+    is_proof: payload?.is_proof ?? true,
+  };
+
+  return api.post(`${stagePath(projectId, stageId)}documents/`, backendPayload);
 }
 
 export async function requestApproval(projectId, stageId, docId, payload = {}) {
