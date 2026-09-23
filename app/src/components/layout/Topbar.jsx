@@ -20,11 +20,14 @@ import {
   UserPlus,
   Layers,
   Inbox,
+  Fingerprint,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { markEventNotificationRead } from '../../services/crmEventNotifications';
+import { useAttendanceStore } from '../../stores/attendanceStore';
+import LanguageSelector from '../common/LanguageSelector';
 
 const THEMES = [
   { id: 'light', name: 'Enterprise Light', icon: Sun, desc: 'Clean high-contrast corporate palette', color: '#1f6bff' },
@@ -57,6 +60,12 @@ export default function Topbar() {
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
   const theme = useAppStore((s) => s.theme) || 'light';
   const setTheme = useAppStore((s) => s.setTheme);
+  const currentUser = useAppStore((s) => s.currentUser || {});
+  const storeEmployees = useAppStore((s) => s.employees || []);
+  const showToast = useAppStore((s) => s.setToast || s.showToast);
+  const punchRecords = useAttendanceStore((s) => s.punchRecords || []);
+  const attendancePunchIn = useAttendanceStore((s) => s.punchIn);
+  const attendancePunchOut = useAttendanceStore((s) => s.punchOut);
 
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
@@ -142,6 +151,66 @@ export default function Topbar() {
   const crmUnreadCount = crmDigest.counts?.unread || crmDigest.counts?.total || 0;
   const totalUnreadCount = erpUnreadCount + crmUnreadCount;
   const totalNotifCount = (crmDigest.reminders?.length || 0) + (crmDigest.notifications?.length || 0) + erpNotifications.length;
+
+  // ── Instant Punch In / Out (icon shortcut, ported from 9980759) ──
+  const currentEmp = useMemo(() => {
+    const list = (storeEmployees || []).filter((e) => e && (e.id || e.name)).map((e) => ({
+      id: e.id || e.employeeCode || e.empId || e.name,
+      name: e.name,
+      shift: e.shift || 'General',
+      location: e.location || null,
+    }));
+    if (list.length === 0) return null;
+    const matched = list.find(
+      (e) => String(e.name || '').toLowerCase() === String(currentUser?.name || '').toLowerCase()
+    );
+    return matched || list[0];
+  }, [storeEmployees, currentUser]);
+
+  const todayIso = useMemo(() => {
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+  }, []);
+
+  const todaySession = useMemo(
+    () => (punchRecords || []).find((r) => r.employeeId === currentEmp?.id && r.date === todayIso) || null,
+    [punchRecords, currentEmp, todayIso]
+  );
+  const hasPunchedIn = Boolean(todaySession?.punchIn);
+  const hasPunchedOut = Boolean(todaySession?.punchOut);
+  const punchTitle = !hasPunchedIn ? 'Punch In' : !hasPunchedOut ? 'Punch Out' : 'Attendance done for today';
+
+  const handlePunchClick = () => {
+    setIsThemeOpen(false);
+    setIsQuickAddOpen(false);
+    setIsNotifOpen(false);
+    if (!currentEmp) {
+      showToast?.('No employee found for Punch In.');
+      return;
+    }
+    if (!hasPunchedIn) {
+      attendancePunchIn?.({
+        employeeId: currentEmp.id,
+        employeeName: currentEmp.name,
+        date: todayIso,
+        shift: currentEmp.shift,
+        branch: currentEmp.location,
+      });
+      const now = new Date();
+      let h = now.getHours();
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const suffix = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      showToast?.(`Punch In Successful · ${h}:${m} ${suffix}`);
+    } else if (!hasPunchedOut) {
+      attendancePunchOut?.(currentEmp.id, { date: todayIso });
+      showToast?.('Punch Out Successful · Attendance record updated.');
+    } else {
+      showToast?.('Already Punched In for today.');
+    }
+  };
 
   // Close popovers on click outside
   useEffect(() => {
@@ -289,6 +358,25 @@ export default function Topbar() {
 
         {/* Harmonized Icon Buttons Cluster */}
         <div className="flex items-center gap-1.5 pl-1">
+          <LanguageSelector compact />
+          {/* Punch In / Out Shortcut — stays green while punched-in */}
+          <button
+            type="button"
+            onClick={handlePunchClick}
+            className="w-9 h-9 rounded-xl border flex items-center justify-center transition cursor-pointer relative shadow-2xs"
+            style={
+              hasPunchedIn && !hasPunchedOut
+                ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
+                : { background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--text)' }
+            }
+            aria-label={punchTitle}
+            title={punchTitle}
+          >
+            <Fingerprint size={16} color={hasPunchedIn && !hasPunchedOut ? '#ffffff' : 'currentColor'} />
+            {hasPunchedIn && !hasPunchedOut && (
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+            )}
+          </button>
           {/* Unified Notifications Button & Dropdown */}
           <div className="relative" ref={notifRef}>
             <button

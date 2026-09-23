@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import { Building, Bell, Database, Save, Check, RotateCcw, AlertTriangle, MapPin, Phone, Hash } from 'lucide-react';
+import LanguageSettingsSection from '../../components/settings/LanguageSettingsSection';
 export const SettingsPage = () => {
     const {
         resetDemoData,
@@ -54,6 +55,7 @@ export const SettingsPage = () => {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
+        <LanguageSettingsSection />
         <div className="bg-white border border-[#CED4DA] rounded-lg p-5">
           <div className="flex items-center gap-2 pb-3 border-b border-[#CED4DA] mb-4">
             <Building className="text-[#1F2E4A]" size={18}/>

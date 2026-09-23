@@ -53,9 +53,14 @@ import {
   Check,
   LogOut,
   Lock,
+  Factory,
+  ExternalLink,
+  Flame,
+  DollarSign,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
+import { useVendorStore } from '../../stores/vendorStore';
 import { useERP } from '../../context/ERPContext';
 import { UserGuideModal } from '../common/UserGuideModal';
 import { clearStoredAuth } from '../../utils/authUtils';
@@ -155,6 +160,40 @@ const NAV = [
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
       { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },
       { label: 'Expenses', icon: Landmark, to: '/purchase/expenses' },
+      { label: 'Vendors & Portal Access', icon: Building2, to: '/purchase/vendors' },
+    ],
+  },
+
+  {
+    label: 'Vendor Outsourcing',
+    icon: Truck,
+    badgeKey: 'vendorApprovals',
+    badgeColor: '#f59e0b',
+    children: [
+      { label: 'Progress Tracking', icon: BarChart3, to: '/vendors/progress', badgeKey: 'vendorApprovals', badgeColor: '#f59e0b' },
+      { label: 'Process Templates', icon: Sliders, to: '/vendors/templates' },
+      { label: 'Vendor Directory & Access', icon: Users, to: '/purchase/vendors' },
+      { label: 'Launch Vendor Portal', icon: ExternalLink, to: '/vendor/login' },
+    ],
+  },
+
+  {
+    label: 'Manufacturing',
+    icon: Factory,
+    children: [
+      { label: 'Overview', icon: Home, to: '/manufacturing' },
+      { label: 'Projects', icon: Layers, to: '/manufacturing/projects' },
+      { label: 'BOM Versions', icon: Layers, to: '/manufacturing/bom' },
+      { label: 'Material Planning', icon: Sliders, to: '/manufacturing/material-planning' },
+      { label: 'Material Issue', icon: Boxes, to: '/manufacturing/material-issue' },
+      { label: 'Material Consumption', icon: Flame, to: '/manufacturing/material-consumption' },
+      { label: 'Production Tasks', icon: Wrench, to: '/manufacturing/production' },
+      { label: 'Labour Cost', icon: Users, to: '/manufacturing/labour' },
+      { label: 'Production Costing', icon: DollarSign, to: '/manufacturing/costing' },
+      { label: 'Batches', icon: Boxes, to: '/manufacturing/batches' },
+      { label: 'Profitability', icon: TrendingUp, to: '/manufacturing/profitability' },
+      { label: 'Packaging', icon: Package, to: '/manufacturing/packaging' },
+      { label: 'Dispatch', icon: Truck, to: '/manufacturing/dispatch' },
     ],
   },
 
@@ -221,6 +260,7 @@ const NAV = [
         defaultOpen: false,
         children: [
           { label: 'Overview', to: '/hrms/attendance', dot: true },
+          { label: "Today's Attendance", to: '/hrms/attendance/today' },
           { label: 'Mark Attendance', to: '/hrms/attendance/mark' },
           { label: 'Individual', to: '/hrms/attendance/individual' },
           { label: 'Bulk', to: '/hrms/attendance/bulk' },
@@ -558,6 +598,19 @@ export default function Sidebar() {
     () => computeNavBadges(pmsProjects, pmsCurrentUserId),
     [pmsProjects, pmsCurrentUserId]
   );
+  // Vendor outsourcing: count stages awaiting approval for nav badge.
+  const vendorOrders = useVendorStore((s) => s.orders || []);
+  const vendorApprovals = useMemo(() => {
+    try {
+      let n = 0;
+      (vendorOrders || []).forEach((o) => {
+        (o?.stages || []).forEach((st) => {
+          if (st?.status === 'Submitted') n += 1;
+        });
+      });
+      return n;
+    } catch { return 0; }
+  }, [vendorOrders]);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -569,7 +622,7 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  let badges = { zone: 0, faulty: 0, ...pmsBadges };
+  let badges = { zone: 0, faulty: 0, vendorApprovals, ...pmsBadges };
   try {
     const erp = useERP();
     if (erp) {

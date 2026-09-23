@@ -45,6 +45,7 @@ const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/C
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
 const AttendanceOverview = lazy(() => import('../features/hrms/attendance/Overview'));
+const TodayAttendance = lazy(() => import('../features/hrms/attendance/Today'));
 const MarkAttendance = lazy(() => import('../features/hrms/attendance/MarkAttendance'));
 const IndividualAttendance = lazy(() => import('../features/hrms/attendance/IndividualAttendance'));
 const BulkAttendance = lazy(() => import('../features/hrms/attendance/BulkAttendance'));
@@ -134,6 +135,35 @@ const FinancialReportsPage = lazy(() => import('../features/accounts/FinancialRe
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
 
+// ── Manufacturing (Lazy Loaded) ───────────────────────────────
+const ManufacturingOverviewPage = lazy(() => import('../features/manufacturing/ManufacturingOverviewPage'));
+const ManufacturingProjectsPage = lazy(() => import('../features/manufacturing/ManufacturingProjectsPage'));
+const BomVersionsPage = lazy(() => import('../features/manufacturing/BomVersionsPage'));
+const MaterialPlanningPage = lazy(() => import('../features/manufacturing/MaterialPlanningPage'));
+const MaterialIssuePage = lazy(() => import('../features/manufacturing/MaterialIssuePage'));
+const MaterialConsumptionPage = lazy(() => import('../features/manufacturing/MaterialConsumptionPage'));
+const ProductionTasksPage = lazy(() => import('../features/manufacturing/ProductionTasksPage'));
+const LabourCostPage = lazy(() => import('../features/manufacturing/LabourCostPage'));
+const ProductionCostPage = lazy(() => import('../features/manufacturing/ProductionCostPage'));
+const BatchManagementPage = lazy(() => import('../features/manufacturing/BatchManagementPage'));
+const ProjectProfitabilityPage = lazy(() => import('../features/manufacturing/ProjectProfitabilityPage'));
+const PackagingPage = lazy(() => import('../features/manufacturing/PackagingPage'));
+const DispatchPage = lazy(() => import('../features/manufacturing/DispatchPage'));
+
+// ── Vendor Outsourcing Admin (Lazy Loaded) ────────────────────
+const AdminVendorProgressDashboard = lazy(() => import('../features/vendor/admin/AdminVendorProgressDashboard'));
+const ProcessTemplatesPage = lazy(() => import('../features/vendor/admin/ProcessTemplatesPage'));
+
+// ── Standalone Vendor Portal (Lazy Loaded) ────────────────────
+const VendorLoginPage = lazy(() => import('../features/vendor/portal/VendorLoginPage'));
+const VendorDashboardPage = lazy(() => import('../features/vendor/portal/VendorDashboardPage'));
+const VendorMyOrdersPage = lazy(() => import('../features/vendor/portal/VendorMyOrdersPage'));
+const VendorOrderDetailPage = lazy(() => import('../features/vendor/portal/VendorOrderDetailPage'));
+const VendorNotificationsPage = lazy(() => import('../features/vendor/portal/VendorNotificationsPage'));
+const VendorProfilePage = lazy(() => import('../features/vendor/portal/VendorProfilePage'));
+const VendorPerformancePage = lazy(() => import('../features/vendor/portal/VendorPerformancePage'));
+import VendorLayout from '../components/layout/VendorLayout';
+
 // ── Administration (Lazy Loaded) ──────────────────────────────
 const UsersPage = lazy(() => import('../features/administration/UsersPage'));
 const RolesPage = lazy(() => import('../features/administration/RolesPage'));
@@ -204,6 +234,30 @@ const router = createBrowserRouter([
     element: <Page component={PMSClientProofApprovalPage} />,
     errorElement: <RootErrorBoundary />,
   },
+  // ── Standalone Vendor Portal (outside auth shell) ──────────
+  // Vendors are external users with their own session (vendorStore),
+  // so these routes must NOT sit inside RequireAuth/MainLayout.
+  {
+    path: '/vendor/login',
+    element: <Page component={VendorLoginPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  {
+    path: '/vendor',
+    element: <VendorLayout />,
+    errorElement: <RootErrorBoundary />,
+    children: [
+      { index: true, element: <Navigate to="/vendor/dashboard" replace /> },
+      { path: 'dashboard', element: <Page component={VendorDashboardPage} /> },
+      { path: 'orders', element: <Page component={VendorMyOrdersPage} /> },
+      { path: 'orders/:orderId', element: <Page component={VendorOrderDetailPage} /> },
+      { path: 'orders/:orderId/stages', element: <Page component={VendorOrderDetailPage} /> },
+      { path: 'notifications', element: <Page component={VendorNotificationsPage} /> },
+      { path: 'profile', element: <Page component={VendorProfilePage} /> },
+      { path: 'performance', element: <Page component={VendorPerformancePage} /> },
+      { path: '*', element: <Navigate to="/vendor/dashboard" replace /> },
+    ],
+  },
   // ── Protected Application Shell (Guarded by RequireAuth) ─
   {
     element: <RequireAuth />,
@@ -273,9 +327,12 @@ const router = createBrowserRouter([
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },
-      // [PHASE-4] DEAD ROUTE — `purchase/vendors` had no nav entry; parties live at `/parties`.
-      //   Restore if a dedicated vendor workspace is ever needed:
-      // { path: 'purchase/vendors', element: <Navigate to="/parties" replace /> },
+      { path: 'purchase/vendors', element: <Page component={VendorsPage} /> },
+      // ── Vendor Outsourcing & Tracking (Admin) ──────────────
+      { path: 'vendors', element: <Navigate to="/purchase/vendors" replace /> },
+      { path: 'vendors/progress', element: <Page component={AdminVendorProgressDashboard} /> },
+      { path: 'vendors/templates', element: <Page component={ProcessTemplatesPage} /> },
+      { path: 'settings/vendor-templates', element: <Page component={ProcessTemplatesPage} /> },
       { path: 'purchase/orders', element: <Page component={PurchaseOrdersPage} /> },
       { path: 'purchase/receipts', element: <Page component={GoodsReceiptPage} /> },
       { path: 'purchase/bills', element: <Page component={PurchaseBillsPage} /> },
@@ -336,6 +393,7 @@ const router = createBrowserRouter([
       { path: 'hrms/dashboard', element: <Page component={HRMSDashboard} /> },
       { path: 'hrms/employees', element: <Page component={Employees} /> },
       { path: 'hrms/attendance', element: <Page component={AttendanceOverview} /> },
+      { path: 'hrms/attendance/today', element: <Page component={TodayAttendance} /> },
       { path: 'hrms/attendance/mark', element: <Page component={MarkAttendance} /> },
       { path: 'hrms/attendance/individual', element: <Page component={IndividualAttendance} /> },
       { path: 'hrms/attendance/bulk', element: <Page component={BulkAttendance} /> },
@@ -399,6 +457,21 @@ const router = createBrowserRouter([
       { path: 'hrms/hr-admin/resignations', element: <Page component={HRAdminPage} defaultTab="resignations" /> },
       { path: 'hrms/hr-admin/complaints', element: <Page component={HRAdminPage} defaultTab="complaints" /> },
       { path: 'hrms/hr-admin/holidays', element: <Page component={HRAdminPage} defaultTab="holidays" /> },
+
+      // ── Manufacturing ─────────────────────────────────────
+      { path: 'manufacturing', element: <Page component={ManufacturingOverviewPage} /> },
+      { path: 'manufacturing/projects', element: <Page component={ManufacturingProjectsPage} /> },
+      { path: 'manufacturing/bom', element: <Page component={BomVersionsPage} /> },
+      { path: 'manufacturing/material-planning', element: <Page component={MaterialPlanningPage} /> },
+      { path: 'manufacturing/material-issue', element: <Page component={MaterialIssuePage} /> },
+      { path: 'manufacturing/material-consumption', element: <Page component={MaterialConsumptionPage} /> },
+      { path: 'manufacturing/production', element: <Page component={ProductionTasksPage} /> },
+      { path: 'manufacturing/labour', element: <Page component={LabourCostPage} /> },
+      { path: 'manufacturing/costing', element: <Page component={ProductionCostPage} /> },
+      { path: 'manufacturing/batches', element: <Page component={BatchManagementPage} /> },
+      { path: 'manufacturing/profitability', element: <Page component={ProjectProfitabilityPage} /> },
+      { path: 'manufacturing/packaging', element: <Page component={PackagingPage} /> },
+      { path: 'manufacturing/dispatch', element: <Page component={DispatchPage} /> },
 
       // ── Reports ───────────────────────────────────────────
       { path: 'reports', element: <Page component={ReportsPage} /> },
