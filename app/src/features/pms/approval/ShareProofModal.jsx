@@ -34,6 +34,7 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
   const showToast = usePmsStore((s) => s.showToast);
   const createShare = useProofShareStore((s) => s.createShare);
   const revokeShare = useProofShareStore((s) => s.revokeShare);
+  const loadShares = useProofShareStore((s) => s.loadShares);
   const shares = useProofShareStore((s) => s.shares);
 
   const existing = shares.find(
@@ -57,7 +58,9 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
     setIssued(null);
     setCopied(false);
     setErrors({});
-  }, [isOpen, project, doc]);
+    // Pull this version's links so a live one shows instead of a blank form.
+    if (doc?.id) loadShares(doc.id).catch(() => {});
+  }, [isOpen, project, doc, loadShares]);
 
   // An existing live link is what the modal shows first — no need to re-issue.
   const active = issued ?? existing;

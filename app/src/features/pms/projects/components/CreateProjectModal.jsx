@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Modal } from '../../../../components/ui/Modal';
 import { Button } from '../../../../components/ui/Button';
-import { usePmsStore, nextProjectId } from '../../../../stores/pmsStore';
+import { usePmsStore, nextProjectId, getProjectManagers } from '../../../../stores/pmsStore';
 import { useERP } from '../../../../context/ERPContext';
 import { formatCurrency } from '../../../../utils/currencyUtils';
 import { AlertCircle, Link2, PackageCheck } from 'lucide-react';
@@ -39,7 +39,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     () => stageConfigs.filter((c) => c.isActive).sort((a, b) => a.sequence - b.sequence),
     [stageConfigs]
   );
-  const managers = useMemo(() => employees.filter((e) => e.isProjectManager), [employees]);
+  const managers = useMemo(() => getProjectManagers(employees), [employees]);
 
   // An order already converted into a project cannot be converted twice, but it
   // still appears in the list — disabled, naming the project that owns it — so

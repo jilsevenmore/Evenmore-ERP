@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Upload, Send, ShieldCheck, Layers, Check, RefreshCw, Clock, AlertCircle } from 'lucide-react';
+import { Upload, Send, ShieldCheck, Layers, Check, RefreshCw, Clock, AlertCircle, Link2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
 import { MockPdfViewer } from '../../components/MockPdfViewer';
 import { ClientApprovalModal } from '../../components/ClientApprovalModal';
+import { ShareProofModal } from '../../approval/ShareProofModal';
 import { UploadProofModal } from './UploadProofModal';
 import { usePmsStore, getProofWorkflowState } from '../../../../stores/pmsStore';
 
@@ -53,6 +54,7 @@ export function DocumentsProofTab({ project }) {
   const [versionId, setVersionId] = useState(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [approvalOpen, setApprovalOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [annotations, setAnnotations] = useState({});
 
   const activeStage =
@@ -155,6 +157,20 @@ export function DocumentsProofTab({ project }) {
               }
             >
               Send to Client
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={Link2}
+              disabled={isClosed || !selected}
+              title={
+                selected
+                  ? 'Generate a shareable client approval link for this version'
+                  : 'Upload a version first'
+              }
+              onClick={() => setShareOpen(true)}
+            >
+              Share Link
             </Button>
             <Button
               size="sm"
@@ -305,6 +321,15 @@ export function DocumentsProofTab({ project }) {
         stage={activeStage}
         document={selected}
         onClose={() => setApprovalOpen(false)}
+      />
+
+      <ShareProofModal
+        isOpen={shareOpen}
+        project={project}
+        stage={activeStage}
+        document={selected}
+        canCirculate={workflow?.canSendToClient}
+        onClose={() => setShareOpen(false)}
       />
     </div>
   );

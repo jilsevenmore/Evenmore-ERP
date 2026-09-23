@@ -1390,6 +1390,18 @@ export function filterProjects(projects = [], filters = {}, now = Date.now()) {
   });
 }
 
+/** Project-manager options for dropdowns: flagged employees, deduped by id
+ * (the team roster lists a person once per role, so a manager can arrive twice). */
+export function getProjectManagers(employees = []) {
+  const seen = new Map();
+  for (const e of employees) {
+    if (e?.isProjectManager && e?.id != null && !seen.has(e.id)) seen.set(e.id, e);
+  }
+  return [...seen.values()].sort((a, b) =>
+    String(a.name ?? '').localeCompare(String(b.name ?? ''))
+  );
+}
+
 /** Distinct dropdown options derived from the projects themselves. */
 export function getProjectFilterOptions(projects = []) {
   const customers = new Set();

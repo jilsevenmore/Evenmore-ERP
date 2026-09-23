@@ -4,6 +4,7 @@ import {
   usePmsStore,
   computeTimelineRows,
   computeTimelineWindow,
+  getProjectManagers,
 } from '../../../stores/pmsStore';
 import { TimelineFilterBar } from './components/TimelineFilterBar';
 import { TimelineGanttChart } from './components/TimelineGanttChart';
@@ -33,7 +34,7 @@ export default function TimelinePage() {
     }
     return {
       departments: [...departments].sort((a, b) => a.localeCompare(b)),
-      managers: employees.filter((e) => e.isProjectManager),
+      managers: getProjectManagers(employees),
     };
   }, [allRows, employees]);
 
