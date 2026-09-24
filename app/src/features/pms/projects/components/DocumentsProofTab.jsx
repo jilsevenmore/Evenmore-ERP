@@ -170,7 +170,7 @@ export function DocumentsProofTab({ project }) {
               }
               onClick={() => setShareOpen(true)}
             >
-              Share Link
+              Generate Link
             </Button>
             <Button
               size="sm"

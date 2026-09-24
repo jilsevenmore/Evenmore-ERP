@@ -92,7 +92,9 @@ export const useProofShareStore = create((set, get) => ({
       recipientName,
       recipientEmail,
       createdBy,
-      validityDays,
+      // Server field is `expiryDays` (ShareProofSerializer) — `validityDays`
+      // would be silently ignored and every link would default to 14 days.
+      expiryDays: Number(validityDays) || DEFAULT_VALIDITY_DAYS,
       message,
     });
     if (!share) return null;

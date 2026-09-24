@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -55,6 +55,33 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
     /\.pdf($|\?)/i.test(doc?.fileName || '') ||
     /\.pdf($|\?)/i.test(fileSource || '');
 
+  // The browser plugin gives no usable error when an iframe/img source is
+  // dead, so probe the URL with a 1-byte range GET. Same-origin token URLs
+  // need no auth headers; data: URLs (fresh local uploads) skip the probe.
+  // A 'failed' probe renders an explicit fallback with the HTTP status plus
+  // working open/download actions instead of a mysterious grey box.
+  const [sourceState, setSourceState] = useState('ready');
+  const [sourceStatus, setSourceStatus] = useState(null);
+
+  useEffect(() => {
+    setSourceState('ready');
+    setSourceStatus(null);
+    if (!fileSource || !hasRealFile || fileSource.startsWith('data:')) return;
+    let cancelled = false;
+    fetch(fileSource, { headers: { Range: 'bytes=0-0' } })
+      .then((r) => {
+        if (cancelled) return;
+        setSourceStatus(r.status);
+        if (!r.ok) setSourceState('failed');
+      })
+      .catch(() => {
+        if (!cancelled) setSourceState('failed');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fileSource, hasRealFile]);
+
   function handleOpenExternal() {
     if (!fileSource) return;
     const win = window.open();
@@ -73,6 +100,36 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
         win.location.href = fileSource;
       }
     }
+  }
+
+  function renderSourceFallback() {
+    return (
+      <div className="p-10 bg-slate-100 flex flex-col items-center justify-center text-center min-h-[380px]">
+        <FileText size={26} className="text-slate-300 mb-3" />
+        <p className="text-xs font-bold text-slate-700">
+          Preview couldn&apos;t load{sourceStatus ? ` (HTTP ${sourceStatus})` : ''}.
+        </p>
+        <p className="text-[11px] text-slate-500 mt-1 max-w-sm">
+          The file itself is fine — open it directly instead.
+        </p>
+        <div className="flex items-center gap-2 mt-4">
+          <button
+            type="button"
+            onClick={handleOpenExternal}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700"
+          >
+            <ExternalLink size={12} /> Open in new tab
+          </button>
+          <a
+            href={fileSource}
+            download={doc.fileName}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce5f4] bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:text-blue-600"
+          >
+            <Download size={12} /> Download
+          </a>
+        </div>
+      </div>
+    );
   }
 
   if (!doc) {
@@ -211,25 +268,34 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
 
         {/* Content Viewer: Real Photo, Real PDF, or Fallback Blueprint */}
         {hasRealFile && isImage ? (
-          <div className="p-6 bg-slate-900/5 flex items-center justify-center overflow-auto min-h-[380px] max-h-[580px]">
-            <img
-              src={fileSource}
-              alt={doc.fileName}
-              className="max-w-full rounded-lg shadow-sm border border-slate-200 object-contain transition-transform duration-150"
-              style={{
-                transform: `scale(${zoom})`,
-                transformOrigin: 'center center',
-              }}
-            />
-          </div>
+          sourceState === 'failed' ? (
+            renderSourceFallback()
+          ) : (
+            <div className="p-6 bg-slate-900/5 flex items-center justify-center overflow-auto min-h-[380px] max-h-[580px]">
+              <img
+                src={fileSource}
+                alt={doc.fileName}
+                onError={() => setSourceState('failed')}
+                className="max-w-full rounded-lg shadow-sm border border-slate-200 object-contain transition-transform duration-150"
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'center center',
+                }}
+              />
+            </div>
+          )
         ) : hasRealFile && isPdf ? (
-          <div className="w-full bg-slate-100 min-h-[480px] h-[58vh] overflow-hidden">
-            <iframe
-              src={fileSource}
-              title={doc.fileName}
-              className="w-full h-full border-0"
-            />
-          </div>
+          sourceState === 'failed' ? (
+            renderSourceFallback()
+          ) : (
+            <div className="w-full bg-slate-100 min-h-[480px] h-[58vh] overflow-hidden">
+              <iframe
+                src={fileSource}
+                title={doc.fileName}
+                className="w-full h-full border-0"
+              />
+            </div>
+          )
         ) : (
           /* Mock sheet fallback */
           <div className="p-5 bg-slate-100 flex justify-center overflow-auto" style={{ minHeight: 340 }}>

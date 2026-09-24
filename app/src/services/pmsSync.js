@@ -302,7 +302,16 @@ export async function shareDocument(projectId, docId, payload = {}) {
 /** The same call, named for the store that issues links. */
 export async function createDocumentShare(projectId, docId, payload = {}) {
   const body = await shareDocument(projectId, docId, payload);
-  return body?.share || body || null;
+  if (!body || typeof body !== 'object') return null;
+  // The server returns `{ token, url, expiresAt, share }` — the token lives
+  // top-level only (it is hashed at rest, so the nested share never carries
+  // it). Merge it in or the link builds as `/pms/approve/undefined`.
+  const share = body.share && typeof body.share === 'object' ? body.share : body;
+  return {
+    ...share,
+    token: share.token ?? body.token ?? null,
+    url: share.url ?? body.url ?? null,
+  };
 }
 
 /** `GET /pms/documents/{docId}/shares/` — every link issued for a document. */
@@ -321,6 +330,18 @@ export async function pullDocumentShares(docId) {
 export async function revokeDocumentShare(token, reason) {
   if (!isBackendEnabled() || !token) return null;
   return api.post(`/pms/shares/${token}/revoke/`, { reason });
+}
+
+/** `GET /public/pms/approve/{token}/` — public proof payload, no account needed. */
+export async function fetchPublicShare(token) {
+  if (!token) return null;
+  return api.get(`/public/pms/approve/${token}/`);
+}
+
+/** `POST /public/pms/approve/{token}/decide/` — client decision, no account needed. */
+export async function decidePublicShare(token, payload = {}) {
+  if (!token) return null;
+  return api.post(`/public/pms/approve/${token}/decide/`, payload);
 }
 
 // ── read-only views the server aggregates ───────────────────────────────────

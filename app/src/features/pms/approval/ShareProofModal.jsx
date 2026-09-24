@@ -63,7 +63,9 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
   }, [isOpen, project, doc, loadShares]);
 
   // An existing live link is what the modal shows first — no need to re-issue.
-  const active = issued ?? existing;
+  // A row without a token can never open (e.g. issued before the token
+  // mapping fix) — never let it masquerade as the live link.
+  const active = issued ?? (existing?.token ? existing : null);
   const activeUrl = active ? shareUrlFor(active.token) : '';
 
   async function copyLink() {
@@ -110,7 +112,7 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
       });
     }
 
-    if (!share) {
+    if (!share || !share.token) {
       setErrors({ recipientName: 'The server could not issue a link. Please try again.' });
       return;
     }

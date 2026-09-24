@@ -8,6 +8,8 @@ import { Button } from '../../../components/ui/Button';
 import { MockPdfViewer } from '../components/MockPdfViewer';
 import { usePmsStore, validateApprovalDecision } from '../../../stores/pmsStore';
 import { useProofShareStore, shareBlockReason } from '../../../stores/proofShareStore';
+import { fetchPublicShare, decidePublicShare } from '../../../services/pmsSync';
+import { isBackendEnabled } from '../../../services/resourceSync';
 import { formatCurrency } from '../../../utils/currencyUtils';
 
 /**
@@ -87,6 +89,57 @@ function PortalNotice({ icon: Icon, tone, title, body, detail }) {
   );
 }
 
+/** Map a public-API failure to the terminal state it means. */
+function blockFromError(err) {
+  const msg = `${err?.message || ''}`.toLowerCase();
+  if (err?.status === 409) {
+    if (msg.includes('revok')) return 'revoked';
+    if (msg.includes('expir')) return 'expired';
+  }
+  return 'invalid';
+}
+
+/** Shape the public payload into the { share, project, stage, doc } the page renders. */
+function remoteFromPayload(token, P) {
+  const D = P.document ?? {};
+  return {
+    share: {
+      token,
+      recipientName: P.recipientName ?? '',
+      message: '',
+      createdBy: '',
+      expiresAt: P.expiresAt ?? null,
+      openedAt: null,
+      status: 'Active',
+      decision: P.decision ?? null,
+      decidedAt: P.decidedAt ?? null,
+      decidedBy: '',
+      revisionReason: '',
+    },
+    project: {
+      id: P.project?.id ?? `remote-${token}`,
+      code: P.project?.code ?? '',
+      customerName: P.project?.customerName ?? '',
+      productDetails: { productName: P.project?.productName ?? '' },
+      crmOrderId: null,
+      expectedCompletionDate: null,
+    },
+    stage: P.stage
+      ? { id: P.stage.id, sequence: P.stage.sequence, name: P.stage.name }
+      : { id: `stage-${token}`, sequence: '', name: 'Design proof' },
+    doc: {
+      id: D.id,
+      fileName: D.fileName,
+      fileSize: D.fileSize,
+      version: D.version,
+      previewUrl: D.previewUrl,
+      uploadedAt: D.uploadedAt,
+      comments: D.comments,
+      approvalStatus: 'Pending',
+    },
+  };
+}
+
 export default function ClientProofApprovalPage() {
   const { token } = useParams();
 
@@ -96,20 +149,54 @@ export default function ClientProofApprovalPage() {
   const markOpened = useProofShareStore((s) => s.markOpened);
   const recordDecision = useProofShareStore((s) => s.recordDecision);
 
-  const share = useMemo(() => shares.find((s) => s.token === token) ?? null, [shares, token]);
+  const localShare = useMemo(() => shares.find((s) => s.token === token) ?? null, [shares, token]);
+
+  // Public mode: the link opened where the issuing browser's memory is
+  // unavailable (new tab, client device). Resolve it via the public API —
+  // the local store alone can never see it there.
+  const [remote, setRemote] = useState(null);
+  const [remoteState, setRemoteState] = useState('idle'); // idle|loading|ready|invalid|expired|revoked
+
+  useEffect(() => {
+    if (localShare || !token || !isBackendEnabled()) return;
+    if (remote || remoteState !== 'idle') return;
+    let cancelled = false;
+    setRemoteState('loading');
+    fetchPublicShare(token)
+      .then((data) => {
+        if (cancelled) return;
+        setRemote(remoteFromPayload(token, data || {}));
+        setRemoteState('ready');
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setRemoteState(blockFromError(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [localShare, token, remote, remoteState]);
+
+  const share = localShare ?? remote?.share ?? null;
   const block = shareBlockReason(share);
 
   const project = useMemo(
-    () => (share ? projects.find((p) => p.id === share.projectId) ?? null : null),
-    [projects, share]
+    () => (localShare
+      ? projects.find((p) => p.id === localShare.projectId) ?? null
+      : remote?.project ?? null),
+    [localShare, projects, remote]
   );
   const stage = useMemo(
-    () => (project && share ? project.stages?.find((s) => s.id === share.stageId) ?? null : null),
-    [project, share]
+    () => (localShare
+      ? project?.stages?.find((s) => s.id === localShare.stageId) ?? null
+      : remote?.stage ?? null),
+    [localShare, project, remote]
   );
   const doc = useMemo(
-    () => (stage && share ? stage.documents?.find((d) => d.id === share.documentId) ?? null : null),
-    [stage, share]
+    () => (localShare
+      ? stage?.documents?.find((d) => d.id === localShare.documentId) ?? null
+      : remote?.doc ?? null),
+    [localShare, stage, remote]
   );
 
   const [decision, setDecision] = useState('Approved');
@@ -124,9 +211,10 @@ export default function ClientProofApprovalPage() {
   }, [share?.recipientName]);
 
   // Stamp the open so the project manager can see the client has looked at it.
+  // Local mode only — the server stamps public opens on first fetch itself.
   useEffect(() => {
-    if (share && !block) markOpened(share.token);
-  }, [share, block, markOpened]);
+    if (localShare && !block) markOpened(localShare.token);
+  }, [localShare, block, markOpened]);
 
   const isRevision = decision === 'Need Improvement';
 
@@ -140,6 +228,40 @@ export default function ClientProofApprovalPage() {
     setErrors(found);
     if (Object.keys(found).length > 0) return;
 
+    const by = approverName.trim();
+
+    // Public mode: the client has no account, so the decision travels with
+    // the link token instead of the staff write path.
+    if (!localShare && remote) {
+      decidePublicShare(share.token, {
+        decision: value,
+        decidedBy: by,
+        comments: comments.trim(),
+        revisionReason: revisionReason.trim(),
+      })
+        .then((res) => {
+          setRemote((prev) => (prev ? {
+            ...prev,
+            share: {
+              ...prev.share,
+              decision: value,
+              decidedAt: res?.decidedAt ?? new Date().toISOString(),
+              decidedBy: by,
+              revisionReason: revisionReason.trim(),
+            },
+          } : prev));
+          setReceipt({ decision: value, at: new Date().toISOString(), by });
+        })
+        .catch((err) => {
+          if (err?.status === 404 || err?.status === 409) {
+            setRemoteState(blockFromError(err));
+          } else {
+            setErrors({ submit: err.message });
+          }
+        });
+      return;
+    }
+
     try {
       decideDocument(
         project.id,
@@ -149,24 +271,51 @@ export default function ClientProofApprovalPage() {
         {
           comments: comments.trim(),
           revisionReason: revisionReason.trim(),
-          approverName: approverName.trim(),
+          approverName: by,
           approverType: 'Client',
         },
-        { id: 'client-portal', name: approverName.trim() }
+        { id: 'client-portal', name: by }
       );
       recordDecision(share.token, {
         decision: value,
-        decidedBy: approverName.trim(),
+        decidedBy: by,
         comments: comments.trim(),
         revisionReason: revisionReason.trim(),
       });
-      setReceipt({ decision: value, at: new Date().toISOString(), by: approverName.trim() });
+      setReceipt({ decision: value, at: new Date().toISOString(), by });
     } catch (err) {
       setErrors({ submit: err.message });
     }
   }
 
   // ── Terminal states ──
+
+  if (remoteState === 'loading') {
+    return (
+      <PortalNotice
+        icon={Clock}
+        tone={{ bg: '#f6f9ff', fg: '#1f6bff' }}
+        title="Checking this link…"
+        body="Fetching the drawing and approval details."
+      />
+    );
+  }
+
+  if (remoteState === 'expired' || remoteState === 'revoked') {
+    const withdrawn = remoteState === 'revoked';
+    return (
+      <PortalNotice
+        icon={withdrawn ? Ban : CalendarClock}
+        tone={withdrawn ? { bg: '#ffe4e6', fg: '#9f1239' } : { bg: '#fef3c7', fg: '#92400e' }}
+        title={withdrawn ? 'This link has been withdrawn' : 'This link has expired'}
+        body={
+          withdrawn
+            ? 'The project manager revoked this approval link. A newer version of the drawing may be on its way.'
+            : 'The approval window for this link has closed. Ask your project manager to re-issue it.'
+        }
+      />
+    );
+  }
 
   if (!share) {
     return (
