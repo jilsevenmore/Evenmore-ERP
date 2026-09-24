@@ -68,16 +68,16 @@ export function StatCard(props) {
   return (
     <article className="stat-card">
       <span className="stat-badge" style={{ background: bg, color: fg }}>
-        <Icon size={22} strokeWidth={2} />
+        <Icon size={20} strokeWidth={2} />
       </span>
       <div className="stat-body">
-        <strong className="stat-num">{value}</strong>
-        <span className="stat-label">{label}</span>
+        <strong className="stat-num" title={String(value)}>{value}</strong>
+        <span className="stat-label" title={label}>{label}</span>
         {trendText && (
           <p className={`stat-trend ${isUp ? 'up' : 'down'}`}>
-            {isUp ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-            <b>{trendText}</b>
-            {note && <em>{note}</em>}
+            {isUp ? <TrendingUp size={13} className="shrink-0" /> : <TrendingDown size={13} className="shrink-0" />}
+            <b className="shrink-0">{trendText}</b>
+            {note && <em className="truncate">{note}</em>}
           </p>
         )}
       </div>

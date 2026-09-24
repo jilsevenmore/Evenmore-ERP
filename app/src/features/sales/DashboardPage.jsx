@@ -153,30 +153,29 @@ export const DashboardPage = () => {
   const fmt = (n) => Number(n || 0).toLocaleString();
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6 max-w-full">
       <PageHeader
         title="Unified Business Dashboard"
         subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration"
         actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
             <Link
               to="/crm/dashboard"
-              className="px-3.5 py-2 bg-card border border-border hover:bg-soft text-text rounded-xl text-xs font-semibold shadow-2xs transition"
+              className="flex-1 sm:flex-initial text-center justify-center px-3.5 py-2 bg-card border border-border hover:bg-soft text-text rounded-xl text-xs font-semibold shadow-2xs transition"
             >
               CRM Dashboard
             </Link>
             <Link
               to="/crm/leads"
-              className="px-3.5 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+              className="flex-1 sm:flex-initial text-center justify-center px-3.5 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
             >
               + New Lead
             </Link>
           </div>
         }
       />
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3 sm:gap-4">
         {/* [PHASE-1-DASHBOARD] "Total Leads" stat card replaced with ERP Totals */}
-        {/* Old: <StatCard label="Total Leads" value={fmt(leads.length + 238)} icon={Target} tone="blue" trend="12%" trendDirection="up" note="vs last month" /> */}
         <StatCard label="Quotations" value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note="challans issued" />
         <StatCard label="Sales Orders" value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note="order value" />
         <StatCard label="Invoices Value" value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />
@@ -186,19 +185,19 @@ export const DashboardPage = () => {
       </div>
 
       {/* All Modules Directory Grid */}
-      <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
           <div>
-            <h3 className="font-bold text-text text-sm">All Enterprise Modules</h3>
-            <p className="text-[11px] text-muted">Direct single-click access across all unified modules</p>
+            <h3 className="font-bold text-text text-sm sm:text-base">All Enterprise Modules</h3>
+            <p className="text-[11px] sm:text-xs text-muted">Direct single-click access across all unified modules</p>
           </div>
-          <Link to="/reports" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+          <Link to="/reports" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 self-start sm:self-auto">
             <span>View Reports</span>
             <ArrowRight size={13} />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
           {modules.map((m) => {
             const Icon = m.icon;
             const style = CARD_STYLES[m.tone] || CARD_STYLES.blue;
@@ -206,18 +205,18 @@ export const DashboardPage = () => {
               <Link
                 key={m.label}
                 to={m.to}
-                className="p-3.5 rounded-xl border border-border bg-soft hover:bg-card hover:border-primary/40 hover:shadow-md transition flex items-center gap-3 group"
+                className="p-3 sm:p-3.5 rounded-xl border border-border bg-soft hover:bg-card hover:border-primary/40 hover:shadow-md transition flex items-center gap-2.5 sm:gap-3 group min-w-0"
               >
                 <span
-                  className="w-10 h-10 rounded-xl grid place-items-center shrink-0 shadow-2xs"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl grid place-items-center shrink-0 shadow-2xs"
                   style={{ background: style.bg, color: style.fg }}
                 >
-                  <Icon size={20} />
+                  <Icon size={18} className="sm:w-5 sm:h-5" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <strong className="text-xs sm:text-sm font-bold text-text">{m.label}</strong>
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+                  <span className="flex items-center gap-1.5 sm:gap-2">
+                    <strong className="text-xs sm:text-sm font-bold text-text truncate">{m.label}</strong>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
                       {m.count} {m.tag}
                     </span>
                   </span>
@@ -231,8 +230,8 @@ export const DashboardPage = () => {
       </div>
 
       {/* Dashboard Analytics & Trends */}
-      <div className="dashboard-view" style={{ padding: 0 }}>
-        <div className="dashboard-stats">
+      <div className="dashboard-view">
+        <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5">
           {/* ── [PHASE-1-DASHBOARD] was: {dashboardData.stats.map((stat) => {...})} ──
               CRM stat cards (leads/tasks pipeline) replaced with live ERP stats below. */}
           {[
@@ -251,55 +250,66 @@ export const DashboardPage = () => {
               <article key={stat.label} className="dashboard-stat">
                 <div className="dashboard-stat-top">
                   <span className="dashboard-stat-icon" style={{ background: style.bg, color: style.fg }}>
-                    <Icon size={22} />
+                    <Icon size={20} className="sm:w-5 sm:h-5" />
                   </span>
                   <div className="dashboard-stat-copy">
-                    <strong>{stat.value}</strong>
-                    <span>{stat.label}</span>
+                    <strong title={stat.value}>{stat.value}</strong>
+                    <span title={stat.label}>{stat.label}</span>
                   </div>
                 </div>
                 <small className={`dashboard-stat-trend${trendClass}`}>
-                  <TrendIcon size={14} />
-                  <b>{stat.trend}</b>
-                  <em>{stat.note}</em>
+                  <TrendIcon size={13} className="shrink-0" />
+                  <b className="shrink-0">{stat.trend}</b>
+                  <em className="truncate">{stat.note}</em>
                 </small>
               </article>
             );
           })}
           <article className="dashboard-stat">
             <div className="dashboard-stat-top">
-              <span className="dashboard-stat-icon" style={{ background: CARD_STYLES.green.bg, color: CARD_STYLES.green.fg }}><FileText size={24} /></span>
-              {/* ── [PHASE-1-DASHBOARD] was: {fmt(quotations.length + 64)} — removed demo +64 offset ── */}
-              <div className="dashboard-stat-copy"><strong>{fmt(quotations.length)}</strong><span>Quotations</span></div>
+              <span className="dashboard-stat-icon" style={{ background: CARD_STYLES.green.bg, color: CARD_STYLES.green.fg }}>
+                <FileText size={20} className="sm:w-5 sm:h-5" />
+              </span>
+              <div className="dashboard-stat-copy">
+                <strong title={fmt(quotations.length)}>{fmt(quotations.length)}</strong>
+                <span>Quotations</span>
+              </div>
             </div>
-            <small className="dashboard-stat-trend"><TrendingUp size={14} /><b>100%</b><em>live count</em></small>
+            <small className="dashboard-stat-trend">
+              <TrendingUp size={13} className="shrink-0" />
+              <b className="shrink-0">100%</b>
+              <em className="truncate">live count</em>
+            </small>
           </article>
           <article className="dashboard-stat">
             <div className="dashboard-stat-top">
               <span className="dashboard-stat-icon" style={{ background: CARD_STYLES.amber.bg, color: CARD_STYLES.amber.fg }}>
-                <Boxes size={22} />
+                <Boxes size={20} className="sm:w-5 sm:h-5" />
               </span>
               <div className="dashboard-stat-copy">
-                <strong>{fmt(items.length)}</strong>
+                <strong title={fmt(items.length)}>{fmt(items.length)}</strong>
                 <span>SKUs Live</span>
               </div>
             </div>
             <small className="dashboard-stat-trend">
-              <TrendingUp size={14} />
-              <b>{fmt(lowStockItems.length)}</b>
-              <em>need reorder</em>
+              <TrendingUp size={13} className="shrink-0" />
+              <b className="shrink-0">{fmt(lowStockItems.length)}</b>
+              <em className="truncate">need reorder</em>
             </small>
           </article>
         </div>
 
-        <div className="dashboard-main-grid">
-          <section className="dashboard-panel dashboard-chart-card">
-            <div className="panel-head panel-head-spread">
-              <div><h3>Revenue Overview</h3><p>{overview.headline}</p></div>
-              <button type="button" className="dashboard-filter-btn">{overview.period}</button>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6 mt-4 sm:mt-5">
+          <section className="xl:col-span-2 bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 className="font-bold text-text text-sm sm:text-base">Revenue Overview</h3>
+                <p className="text-[11px] sm:text-xs text-muted">{overview.headline}</p>
+              </div>
+              <button type="button" className="dashboard-filter-btn self-start sm:self-auto">{overview.period}</button>
             </div>
-            <div className="chart-wrap">
-              <svg viewBox="0 0 620 260" className="chart-svg" aria-label="Invoiced revenue chart">
+            <div className="chart-wrap overflow-hidden">
+              <svg viewBox="0 0 620 260" className="chart-svg w-full h-auto max-h-[260px]" aria-label="Invoiced revenue chart">
                 <defs>
                   <linearGradient id="uniChartArea" x1="0" x2="0" y1="0" y2="1">
                     <stop offset="0%" stopColor="#2b7cff" stopOpacity="0.28" />
@@ -326,20 +336,26 @@ export const DashboardPage = () => {
               </svg>
             </div>
             <p className="chart-note">{overview.summary}</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
-              <Link to="/sales/quotes" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Quotes: {fmt(quotations.length)}</Link>
-              <Link to="/sales/invoices" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Invoices: {fmt(invoices.length)}</Link>
-              <Link to="/sales/challans" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition">Challans: {fmt(deliveryChallans.length)}</Link>
-              <Link to="/sales/orders" className="text-center px-3 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-xs font-semibold shadow-2xs transition flex items-center justify-center gap-1.5"><Settings size={12} className="text-primary" /> Orders: {fmt(salesOrders.length)}</Link>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-[11px] sm:text-xs font-semibold">
+              <Link to="/sales/quotes" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition truncate">Quotes: {fmt(quotations.length)}</Link>
+              <Link to="/sales/invoices" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition truncate">Invoices: {fmt(invoices.length)}</Link>
+              <Link to="/sales/challans" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition truncate">Challans: {fmt(deliveryChallans.length)}</Link>
+              <Link to="/sales/orders" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition flex items-center justify-center gap-1.5 truncate">
+                <Settings size={12} className="text-primary shrink-0" />
+                <span className="truncate">Orders: {fmt(salesOrders.length)}</span>
+              </Link>
             </div>
           </section>
 
-          <section className="dashboard-panel dashboard-donut-card">
-            <div className="panel-head panel-head-spread">
-              <div><h3>Invoice Status</h3><p>Billing distribution.</p></div>
-              <Link to="/sales/invoices" className="view-all-link">View All</Link>
+          <section className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <div>
+                <h3 className="font-bold text-text text-sm sm:text-base">Invoice Status</h3>
+                <p className="text-[11px] sm:text-xs text-muted">Billing distribution</p>
+              </div>
+              <Link to="/sales/invoices" className="text-xs font-bold text-primary hover:underline">View All</Link>
             </div>
-            <div className="donut-layout">
+            <div className="donut-layout py-2">
               <div className="donut-chart">
                 <svg viewBox="0 0 220 220" aria-label="Task status donut chart">
                   <circle cx="110" cy="110" r="72" className="donut-track" />
@@ -347,7 +363,10 @@ export const DashboardPage = () => {
                     <path key={item.key} d={item.path} stroke={item.color} strokeWidth="22" strokeLinecap="round" fill="none" />
                   ))}
                 </svg>
-                <div className="donut-center"><strong>{completedPct}%</strong><span>Paid</span></div>
+                <div className="donut-center">
+                  <strong>{completedPct}%</strong>
+                  <span>Paid</span>
+                </div>
               </div>
               <div className="donut-legend">
                 {/* ── [PHASE-1-DASHBOARD] was: dashboardData.taskStatus.map(...) — now ERP taskStatus ── */}
@@ -355,14 +374,14 @@ export const DashboardPage = () => {
                   <div key={item.key} className="legend-row">
                     <div className="legend-meta">
                       <span className="legend-dot" style={{ backgroundColor: item.color }} />
-                      <span>{item.label}</span>
+                      <span className="truncate">{item.label}</span>
                     </div>
                     <strong>{item.value}</strong>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="activity-list mt-4">
+            <div className="activity-list mt-4 pt-3 border-t border-border">
               {/* ── [PHASE-1-DASHBOARD] was: dashboardData.recentActivity.slice(0,3) — now ERP recentActivity ── */}
               {recentActivity.map((item) => {
                 const Icon = ACTIVITY_ICONS[item.icon] || UserPlus;
@@ -373,10 +392,10 @@ export const DashboardPage = () => {
                       <Icon size={16} />
                     </span>
                     <div className="activity-copy">
-                      <strong>{item.title}</strong>
-                      <p>{item.person}</p>
+                      <strong className="truncate">{item.title}</strong>
+                      <p className="truncate">{item.person}</p>
                     </div>
-                    <time>{item.time}</time>
+                    <time className="shrink-0">{item.time}</time>
                   </div>
                 );
               })}
@@ -386,13 +405,13 @@ export const DashboardPage = () => {
       </div>
 
       {/* Low-Stock Alerts & Snapshots Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6">
         {/* Left: Low Stock Alerts */}
-        <div className="lg:col-span-2 bg-card border border-border rounded-2xl p-5 shadow-xs">
+        <div className="xl:col-span-2 bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-text text-sm">Low-Stock Alerts</h3>
-              <p className="text-[11px] text-muted">Items below safety reorder threshold</p>
+              <h3 className="font-bold text-text text-sm sm:text-base">Low-Stock Alerts</h3>
+              <p className="text-[11px] sm:text-xs text-muted">Items below safety reorder threshold</p>
             </div>
             <Link to="/inventory/stock-position" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
               <span>View All</span>
@@ -400,8 +419,8 @@ export const DashboardPage = () => {
             </Link>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[520px] lg:min-w-0 text-left border-collapse text-xs">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-thin">
+            <table className="w-full min-w-[460px] text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-border text-muted uppercase tracking-wider font-bold text-[10px]">
                   <th className="py-2.5 px-3">SKU</th>
@@ -414,18 +433,18 @@ export const DashboardPage = () => {
               <tbody className="divide-y divide-border/60">
                 {lowStockItems.slice(0, 6).map((item) => (
                   <tr key={item.id || item.sku} className="hover:bg-soft/70 transition-colors">
-                    <td className="py-3 px-3 font-mono font-semibold text-text-secondary">{item.sku}</td>
-                    <td className="py-3 px-3 font-semibold text-text">{item.name}</td>
-                    <td className="py-3 px-3 text-center font-bold text-danger font-mono">
+                    <td className="py-2.5 sm:py-3 px-3 font-mono font-semibold text-text-secondary whitespace-nowrap">{item.sku}</td>
+                    <td className="py-2.5 sm:py-3 px-3 font-semibold text-text max-w-[160px] sm:max-w-none truncate">{item.name}</td>
+                    <td className="py-2.5 sm:py-3 px-3 text-center font-bold text-danger font-mono whitespace-nowrap">
                       {item.availableQty}
                     </td>
-                    <td className="py-3 px-3 text-center">
+                    <td className="py-2.5 sm:py-3 px-3 text-center whitespace-nowrap">
                       <StatusBadge status={item.status} />
                     </td>
-                    <td className="py-3 px-3 text-right">
+                    <td className="py-2.5 sm:py-3 px-3 text-right whitespace-nowrap">
                       <Link
                         to="/purchase/orders"
-                        className="inline-flex items-center justify-center px-3 py-1 bg-primary text-white hover:bg-primary-hover rounded-lg text-[11px] font-semibold shadow-2xs transition"
+                        className="inline-flex items-center justify-center px-2.5 sm:px-3 py-1 bg-primary text-white hover:bg-primary-hover rounded-lg text-[11px] font-semibold shadow-2xs transition"
                       >
                         Order
                       </Link>
@@ -443,86 +462,89 @@ export const DashboardPage = () => {
             </table>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4 text-xs font-semibold">
-            <Link to="/inventory/items" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-xs font-semibold">
+            <Link to="/inventory/items" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition truncate">
               Items: {fmt(items.length)}
             </Link>
-            <Link to="/inventory/transfers" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition">
+            <Link to="/inventory/transfers" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition truncate">
               Transfers: {fmt(transfers.length)}
             </Link>
-            <Link to="/inventory/faulty-parts" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition">
+            <Link to="/inventory/faulty-parts" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition truncate">
               Faulty: {fmt(openFaulty)}
             </Link>
-            <Link to="/inventory/locations" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition flex items-center justify-center gap-1">
-              <MapPin size={12} />
-              <span>Locations</span>
+            <Link to="/inventory/locations" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition flex items-center justify-center gap-1 truncate">
+              <MapPin size={12} className="shrink-0" />
+              <span className="truncate">Locations</span>
             </Link>
           </div>
         </div>
 
         {/* Right: Sales & Purchase Snapshots */}
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-xs flex flex-col gap-4">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="font-bold text-text text-sm">Sales Snapshot</h3>
-                <p className="text-[11px] text-muted">Orders + Invoices + Challans</p>
-              </div>
-              <Link to="/sales/orders" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                <span>View All</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-            <div className="space-y-2 text-xs">
-              {salesOrders.slice(0, 3).map((o) => (
-                <div key={o.id} className="p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs font-bold text-text">{o.orderNumber || o.id}</p>
-                    <p className="text-[11px] text-muted truncate">{o.customer} • ₹{fmt(o.amount || 0)}</p>
-                  </div>
-                  <StatusBadge status={o.stage || o.status || 'Draft'} />
+        <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-bold text-text text-sm">Sales Snapshot</h3>
+                  <p className="text-[11px] text-muted">Orders + Invoices + Challans</p>
                 </div>
-              ))}
+                <Link to="/sales/orders" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+                  <span>View All</span>
+                  <ArrowRight size={13} />
+                </Link>
+              </div>
+              <div className="space-y-2 text-xs">
+                {salesOrders.slice(0, 3).map((o) => (
+                  <div key={o.id} className="p-2.5 sm:p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono text-xs font-bold text-text truncate">{o.orderNumber || o.id}</p>
+                      <p className="text-[11px] text-muted truncate">{o.customer} • ₹{fmt(o.amount || 0)}</p>
+                    </div>
+                    <StatusBadge status={o.stage || o.status || 'Draft'} />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="font-bold text-text text-sm">Purchase Snapshot</h3>
+                  <p className="text-[11px] text-muted">POs + Bills + Expenses</p>
+                </div>
+                <Link to="/purchase/orders" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+                  <span>View All</span>
+                  <ArrowRight size={13} />
+                </Link>
+              </div>
+              <div className="space-y-2 text-xs">
+                {purchaseOrders.slice(0, 3).map((o) => (
+                  <div key={o.id} className="p-2.5 sm:p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono text-xs font-bold text-text truncate">{o.orderNumber || o.poNumber || o.id}</p>
+                      <p className="text-[11px] text-muted truncate">{o.vendor} • ₹{fmt(o.total || o.amount || 0)}</p>
+                    </div>
+                    <StatusBadge status={o.status || 'Draft'} />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h3 className="font-bold text-text text-sm">Purchase Snapshot</h3>
-                <p className="text-[11px] text-muted">POs + Bills + Expenses</p>
-              </div>
-              <Link to="/purchase/orders" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
-                <span>View All</span>
-                <ArrowRight size={13} />
-              </Link>
-            </div>
-            <div className="space-y-2 text-xs">
-              {purchaseOrders.slice(0, 3).map((o) => (
-                <div key={o.id} className="p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
-                  <div className="min-w-0">
-                    <p className="font-mono text-xs font-bold text-text">{o.orderNumber || o.poNumber || o.id}</p>
-                    <p className="text-[11px] text-muted truncate">{o.vendor} • ₹{fmt(o.total || o.amount || 0)}</p>
-                  </div>
-                  <StatusBadge status={o.status || 'Draft'} />
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="pt-3 border-t border-border grid grid-cols-2 gap-2 text-xs font-semibold">
-            <Link to="/sales/invoices" className="px-3 py-2 rounded-xl bg-primary text-white text-center shadow-2xs hover:bg-primary/90 transition">
+          <div className="pt-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2 text-xs font-semibold">
+            <Link to="/sales/invoices" className="px-2.5 py-2 rounded-xl bg-primary text-white text-center shadow-2xs hover:bg-primary/90 transition truncate">
               Invoices ₹{fmt(Math.round(invoiceTotal))}
             </Link>
-            <Link to="/purchase/bills" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/purchase/bills" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               Bills ₹{fmt(Math.round(billTotal))}
             </Link>
-            <Link to="/sales/payments" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/sales/payments" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               PayIn ₹{fmt(Math.round(paymentInTotal))}
             </Link>
-            <Link to="/purchase/payments" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/purchase/payments" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               PayOut ₹{fmt(Math.round(paymentOutTotal))}
             </Link>
-            <Link to="/purchase/expenses" className="px-3 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center col-span-2 transition">
+            <Link to="/purchase/expenses" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center col-span-2 sm:col-span-4 xl:col-span-2 transition text-[11px] sm:text-xs">
               Expenses ₹{fmt(Math.round(expenseTotal))} • Challans {fmt(deliveryChallans.length)} • Returns {fmt(salesReturns.length)}
             </Link>
           </div>
@@ -530,12 +552,12 @@ export const DashboardPage = () => {
       </div>
 
       {/* Bottom Row: Parties, Accounts, HRMS + Admin */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
+        <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-bold text-text text-sm">Parties</h3>
-              <p className="text-[11px] text-muted">Customers + Vendors</p>
+              <h3 className="font-bold text-text text-sm sm:text-base">Parties</h3>
+              <p className="text-[11px] sm:text-xs text-muted">Customers + Vendors</p>
             </div>
             <Link to="/parties" className="text-xs font-bold text-primary hover:underline">
               View All
@@ -543,34 +565,34 @@ export const DashboardPage = () => {
           </div>
           <div className="space-y-2 text-xs font-semibold">
             <Link to="/crm/customers" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
-              <span className="flex items-center gap-2 font-bold">
-                <Users size={14} className="text-primary" />
-                <span>Customers</span>
+              <span className="flex items-center gap-2 font-bold min-w-0">
+                <Users size={14} className="text-primary shrink-0" />
+                <span className="truncate">Customers</span>
               </span>
-              <strong className="text-text">{fmt(customers.length)}</strong>
+              <strong className="text-text font-mono shrink-0">{fmt(customers.length)}</strong>
             </Link>
             <Link to="/parties" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
-              <span className="flex items-center gap-2 font-bold">
-                <Building2 size={14} className="text-primary" />
-                <span>Vendors</span>
+              <span className="flex items-center gap-2 font-bold min-w-0">
+                <Building2 size={14} className="text-primary shrink-0" />
+                <span className="truncate">Vendors</span>
               </span>
-              <strong className="text-text">{fmt(vendors.length)}</strong>
+              <strong className="text-text font-mono shrink-0">{fmt(vendors.length)}</strong>
             </Link>
             <Link to="/parties" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
-              <span className="flex items-center gap-2 font-bold">
-                <BriefcaseBusiness size={14} className="text-primary" />
-                <span>All Parties</span>
+              <span className="flex items-center gap-2 font-bold min-w-0">
+                <BriefcaseBusiness size={14} className="text-primary shrink-0" />
+                <span className="truncate">All Parties</span>
               </span>
-              <strong className="text-text">{fmt(parties.length)}</strong>
+              <strong className="text-text font-mono shrink-0">{fmt(parties.length)}</strong>
             </Link>
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
+        <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-bold text-text text-sm">Accounts</h3>
-              <p className="text-[11px] text-muted">Cash + Ledger + Reports</p>
+              <h3 className="font-bold text-text text-sm sm:text-base">Accounts</h3>
+              <p className="text-[11px] sm:text-xs text-muted">Cash + Ledger + Reports</p>
             </div>
             <Link to="/accounts/cash-bank" className="text-xs font-bold text-primary hover:underline">
               View All
@@ -578,70 +600,70 @@ export const DashboardPage = () => {
           </div>
           <div className="space-y-2 text-xs font-semibold">
             <Link to="/accounts/cash-bank" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
-              <span className="flex items-center gap-2 font-bold text-text">
-                <Landmark size={14} className="text-primary" />
-                <span>Bank Balance</span>
+              <span className="flex items-center gap-2 font-bold text-text min-w-0">
+                <Landmark size={14} className="text-primary shrink-0" />
+                <span className="truncate">Bank Balance</span>
               </span>
-              <strong className="text-text font-mono font-bold">₹{fmt(Math.round(bankBalance))}</strong>
+              <strong className="text-text font-mono font-bold shrink-0">₹{fmt(Math.round(bankBalance))}</strong>
             </Link>
             <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
-              <span className="flex items-center gap-2 font-bold text-text">
-                <FileText size={14} className="text-primary" />
-                <span>General Ledger</span>
+              <span className="flex items-center gap-2 font-bold text-text min-w-0">
+                <FileText size={14} className="text-primary shrink-0" />
+                <span className="truncate">General Ledger</span>
               </span>
-              <span className="text-primary text-xs font-bold">Open →</span>
+              <span className="text-primary text-xs font-bold shrink-0">Open →</span>
             </Link>
             <Link to="/accounts/reports" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
-              <span className="flex items-center gap-2 font-bold text-text">
-                <PieChart size={14} className="text-primary" />
-                <span>Financial Reports</span>
+              <span className="flex items-center gap-2 font-bold text-text min-w-0">
+                <PieChart size={14} className="text-primary shrink-0" />
+                <span className="truncate">Financial Reports</span>
               </span>
-              <span className="text-primary text-xs font-bold">View →</span>
+              <span className="text-primary text-xs font-bold shrink-0">View →</span>
             </Link>
           </div>
         </div>
 
-        <div className="bg-card border border-border rounded-2xl p-5 shadow-xs">
+        <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs md:col-span-2 xl:col-span-1">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-bold text-text text-sm">HRMS + Admin</h3>
-              <p className="text-[11px] text-muted">People + Settings</p>
+              <h3 className="font-bold text-text text-sm sm:text-base">HRMS + Admin</h3>
+              <p className="text-[11px] sm:text-xs text-muted">People + Settings</p>
             </div>
             <Link to="/hrms/dashboard" className="text-xs font-bold text-primary hover:underline">
               HRMS
             </Link>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs font-semibold">
-            <Link to="/hrms/employees" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 gap-2 text-xs font-semibold">
+            <Link to="/hrms/employees" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               Employees
             </Link>
-            <Link to="/hrms/attendance" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/hrms/attendance" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               Attendance
             </Link>
-            <Link to="/hrms/leave" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/hrms/leave" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               Leave
             </Link>
-            <Link to="/hrms/payroll" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/hrms/payroll" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               Payroll
             </Link>
-            <Link to="/administration/users" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/administration/users" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               Users
             </Link>
-            <Link to="/administration/settings" className="p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition">
+            <Link to="/administration/settings" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
               Settings
             </Link>
           </div>
-          <div className="mt-3 flex items-center gap-2 text-xs font-semibold">
-            <Link to="/crm/user-allocation" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
-              <ListChecks size={13} className="text-primary" />
-              <span>Allocation</span>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-semibold">
+            <Link to="/crm/user-allocation" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
+              <ListChecks size={13} className="text-primary shrink-0" />
+              <span className="truncate">Allocation</span>
             </Link>
-            <Link to="/inventory/zone-requests" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
-              <span>Zone Requests ({pendingZoneReqs})</span>
+            <Link to="/inventory/zone-requests" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
+              <span className="truncate">Zone Requests ({pendingZoneReqs})</span>
             </Link>
-            <Link to="/inventory/transfers" className="flex-1 p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs">
-              <ArrowLeftRight size={13} className="text-primary" />
-              <span>Transfers ({pendingTransfers})</span>
+            <Link to="/inventory/transfers" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
+              <ArrowLeftRight size={13} className="text-primary shrink-0" />
+              <span className="truncate">Transfers ({pendingTransfers})</span>
             </Link>
           </div>
         </div>
