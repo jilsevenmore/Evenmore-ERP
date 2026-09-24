@@ -466,7 +466,7 @@ export function DocumentsPage() {
         </div>
 
         {/* Primary Action Button: Directly select PDF from device */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           <button
             type="button"
             onClick={() =>
@@ -584,11 +584,11 @@ export function DocumentsPage() {
       </div>
 
       {/* Main Section Navigation Tabs */}
-      <div className="flex border-b border-bdr gap-2 bg-white px-4 pt-3 rounded-2xl border shadow-xs">
+      <div className="flex border-b border-bdr gap-2 bg-white px-4 pt-3 rounded-2xl border shadow-xs overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
         <button
           type="button"
           onClick={() => setActiveTab("all")}
-          className={`pb-3.5 px-3 text-[14px] font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3.5 px-3 text-[14px] font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 lg:shrink cursor-pointer ${
             activeTab === "all"
               ? "border-navy text-navy font-bold"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -604,7 +604,7 @@ export function DocumentsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("employee")}
-          className={`pb-3.5 px-3 text-[14px] font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3.5 px-3 text-[14px] font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 lg:shrink cursor-pointer ${
             activeTab === "employee"
               ? "border-navy text-navy font-bold"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -620,7 +620,7 @@ export function DocumentsPage() {
         <button
           type="button"
           onClick={() => setActiveTab("my")}
-          className={`pb-3.5 px-3 text-[14px] font-semibold border-b-2 transition-all flex items-center gap-2 cursor-pointer ${
+          className={`pb-3.5 px-3 text-[14px] font-semibold border-b-2 transition-all flex items-center gap-2 shrink-0 lg:shrink cursor-pointer ${
             activeTab === "my"
               ? "border-navy text-navy font-bold"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -692,7 +692,7 @@ export function DocumentsPage() {
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => triggerSelectFromDevice("All Staff")}
@@ -707,7 +707,7 @@ export function DocumentsPage() {
           {/* Master Table */}
           <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
                 <thead className="bg-slate-50/75 border-b border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                   <tr>
                     <th className="py-3.5 px-5">Document Title &amp; Details</th>
@@ -997,7 +997,7 @@ export function DocumentsPage() {
               </div>
 
               {/* Direct Select from Device for Employee */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => triggerSelectFromDevice(currentSelectedEmployee.name)}
@@ -1181,13 +1181,13 @@ export function DocumentsPage() {
       {activeTab === "my" && (
         <div className="flex flex-col gap-6">
           {/* My Profile Document Vault Banner */}
-          <div className="bg-gradient-to-r from-navy/95 to-navy/80 text-white rounded-2xl p-6 shadow-md flex flex-wrap justify-between items-center gap-6">
-            <div className="flex items-center gap-4.5">
+          <div className="bg-gradient-to-r from-navy/95 to-navy/80 text-white rounded-2xl p-4 sm:p-6 shadow-md flex flex-wrap justify-between items-center gap-6">
+            <div className="flex items-center gap-4.5 min-w-0 lg:min-w-auto">
               <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-white text-[22px] font-bold shadow-inner">
                 {currentUser?.initials || "AG"}
               </div>
               <div>
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
                   <h2 className="text-[20px] font-bold leading-tight">{myDocUser}</h2>
                   <span className="px-2.5 py-0.5 bg-white/15 border border-white/20 rounded-full text-[11px] font-medium">
                     Personal PDF Vault
@@ -1196,7 +1196,7 @@ export function DocumentsPage() {
                 <p className="text-[13px] text-white/80 mt-1">
                   Role: {currentUser?.role} • {currentUser?.email}
                 </p>
-                <div className="flex items-center gap-3 mt-2 text-[12px] text-white/90">
+                <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 mt-2 text-[12px] text-white/90">
                   <span className="inline-flex items-center gap-1">
                     <CheckCircle2 size={14} className="text-emerald-400" />
                     {myDocs.filter((d) => d.status === "Valid").length} Verified PDFs
@@ -1241,7 +1241,7 @@ export function DocumentsPage() {
 
           {/* Quick Notice if Expiring */}
           {myDocs.some((d) => d.status === "Expiring Soon" || d.status === "Expired") && (
-            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between gap-3 text-amber-900">
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 text-amber-900">
               <div className="flex items-center gap-2.5">
                 <AlertTriangle size={18} className="text-amber-600 shrink-0" />
                 <span className="text-[13px] font-medium">
@@ -1518,7 +1518,7 @@ export function DocumentsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1">
                   Category

@@ -115,7 +115,7 @@ export default function Flexibility() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
             <button
               type="button"
               onClick={reset}
@@ -175,7 +175,7 @@ export default function Flexibility() {
       {/* ── 2-Column Responsive Form Layout ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* ── Card 1: Late Arrival & Grace Period ── */}
-        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
+        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
           <div>
             <div className="flex items-center gap-3 pb-4 mb-5 border-b border-[#f1f5f9]">
               <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 grid place-items-center">
@@ -255,7 +255,7 @@ export default function Flexibility() {
         </div>
 
         {/* ── Card 2: Early Clock-Out Rules ── */}
-        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
+        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
           <div>
             <div className="flex items-center gap-3 pb-4 mb-5 border-b border-[#f1f5f9]">
               <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 grid place-items-center">
@@ -302,7 +302,7 @@ export default function Flexibility() {
         </div>
 
         {/* ── Card 3: Working Hours & Shifts ── */}
-        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
+        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
           <div>
             <div className="flex items-center gap-3 pb-4 mb-5 border-b border-[#f1f5f9]">
               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 grid place-items-center">
@@ -356,7 +356,7 @@ export default function Flexibility() {
         </div>
 
         {/* ── Card 4: Overtime Rules ── */}
-        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
+        <div className="bg-white border border-[#e2e8f0] rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
           <div>
             <div className="flex items-center gap-3 pb-4 mb-5 border-b border-[#f1f5f9]">
               <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 grid place-items-center">

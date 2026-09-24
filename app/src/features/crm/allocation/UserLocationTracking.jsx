@@ -265,7 +265,7 @@ export default function UserLocationTracking() {
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 space-y-4">
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 px-4 py-3 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5"><span className={`w-2 h-2 rounded-full ${live ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} /> Live Employee Locations</h3>
                 <p className="text-[11px] text-slate-400 mt-0.5">Real-time tracking. Last updated: {updatedAt}</p>
@@ -439,8 +439,8 @@ export default function UserLocationTracking() {
       </div>
 
       {activeCallStaff && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setActiveCallStaff(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 p-6 text-center animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4" onClick={() => setActiveCallStaff(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-center animate-in zoom-in-95 duration-150">
             <div className="w-16 h-16 rounded-full mx-auto grid place-items-center text-xl font-bold text-white mb-3 shadow-md" style={{ background: activeCallStaff.color }}>
               {initials(activeCallStaff.name)}
             </div>
@@ -462,7 +462,7 @@ export default function UserLocationTracking() {
       )}
 
       {activeMessageStaff && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setActiveMessageStaff(null)}>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4" onClick={() => setActiveMessageStaff(null)}>
           <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -511,10 +511,10 @@ export default function UserLocationTracking() {
       )}
 
       {historyModalStaff && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4" onClick={() => setHistoryModalStaff(null)}>
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4" onClick={() => setHistoryModalStaff(null)}>
           <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3 lg:gap-0 px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+              <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
                 <span className="w-10 h-10 rounded-full grid place-items-center text-xs font-bold text-white shadow-sm" style={{ background: historyModalStaff.color }}>
                   {initials(historyModalStaff.name)}
                 </span>
@@ -526,7 +526,7 @@ export default function UserLocationTracking() {
               <button type="button" onClick={() => setHistoryModalStaff(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={18} /></button>
             </div>
             <div className="p-5 overflow-y-auto space-y-4">
-              <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl p-3">
+              <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 bg-blue-50 border border-blue-100 rounded-xl p-3">
                 <div className="flex items-center gap-2 text-xs text-blue-900 font-semibold">
                   <CalendarDays size={16} className="text-blue-600" />
                   <span>Log Date:</span>
@@ -537,7 +537,7 @@ export default function UserLocationTracking() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-4 gap-2.5 text-center">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
                   <Footprints size={16} className="mx-auto text-blue-600 mb-1" />
                   <span className="block text-[10px] text-slate-400">Total Distance</span>
@@ -562,8 +562,8 @@ export default function UserLocationTracking() {
 
               <div>
                 <h4 className="text-xs font-bold text-slate-800 mb-2.5">Chronological Movement & GPS Timeline</h4>
-                <div className="border border-slate-200 rounded-xl overflow-hidden text-xs">
-                  <table className="w-full text-left border-collapse">
+                <div className="border border-slate-200 rounded-xl overflow-x-auto text-xs">
+                  <table className="w-full text-left border-collapse min-w-[480px] lg:min-w-0">
                     <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase">
                       <tr>
                         <th className="px-3 py-2">Timestamp</th>
@@ -599,7 +599,7 @@ export default function UserLocationTracking() {
       )}
 
       {reportsOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" role="presentation" onMouseDown={() => setReportsOpen(false)}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4" role="presentation" onMouseDown={() => setReportsOpen(false)}>
           <div onMouseDown={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h2 className="text-sm font-bold text-slate-900">Tracking Report — {date}</h2>

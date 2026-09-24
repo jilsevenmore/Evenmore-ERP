@@ -125,8 +125,8 @@ export default function RecruitmentFunnel() {
       </div>
 
       {/* Visual Funnel Visualization Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs space-y-4">
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-100 dark:border-slate-800">
           <h3 className="text-[15px] font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <Filter size={16} className="text-indigo-600" />
             <span>Recruitment Conversion Pipeline</span>

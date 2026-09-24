@@ -159,7 +159,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
             }
         }
     };
-    return (<div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center pt-20 p-4 animate-in fade-in duration-150">
+    return (<div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center p-2 pt-12 sm:p-4 sm:pt-20 animate-in fade-in duration-150">
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[75vh]">
         {/* Search Bar Input */}
         <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-200 bg-slate-50/50">
@@ -211,7 +211,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         </div>
 
         {/* Footer shortcuts */}
-        <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
+        <div className="px-4 py-2 bg-slate-50 border-t border-slate-200 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-[11px] text-slate-500">
           <div className="flex items-center gap-3">
             <span>
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-white border border-slate-200 rounded mr-1">↑</kbd>

@@ -19,6 +19,8 @@ export default function MainLayout() {
   const clearToast = useAppStore((s) => s.clearToast);
   const commandPaletteOpen = useAppStore((s) => s.commandPaletteOpen);
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
+  const mobileSidebarOpen = useAppStore((s) => s.mobileSidebarOpen);
+  const setMobileSidebarOpen = useAppStore((s) => s.setMobileSidebarOpen);
   const { pathname } = useLocation();
   const isErpRoute = ERP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
@@ -40,6 +42,31 @@ export default function MainLayout() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [commandPaletteOpen, setCommandPaletteOpen]);
 
+  // Auto-close the mobile navigation drawer on route navigation.
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [pathname, setMobileSidebarOpen]);
+
+  // Escape closes the mobile navigation drawer.
+  useEffect(() => {
+    if (!mobileSidebarOpen) return undefined;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setMobileSidebarOpen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileSidebarOpen, setMobileSidebarOpen]);
+
+  // Leaving the drawer breakpoint (e.g. rotating a tablet) drops any open drawer.
+  useEffect(() => {
+    const desktop = window.matchMedia('(min-width: 1024px)');
+    const handleChange = (e) => {
+      if (e.matches) setMobileSidebarOpen(false);
+    };
+    desktop.addEventListener('change', handleChange);
+    return () => desktop.removeEventListener('change', handleChange);
+  }, [setMobileSidebarOpen]);
+
   useEffect(() => {
     if (!toast) return undefined;
     const timer = window.setTimeout(() => clearToast?.(), 3000);
@@ -48,12 +75,18 @@ export default function MainLayout() {
 
   return (
     <div
-      className="app-shell"
-      style={{
-        '--sidebar-width': `${sidebarWidth}px`,
-        gridTemplateColumns: `${sidebarWidth}px minmax(0,1fr)`,
-      }}
+      className={`app-shell${mobileSidebarOpen ? ' mobile-nav-open' : ''}`}
+      style={{ '--sidebar-width': `${sidebarWidth}px` }}
     >
+      {/* Mobile navigation backdrop (below lg only) */}
+      {mobileSidebarOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       <Sidebar />
 
       <div className="main-col">

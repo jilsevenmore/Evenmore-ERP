@@ -367,7 +367,7 @@ export function ClientsPage() {
   return (
     <div className="min-h-screen text-slate-800 p-4 md:p-7 space-y-6" style={{ backgroundColor: 'var(--page, #f6f9ff)', color: 'var(--text)' }}>
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="fixed top-4 right-4 left-4 sm:left-auto sm:top-6 sm:right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
           <CheckCircle2 size={18} className="text-emerald-400" />
           <span className="text-sm font-medium">{toastMessage}</span>
         </div>
@@ -815,7 +815,7 @@ export function ClientsPage() {
       ) : (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
+            <table className="w-full min-w-[960px] lg:min-w-0 text-left text-xs text-slate-700">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[11px] font-semibold">
                 <tr>
                   <th className="py-3 px-4">Client</th>
@@ -967,8 +967,8 @@ export function ClientsPage() {
       )}
 
       {clientToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
                 <AlertTriangle size={20} />
@@ -980,7 +980,7 @@ export function ClientsPage() {
               Are you sure you want to delete <strong>{clientToDelete.name}</strong>? All associated notes and communication history will be archived.
             </p>
 
-            <div className="flex items-center justify-end gap-2 mt-6 pt-3 border-t border-slate-100 text-xs">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 mt-6 pt-3 border-t border-slate-100 text-xs">
               <button
                 type="button"
                 onClick={() => setClientToDelete(null)}
@@ -1111,8 +1111,8 @@ function CreateEditClientModal({ client, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 my-8">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-slate-100 my-4 sm:my-8">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900">
             {client ? 'Edit Client' : 'Create New Client'}
@@ -1299,7 +1299,7 @@ function CreateEditClientModal({ client, onClose, onSave }) {
           </div>
 
           <div className="pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 lg:gap-0">
               <div>
                 <span className="font-bold text-slate-800">Login Enable</span>
                 <p className="text-[11px] text-slate-400">Allow this client to login to the client portal</p>
@@ -1364,7 +1364,7 @@ function CreateEditClientModal({ client, onClose, onSave }) {
             </div>
           )}
 
-          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-4 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
@@ -1504,8 +1504,8 @@ function ClientDealsModal({ client, onClose }) {
   const deals = client?.activeDeals || [];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Handshake size={18} className="text-purple-600" />
@@ -1524,7 +1524,7 @@ function ClientDealsModal({ client, onClose }) {
             <div className="text-center py-8 text-slate-400">No active deals found for this client.</div>
           ) : (
             deals.map((deal) => (
-              <div key={deal.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+              <div key={deal.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 lg:gap-0">
                 <div>
                   <div className="font-bold text-slate-800">{deal.name}</div>
                   <div className="text-[11px] text-purple-600 font-semibold mt-0.5">{deal.stage}</div>
@@ -1552,8 +1552,8 @@ function ClientProjectsModal({ client, onClose }) {
   const projects = client?.activeProjects || [];
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <Folder size={18} className="text-amber-600" />
@@ -1613,8 +1613,8 @@ function AddNoteModal({ client, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <StickyNote size={18} className="text-indigo-600" />
@@ -1641,7 +1641,7 @@ function AddNoteModal({ client, onClose, onSave }) {
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}

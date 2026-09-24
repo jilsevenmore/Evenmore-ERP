@@ -527,7 +527,7 @@ export function RolesPage() {
   return (
     <div className="min-h-screen text-slate-800 p-4 md:p-7 space-y-6" style={{ backgroundColor: 'var(--page, #f6f9ff)', color: 'var(--text)' }}>
       {toastMessage && (
-        <div className="fixed top-6 right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
+        <div className="fixed top-4 right-4 left-4 sm:left-auto sm:top-6 sm:right-6 z-50 bg-[#0f172a] text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-in fade-in slide-in-from-top-4 duration-200">
           <CheckCircle2 size={18} className="text-emerald-400" />
           <span className="text-sm font-medium">{toastMessage}</span>
         </div>
@@ -796,7 +796,7 @@ export function RolesPage() {
           </div>
 
           <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between border-b border-slate-200 gap-3 pb-2">
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-1">
+            <div className="flex flex-nowrap items-center gap-1 overflow-x-auto no-scrollbar scrollbar-none py-1">
               {MODULE_TABS.map((tab) => {
                 const isActive = activeTab === tab;
                 return (
@@ -806,7 +806,7 @@ export function RolesPage() {
                       setActiveTab(tab);
                       setPermissionSearchQuery('');
                     }}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
+                    className={`shrink-0 lg:shrink px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
                       isActive
                         ? 'text-[#1f6bff] border-b-2 border-[#1f6bff] rounded-b-none bg-blue-50/30'
                         : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
@@ -818,8 +818,8 @@ export function RolesPage() {
               })}
             </div>
 
-            <div className="flex items-center gap-3">
-              <div className="relative min-w-[180px]">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-3">
+              <div className="relative min-w-[180px] flex-1 md:flex-initial">
                 <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
@@ -863,10 +863,10 @@ export function RolesPage() {
                     key={group.id}
                     className="border border-slate-200 rounded-2xl bg-white overflow-hidden transition-all shadow-2xs"
                   >
-                    <div className="flex items-center justify-between p-3.5 bg-slate-50/50 border-b border-slate-100">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 p-3.5 bg-slate-50/50 border-b border-slate-100">
+                      <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
                         <div
-                          className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                          className={`w-9 h-9 shrink-0 lg:shrink rounded-xl flex items-center justify-center ${
                             group.color === 'green'
                               ? 'bg-emerald-100 text-emerald-700'
                               : group.color === 'orange'
@@ -890,7 +890,7 @@ export function RolesPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4 text-xs">
+                      <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1 text-xs">
                         <label className="flex items-center gap-1.5 font-medium text-slate-600 cursor-pointer select-none">
                           <input
                             type="checkbox"
@@ -948,7 +948,7 @@ export function RolesPage() {
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               onClick={handleCancelChanges}
               className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
@@ -966,8 +966,8 @@ export function RolesPage() {
       </div>
 
       {isDeleteModalOpen && (roleToDelete || activeRole) && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
                 <AlertTriangle size={20} />
@@ -980,7 +980,7 @@ export function RolesPage() {
               Users currently assigned to this role will lose their permission scope.
             </p>
 
-            <div className="flex items-center justify-end gap-2 mt-6 pt-3 border-t border-slate-100 text-xs">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 mt-6 pt-3 border-t border-slate-100 text-xs">
               <button
                 type="button"
                 onClick={() => {
@@ -1024,8 +1024,8 @@ function CreateRoleModal({ onClose, onCreate }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] overflow-y-auto">
         <div className="flex items-center justify-between pb-3 border-b border-slate-100">
           <h3 className="text-base font-bold text-slate-900">Create New Role</h3>
           <button

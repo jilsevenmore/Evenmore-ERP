@@ -56,8 +56,8 @@ export function TimelineGanttChart({ rows = [], window: win }) {
   const nowPct = pct(Date.now());
 
   return (
-    <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs">
-      <header className="flex items-baseline justify-between mb-4">
+    <section className="rounded-xl border border-[#dce5f4] bg-white p-4 sm:p-5 shadow-2xs">
+      <header className="flex flex-wrap lg:flex-nowrap items-baseline justify-between gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0 mb-4">
         <h3 className="text-sm font-bold text-slate-800">Project Timeline</h3>
         <span className="text-[11px] text-slate-400">
           {new Date(win.startMs).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })} —{' '}
@@ -119,7 +119,7 @@ export function TimelineGanttChart({ rows = [], window: win }) {
             <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {rows.map((row) => (
                 <li key={row.projectId} className="flex items-center gap-2 py-1.5 relative">
-                  <div style={{ width: 150 }} className="shrink-0 min-w-0 pr-2">
+                  <div style={{ width: 150 }} className="shrink-0 min-w-0 pr-2 sticky left-0 z-10 bg-white">
                     <Link
                       to={`/pms/projects/${row.projectId}`}
                       className="block text-[11px] font-bold text-blue-600 hover:underline truncate"

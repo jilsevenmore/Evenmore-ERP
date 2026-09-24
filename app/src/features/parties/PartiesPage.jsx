@@ -288,7 +288,7 @@ export default function PartiesPage() {
       />
 
       {/* Modern Colorful Metric Badges Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <MetricChip
           icon={Users}
           label="Total Active Parties"
@@ -316,7 +316,7 @@ export default function PartiesPage() {
       </div>
 
       {/* Horizontal Underline Tabs */}
-      <div className="border-b border-slate-200 flex items-center gap-6">
+      <div className="border-b border-slate-200 flex flex-nowrap items-center gap-6 overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
         {[
           { id: 'All', label: 'All Parties', count: stats.total },
           { id: 'Customer', label: 'Customers', count: stats.customers },
@@ -328,7 +328,7 @@ export default function PartiesPage() {
             <button
               key={tab.id}
               onClick={() => setSelectedType(tab.id)}
-              className={`pb-3 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer relative ${
+              className={`shrink-0 lg:shrink pb-3 text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer relative ${
                 isActive
                   ? 'text-blue-600 font-bold border-b-2 border-blue-600'
                   : 'text-slate-500 hover:text-slate-800'
@@ -383,16 +383,16 @@ export default function PartiesPage() {
 
       {/* View Party Details Modal */}
       {viewingParty && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
             {/* Modal Header using EntityHeroCard styling */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md shadow-blue-500/20">
+            <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between gap-2 lg:gap-0 bg-slate-50/50">
+              <div className="flex items-center gap-3.5 min-w-0 lg:min-w-auto">
+                <div className="w-12 h-12 shrink-0 lg:shrink rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-black text-lg flex items-center justify-center shadow-md shadow-blue-500/20">
                   {getInitial(viewingParty?.name || viewingParty?.companyName || viewingParty?.company, 'P')}
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                <div className="min-w-0 lg:min-w-auto">
+                  <h3 className="font-extrabold text-slate-800 text-base flex flex-wrap lg:flex-nowrap items-center gap-2">
                     {safeString(viewingParty?.name || viewingParty?.companyName || viewingParty?.company, 'Unnamed Party')}
                     <StatusBadge status={viewingParty.type === 'Both' ? 'Both' : viewingParty.type} />
                   </h3>
@@ -407,7 +407,7 @@ export default function PartiesPage() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto space-y-5 text-xs">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 text-xs">
               {/* Statutory & Tax */}
               <div className="bg-slate-50 p-4 rounded-xl border border-slate-200/80 space-y-2.5">
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -520,7 +520,7 @@ export default function PartiesPage() {
               </div>
             </div>
 
-            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <div className="p-4 border-t border-slate-100 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 bg-slate-50/50">
               <button
                 type="button"
                 onClick={() => {

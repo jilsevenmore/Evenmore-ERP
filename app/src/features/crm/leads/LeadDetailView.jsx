@@ -555,7 +555,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left Column: Lead Sources */}
         <div className="card">
-          <div className="card-header flex items-center justify-between">
+          <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
             <h3 className="font-bold text-sm">Lead Sources ({sources.length})</h3>
             <button
               type="button"
@@ -568,7 +568,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
           {showAddSource && (
             <form onSubmit={handleAddSource} className="p-4 bg-slate-50 dark:bg-slate-800/40 border-b border-slate-200 dark:border-slate-700 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label text-xs">Source Channel</label>
                   <select
@@ -607,7 +607,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
           )}
 
           <div className="table-scroll">
-            <table className="data-table text-xs">
+            <table className="data-table text-xs min-w-[640px] lg:min-w-0">
               <thead>
                 <tr>
                   <th style={{ width: 36 }}>#</th>
@@ -672,7 +672,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 
         {/* Right Column: Emails */}
         <div className="card">
-          <div className="card-header flex items-center justify-between">
+          <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
             <h3 className="font-bold text-sm">Emails ({emails.length})</h3>
             <button
               type="button"
@@ -684,8 +684,8 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
           </div>
 
           {showSendEmail && (
-            <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50" onClick={closeEmailModal}>
-              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[560px] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-slate-950/50" onClick={closeEmailModal}>
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[560px] max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
                   <h2 className="text-[15px] font-bold text-slate-800">Create Email</h2>
                   <button type="button" onClick={closeEmailModal} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Close">
@@ -749,7 +749,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
           )}
 
           <div className="table-scroll">
-            <table className="data-table text-xs">
+            <table className="data-table text-xs min-w-[640px] lg:min-w-0">
               <thead>
                 <tr>
                   <th style={{ width: 36 }}>#</th>
@@ -932,7 +932,7 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
         </div>
       </div>
       <div className="table-scroll">
-        <table className="data-table text-xs">
+        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
           <thead><tr><th>Name</th><th>Size</th><th>Sent On</th><th>Sent By</th><th style={{ textAlign: 'center' }}>Action</th></tr></thead>
           <tbody>
             {visibleFiles.map((f) => (
@@ -1058,9 +1058,9 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
 
   return (
     <div className="card">
-      <div className="card-header flex items-center justify-between">
+      <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <h3 className="font-bold text-sm">Calls ({calls.length})</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <button type="button" onClick={() => setIsLogOpen(true)} className="btn-outline btn-sm">
             Log Call
           </button>
@@ -1074,7 +1074,7 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
       </div>
 
       <div className="table-scroll">
-        <table className="data-table text-xs">
+        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
           <thead>
             <tr>
               <th style={{ width: 36 }}>#</th>
@@ -1141,8 +1141,8 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
       </div>
 
       {isLogOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setIsLogOpen(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsLogOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-900">Log Call</h4>
@@ -1151,7 +1151,7 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
               <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsLogOpen(false)} aria-label="Close log call dialog">×</button>
             </div>
             <form onSubmit={saveManualLog} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="form-label text-xs">Outcome *</label>
                   <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="form-select text-xs">
@@ -1181,8 +1181,8 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
       )}
 
       {isAddOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setIsAddOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Add Call">
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsAddOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Add Call">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h4 className="text-[15px] font-semibold text-slate-900">Add Call</h4>
               <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600 transition" aria-label="Close add call dialog"><X size={20} /></button>
@@ -1726,7 +1726,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[70] flex items-start justify-center p-4 bg-slate-950/50 overflow-y-auto" onClick={() => setIsModalOpen(false)}>
+        <div className="fixed inset-0 z-[70] flex items-start justify-center p-2 sm:p-4 bg-slate-950/50 overflow-y-auto" onClick={() => setIsModalOpen(false)}>
           <div className="bg-[#f1f5f9] rounded-xl shadow-2xl w-full max-w-5xl my-6 overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={editingId ? 'Edit lead task' : 'Create lead task'}>
             <div className="bg-white px-6 pt-5 pb-4 border-b border-slate-100">
               <h2 className="text-[15px] font-bold text-slate-900">Create Lead Task</h2>
@@ -1860,8 +1860,8 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       )}
 
       {deleteId && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50" onClick={() => setDeleteId(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-slate-950/50" onClick={() => setDeleteId(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <h2 className="text-sm font-bold text-slate-900">Delete this task?</h2>
             <p className="text-xs text-slate-500 mt-1">This action cannot be undone.</p>
             <div className="flex items-center justify-end gap-2 mt-4">
@@ -1945,14 +1945,14 @@ function EstimatesTab({ lead, onCountsChange }) {
 
   return (
     <div className="card">
-      <div className="card-header flex items-center justify-between">
+      <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <h3 className="font-bold text-sm">Estimates ({linked.length})</h3>
         <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
           <Plus size={13} strokeWidth={2.4} /> New Estimate
         </button>
       </div>
       <div className="table-scroll">
-        <table className="data-table text-xs">
+        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
           <thead>
             <tr>
               <th style={{ width: 36 }}>#</th>
@@ -2004,8 +2004,8 @@ function EstimatesTab({ lead, onCountsChange }) {
       </div>
 
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsCreateOpen(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" onClick={() => setIsCreateOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Create Sales Estimate</h3>
               <button onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
@@ -2151,14 +2151,14 @@ function QuotationsTab({ lead, onActivity }) {
 
   return (
     <div className="card">
-      <div className="card-header flex items-center justify-between">
+      <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <h3 className="font-bold text-sm">Quotations ({linked.length})</h3>
         <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
           <Plus size={13} strokeWidth={2.4} /> New Quotation
         </button>
       </div>
       <div className="table-scroll">
-        <table className="data-table text-xs">
+        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
           <thead>
             <tr>
               <th style={{ width: 36 }}>#</th>
@@ -2215,8 +2215,8 @@ function QuotationsTab({ lead, onActivity }) {
       </div>
 
       {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setIsCreateOpen(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" onClick={() => setIsCreateOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Create Quotation Estimate</h3>
               <button type="button" onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer" aria-label="Close quotation dialog">
@@ -2353,14 +2353,14 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
 
   return (
     <div className="card">
-      <div className="card-header flex items-center justify-between">
+      <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <h3 className="font-bold text-sm">Delivery Challans ({linked.length})</h3>
         <button type="button" onClick={openIssueModal} className="btn-primary btn-sm flex items-center gap-1.5">
           <Plus size={13} strokeWidth={2.4} /> New Challan
         </button>
       </div>
       <div className="table-scroll">
-        <table className="data-table text-xs">
+        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
           <thead>
             <tr>
               <th style={{ width: 36 }}>#</th>
@@ -2398,8 +2398,8 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
       </div>
 
       {showIssueModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setShowIssueModal(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-3xl p-5" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setShowIssueModal(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-3xl p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
               <div>
                 <h4 className="text-sm font-bold text-slate-900">Issue Delivery Challan</h4>
@@ -2774,7 +2774,7 @@ function GeneralTab({ lead }) {
           {infoRows.map(([label, val]) => (
             <div key={label} className="flex items-center justify-between gap-3">
               <span className="text-slate-400 font-normal shrink-0">{label}</span>
-              <span className="text-slate-900 font-semibold text-right truncate">{val}</span>
+              <span className="text-slate-900 font-semibold text-right truncate min-w-0 lg:min-w-auto">{val}</span>
             </div>
           ))}
         </div>
@@ -2786,7 +2786,7 @@ function GeneralTab({ lead }) {
           {addressRows.map(([label, val]) => (
             <div key={label} className="flex items-center justify-between gap-3">
               <span className="text-slate-400 font-normal shrink-0">{label}</span>
-              <span className="text-slate-900 font-semibold text-right truncate">{val}</span>
+              <span className="text-slate-900 font-semibold text-right truncate min-w-0 lg:min-w-auto">{val}</span>
             </div>
           ))}
         </div>
@@ -2986,8 +2986,8 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
         </div>
 
         {isAddUserOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsAddUserOpen(false)}>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(event) => event.stopPropagation()}>
+          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsAddUserOpen(false)}>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">Add Employee</h4>
@@ -3053,7 +3053,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[560px] lg:min-w-0 text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-700">
                 <th className="py-2.5 px-2 w-7 font-bold">#</th>
@@ -3129,8 +3129,8 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
         </div>
 
         {isAddProductOpen && (
-          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsAddProductOpen(false)}>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-5" onClick={(event) => event.stopPropagation()}>
+          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsAddProductOpen(false)}>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">Add Product</h4>
@@ -3221,8 +3221,8 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
         )}
 
         {editingProduct && (
-          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setEditingProduct(null)}>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-5" onClick={(event) => event.stopPropagation()}>
+          <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-2 sm:p-4" onClick={() => setEditingProduct(null)}>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h4 className="text-sm font-bold text-slate-900">Edit Product</h4>
@@ -3340,7 +3340,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[560px] lg:min-w-0 text-left text-xs">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-700">
                 <th className="py-2.5 px-2 w-7 font-bold">#</th>
@@ -3620,7 +3620,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
         {convertedDeal ? <>Converted to Deal: {convertedDeal.id} <Link className="ml-2 text-blue-600 hover:underline" to={`/crm/deals?deal=${encodeURIComponent(convertedDeal.id)}`}>View Deal</Link></> : 'Not converted / No Deal'}
       </div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-0.5">
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 min-w-0 lg:min-w-auto text-xs font-medium text-slate-500">
           <Link to="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
           <span className="text-slate-300">&gt;</span>
           <Link to="/crm/leads" className="text-blue-600 hover:underline">Leads</Link>
@@ -3628,7 +3628,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
           <span className="text-slate-900 font-semibold">{displayName}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <button
             type="button"
             onClick={onBackToLeads}
@@ -3665,8 +3665,8 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       </div>
 
       {isExportOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsExportOpen(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsExportOpen(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">Print Lead Details</h2>
@@ -3687,7 +3687,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
       <div className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 min-w-0 lg:min-w-auto">
             <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-xs border border-slate-100 ring-2 ring-slate-50">
               <img
                 src={activeLeadData.photo || 'https://i.pravatar.cc/160?img=60'}
@@ -3695,9 +3695,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
                 className="w-full h-full object-cover"
               />
             </div>
-            <div className="space-y-1">
-              <div className="flex items-center gap-2.5">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">{displayName}</h1>
+            <div className="space-y-1 min-w-0 lg:min-w-auto">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight break-words">{displayName}</h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {isConverted ? 'Converted' : (activeLeadData.status || 'Qualified')}
                 </span>
@@ -3705,7 +3705,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               <p className="text-xs text-slate-500 font-medium">{activeLeadData.company || 'Hirapara Industries'}</p>
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-0.5">
                 <span className="flex items-center gap-1.5"><Phone size={13} className="text-slate-400" /> +91 {activeLeadData.phone || '98765 43210'}</span>
-                <span className="flex items-center gap-1.5"><Mail size={13} className="text-slate-400" /> {activeLeadData.email || 'chirag@hirapara.com'}</span>
+                <span className="flex items-center gap-1.5 min-w-0 lg:min-w-auto break-all"><Mail size={13} className="text-slate-400 shrink-0 lg:shrink" /> {activeLeadData.email || 'chirag@hirapara.com'}</span>
                 <span className="flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" /> {activeLeadData.city || 'Surat'}, {activeLeadData.state || 'Gujarat'}, {activeLeadData.country || 'India'}</span>
               </div>
             </div>
@@ -3743,7 +3743,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 whitespace-nowrap rounded-lg text-xs font-semibold transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3.5 py-2 whitespace-nowrap rounded-lg text-xs font-semibold transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200 ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-900 hover:bg-white hover:shadow-xs'
@@ -3779,7 +3779,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       )}
 
       {isEditOpen && editForm && (
-        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => { setIsEditOpen(false); setEditForm(null); }}>
+        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-2 sm:p-4" onClick={() => { setIsEditOpen(false); setEditForm(null); }}>
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="Edit lead information">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 sticky top-0 bg-white rounded-t-xl">
               <div>

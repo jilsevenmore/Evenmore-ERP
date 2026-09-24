@@ -254,8 +254,8 @@ export const UserGuideModal = ({ isOpen, onClose }) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-soft/50">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between gap-2 lg:gap-0 px-4 sm:px-6 py-4 border-b border-border bg-soft/50">
+          <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
             <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center shrink-0">
               <BookOpen size={20} />
             </div>
@@ -350,7 +350,7 @@ export const UserGuideModal = ({ isOpen, onClose }) => {
           </div>
 
           {/* Module Content Detail */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-card">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-card">
             {activeModule && (
               <>
                 {/* Module Title Banner */}
@@ -412,7 +412,7 @@ export const UserGuideModal = ({ isOpen, onClose }) => {
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-3 border-t border-border bg-soft/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted">
+        <div className="px-4 sm:px-6 py-3 border-t border-border bg-soft/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted">
           <div className="flex items-center gap-2">
             <HelpCircle size={14} className="text-primary" />
             <span>Need dedicated operational assistance? Contact our 24/7 help desk.</span>

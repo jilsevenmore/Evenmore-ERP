@@ -405,7 +405,7 @@ export default function AnalyticsVolumeChart() {
       {/* ── Top Tabs & Export Bar ── */}
       <div className="flex flex-wrap items-center justify-between border-b border-[#e5e7eb] px-5 pt-3 gap-2">
         {/* Navigation Tabs */}
-        <div className="flex items-center gap-1 sm:gap-6 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-4 sm:gap-6 overflow-x-auto no-scrollbar scrollbar-none max-w-full lg:max-w-none">
           {TABS.map((tab) => {
             const isActive = activeTab === tab;
             return (
@@ -416,7 +416,7 @@ export default function AnalyticsVolumeChart() {
                   setActiveTab(tab);
                   setHoveredData(null);
                 }}
-                className={`pb-3 text-[13.5px] font-semibold whitespace-nowrap relative transition-colors ${
+                className={`pb-3 text-[13.5px] font-semibold whitespace-nowrap shrink-0 lg:shrink relative transition-colors ${
                   isActive
                     ? "text-[#0f172a]"
                     : "text-[#64748b] hover:text-[#0f172a]"
@@ -512,7 +512,7 @@ export default function AnalyticsVolumeChart() {
         </div>
 
         {/* Right Legend */}
-        <div className="flex items-center gap-5 text-[12px] text-[#475569]">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-5 gap-y-1.5 text-[12px] text-[#475569]">
           <div className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-xs bg-[#1F2E4A]" />
             <span className="font-medium">{seriesNames[0]}</span>

@@ -404,8 +404,9 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
 
     return (
     <div className="space-y-4 font-sans text-xs">
-      <div className="border border-border rounded-xl bg-card shadow-xs overflow-hidden">
-        <table className="w-full border-collapse text-xs">
+      {/* Scrolls sideways on narrow screens instead of clipping columns. */}
+      <div className="border border-border rounded-xl bg-card shadow-xs overflow-x-auto custom-scrollbar">
+        <table className="w-full min-w-[720px] lg:min-w-0 border-collapse text-xs">
           <thead>
             <tr className="bg-table-head border-b border-border text-[11px] font-bold text-text-secondary uppercase tracking-wider">
               <th className="text-left px-3.5 py-3 w-[36%]">Item / Description</th>
@@ -794,10 +795,10 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
 
       {/* Stock Item Picker Modal for adding any standalone stock item or machine component */}
       {isStockPickerOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-2xs p-4 animate-in fade-in duration-150">
-          <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col text-text">
-            <div className="flex items-center justify-between border-b border-border pb-3">
-              <div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-2xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 max-h-[96vh] sm:max-h-[90vh] flex flex-col overflow-y-auto text-text">
+            <div className="flex items-start sm:items-center justify-between gap-3 lg:gap-0 border-b border-border pb-3">
+              <div className="min-w-0 lg:min-w-auto">
                 <h3 className="font-bold text-base text-text flex items-center gap-2">
                   <Package className="text-purple-600 shrink-0" size={18} />
                   <span>
@@ -814,7 +815,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
               </div>
               <button
                 onClick={() => setIsStockPickerOpen(false)}
-                className="text-muted hover:text-text cursor-pointer p-1"
+                className="text-muted hover:text-text cursor-pointer p-1 shrink-0 lg:shrink"
               >
                 <X size={18} />
               </button>
@@ -822,7 +823,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
 
             {/* Destination Target Selector (if machines exist in document) */}
             {activeMachines.length > 0 && (
-              <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-purple-500/[0.05] dark:bg-purple-950/30 border border-purple-300/60 dark:border-purple-800 text-xs">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 p-2.5 rounded-xl bg-purple-500/[0.05] dark:bg-purple-950/30 border border-purple-300/60 dark:border-purple-800 text-xs">
                 <span className="font-bold text-text-secondary whitespace-nowrap">Target Destination:</span>
                 <select
                   value={stockPickerTargetMachineId || 'top-level'}

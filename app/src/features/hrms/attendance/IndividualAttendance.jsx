@@ -485,6 +485,20 @@ export default function IndividualAttendance() {
           .ind-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .ind-att-page { padding: 14px 14px 22px; }
         }
+        @media (max-width: 1023px) {
+          .ind-att-page { margin: -16px -20px -24px; }
+        }
+        @media (max-width: 767px) {
+          .ind-att-page { margin: -12px -14px -20px; }
+        }
+        @media (max-width: 640px) {
+          .ind-filter-card, .ind-hero-card { padding: 12px 14px; }
+          .ind-hero-avatar { flex-shrink: 0; }
+          .ind-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+          .ind-tab { flex-shrink: 0; white-space: nowrap; }
+          .ind-cal-grid { gap: 4px; }
+          .ind-cal-cell { min-height: 52px; padding: 4px; }
+        }
       `}</style>
     </div>
   );

@@ -22,8 +22,8 @@ export const BarcodeLabelModal = ({ item, onClose, variant = 'shelf', rmaNumber,
     const barcodeValue = isRma ? (rmaNumber || item.rmaNumber || 'RMA-0001') : (item.sku || 'SKU-0001');
     const price = Number(item.sellingPrice) || Number(item.price) || 0;
     // Shared printable label card body; fields depend on variant.
-    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150 printable-document">
-      <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-6 shadow-2xl text-xs flex flex-col overflow-hidden print:max-h-none">
+    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150 printable-document">
+      <div className="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs flex flex-col overflow-hidden print:max-h-none">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
             {isRma ? <PackageX className="w-5 h-5 text-rose-600"/> : <Tag className="w-5 h-5 text-blue-600"/>}
@@ -39,7 +39,7 @@ export const BarcodeLabelModal = ({ item, onClose, variant = 'shelf', rmaNumber,
 
         {/* Printable Label Card */}
         <div className="py-6 flex justify-center">
-          <div className="border-2 border-slate-400 rounded-xl p-4 bg-white shadow-sm w-80 space-y-3 print:border-black text-center">
+          <div className="border-2 border-slate-400 rounded-xl p-4 bg-white shadow-sm w-full max-w-80 space-y-3 print:border-black text-center">
             <div className="border-b border-slate-200 pb-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">{brand}</span>
               <h4 className="font-bold text-sm text-slate-900 truncate">{isRma ? (item.name || product || 'RMA Return') : item.name}</h4>
@@ -101,7 +101,7 @@ export const BarcodeLabelModal = ({ item, onClose, variant = 'shelf', rmaNumber,
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-200">
           <span className="text-[11px] text-slate-500">
             {isRma ? 'Barcode verified' : `Current Stock: <strong>${Number(item.stock) || 0} ${item.unit || 'pcs'}</strong>`}
           </span>

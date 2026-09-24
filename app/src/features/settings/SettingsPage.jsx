@@ -102,28 +102,28 @@ export const SettingsPage = () => {
             <h3 className="font-bold text-sm text-[#1F2E4A]">Inventory Automation & Alerts</h3>
           </div>
           <div className="space-y-4 text-xs">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 lg:gap-0">
               <div>
                 <p className="font-semibold text-slate-800">Automated Reorder Triggering</p>
                 <p className="text-slate-500 text-[11px]">
                   Draft purchase orders automatically when stock levels breach SKU minimum safety points.
                 </p>
               </div>
-              <input type="checkbox" checked={autoReorder} onChange={(e) => setAutoReorder(e.target.checked)} className="w-4 h-4 accent-[#1F2E4A]"/>
+              <input type="checkbox" checked={autoReorder} onChange={(e) => setAutoReorder(e.target.checked)} className="w-4 h-4 shrink-0 lg:shrink accent-[#1F2E4A]"/>
             </div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3 lg:gap-0">
               <div>
                 <p className="font-semibold text-slate-800">Low Stock & RMA Email Notifications</p>
                 <p className="text-slate-500 text-[11px]">
                   Send daily briefing notifications to warehouse floor managers and QA engineers.
                 </p>
               </div>
-              <input type="checkbox" checked={emailAlerts} onChange={(e) => setEmailAlerts(e.target.checked)} className="w-4 h-4 accent-[#1F2E4A]"/>
+              <input type="checkbox" checked={emailAlerts} onChange={(e) => setEmailAlerts(e.target.checked)} className="w-4 h-4 shrink-0 lg:shrink accent-[#1F2E4A]"/>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 lg:gap-0 pt-2">
           {saved ? (<span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded">
               <Check size={14}/> Configuration saved successfully
             </span>) : (<span />)}
@@ -210,7 +210,7 @@ export const SettingsPage = () => {
               <RotateCcw className="w-3.5 h-3.5"/> Reset to Factory Seed
             </button>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowConfirmReset(false)}

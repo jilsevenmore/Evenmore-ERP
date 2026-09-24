@@ -92,7 +92,7 @@ export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMod
       {onChallan && <div className="qw-card"><div className="qw-card-title"><Truck size={17}/><h4>Quotation to Delivery Challan</h4></div><ul className="qw-checklist">{['Reuse quotation items and quantities', 'Copy customer and delivery address', 'Keep a link to the original quotation', 'Review dispatch before stock is posted'].map(text => <li key={text}><CheckCircle2 size={14}/>{text}</li>)}</ul><Button onClick={() => quotation.deliveryChallanId ? onChallan() : setMode('challan')}>{quotation.deliveryChallanId ? 'Open Delivery Challan' : 'Convert to Delivery Challan'}</Button></div>}</div>
     </div>
     {error && <p role="alert" className="text-red-700">{error}</p>}
-    {mode && <div className="fixed inset-0 z-[65] bg-black/50 flex items-center justify-center p-4"><div role="dialog" aria-modal="true" aria-label={mode === 'share' ? 'Share Quotation' : mode === 'challan' ? 'Convert to Delivery Challan' : 'Send Quotation'} className="qw-dialog bg-white text-slate-800 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-auto space-y-4">
+    {mode && <div className="fixed inset-0 z-[65] bg-black/50 flex items-center justify-center p-2 sm:p-4"><div role="dialog" aria-modal="true" aria-label={mode === 'share' ? 'Share Quotation' : mode === 'challan' ? 'Convert to Delivery Challan' : 'Send Quotation'} className="qw-dialog bg-white text-slate-800 rounded-2xl p-4 sm:p-6 w-full max-w-lg max-h-[90vh] overflow-auto space-y-4">
       <div className="qw-dialog-title"><h3>{mode === 'share' ? 'Share Quotation' : mode === 'challan' ? 'Convert to Delivery Challan' : 'Send Quotation'}</h3><button aria-label="Close dialog" onClick={() => setMode('')}><X size={19}/></button></div>
       {error && <p role="alert" className="text-red-700">{error}</p>}
       {mode === 'challan' ? <><div className="qw-notice"><Truck size={22}/><p>Create a draft delivery challan for <strong>{quotation.customer}</strong> using {quotation.items?.length || 0} quotation items. Review quantities and dispatch details before issuing it.</p></div><p>Source quotation: <strong>{quotation.quoteNumber}</strong></p><Button onClick={() => { setMode(''); onChallan(); }}>Create Delivery Challan</Button></> : mode === 'share' ? <>
@@ -112,7 +112,7 @@ export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMod
         <label className="block">Message<textarea rows="7" className="border rounded p-2 w-full" value={message} onChange={event => setMessage(event.target.value)}/></label>
         {['Include PDF attachment', 'Include preview link', 'Include QR code'].map(label => <label key={label} className="flex gap-2"><input type="checkbox" defaultChecked/>{label}</label>)}
         <p role="status" className="rounded bg-amber-50 p-3">Email and WhatsApp delivery are not connected. Nothing has been sent and the quotation status remains unchanged. You can copy the preview link to share it manually.</p>
-        <div className="flex gap-2"><Button disabled title="Connect an email service to enable sending">Send Quotation</Button><Button variant="outline" disabled={busy} onClick={copy}>Copy Link</Button></div>
+        <div className="flex flex-wrap lg:flex-nowrap gap-2"><Button disabled title="Connect an email service to enable sending">Send Quotation</Button><Button variant="outline" disabled={busy} onClick={copy}>Copy Link</Button></div>
       </>}
       <Button variant="outline" onClick={() => setMode('')}>Close</Button>
     </div></div>}

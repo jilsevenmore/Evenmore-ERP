@@ -100,7 +100,7 @@ export default function TaskForm({ lead, onAddNote, onBack }) {
           </div>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 14 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 14 }}>
           <label style={{ display: "grid", gap: 7, minWidth: 0 }}>
             <span style={labelStyle}>Task Title</span>
             <input type="text" style={inputStyle} defaultValue={lead ? `Follow up with ${lead.name}` : ""} placeholder="Enter task title" />
@@ -141,7 +141,7 @@ export default function TaskForm({ lead, onAddNote, onBack }) {
           </label>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 }}>
+        <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12 }}>
           <div style={{ display: "flex", gap: 10, alignItems: "flex-start", border: "1px solid var(--border)", background: "var(--soft)", borderRadius: 10, padding: "12px" }}>
             <ClipboardList size={17} style={{ flexShrink: 0, marginTop: 1, color: "var(--primary)" }} />
             <div style={{ display: "grid", gap: 2, minWidth: 0 }}>

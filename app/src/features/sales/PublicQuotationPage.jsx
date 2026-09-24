@@ -26,7 +26,7 @@ export default function PublicQuotationPage() {
     return () => { active = false; };
   }, [quotationNumber, secureToken]);
   return <main className="min-h-screen bg-slate-100 p-4 sm:p-8 print:bg-white print:p-0"><meta name="referrer" content="no-referrer"/><meta name="robots" content="noindex,nofollow"/>
-    <div className="max-w-4xl mx-auto mb-5 no-print flex items-center justify-between gap-4"><div><p className="text-blue-600 font-bold">EVENMORE ERP</p><h1 className="text-xl font-bold text-slate-800 mt-1">Your quotation</h1><p className="text-sm text-slate-500 mt-1">Review your products, pricing and terms below.</p></div><span className="rounded-full border border-blue-200 bg-blue-50 text-blue-700 px-3 py-2 text-xs">Shared quotation</span></div>
+    <div className="max-w-4xl mx-auto mb-5 no-print flex flex-col items-start sm:flex-row sm:items-center sm:justify-between gap-4"><div><p className="text-blue-600 font-bold">EVENMORE ERP</p><h1 className="text-xl font-bold text-slate-800 mt-1">Your quotation</h1><p className="text-sm text-slate-500 mt-1">Review your products, pricing and terms below.</p></div><span className="rounded-full border border-blue-200 bg-blue-50 text-blue-700 px-3 py-2 text-xs">Shared quotation</span></div>
     <div className="max-w-4xl mx-auto bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm">
       {error && <p role="alert" className="p-8">{error}</p>}
       {!data && !error && <p className="p-8">Loading quotation…</p>}

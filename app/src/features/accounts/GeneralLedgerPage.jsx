@@ -163,8 +163,8 @@ export const GeneralLedgerPage = () => {
             text(e.debitAccount).includes(term) ||
             text(e.creditAccount).includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
-          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-2 sm:p-4">
+          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <h3 className="font-bold text-base text-[#1F2E4A] mb-1">
               Create Journal Voucher Entry
             </h3>
@@ -178,7 +178,7 @@ export const GeneralLedgerPage = () => {
                 <input required value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]" placeholder="e.g. Accrued utility adjustment for Q3"/>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Debit Account (Dr)</label>
                   <select value={debitAccount} onChange={(e) => setDebitAccount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]">
@@ -200,7 +200,7 @@ export const GeneralLedgerPage = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Amount ($)</label>
                   <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono" placeholder="2500"/>
@@ -211,7 +211,7 @@ export const GeneralLedgerPage = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-4 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3.5 py-1.5 border border-[#CED4DA] rounded text-slate-600 hover:bg-slate-100">
                   Cancel
                 </button>

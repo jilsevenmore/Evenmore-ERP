@@ -588,7 +588,7 @@ export default function DealsPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           <button
             type="button"
             onClick={handlePrintDeals}
@@ -862,7 +862,7 @@ export default function DealsPage() {
 
       {/* Kanban Pipeline / List View */}
       {viewMode === 'kanban' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-start overflow-x-auto pb-4 pt-1">
+        <div className="flex snap-x snap-mandatory lg:grid lg:grid-cols-5 lg:snap-none gap-4 items-start overflow-x-auto pb-4 pt-1">
           {STAGES.map((st) => {
             const items = filteredDeals.filter((d) => d.stage === st);
             const stageStyle = STAGE_STYLES[st] || STAGE_STYLES.Draft;
@@ -889,7 +889,7 @@ export default function DealsPage() {
                     handleMoveStage(droppedId, st);
                   }
                 }}
-                className={`border rounded-2xl p-3.5 flex flex-col space-y-3 transition-all duration-200 shadow-2xs relative ${
+                className={`min-w-[280px] max-w-[320px] shrink-0 lg:shrink snap-start lg:min-w-auto lg:max-w-none border rounded-2xl p-3.5 flex flex-col space-y-3 transition-all duration-200 shadow-2xs relative ${
                   isDragOver ? 'ring-2 ring-blue-500/40 border-blue-400' : ''
                 }`}
                 style={{
@@ -1123,7 +1123,7 @@ export default function DealsPage() {
         /* List View */
         <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-700">
+            <table className="w-full min-w-[720px] lg:min-w-0 text-left text-xs text-slate-700">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[11px] font-semibold">
                 <tr>
                   <th className="py-3.5 px-4">Deal Name</th>
@@ -1241,7 +1241,7 @@ export default function DealsPage() {
       </Modal>
 
       {isCreateModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl border border-slate-100 my-8">
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">
@@ -1403,8 +1403,8 @@ export default function DealsPage() {
       )}
 
       {dealToDelete && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-100">
             <div className="flex items-center gap-3 text-rose-600 mb-3">
               <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center">
                 <AlertTriangle size={20} />

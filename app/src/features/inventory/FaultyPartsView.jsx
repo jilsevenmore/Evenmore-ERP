@@ -61,17 +61,17 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                 return 'bg-[#f1f3f5] text-[#343A40] border-[#CED4DA]';
         }
     };
-    return (<div className="flex-1 flex h-[calc(100vh-56px)] overflow-hidden font-sans">
+    return (<div className="flex-1 flex flex-col lg:flex-row lg:h-[calc(100vh-56px)] lg:overflow-hidden font-sans">
       {/* Toast Notification */}
-      {toastMessage && (<div className="fixed bottom-6 right-6 z-50 bg-[#1F2E4A] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3">
+      {toastMessage && (<div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 z-50 bg-[#1F2E4A] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3">
           <CheckCircle2 className="w-4 h-4 text-emerald-400"/>
           <span>{toastMessage}</span>
         </div>)}
 
       {/* Left Pane: List View */}
-      <div className="flex-1 flex flex-col h-full bg-transparent overflow-hidden">
+      <div className="flex-1 min-w-0 lg:min-w-auto flex flex-col h-full bg-transparent overflow-x-auto lg:overflow-hidden">
         {/* Header Actions */}
-        <div className="px-8 py-6 flex items-center justify-between shrink-0">
+        <div className="px-4 sm:px-8 py-4 sm:py-6 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 lg:gap-0 shrink-0">
           <div>
             <h2 className="text-2xl font-bold text-[#1F2E4A] tracking-tight">
               Faulty Parts
@@ -87,7 +87,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
         </div>
 
         {/* Data Table Header */}
-        <div className="px-8 flex items-center border-b border-[#CED4DA] pb-2 text-xs font-semibold text-[#343A40] uppercase tracking-wider shrink-0 pr-[calc(2rem+8px)] select-none">
+        <div className="px-4 pr-[calc(1rem+8px)] sm:px-8 sm:pr-[calc(2rem+8px)] min-w-[640px] lg:min-w-0 flex items-center border-b border-[#CED4DA] pb-2 text-xs font-semibold text-[#343A40] uppercase tracking-wider shrink-0 select-none">
           <div className="w-[120px]">Date</div>
           <div className="flex-1">Product</div>
           <div className="w-[80px]">Qty</div>
@@ -96,7 +96,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
         </div>
 
         {/* Data Table Body (Scrollable) */}
-        <div className="flex-1 overflow-y-auto px-8 pb-8 space-y-0 text-sm">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-8 pb-8 min-w-[640px] lg:min-w-0 space-y-0 text-sm">
           {filteredParts.length === 0 ? (<div className="py-12 text-center text-xs text-[#767c7e]">
               No faulty parts match your search criteria.
             </div>) : (filteredParts.map((part) => {
@@ -127,9 +127,9 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
       </div>
 
       {/* Right Pane: Detail View / Timeline */}
-      {selectedPart && (<aside className="w-[400px] border-l border-[#CED4DA] bg-white h-full flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.03)] shrink-0 z-10">
+      {selectedPart && (<aside className="w-full lg:w-[400px] border-t lg:border-t-0 lg:border-l border-[#CED4DA] bg-white h-full flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.03)] shrink-0 z-10">
           {/* Detail Header */}
-          <div className="p-6 border-b border-[#CED4DA] bg-white shrink-0">
+          <div className="p-4 sm:p-6 border-b border-[#CED4DA] bg-white shrink-0">
             <div className="flex justify-between items-start mb-2">
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-[#f1f3f5] text-[#1F2E4A] border border-[#CED4DA] uppercase tracking-wide">
                 {selectedPart.status}
@@ -164,7 +164,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
           </div>
 
           {/* Detail Body (Timeline) */}
-          <div className="flex-1 overflow-y-auto p-6 bg-white">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-white">
             <h4 className="text-xs font-bold uppercase text-[#343A40] tracking-wider mb-6">
               Lifecycle Timeline
             </h4>
@@ -284,10 +284,10 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
 
       {/* Edit Diagnostic Notes Modal */}
       {isEditNotesModalOpen && selectedPart && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] flex flex-col text-[#1F2E4A]">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div className="flex items-center gap-2.5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto flex flex-col text-[#1F2E4A]">
+            <div className="flex items-center justify-between gap-2 lg:gap-0 border-b border-slate-200 pb-3">
+              <div className="flex items-center gap-2.5 min-w-0 lg:min-w-auto">
                 <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
                   <FileText size={18} />
                 </div>
@@ -339,7 +339,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2.5 pt-3 border-t border-slate-200">
                 <button
                   type="button"
                   onClick={() => setIsEditNotesModalOpen(false)}

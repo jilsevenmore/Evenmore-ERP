@@ -484,8 +484,8 @@ export default function CRMSystemSetupPage() {
       </div>
 
       {showDifferenceModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setShowDifferenceModal(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-5" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Lead stages and deal stages difference">
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setShowDifferenceModal(false)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-lg p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Lead stages and deal stages difference">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-800">Lead Stages vs Deal Stages</h2>
               <button type="button" onClick={() => setShowDifferenceModal(false)} className="text-slate-400 hover:text-slate-600 p-1" aria-label="Close">
@@ -532,8 +532,8 @@ export default function CRMSystemSetupPage() {
       )}
 
       {leadModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setLeadModal(null)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setLeadModal(null)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-800">{leadModal.id ? 'Edit Lead Stage' : 'Add Lead Stage'}</h2>
               <button type="button" onClick={() => setLeadModal(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={16} /></button>
@@ -560,8 +560,8 @@ export default function CRMSystemSetupPage() {
       )}
 
       {dealModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setDealModal(null)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setDealModal(null)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-800">{dealModal.id ? 'Edit Deal Stage' : 'Add Deal Stage'}</h2>
               <button type="button" onClick={() => setDealModal(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={16} /></button>
@@ -571,7 +571,7 @@ export default function CRMSystemSetupPage() {
                 <label className="text-xs font-semibold text-slate-600">Stage Name *</label>
                 <input value={dealModal.name} onChange={(e) => setDealModal({ ...dealModal, name: e.target.value })} placeholder="e.g. Proposal" className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-semibold text-slate-600">Pipeline</label>
                   <input value={dealModal.pipeline} onChange={(e) => setDealModal({ ...dealModal, pipeline: e.target.value })} placeholder="Sales" className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
@@ -594,8 +594,8 @@ export default function CRMSystemSetupPage() {
       )}
 
       {deleteModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-4" onClick={() => setDeleteModal(null)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setDeleteModal(null)}>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 border border-red-100 flex items-center justify-center"><Trash2 size={17} /></div>
             <h2 className="text-sm font-bold text-slate-800 mt-3">Delete {deleteModal.type === 'lead' ? 'Lead' : 'Deal'} Stage?</h2>
             <p className="text-xs text-slate-500 mt-1">Are you sure you want to delete <strong className="text-slate-700">{deleteModal.name}</strong>? This action is permanent.</p>

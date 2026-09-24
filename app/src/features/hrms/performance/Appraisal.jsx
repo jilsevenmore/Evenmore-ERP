@@ -462,7 +462,7 @@ export default function Appraisal() {
       {/* Header & Role Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
             <h1 className="text-[22px] font-bold text-slate-800">Performance Appraisal</h1>
             <PageInfoButton guide={hrmsGuides.appraisal} />
             <button
@@ -478,7 +478,7 @@ export default function Appraisal() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           {/* Simulated Role Selector */}
           <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-[#e2e8f0] shadow-2xs">
             <span className="text-[11px] font-semibold text-slate-400 px-2">Role:</span>
@@ -535,10 +535,10 @@ export default function Appraisal() {
 
       {/* Tabs: Active Appraisals vs Performance History */}
       <div className="flex items-center justify-between border-b border-[#e2e8f0]">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 min-w-0 lg:min-w-auto overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
           <button
             onClick={() => setTab("active")}
-            className={`pb-2.5 text-[13.5px] font-medium transition border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2.5 text-[13.5px] font-medium transition border-b-2 flex items-center gap-1.5 shrink-0 lg:shrink ${
               tab === "active"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-slate-500 hover:text-slate-800"
@@ -552,7 +552,7 @@ export default function Appraisal() {
 
           <button
             onClick={() => setTab("history")}
-            className={`pb-2.5 text-[13.5px] font-medium transition border-b-2 flex items-center gap-1.5 ${
+            className={`pb-2.5 text-[13.5px] font-medium transition border-b-2 flex items-center gap-1.5 shrink-0 lg:shrink ${
               tab === "history"
                 ? "border-blue-600 text-blue-600"
                 : "border-transparent text-slate-500 hover:text-slate-800"

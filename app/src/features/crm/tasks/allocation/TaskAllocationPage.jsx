@@ -187,7 +187,7 @@ export default function TaskAllocationPage() {
       </div>
 
       {showFilters && (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.05)] p-5 mb-5">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.05)] p-4 sm:p-5 mb-5">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-3.5 items-end">
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5">Status</label>
@@ -392,8 +392,8 @@ export default function TaskAllocationPage() {
       <AssignTaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
 
       {deleteId && (
-        <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center z-[70] p-4" onClick={() => setDeleteId(null)}>
-          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 p-6">
+        <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center z-[70] p-2 sm:p-4" onClick={() => setDeleteId(null)}>
+          <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 p-4 sm:p-6">
             <div className="w-10 h-10 grid place-items-center rounded-xl bg-rose-50 border border-rose-100 text-rose-500 mb-3">
               <AlertTriangle size={18} />
             </div>

@@ -121,7 +121,7 @@ export default function TrainingDashboard({ initialTab }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           {activeTab === "overview" && (
             <button
               type="button"
@@ -136,7 +136,7 @@ export default function TrainingDashboard({ initialTab }) {
       </div>
 
       {/* Unified Tab Bar */}
-      <div className="flex items-center gap-1.5 border-b border-[#e2e8f0] pb-1 overflow-x-auto">
+      <div className="flex items-center gap-1.5 border-b border-[#e2e8f0] pb-1 overflow-x-auto scrollbar-none">
         {tabs.map((t) => {
           const isActive = activeTab === t.key;
           const Icon = t.icon;
@@ -145,7 +145,7 @@ export default function TrainingDashboard({ initialTab }) {
               key={t.key}
               type="button"
               onClick={() => handleTabChange(t.key)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-medium transition cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 shrink-0 lg:shrink px-4 py-2.5 rounded-xl text-[13px] font-medium transition cursor-pointer whitespace-nowrap ${
                 isActive
                   ? "bg-[#1b2b4a] text-white shadow-2xs font-semibold"
                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
@@ -255,7 +255,7 @@ export default function TrainingDashboard({ initialTab }) {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-[13px]">
+                <table className="w-full min-w-[560px] lg:min-w-0 text-left text-[13px]">
                   <thead>
                     <tr className="border-b border-[#e2e8f0] text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                       <th className="pb-2.5">Program</th>

@@ -169,7 +169,7 @@ export default function TrainingList({ embedded = false, onBack }) {
           </div>
           <p className="text-[13px] text-muted">{trainings.length} total programs linked to Funnel and Performance</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/hrms/training/training-funnel")}

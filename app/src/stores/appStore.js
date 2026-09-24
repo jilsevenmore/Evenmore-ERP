@@ -62,6 +62,10 @@ const useAppStoreBase = create((set) => ({
   setCommandPaletteOpen: (commandPaletteOpen) => set({ commandPaletteOpen }),
   sidebarWidth: 280,
   setSidebarWidth: (sidebarWidth) => set({ sidebarWidth }),
+  // Off-canvas navigation drawer below the `lg` breakpoint.
+  mobileSidebarOpen: false,
+  setMobileSidebarOpen: (mobileSidebarOpen) => set({ mobileSidebarOpen }),
+  toggleMobileSidebar: () => set((s) => ({ mobileSidebarOpen: !s.mobileSidebarOpen })),
 
   // ── HRMS data ─────────────────────────────────────────────────────────────
   //

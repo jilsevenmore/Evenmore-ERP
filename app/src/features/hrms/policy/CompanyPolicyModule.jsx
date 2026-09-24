@@ -414,7 +414,7 @@ export function CompanyPolicyModule({ forcedSection }) {
             )}
           </nav>
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-2.5">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
               <h1 className="text-[24px] font-extrabold text-slate-900 tracking-tight">
                 Company Policy
               </h1>
@@ -464,11 +464,11 @@ export function CompanyPolicyModule({ forcedSection }) {
       </div>
 
       {/* ── Sub-Navigation Tabs ─────────────────────────────────── */}
-      <div className="flex items-center gap-2 border-b border-bdr overflow-x-auto pb-0 -mb-1">
+      <div className="flex items-center gap-2 border-b border-bdr overflow-x-auto scrollbar-none pb-0 -mb-1">
         <button
           type="button"
           onClick={() => handleNavSection("dashboard")}
-          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer whitespace-nowrap ${
             activeSection === "dashboard" ? "text-navy font-bold" : "text-muted hover:text-slate-800"
           }`}
         >
@@ -482,7 +482,7 @@ export function CompanyPolicyModule({ forcedSection }) {
         <button
           type="button"
           onClick={() => handleNavSection("policies")}
-          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer whitespace-nowrap ${
             activeSection === "policies" ? "text-navy font-bold" : "text-muted hover:text-slate-800"
           }`}
         >
@@ -499,7 +499,7 @@ export function CompanyPolicyModule({ forcedSection }) {
         <button
           type="button"
           onClick={() => handleNavSection("categories")}
-          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer whitespace-nowrap ${
             activeSection === "categories" ? "text-navy font-bold" : "text-muted hover:text-slate-800"
           }`}
         >
@@ -517,7 +517,7 @@ export function CompanyPolicyModule({ forcedSection }) {
           <button
             type="button"
             onClick={() => handleNavSection("pending-approval")}
-            className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer whitespace-nowrap ${
               activeSection === "pending-approval" ? "text-navy font-bold" : "text-muted hover:text-slate-800"
             }`}
           >
@@ -537,7 +537,7 @@ export function CompanyPolicyModule({ forcedSection }) {
         <button
           type="button"
           onClick={() => handleNavSection("acknowledgements")}
-          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+          className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer whitespace-nowrap ${
             activeSection === "acknowledgements" ? "text-navy font-bold" : "text-muted hover:text-slate-800"
           }`}
         >
@@ -557,7 +557,7 @@ export function CompanyPolicyModule({ forcedSection }) {
           <button
             type="button"
             onClick={() => handleNavSection("archive")}
-            className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+            className={`pb-3 px-3.5 text-[13.5px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer whitespace-nowrap ${
               activeSection === "archive" ? "text-navy font-bold" : "text-muted hover:text-slate-800"
             }`}
           >
@@ -746,7 +746,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-bdr/60 flex items-center justify-between text-[12px] text-muted">
+              <div className="pt-3 border-t border-bdr/60 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-[12px] text-muted">
                 <span>Showing 5 of {policies.length} registered policies</span>
                 <span className="text-emerald-700 font-medium flex items-center gap-1">
                   <CheckCircle2 size={13} /> Synchronized with enterprise vault
@@ -872,7 +872,7 @@ export function CompanyPolicyModule({ forcedSection }) {
         <div className="flex flex-col gap-4">
           {/* Section banner / guidance */}
           {activeSection === "pending-approval" && (
-            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 text-amber-900 text-[13px]">
                 <Clock size={16} className="text-amber-600 shrink-0" />
                 <span>
@@ -883,7 +883,7 @@ export function CompanyPolicyModule({ forcedSection }) {
           )}
 
           {activeSection === "archive" && (
-            <div className="bg-slate-50 border border-bdr rounded-2xl p-4 flex items-center justify-between gap-3">
+            <div className="bg-slate-50 border border-bdr rounded-2xl p-4 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 text-slate-700 text-[13px]">
                 <Archive size={16} className="text-slate-500 shrink-0" />
                 <span>
@@ -994,7 +994,7 @@ export function CompanyPolicyModule({ forcedSection }) {
           {/* Policy Management Table */}
           <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px] border-collapse">
+              <table className="w-full min-w-[1000px] lg:min-w-0 text-left text-[13px] border-collapse">
                 <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase tracking-wider text-muted">
                   <tr>
                     <th className="py-3 px-5">Policy Name</th>
@@ -1403,7 +1403,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                 Audited proof-of-acknowledgement log ensuring all staff understand active workplace guidelines.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
               <span className="text-[12.5px] font-semibold text-slate-700 bg-off px-3 py-1.5 rounded-xl border border-bdr">
                 Your Status:{" "}
                 <b className={myPendingAcks.length > 0 ? "text-amber-700" : "text-emerald-700"}>
@@ -1416,7 +1416,7 @@ export function CompanyPolicyModule({ forcedSection }) {
           {/* Acknowledgements Table */}
           <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px] border-collapse">
+              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px] border-collapse">
                 <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase tracking-wider text-muted">
                   <tr>
                     <th className="py-3 px-5">Policy Name</th>
@@ -1496,7 +1496,7 @@ export function CompanyPolicyModule({ forcedSection }) {
         title={viewPolicy ? `${viewPolicy.name} (${viewPolicy.version})` : "Policy Details"}
         size="lg"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 w-full">
             <div className="flex items-center gap-2">
               {viewPolicy && userAckMap[viewPolicy.id] ? (
                 <span className="text-[12px] font-semibold text-emerald-700 flex items-center gap-1">
@@ -1657,7 +1657,7 @@ export function CompanyPolicyModule({ forcedSection }) {
         }
         size="lg"
         footer={
-          <div className="flex items-center justify-between w-full">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 w-full">
             <button
               type="button"
               onClick={() => setIsCreateOpen(false)}

@@ -83,7 +83,7 @@ export default function InterviewDetails() {
       </button>
 
       {/* Hero Entity Card */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
             <img
@@ -218,8 +218,8 @@ export default function InterviewDetails() {
         <div className="lg:col-span-2 space-y-5">
           {/* Evaluation Score Card */}
           {it.status === "Completed" ? (
-            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs">
-              <div className="flex items-center justify-between pb-4 mb-5 border-b border-slate-100 dark:border-slate-800">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
+              <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-4 mb-5 border-b border-slate-100 dark:border-slate-800">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40">
                     <Award size={18} />
@@ -236,7 +236,7 @@ export default function InterviewDetails() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-3 gap-3 mb-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
                 <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700 rounded-xl p-4 text-center">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     Technical Score
@@ -272,7 +272,7 @@ export default function InterviewDetails() {
               </div>
             </div>
           ) : (
-            <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-6 shadow-xs text-center">
+            <div className="bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-2xl p-4 sm:p-6 shadow-xs text-center">
               <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 grid place-items-center mx-auto mb-3">
                 <Award size={22} />
               </div>
@@ -289,7 +289,7 @@ export default function InterviewDetails() {
           )}
 
           {/* Meeting & Location Details */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-6 shadow-xs">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
             <h3 className="text-[15px] font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
               <Video size={16} className="text-indigo-600" />
               <span>Location & Connectivity</span>

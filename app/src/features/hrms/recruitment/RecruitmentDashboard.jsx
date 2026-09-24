@@ -128,7 +128,7 @@ export default function RecruitmentDashboard() {
         ]}
         guide={RECRUITMENT_GUIDE}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -181,7 +181,7 @@ export default function RecruitmentDashboard() {
 
       {/* Quick Navigation Action Strip */}
       <div className="bg-card border border-border rounded-2xl p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <span className="text-xs font-bold uppercase tracking-wider text-muted px-2">
             Quick Actions:
           </span>
@@ -221,7 +221,7 @@ export default function RecruitmentDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/hrms/recruitment/candidates")}

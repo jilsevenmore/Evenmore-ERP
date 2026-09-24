@@ -29,13 +29,10 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   const [editor, setEditor] = useState(null);
   const [error, setError] = useState('');
   const [removal, setRemoval] = useState(null);
-  const [navigationOpen, setNavigationOpen] = useState(false);
-  useEffect(() => {
-    if (!navigationOpen) return;
-    const close = (event) => { if (event.key === 'Escape') setNavigationOpen(false); };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, [navigationOpen]);
+  // The floating "Menu" button drives the app-wide mobile navigation drawer
+  // (backdrop, Escape and route-change dismissal live in MainLayout).
+  const navigationOpen = useAppStore((state) => state.mobileSidebarOpen);
+  const toggleNavigation = useAppStore((state) => state.toggleMobileSidebar);
   useEffect(() => {
     const sync = () => setTasks(loadCrmTasks());
     window.addEventListener(CRM_EVENT, sync);
@@ -141,9 +138,8 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   }
   const productTable = <ProductsTable products={products} discount={deal.discount} taxRate={deal.taxRate} onEdit={(item) => openEditor('Product', { ...item, title: item.name, description: item.details || item.description || '' })} onRemove={(item) => setRemoval({ type: 'Product', item })} onPricing={() => openEditor('Pricing', { discount: deal.discount || 0, taxRate: deal.taxRate || 0 })} />;
 
-  return <div className="crm-deal-detail" data-navigation-open={navigationOpen}>
-    <button type="button" className="deal-mobile-menu btn-outline btn-sm" aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navigationOpen} onClick={() => setNavigationOpen(!navigationOpen)}>{navigationOpen ? <X size={16} /> : <Menu size={16} />}Menu</button>
-    {navigationOpen && <button className="deal-navigation-backdrop" aria-label="Close navigation overlay" onClick={() => setNavigationOpen(false)} />}
+  return <div className="crm-deal-detail">
+    <button type="button" className="deal-mobile-menu btn-outline btn-sm" aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navigationOpen} onClick={toggleNavigation}>{navigationOpen ? <X size={16} /> : <Menu size={16} />}Menu</button>
     <DealProjectHandoff deal={deal} onNotify={onNotify} renderTrigger={({ open, project, referenceError }) => {
       const projectAction = project ? <Link className="btn-primary btn-sm" to={`/crm/projects/${encodeURIComponent(project.id)}`}><FolderPlus size={15} />View Project</Link> : <button className="btn-primary btn-sm" disabled={deal.stage !== 'Won' || Boolean(referenceError)} title={deal.stage !== 'Won' ? 'Save this deal as Won to create a project' : undefined} onClick={open}><FolderPlus size={15} />Create Project</button>;
       const related = <><dl className="deal-info-list"><div><dt>Source Lead</dt><dd>{deal.leadId != null ? <Link to={`/crm/leads/${encodeURIComponent(deal.leadId)}`}>{deal.leadNumber || deal.leadId}</Link> : 'No source lead linked'}</dd></div><div><dt>Project</dt><dd>{project ? <Link to={`/crm/projects/${encodeURIComponent(project.id)}`}>{project.projectNumber} <span className="deal-stage">{project.status}</span></Link> : 'Not created'}</dd></div><div><dt>Created On</dt><dd>{date(deal.createdAt)}</dd></div></dl>{referenceError && <p role="alert" className="text-rose-600 text-xs">{referenceError}</p>}{project && <><div className="deal-linked-note"><Link2 size={20} /><div><strong>Project Linked</strong><p>This deal has been converted to a project.</p><Link to={`/crm/projects/${encodeURIComponent(project.id)}`}>Open {project.projectNumber} <ArrowRight size={12} /></Link></div></div><div className="deal-handoff-complete"><CheckCircle2 size={22} /><div><strong>Project hand-off complete</strong><p>Project created and deal linked. Customer, owner and available team information transferred.</p></div></div></>}</>;

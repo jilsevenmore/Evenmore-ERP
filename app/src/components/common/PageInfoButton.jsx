@@ -115,11 +115,11 @@ export function PageInfoButton({ guide, title }) {
 
       {isGuideOpen && (
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150"
           onClick={() => setIsGuideOpen(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full p-6 shadow-2xl text-xs max-h-[85vh] flex flex-col overflow-hidden text-slate-800 dark:text-slate-200"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 max-w-2xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[85vh] flex flex-col overflow-hidden text-slate-800 dark:text-slate-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

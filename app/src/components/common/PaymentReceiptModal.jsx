@@ -10,8 +10,8 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
     }, [receipt, onClose]);
     if (!receipt)
         return null;
-    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label="Official payment receipt">
-      <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-6 shadow-2xl text-xs flex flex-col overflow-hidden printable-document" onClick={(e) => e.stopPropagation()}>
+    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label="Official payment receipt">
+      <div className="bg-white rounded-2xl border border-slate-200 max-w-lg w-full p-4 sm:p-6 shadow-2xl text-xs flex flex-col max-h-[95vh] overflow-y-auto printable-document" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
@@ -79,7 +79,7 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
         </div>
 
         {/* Footer actions */}
-        <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-3 border-t border-slate-200">
           <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
             <CheckCircle2 size={12}/> Ledger GL Posted & Invoice Settled
           </span>

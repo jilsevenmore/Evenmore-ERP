@@ -272,7 +272,7 @@ export default function MasterTasksPage() {
           <h1 className="text-xl font-bold text-slate-900 tracking-tight">Manage Master Lead Tasks</h1>
           <p className="text-xs text-slate-500 mt-1">Create and manage reusable tasks that can be assigned to different lead stages.</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setIsGuideOpen(true)}
@@ -486,7 +486,7 @@ export default function MasterTasksPage() {
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" role="presentation" onMouseDown={() => setModalOpen(false)}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4" role="presentation" onMouseDown={() => setModalOpen(false)}>
           <form onSubmit={submitForm} onMouseDown={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h2 className="text-sm font-bold text-slate-900">{editingId ? 'Edit Master Task' : 'Create Master Task'}</h2>
@@ -499,7 +499,7 @@ export default function MasterTasksPage() {
                 <label className="block font-semibold text-slate-700 mb-1">Task Name <span className="text-rose-500">*</span></label>
                 <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Call, Demo, Quotation" className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Assigned Role</label>
                   <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800">
@@ -517,7 +517,7 @@ export default function MasterTasksPage() {
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Priority</label>
                   <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800">
@@ -594,7 +594,7 @@ export default function MasterTasksPage() {
       )}
 
       {deleteId && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" role="presentation" onMouseDown={() => setDeleteId(null)}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4" role="presentation" onMouseDown={() => setDeleteId(null)}>
           <div onMouseDown={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 p-5">
             <h2 className="text-sm font-bold text-slate-900">Delete this task?</h2>
             <p className="text-xs text-slate-500 mt-1">This action cannot be undone. The master task will be removed permanently.</p>
@@ -611,7 +611,7 @@ export default function MasterTasksPage() {
       )}
 
       {bulkDelete && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4" role="presentation" onMouseDown={() => setBulkDelete(false)}>
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4" role="presentation" onMouseDown={() => setBulkDelete(false)}>
           <div onMouseDown={(e) => e.stopPropagation()} className="bg-white rounded-2xl shadow-xl w-full max-w-sm border border-slate-200 p-5">
             <h2 className="text-sm font-bold text-slate-900">Delete {selected.length} tasks?</h2>
             <p className="text-xs text-slate-500 mt-1">Selected master tasks will be removed permanently.</p>

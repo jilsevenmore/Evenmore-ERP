@@ -59,7 +59,7 @@ export function TaskFilterBar({ filters, options, onChange, onReset, resultCount
         </select>
       </div>
 
-      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+      <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-1 border-t border-slate-100">
         <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
           <SlidersHorizontal size={12} className="text-slate-300" />
           Showing <strong className="text-slate-700">{resultCount}</strong> of {totalCount} tasks

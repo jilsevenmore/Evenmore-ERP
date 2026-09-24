@@ -90,10 +90,10 @@ export function AddEditEventModal({
   const selectedCategoryMeta = EVENT_CATEGORIES[formData.type] || EVENT_CATEGORIES.Meeting;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fade-in">
+      <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg overflow-hidden my-2 sm:my-6">
         {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-bdr bg-slate-50/70">
+        <div className="flex justify-between items-center gap-2 lg:gap-0 px-4 sm:px-6 py-4 border-b border-bdr bg-slate-50/70">
           <div className="flex items-center gap-2.5">
             <div className={`w-3 h-3 rounded-full ${selectedCategoryMeta.dotClass}`} />
             <div>
@@ -115,7 +115,7 @@ export function AddEditEventModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 flex flex-col gap-4 max-h-[80vh] sm:max-h-[75vh] overflow-y-auto">
           {/* Title */}
           <div>
             <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
@@ -197,7 +197,7 @@ export function AddEditEventModal({
           </div>
 
           {/* Dates */}
-          <div className={`grid ${formData.isMultiDay ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+          <div className={`grid ${formData.isMultiDay ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"} gap-3`}>
             <div>
               <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
                 {formData.isMultiDay ? "Start Date" : "Date"}
@@ -325,7 +325,7 @@ export function AddEditEventModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between pt-4 mt-2 border-t border-bdr">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 mt-2 border-t border-bdr">
             {isEditMode && onDelete ? (
               <button
                 type="button"

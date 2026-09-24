@@ -158,7 +158,7 @@ export const DashboardPage = () => {
         title="Unified Business Dashboard"
         subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration"
         actions={
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
             <Link
               to="/crm/dashboard"
               className="px-3.5 py-2 bg-card border border-border hover:bg-soft text-text rounded-xl text-xs font-semibold shadow-2xs transition"
@@ -401,7 +401,7 @@ export const DashboardPage = () => {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full min-w-[520px] lg:min-w-0 text-left border-collapse text-xs">
               <thead>
                 <tr className="border-b border-border text-muted uppercase tracking-wider font-bold text-[10px]">
                   <th className="py-2.5 px-3">SKU</th>

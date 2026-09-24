@@ -90,8 +90,8 @@ export const AutoPOModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-150 overflow-y-auto" onClick={onClose} role="dialog" aria-modal="true" aria-label="Auto-PO shortage requisition">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 text-xs flex flex-col overflow-hidden my-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-150 overflow-y-auto" onClick={onClose} role="dialog" aria-modal="true" aria-label="Auto-PO shortage requisition">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-4 sm:p-6 text-xs flex flex-col overflow-hidden my-auto max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -150,7 +150,7 @@ export const AutoPOModal = ({
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
                 Target Supplier / Vendor *
@@ -179,7 +179,7 @@ export const AutoPOModal = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">Requisition Qty *</label>
               <input
@@ -216,7 +216,7 @@ export const AutoPOModal = ({
             />
           </div>
 
-          <div className="pt-3 border-t border-slate-200 flex items-center justify-between">
+          <div className="pt-3 border-t border-slate-200 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
             <div className="font-mono text-xs text-slate-600">
               Total PO:{' '}
               <strong className="text-slate-900 font-bold">

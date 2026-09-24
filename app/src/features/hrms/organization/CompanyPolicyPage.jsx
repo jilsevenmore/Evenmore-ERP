@@ -184,7 +184,7 @@ export function LegacyCompanyPolicyPage() {
       </div>
 
       {/* Featured Policy Card */}
-      <div className="bg-white border border-bdr rounded-2xl p-6 shadow-xs">
+      <div className="bg-white border border-bdr rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2.5 flex-wrap">
@@ -216,7 +216,7 @@ export function LegacyCompanyPolicyPage() {
             </p>
           </div>
 
-          <div className="bg-[#f8fafc] border border-bdr rounded-xl p-4 min-w-[240px] text-right">
+          <div className="bg-[#f8fafc] border border-bdr rounded-xl p-4 w-full sm:w-auto sm:min-w-[240px] text-right">
             <div className="text-[11px] text-muted uppercase tracking-wider font-semibold">
               Organization Acknowledgement
             </div>
@@ -253,13 +253,13 @@ export function LegacyCompanyPolicyPage() {
       {/* Directory Table */}
       <div className="flex flex-col gap-4">
         <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search policy name, author..."
-              className="pl-9 pr-4 h-9 w-64 md:w-80 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
+              className="pl-9 pr-4 h-9 w-full sm:w-64 md:w-80 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
             />
           </div>
           <div className="flex items-center gap-2 text-[12.5px]">
@@ -281,7 +281,7 @@ export function LegacyCompanyPolicyPage() {
 
         <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
                   <th className="py-3 px-5">Policy Name</th>
@@ -348,8 +348,8 @@ export function LegacyCompanyPolicyPage() {
 
       {/* Modal: Publish Policy */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <h3 className="font-bold text-[16px] text-slate-900">Publish Company Policy</h3>
               <button
@@ -372,7 +372,7 @@ export function LegacyCompanyPolicyPage() {
                   className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Category</label>
                   <select

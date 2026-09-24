@@ -304,11 +304,11 @@ export const CreateWarrantyCardModal = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-5 overflow-y-auto animate-in fade-in duration-150">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full my-auto overflow-hidden flex flex-col max-h-[92vh]">
                 
                 {/* Clean Enterprise Modal Header */}
-                <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between shrink-0 bg-white">
+                <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-2 lg:gap-0 shrink-0 bg-white">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shrink-0">
                             <ShieldCheck size={22} />
@@ -339,7 +339,7 @@ export const CreateWarrantyCardModal = ({
                 </div>
 
                 {/* Refined Context Strip */}
-                <div className="bg-slate-50/70 px-6 py-3.5 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
+                <div className="bg-slate-50/70 px-4 sm:px-6 py-3.5 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0">
                     <div className="bg-white p-3 rounded-xl border border-slate-200/80 flex items-start gap-3 shadow-2xs">
                         <div className="p-2 rounded-lg bg-blue-50 text-blue-600 shrink-0">
                             <User size={16} />
@@ -377,11 +377,11 @@ export const CreateWarrantyCardModal = ({
                 </div>
 
                 {/* Sleek Segmented Tab Navigation */}
-                <div className="flex items-center gap-2 px-6 pt-3 pb-2 border-b border-slate-200 bg-white shrink-0">
+                <div className="flex items-center gap-2 px-4 sm:px-6 pt-3 pb-2 border-b border-slate-200 bg-white shrink-0 overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
                     <button
                         type="button"
                         onClick={() => setActiveTab('coverage')}
-                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shrink-0 lg:shrink transition-all cursor-pointer ${
                             activeTab === 'coverage'
                                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
@@ -394,7 +394,7 @@ export const CreateWarrantyCardModal = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('components')}
-                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shrink-0 lg:shrink transition-all cursor-pointer ${
                             activeTab === 'components'
                                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
@@ -407,7 +407,7 @@ export const CreateWarrantyCardModal = ({
                     <button
                         type="button"
                         onClick={() => setActiveTab('terms')}
-                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                        className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shrink-0 lg:shrink transition-all cursor-pointer ${
                             activeTab === 'terms'
                                 ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 border border-transparent'
@@ -419,7 +419,7 @@ export const CreateWarrantyCardModal = ({
                 </div>
 
                 {/* Body Content */}
-                <div className="p-6 overflow-y-auto flex-1 space-y-5 text-xs bg-slate-50/40">
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 text-xs bg-slate-50/40">
                     
                     {/* TAB 1: WARRANTY POLICY & DATES */}
                     {activeTab === 'coverage' && (
@@ -658,7 +658,7 @@ export const CreateWarrantyCardModal = ({
 
                                         {(item.components && item.components.length > 0) ? (
                                             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-                                                <table className="w-full text-left text-xs">
+                                                <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs">
                                                     <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
                                                         <tr>
                                                             <th className="py-2 px-3">Component Description</th>
@@ -805,7 +805,7 @@ export const CreateWarrantyCardModal = ({
                 </div>
 
                 {/* Footer Actions */}
-                <div className="px-6 py-4 border-t border-slate-200 bg-white flex items-center justify-between shrink-0">
+                <div className="px-4 sm:px-6 py-4 border-t border-slate-200 bg-white flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 shrink-0">
                     <div>
                         <button
                             type="button"

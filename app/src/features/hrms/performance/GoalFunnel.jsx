@@ -19,7 +19,7 @@ export default function GoalFunnel() {
         <p className="text-[13px] text-muted">Created to completed with at-risk visibility.</p>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-8 bg-white border border-bdr rounded-xl p-6 shadow-sm">
+        <div className="lg:col-span-8 bg-white border border-bdr rounded-xl p-4 sm:p-6 shadow-sm">
           <div className="flex flex-col gap-4">
             {stages.map((s) => <div key={s.label} className="flex items-center gap-3">
                 <div className="w-24 text-[12px] font-medium">{s.label}</div>
@@ -30,7 +30,7 @@ export default function GoalFunnel() {
                 {s.alert && <span className="px-2 py-1 bg-red-50 border border-red-200 text-red-700 rounded-full text-[11px]">At-risk: 8</span>}
               </div>)}
           </div>
-          <div className="mt-6 grid grid-cols-3 gap-3 text-center text-[12px]">
+          <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-[12px]">
             <div className="bg-off border border-bdr rounded-xl p-3"><div className="text-muted">Conversion</div><div className="font-bold text-[16px]">42%</div><div className="text-muted">Created → Completed</div></div>
             <div className="bg-red-50 border border-red-200 rounded-xl p-3"><div className="text-red-700">At-risk</div><div className="font-bold text-[16px] text-red-700">8 goals</div><div className="text-muted">19% of active</div></div>
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3"><div className="text-emerald-700">Completed</div><div className="font-bold text-[16px]">18</div><div className="text-muted">+6% vs last quarter</div></div>

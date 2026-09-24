@@ -356,6 +356,17 @@ export default function BulkAttendance() {
         .bulk-avatar { width: 32px; height: 32px; border-radius: 999px; object-fit: cover; }
         .bulk-id { font-family: inherit; font-size: 12.5px; color: #6b7280; white-space: nowrap; }
         .bulk-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 13px; border: 1px solid; white-space: nowrap; }
+        @media (max-width: 1023px) {
+          .bulk-att-page { margin: -16px -20px -24px; }
+        }
+        @media (max-width: 767px) {
+          .bulk-att-page { margin: -12px -14px -20px; }
+        }
+        @media (max-width: 640px) {
+          .bulk-att-page { padding: 14px 14px 22px; }
+          .bulk-filter-card, .bulk-action-card { padding: 12px 14px; }
+          .bulk-action-card { justify-content: flex-start; }
+        }
       `}</style>
     </div>
   );

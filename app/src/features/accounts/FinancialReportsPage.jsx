@@ -169,13 +169,13 @@ export function FinancialReportsPage() {
   }, [budgets, expenses, totalCOGS]);
 
   return (
-    <div className="feature-page printable-document" style={{ padding: '24px 32px' }}>
+    <div className="feature-page printable-document py-4 sm:py-6 px-0 sm:px-8">
       <PageHeader
         title="Financial Reports"
         subtitle="Consolidated Profit & Loss, Balance Sheet, and Cash Flow metrics."
         breadcrumb={[{ label: 'Accounts', to: '/accounts/cash-bank' }, { label: 'Reports' }]}
         actions={
-          <div style={{ display: 'flex', gap: 10 }}>
+          <div className="flex-wrap lg:flex-nowrap" style={{ display: 'flex', gap: 10 }}>
             <button type="button" className="btn-outline" onClick={() => window.print()}>
               <Printer size={15} /> Print Statement
             </button>
@@ -202,7 +202,7 @@ export function FinancialReportsPage() {
       </div>
 
       <div className="card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
+        <div className="flex-wrap lg:flex-nowrap gap-3 lg:gap-0" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
           <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {[
               { id: 'pl', label: 'Profit & Loss' },

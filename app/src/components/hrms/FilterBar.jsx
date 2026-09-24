@@ -5,7 +5,7 @@ export function FilterBar({ search, onSearch, selects = [], onClear, placeholder
     <div className="bg-card border border-border rounded-2xl p-3.5 flex flex-wrap items-center gap-2.5 shadow-2xs">
       {/* Search Input */}
       {onSearch !== undefined && (
-        <div className="relative flex-1 min-w-[200px] max-w-[240px]">
+        <div className="relative flex-1 min-w-[200px] max-w-full sm:max-w-[240px]">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="text"

@@ -73,7 +73,7 @@ export default function AppraisalFunnel() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
         {/* Main Chart */}
-        <div className="lg:col-span-8 bg-white border border-[#e2e8f0] rounded-2xl p-6 shadow-2xs flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-white border border-[#e2e8f0] rounded-2xl p-4 sm:p-6 shadow-2xs flex flex-col justify-between">
           <div className="flex flex-col gap-3.5">
             {funnelStages.map((s, i) => {
               const isDraft = i === 0;
@@ -87,7 +87,7 @@ export default function AppraisalFunnel() {
 
               return (
                 <div key={s.label} className="flex items-center gap-3">
-                  <div className="w-32 text-[12.5px] font-medium text-slate-700 truncate">
+                  <div className="w-24 sm:w-32 text-[12.5px] font-medium text-slate-700 truncate">
                     {String(i + 1).padStart(2, "0")} {s.label}
                   </div>
                   <div className="flex-1 h-9 rounded-full overflow-hidden relative bg-slate-100">

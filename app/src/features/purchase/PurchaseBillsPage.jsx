@@ -342,7 +342,7 @@ export const PurchaseBillsPage = () => {
           </Button>}/>
 
       {/* Purchase Bills KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Billed Invoices" value={formatCurrency(totalBilled)} icon={DollarSign} />
         <StatCard label="AP Payable Due" value={formatCurrency(totalApOutstanding)} icon={Clock} trend={{ positive: totalApOutstanding === 0, text: totalApOutstanding > 0 ? `${unpaidBillsCount} unpaid bills` : 'All bills cleared' }} highlight={totalApOutstanding > 0} />
         <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={CheckCircle2} trend={{ positive: true, text: 'Disbursements verified' }} />
@@ -354,8 +354,8 @@ export const PurchaseBillsPage = () => {
             String(b.vendor ?? '').toLowerCase().includes(term)}/>
 
       {/* Enter Bill Modal */}
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-5xl w-full p-4 sm:p-6 text-xs max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Record Vendor Purchase Bill
@@ -366,7 +366,7 @@ export const PurchaseBillsPage = () => {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Pull From PO (Optional)</label>
                   <select value={selectedPoId} onChange={(e) => handleSelectPo(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
@@ -423,7 +423,7 @@ export const PurchaseBillsPage = () => {
                 <LineItemEditor items={lineItems} onChange={setLineItems} type="purchase"/>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
                   Cancel
                 </button>
@@ -436,10 +436,10 @@ export const PurchaseBillsPage = () => {
         </div>)}
 
       {/* Bill Detail Modal */}
-      {selectedBill && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-3">
+      {selectedBill && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 sm:gap-3 min-w-0 lg:min-w-auto">
                 <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedBill.billNumber}</h3>
                 <span className="font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded">
                   {selectedBill.vendor}
@@ -483,7 +483,7 @@ export const PurchaseBillsPage = () => {
 
               {/* 3-Way Reconciliation Audit Banner */}
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                   <span className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                     <CheckCircle2 size={14} className="text-emerald-600"/>
                     3-Way Matching Audit Verification
@@ -492,7 +492,7 @@ export const PurchaseBillsPage = () => {
                     RECONCILED
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-[11px] pt-1 border-t border-slate-200/70">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] pt-1 border-t border-slate-200/70">
                   <div>
                     <span className="text-slate-400 block text-[10px]">1. PO Approved Qty</span>
                     <strong className="text-slate-800 font-mono">
@@ -525,11 +525,11 @@ export const PurchaseBillsPage = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
               <div className="font-mono text-xs">
                 Total: <strong className="text-slate-900">${(selectedBill.total || selectedBill.amount).toFixed(2)}</strong> | Due: <strong className="text-amber-700">${getBillOutstanding(selectedBill.id).balanceDue.toFixed(2)}</strong>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedBill.status === 'Cancelled' ? (
                   <span className="text-xs font-semibold text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200 inline-flex items-center gap-1.5">
                     <Ban size={13} /> Bill Cancelled
@@ -566,8 +566,8 @@ export const PurchaseBillsPage = () => {
         </div>)}
 
       {/* Pay Modal */}
-      {showPayModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 shadow-2xl text-xs">
+      {showPayModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5 text-emerald-600"/>
@@ -598,7 +598,7 @@ export const PurchaseBillsPage = () => {
                 <input type="number" step="0.01" min="0.01" max={getBillOutstanding(showPayModal.id).balanceDue} value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} required className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-mono font-bold text-sm"/>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
                   <select value={payMode} onChange={(e) => setPayMode(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800">
@@ -614,7 +614,7 @@ export const PurchaseBillsPage = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowPayModal(null)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
                   Cancel
                 </button>

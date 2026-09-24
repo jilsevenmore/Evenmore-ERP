@@ -62,7 +62,7 @@ export default function StageConfigPage() {
 
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#dce5f4] bg-[#f6f9ff] px-4 py-3">
         <Info size={14} className="text-blue-500 shrink-0" />
-        <p className="text-[11px] text-slate-600 flex-1 min-w-[260px]">
+        <p className="text-[11px] text-slate-600 flex-1 min-w-[200px] sm:min-w-[260px]">
           New projects instantiate <strong>{activeCount} active</strong>{' '}
           {activeCount === 1 ? 'stage' : 'stages'} from this list, in this order — a nominal{' '}
           <strong>{totalDuration} days</strong> end to end. Editing a template never rewrites

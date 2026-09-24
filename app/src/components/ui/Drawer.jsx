@@ -19,7 +19,7 @@ export function Drawer({ isOpen, onClose, title, subtitle, children, footer, wid
 
   return (
     <div
-      className="modal-backdrop"
+      className="modal-backdrop drawer-backdrop"
       style={{ zIndex: 1100, display: 'flex', justifyContent: 'flex-end' }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose?.();
@@ -29,7 +29,7 @@ export function Drawer({ isOpen, onClose, title, subtitle, children, footer, wid
         className="drawer-panel"
         style={{
           width: typeof width === 'number' ? `${width}px` : width === 'lg' ? '680px' : width === 'xl' ? '820px' : '520px',
-          maxWidth: '100vw',
+          maxWidth: '100%',
           height: '100vh',
           background: '#ffffff',
           boxShadow: '-8px 0 32px rgba(15, 23, 42, 0.12)',

@@ -529,7 +529,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             />
 
             {/* Sales Invoices KPI Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="Total Invoiced Value" value={formatCurrency(totalInvoiced)} icon={DollarSign} />
                 <StatCard label="AR Outstanding Due" value={formatCurrency(totalBalanceDue)} icon={Clock} trend={{ positive: totalBalanceDue === 0, text: totalBalanceDue > 0 ? `${unpaidCount} unpaid/partial` : 'All settled' }} highlight={totalBalanceDue > 0} />
                 <StatCard label="Total Collected" value={formatCurrency(totalCollected)} icon={CheckCircle2} trend={{ positive: true, text: 'Receipts synchronized' }} />
@@ -537,12 +537,12 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex items-center gap-2 border-b border-slate-200 pb-2 text-xs">
+            <div className="flex flex-nowrap items-center gap-2 border-b border-slate-200 pb-2 text-xs overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
                 {['All', 'Draft', 'Unpaid', 'Paid', 'Cancelled'].map((tab) => (
                     <button
                         key={tab}
                         onClick={() => setStatusFilter(tab)}
-                        className={`px-3 py-1.5 rounded-t font-semibold transition-colors cursor-pointer ${
+                        className={`shrink-0 lg:shrink px-3 py-1.5 rounded-t font-semibold transition-colors cursor-pointer ${
                             statusFilter === tab
                                 ? 'bg-white border-t-2 border-[#1F2E4A] text-[#1F2E4A] shadow-xs'
                                 : 'text-slate-500 hover:text-slate-800'
@@ -555,16 +555,16 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* Invoices List Table Card */}
             <div className="bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col overflow-hidden">
-                <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
+                <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 lg:gap-0 bg-white">
                     <h3 className="font-bold text-slate-800 text-sm">Commercial Invoice Register</h3>
-                    <div className="relative">
+                    <div className="relative w-full sm:w-auto">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
                         <input
                             type="text"
                             placeholder="Filter invoice, customer, SO..."
                             value={filterText}
                             onChange={(e) => setFilterText(e.target.value)}
-                            className="pl-9 pr-4 py-1.5 border border-slate-300 rounded-lg text-xs w-64 focus:ring-1 focus:ring-blue-500 bg-white text-slate-800"
+                            className="pl-9 pr-4 py-1.5 border border-slate-300 rounded-lg text-xs w-full sm:w-64 focus:ring-1 focus:ring-blue-500 bg-white text-slate-800"
                         />
                     </div>
                 </div>
@@ -679,8 +679,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* CREATE / EDIT DRAFT INVOICE MODAL */}
             {showCreateModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[92vh] flex flex-col overflow-hidden text-slate-800">
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-4 sm:p-6 text-xs max-h-[92vh] flex flex-col overflow-hidden text-slate-800">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                             <div>
                                 <h2 className="text-base font-bold text-slate-900">
@@ -750,7 +750,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
                             {/* BILL TO & SHIP TO ADDRESS SECTION */}
                             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                                     <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
                                         <MapPin size={14} className="text-blue-600"/> Bill To & Ship To Address Snapshots
                                     </h4>
@@ -783,7 +783,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             }}
                                             className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
                                         />
-                                        <div className="grid grid-cols-3 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                             <input
                                                 type="text"
                                                 placeholder="City"
@@ -831,7 +831,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             onChange={(e) => setShippingAddress({ ...shippingAddress, line1: e.target.value })}
                                             className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs disabled:bg-slate-100 disabled:text-slate-500"
                                         />
-                                        <div className="grid grid-cols-3 gap-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                             <input
                                                 type="text"
                                                 placeholder="City"
@@ -882,7 +882,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                         </div>
 
                         {/* Footer Actions */}
-                        <div className="pt-3 border-t border-slate-200 flex justify-end gap-2 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+                        <div className="pt-3 border-t border-slate-200 flex flex-wrap lg:flex-nowrap justify-end gap-2 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
                             <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-100 transition-colors text-xs cursor-pointer">
                                 Cancel
                             </button>
@@ -907,10 +907,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* INVOICE DETAIL MODAL */}
             {selectedInvoice && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                            <div className="flex items-center gap-3">
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+                    <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+                        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
+                            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 sm:gap-3 min-w-0 lg:min-w-auto">
                                 <h3 className="font-bold text-lg text-[#1F2E4A] flex items-center gap-1.5">
                                     {selectedInvoice.invoiceNumber}
                                     {selectedInvoice.finalized && <Lock size={13} className="text-slate-400" title="Finalized Commercial Document"/>}
@@ -920,7 +920,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 </span>
                                 <StatusBadge status={selectedInvoice.status}/>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                                 <button onClick={() => setPrintInvoiceTarget(selectedInvoice)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
                                     <Printer size={13}/>
                                     Print Official Invoice
@@ -936,7 +936,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             <DocumentTimeline steps={getInvoiceTimelineSteps(selectedInvoice)}/>
 
                             {/* Address Snapshots */}
-                            <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
                                 <div>
                                     <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Billed To (Snapshot)</span>
                                     <p className="font-semibold text-slate-800">{selectedInvoice.customer}</p>
@@ -956,7 +956,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
                             {/* Items */}
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                                     <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
                                         Invoiced Line Items ({selectedInvoice.items?.length || 0})
                                     </h4>
@@ -970,11 +970,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+                        <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
                             <div className="font-mono text-xs">
                                 Total: <strong className="text-slate-900">{formatCurrency(selectedInvoice.total)}</strong> | Paid: <strong className="text-emerald-700">{formatCurrency(selectedInvoice.paidAmount || 0)}</strong>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                                 {(!selectedInvoice.finalized || selectedInvoice.status === 'Draft') && (
                                     <>
                                         <button
@@ -1027,8 +1027,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* FINALIZE CONFIRMATION MODAL */}
             {finalizeModalTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 text-xs flex flex-col max-h-[95vh] overflow-y-auto">
                         <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
                             <CheckCircle2 className="w-5 h-5 text-blue-600"/>
                             <h3 className="font-bold text-base text-[#1F2E4A]">Finalize Sales Invoice?</h3>
@@ -1062,8 +1062,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* CANCEL INVOICE MODAL */}
             {cancelModalTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 text-xs flex flex-col max-h-[95vh] overflow-y-auto">
                         <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
                             <ShieldAlert className="w-5 h-5 text-rose-600"/>
                             <h3 className="font-bold text-base text-[#1F2E4A]">Cancel Invoice {cancelModalTarget.invoiceNumber}?</h3>
@@ -1108,8 +1108,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* RECORD PAYMENT IN MODAL */}
             {showPaymentModal && (
-                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 shadow-2xl text-xs">
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+                    <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] overflow-y-auto">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                             <div className="flex items-center gap-2">
                                 <Receipt className="w-5 h-5 text-emerald-600"/>
@@ -1153,7 +1153,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
                                     <select value={payMode} onChange={(e) => setPayMode(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800">
@@ -1169,7 +1169,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                            <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                                 <button type="button" onClick={() => setShowPaymentModal(null)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded hover:bg-slate-100 font-medium cursor-pointer">
                                     Cancel
                                 </button>

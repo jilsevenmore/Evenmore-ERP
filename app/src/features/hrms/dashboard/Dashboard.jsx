@@ -596,7 +596,7 @@ export default function HRMSDashboard() {
           <h1 className="hrms-title">Dashboard Overview</h1>
           <PageInfoButton guide={hrmsGuides.dashboard} />
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button
             type="button"
             onClick={() => setShowDateModal(true)}
@@ -725,7 +725,7 @@ export default function HRMSDashboard() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between px-5 py-3 border-t border-border bg-soft/30 text-[12px] text-muted font-medium mt-auto">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0 px-5 py-3 border-t border-border bg-soft/30 text-[12px] text-muted font-medium mt-auto">
             <span>Showing {filtered.length} of {scheduleItems.length} scheduled sessions</span>
             <span className="text-[11.5px] text-text-secondary">Updated live · Wednesday, Oct 11</span>
           </div>
@@ -1016,7 +1016,7 @@ export default function HRMSDashboard() {
       >
         <div style={{ display: "grid", gap: 16 }}>
           <label className="form-label">Preset Ranges:</label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 8 }}>
             <button
               type="button"
               className="btn-outline"
@@ -1492,9 +1492,18 @@ export default function HRMSDashboard() {
           .hrms-stat-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
           .hrms-main-grid { grid-template-columns: minmax(0,1fr); }
         }
+        @media (max-width: 1023px) {
+          .hrms-dash { margin: -16px -20px -24px; }
+        }
+        @media (max-width: 767px) {
+          .hrms-dash { margin: -12px -14px -20px; }
+        }
         @media (max-width: 640px) {
           .hrms-stat-grid { grid-template-columns: minmax(0,1fr); }
           .hrms-dash { padding: 14px 14px 22px; }
+          .hrms-card-head { padding: 14px 14px 12px; }
+          .hrms-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+          .hrms-tab { flex-shrink: 0; white-space: nowrap; }
         }
       `}</style>
     </div>

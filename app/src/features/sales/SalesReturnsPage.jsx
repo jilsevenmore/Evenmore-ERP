@@ -405,9 +405,9 @@ export const SalesReturnsPage = () => {
 
             {/* CREATE SALES RETURN MODAL */}
             {showAddModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[92vh] flex flex-col overflow-hidden">
-                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-4 sm:p-6 text-xs max-h-[92vh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between gap-3 lg:gap-0 pb-3 border-b border-slate-200">
                             <div className="flex items-center gap-2">
                                 <RotateCcw className="w-5 h-5 text-rose-600"/>
                                 <div>
@@ -473,13 +473,13 @@ export const SalesReturnsPage = () => {
 
                             {/* SELECTIVE RETURN LINE ITEMS TABLE */}
                             <div className="space-y-2">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                                     <label className="font-semibold text-slate-700 block">Select Items & Quantities to Return</label>
                                     <span className="text-[11px] text-slate-500">Dynamic over-return protection enforced</span>
                                 </div>
 
                                 <div className="overflow-x-auto rounded-lg border border-slate-200">
-                                    <table className="w-full text-left text-xs">
+                                    <table className="w-full min-w-[760px] lg:min-w-0 text-left text-xs">
                                         <thead className="bg-slate-50 uppercase text-slate-500 font-semibold border-b border-slate-200">
                                             <tr>
                                                 <th className="py-2.5 px-3">Product Description</th>
@@ -585,7 +585,7 @@ export const SalesReturnsPage = () => {
                             </div>
 
                             {/* SUMMARY TOTALS */}
-                            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-200">
+                            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 p-3 bg-slate-50 rounded-xl border border-slate-200">
                                 <span className="font-semibold text-slate-700">Total Returning Items: <strong>{totalReturnQty} units</strong></span>
                                 <div className="text-right">
                                     <span className="text-slate-500 text-[11px] block">Total Credit Note Amount</span>
@@ -618,8 +618,8 @@ export const SalesReturnsPage = () => {
 
             {/* VIEW RETURN DETAILS MODAL */}
             {viewReturn && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-4 sm:p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
                         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
                             <div className="flex items-center gap-2">
                                 <RotateCcw className="w-5 h-5 text-rose-600"/>
@@ -716,8 +716,8 @@ export const SalesReturnsPage = () => {
 
             {/* CANCEL CONFIRMATION MODAL */}
             {cancelModalTarget && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 text-xs flex flex-col max-h-[95vh] overflow-y-auto">
                         <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
                             <ShieldAlert className="w-5 h-5 text-rose-600"/>
                             <h3 className="font-bold text-base text-[#1F2E4A]">Cancel Sales Return {cancelModalTarget.returnNumber}?</h3>

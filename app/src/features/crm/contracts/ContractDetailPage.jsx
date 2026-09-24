@@ -388,10 +388,10 @@ export default function ContractDetailPage() {
       </div>
 
       <div className="card contract-detail-content">
-        <div className="flex overflow-x-auto gap-1 px-4 border-b border-slate-100" role="tablist" aria-label="Contract sections">
+        <div className="flex overflow-x-auto scrollbar-none gap-1 px-4 border-b border-slate-100" role="tablist" aria-label="Contract sections">
           {tabs.map(({ name, count }) => (
             <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}
-              className={`inline-flex items-center gap-1.5 px-3 py-3 text-xs whitespace-nowrap border-b-2 ${tab === name ? 'text-blue-600 border-blue-600 font-semibold' : 'text-slate-500 border-transparent'}`}>
+              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3 py-3 text-xs whitespace-nowrap border-b-2 ${tab === name ? 'text-blue-600 border-blue-600 font-semibold' : 'text-slate-500 border-transparent'}`}>
               {name}{count != null && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{count}</span>}
             </button>
           ))}

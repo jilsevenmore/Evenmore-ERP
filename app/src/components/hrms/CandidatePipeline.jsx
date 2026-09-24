@@ -148,7 +148,7 @@ export function CandidatePipeline({ onSelectCandidate }) {
       </div>
 
       {/* Kanban Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="flex overflow-x-auto snap-x snap-mandatory pb-2 gap-3 lg:grid lg:grid-cols-7 lg:overflow-visible lg:snap-none lg:pb-0">
         {STAGE_CONFIG.map(({ key, label, dot, badge, activeDropBg }) => {
           const colCandidates = candidates.filter((c) => c.stage === key);
           const isDropActive = dragOverStage === key;
@@ -159,7 +159,7 @@ export function CandidatePipeline({ onSelectCandidate }) {
               onDragOver={(e) => handleDragOver(e, key)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, key, label)}
-              className={`rounded-xl p-3 flex flex-col min-h-[260px] transition-all duration-200 ${
+              className={`rounded-xl p-3 flex flex-col min-h-[260px] min-w-[280px] shrink-0 snap-start lg:min-w-0 lg:shrink transition-all duration-200 ${
                 isDropActive
                   ? activeDropBg
                   : "bg-soft/70 border border-border/80 hover:border-border"

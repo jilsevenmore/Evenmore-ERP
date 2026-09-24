@@ -62,10 +62,10 @@ export default function TaskAllocationDetailPage() {
 
   return (
     <section className="w-full space-y-4">
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900 tracking-tight">{task.title}</h1>
-          <div className="text-xs mt-1 flex items-center gap-1.5">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-4">
+        <div className="min-w-0 lg:min-w-auto">
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight break-words">{task.title}</h1>
+          <div className="text-xs mt-1 flex flex-wrap lg:flex-nowrap items-center gap-1.5">
             <Link to="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
             <span className="text-slate-400">&gt;</span>
             <Link to="/crm/tasks/allocation" className="text-blue-600 hover:underline">Task Allocation</Link>

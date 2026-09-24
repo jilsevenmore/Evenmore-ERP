@@ -76,7 +76,7 @@ export default function CompleteTaskModal({ open, task, lead, onCancel, onComple
 
   return (
     <div
-      className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-[75] flex items-center justify-center bg-slate-950/50 p-2 sm:p-4 backdrop-blur-xs"
       onClick={() => { if (!submitting && phase === 'form') onCancel?.(); }}
       role="dialog"
       aria-modal="true"

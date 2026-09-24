@@ -187,14 +187,14 @@ export function DataTable({
       {/* Optional Card Header with Title, Subtitle, and Search / Action */}
       {(title || isSearchEnabled || action) && (
         <div className="p-3.5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card-alt">
-          <div>
+          <div className="min-w-0 lg:min-w-auto">
             {title && <h3 className="font-bold text-text text-sm tracking-tight">{title}</h3>}
             {subtitle && <p className="text-[11px] text-muted mt-0.5">{subtitle}</p>}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
             {isSearchEnabled && (
-              <div className="relative flex items-center w-full sm:w-64">
+              <div className="relative flex items-center flex-1 min-w-0 lg:min-w-auto sm:flex-none sm:w-64">
                 <Search size={14} className="absolute left-3 text-muted pointer-events-none" />
                 <input
                   type="text"
@@ -225,7 +225,9 @@ export function DataTable({
 
       {/* Table Content */}
       <div className="table-scroll overflow-x-auto max-h-[70vh]">
-        <table className="data-table w-full border-collapse text-left text-xs">
+        {/* Wide tables keep legible column widths and scroll inside this box
+            on narrow screens instead of crushing cells. */}
+        <table className={`data-table w-full border-collapse text-left text-xs${columns.length > 4 ? ' min-w-[640px] lg:min-w-0' : ''}`}>
           <thead className="sticky top-0 z-10 shadow-xs">
             <tr className="border-b border-border bg-table-head text-text-secondary font-semibold text-[11px] uppercase tracking-wider">
               {selectable && (

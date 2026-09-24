@@ -70,7 +70,7 @@ function PortalShell({ children }) {
 function PortalNotice({ icon: Icon, tone, title, body, detail }) {
   return (
     <PortalShell>
-      <section className="rounded-xl border border-[#dce5f4] bg-white p-8 shadow-2xs text-center">
+      <section className="rounded-xl border border-[#dce5f4] bg-white p-6 sm:p-8 shadow-2xs text-center">
         <span
           className="w-12 h-12 rounded-2xl mx-auto flex items-center justify-center mb-3"
           style={{ background: tone.bg }}

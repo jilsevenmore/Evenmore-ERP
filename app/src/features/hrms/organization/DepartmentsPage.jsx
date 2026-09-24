@@ -107,13 +107,13 @@ export function DepartmentsPage() {
 
       {/* Filter / View Control Bar */}
       <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap justify-between items-center gap-3">
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search department or head..."
-            className="pl-9 pr-4 h-9 w-64 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
+            className="pl-9 pr-4 h-9 w-full sm:w-64 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
           />
         </div>
 
@@ -143,7 +143,7 @@ export function DepartmentsPage() {
       {view === 'table' ? (
         <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
                   <th className="py-3 px-5">Department</th>

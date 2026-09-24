@@ -437,7 +437,7 @@ export const SalesOrdersPage = () => {
           </Button>}/>
 
       {/* Sales Orders KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Booked Pipeline" value={formatCurrency(totalSoValue)} icon={DollarSign} />
         <StatCard label="Active In-Fulfillment" value={formatCurrency(confirmedValue)} icon={Truck} trend={{ positive: true, text: `${openOrdersCount} orders active` }} highlight={openOrdersCount > 0} />
         <StatCard label="Open Backlog Orders" value={`${openOrdersCount} Orders`} icon={Clock} subtext="Pending warehouse dispatch" />
@@ -445,8 +445,8 @@ export const SalesOrdersPage = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs">
-        {['All', 'Draft', 'Confirmed', 'Delivered', 'Invoiced', 'Cancelled'].map((stg) => (<button key={stg} onClick={() => setStageFilter(stg)} className={`px-3 py-1.5 rounded-t font-semibold transition-colors ${stageFilter === stg
+      <div className="flex flex-nowrap items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
+        {['All', 'Draft', 'Confirmed', 'Delivered', 'Invoiced', 'Cancelled'].map((stg) => (<button key={stg} onClick={() => setStageFilter(stg)} className={`shrink-0 lg:shrink px-3 py-1.5 rounded-t font-semibold transition-colors ${stageFilter === stg
                 ? 'bg-white border-t-2 border-[#1F2E4A] text-[#1F2E4A] shadow-sm'
                 : 'text-slate-500 hover:text-slate-800'}`}>
             {stg}
@@ -457,9 +457,9 @@ export const SalesOrdersPage = () => {
 
       {/* Create Modal */}
       {showAddModal && (
-        <div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-4'}`}>
+        <div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-2 sm:p-4'}`}>
           <div className={`bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
-            isFullscreen ? 'w-full h-full rounded-none p-8' : 'max-w-5xl w-full rounded-2xl p-6 max-h-[92vh]'
+            isFullscreen ? 'w-full h-full rounded-none p-4 sm:p-8' : 'max-w-5xl w-full rounded-2xl p-4 sm:p-6 max-h-[92vh]'
           } text-xs`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">Create New Sales Order</h3>
@@ -553,17 +553,17 @@ export const SalesOrdersPage = () => {
       <AutoPOModal isOpen={autoPOState.isOpen} onClose={() => setAutoPOState({ isOpen: false })} shortageItem={autoPOState.item} requiredDeficitQty={autoPOState.deficitQty} sourceRef={`Sales Order Requisition`}/>
 
       {/* Sales Order Detail & Lifecycle Stepper Modal */}
-      {selectedOrder && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-3">
+      {selectedOrder && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 sm:gap-3 min-w-0 lg:min-w-auto">
                 <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedOrder.orderNumber}</h3>
                 <span className="font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded">
                   {selectedOrder.customer}
                 </span>
                 <StatusBadge status={selectedOrder.stage || 'Draft'}/>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setPrintSalesOrderTarget(selectedOrder)}
@@ -587,7 +587,7 @@ export const SalesOrdersPage = () => {
 
               {/* Order Line Items Table */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                   <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
                     Committed Line Items & Fulfillment Status ({selectedOrder.items?.length || 0})
                   </h4>
@@ -599,7 +599,7 @@ export const SalesOrdersPage = () => {
                 {/* Line Fulfillment Progress Summary Table */}
                 {selectedOrder.items && selectedOrder.items.length > 0 && (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="w-full text-left text-xs text-slate-600">
+                    <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
                       <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200 text-[10px]">
                         <tr>
                           <th className="py-2 px-3">Item / Description</th>
@@ -644,7 +644,7 @@ export const SalesOrdersPage = () => {
                 )}
 
                 {/* Address Snapshot Details */}
-                <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs">
                   <div>
                     <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Billed To (Snapshot)</span>
                     <p className="font-semibold text-slate-800">{selectedOrder.customer}</p>
@@ -661,11 +661,11 @@ export const SalesOrdersPage = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
               <div className="font-mono text-xs">
                 Total Value: <span className="font-bold text-slate-900">{formatCurrency(selectedOrder.amount || 0)}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedOrder.stage !== 'Cancelled' && (
                   <>
                     <Button variant="outline" onClick={() => { handleGenerateProforma(selectedOrder); setSelectedOrder(null); }}>
@@ -702,8 +702,8 @@ export const SalesOrdersPage = () => {
 
       {/* Cancel Confirmation Modal */}
       {cancelModalTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 text-xs flex flex-col max-h-[95vh] overflow-y-auto">
             <div className="flex items-center gap-2 pb-3 border-b border-slate-200">
               <ShieldAlert className="w-5 h-5 text-rose-600"/>
               <h3 className="font-bold text-base text-[#1F2E4A]">Cancel Sales Order {cancelModalTarget.orderNumber}?</h3>

@@ -392,14 +392,14 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
 
                 {/* Error Banner */}
                 {errorMsg && (
-                    <div className="mx-6 mt-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-medium flex items-center gap-2.5 animate-in fade-in duration-150">
+                    <div className="mx-4 sm:mx-6 mt-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs font-medium flex items-center gap-2.5 animate-in fade-in duration-150">
                         <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
                         <span>{errorMsg}</span>
                     </div>
                 )}
 
                 {/* Scrollable Step Content */}
-                <div className="p-6 overflow-y-auto flex-1 space-y-5 text-xs text-text">
+                <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 text-xs text-text">
                     {/* STEP 1: Basic Info */}
                     {step === 1 && (
                         <div className="space-y-5 animate-in fade-in duration-150">
@@ -1054,7 +1054,7 @@ export const PartyWizardModal = ({ isOpen, onClose, onSave, existingParty = null
                 </div>
 
                 {/* Footer Navigation */}
-                <div className="bg-soft/50 border-t border-border px-6 py-4 flex items-center justify-between">
+                <div className="bg-soft/50 border-t border-border px-4 sm:px-6 py-4 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                     <div>
                         {step > 1 ? (
                             <button

@@ -349,7 +349,7 @@ export default function LeadFormBuilder({
                 Create and manage your lead form with custom fields. Click or drag fields to build your layout.
               </p>
             </div>
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={onPreview}
@@ -425,7 +425,7 @@ export default function LeadFormBuilder({
                 Click any field from the left panel to add it into the selected section.
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={onAddSection}
@@ -595,7 +595,7 @@ export default function LeadFormBuilder({
 
       {isPropertiesOpen && selectedField && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
           role="presentation"
           onClick={() => setIsPropertiesOpen(false)}
         >

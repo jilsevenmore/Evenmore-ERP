@@ -281,7 +281,7 @@ export const CategoriesPage = () => {
         subtitle={pageSubtitle}
         guide={categoryGuide}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <Button
               variant="outline"
               onClick={() => navigate(isMachineView ? '/inventory/items/machines' : '/inventory/items/stock')}
@@ -296,10 +296,10 @@ export const CategoriesPage = () => {
       />
 
       {/* View Segmented Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit text-xs font-semibold">
+      <div className="flex flex-nowrap items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit max-w-full lg:max-w-none overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none text-xs font-semibold">
         <Link
           to="/inventory/categories"
-          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
             !isMachineView && !isStockView
               ? 'bg-white text-blue-600 shadow-2xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
@@ -309,7 +309,7 @@ export const CategoriesPage = () => {
         </Link>
         <Link
           to="/inventory/categories/machines"
-          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
             isMachineView
               ? 'bg-white text-blue-600 shadow-2xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
@@ -319,7 +319,7 @@ export const CategoriesPage = () => {
         </Link>
         <Link
           to="/inventory/categories/stock"
-          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
             isStockView
               ? 'bg-white text-blue-600 shadow-2xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
@@ -338,8 +338,8 @@ export const CategoriesPage = () => {
         searchFilter={(c, term) => String(c.name ?? '').toLowerCase().includes(term) || String(c.code ?? '').toLowerCase().includes(term)}
       />
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
-          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-2 sm:p-4">
+          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <h3 className="font-bold text-base text-[#1F2E4A] mb-1">
               Add Inventory Category
             </h3>
@@ -352,7 +352,7 @@ export const CategoriesPage = () => {
                 <label className="block font-semibold text-slate-700 mb-1">Category Title</label>
                 <input required value={name} onChange={(e) => setName(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]" placeholder="e.g. Endoscopy Machines"/>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Short Code</label>
                   <input required value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono uppercase" placeholder="ENDO"/>
@@ -380,7 +380,7 @@ export const CategoriesPage = () => {
                 </label>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-4 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3.5 py-1.5 border border-[#CED4DA] rounded text-slate-600 hover:bg-slate-100 cursor-pointer">
                   Cancel
                 </button>
@@ -394,10 +394,10 @@ export const CategoriesPage = () => {
 
       {/* Manage Custom Fields Modal */}
       {managingCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
-          <div className="bg-white rounded-xl border border-[#CED4DA] shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-2 sm:p-4">
+          <div className="bg-white rounded-xl border border-[#CED4DA] shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-2 lg:gap-0 border-b border-slate-200 pb-3">
+              <div className="min-w-0 lg:min-w-auto">
                 <h3 className="font-bold text-base text-[#1F2E4A] flex items-center gap-2">
                   <Sliders size={18} className="text-[#1F2E4A]" />
                   Custom Fields for {managingCategory.name}
@@ -426,9 +426,9 @@ export const CategoriesPage = () => {
                   {(managingCategory.customFields || []).map((field) => (
                     <div
                       key={field.id || field.name}
-                      className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                      className="flex items-center justify-between gap-2 lg:gap-0 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                     >
-                      <div>
+                      <div className="min-w-0 lg:min-w-auto">
                         <span className="font-bold text-slate-800">{field.name}</span>
                         <span className="ml-2 font-mono text-[10px] text-slate-500 uppercase px-1.5 py-0.5 bg-white border border-slate-200 rounded">
                           {field.type}
@@ -456,7 +456,7 @@ export const CategoriesPage = () => {
             {/* Add New Custom Field Form */}
             <form onSubmit={handleAddCustomField} className="space-y-3 pt-3 border-t border-slate-200 text-xs">
               <span className="font-bold text-slate-800 block">Add New Custom Field</span>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">Field Label</label>
                   <input
@@ -516,10 +516,10 @@ export const CategoriesPage = () => {
 
       {/* Manage Category BOM / Sub-Parts Modal */}
       {managingBomCategory && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-xl border border-[#CED4DA] shadow-2xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-              <div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-xl border border-[#CED4DA] shadow-2xl max-w-lg w-full p-4 sm:p-6 space-y-4 max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between gap-2 lg:gap-0 border-b border-slate-200 pb-3">
+              <div className="min-w-0 lg:min-w-auto">
                 <h3 className="font-bold text-base text-[#1F2E4A] flex items-center gap-2">
                   <Boxes size={18} className="text-purple-600" />
                   BOM Sub-Parts for {managingBomCategory.name}
@@ -552,17 +552,17 @@ export const CategoriesPage = () => {
                     return (
                       <div
                         key={part.id}
-                        className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                        className="flex items-center justify-between gap-2 lg:gap-0 p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                       >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-6 h-6 rounded bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-[10px]">
+                        <div className="flex items-center gap-2.5 min-w-0 lg:min-w-auto">
+                          <div className="w-6 h-6 shrink-0 lg:shrink rounded bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-[10px]">
                             {part.defaultQty}x
                           </div>
                           <div>
                             <span className="font-bold text-slate-800">
                               {item ? item.name : `Item #${part.itemId}`}
                             </span>
-                            <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                            <div className="text-[11px] text-slate-500 flex flex-wrap lg:flex-nowrap items-center gap-x-2">
                               <span>SKU: {item?.sku || '—'}</span>
                               <span>•</span>
                               <span>Cost: ₹{item?.costPrice || 0}</span>

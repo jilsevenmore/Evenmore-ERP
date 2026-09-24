@@ -35,11 +35,11 @@ export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
         });
         onClose();
     };
-    return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+    return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-2 sm:p-4">
+      <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl w-full max-w-lg max-h-[95vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-[#CED4DA] flex items-center justify-between bg-[#F8F9FA]">
-          <div className="flex items-center gap-2.5">
+        <div className="px-4 sm:px-6 py-4 border-b border-[#CED4DA] flex items-center justify-between gap-2 lg:gap-0 bg-[#F8F9FA]">
+          <div className="flex items-center gap-2.5 min-w-0 lg:min-w-auto">
             <div className="w-8 h-8 rounded bg-[#1F2E4A]/10 text-[#1F2E4A] flex items-center justify-center">
               <AlertTriangle className="w-4 h-4"/>
             </div>
@@ -54,7 +54,7 @@ export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
         </div>
 
         {/* Modal Body */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 text-sm text-[#2d3335]">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 text-sm text-[#2d3335]">
           {error && (<div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded">
               {error}
             </div>)}
@@ -69,7 +69,7 @@ export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
         }} className="w-full border border-[#CED4DA] rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F2E4A]"/>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-[#1F2E4A] uppercase tracking-wider mb-1">
                 Serial Number (S/N) *
@@ -110,7 +110,7 @@ export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
           </div>
 
           {/* Modal Footer */}
-          <div className="pt-3 border-t border-[#CED4DA] flex items-center justify-end gap-3">
+          <div className="pt-3 border-t border-[#CED4DA] flex flex-wrap lg:flex-nowrap items-center justify-end gap-3">
             <button type="button" onClick={onClose} className="px-4 py-2 border border-[#CED4DA] text-[#343A40] rounded text-xs font-medium hover:bg-gray-100 transition-colors">
               Cancel
             </button>

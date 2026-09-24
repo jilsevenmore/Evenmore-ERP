@@ -123,7 +123,7 @@ export const TransfersPage = () => {
           </Button>}/>
 
       {/* Transfers KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Transfer Manifests" value={`${transfers.length} Moves`} icon={ArrowLeftRight} />
         <StatCard label="In-Transit Active" value={`${inTransitCount} En Route`} icon={Truck} trend={{ positive: inTransitCount === 0, text: inTransitCount > 0 ? 'Awaiting intake' : 'All delivered' }} highlight={inTransitCount > 0} />
         <StatCard label="Completed Intakes" value={`${receivedCount} Restocked`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
@@ -134,9 +134,9 @@ export const TransfersPage = () => {
             String(t.sourceLocation ?? '').toLowerCase().includes(term) ||
             String(t.destLocation ?? '').toLowerCase().includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-4 sm:p-6 text-xs max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
               <h3 className="font-bold text-base text-[#1F2E4A]">
                 Create Stock Transfer Manifest
               </h3>
@@ -146,7 +146,7 @@ export const TransfersPage = () => {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Origin Source Facility *</label>
                   <select value={sourceLocId} onChange={(e) => setSourceLocId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
@@ -176,7 +176,7 @@ export const TransfersPage = () => {
                 <LineItemEditor items={lineItems} onChange={setLineItems}/>
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
                   Cancel
                 </button>

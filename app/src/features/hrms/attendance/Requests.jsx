@@ -305,7 +305,7 @@ export default function Requests() {
           </div>
           <p className="req-sub">Single request management for regularization &amp; early clock-out.</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button type="button" onClick={() => setShowRegModal(true)} className="req-btn-outline">
             Regularize
           </button>
@@ -592,7 +592,7 @@ export default function Requests() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 10 }}>
               <div><strong>Type:</strong> {selectedReq.type}</div>
               <div><strong>Status:</strong> <span className="req-status" style={{ ...statusStyles[selectedReq.status] }}>{selectedReq.status}</span></div>
               <div><strong>Requested By:</strong> {selectedReq.requestedBy}</div>
@@ -843,6 +843,19 @@ export default function Requests() {
         .req-btn-reject:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
         .req-btn-view { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
         .req-btn-view:hover { background: #f8fafc; color: #111827; }
+        @media (max-width: 1023px) {
+          .req-page { margin: -16px -20px -24px; }
+        }
+        @media (max-width: 767px) {
+          .req-page { margin: -12px -14px -20px; }
+        }
+        @media (max-width: 640px) {
+          .req-page { padding: 14px 14px 22px; }
+          .req-filter-card { padding: 12px 14px; }
+          .req-search-wrap { flex: 1 1 100%; min-width: 0; }
+          .req-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+          .req-tab { flex-shrink: 0; white-space: nowrap; }
+        }
       `}</style>
     </div>
   );

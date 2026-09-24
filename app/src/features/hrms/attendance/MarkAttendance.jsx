@@ -474,6 +474,17 @@ export default function MarkAttendance() {
         .mark-btn-cancel:hover { background: #f8fafc; color: #111827; }
         .mark-btn-save { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .mark-btn-save:hover { background: #0f172a; }
+        @media (max-width: 1023px) {
+          .mark-att-page { margin: -16px -20px -24px; }
+        }
+        @media (max-width: 767px) {
+          .mark-att-page { margin: -12px -14px -20px; }
+        }
+        @media (max-width: 640px) {
+          .mark-att-page { padding: 14px 14px 22px; }
+          .mark-filter-card { padding: 12px 14px; }
+          .mark-footer { flex-wrap: wrap; padding: 12px 14px; }
+        }
       `}</style>
     </div>
   );

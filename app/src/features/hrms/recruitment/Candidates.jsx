@@ -364,7 +364,7 @@ export default function Candidates() {
         ]}
         guide={CANDIDATES_GUIDE}
         actions={
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
             <div className="inline-flex items-center bg-soft border border-border rounded-xl p-0.5">
               <button
                 type="button"

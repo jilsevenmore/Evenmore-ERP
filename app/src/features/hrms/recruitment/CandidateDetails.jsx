@@ -145,7 +145,7 @@ export default function CandidateDetails() {
       </button>
 
       {/* Candidate Entity Hero Card */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-2xs">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-2xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
             <img
@@ -321,7 +321,7 @@ export default function CandidateDetails() {
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted mb-3">
               Application Documents
             </h3>
-            <div className="border border-border/80 rounded-xl p-4 bg-soft/60 flex items-center justify-between gap-3">
+            <div className="border border-border/80 rounded-xl p-4 bg-soft/60 flex flex-wrap lg:flex-nowrap items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center font-bold">
                   <FileText size={20} />

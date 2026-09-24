@@ -675,7 +675,7 @@ export const AddEditItemPage = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <Link to={itemKind === 'Machine' ? '/items/machines' : '/items/stock'}>
             <Button variant="outline" icon={ArrowLeft}>
               Back to {itemKind === 'Machine' ? 'Machines' : 'Stock'}
@@ -693,7 +693,7 @@ export const AddEditItemPage = () => {
 
       {/* Main Form Container */}
       <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-        <form onSubmit={handleSubmit} className="p-6 space-y-8">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-8">
 
           {/* Classification & Identity Bar */}
           <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -703,7 +703,7 @@ export const AddEditItemPage = () => {
                 Select whether this item is an assembled Machine, Component Part, Finished Good, Consumable, Raw Material, or Service.
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <label
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Machine'
                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
@@ -816,7 +816,7 @@ export const AddEditItemPage = () => {
                 <h3 className="text-base font-bold text-slate-800">Core Specifications</h3>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     SKU Code *
@@ -869,7 +869,7 @@ export const AddEditItemPage = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
                     Category
@@ -906,7 +906,7 @@ export const AddEditItemPage = () => {
 
               {/* Units of Measure & Conversion Factors */}
               <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-xl space-y-3">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <Scale size={14} className="text-blue-600" />
                     Units of Measure & Conversion
@@ -920,7 +920,7 @@ export const AddEditItemPage = () => {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-medium text-slate-600 mb-1">
                       Purchase Unit
@@ -1003,7 +1003,7 @@ export const AddEditItemPage = () => {
                     Steel & raw metal: intake is weighed on the weighbridge; stock & billing follow the received weight.
                   </p>
                   {isWeightItem && (
-                    <div className="grid grid-cols-2 gap-3 mt-2.5 ml-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5 ml-6">
                       <div>
                         <label className="block text-[11px] font-medium text-slate-600 mb-1">
                           Theoretical Weight (kg / unit)
@@ -1122,7 +1122,7 @@ export const AddEditItemPage = () => {
                     <Barcode size={15} className="text-amber-700" />
                     Inventory Tracking Mode
                   </span>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-3 gap-y-1.5">
                     <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
                       <input
                         type="radio"
@@ -1176,7 +1176,7 @@ export const AddEditItemPage = () => {
                           {parsedSerialNumbers.length} Registered
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 text-[11px]">
+                      <div className="flex flex-wrap lg:flex-nowrap items-center gap-1 text-[11px]">
                         <button
                           type="button"
                           onClick={() => setSerialViewMode('chips')}
@@ -1235,7 +1235,7 @@ export const AddEditItemPage = () => {
 
                     {/* Single Serial Quick Add Input */}
                     <div className="flex items-center gap-2 pt-1">
-                      <div className="relative flex-1">
+                      <div className="relative flex-1 min-w-0 lg:min-w-auto">
                         <input
                           type="text"
                           value={singleSerialInput}
@@ -1327,7 +1327,7 @@ export const AddEditItemPage = () => {
                       </div>
                     )}
 
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs flex justify-between items-center">
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs flex flex-wrap lg:flex-nowrap justify-between items-center gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0">
                       <span className="text-slate-600 font-medium">Available Stock (Derived from Serials):</span>
                       <span className="font-mono font-bold text-blue-700 text-sm">
                         {parsedSerialNumbers.length} {salesUnit || 'Unit'}
@@ -1336,7 +1336,7 @@ export const AddEditItemPage = () => {
                   </div>
                 ) : trackingMode === 'Batch' ? (
                   <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200/80 shadow-2xs">
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-2 border-b border-slate-100">
                       <span className="text-xs font-bold text-slate-800">
                         Batch / Lot Tracking Parameters
                       </span>
@@ -1401,7 +1401,7 @@ export const AddEditItemPage = () => {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
                           Initial Batch Quantity ({salesUnit || 'Unit'})
@@ -1429,7 +1429,7 @@ export const AddEditItemPage = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
                         Initial Stock Level ({salesUnit || 'Unit'})
@@ -1460,8 +1460,8 @@ export const AddEditItemPage = () => {
 
               {/* Default Warranty Policy Section */}
               <div className="p-4 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl space-y-3.5">
-                <div className="flex items-center justify-between pb-2 border-b border-emerald-200/60">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-2 border-b border-emerald-200/60">
+                  <div className="flex items-center gap-2 min-w-0 lg:min-w-auto">
                     <ShieldCheck className="w-5 h-5 text-emerald-600" />
                     <div>
                       <h4 className="text-xs font-bold text-slate-800">Default Warranty Configuration</h4>
@@ -1569,7 +1569,7 @@ export const AddEditItemPage = () => {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-2 lg:gap-x-0 mb-1">
                   <label className="block text-xs font-semibold text-slate-700">
                     Default Warehouse & Storage Location
                   </label>
@@ -1650,7 +1650,7 @@ export const AddEditItemPage = () => {
                   />
 
                   {imagePreview ? (
-                    <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 flex items-center gap-4">
+                    <div className="border border-slate-200 rounded-2xl p-3 sm:p-4 bg-slate-50 flex items-center gap-3 sm:gap-4">
                       <img
                         src={imagePreview}
                         alt="Product Schematic Preview"
@@ -1731,7 +1731,7 @@ export const AddEditItemPage = () => {
 
           {/* CRITICAL SECTION: REQUIRED PARTS / MACHINE BOM (Visible whenever itemKind === 'Machine') */}
           {itemKind === 'Machine' && (
-            <div className="bg-blue-50/30 border-2 border-blue-200 rounded-2xl p-6 space-y-4">
+            <div className="bg-blue-50/30 border-2 border-blue-200 rounded-2xl p-4 sm:p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-200/80">
                 <div>
                   <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
@@ -1743,7 +1743,7 @@ export const AddEditItemPage = () => {
                     When this machine is added to quotes or invoices, these parts will auto-populate as editable line items.
                   </p>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 shrink-0">
                   {categoryParts.some((cp) => cp.categoryId === activeCategoryObj?.id || cp.categoryId === activeCategoryObj?.name) && (
                     <button
                       type="button"
@@ -1787,7 +1787,7 @@ export const AddEditItemPage = () => {
                 </div>
               ) : (
                 <div className="overflow-x-auto bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                  <table className="w-full text-left text-xs">
+                  <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs">
                     <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80">
                       <tr>
                         <th className="p-3">Component / Stock Item</th>
@@ -1878,7 +1878,7 @@ export const AddEditItemPage = () => {
               </button>
             </div>
           ) : (
-            <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200">
+            <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
@@ -1893,7 +1893,7 @@ export const AddEditItemPage = () => {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setShowNewFieldModal(true)}
@@ -2009,7 +2009,7 @@ export const AddEditItemPage = () => {
           )}
 
           {/* Footer Action Buttons */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200/80">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-3 pt-4 border-t border-slate-200/80">
             <Button
               type="button"
               variant="outline"
@@ -2026,10 +2026,10 @@ export const AddEditItemPage = () => {
 
       {/* Stock Part Picker Modal for Machine BOM */}
       {isAddPartModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-y-auto">
+            <div className="flex items-center justify-between gap-2 lg:gap-0 border-b border-slate-100 pb-3">
+              <div className="min-w-0 lg:min-w-auto">
                 <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
                   <Boxes className="text-blue-600" size={18} /> Select Stock Part for Machine BOM
                 </h3>
@@ -2096,13 +2096,13 @@ export const AddEditItemPage = () => {
                           setPickerRequiredQty(1);
                         }
                       }}
-                      className={`p-3.5 flex items-center justify-between cursor-pointer transition-colors ${isSelected
+                      className={`p-3.5 flex items-center justify-between gap-3 lg:gap-0 cursor-pointer transition-colors ${isSelected
                           ? 'bg-blue-50/80 border-l-4 border-blue-600'
                           : 'hover:bg-slate-50'
                         }`}
                     >
-                      <div>
-                        <div className="font-bold text-slate-800 flex items-center gap-2">
+                      <div className="min-w-0 lg:min-w-auto">
+                        <div className="font-bold text-slate-800 flex flex-wrap lg:flex-nowrap items-center gap-2">
                           <span>{it.name}</span>
                           {isAlreadyAdded && (
                             <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">
@@ -2110,7 +2110,7 @@ export const AddEditItemPage = () => {
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                        <div className="text-[11px] text-slate-500 flex flex-wrap lg:flex-nowrap items-center gap-x-2 gap-y-0.5 mt-0.5">
                           <span className="font-mono font-medium">{it.sku}</span>
                           <span>•</span>
                           <span>{it.category}</span>
@@ -2118,7 +2118,7 @@ export const AddEditItemPage = () => {
                           <span>Cost: ₹{it.costPrice ?? it.unitCost ?? 0}</span>
                         </div>
                       </div>
-                      <div className="text-right font-mono">
+                      <div className="text-right font-mono shrink-0 lg:shrink">
                         <span className="text-xs font-bold text-slate-800">
                           {it.availableQty ?? it.stock ?? 0} {it.salesUnit || it.uom || 'Unit'}
                         </span>
@@ -2141,8 +2141,8 @@ export const AddEditItemPage = () => {
             )}
 
             {/* Quantity and Submit */}
-            <form onSubmit={handleAddPartToBom} className="pt-3 border-t border-slate-100 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-xs">
+            <form onSubmit={handleAddPartToBom} className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 text-xs">
                 <label className="font-semibold text-slate-700">Required Qty per Machine:</label>
                 <input
                   type="number"
@@ -2157,7 +2157,7 @@ export const AddEditItemPage = () => {
                 </span>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <Button
                   type="button"
                   variant="outline"
@@ -2181,8 +2181,8 @@ export const AddEditItemPage = () => {
 
       {/* Custom Serial Batch Generator Modal */}
       {showBatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
                 <Wand2 size={18} className="text-blue-600" /> Auto-Generate Serial Numbers Batch
@@ -2300,8 +2300,8 @@ export const AddEditItemPage = () => {
 
       {/* Inline Unit Create Modal */}
       {showNewUnitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-sm w-full p-4 sm:p-5 space-y-4 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
                 <Scale size={16} className="text-blue-600" /> Add Unit of Measure
@@ -2356,8 +2356,8 @@ export const AddEditItemPage = () => {
 
       {/* Inline Add Field Modal */}
       {showNewFieldModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-5 space-y-4 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
                 <Sliders size={16} className="text-blue-600" /> Add Custom Parameter for {category}

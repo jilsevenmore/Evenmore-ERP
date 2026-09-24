@@ -124,7 +124,7 @@ export const CashBankPage = () => {
 
       {/* ── [PHASE-2E] Inter-Bank Transfer (treasury reshuffling, no P&L impact) ── */}
       <div className="bg-white border border-[#CED4DA] rounded-lg shadow-xs">
-        <div className="px-5 py-4 border-b border-[#CED4DA] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-[#CED4DA] flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
           <div>
             <h3 className="font-bold text-sm text-[#1F2E4A]">Inter-Bank Transfer</h3>
             <p className="text-xs text-slate-500 mt-0.5">Move cash between company bank accounts. A mirrored journal entry is auto-posted; P&amp;L is unaffected.</p>
@@ -134,8 +134,8 @@ export const CashBankPage = () => {
           </button>
         </div>
         {showTransfer && (
-          <div className="p-5">
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_160px_auto] gap-3 items-end">
+          <div className="p-4 sm:p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_160px_auto] gap-3 items-end">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">From Account *</label>
                 <select value={transferFrom} onChange={(e) => setTransferFrom(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 text-xs">
@@ -184,7 +184,7 @@ export const CashBankPage = () => {
             <h3 className="font-bold text-xs text-[#1F2E4A]">Inter-Bank Transfer Ledger</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-600">
+            <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
               <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="py-2 px-3">Ref</th>
@@ -216,8 +216,8 @@ export const CashBankPage = () => {
             String(a.accountNumber ?? '').toLowerCase().includes(term) ||
             (a.accountType || '').toLowerCase().includes(term)}/>
 
-      {isModalOpen && (<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg border border-[#CED4DA] max-w-md w-full p-6 shadow-xl text-xs">
+      {isModalOpen && (<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-lg border border-[#CED4DA] max-w-md w-full p-4 sm:p-6 shadow-xl text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-[#CED4DA]">
               <h3 className="font-bold text-base text-[#1F2E4A]">Link New Bank Account</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
@@ -233,7 +233,7 @@ export const CashBankPage = () => {
                 <label className="font-semibold text-slate-700 block mb-1">Account Number Mask</label>
                 <input type="text" placeholder="e.g. •••• 9921" value={newAcc.accountNumber} onChange={(e) => setNewAcc({ ...newAcc, accountNumber: e.target.value })} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Account Type</label>
                   <select value={newAcc.accountType} onChange={(e) => setNewAcc({ ...newAcc, accountType: e.target.value })} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]">
@@ -247,7 +247,7 @@ export const CashBankPage = () => {
                   <input type="number" value={newAcc.balance} onChange={(e) => setNewAcc({ ...newAcc, balance: Number(e.target.value) })} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
                 </div>
               </div>
-              <div className="flex justify-end gap-3 pt-3 border-t border-[#CED4DA]">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-3 pt-3 border-t border-[#CED4DA]">
                 <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </Button>

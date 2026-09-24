@@ -176,7 +176,7 @@ function HrmsSetupPageOriginal() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px]">
+          <table className="w-full min-w-[640px] lg:min-w-0 text-left text-[13px]">
             <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
               <tr>
                 <th className="py-3.5 px-5">Role &amp; Responsibilities</th>
@@ -212,7 +212,7 @@ function HrmsSetupPageOriginal() {
         </div>
       </div>
 
-      <div className="bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col gap-4">
+      <div className="bg-white border border-bdr rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col gap-4">
         <div className="flex items-center justify-between pb-3 border-b border-bdr">
           <div className="flex items-center gap-2">
             <History size={18} className="text-navy" />
@@ -248,8 +248,8 @@ function HrmsSetupPageOriginal() {
       </div>
 
       {isRoleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <h3 className="font-bold text-[16px] text-slate-900">Define Custom Role</h3>
               <button

@@ -429,11 +429,11 @@ export default function TasksPage() {
       {/* Edit / Reassign Task Modal */}
       {editingTask && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-2 sm:p-4"
           role="dialog"
           aria-modal="true"
         >
-          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-xl overflow-hidden">
+          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-xl max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-bold text-slate-900">Edit / Reassign Task</h3>
@@ -481,7 +481,7 @@ export default function TasksPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Due Date</label>
                   <input

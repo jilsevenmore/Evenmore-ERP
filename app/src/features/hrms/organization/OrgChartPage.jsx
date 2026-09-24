@@ -275,7 +275,7 @@ export function OrgChartPage() {
   const rootMatches = matchesQuery(INITIAL_TREE);
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-[1600px] mx-auto w-full printable-document">
+    <div className="flex flex-col gap-6 p-2 sm:p-6 max-w-[1600px] mx-auto w-full printable-document">
       {/* ── Page Header ─────────────────────────────────────────── */}
       <div className="flex flex-wrap justify-between items-start gap-4">
         <div>
@@ -288,7 +288,7 @@ export function OrgChartPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           {/* Export Dropdown / Button */}
           <div className="relative">
             <button
@@ -302,7 +302,7 @@ export function OrgChartPage() {
             </button>
 
             {isExportOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-bdr rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div className="absolute left-0 lg:left-auto lg:right-0 mt-2 w-48 bg-white border border-bdr rounded-xl shadow-lg py-1.5 z-30 animate-in fade-in slide-in-from-top-2 duration-150">
                 <button
                   type="button"
                   onClick={exportCSV}
@@ -336,15 +336,15 @@ export function OrgChartPage() {
 
       {/* ── Control Bar ─────────────────────────────────────────── */}
       <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3 no-print">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 w-full sm:w-auto">
           {/* Search Input */}
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search by name or role"
-              className="pl-10 pr-4 h-9 w-64 bg-off border border-bdr rounded-xl text-[13px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
+              className="pl-10 pr-4 h-9 w-full sm:w-64 bg-off border border-bdr rounded-xl text-[13px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
             />
             {q && (
               <button
@@ -400,7 +400,7 @@ export function OrgChartPage() {
       </div>
 
       {/* ── Main Org Chart Canvas ───────────────────────────────── */}
-      <div className="bg-white border border-bdr rounded-xl shadow-xs p-8 overflow-x-auto min-h-[520px] flex justify-center items-start">
+      <div className="bg-white border border-bdr rounded-xl shadow-xs p-4 sm:p-8 overflow-x-auto min-h-[520px] flex justify-center-safe items-start">
         <div
           style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
           className="min-w-[880px] flex flex-col items-center transition-transform duration-150"
@@ -614,7 +614,7 @@ export function OrgChartPage() {
             </select>
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-bdr mt-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-3 border-t border-bdr mt-2">
             <button
               type="button"
               onClick={() => {
@@ -747,7 +747,7 @@ export function OrgChartPage() {
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-3 border-t border-bdr">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-3 border-t border-bdr">
               <button
                 type="button"
                 onClick={() => {

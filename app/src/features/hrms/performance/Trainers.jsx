@@ -102,7 +102,7 @@ export default function Trainers({ embedded = false, onBack }) {
           </div>
           <p className="text-[13px] text-muted">{trainers.length} registered trainers across departments</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/hrms/training/training-funnel")}

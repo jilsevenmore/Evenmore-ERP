@@ -20,6 +20,7 @@ import {
   UserPlus,
   Layers,
   Inbox,
+  Menu,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useERP } from '../../context/ERPContext';
@@ -56,6 +57,8 @@ export default function Topbar() {
   const globalSearch = useAppStore((s) => s.globalSearch);
   const setGlobalSearch = useAppStore((s) => s.setGlobalSearch);
   const setCommandPaletteOpen = useAppStore((s) => s.setCommandPaletteOpen);
+  const mobileSidebarOpen = useAppStore((s) => s.mobileSidebarOpen);
+  const toggleMobileSidebar = useAppStore((s) => s.toggleMobileSidebar);
   const theme = useAppStore((s) => s.theme) || 'light';
   const setTheme = useAppStore((s) => s.setTheme);
 
@@ -202,6 +205,29 @@ export default function Topbar() {
 
   return (
     <header className="topbar">
+      {/* Mobile / tablet navigation toggle (below lg only) */}
+      <button
+        type="button"
+        onClick={toggleMobileSidebar}
+        className="topbar-hamburger"
+        aria-label={mobileSidebarOpen ? 'Close navigation' : 'Open navigation'}
+        aria-expanded={mobileSidebarOpen}
+        title="Menu"
+      >
+        <Menu size={18} />
+      </button>
+
+      {/* Compact search trigger (phones only) — opens the Command Palette */}
+      <button
+        type="button"
+        onClick={() => setCommandPaletteOpen(true)}
+        className="top-search-compact"
+        aria-label="Search (Ctrl+K)"
+        title="Search"
+      >
+        <Search size={16} />
+      </button>
+
       {/* Search Input Bar */}
       <label className="top-search cursor-pointer">
         <Search size={15} className="top-search-ico shrink-0 text-muted" />
@@ -220,7 +246,7 @@ export default function Topbar() {
       </label>
 
       {/* Right Actions Cluster */}
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="top-actions flex items-center gap-2 shrink-0">
         {/* Theme Switcher Button & Dropdown */}
         <div className="relative" ref={themeRef}>
           <button

@@ -62,8 +62,8 @@ export const ImportModal = ({ isOpen, onClose, title, templateHeaders, sampleRow
         setCsvText('');
         setParsedRows([]);
     };
-    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Import ${title} via CSV`}>
-      <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Import ${title} via CSV`}>
+      <div className="bg-white rounded-2xl border border-slate-200 max-w-2xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2.5">
@@ -82,7 +82,7 @@ export const ImportModal = ({ isOpen, onClose, title, templateHeaders, sampleRow
 
         {/* Modal Body */}
         <div className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
-          <div className="flex items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 bg-slate-50 p-3 rounded-xl border border-slate-200">
             <div>
               <p className="font-semibold text-slate-800">Need the correct column format?</p>
               <p className="text-[11px] text-slate-500">Download our pre-formatted sample CSV template.</p>
@@ -148,7 +148,7 @@ export const ImportModal = ({ isOpen, onClose, title, templateHeaders, sampleRow
         </div>
 
         {/* Modal Footer */}
-        <div className="pt-3 border-t border-slate-200 mt-4 flex items-center justify-between">
+        <div className="pt-3 border-t border-slate-200 mt-4 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
           <button type="button" onClick={onClose} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
             Cancel
           </button>

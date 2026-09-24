@@ -99,13 +99,13 @@ export function LocationsPage() {
 
       {/* Search Bar */}
       <div className="bg-white border border-bdr rounded-xl p-4 shadow-xs flex flex-wrap justify-between items-center gap-3">
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search location by name or address..."
-            className="pl-9 pr-4 h-9 w-72 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
+            className="pl-9 pr-4 h-9 w-full sm:w-72 bg-off border border-bdr rounded-xl text-[13px] focus:outline-none focus:border-navy"
           />
         </div>
       </div>
@@ -197,7 +197,7 @@ export function LocationsPage() {
               className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
                 Office Type

@@ -354,7 +354,7 @@ export default function Jobs() {
       {/* Modern FilterBar */}
       <div className="bg-card border border-border rounded-2xl p-3.5 flex flex-wrap items-center gap-2.5 shadow-2xs">
         {/* Search Input */}
-        <div className="relative flex-1 min-w-[200px] max-w-[260px]">
+        <div className="relative flex-1 min-w-[200px] max-w-full sm:max-w-[260px]">
           <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="text"

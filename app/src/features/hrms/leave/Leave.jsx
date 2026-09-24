@@ -502,7 +502,7 @@ export default function Leave() {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-medium text-muted block mb-1">From Date</label>
                 <input
@@ -649,13 +649,13 @@ export default function Leave() {
             </div>
 
             {/* Status Tabs */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl max-w-full lg:max-w-none overflow-x-auto lg:overflow-visible scrollbar-none">
               {["All", "Pending Review", "Approved", "Rejected"].map((st) => (
                 <button
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
-                  className={`px-2.5 py-1 text-[11.5px] font-semibold rounded-lg transition cursor-pointer ${
+                  className={`px-2.5 py-1 text-[11.5px] font-semibold rounded-lg transition cursor-pointer shrink-0 lg:shrink whitespace-nowrap ${
                     statusFilter === st ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
@@ -666,8 +666,8 @@ export default function Leave() {
           </div>
 
           {/* Search & Type Filter Bar */}
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex-1">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+            <div className="relative flex-1 min-w-[180px] lg:min-w-0">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
@@ -702,14 +702,14 @@ export default function Leave() {
                   className="border border-bdr rounded-2xl p-4 flex flex-col gap-3 transition hover:border-slate-300"
                 >
                   <div className="flex justify-between items-start gap-3">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
                       <img
                         src={l.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(l.employee)}`}
                         alt={l.employee}
-                        className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                        className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0 lg:shrink"
                       />
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0 lg:min-w-auto">
+                        <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-2">
                           <span className="text-[13.5px] font-bold text-slate-900">{l.employee}</span>
                           <span className="text-[11px] font-medium text-slate-400">({l.id})</span>
                         </div>
@@ -790,7 +790,7 @@ export default function Leave() {
                   )}
 
                   {l.status === "Pending Review" && (
-                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-bdr/40">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-1 border-t border-bdr/40">
                       <button
                         type="button"
                         onClick={() => handleOpenReject(l)}
@@ -820,7 +820,7 @@ export default function Leave() {
           </div>
 
           {filteredLeaves.length > 0 && (
-            <div className="pt-2 border-t border-bdr/60 flex items-center justify-between text-[11.5px] text-muted">
+            <div className="pt-2 border-t border-bdr/60 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-[11.5px] text-muted">
               <span>Showing {filteredLeaves.length} leave application{filteredLeaves.length === 1 ? "" : "s"}</span>
               {filteredLeaves.length > 3 && (
                 <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -850,11 +850,11 @@ export default function Leave() {
             </span>
           </div>
 
-          <div className="flex gap-4 mt-4 border-b border-bdr overflow-x-auto">
+          <div className="flex gap-4 mt-4 border-b border-bdr overflow-x-auto scrollbar-none">
             <button
               type="button"
               onClick={() => setTab("assigned")}
-              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 lg:shrink ${
                 tab === "assigned"
                   ? "border-navy text-navy"
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -868,7 +868,7 @@ export default function Leave() {
             <button
               type="button"
               onClick={() => setTab("mine")}
-              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 lg:shrink ${
                 tab === "mine"
                   ? "border-navy text-navy"
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -882,7 +882,7 @@ export default function Leave() {
             <button
               type="button"
               onClick={() => setTab("compoff")}
-              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 lg:shrink ${
                 tab === "compoff"
                   ? "border-navy text-navy"
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -897,7 +897,7 @@ export default function Leave() {
             <button
               type="button"
               onClick={() => setTab("encashment")}
-              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 lg:shrink ${
                 tab === "encashment"
                   ? "border-navy text-navy"
                   : "border-transparent text-slate-500 hover:text-slate-800"
@@ -915,7 +915,7 @@ export default function Leave() {
         {/* Delegations View */}
         {(tab === "assigned" || tab === "mine") && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                 <tr>
                   <th className="py-3.5 px-5">Colleague</th>
@@ -978,7 +978,7 @@ export default function Leave() {
         {/* Comp-Off Credits View */}
         {tab === "compoff" && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                 <tr>
                   <th className="py-3.5 px-5">Claim ID &amp; Employee</th>
@@ -1068,7 +1068,7 @@ export default function Leave() {
         {/* Leave Encashments View */}
         {tab === "encashment" && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
+            <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                 <tr>
                   <th className="py-3.5 px-5">Request ID &amp; Employee</th>
@@ -1212,7 +1212,7 @@ export default function Leave() {
             </select>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 12 }}>
             <div className="form-group">
               <label className="form-label">From Date</label>
               <input
@@ -1524,7 +1524,7 @@ export default function Leave() {
             </select>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 12 }}>
             <div className="form-group">
               <label className="form-label">Weekend / Holiday Date Worked</label>
               <input

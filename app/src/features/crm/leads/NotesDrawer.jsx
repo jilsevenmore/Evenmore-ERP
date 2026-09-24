@@ -98,7 +98,7 @@ export default function NotesDrawer({ lead, isOpen, onClose }) {
   return (
     <div className="fixed inset-0 z-[60] flex justify-end bg-slate-900/40" onClick={onClose}>
       <aside
-        className="relative w-full max-w-[560px] h-full bg-white shadow-2xl flex flex-col"
+        className="relative w-full max-w-[min(560px,calc(100%-1.5rem))] h-full bg-white shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"

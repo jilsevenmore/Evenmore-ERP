@@ -82,7 +82,7 @@ export default function JobDetails() {
       </button>
 
       {/* Entity Hero Card */}
-      <div className="bg-card border border-border rounded-2xl p-6 shadow-2xs">
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-2xs">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-start gap-4">
             <div className="w-13 h-13 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 border border-blue-100 dark:border-blue-900/40 flex items-center justify-center shrink-0">

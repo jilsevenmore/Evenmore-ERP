@@ -405,12 +405,12 @@ export default function TaskFormPage() {
 
       {isModalOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
           role="presentation"
           onMouseDown={closeModal}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 overflow-hidden"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 max-h-[95vh] overflow-y-auto"
             role="dialog"
             aria-modal="true"
             onMouseDown={(e) => e.stopPropagation()}
@@ -477,7 +477,7 @@ export default function TaskFormPage() {
 
       {deleteId && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
           role="presentation"
           onMouseDown={() => setDeleteId(null)}
         >

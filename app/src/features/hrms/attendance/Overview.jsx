@@ -255,7 +255,7 @@ export default function AttendanceOverview() {
           </div>
           <p className="att-sub">Daily tracking, attendance status, regularization, shifts and overtime.</p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button type="button" onClick={handleExport} className="att-export-btn">
             <Download size={15} /> Export
           </button>
@@ -514,7 +514,7 @@ export default function AttendanceOverview() {
               onChange={(e) => setRegDate(e.target.value)}
             />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 12 }}>
             <div className="form-group">
               <label className="form-label">Check In Time</label>
               <input
@@ -611,9 +611,19 @@ export default function AttendanceOverview() {
         @media (max-width: 1200px) {
           .att-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         }
+        @media (max-width: 1023px) {
+          .att-mgmt-page { margin: -16px -20px -24px; }
+        }
+        @media (max-width: 767px) {
+          .att-mgmt-page { margin: -12px -14px -20px; }
+        }
         @media (max-width: 640px) {
           .att-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .att-mgmt-page { padding: 14px 14px 22px; }
+          .att-filter-card { padding: 12px 14px; }
+          .att-filter-left { width: 100%; }
+          .att-search-wrap { flex: 1 1 100%; min-width: 0; }
+          .att-filter-right { flex-wrap: wrap; }
         }
       `}</style>
     </div>

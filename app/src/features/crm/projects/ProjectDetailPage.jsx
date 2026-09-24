@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Building2, CalendarDays, CheckCircle2, CircleDashed, FileText, FolderOpen, Handshake, Link2, Menu, X, UserRound, Users } from 'lucide-react';
 import { loadProjects } from '../../../services/dealProjectService';
 import { loadDeals } from '../../../services/dealService';
+import { useAppStore } from '../../../stores/appStore';
 
 function formatDate(value) {
   if (!value) return 'Not specified';
@@ -28,13 +29,10 @@ function Fields({ rows }) {
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
-  const [navigationOpen, setNavigationOpen] = useState(false);
-  useEffect(() => {
-    if (!navigationOpen) return;
-    const close = (event) => { if (event.key === 'Escape') setNavigationOpen(false); };
-    window.addEventListener('keydown', close);
-    return () => window.removeEventListener('keydown', close);
-  }, [navigationOpen]);
+  // The floating "Menu" button drives the app-wide mobile navigation drawer
+  // (backdrop, Escape and route-change dismissal live in MainLayout).
+  const navigationOpen = useAppStore((state) => state.mobileSidebarOpen);
+  const toggleNavigation = useAppStore((state) => state.toggleMobileSidebar);
   const [record, setRecord] = useState({ project: null, deal: null, error: '', loading: true });
   useEffect(() => {
     function read() {
@@ -75,9 +73,8 @@ export default function ProjectDetailPage() {
     ['Team', team || 'Not assigned', Users, 'bg-amber-50 text-amber-600'],
     ['Status', status, statusTone === 'positive' ? CheckCircle2 : CircleDashed, statusTone === 'positive' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-600'],
   ];
-  return <div className="crm-project-detail space-y-4 pb-5" data-navigation-open={navigationOpen}>
-    <button type="button" className="project-mobile-navigation btn-outline btn-sm" aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navigationOpen} onClick={() => setNavigationOpen(!navigationOpen)}>{navigationOpen ? <X size={16} /> : <Menu size={16} />}Menu</button>
-    {navigationOpen && <button type="button" className="project-navigation-backdrop" aria-label="Close navigation overlay" onClick={() => setNavigationOpen(false)} />}
+  return <div className="crm-project-detail space-y-4 pb-5">
+    <button type="button" className="project-mobile-navigation btn-outline btn-sm" aria-label={navigationOpen ? 'Close navigation' : 'Open navigation'} aria-expanded={navigationOpen} onClick={toggleNavigation}>{navigationOpen ? <X size={16} /> : <Menu size={16} />}Menu</button>
     <header className="card project-hero p-5 sm:p-6 space-y-4">
       <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-slate-500"><Link to="/crm/deals" className="hover:text-blue-600">CRM Deals</Link><span>/</span><span>Project</span><span>/</span><span className="text-blue-600 font-semibold">{project.projectNumber}</span></nav>
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">

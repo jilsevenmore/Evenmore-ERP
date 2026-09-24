@@ -49,7 +49,7 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
             <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-4xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none">
                 {/* Top Control Bar (Screen Only) */}
-                <div className="bg-[#1F2E4A] text-white px-6 py-3 flex items-center justify-between no-print shrink-0">
+                <div className="bg-[#1F2E4A] text-white px-4 sm:px-6 py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 no-print shrink-0">
                     <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-blue-300" />
                         <span className="font-bold text-sm tracking-tight">
@@ -75,7 +75,8 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                 </div>
 
                 {/* Real Printable Estimate Document Sheet (A4 Proportion) */}
-                <div className="p-8 sm:p-12 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
+                <div className="overflow-x-auto p-2 sm:p-6 lg:p-0 print:p-0 print:overflow-visible">
+                <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
                     {/* Header / Letterhead */}
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
                         <div className="space-y-1">
@@ -274,9 +275,10 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                         Thank you for your interest! For any questions regarding this estimate, please contact sales@evenmore-erp.com.
                     </div>
                 </div>
+                </div>
 
                 {/* Modal Footer (Screen Only) */}
-                <div className="bg-slate-100 p-4 border-t border-slate-200 flex justify-between items-center no-print shrink-0">
+                <div className="bg-slate-100 p-4 border-t border-slate-200 flex flex-wrap lg:flex-nowrap justify-between items-center gap-2 lg:gap-0 no-print shrink-0">
                     <span className="text-xs text-slate-500">
                         Press <strong>Ctrl+P</strong> or click <strong>Print</strong> to generate a clean, official A4 PDF.
                     </span>

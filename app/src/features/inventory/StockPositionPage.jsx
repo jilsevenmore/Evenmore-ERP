@@ -151,7 +151,7 @@ export const StockPositionPage = () => {
             Dynamic inventory balance computed from verified physical movements, sales reservations, and RMA deductions.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <Button
             variant="outline"
             icon={ArrowLeftRight}
@@ -168,7 +168,7 @@ export const StockPositionPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Tracked SKUs" value={items.length} icon={Boxes}/>
         <StatCard label="Total Inventory Value" value={formatCurrency(Math.round(totalValue), { noDecimals: true })}/>
         <StatCard label="Critical Depletions" value={criticalCount} trend={{ positive: false, text: 'Requires PO' }}/>
@@ -176,8 +176,8 @@ export const StockPositionPage = () => {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs">
-        {['All', 'Optimal', 'Low Stock', 'Critical'].map((tab) => (<button key={tab} onClick={() => setFilterState(tab)} className={`px-3 py-1.5 rounded-t font-semibold transition-colors ${filterState === tab
+      <div className="flex flex-nowrap items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
+        {['All', 'Optimal', 'Low Stock', 'Critical'].map((tab) => (<button key={tab} onClick={() => setFilterState(tab)} className={`shrink-0 lg:shrink px-3 py-1.5 rounded-t font-semibold transition-colors ${filterState === tab
                 ? 'bg-white border-t-2 border-[#1F2E4A] text-[#1F2E4A] shadow-sm'
                 : 'text-slate-500 hover:text-slate-800'}`}>
             {tab}

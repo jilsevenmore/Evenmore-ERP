@@ -354,7 +354,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
             </p>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-3 shrink-0">
             <button
               type="button"
               onClick={() => setIsGuideOpen(true)}
@@ -396,7 +396,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs mb-8 overflow-hidden">
         <div
           onClick={() => setIsTaskRolesOpen((prev) => !prev)}
-          className="flex items-center justify-between p-4 sm:p-5 cursor-pointer hover:bg-slate-50/50 transition select-none"
+          className="flex items-center justify-between gap-3 lg:gap-0 p-4 sm:p-5 cursor-pointer hover:bg-slate-50/50 transition select-none"
         >
           <div className="flex items-start gap-3">
             <span className="text-slate-500 mt-0.5">
@@ -430,7 +430,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
 
         {isTaskRolesOpen && (
           <div className="border-t border-slate-100 overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-slate-50/80 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                   <th className="px-5 py-3">TASK</th>
@@ -548,9 +548,9 @@ export default function LeadStageTasks({ leadForms = [] }) {
               >
                 <div
                   onClick={() => toggleStage(stage.id)}
-                  className={`flex items-center justify-between px-4 sm:px-5 py-3 cursor-pointer transition select-none ${theme.headerBg}`}
+                  className={`flex items-center justify-between gap-2 lg:gap-0 px-4 sm:px-5 py-3 cursor-pointer transition select-none ${theme.headerBg}`}
                 >
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 min-w-0 lg:min-w-auto">
                     <span className="text-slate-600">
                       {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                     </span>
@@ -580,7 +580,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
 
                 {isOpen && (
                   <div className="border-t border-slate-100 overflow-x-auto">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full min-w-[900px] lg:min-w-0 text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-white border-b border-slate-100 text-[11px] font-bold text-slate-800 uppercase tracking-wider">
                           <th className="px-3 py-3 w-64">TASK</th>
@@ -783,7 +783,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
 
       {taskModalStageId && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
           role="presentation"
           onMouseDown={closeTaskModal}
         >

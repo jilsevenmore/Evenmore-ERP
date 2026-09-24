@@ -739,7 +739,7 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
 
         {/* Top Action Buttons */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           {/* Quick Action Dropdown */}
           <div className="relative" ref={quickActionRef}>
             <button
@@ -753,7 +753,7 @@ export default function HRAdminPage({ defaultTab }) {
             </button>
 
             {isQuickActionOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-white border border-bdr rounded-2xl shadow-xl z-30 py-2 animate-in fade-in zoom-in-95">
+              <div className="absolute left-0 lg:left-auto lg:right-0 mt-2 w-56 bg-white border border-bdr rounded-2xl shadow-xl z-30 py-2 animate-in fade-in zoom-in-95">
                 <div className="px-3 py-1.5 text-[11px] font-bold text-muted uppercase tracking-wider">
                   Create / Initiate
                 </div>
@@ -1041,7 +1041,7 @@ export default function HRAdminPage({ defaultTab }) {
 
           {/* Teams Table Container */}
           <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
-            <div className="p-3.5 border-b border-bdr flex items-center justify-between bg-off/50">
+            <div className="p-3.5 border-b border-bdr flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 bg-off/50">
               <span className="text-[12.5px] font-bold text-slate-800">Departmental Squad List</span>
               <span className="text-[11.5px] text-muted">
                 Showing {teams.filter((t) => {
@@ -1053,7 +1053,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
                 <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                   <tr>
                     <th className="py-3 px-5">Team Name</th>
@@ -1218,7 +1218,7 @@ export default function HRAdminPage({ defaultTab }) {
           {/* Approval Chains Table */}
           <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
                 <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                   <tr>
                     <th className="py-3 px-5">Target Module</th>
@@ -1421,7 +1421,7 @@ export default function HRAdminPage({ defaultTab }) {
               </span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
                 <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                   <tr>
                     <th className="py-3 px-5">Candidate &amp; ID</th>
@@ -1556,7 +1556,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
                   <th className="py-3 px-5">Employee &amp; ID</th>
@@ -1676,7 +1676,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
                   <th className="py-3 px-5">Employee &amp; ID</th>
@@ -1757,7 +1757,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
                   <th className="py-3 px-5">Ticket &amp; Filed On</th>
@@ -1847,7 +1847,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[640px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted">
                 <tr>
                   <th className="py-3 px-5">Holiday Name</th>
@@ -1918,7 +1918,7 @@ export default function HRAdminPage({ defaultTab }) {
           VIEW 8: GENERAL ORGANIZATION SETTINGS
          ════════════════════════════════════════════════════════════════ */}
       {activeTab === "settings" && (
-        <form onSubmit={handleSaveOrgSettings} className="bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col gap-6">
+        <form onSubmit={handleSaveOrgSettings} className="bg-white border border-bdr rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col gap-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div>
               <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Legal Company Name</label>
@@ -2013,7 +2013,7 @@ export default function HRAdminPage({ defaultTab }) {
           </div>
 
           {/* Department Working Days Policy Preview Card */}
-          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between">
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 lg:gap-0">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold">
                 <CalendarCheck size={20} />
@@ -2135,7 +2135,7 @@ export default function HRAdminPage({ defaultTab }) {
 
           {/* Department Working Days & Hours Table */}
           <div className="bg-white border border-bdr rounded-xl shadow-xs overflow-hidden">
-            <div className="p-4 border-b border-bdr/60 flex items-center justify-between">
+            <div className="p-4 border-b border-bdr/60 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
               <div>
                 <h3 className="font-bold text-[14px] text-slate-900">Monthly Working Days &amp; Daily Hours by Department</h3>
                 <p className="text-[12px] text-muted">
@@ -2149,7 +2149,7 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-[13px]">
+              <table className="w-full min-w-[640px] lg:min-w-0 text-[13px]">
                 <thead className="bg-slate-50/75 border-b border-bdr/60 text-slate-600 font-semibold text-[12px]">
                   <tr>
                     <th className="py-3 px-4 text-left">Department</th>
@@ -2379,8 +2379,8 @@ export default function HRAdminPage({ defaultTab }) {
 
       {/* ── Modal: Add / Edit Team ── */}
       {isTeamModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <h3 className="font-bold text-[16px] text-slate-900">
                 {editingTeam ? `Edit Team (${editingTeam.id})` : "Create New Team"}
@@ -2405,7 +2405,7 @@ export default function HRAdminPage({ defaultTab }) {
                   className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
                   <select
@@ -2475,8 +2475,8 @@ export default function HRAdminPage({ defaultTab }) {
 
       {/* ── Modal: Add / Edit Approval Chain ── */}
       {isChainModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <h3 className="font-bold text-[16px] text-slate-900">
                 {editingChain ? `Edit Chain (${editingChain.module})` : "New Approval Chain"}
@@ -2525,7 +2525,7 @@ export default function HRAdminPage({ defaultTab }) {
                   className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Tier 3 (Optional)</label>
                   <input
@@ -2570,8 +2570,8 @@ export default function HRAdminPage({ defaultTab }) {
 
       {/* ── Modal: Record Termination ── */}
       {isTerminationModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <div>
                 <h3 className="font-bold text-[16px] text-slate-900">Record Employee Termination</h3>
@@ -2616,7 +2616,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Employee Name</label>
                   <input
@@ -2640,7 +2640,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
                   <select
@@ -2668,7 +2668,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Termination Type</label>
                   <select
@@ -2694,7 +2694,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Notice Served Date</label>
                   <input
@@ -2748,8 +2748,8 @@ export default function HRAdminPage({ defaultTab }) {
 
       {/* ── Modal: Submit Resignation ── */}
       {isResignationModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <h3 className="font-bold text-[16px] text-slate-900">Log Voluntary Resignation</h3>
               <button
@@ -2790,7 +2790,7 @@ export default function HRAdminPage({ defaultTab }) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Employee Name</label>
                   <input
@@ -2814,7 +2814,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
                   <select
@@ -2842,7 +2842,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Submission Date</label>
                   <input
@@ -2862,7 +2862,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Notice Period</label>
                   <input
@@ -2916,8 +2916,8 @@ export default function HRAdminPage({ defaultTab }) {
 
       {/* ── Modal: File Grievance / Complaint ── */}
       {isComplaintModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <div>
                 <h3 className="font-bold text-[16px] text-slate-900">File Grievance / Compliance Ticket</h3>
@@ -2932,7 +2932,7 @@ export default function HRAdminPage({ defaultTab }) {
               </button>
             </div>
             <form onSubmit={handleCreateComplaint} className="flex flex-col gap-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Complainant Name</label>
                   <input
@@ -2955,7 +2955,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Category</label>
                   <select
@@ -3032,8 +3032,8 @@ export default function HRAdminPage({ defaultTab }) {
 
       {/* ── Modal: Add / Edit Holiday ── */}
       {isHolidayModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-5 pb-3 border-b border-bdr">
               <h3 className="font-bold text-[16px] text-slate-900">
                 {editingHoliday ? "Edit Holiday" : "Add Holiday to Calendar"}
@@ -3058,7 +3058,7 @@ export default function HRAdminPage({ defaultTab }) {
                   className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Holiday Date</label>
                   <input
@@ -3079,7 +3079,7 @@ export default function HRAdminPage({ defaultTab }) {
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Classification</label>
                   <select

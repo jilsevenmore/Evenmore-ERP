@@ -104,7 +104,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
 
   function renderSourceFallback() {
     return (
-      <div className="p-10 bg-slate-100 flex flex-col items-center justify-center text-center min-h-[380px]">
+      <div className="p-6 sm:p-10 bg-slate-100 flex flex-col items-center justify-center text-center min-h-[380px]">
         <FileText size={26} className="text-slate-300 mb-3" />
         <p className="text-xs font-bold text-slate-700">
           Preview couldn&apos;t load{sourceStatus ? ` (HTTP ${sourceStatus})` : ''}.
@@ -134,7 +134,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
 
   if (!doc) {
     return (
-      <div className="rounded-xl border border-dashed border-[#dce5f4] bg-[#f6f9ff] p-10 text-center">
+      <div className="rounded-xl border border-dashed border-[#dce5f4] bg-[#f6f9ff] p-6 sm:p-10 text-center">
         <FileText size={22} className="text-slate-300 mx-auto mb-2" />
         <p className="text-xs text-slate-500">Select a version to preview it.</p>
       </div>
@@ -271,7 +271,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
           sourceState === 'failed' ? (
             renderSourceFallback()
           ) : (
-            <div className="p-6 bg-slate-900/5 flex items-center justify-center overflow-auto min-h-[380px] max-h-[580px]">
+            <div className="p-3 sm:p-6 bg-slate-900/5 flex items-center justify-center overflow-auto min-h-[380px] max-h-[580px]">
               <img
                 src={fileSource}
                 alt={doc.fileName}
@@ -298,7 +298,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
           )
         ) : (
           /* Mock sheet fallback */
-          <div className="p-5 bg-slate-100 flex justify-center overflow-auto" style={{ minHeight: 340 }}>
+          <div className="p-3 sm:p-5 bg-slate-100 flex justify-center-safe lg:justify-center overflow-auto" style={{ minHeight: 340 }}>
             <div
               className="bg-white border border-slate-300 shadow-sm"
               style={{

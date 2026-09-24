@@ -178,7 +178,7 @@ export const GoodsReceiptPage = () => {
                 actions={<span className="text-xs font-semibold text-slate-500 flex items-center gap-1.5"><PackageCheck size={14} /> Intake Workbench</span>}
             />
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="Awaiting Receipt" value={`${pendingReceipts.length} Bills`} icon={Truck} tone="amber" />
                 <StatCard label="Pending Qty" value={`${pendingQty.toLocaleString()} Units`} icon={Boxes} />
                 {/* [PHASE-2A] pending weight captures kg not yet weighed in */}
@@ -189,7 +189,7 @@ export const GoodsReceiptPage = () => {
             {/* ── [PHASE-2A] Vendor weight-variation history (steel variance register) ── */}
             {(variationHistory.length > 0) && (
                 <div className="bg-white border border-[#CED4DA] rounded-lg overflow-hidden">
-                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap lg:flex-nowrap gap-2 lg:gap-0">
                         <div>
                             <h3 className="font-bold text-sm text-[#1F2E4A]">Weight Variation Register</h3>
                             <p className="text-xs text-slate-500 mt-0.5">Every weighed receipt vs its theoretical weight — drift above tolerance goes to Pending Approval.</p>
@@ -197,7 +197,7 @@ export const GoodsReceiptPage = () => {
                         <span className="text-[11px] font-mono text-slate-500">{variationHistory.length} weighed lines</span>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-600">
+                        <table className="w-full min-w-[760px] lg:min-w-0 text-left text-xs text-slate-600">
                             <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                                 <tr>
                                     <th className="py-2.5 px-3">Bill</th>
@@ -265,7 +265,7 @@ export const GoodsReceiptPage = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-600">
+                        <table className="w-full min-w-[680px] lg:min-w-0 text-left text-xs text-slate-600">
                             <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                                 <tr>
                                     <th className="py-2.5 px-3">Bill / Received</th>
@@ -361,7 +361,7 @@ export const GoodsReceiptPage = () => {
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs text-slate-600">
+                        <table className="w-full min-w-[720px] lg:min-w-0 text-left text-xs text-slate-600">
                             <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                                 <tr>
                                     <th className="py-2.5 px-3">Bill / PO</th>
@@ -411,9 +411,9 @@ export const GoodsReceiptPage = () => {
             </div>
 
             {selectedBill && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white">
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2 sm:p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+                        <div className="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2 lg:gap-0 sticky top-0 bg-white">
                             <div>
                                 <h3 className="font-bold text-[#1F2E4A]">Goods Receipt — {selectedBill.billNumber}</h3>
                                 <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} • {selectedBill.linkedPo || 'Direct Bill'}</p>
@@ -421,7 +421,7 @@ export const GoodsReceiptPage = () => {
                             <button onClick={() => setSelectedBill(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"><X size={18} /></button>
                         </div>
 
-                        <div className="p-5 space-y-5">
+                        <div className="p-4 sm:p-5 space-y-5">
                             {/* Line-by-line received quantity */}
                             <div>
                                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Received Quantity per Line (Actual / Weighed)</h4>
@@ -458,7 +458,7 @@ export const GoodsReceiptPage = () => {
                                                 </div>
                                                 {/* ── [PHASE-2A] weighbridge input — appears for steel / weight items ── */}
                                                 {wMeta.isWeightItem && (
-                                                    <div className="mt-2 pl-1 flex items-center gap-3">
+                                                    <div className="mt-2 pl-1 flex flex-wrap lg:flex-nowrap items-center gap-3">
                                                         <Scale size={13} className="text-blue-600 shrink-0" />
                                                         <input
                                                             type="number"
@@ -487,7 +487,7 @@ export const GoodsReceiptPage = () => {
                             {/* QC checkpoint — [PHASE-2C] standard statuses: Approved / Pending Approval / Rejected */}
                             <div>
                                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">QC Checkpoint</h4>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap lg:flex-nowrap gap-2">
                                     {['Approved', 'Pending Approval', 'Rejected'].map((q) => (
                                         <button
                                             key={q}
@@ -538,7 +538,7 @@ export const GoodsReceiptPage = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                            <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-100">
                                 <button onClick={() => setSelectedBill(null)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium text-xs cursor-pointer">Cancel</button>
                                 <button onClick={confirmReceipt} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs flex items-center gap-1.5 cursor-pointer">
                                     <CheckCircle2 size={14} /> Confirm GRN & Add to Stock

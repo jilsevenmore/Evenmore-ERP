@@ -583,11 +583,20 @@ a { text-decoration: none; color: inherit; }
 img { display: block; max-width: 100%; }
 
 /* ── App Shell ──────────────────────────────────────────── */
+/* Mobile-first: one column below lg; the sidebar becomes an off-canvas
+   drawer (see "Mobile Sidebar Drawer" below). */
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   transition: grid-template-columns 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 100%;
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
+  }
 }
 
 .main-col {
@@ -597,9 +606,39 @@ img { display: block; max-width: 100%; }
 }
 
 .content {
-  padding: 16px 24px 24px;
-  min-height: calc(100vh - 62px);
+  padding: 12px 14px 20px;
+  min-height: calc(100vh - 58px);
   flex: 1;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .content {
+    padding: 16px 20px 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .content {
+    padding: 16px 24px 24px;
+    min-height: calc(100vh - 62px);
+  }
+}
+
+/* Keep the page itself from scrolling sideways on small screens; wide
+   content (tables, editors, boards) scrolls inside its own container.
+   `clip` (unlike `hidden`) does not create a scroll container, so the
+   sticky topbar keeps working. */
+@media (max-width: 1023px) {
+  html {
+    overflow-x: hidden;
+  }
+
+  .main-col {
+    overflow-x: clip;
+  }
 }
 
 /* ── Custom Scrollbars & Arrow Suppression ───────────────── */
@@ -972,6 +1011,66 @@ img { display: block; max-width: 100%; }
 
 .sidebar-resize-handle:hover .resize-thumb { opacity: 1; }
 
+/* ── Mobile Sidebar Drawer (below lg) ───────────────────── */
+.sidebar-backdrop {
+  display: none;
+}
+
+.sidebar-mobile-close {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    height: 100vh;
+    height: 100dvh;
+    width: min(300px, 85vw) !important;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.28s;
+    z-index: 50;
+    box-shadow: none;
+  }
+
+  /* `transform: none` (not translateX(0)) so the open drawer is never the
+     containing block of fixed-position popups rendered inside it. */
+  .app-shell.mobile-nav-open .sidebar {
+    transform: none;
+    visibility: visible;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+  }
+
+  .sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    animation: sidebarBackdropIn 0.2s ease-out;
+  }
+
+  .sidebar-mobile-close {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  .sidebar-resize-handle {
+    display: none !important;
+  }
+}
+
+@keyframes sidebarBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ── Topbar ──────────────────────────────────────────────── */
 .topbar {
   height: 62px;
@@ -1019,6 +1118,58 @@ img { display: block; max-width: 100%; }
 
 .top-search-ico { color: var(--muted); }
 
+/* Topbar mobile controls (hamburger + compact search) — hidden by default */
+.topbar-hamburger,
+.top-search-compact {
+  display: none;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.topbar-hamburger:hover,
+.top-search-compact:hover {
+  background: var(--soft);
+}
+
+.top-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 1023px) {
+  .topbar-hamburger { display: inline-flex; }
+
+  .topbar {
+    gap: 10px;
+    padding: 0 16px;
+  }
+
+  .top-search {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto;
+    max-width: 520px;
+  }
+}
+
+@media (max-width: 639px) {
+  .topbar {
+    height: 58px;
+    gap: 8px;
+    padding: 0 12px;
+  }
+
+  .top-search { display: none; }
+  .top-search-compact { display: inline-flex; }
+}
+
 .top-right {
   display: flex;
   align-items: center;
@@ -1064,6 +1215,7 @@ img { display: block; max-width: 100%; }
   position: absolute;
   top: 100%;
   right: 0;
+  max-width: calc(100vw - 24px);
   margin-top: 8px;
   background: var(--card);
   border: 1px solid var(--border);
@@ -1072,6 +1224,22 @@ img { display: block; max-width: 100%; }
   z-index: 50;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+}
+
+/* Phones: topbar popovers span the screen width under the topbar instead of
+   hanging off their trigger, so they can never overflow the viewport. */
+@media (max-width: 639px) {
+  .top-dropdown-menu {
+    position: fixed;
+    top: 58px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - 72px);
+    overflow-y: auto;
+    margin-top: 4px;
+  }
 }
 
 .notif-dot {
@@ -1264,6 +1432,15 @@ img { display: block; max-width: 100%; }
 
 .card-header h3 { margin: 0; font-size: 1rem; color: var(--text); font-weight: 600; }
 
+@media (max-width: 639px) {
+  .card-body { padding: 14px; }
+  .card-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+}
+
 /* ── Stat Cards ──────────────────────────────────────────── */
 .stat-card {
   background: var(--card);
@@ -1324,6 +1501,40 @@ img { display: block; max-width: 100%; }
 .stat-trend.down { color: var(--danger); }
 .stat-trend b { font-weight: 700; }
 .stat-trend em { font-style: normal; color: var(--muted); font-weight: 400; margin-left: 2px; }
+
+/* Phones: stat cards sit two-across, so stack the badge above the numbers. */
+@media (max-width: 639px) {
+  .stat-card {
+    flex-direction: column;
+    gap: 10px;
+    padding: 14px;
+    min-width: 0;
+  }
+
+  .stat-badge {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .stat-body { width: 100%; }
+
+  .stat-num {
+    font-size: 1.25rem;
+    overflow-wrap: anywhere;
+  }
+
+  .stat-label {
+    font-size: 0.72rem;
+    overflow-wrap: anywhere;
+  }
+
+  .stat-trend {
+    flex-wrap: wrap;
+    gap: 4px;
+    font-size: 0.74rem;
+  }
+}
 
 /* ── Table ───────────────────────────────────────────────── */
 .table-card {
@@ -1894,10 +2105,59 @@ img { display: block; max-width: 100%; }
   background: var(--card-alt);
 }
 
+/* Phones: modals use nearly the full screen, with tighter paddings and
+   stacked full-width footer actions (primary action ends up on top). */
+@media (max-width: 639px) {
+  .modal-backdrop {
+    padding: 8px;
+  }
+
+  .modal-card {
+    max-height: 96vh;
+    max-height: 96dvh;
+    border-radius: 14px;
+  }
+
+  .modal-header {
+    padding: 14px 16px 12px;
+  }
+
+  .modal-body {
+    padding: 14px 16px;
+  }
+
+  .modal-footer {
+    padding: 12px 16px;
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .modal-footer > button,
+  .modal-footer > a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Side drawers go edge-to-edge on phones. */
+  .modal-backdrop.drawer-backdrop {
+    padding: 0;
+  }
+}
+
 /* ── Forms ───────────────────────────────────────────────── */
 .form-group { display: grid; gap: 6px; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+/* Stack shared form rows on phones. */
+@media (max-width: 639px) {
+  .form-row,
+  .form-row-3 {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
 
 .form-label {
   font-size: 0.84rem;
@@ -1965,6 +2225,20 @@ img { display: block; max-width: 100%; }
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+@media (max-width: 639px) {
+  .pagination {
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 12px;
+    text-align: center;
+  }
+
+  .pagination-pages {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 
 .pager-btn {
@@ -2164,6 +2438,12 @@ img { display: block; max-width: 100%; }
   gap: 16px;
 }
 
+@media (max-width: 1023px) {
+  .dashboard-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .dashboard-panel {
   background: var(--card);
   border: 1px solid var(--border);
@@ -2199,6 +2479,14 @@ img { display: block; max-width: 100%; }
 .dashboard-filter-btn:hover { background: var(--soft); }
 
 .donut-layout { display: flex; align-items: center; gap: 20px; }
+
+@media (max-width: 639px) {
+  .donut-layout {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+  }
+}
 .donut-chart { position: relative; flex-shrink: 0; }
 .donut-chart svg { width: 140px; display: block; }
 .donut-track { fill: none; stroke: var(--soft); stroke-width: 22; }
@@ -2250,6 +2538,14 @@ img { display: block; max-width: 100%; }
 }
 
 .content-grid-wide { grid-template-columns: minmax(0, 1fr); }
+
+/* Leads filter panel stacks above the table on phones / small tablets. */
+@media (max-width: 767px) {
+  .content-grid {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px 0 0;
+  }
+}
 .table-col { min-width: 0; }
 
 .leads-toolbar-wrap { border-bottom: 1px solid var(--border); }
@@ -2260,6 +2556,14 @@ img { display: block; max-width: 100%; }
   justify-content: space-between;
   gap: 16px;
   padding: 10px 12px 8px 24px;
+}
+
+@media (max-width: 639px) {
+  .tabs-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding-left: 12px;
+  }
 }
 
 .tabs-list { display: flex; align-items: center; gap: 8px; }
@@ -4265,6 +4569,15 @@ img { display: block; max-width: 100%; }
 }
 
 /* ── Utilities ───────────────────────────────────────────── */
+/* Horizontal swipe strips (breadcrumbs, tab bars) without a visible bar. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer utilities {
   .text-muted { color: var(--muted); }
   .text-primary { color: var(--primary); }

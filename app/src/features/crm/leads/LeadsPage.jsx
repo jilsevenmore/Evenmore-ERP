@@ -556,7 +556,7 @@ export default function LeadsPage() {
       />
 
       {isPrintOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-4" onClick={() => setIsPrintOpen(false)}>
+        <div className="fixed inset-0 z-50 bg-slate-950/30 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsPrintOpen(false)}>
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-sm p-5" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>

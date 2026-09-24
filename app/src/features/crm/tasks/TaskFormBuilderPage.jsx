@@ -204,7 +204,7 @@ export default function TaskFormBuilderPage() {
 
       {previewOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
           role="presentation"
           onMouseDown={() => setPreviewOpen(false)}
         >
@@ -247,7 +247,7 @@ export default function TaskFormBuilderPage() {
                       </label>
                     ))}
                     {section.fields.length === 0 && (
-                      <p className="text-[11px] text-slate-400 col-span-2">No fields in this section yet.</p>
+                      <p className="text-[11px] text-slate-400 col-span-full">No fields in this section yet.</p>
                     )}
                   </div>
                 </div>

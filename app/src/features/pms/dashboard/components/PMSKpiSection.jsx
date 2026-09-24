@@ -33,7 +33,7 @@ const TILES = [
 export function PMSKpiSection({ metrics }) {
   return (
     <section
-      className="grid gap-4 grid-cols-2 lg:grid-cols-4 xl:grid-cols-7"
+      className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7"
       aria-label="Project management key metrics"
     >
       {TILES.map((tile) => (

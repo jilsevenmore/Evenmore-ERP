@@ -259,7 +259,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
           </div>
 
           {/* Top Right Action Icons */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             {/* View switcher: Kanban vs List */}
             <div className="flex p-1 bg-white border border-bdr rounded-xl shadow-xs">
               <button
@@ -341,7 +341,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
         </div>
 
         {/* Quick Links to other training modules */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           <button
             type="button"
             onClick={() => navigate("/hrms/training/list")}
@@ -360,7 +360,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
       </div>
 
       {/* Main Funnel Card */}
-      <div className="bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col gap-5 overflow-hidden">
+      <div className="bg-white border border-bdr rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col gap-5 overflow-hidden">
         {/* Card Header matching image */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
@@ -388,7 +388,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
         {/* KANBAN FUNNEL VIEW */}
         {viewMode === "kanban" && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2.5 lg:gap-2 xl:gap-2.5 w-full min-h-[480px]">
+          <div className="flex overflow-x-auto snap-x snap-mandatory pb-2 gap-2.5 lg:grid lg:grid-cols-7 lg:overflow-visible lg:snap-none lg:pb-0 lg:gap-2 xl:gap-2.5 w-full min-h-[480px]">
             {TRAINING_FUNNEL_STAGES.map((stageObj) => {
               const stageTrainings = filteredTrainings.filter((t) => t.stage === stageObj.key);
               const stageCount = stageTrainings.length;
@@ -402,7 +402,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   onDragOver={(e) => handleDragOver(e, stageObj.key)}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, stageObj.key, stageObj.label)}
-                  className={`rounded-2xl p-2.5 lg:p-2 xl:p-2.5 flex flex-col justify-between transition-all duration-200 min-w-0 w-full ${
+                  className={`rounded-2xl p-2.5 lg:p-2 xl:p-2.5 flex flex-col justify-between transition-all duration-200 min-w-[280px] w-[280px] shrink-0 snap-start lg:min-w-0 lg:w-full lg:shrink ${
                     isDropActive
                       ? STAGE_DROP_STYLES[stageObj.key] || "ring-2 ring-blue-500/60 bg-blue-50/70 border-blue-400"
                       : "bg-slate-50/50 border border-[#e2e8f0] hover:border-slate-300"
@@ -549,7 +549,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
         {/* LIST / TABLE VIEW */}
         {viewMode === "list" && (
           <div className="border border-bdr rounded-xl overflow-x-auto">
-            <table className="w-full text-left text-[13px]">
+            <table className="w-full min-w-[640px] lg:min-w-0 text-left text-[13px]">
               <thead className="bg-off border-b border-bdr text-[11px] uppercase tracking-wider text-muted font-semibold">
                 <tr>
                   <th className="py-3 px-4">Program Name</th>
@@ -649,9 +649,9 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
       {/* Add / Edit Training Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/45 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
           <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg overflow-hidden animate-fade-in">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-bdr bg-slate-50/80">
+            <div className="flex justify-between items-center gap-2 lg:gap-0 px-4 sm:px-6 py-4 border-b border-bdr bg-slate-50/80">
               <div>
                 <h3 className="font-bold text-[16px] text-slate-900">
                   {editingItem ? "Edit Training Program" : "Create Training Request"}
@@ -669,7 +669,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
               </button>
             </div>
 
-            <form onSubmit={handleSave} className="p-6 flex flex-col gap-4 max-h-[75vh] overflow-y-auto">
+            <form onSubmit={handleSave} className="p-4 sm:p-6 flex flex-col gap-4 max-h-[80vh] sm:max-h-[75vh] overflow-y-auto">
               <div>
                 <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
                   Training Program Title <span className="text-rose-500">*</span>
@@ -847,7 +847,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                 />
               </div>
 
-              <div className="flex items-center justify-between pt-4 mt-2 border-t border-bdr">
+              <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 mt-2 border-t border-bdr">
                 {editingItem ? (
                   <button
                     type="button"

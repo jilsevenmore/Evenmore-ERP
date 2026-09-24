@@ -104,7 +104,7 @@ function ReportBlock({ title, subtitle, actions, columns, rows, empty }) {
           <h3 className="text-sm font-bold text-slate-800">{title}</h3>
           {subtitle && <p className="text-[11px] text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+        {actions && <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 shrink-0">{actions}</div>}
       </div>
       {rows.length === 0 ? (
         <div className="text-xs text-slate-400 bg-slate-50 border border-slate-100 rounded-lg px-3 py-6 text-center">
@@ -387,7 +387,7 @@ export default function CRMReportsPage() {
         subtitle="Manager analytics — leads by employee, source and stage, Won/Lost, conversion %, task health, follow-ups and deal value. Download every report as CSV."
         guide={reportsGuide}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <button
               type="button"
               onClick={handlePrint}

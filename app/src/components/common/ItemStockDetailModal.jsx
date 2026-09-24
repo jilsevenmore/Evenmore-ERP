@@ -71,12 +71,12 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
           </span>);
         }
     };
-    return (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${item.name} stock detail`}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
+    return (<div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${item.name} stock detail`}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-          <div>
-            <div className="flex items-center gap-3">
+        <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-2 lg:gap-0 bg-slate-50">
+          <div className="min-w-0 lg:min-w-auto">
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-3">
               <h3 className="text-lg font-bold text-slate-900">{item.name}</h3>
               <span className="font-mono text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
                 {item.sku}
@@ -101,7 +101,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1">
           {/* Stock Metrics Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5">
@@ -133,7 +133,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
           </div>
 
           {/* Quick Stock Adjustment Trigger */}
-          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div>
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Physical Inventory Adjustment</h4>
               <p className="text-xs text-slate-500 mt-0.5">Need to record cycle count discrepancy or write-off?</p>
@@ -171,7 +171,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
 
           {/* Warranty Policy & Physical Asset Registry Section */}
           <div className="bg-gradient-to-r from-emerald-50/60 to-teal-50/60 border border-emerald-200 rounded-xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" />
                 <div>
@@ -222,7 +222,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                       Physical Serial Numbers & Active Warranty Cards ({item.serialNumbers?.length || 0} units)
                     </span>
                     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                      <table className="w-full text-left text-xs">
+                      <table className="w-full min-w-[560px] lg:min-w-0 text-left text-xs">
                         <thead className="bg-slate-50 font-semibold text-slate-500 text-[10px] uppercase border-b border-slate-200">
                           <tr>
                             <th className="py-2 px-3">Serial #</th>
@@ -291,7 +291,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
 
           {/* Movement Audit History Table */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
               <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 Inventory Movement Audit Ledger ({movements.length} events)
               </h4>
@@ -299,7 +299,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-slate-200">
-              <table className="w-full text-left text-xs text-slate-600">
+              <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="py-2.5 px-3">Date</th>
@@ -340,7 +340,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="px-4 sm:px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
           <div className="text-xs text-slate-500">
             Total Asset Value: <span className="font-mono font-bold text-slate-900">{formatCurrency(stock.onHand * (item.costPrice || item.unitCost || 0))}</span> (Cost: {formatCurrency(item.costPrice || item.unitCost || 0)} | Price: {formatCurrency(item.sellingPrice || 0)})
           </div>

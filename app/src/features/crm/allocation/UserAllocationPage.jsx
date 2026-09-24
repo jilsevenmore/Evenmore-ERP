@@ -114,7 +114,7 @@ export default function UserAllocationPage() {
         title="User Tracking"
         subtitle="Sales representative capacity, lead assignment rules, and workload metrics"
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg text-xs font-bold">
               <button type="button" onClick={() => setView('allocation')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition ${view === 'allocation' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-500'}`}>
                 <ListChecks size={13} /> Allocation
@@ -195,7 +195,7 @@ export default function UserAllocationPage() {
       ) : (
       <>
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <CrmKpiCard label="Active Representatives" value={teamMembers.length} icon={Users} tone="blue" />
         <CrmKpiCard label="Total Won Deals" value={totalDeals} icon={CheckCircle2} tone="emerald" />
         <CrmKpiCard label="Avg. Conversion Rate" value="48.2%" icon={Award} tone="amber" />
@@ -204,7 +204,7 @@ export default function UserAllocationPage() {
 
       {/* Team Roster & Allocation Table */}
       <div className="card">
-        <div className="card-header flex items-center justify-between">
+        <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
           <h3 className="font-bold text-sm">Representative Workload & Performance</h3>
           <label className="search-bar" style={{ width: 240, height: 32 }}>
             <Search size={14} className="text-slate-400" />
@@ -219,7 +219,7 @@ export default function UserAllocationPage() {
         </div>
 
         <div className="table-scroll">
-          <table className="data-table text-xs">
+          <table className="data-table text-xs min-w-[760px] lg:min-w-0">
             <thead>
               <tr>
                 <th>Representative</th>

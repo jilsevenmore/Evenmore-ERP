@@ -53,15 +53,15 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
                 return 'bg-gray-100 text-gray-800';
         }
     };
-    return (<div className="flex-1 flex h-[calc(100vh-56px)] bg-[#FBFBFC] overflow-hidden font-sans">
+    return (<div className="flex-1 flex flex-col lg:flex-row lg:h-[calc(100vh-56px)] bg-[#FBFBFC] lg:overflow-hidden font-sans">
       {/* Toast Notification */}
-      {toastMessage && (<div className="fixed bottom-6 right-6 z-50 bg-[#1F2E4A] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3">
+      {toastMessage && (<div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 z-50 bg-[#1F2E4A] text-white text-xs px-4 py-2.5 rounded shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-3">
           <CheckCircle2 className="w-4 h-4 text-[#0CB1AC]"/>
           <span>{toastMessage}</span>
         </div>)}
 
       {/* Table Section */}
-      <div className="flex-1 p-6 overflow-y-auto">
+      <div className="flex-1 min-w-0 lg:min-w-auto p-4 sm:p-6 overflow-y-auto">
         {/* Bento-style Stats Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           {/* Card 1: Pending Requests */}
@@ -111,7 +111,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
         </div>
 
         {/* Action button bar */}
-        <div className="flex justify-between items-center mb-3">
+        <div className="flex flex-wrap lg:flex-nowrap justify-between items-center gap-2 lg:gap-0 mb-3">
           <p className="text-xs text-[#5a6062] font-medium">
             Active zone requisition queues across production facilities
           </p>
@@ -122,9 +122,9 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
         </div>
 
         {/* Main Data Table inside a Card */}
-        <div className="bg-white border border-[#E1E1E1] rounded-lg overflow-hidden flex flex-col shadow-2xs">
+        <div className="bg-white border border-[#E1E1E1] rounded-lg overflow-x-auto flex flex-col shadow-2xs">
           {/* Table Header */}
-          <div className="grid grid-cols-[1.5fr_1.5fr_0.5fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-3 border-b border-[#E1E1E1] bg-[#f1f4f5] text-xs font-semibold text-[#5a6062] uppercase tracking-wider items-center select-none">
+          <div className="grid grid-cols-[1.5fr_1.5fr_0.5fr_1fr_1fr_1fr_1fr] gap-4 px-4 py-3 min-w-[760px] lg:min-w-0 border-b border-[#E1E1E1] bg-[#f1f4f5] text-xs font-semibold text-[#5a6062] uppercase tracking-wider items-center select-none">
             <div>Requested By</div>
             <div>Product</div>
             <div>Qty</div>
@@ -135,7 +135,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
           </div>
 
           {/* Table Body */}
-          <div className="flex flex-col text-sm divide-y divide-[#E1E1E1]">
+          <div className="flex flex-col text-sm divide-y divide-[#E1E1E1] min-w-[760px] lg:min-w-0">
             {filteredRequests.length === 0 ? (<div className="py-8 text-center text-xs text-gray-500">
                 No zone requests found.
               </div>) : (filteredRequests.map((req) => {
@@ -188,9 +188,9 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
       </div>
 
       {/* Side Detail Card (List-to-Detail Pattern) */}
-      {isDetailOpen && selectedRequest && (<aside className="w-[340px] border-l border-[#E1E1E1] bg-[#F0F5E6] flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.02)] z-10 overflow-y-auto shrink-0 transition-all">
+      {isDetailOpen && selectedRequest && (<aside className="w-full lg:w-[340px] border-t lg:border-t-0 lg:border-l border-[#E1E1E1] bg-[#F0F5E6] flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.02)] z-10 overflow-y-auto shrink-0 transition-all">
           {/* Detail Header */}
-          <div className="p-6 border-b border-[#E1E1E1] flex justify-between items-start bg-white/50 backdrop-blur-xs sticky top-0">
+          <div className="p-4 sm:p-6 border-b border-[#E1E1E1] flex justify-between items-start gap-2 lg:gap-0 bg-white/50 backdrop-blur-xs sticky top-0">
             <div>
               <h3 className="font-bold text-lg text-[#2d3335]">
                 Request {selectedRequest.requestNumber}
@@ -205,7 +205,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
           </div>
 
           {/* Detail Content */}
-          <div className="p-6 flex-1 flex flex-col gap-6">
+          <div className="p-4 sm:p-6 flex-1 flex flex-col gap-6">
             {/* Status Banner */}
             {selectedRequest.status === 'Requested' ? (<div className="bg-amber-50 border border-amber-200 rounded p-3 flex items-center gap-3">
                 <Clock className="w-5 h-5 text-amber-600 shrink-0"/>
@@ -274,7 +274,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
                   <div className="w-10 h-10 bg-slate-100 flex items-center justify-center rounded text-[#5a6062]">
                     <BatteryCharging className="w-5 h-5"/>
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0 lg:min-w-auto">
                     <p className="font-semibold text-xs text-[#2d3335]">
                       {selectedRequest.product}
                     </p>
@@ -316,7 +316,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
           </div>
 
           {/* Action Footer */}
-          <div className="p-6 border-t border-[#E1E1E1] bg-white/80 backdrop-blur-md sticky bottom-0 mt-auto flex flex-col gap-3">
+          <div className="p-4 sm:p-6 border-t border-[#E1E1E1] bg-white/80 backdrop-blur-md sticky bottom-0 mt-auto flex flex-col gap-3">
             {selectedRequest.status === 'Requested' && (<button onClick={() => handleApprove(selectedRequest.id)} className="w-full bg-[#0CB1AC] hover:bg-[#0aa09c] text-white py-2.5 rounded font-medium shadow-sm flex items-center justify-center gap-2 text-xs transition-all active:scale-[0.99]">
                 <Check className="w-4 h-4"/>
                 Approve Request

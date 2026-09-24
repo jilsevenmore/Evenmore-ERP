@@ -449,9 +449,9 @@ export const DeliveryChallansPage = () => {
             (c.transporter && String(c.transporter ?? '').toLowerCase().includes(term))}/>
 
       {/* Create Logistics Challan Modal */}
-      {showAddModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+      {showAddModal && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between gap-3 lg:gap-0 pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <Truck className="w-5 h-5 text-blue-600"/>
                 <div>
@@ -503,7 +503,7 @@ export const DeliveryChallansPage = () => {
 
               {/* Warehouse Dispatch Manifest Item Table (No Commercial Invoicing Fields) */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                   <label className="font-semibold text-slate-700 block">
                     Dispatch Item Manifest (Physical Goods Only)
                   </label>
@@ -525,7 +525,7 @@ export const DeliveryChallansPage = () => {
                   </div>)}
 
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-left text-xs text-slate-600">
+                  <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
                     <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                       <tr>
                         <th className="py-2.5 px-3">Item SKU & Description</th>
@@ -653,10 +653,10 @@ export const DeliveryChallansPage = () => {
         </div>)}
 
       {/* Printable Logistics Waybill & POD Modal */}
-      {selectedChallan && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
-              <div className="flex items-center gap-3">
+      {selectedChallan && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full p-4 sm:p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 border-b border-slate-200 pb-3 mb-4">
+              <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
                 <div className="w-8 h-8 rounded-lg bg-[#1F2E4A] text-white font-bold flex items-center justify-center">
                   <Truck size={18}/>
                 </div>
@@ -666,7 +666,7 @@ export const DeliveryChallansPage = () => {
                 </div>
                 <StatusBadge status={selectedChallan.status}/>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedChallan.status !== 'Cancelled' && (
                   <button
                     onClick={() => setSendModalChallan(selectedChallan)}
@@ -747,7 +747,7 @@ export const DeliveryChallansPage = () => {
 
                 return (
                   <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                       <div className="flex items-center gap-2">
                         <div className="p-1.5 bg-blue-100 text-blue-700 rounded-lg">
                           <Truck size={16} />
@@ -764,7 +764,7 @@ export const DeliveryChallansPage = () => {
 
                       {/* Interactive Move Vehicle Actions */}
                       {!isCancelled && currentStatus !== 'Delivered' && (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex flex-wrap lg:flex-nowrap items-center gap-1.5">
                           {currentStatus === 'Dispatched' && (
                             <button
                               onClick={() => advanceStage('In Transit')}
@@ -857,7 +857,7 @@ export const DeliveryChallansPage = () => {
                 const wc = (getWarrantyByChallanId && getWarrantyByChallanId(selectedChallan.id)) || warranties.find((w) => w.deliveryChallanId === selectedChallan.id || w.challanNumber === selectedChallan.challanNumber);
                 return (
                   <div className="bg-gradient-to-r from-emerald-50/70 to-teal-50/70 border border-emerald-200 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                       <div className="flex items-center gap-2">
                         <Award className="w-5 h-5 text-emerald-600" />
                         <div>
@@ -871,7 +871,7 @@ export const DeliveryChallansPage = () => {
                       </div>
 
                       {wc ? (
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                           <button
                             onClick={() => setSelectedWarrantyCard(wc)}
                             className="px-3 py-1 bg-white hover:bg-slate-50 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer shadow-2xs"
@@ -939,7 +939,7 @@ export const DeliveryChallansPage = () => {
 
               {/* Clean Manifest Table (No Commercial Prices/Taxes) */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                   <h4 className="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center gap-1.5">
                     <Package size={14} className="text-blue-600"/> Physical Goods Manifest ({selectedChallan.items?.length || 0} Items)
                   </h4>
@@ -947,7 +947,7 @@ export const DeliveryChallansPage = () => {
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full text-left text-xs text-slate-600">
+                  <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
                     <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                       <tr>
                         <th className="py-2.5 px-3 w-12 text-center">#</th>
@@ -1006,11 +1006,11 @@ export const DeliveryChallansPage = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
               <span className="text-slate-500">
                 Logistics Status: <strong className="text-slate-800">{selectedChallan.status}</strong>
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedChallan.status === 'Draft' && <Button onClick={() => prepareDraftDispatch(selectedChallan)}>Prepare Dispatch</Button>}
                 {selectedChallan.status !== 'Draft' && selectedChallan.status !== 'Delivered' && selectedChallan.status !== 'Cancelled' && (
                   <Button onClick={() => markDelivered(selectedChallan.id)}>
@@ -1038,8 +1038,8 @@ export const DeliveryChallansPage = () => {
 
       {/* Cancel Challan Modal */}
       {cancelModalTarget && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-xl border border-slate-200 max-w-md w-full p-4 sm:p-6 shadow-2xl space-y-4 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center gap-3 text-rose-600">
               <div className="p-2 bg-rose-100 rounded-lg">
                 <ShieldAlert size={20}/>

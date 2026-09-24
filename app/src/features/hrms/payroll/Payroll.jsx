@@ -718,9 +718,9 @@ export default function Payroll() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           {/* Department Working Days Schedule Dropdown (Pure Dropdown - No Up/Down Arrows) */}
-          <div className="flex items-center gap-2 px-3 h-10 bg-white border border-bdr rounded-xl text-[13px] font-medium text-slate-700 shadow-xs">
+          <div className="flex items-center gap-2 px-3 h-10 w-full sm:w-auto max-w-full lg:max-w-none min-w-0 lg:min-w-auto bg-white border border-bdr rounded-xl text-[13px] font-medium text-slate-700 shadow-xs">
             <Building2 size={14} className="text-navy shrink-0" />
             <span className="text-muted text-[12px] whitespace-nowrap">Dept Schedule:</span>
             <select
@@ -733,7 +733,7 @@ export default function Payroll() {
                   showToast(`${e.target.value}: ${days} Working Days • ${hours}h/day (${days * hours}h target)`);
                 }
               }}
-              className="font-semibold text-slate-900 bg-transparent outline-none cursor-pointer text-[13px]"
+              className="min-w-0 lg:min-w-auto flex-1 w-0 sm:flex-initial sm:w-auto font-semibold text-slate-900 bg-transparent outline-none cursor-pointer text-[13px]"
             >
               <option value="All">All Departments (HR Admin Schedule)</option>
               {Object.entries(departmentWorkingDays).map(([dept, days]) => {
@@ -791,11 +791,11 @@ export default function Payroll() {
       </div>
 
       {/* ── Minimal 4-Tab Navigation Bar ── */}
-      <div className="flex border-b border-bdr gap-1 bg-white px-3 pt-2.5 rounded-2xl border shadow-xs">
+      <div className="flex border-b border-bdr gap-1 bg-white px-3 pt-2.5 rounded-2xl border shadow-xs overflow-x-auto lg:overflow-visible scrollbar-none">
         <button
           type="button"
           onClick={() => setActiveTab("overall")}
-          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer shrink-0 lg:shrink whitespace-nowrap ${
             activeTab === "overall"
               ? "border-navy text-navy font-bold"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -808,7 +808,7 @@ export default function Payroll() {
         <button
           type="button"
           onClick={() => setActiveTab("department")}
-          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer shrink-0 lg:shrink whitespace-nowrap ${
             activeTab === "department"
               ? "border-navy text-navy font-bold"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -824,7 +824,7 @@ export default function Payroll() {
         <button
           type="button"
           onClick={() => setActiveTab("employee")}
-          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer shrink-0 lg:shrink whitespace-nowrap ${
             activeTab === "employee"
               ? "border-navy text-navy font-bold"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -840,7 +840,7 @@ export default function Payroll() {
         <button
           type="button"
           onClick={() => setActiveTab("own")}
-          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 px-3 text-[13.5px] font-semibold border-b-2 transition flex items-center gap-2 cursor-pointer shrink-0 lg:shrink whitespace-nowrap ${
             activeTab === "own"
               ? "border-navy text-navy font-bold"
               : "border-transparent text-slate-500 hover:text-slate-800"
@@ -1265,7 +1265,7 @@ export default function Payroll() {
           {/* Master Employee Table with Advanced Calculation Matrix */}
           <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full min-w-[960px] lg:min-w-0 text-left text-[13px]">
                 <thead className="bg-slate-50/75 border-b border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                   <tr>
                     <th className="py-3.5 px-4">Employee</th>
@@ -1654,7 +1654,7 @@ export default function Payroll() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-6 text-[12.5px]">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-6 gap-y-2 text-[12.5px]">
                 <div>
                   <span className="text-muted block text-[11px]">Paid Amount</span>
                   <span className="font-extrabold text-emerald-950 text-[15px]">
@@ -1759,7 +1759,7 @@ export default function Payroll() {
 
           {/* Past Months Payslips History Table */}
           <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
-            <div className="p-4 pb-2 border-b border-bdr/60 flex justify-between items-center">
+            <div className="p-4 pb-2 border-b border-bdr/60 flex flex-wrap lg:flex-nowrap justify-between items-center gap-2 lg:gap-0">
               <div>
                 <h3 className="font-bold text-[15px] text-slate-900">Payslip Archive &amp; History</h3>
                 <p className="text-[12px] text-muted">6-month salary records with PDF download</p>
@@ -1767,7 +1767,7 @@ export default function Payroll() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px]">
+              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px]">
                 <thead className="bg-slate-50/75 border-b border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                   <tr>
                     <th className="py-3.5 px-5">Month Period</th>
@@ -1851,8 +1851,8 @@ export default function Payroll() {
           MODAL 1: PAYSLIP DETAIL MODAL (ADVANCED FORMULA BREAKDOWN)
          ========================================================================= */}
       {selectedPayslip && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div className="flex items-center gap-3">
                 <img
@@ -2000,8 +2000,8 @@ export default function Payroll() {
           MODAL 2: RUN MONTH-END PAYROLL CONFIRMATION MODAL
          ========================================================================= */}
       {showRunModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <h3 className="font-bold text-[16px] text-slate-900">
                 Process Month-End Payroll — {currentPeriod}
@@ -2082,10 +2082,10 @@ export default function Payroll() {
           MODAL 3: QUICK ADJUST ADVANCE / EARNINGS MODAL
          ========================================================================= */}
       {editingEmployee && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
           <form
             onSubmit={handleSaveParams}
-            className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div>
@@ -2222,7 +2222,7 @@ export default function Payroll() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1">
                     Additional Earnings [₹]
@@ -2297,10 +2297,10 @@ export default function Payroll() {
           MODAL 4: ADD SALARY STRUCTURE MODAL
          ========================================================================= */}
       {showAddStructureModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
           <form
             onSubmit={handleAddStructureSubmit}
-            className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95"
+            className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <h3 className="font-bold text-[16px] text-slate-900">Add Salary Band Structure</h3>
@@ -2328,7 +2328,7 @@ export default function Payroll() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1">
                     Department
@@ -2386,8 +2386,8 @@ export default function Payroll() {
           MODAL 5: LIFECYCLE TRANSITION WITH REAL-LIFE SCENARIO
          ========================================================================= */}
       {showLifecycleModal && targetStage && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-lg p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -2476,8 +2476,8 @@ export default function Payroll() {
           MODAL 6: GENERATE PAYROLL SLIP (PDF)
          ========================================================================= */}
       {showGenerateSlipModal && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-xl p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-2xl w-full max-w-xl p-4 sm:p-6 flex flex-col gap-4 animate-in fade-in zoom-in-95 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">

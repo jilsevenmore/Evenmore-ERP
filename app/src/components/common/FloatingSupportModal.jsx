@@ -95,7 +95,7 @@ export function FloatingSupportModal() {
 
       {/* Support Popover Card */}
       {isOpen && (
-        <div className="w-80 sm:w-96 rounded-2xl bg-card border border-border shadow-2xl p-4 animate-in fade-in slide-in-from-bottom-4 duration-200 text-text">
+        <div className="w-[calc(100vw-3rem)] max-w-80 sm:w-96 sm:max-w-none max-h-[calc(100dvh-3rem)] overflow-y-auto rounded-2xl bg-card border border-border shadow-2xl p-4 animate-in fade-in slide-in-from-bottom-4 duration-200 text-text">
           {/* Header */}
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <div className="flex items-center gap-2.5">

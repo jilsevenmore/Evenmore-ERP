@@ -109,7 +109,7 @@ export default function TerminationLetterModal({
               <FileText size={16} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <span className="font-bold text-sm text-white">
                   Termination Notice — {formData.employeeName}
                 </span>
@@ -123,7 +123,7 @@ export default function TerminationLetterModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             {/* Toggle Edit / Preview */}
             <button
               type="button"
@@ -184,7 +184,7 @@ export default function TerminationLetterModal({
         <div className="max-h-[calc(88vh-55px)] overflow-y-auto">
           {isEditing ? (
             /* ── EDIT MODE FORM ── */
-            <div className="p-6 bg-slate-50 space-y-4 no-print text-xs">
+            <div className="p-4 sm:p-6 bg-slate-50 space-y-4 no-print text-xs">
               <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                 <h4 className="font-bold text-slate-900 text-sm">
                   Edit Separation Details
@@ -368,7 +368,8 @@ export default function TerminationLetterModal({
           ) : null}
 
           {/* ── MINIMAL & SIMPLE PRINTABLE TERMINATION LETTER ── */}
-          <div className="p-8 sm:p-12 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
+          <div className="overflow-x-auto p-2 sm:p-6 lg:p-0 print:p-0 print:overflow-visible">
+          <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
             
             {/* Header / Company Info */}
             <div className="flex items-start justify-between border-b border-slate-200 pb-4">
@@ -516,6 +517,7 @@ export default function TerminationLetterModal({
               Evenmore Technologies Inc. • Confidential Separation Notice
             </div>
 
+          </div>
           </div>
         </div>
 

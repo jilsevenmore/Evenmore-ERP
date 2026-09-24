@@ -343,7 +343,7 @@ export default function Interviews() {
           { label: "Interviews" },
         ]}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <button
               type="button"
               onClick={() => setGuideOpen(true)}
@@ -454,7 +454,7 @@ export default function Interviews() {
 
         <div className="flex items-center gap-2.5 flex-wrap">
           {/* Search Input */}
-          <div className="relative min-w-[200px] max-w-[260px]">
+          <div className="relative w-full sm:w-auto min-w-[200px] max-w-full sm:max-w-[260px]">
             <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
             <input
               type="text"
@@ -519,7 +519,7 @@ export default function Interviews() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Left 8 Cols: Main Calendar Canvas */}
-          <div className="lg:col-span-8 bg-card border border-border rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+          <div className="lg:col-span-8 bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between">
             <div>
               {/* Calendar Controls & Month/Year Title */}
               <div className="flex flex-wrap items-center justify-between pb-4 mb-4 border-b border-border gap-3">
@@ -1059,11 +1059,11 @@ export default function Interviews() {
       {/* Guide Modal */}
       {guideOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
           onClick={() => setGuideOpen(false)}
         >
           <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-6 text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">

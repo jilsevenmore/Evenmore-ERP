@@ -29,7 +29,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
     return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${customer.name || 'Customer'} 360 view`}>
       <div className="bg-white w-full max-w-xl h-full shadow-2xl border-l border-slate-200 flex flex-col text-xs overflow-hidden printable-document" onClick={(e) => e.stopPropagation()}>
         {/* Top Header */}
-        <div className="p-5 border-b border-slate-200 bg-slate-50/70 flex items-start justify-between">
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50/70 flex items-start justify-between gap-3 lg:gap-0">
           <div>
             <span className="font-mono text-[10px] font-bold text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
               {customer.code || 'CUST'}
@@ -47,7 +47,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
         </div>
 
         {/* Content Body */}
-        <div className="p-5 overflow-y-auto space-y-5 flex-1">
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-5 flex-1">
           {/* Financial Exposure & Credit Meter */}
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
@@ -57,7 +57,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
               <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase block">Outstanding Due</span>
                 <p className="font-mono font-bold text-sm text-slate-900 mt-0.5">

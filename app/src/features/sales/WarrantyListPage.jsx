@@ -338,7 +338,7 @@ export const WarrantyListPage = () => {
             />
 
             {/* Summary Stat Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <StatCard
                     label="Active Warranties"
                     value={`${activeCount} Cards`}
@@ -362,7 +362,7 @@ export const WarrantyListPage = () => {
             </div>
 
             {/* Status Filter Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
                 {[
                     { id: 'All', label: 'All Warranties', count: warranties.length },
                     { id: 'Active', label: 'Active Coverage', count: activeCount },
@@ -375,7 +375,7 @@ export const WarrantyListPage = () => {
                     <button
                         key={tab.id}
                         onClick={() => setStatusFilter(tab.id)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition flex items-center gap-1.5 ${
+                        className={`shrink-0 lg:shrink px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition flex items-center gap-1.5 ${
                             statusFilter === tab.id
                                 ? 'bg-primary text-white shadow-2xs'
                                 : 'bg-card text-muted hover:text-text border border-border'
@@ -463,16 +463,16 @@ export const WarrantyListPage = () => {
             {/* ACTION DIALOG: Void, Pause, Delete Confirmations */}
             {actionDialog && (
                 <div
-                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-4"
+                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
                     role="presentation"
                     onMouseDown={() => setActionDialog(null)}
                 >
                     <form
                         onSubmit={handleConfirmAction}
                         onMouseDown={(e) => e.stopPropagation()}
-                        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                        className="bg-card rounded-2xl shadow-2xl w-full max-w-md border border-border max-h-[95vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150"
                     >
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-soft/50">
+                        <div className="flex items-center justify-between gap-3 lg:gap-0 px-5 py-4 border-b border-border bg-soft/50">
                             <div className="flex items-center gap-2">
                                 <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                                     actionDialog.type === 'delete' || actionDialog.type === 'void'

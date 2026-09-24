@@ -140,7 +140,7 @@ export const MonthEndAuditPage = () => {
             Monthly physical count verification against book balance, variance write-offs, and auditor GL closing.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
           {!auditLocked ? (<Button icon={UserCheck} onClick={handleSignOff}>
               Lock & Sign-Off Audit
             </Button>) : (<span className="px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-xs flex items-center gap-1.5 border border-emerald-300">

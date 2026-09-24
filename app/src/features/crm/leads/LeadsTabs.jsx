@@ -56,7 +56,7 @@ export default function LeadsTabs({
   return (
     <div className="leads-toolbar-wrap">
       <div className="tabs-bar">
-        <div className="tabs-list">
+        <div className="tabs-list flex-wrap lg:flex-nowrap">
           <div className="relative">
             <select
               aria-label="Filter leads by status"

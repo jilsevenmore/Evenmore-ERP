@@ -254,7 +254,7 @@ export default function Dashboard() {
             Overview of review cycles, appraisal workflows, indicators, and department ratings.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           <button
             onClick={handleOpenNewCycle}
             className="bg-[#16233a] text-white px-4 py-2 rounded-xl text-[13px] font-medium hover:bg-[#0f172a] transition shadow-2xs flex items-center gap-1.5"

@@ -271,7 +271,7 @@ export function CalendarPage() {
       {/* Filter & Search Bar */}
       <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3.5">
         {/* Category Chips with Scrollbar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0 pb-2 custom-scrollbar">
+        <div className="flex items-center gap-1.5 overflow-x-auto flex-1 min-w-0 w-full md:w-auto pb-2 custom-scrollbar">
           <button
             type="button"
             onClick={() => setCategoryFilter("All")}
@@ -398,7 +398,7 @@ export function CalendarPage() {
       {/* Main Grid + Sidebar */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left 8 Cols: Main Calendar Canvas */}
-        <div className="lg:col-span-8 bg-white border border-bdr rounded-2xl p-6 shadow-xs flex flex-col justify-between">
+        <div className="lg:col-span-8 bg-white border border-bdr rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col justify-between">
           <div>
             {/* Calendar Controls & Month/Year Title */}
             <div className="flex flex-wrap items-center justify-between pb-4 mb-4 border-b border-bdr gap-3">

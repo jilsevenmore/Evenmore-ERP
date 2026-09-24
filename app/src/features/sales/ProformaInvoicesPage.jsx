@@ -547,7 +547,7 @@ export const ProformaInvoicesPage = () => {
       />
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Proformas Issued" value={totalPiCount} icon={FileSpreadsheet} />
         <StatCard
           label="Active Proforma Pipeline"
@@ -571,12 +571,12 @@ export const ProformaInvoicesPage = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs">
+      <div className="flex flex-nowrap items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
         {['All', 'Draft', 'Sent', 'Accepted', 'Converted', 'Cancelled'].map((stg) => (
           <button
             key={stg}
             onClick={() => setStatusFilter(stg)}
-            className={`px-3 py-1.5 rounded-t font-semibold transition-colors cursor-pointer ${
+            className={`shrink-0 lg:shrink px-3 py-1.5 rounded-t font-semibold transition-colors cursor-pointer ${
               statusFilter === stg
                 ? 'bg-white border-t-2 border-[#1F2E4A] text-[#1F2E4A] shadow-sm font-bold'
                 : 'text-slate-500 hover:text-slate-800'
@@ -612,15 +612,15 @@ export const ProformaInvoicesPage = () => {
 
       {/* Create / Edit Proforma Modal (with Fullscreen option) */}
       {showCreateModal && (
-        <div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-4'}`}>
+        <div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-2 sm:p-4'}`}>
           <div
             className={`bg-white border border-slate-200 shadow-2xl flex flex-col overflow-hidden transition-all duration-200 ${
-              isFullscreen ? 'w-full h-full rounded-none p-8' : 'max-w-5xl w-full rounded-2xl p-6 max-h-[92vh]'
+              isFullscreen ? 'w-full h-full rounded-none p-4 sm:p-8' : 'max-w-5xl w-full rounded-2xl p-4 sm:p-6 max-h-[92vh]'
             } text-xs`}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3 lg:gap-0 pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
                 <div className="p-2 rounded-xl bg-blue-50 text-blue-700">
                   <FileSpreadsheet size={20} />
                 </div>
@@ -756,7 +756,7 @@ export const ProformaInvoicesPage = () => {
 
               {/* Items Section */}
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 mb-2">
                   <label className="font-semibold text-slate-800 block text-xs">
                     Product Line Items & Machine Components
                   </label>
@@ -771,7 +771,7 @@ export const ProformaInvoicesPage = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2">
                 {/* Proposed Payment Terms & Milestones */}
                 <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                     <div>
                       <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
                         <Clock size={14} className="text-blue-600" /> Proposed Payment Terms & Schedule
@@ -806,13 +806,13 @@ export const ProformaInvoicesPage = () => {
                   {/* Milestone Rows */}
                   <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                     {paymentSchedule.map((s, idx) => (
-                      <div key={idx} className="flex items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 text-xs">
+                      <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2 bg-white p-2 rounded-lg border border-slate-200 text-xs">
                         <input
                           type="text"
                           value={s.milestone}
                           onChange={(e) => handleUpdateScheduleMilestone(idx, 'milestone', e.target.value)}
                           placeholder="Milestone description"
-                          className="flex-1 p-1 text-xs border border-slate-200 rounded"
+                          className="flex-1 basis-full sm:basis-0 p-1 text-xs border border-slate-200 rounded"
                         />
                         <div className="flex items-center gap-1 w-20 shrink-0">
                           <input
@@ -940,7 +940,7 @@ export const ProformaInvoicesPage = () => {
               </div>
 
               {/* Form Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
                   Cancel
                 </Button>
@@ -962,16 +962,16 @@ export const ProformaInvoicesPage = () => {
 
       {/* 360 Detail & Printable Voucher Modal */}
       {selectedPi && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-6 text-xs max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full p-4 sm:p-6 text-xs max-h-[92vh] flex flex-col overflow-hidden">
             {/* Modal Header Toolbar */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 bg-slate-50 -m-6 mb-4 p-6">
-              <div className="flex items-center gap-3">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 lg:gap-0 pb-3 border-b border-slate-200 bg-slate-50 -m-4 mb-4 p-4 sm:-m-6 sm:mb-4 sm:p-6">
+              <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
                 <div className="p-2 rounded-xl bg-blue-100 text-blue-800">
                   <FileSpreadsheet size={22} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                     <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedPi.proformaNumber}</h3>
                     <StatusBadge status={selectedPi.status} />
                   </div>
@@ -981,7 +981,7 @@ export const ProformaInvoicesPage = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setPrintPiTarget(selectedPi)}
@@ -1040,7 +1040,7 @@ export const ProformaInvoicesPage = () => {
             {/* Printable Voucher Content */}
             <div className="overflow-y-auto space-y-5 pr-1 flex-1 text-xs">
               {/* Commercial Watermark Banner */}
-              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between text-blue-900 text-xs">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-blue-900 text-xs">
                 <div className="flex items-center gap-2">
                   <Info size={16} className="text-blue-600 shrink-0" />
                   <span>
@@ -1053,7 +1053,7 @@ export const ProformaInvoicesPage = () => {
               </div>
 
               {/* Company & Client Header Grid */}
-              <div className="grid grid-cols-2 gap-6 p-4 rounded-xl border border-slate-200 bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 rounded-xl border border-slate-200 bg-white">
                 <div>
                   {/* [PHASE-2E.1] company identity from companyProfile (was hardcoded Evenmore strings) */}
                   <h4 className="font-extrabold text-sm text-[#1F2E4A] mb-1">{companyProfile?.name || 'EVENMORE ERP MEDICAL & SYSTEMS'}</h4>
@@ -1064,7 +1064,7 @@ export const ProformaInvoicesPage = () => {
                   </p>
                 </div>
 
-                <div className="text-right">
+                <div className="sm:text-right">
                   <h4 className="font-bold text-xs uppercase text-slate-400 mb-1">PROFORMA INVOICE RECIPIENT</h4>
                   <p className="font-bold text-sm text-slate-800">{selectedPi.customer}</p>
                   <p className="text-slate-600 text-[11px] leading-relaxed">
@@ -1076,7 +1076,7 @@ export const ProformaInvoicesPage = () => {
               </div>
 
               {/* Meta Parameters Bar */}
-              <div className="grid grid-cols-4 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
                 <div>
                   <span className="text-slate-400 text-[10px] block font-semibold uppercase">Proforma #</span>
                   <span className="font-mono font-bold text-slate-800">{selectedPi.proformaNumber}</span>
@@ -1096,8 +1096,8 @@ export const ProformaInvoicesPage = () => {
               </div>
 
               {/* Line Items Table */}
-              <div className="border border-slate-200 rounded-xl overflow-hidden">
-                <table className="w-full text-xs text-left">
+              <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                <table className="w-full min-w-[640px] lg:min-w-0 text-xs text-left">
                   <thead className="bg-slate-100 border-b border-slate-200 font-bold text-slate-700 text-[11px]">
                     <tr>
                       <th className="p-2.5 w-8 text-center">#</th>
@@ -1139,7 +1139,7 @@ export const ProformaInvoicesPage = () => {
               </div>
 
               {/* Proposed Schedule & Financials Split */}
-              <div className="grid grid-cols-2 gap-6 pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
                 {/* Proposed Payment Milestones */}
                 <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50 space-y-2">
                   <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
@@ -1222,7 +1222,7 @@ export const ProformaInvoicesPage = () => {
             </div>
 
             {/* Modal Bottom Footer */}
-            <div className="flex items-center justify-between pt-3 border-t border-slate-200 mt-4">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-3 border-t border-slate-200 mt-4">
               <span className="text-[11px] text-slate-400">
                 Commercial document • Created via Evenmore ERP Unified Platform
               </span>
@@ -1236,8 +1236,8 @@ export const ProformaInvoicesPage = () => {
 
       {/* Delete Draft Confirmation Modal */}
       {deleteTargetPi && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-6 text-xs flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 text-xs flex flex-col space-y-4 max-h-[95vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-start gap-3.5">
               <div className="p-3 rounded-xl bg-rose-50 text-rose-600 shrink-0 border border-rose-100">
                 <Trash2 size={22} />

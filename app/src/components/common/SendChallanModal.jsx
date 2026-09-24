@@ -89,11 +89,11 @@ export const SendChallanModal = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-2 sm:p-5 overflow-y-auto animate-in fade-in duration-150">
             <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full my-auto overflow-hidden flex flex-col">
                 
                 {/* Header */}
-                <div className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between shrink-0">
+                <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-4 flex items-center justify-between gap-2 lg:gap-0 shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0">
                             <Send size={18} />
@@ -111,7 +111,7 @@ export const SendChallanModal = ({
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSend} className="p-6 space-y-4 text-xs">
+                <form onSubmit={handleSend} className="p-4 sm:p-6 space-y-4 text-xs">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label className="font-semibold text-slate-700 block mb-1">
@@ -263,7 +263,7 @@ export const SendChallanModal = ({
                     </div>
 
                     {/* Footer */}
-                    <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-4 border-t border-slate-200">
                         <button
                             type="button"
                             onClick={onClose}

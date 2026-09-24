@@ -540,6 +540,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const sidebarWidth = useAppStore((s) => s.sidebarWidth) ?? 280;
   const setSidebarWidth = useAppStore((s) => s.setSidebarWidth);
+  const setMobileSidebarOpen = useAppStore((s) => s.setMobileSidebarOpen);
   const currentUser = useAppStore((s) => s.currentUser);
   const theme = useAppStore((s) => s.theme) || 'light';
   const setTheme = useAppStore((s) => s.setTheme);
@@ -636,8 +637,15 @@ export default function Sidebar() {
     window.addEventListener('mouseup', handleUp);
   }
 
+  // Mobile drawer: any link inside the sidebar dismisses it (including a
+  // re-click on the current route, which does not change the pathname).
+  function handleNavClick(e) {
+    if (e.target.closest?.('a[href]')) setMobileSidebarOpen(false);
+  }
+
   return (
-    <aside className="sidebar" style={{ width: sidebarWidth }}>
+    <>
+    <aside className="sidebar" style={{ width: sidebarWidth }} onClick={handleNavClick}>
       <div className="side-top">
         {/* Brand Header */}
         <div className="brand-block">
@@ -650,6 +658,16 @@ export default function Sidebar() {
               <div className="brand-tag">PEOPLE | PROCESS | PROGRESS</div>
             </div>
           </div>
+          {/* Mobile drawer close (below lg only) */}
+          <button
+            type="button"
+            className="brand-menu sidebar-mobile-close"
+            onClick={() => setMobileSidebarOpen(false)}
+            aria-label="Close navigation"
+            title="Close navigation"
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Search Bar Above Navigation */}
@@ -857,13 +875,7 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Interactive Global User Guide Modal */}
-      <UserGuideModal
-        isOpen={isGuideOpen}
-        onClose={() => setIsGuideOpen(false)}
-      />
-
-      {/* Visual Drag Handle for Sidebar Width */}
+      {/* Visual Drag Handle for Sidebar Width (hidden below lg) */}
       <div
         className="sidebar-resize-handle"
         onMouseDown={handleResizeStart}
@@ -872,5 +884,13 @@ export default function Sidebar() {
         <div className="resize-thumb" />
       </div>
     </aside>
+
+    {/* Interactive Global User Guide Modal — rendered outside the aside so the
+        mobile drawer's transform never becomes its containing block. */}
+    <UserGuideModal
+      isOpen={isGuideOpen}
+      onClose={() => setIsGuideOpen(false)}
+    />
+    </>
   );
 }

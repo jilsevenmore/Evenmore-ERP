@@ -146,7 +146,7 @@ export default function DynamicLeadFormPage({
   return (
     <section className="w-full">
       {/* Top Bar */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-3 lg:gap-0 mb-6">
         <button
           type="button"
           onClick={handleBack}
@@ -155,7 +155,7 @@ export default function DynamicLeadFormPage({
           <ArrowLeft size={15} />
           Back to Leads
         </button>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           <button
             type="button"
             onClick={handleEdit}

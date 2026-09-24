@@ -56,7 +56,7 @@ function ContractForm({ form, setForm, deals }) {
             placeholder="Customer name"
             className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
         </label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <label className="space-y-1.5 font-semibold text-slate-600">
             Start Date *
             <input type="date" required value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })}
@@ -245,7 +245,7 @@ export default function ContractsPage() {
             <option value="All">All Customers</option>
             {customers.map((customer) => <option key={customer} value={customer}>{customer}</option>)}
           </select>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <input type="date" aria-label="From date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
               className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 text-slate-600" />
             <span className="text-slate-400 text-xs">→</span>
@@ -323,7 +323,7 @@ export default function ContractsPage() {
         {filtered.length > 0 && (
           <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
             <p>Showing {(safePage - 1) * PAGE_SIZE + 1} to {Math.min(safePage * PAGE_SIZE, filtered.length)} of {filtered.length} contracts</p>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-center gap-1.5">
               <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}
                 className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-100" aria-label="Previous page"><ChevronLeft size={14} /></button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 7).map((number) => (

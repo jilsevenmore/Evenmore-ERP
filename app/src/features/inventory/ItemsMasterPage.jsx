@@ -307,7 +307,7 @@ export const ItemsMasterPage = () => {
         subtitle={pageSubtitle}
         guide={guideConfig}
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <Button variant="outline" icon={Upload} onClick={() => setIsImportOpen(true)}>
               Import CSV
             </Button>
@@ -329,10 +329,10 @@ export const ItemsMasterPage = () => {
       />
 
       {/* View Segmented Tabs */}
-      <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit text-xs font-semibold">
+      <div className="flex flex-nowrap items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit max-w-full lg:max-w-none overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none text-xs font-semibold">
         <Link
           to="/inventory/items"
-          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
             !isMachineView && !isStockView
               ? 'bg-white text-blue-600 shadow-2xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
@@ -342,7 +342,7 @@ export const ItemsMasterPage = () => {
         </Link>
         <Link
           to="/inventory/items/machines"
-          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
             isMachineView
               ? 'bg-white text-blue-600 shadow-2xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
@@ -352,7 +352,7 @@ export const ItemsMasterPage = () => {
         </Link>
         <Link
           to="/inventory/items/stock"
-          className={`px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
+          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
             isStockView
               ? 'bg-white text-blue-600 shadow-2xs font-bold'
               : 'text-slate-600 hover:text-slate-900'
@@ -363,7 +363,7 @@ export const ItemsMasterPage = () => {
       </div>
 
       {/* Item Master KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label={isMachineView ? 'Total Machines' : 'Total Stock SKUs'} value={`${displayItems.length} SKUs`} icon={isMachineView ? Cpu : Package} />
         <StatCard label="Total Asset Valuation" value={formatCurrency(Math.round(totalCatalogValue), { noDecimals: true })} icon={DollarSign} />
         <StatCard label="Low Stock Alerts" value={`${lowStockItems.length} SKUs`} icon={AlertTriangle} trend={{ positive: lowStockItems.length === 0, text: lowStockItems.length > 0 ? 'Requires Reorder' : 'Healthy Buffers' }} highlight={lowStockItems.length > 0} />
@@ -388,7 +388,7 @@ export const ItemsMasterPage = () => {
           </button>
         </div>)}
 
-      {restockSuccess && (<div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
+      {restockSuccess && (<div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-xs text-emerald-800">
           <span className="flex items-center gap-2 font-semibold">
             <CheckCircle2 size={16} className="text-emerald-600"/>
             Restock Purchase Order generated successfully! View in Purchase Orders.

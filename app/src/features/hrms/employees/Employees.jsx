@@ -204,7 +204,7 @@ export default function Employees() {
             {filtered.length} employees • 12 departments
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <button type="button" onClick={handleExport} className="emp-export-btn">
             <Download size={15} /> Export
           </button>
@@ -216,7 +216,7 @@ export default function Employees() {
 
       {/* Filter Card */}
       <div className="emp-card emp-filter-card">
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div className={`emp-filter-dropdown ${dept !== "All" ? "active" : ""}`}>
             <span className="emp-filter-text">
               {dept === "All" ? "Department" : dept}
@@ -546,6 +546,20 @@ export default function Employees() {
         .emp-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .emp-page-btn:not(:disabled):hover { background: #f9fafb; border-color: #d1d5db; }
         .emp-page-indicator { display: inline-flex; align-items: center; justify-content: center; background: #16233a; color: #fff; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 12px; height: 26px; }
+        @media (max-width: 1023px) {
+          .emp-dir-page { margin: -16px -20px -24px; }
+        }
+        @media (max-width: 767px) {
+          .emp-dir-page { margin: -12px -14px -20px; }
+        }
+        @media (max-width: 640px) {
+          .emp-dir-page { padding: 14px 14px 22px; }
+          .emp-filter-card { padding: 12px 14px; }
+          .emp-grid-view { grid-template-columns: minmax(0, 1fr); padding: 14px; }
+          .emp-footer { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+          .emp-tabs { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+          .emp-tab { flex-shrink: 0; white-space: nowrap; }
+        }
       `}</style>
     </div>
   );

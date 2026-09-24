@@ -87,8 +87,8 @@ export const ServiceUsagePage = () => {
             String(s.sku ?? '').toLowerCase().includes(term) ||
             String(s.purpose ?? '').toLowerCase().includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-4">
-          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-6">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-2 sm:p-4">
+          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
             <h3 className="font-bold text-base text-[#1F2E4A] mb-1">
               Log Service Part Consumption
             </h3>
@@ -107,7 +107,7 @@ export const ServiceUsagePage = () => {
                 <input required value={technician} onChange={(e) => setTechnician(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]" placeholder="Liam Vance"/>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">SKU Code</label>
                   <input required value={sku} onChange={(e) => setSku(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono" placeholder="CAB-6-01"/>
@@ -123,7 +123,7 @@ export const ServiceUsagePage = () => {
                 <input required value={purpose} onChange={(e) => setPurpose(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]" placeholder="Server rack maintenance"/>
               </div>
 
-              <div className="flex justify-end gap-2 pt-4 border-t border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-4 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-3.5 py-1.5 border border-[#CED4DA] rounded text-slate-600 hover:bg-slate-100">
                   Cancel
                 </button>

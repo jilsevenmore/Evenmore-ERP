@@ -155,7 +155,7 @@ export const ValuationAgeingPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Total Inventory Assets" value={formatCurrency(totalValuation, { noDecimals: true })} icon={DollarSign}/>
         <StatCard label="Current Stock (0-30 Days)" value={formatCurrency(currentStockValue, { noDecimals: true })} trend={{ positive: true, text: 'High velocity turnover' }}/>
         <StatCard label="Stale Stock (90+ Days)" value={formatCurrency(staleValuation, { noDecimals: true })} trend={{ positive: false, text: 'Review for clearance' }}/>
@@ -163,9 +163,9 @@ export const ValuationAgeingPage = () => {
       </div>
 
       {/* Bucket Filter */}
-      <div className="flex items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs">
-        <span className="text-slate-500 font-semibold">Aging Bracket:</span>
-        {['All', '0-30 Days', '31-60 Days', '61-90 Days', '90+ Days (Stale)'].map((b) => (<button key={b} onClick={() => setSelectedBucket(b)} className={`px-3 py-1 rounded-full font-medium transition cursor-pointer ${selectedBucket === b
+      <div className="flex flex-nowrap items-center gap-2 border-b border-[#CED4DA] pb-2 text-xs overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
+        <span className="shrink-0 lg:shrink text-slate-500 font-semibold">Aging Bracket:</span>
+        {['All', '0-30 Days', '31-60 Days', '61-90 Days', '90+ Days (Stale)'].map((b) => (<button key={b} onClick={() => setSelectedBucket(b)} className={`shrink-0 lg:shrink px-3 py-1 rounded-full font-medium transition cursor-pointer ${selectedBucket === b
                 ? 'bg-[#1F2E4A] text-white'
                 : 'text-slate-600 hover:bg-slate-200'}`}>
             {b}

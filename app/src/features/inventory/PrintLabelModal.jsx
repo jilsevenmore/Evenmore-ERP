@@ -39,7 +39,7 @@ const PrintLabelModalOriginal = ({ isOpen, onClose, part, }) => {
     const handlePrint = () => {
         window.print();
     };
-    return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-4">
+    return (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-xs p-2 sm:p-4">
       <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150 printable-document">
         <div className="px-5 py-3 border-b border-[#CED4DA] flex items-center justify-between bg-[#F8F9FA]">
           <div className="flex items-center gap-2">
@@ -50,7 +50,7 @@ const PrintLabelModalOriginal = ({ isOpen, onClose, part, }) => {
             <X className="w-4 h-4"/>
           </button>
         </div>
-        <div className="p-6 bg-slate-50 flex justify-center">
+        <div className="p-4 sm:p-6 bg-slate-50 flex justify-center">
           <div className="w-full bg-white border-2 border-black p-4 rounded text-black font-sans text-xs space-y-3 shadow-md print:shadow-none">
             <div className="flex justify-between items-start border-b-2 border-black pb-2">
               <div>
@@ -95,7 +95,7 @@ const PrintLabelModalOriginal = ({ isOpen, onClose, part, }) => {
             </div>
           </div>
         </div>
-        <div className="px-5 py-3 border-t border-[#CED4DA] bg-white flex items-center justify-between">
+        <div className="px-5 py-3 border-t border-[#CED4DA] bg-white flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
           <span className="text-[11px] text-green-700 font-medium flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5"/> Barcode verified
           </span>

@@ -279,7 +279,7 @@ export const ReportsPage = () => {
     const categoryColors = ['bg-[#1F2E4A]', 'bg-blue-600', 'bg-emerald-600', 'bg-amber-600', 'bg-purple-600', 'bg-rose-600', 'bg-teal-600'];
 
     return (<div className="space-y-6 printable-document">
-      <PageHeader title="Financial & Inventory Reports" subtitle="Generate executive compliance summaries, AR/AP aging schedules, valuation ledgers, and operational sales analyses." guide={reportsGuide} actions={<div className="flex items-center gap-2">
+      <PageHeader title="Financial & Inventory Reports" subtitle="Generate executive compliance summaries, AR/AP aging schedules, valuation ledgers, and operational sales analyses." guide={reportsGuide} actions={<div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             <Button variant="outline" icon={Printer} onClick={() => window.print()}>
               Print Report
             </Button>
@@ -317,7 +317,7 @@ export const ReportsPage = () => {
       </div>
 
       {activeReport === 'inventory' && (<div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Total Stock Valuation" value={formatCurrency(totalInventoryValuation)} icon={DollarSign}/>
             <StatCard label="Total SKUs Tracked" value={`${items.length} Active`} icon={Package}/>
             <StatCard label="Stock Categories" value={`${categoryValuations.length} Groups`} highlight/>
@@ -362,7 +362,7 @@ export const ReportsPage = () => {
             ) : (
                 <div className="divide-y divide-slate-100 text-xs">
                     {topAccounts.map((account) => (
-                        <div key={account.name} className="py-2.5 flex justify-between items-center">
+                        <div key={account.name} className="py-2.5 flex justify-between items-center gap-3 lg:gap-0">
                             <div>
                                 <p className="font-semibold text-slate-800">{account.name}</p>
                                 <p className="text-[11px] text-slate-500">{account.invoiceCount} Invoice(s) billed • Code: {account.code}</p>
@@ -399,12 +399,12 @@ export const ReportsPage = () => {
                     </div>
                     <div className="divide-y divide-slate-100 text-xs pt-2">
                         {topVendors.map((vendor) => (
-                            <div key={vendor.name} className="py-2 flex justify-between items-center">
-                                <div>
+                            <div key={vendor.name} className="py-2 flex justify-between items-center gap-3 lg:gap-0">
+                                <div className="min-w-0 lg:min-w-auto">
                                     <span className="font-semibold text-slate-800">{vendor.name}</span>
                                     <span className="text-[11px] text-slate-500 ml-2">({vendor.billCount} bills)</span>
                                 </div>
-                                <div className="text-right">
+                                <div className="text-right shrink-0 lg:shrink">
                                     <span className="font-mono font-bold text-slate-900 mr-2">{formatCurrency(vendor.spend)}</span>
                                     <span className="text-slate-500">({vendor.percentage.toFixed(1)}%)</span>
                                 </div>
@@ -417,7 +417,7 @@ export const ReportsPage = () => {
         </div>)}
 
       {activeReport === 'aging' && (<div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Total Accounts Receivable (AR)" value={formatCurrency(totalAr)} icon={DollarSign}/>
             <StatCard label="Total Accounts Payable (AP)" value={formatCurrency(totalAp)} icon={Clock} highlight/>
             <StatCard label="Net Working Capital Delta" value={formatCurrency(totalAr - totalAp)}/>
@@ -426,12 +426,12 @@ export const ReportsPage = () => {
 
           {/* AR Aging Buckets Schedule */}
           <div className="bg-white border border-[#CED4DA] rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0">
               <h3 className="font-bold text-sm text-[#1F2E4A]">Accounts Receivable (AR) Aging Analysis</h3>
               <span className="text-[11px] text-slate-500 font-mono">Real-time Outstanding Balance By Due Window</span>
             </div>
 
-            <div className="grid grid-cols-4 gap-3 text-center text-xs">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center text-xs">
               <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
                 <span className="text-emerald-700 font-bold block text-[11px] uppercase">Current (0 - 30 Days)</span>
                 <p className="font-mono font-bold text-base text-emerald-900 mt-1">
@@ -469,7 +469,7 @@ export const ReportsPage = () => {
 
             {/* AR Customer Breakdown Table */}
             <div className="overflow-x-auto pt-2">
-              <table className="w-full text-left text-xs text-slate-600">
+              <table className="w-full min-w-[760px] lg:min-w-0 text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="py-2.5 px-3">Customer Account</th>
@@ -513,12 +513,12 @@ export const ReportsPage = () => {
 
           {/* AP Aging Buckets Schedule */}
           <div className="bg-white border border-[#CED4DA] rounded-xl p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0">
               <h3 className="font-bold text-sm text-[#1F2E4A]">Accounts Payable (AP) Aging Analysis</h3>
               <span className="text-[11px] text-slate-500 font-mono">Real-time Payable Due Window by Bill Due Date</span>
             </div>
 
-            <div className="grid grid-cols-4 gap-3 text-center text-xs">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center text-xs">
               <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
                 <span className="text-emerald-700 font-bold block text-[11px] uppercase">Current (0 - 30 Days)</span>
                 <p className="font-mono font-bold text-base text-emerald-900 mt-1">{formatCurrency(apBuckets.current)}</p>
@@ -543,7 +543,7 @@ export const ReportsPage = () => {
 
             {/* AP Vendor Breakdown Table */}
             <div className="overflow-x-auto pt-2">
-              <table className="w-full text-left text-xs text-slate-600">
+              <table className="w-full min-w-[680px] lg:min-w-0 text-left text-xs text-slate-600">
                 <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="py-2.5 px-3">Vendor Account</th>
@@ -579,28 +579,28 @@ export const ReportsPage = () => {
           </div>
         </div>)}
 
-      {activeReport === 'pnl' && (<div className="bg-white border border-[#CED4DA] rounded-lg p-6">
+      {activeReport === 'pnl' && (<div className="bg-white border border-[#CED4DA] rounded-lg p-4 sm:p-6">
           <h3 className="font-bold text-base text-[#1F2E4A] mb-4">P&L Financial Performance Summary (Real-Time)</h3>
           <div className="space-y-3 text-xs max-w-xl">
-            <div className="flex justify-between py-2 border-b border-slate-100">
+            <div className="flex justify-between gap-3 lg:gap-0 py-2 border-b border-slate-100">
               <span className="font-medium text-slate-600">Gross Operating Revenue (Recognized Invoices)</span>
               <span className="font-bold font-mono text-slate-900">{formatCurrency(totalRevenue)}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100 text-rose-600">
+            <div className="flex justify-between gap-3 lg:gap-0 py-2 border-b border-slate-100 text-rose-600">
               <span className="font-medium">Less: Cost of Goods Sold (Sold Items at Cost)</span>
               <span className="font-bold font-mono">-{formatCurrency(totalCogs)}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-200 bg-slate-50 px-2 rounded">
+            <div className="flex justify-between gap-3 lg:gap-0 py-2 border-b border-slate-200 bg-slate-50 px-2 rounded">
               <span className="font-bold text-slate-800">Gross Margin ({grossMarginPct.toFixed(1)}%)</span>
               <span className={`font-bold font-mono ${grossProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'}`}>
                 {formatCurrency(grossProfit)}
               </span>
             </div>
-            <div className="flex justify-between py-2 border-b border-slate-100 text-slate-600">
+            <div className="flex justify-between gap-3 lg:gap-0 py-2 border-b border-slate-100 text-slate-600">
               <span className="font-medium">Direct & Overhead Operating Expenses</span>
               <span className="font-bold font-mono">-{formatCurrency(totalExpenses)}</span>
             </div>
-            <div className="flex justify-between py-3 border-t-2 border-[#1F2E4A] bg-[#F8F9FA] px-2 rounded">
+            <div className="flex justify-between gap-3 lg:gap-0 py-3 border-t-2 border-[#1F2E4A] bg-[#F8F9FA] px-2 rounded">
               <span className="font-bold text-sm text-[#1F2E4A]">Net Operating Profit (EBITDA)</span>
               <span className={`font-bold font-mono text-base ${netOperatingProfit >= 0 ? 'text-[#1F2E4A]' : 'text-rose-600'}`}>
                 {formatCurrency(netOperatingProfit)}

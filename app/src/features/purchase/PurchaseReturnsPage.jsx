@@ -269,9 +269,9 @@ export const PurchaseReturnsPage = () => {
             String(r.reason ?? '').toLowerCase().includes(term)}/>
 
       {/* Create Debit Note Modal */}
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-6 text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-5xl w-full p-4 sm:p-6 text-xs max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
                 <RotateCcw className="w-5 h-5 text-rose-600" />
                 <h3 className="font-bold text-base text-[#1F2E4A]">
@@ -301,7 +301,7 @@ export const PurchaseReturnsPage = () => {
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0 mb-2">
                   <label className="font-semibold text-slate-700 block">
                     Selective Item Quantities & Conditions
                   </label>
@@ -310,8 +310,8 @@ export const PurchaseReturnsPage = () => {
                   </span>
                 </div>
 
-                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-                  <table className="w-full text-left border-collapse text-xs">
+                <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
+                  <table className="w-full min-w-[820px] lg:min-w-0 text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                         <th className="py-2.5 px-3">Item Description / SKU</th>
@@ -397,11 +397,11 @@ export const PurchaseReturnsPage = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:gap-0 pt-3 border-t border-slate-200">
                 <div className="font-mono text-xs">
                   Total Debit Amount: <strong className="text-rose-600 text-sm">{formatCurrency(activeTotalAmount)}</strong>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap lg:flex-nowrap gap-2">
                   <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer">
                     Cancel
                   </button>
@@ -416,10 +416,10 @@ export const PurchaseReturnsPage = () => {
 
       {/* Return Detail Modal */}
       {selectedReturn && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <div className="flex items-center gap-3">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 sm:gap-3 min-w-0 lg:min-w-auto">
                 <RotateCcw className="w-5 h-5 text-rose-600" />
                 <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedReturn.debitNoteNumber}</h3>
                 <span className="font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded">
@@ -443,7 +443,7 @@ export const PurchaseReturnsPage = () => {
 
             <div className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">Vendor & Matched Bill</span>
                     <strong className="text-slate-900 text-sm block">{selectedReturn.vendor}</strong>
@@ -461,8 +461,8 @@ export const PurchaseReturnsPage = () => {
                 <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs mb-2">
                   Returned Line Items ({selectedReturn.items?.length || 0})
                 </h4>
-                <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-left border-collapse text-xs">
+                <div className="border border-slate-200 rounded-xl overflow-x-auto">
+                  <table className="w-full min-w-[560px] lg:min-w-0 text-left border-collapse text-xs">
                     <thead>
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
                         <th className="py-2 px-3">Item Description</th>
@@ -498,11 +498,11 @@ export const PurchaseReturnsPage = () => {
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200 bg-slate-50 -mx-6 -mb-6 px-6 py-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
               <div className="font-mono text-xs">
                 Total Credit Value: <strong className="text-rose-600 text-sm">{formatCurrency(selectedReturn.amount || 0)}</strong>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedReturn.status !== 'Cancelled' && selectedReturn.status !== 'Settled' && (
                   <button
                     type="button"

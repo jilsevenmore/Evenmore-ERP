@@ -145,7 +145,7 @@ export default function Career() {
       />
 
       {/* Hero Banner with Integrated Search */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-8 md:p-10 shadow-lg border border-slate-800">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-8 md:p-10 shadow-lg border border-slate-800">
         <div className="relative z-10 max-w-3xl mx-auto text-center space-y-4">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11.5px] font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 backdrop-blur-xs">
             <Sparkles size={12} />
@@ -225,7 +225,7 @@ export default function Career() {
       </div>
 
       {/* Results Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <span className="text-[13px] font-semibold text-slate-700 dark:text-slate-300">
           Showing <span className="text-indigo-600 dark:text-indigo-400">{filtered.length}</span>{" "}
           Available Openings

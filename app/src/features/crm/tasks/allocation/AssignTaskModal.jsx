@@ -69,7 +69,7 @@ export default function AssignTaskModal({ isOpen, initial, onClose, onSubmit }) 
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-slate-950/50" onClick={onClose}>
       <div
         className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -84,7 +84,7 @@ export default function AssignTaskModal({ isOpen, initial, onClose, onSubmit }) 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 overflow-y-auto space-y-4 text-sm">
+        <form onSubmit={handleSubmit} className="px-4 sm:px-6 py-5 overflow-y-auto space-y-4 text-sm">
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Task Title<span className="text-rose-500">*</span></label>
             <input
@@ -172,7 +172,7 @@ export default function AssignTaskModal({ isOpen, initial, onClose, onSubmit }) 
                   onChange={(e) => update('fileName', e.target.files?.[0]?.name ?? '')}
                 />
               </label>
-              <span className="px-3.5 py-2.5 text-[13px] text-slate-500 truncate">{form.fileName || 'No file chosen'}</span>
+              <span className="px-3.5 py-2.5 text-[13px] text-slate-500 truncate min-w-0 lg:min-w-auto">{form.fileName || 'No file chosen'}</span>
             </div>
           </div>
 

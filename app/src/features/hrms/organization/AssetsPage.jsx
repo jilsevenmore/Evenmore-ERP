@@ -478,7 +478,7 @@ export function AssetsPage() {
             Lifecycle management, hardware provisioning, allocations, repairs &amp; return audits.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           {activeTab === "inventory" ? (
             <button
               type="button"
@@ -502,11 +502,11 @@ export function AssetsPage() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-bdr">
+      <div className="flex items-center gap-2 border-b border-bdr overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none">
         <button
           type="button"
           onClick={() => handleTabChange("inventory")}
-          className={`pb-3 px-3 text-[14px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 px-3 text-[14px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer ${
             activeTab === "inventory" ? "text-navy" : "text-muted hover:text-slate-700"
           }`}
         >
@@ -523,7 +523,7 @@ export function AssetsPage() {
         <button
           type="button"
           onClick={() => handleTabChange("requests")}
-          className={`pb-3 px-3 text-[14px] font-semibold transition-colors relative flex items-center gap-2 cursor-pointer ${
+          className={`pb-3 px-3 text-[14px] font-semibold transition-colors relative flex items-center gap-2 shrink-0 lg:shrink cursor-pointer ${
             activeTab === "requests" ? "text-navy" : "text-muted hover:text-slate-700"
           }`}
         >
@@ -705,7 +705,7 @@ export function AssetsPage() {
       {/* Assets Inventory Table */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-[13px] border-collapse">
+          <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px] border-collapse">
             <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase tracking-wider text-muted">
               <tr>
                 <th className="py-3 px-5">Asset Details</th>
@@ -998,7 +998,7 @@ export function AssetsPage() {
           {/* Requests Table */}
           <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-[13px] border-collapse">
+              <table className="w-full min-w-[800px] lg:min-w-0 text-left text-[13px] border-collapse">
                 <thead className="bg-off border-b border-bdr text-[11px] font-semibold uppercase tracking-wider text-muted">
                   <tr>
                     <th className="py-3 px-5">Request ID</th>
@@ -1613,7 +1613,7 @@ export function AssetsPage() {
         {selectedAsset && (
           <div className="flex flex-col gap-5">
             {/* Asset Headline */}
-            <div className="flex items-start justify-between p-4 bg-off border border-bdr rounded-2xl">
+            <div className="flex flex-wrap lg:flex-nowrap items-start justify-between gap-3 lg:gap-0 p-4 bg-off border border-bdr rounded-2xl">
               <div className="flex items-start gap-3.5">
                 <div className="w-12 h-12 rounded-xl bg-white border border-bdr grid place-items-center shrink-0">
                   {getCategoryIcon(selectedAsset.category)}

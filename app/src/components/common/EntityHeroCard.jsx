@@ -87,7 +87,7 @@ export const EntityHeroCard = ({
           )}
 
           {/* Action Toolbar */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
             {onEdit && (
               <button
                 type="button"

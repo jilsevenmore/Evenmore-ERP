@@ -41,13 +41,13 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
             <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-4xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none max-h-[94vh]">
                 
                 {/* Top Control Bar (Screen Only) */}
-                <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between no-print shrink-0">
-                    <div className="flex items-center gap-3">
+                <div className="bg-white border-b border-slate-200 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-2 lg:gap-0 no-print shrink-0">
+                    <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
                         <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center">
                             <Award className="w-5 h-5" />
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                                 <span className="font-bold text-sm text-slate-900 tracking-tight block">
                                     Customer Warranty Certificate Preview
                                 </span>
@@ -318,11 +318,11 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                 </div>
 
                 {/* Footer Controls (Screen Only) */}
-                <div className="px-6 py-3.5 border-t border-slate-200 bg-white flex items-center justify-between no-print shrink-0">
+                <div className="px-4 sm:px-6 py-3.5 border-t border-slate-200 bg-white flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 no-print shrink-0">
                     <div className="text-xs text-slate-500">
                         Certificate ID: <span className="font-mono font-bold text-slate-800">{warrantyCard.id}</span> • Linked DC: <span className="font-mono text-slate-800">{warrantyCard.challanNumber}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                         {onSend && !isCancelled && (
                             <button
                                 onClick={handleSendAction}
