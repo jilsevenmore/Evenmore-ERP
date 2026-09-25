@@ -60,6 +60,7 @@ import { useERP } from '../../context/ERPContext';
 import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
 import { clearStoredAuth } from '../../utils/authUtils';
+import { filterNavByPermission } from '../../utils/navAccess';
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -78,6 +79,7 @@ const NAV = [
 
   {
     label: 'CRM',
+    menu: 'menu_crm',
     icon: LayoutGrid,
     defaultOpen: false,
     children: [
@@ -114,6 +116,7 @@ const NAV = [
 
   {
     label: 'PMS (Projects)',
+    menu: 'menu_pms',
     icon: Briefcase,
     badgeKey: 'pmsActiveCount',
     children: [
@@ -131,6 +134,7 @@ const NAV = [
 
   {
     label: 'Sales',
+    menu: 'menu_sales',
     icon: BarChart3,
     children: [
       { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
@@ -147,6 +151,7 @@ const NAV = [
 
   {
     label: 'Purchase',
+    menu: 'menu_purchase',
     icon: Truck,
     children: [
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
@@ -167,6 +172,7 @@ const NAV = [
 
   {
     label: 'Inventory',
+    menu: 'menu_inventory',
     icon: Package,
     children: [
       {
@@ -202,6 +208,7 @@ const NAV = [
 
   {
     label: 'Accounts',
+    menu: 'menu_accounts',
     icon: Landmark,
     children: [
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
@@ -212,6 +219,7 @@ const NAV = [
 
   {
     label: 'HRMS',
+    menu: 'menu_hrms',
     icon: UserCheck,
     children: [
       { label: 'Dashboard', icon: Home, to: '/hrms/dashboard' },
@@ -291,6 +299,7 @@ const NAV = [
 
   {
     label: 'Administration',
+    menu: 'menu_admin',
     icon: Shield,
     children: [
       { label: 'Users', to: '/administration/users' },
@@ -550,7 +559,13 @@ export default function Sidebar() {
   const profileRef = useRef(null);
   const dragRef = useRef({ dragging: false, startX: 0, startWidth: sidebarWidth });
 
-  const filteredNav = useMemo(() => filterNavTree(NAV, searchQuery), [searchQuery]);
+  // Hide what the server would refuse (UX only -- the API is the real gate).
+  const permissions = useAppStore((s) => s.permissions);
+  const permittedNav = useMemo(() => filterNavByPermission(NAV, permissions || []), [permissions]);
+  const filteredNav = useMemo(
+    () => filterNavTree(permittedNav, searchQuery),
+    [permittedNav, searchQuery],
+  );
 
   // PMS live nav counters. Subscribe to stable slices and derive, so the
   // selector never hands useSyncExternalStore a fresh object each render.
