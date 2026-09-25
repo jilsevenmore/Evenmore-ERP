@@ -50,7 +50,7 @@ const CARD_STYLES = {
 };
 
 export const DashboardPage = () => {
-  const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock } = useERP();
+  const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock, cashPaymentReceipts, getInvoiceOutstanding } = useERP();
   // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──
   // Before (kept for reference): dashboardData.leadsOverview, dashboardData.taskStatus drove
   //   the chart + donut. Now we chart invoice revenue over the last 6 months and show
@@ -136,6 +136,33 @@ export const DashboardPage = () => {
   const expenseTotal = expenses.reduce((a, e) => a + (e.amount || e.total || 0), 0);
   const bankBalance = bankAccounts.reduce((a, b) => a + (b.balance || b.currentBalance || 0), 0);
 
+  // ── [PHASE-4] Core Financial Metrics: Distinguishing Billed Sales vs Without-Bill Cash ──
+  const activeInvoices = invoices.filter((inv) => inv.status !== 'Cancelled');
+  const billedSales = activeInvoices.reduce((sum, inv) => sum + (Number(inv.grandTotal ?? inv.total ?? inv.amount) || 0), 0);
+  const gstTotal = activeInvoices.reduce((sum, inv) => {
+    const out = getInvoiceOutstanding ? getInvoiceOutstanding(inv.id) : null;
+    return sum + (out?.gst ?? Number(inv.taxAmount || 0));
+  }, 0);
+  const validWithBillPayments = paymentIns.filter(
+    (p) => p.paymentType !== 'WITHOUT_BILL' && p.status !== 'Cancelled' && p.status !== 'CANCELLED'
+  );
+  const withBillPaymentsTotal = validWithBillPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const validCashReceipts = (cashPaymentReceipts || []).filter(
+    (r) => r.status === 'RECEIVED' || (!r.status && r.status !== 'CANCELLED' && r.status !== 'VOIDED')
+  );
+  const withoutBillCashTotal = validCashReceipts.length > 0
+    ? validCashReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+    : paymentIns.filter((p) => p.paymentType === 'WITHOUT_BILL' && p.status !== 'Cancelled').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalPaymentsReceived = withBillPaymentsTotal + withoutBillCashTotal;
+  const totalInvoiceOutstanding = activeInvoices.reduce((sum, inv) => {
+    const out = getInvoiceOutstanding ? getInvoiceOutstanding(inv.id) : null;
+    return sum + (out?.outstanding ?? Math.max(0, (inv.total || 0) - (inv.paidAmount || 0)));
+  }, 0);
+  const overdueOrUnpaidCount = activeInvoices.filter((inv) => {
+    const out = getInvoiceOutstanding ? getInvoiceOutstanding(inv.id) : null;
+    return (out?.outstanding ?? (inv.total || 0)) > 0.01;
+  }).length;
+
   const modules = [
     // ── [PHASE-1-DASHBOARD] CRM module card now counts ERP quotations (was: leads) ──
     // Old: { label: 'CRM', desc: `${leads.length} Leads | Deals | Tasks`, ... count: leads.length, tag: 'Leads' }
@@ -182,6 +209,110 @@ export const DashboardPage = () => {
         <StatCard label="Purchase Orders" value={fmt(purchaseOrders.length)} icon={ClipboardList} tone="amber" trend={`${fmt(Math.round(purchaseTotal / 1000))}k`} note="purchase value" />
         <StatCard label="Stock Value" value={`₹${fmt(Math.round(totalStockValue))}`} icon={Package} tone="teal" trend={`${fmt(lowStockItems.length)}`} note="low stock" />
         <StatCard label="Bank Balance" value={`₹${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note="net flow" />
+      </div>
+
+      {/* ── [PHASE-4] Sales & Collections Financial Summary (Billed vs Without-Bill Cash) ── */}
+      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
+          <div>
+            <h3 className="font-bold text-text text-sm sm:text-base flex items-center gap-2">
+              <Receipt size={17} className="text-primary" />
+              <span>Sales & Collections Financial Summary</span>
+            </h3>
+            <p className="text-[11px] sm:text-xs text-muted">
+              Distinguishing Billed Sales (GST Invoices) vs Unbilled Cash (Cash Payment Receipts)
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/sales/payments"
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+            >
+              <span>Manage Collections</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {/* 1. Billed Sales */}
+          <div className="p-3.5 rounded-xl border border-border bg-soft/70 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider block">Billed Sales</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-text block">
+                ₹{fmt(Math.round(billedSales))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-text-secondary">
+              {activeInvoices.length} Tax Invoices booked
+            </span>
+          </div>
+
+          {/* 2. GST Total */}
+          <div className="p-3.5 rounded-xl border border-blue-200/50 bg-blue-50/40 dark:bg-blue-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider block">GST Tax</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-blue-800 dark:text-blue-300 block">
+                ₹{fmt(Math.round(gstTotal))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-blue-600/80 dark:text-blue-400/80">
+              Taxable: ₹{fmt(Math.round(Math.max(0, billedSales - gstTotal)))}
+            </span>
+          </div>
+
+          {/* 3. With-Bill Payments */}
+          <div className="p-3.5 rounded-xl border border-emerald-200/50 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">With-Bill Payments</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300 block">
+                ₹{fmt(Math.round(withBillPaymentsTotal))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80">
+              {validWithBillPayments.length} payments allocated
+            </span>
+          </div>
+
+          {/* 4. Without-Bill Cash */}
+          <div className="p-3.5 rounded-xl border border-amber-200/50 bg-amber-50/40 dark:bg-amber-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-400 uppercase tracking-wider block">Without-Bill Cash</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-amber-800 dark:text-amber-300 block">
+                ₹{fmt(Math.round(withoutBillCashTotal))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+              {validCashReceipts.length} Cash Receipts (CPR)
+            </span>
+          </div>
+
+          {/* 5. Total Payments Received */}
+          <div className="p-3.5 rounded-xl border border-purple-200/50 bg-purple-50/40 dark:bg-purple-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wider block">Total Received</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-purple-800 dark:text-purple-300 block">
+                ₹{fmt(Math.round(totalPaymentsReceived))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-purple-600/80 dark:text-purple-400/80">
+              Billed + Cash desk receipts
+            </span>
+          </div>
+
+          {/* 6. Outstanding Invoices */}
+          <div className="p-3.5 rounded-xl border border-rose-200/50 bg-rose-50/40 dark:bg-rose-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 uppercase tracking-wider block">Outstanding Invoices</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-rose-700 dark:text-rose-300 block">
+                ₹{fmt(Math.round(totalInvoiceOutstanding))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-rose-600/80 dark:text-rose-400/80">
+              {overdueOrUnpaidCount} open invoices due
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* All Modules Directory Grid */}

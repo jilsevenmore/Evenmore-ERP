@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin } from 'lucide-react';
+import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, SlidersHorizontal } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { StatCard } from '../../components/ui/StatCard';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
@@ -42,6 +42,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         updateDraftInvoice,
         finalizeInvoice,
         cancelSalesInvoice,
+        updateSalesAllocation,
         getInvoiceOutstanding,
         deliveryChallans = [],
         formatCurrency,
@@ -84,6 +85,19 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [billingAddress, setBillingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
     const [shippingAddress, setShippingAddress] = useState({ line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
     const [sameAsBilling, setSameAsBilling] = useState(true);
+
+    // Allocation Split state for Create / Edit
+    const [totalSalesValueInput, setTotalSalesValueInput] = useState(0);
+    const [formalInvoiceAmountInput, setFormalInvoiceAmountInput] = useState(0);
+    const [cashAmountInput, setCashAmountInput] = useState(0);
+
+    // Allocation adjustment modal for existing invoices (both Draft and Finalized)
+    const [allocationModalInvoice, setAllocationModalInvoice] = useState(null);
+    const [allocModalFormal, setAllocModalFormal] = useState(0);
+    const [allocModalCash, setAllocModalCash] = useState(0);
+    const [allocModalTotal, setAllocModalTotal] = useState(0);
+    const [allocModalReason, setAllocModalReason] = useState('');
+    const [allocSubmitting, setAllocSubmitting] = useState(false);
 
     // Populate addresses on customer select
     const populateCustomerAddresses = (custId) => {
@@ -160,6 +174,9 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setNotes('');
         setLineItems([]);
         setSameAsBilling(true);
+        setTotalSalesValueInput(0);
+        setFormalInvoiceAmountInput(0);
+        setCashAmountInput(0);
         setErrorMessage('');
         setShowCreateModal(true);
     };
@@ -176,9 +193,33 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setNotes(inv.notes || '');
         setLineItems(inv.items || []);
         setSameAsBilling(false);
+        const invTotal = Number(inv.total || inv.grandTotal || 0);
+        const cashAmt = Number(inv.cashAmount || 0);
+        const totalSales = inv.totalSalesValue !== undefined ? Number(inv.totalSalesValue) : (invTotal + cashAmt);
+        const formalAmt = inv.formalInvoiceAmount !== undefined ? Number(inv.formalInvoiceAmount) : invTotal;
+        setTotalSalesValueInput(totalSales);
+        setFormalInvoiceAmountInput(formalAmt);
+        setCashAmountInput(cashAmt);
         setErrorMessage('');
         setShowCreateModal(true);
     };
+
+    useEffect(() => {
+        if (!showCreateModal) return;
+        const computed = lineItems.reduce((acc, it) => {
+            const sub = (Number(it.rate) || 0) * (Number(it.qty) || 1);
+            const disc = (sub * (Number(it.discount || it.discountPercent) || 0)) / 100;
+            const taxable = sub - disc;
+            const tax = (taxable * (Number(it.tax !== undefined ? it.tax : it.taxRate) || 18)) / 100;
+            return acc + taxable + tax;
+        }, 0);
+        const rounded = Math.round(computed * 100) / 100;
+        if (totalSalesValueInput === 0 && rounded > 0 && !editingDraftTarget) {
+            setTotalSalesValueInput(rounded);
+            setFormalInvoiceAmountInput(rounded);
+            setCashAmountInput(0);
+        }
+    }, [lineItems, showCreateModal, editingDraftTarget, totalSalesValueInput]);
 
     const handleSaveInvoice = (statusTarget) => {
         const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
@@ -228,6 +269,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         }
 
         const grandTotal = Math.round((taxableAmount + cgst + sgst + igst) * 100) / 100;
+        const totalSales = totalSalesValueInput > 0 ? totalSalesValueInput : grandTotal;
+        const formalInvoice = formalInvoiceAmountInput > 0 ? formalInvoiceAmountInput : grandTotal;
+        const cashAmt = cashAmountInput;
+
+        if (formalInvoice + cashAmt > totalSales + 0.01) {
+            setErrorMessage('Formal Invoice + Cash Receipt cannot exceed Total Sales Value.');
+            return;
+        }
+
         const effectiveShipAddress = sameAsBilling ? billingAddress : shippingAddress;
 
         // Check if Delivery Challan exists for linked SO
@@ -252,8 +302,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 cgst,
                 sgst,
                 igst,
-                total: grandTotal,
-                grandTotal,
+                total: formalInvoice,
+                grandTotal: formalInvoice,
+                totalSalesValue: totalSales,
+                formalInvoiceAmount: formalInvoice,
+                cashAmount: cashAmt,
                 notes,
             });
             setShowCreateModal(false);
@@ -286,12 +339,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             sgst,
             igst,
             tax: totalTax,
-            total: grandTotal,
-            grandTotal,
-            amount: grandTotal,
-            paidAmount: isPaid ? grandTotal : 0,
-            amountPaid: isPaid ? grandTotal : 0,
-            balanceDue: isPaid ? 0 : grandTotal,
+            total: formalInvoice,
+            grandTotal: formalInvoice,
+            amount: formalInvoice,
+            paidAmount: isPaid ? formalInvoice : 0,
+            amountPaid: isPaid ? formalInvoice : 0,
+            balanceDue: isPaid ? 0 : formalInvoice,
+            totalSalesValue: totalSales,
+            formalInvoiceAmount: formalInvoice,
+            cashAmount: cashAmt,
             notes,
             dispatchedViaChallan: hasChallan,
         };
@@ -304,7 +360,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 invoiceId: created.id,
                 invoiceNumber: created.invoiceNumber,
                 amount: created.total,
-                mode: 'Bank Transfer',
+                mode: 'Bank',
                 reference: `SETTLE-${created.invoiceNumber}`,
             });
         }
@@ -342,6 +398,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         e.preventDefault();
         if (!showPaymentModal || payAmount <= 0) return;
         addPaymentIn({
+            paymentType: 'WITH_BILL',
             customerId: showPaymentModal.customerId,
             customer: showPaymentModal.customer,
             invoiceId: showPaymentModal.id,
@@ -384,6 +441,72 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         setErrorMessage('');
         if (selectedInvoice && selectedInvoice.id === cancelModalTarget.id) {
             setSelectedInvoice((prev) => ({ ...prev, status: 'Cancelled' }));
+        }
+    };
+
+    const handleOpenAllocationModal = (inv) => {
+        const invOut = getInvoiceOutstanding(inv.id);
+        const total = Number(inv.totalSalesValue || invOut.totalSalesValue || inv.total || 0);
+        const formal = Number(inv.formalInvoiceAmount || invOut.formalInvoiceAmount || inv.total || 0);
+        const cash = Number(inv.cashAmount !== undefined ? inv.cashAmount : (invOut.cashAmount || 0));
+
+        setAllocationModalInvoice(inv);
+        setAllocModalTotal(total);
+        setAllocModalFormal(formal);
+        setAllocModalCash(cash);
+        setAllocModalReason('');
+        setErrorMessage('');
+    };
+
+    const handleSaveAllocation = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (!allocationModalInvoice) return;
+
+        const formal = Math.round(Number(allocModalFormal) * 100) / 100;
+        const cash = Math.round(Number(allocModalCash) * 100) / 100;
+        const total = Math.round(Number(allocModalTotal) * 100) / 100;
+
+        if (formal + cash > total + 0.01) {
+            setErrorMessage('Formal Invoice + Cash Receipt cannot exceed Total Sales Value.');
+            return;
+        }
+
+        if (formal <= 0) {
+            setErrorMessage('Formal Invoice amount must be greater than zero.');
+            return;
+        }
+
+        if (allocationModalInvoice.finalized && !allocModalReason.trim()) {
+            setErrorMessage('A reason is required when adjusting allocation for a finalized commercial invoice.');
+            return;
+        }
+
+        setAllocSubmitting(true);
+        setErrorMessage('');
+        try {
+            const updated = await updateSalesAllocation(allocationModalInvoice.id, {
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+                totalSalesValue: total,
+                reason: allocModalReason.trim() || 'Manual allocation split adjustment',
+            });
+
+            if (selectedInvoice && selectedInvoice.id === allocationModalInvoice.id) {
+                setSelectedInvoice((prev) => ({
+                    ...prev,
+                    totalSalesValue: total,
+                    formalInvoiceAmount: formal,
+                    cashAmount: cash,
+                    total: formal,
+                    revisions: updated?.revisions || prev.revisions,
+                }));
+            }
+            setAllocationModalInvoice(null);
+        } catch (err) {
+            console.error('Failed to update allocation split:', err);
+            setErrorMessage(err.message || 'Failed to update allocation split.');
+        } finally {
+            setAllocSubmitting(false);
         }
     };
 
@@ -632,6 +755,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                     <button onClick={() => setSelectedInvoice(inv)} className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer" title="View Invoice">
                                                         <Eye className="w-4 h-4"/>
                                                     </button>
+                                                    {inv.status !== 'Cancelled' && (
+                                                        <button onClick={() => handleOpenAllocationModal(inv)} className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer" title="Adjust Allocation Split">
+                                                            <SlidersHorizontal className="w-4 h-4"/>
+                                                        </button>
+                                                    )}
                                                     
                                                     {isDraft ? (
                                                         <>
@@ -867,6 +995,115 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 <LineItemEditor items={lineItems} onChange={setLineItems} type="sales"/>
                             </div>
 
+                            {/* Sales Value & Cash Allocation Split */}
+                            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                                        <Receipt size={14} className="text-indigo-600"/> Sales Value & Cash Allocation Split
+                                    </h4>
+                                    <span className="text-[10px] text-slate-500 font-mono">
+                                        Formal Invoice + Cash Receipt ≤ Total Sales Value
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 text-xs">
+                                    <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                                        <label className="font-semibold text-slate-700 block text-[11px] mb-1">
+                                            Total Sales Value
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={totalSalesValueInput}
+                                            onChange={(e) => {
+                                                const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                                setTotalSalesValueInput(val);
+                                                const newFormal = Math.min(formalInvoiceAmountInput, val);
+                                                setFormalInvoiceAmountInput(newFormal);
+                                                setCashAmountInput(Math.max(0, val - newFormal));
+                                                setErrorMessage('');
+                                            }}
+                                            className="w-full font-mono font-bold text-slate-900 border border-slate-300 rounded px-2 py-1 text-xs"
+                                        />
+                                        <span className="text-[9px] text-slate-400 block mt-0.5">Total commercial value</span>
+                                    </div>
+
+                                    <div className="bg-blue-50/50 p-2.5 rounded-lg border border-blue-200">
+                                        <label className="font-semibold text-blue-900 block text-[11px] mb-1">
+                                            Formal Invoice Amount
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={formalInvoiceAmountInput}
+                                            onChange={(e) => {
+                                                const formal = Math.max(0, parseFloat(e.target.value) || 0);
+                                                setFormalInvoiceAmountInput(formal);
+                                                const cash = Math.max(0, totalSalesValueInput - formal);
+                                                setCashAmountInput(cash);
+                                                setErrorMessage('');
+                                            }}
+                                            className="w-full font-mono font-bold text-blue-950 border border-blue-300 rounded px-2 py-1 text-xs bg-white"
+                                        />
+                                        <span className="text-[9px] text-blue-600 block mt-0.5">Tax Invoice (line rates scale)</span>
+                                    </div>
+
+                                    <div className="bg-amber-50/50 p-2.5 rounded-lg border border-amber-200">
+                                        <label className="font-semibold text-amber-900 block text-[11px] mb-1">
+                                            Cash Receipt Amount
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            value={cashAmountInput}
+                                            onChange={(e) => {
+                                                const cash = Math.max(0, parseFloat(e.target.value) || 0);
+                                                setCashAmountInput(cash);
+                                                const formal = Math.max(0, totalSalesValueInput - cash);
+                                                setFormalInvoiceAmountInput(formal);
+                                                setErrorMessage('');
+                                            }}
+                                            className="w-full font-mono font-bold text-amber-950 border border-amber-300 rounded px-2 py-1 text-xs bg-white"
+                                        />
+                                        <span className="text-[9px] text-amber-600 block mt-0.5">Unbilled cash receipt</span>
+                                    </div>
+
+                                    <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                                        <span className="font-semibold text-slate-600 block text-[11px] mb-1">Total Allocated</span>
+                                        <div className="font-mono font-bold text-slate-800 text-xs py-1">
+                                            {formatCurrency(formalInvoiceAmountInput + cashAmountInput)}
+                                        </div>
+                                        <span className="text-[9px] text-slate-400 block mt-0.5">Formal + Cash</span>
+                                    </div>
+
+                                    <div className={`p-2.5 rounded-lg border ${
+                                        (totalSalesValueInput - (formalInvoiceAmountInput + cashAmountInput)) < -0.01
+                                            ? 'bg-rose-50 border-rose-200 text-rose-700'
+                                            : 'bg-emerald-50/60 border-emerald-200 text-emerald-800'
+                                    }`}>
+                                        <span className="font-semibold block text-[11px] mb-1">Remaining</span>
+                                        <div className="font-mono font-bold text-xs py-1">
+                                            {formatCurrency(Math.max(0, totalSalesValueInput - (formalInvoiceAmountInput + cashAmountInput)))}
+                                        </div>
+                                        <span className="text-[9px] block mt-0.5">
+                                            {(totalSalesValueInput - (formalInvoiceAmountInput + cashAmountInput)) < -0.01
+                                                ? 'Exceeds Total Sales Value!'
+                                                : 'Unallocated balance'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {errorMessage && (
+                                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2">
+                                    <AlertCircle size={14} className="shrink-0" />
+                                    <span>{errorMessage}</span>
+                                </div>
+                            )}
+
                             {/* Notes */}
                             <div>
                                 <label className="text-xs font-semibold text-slate-800 block mb-1.5">
@@ -968,11 +1205,177 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 </div>
                                 <LineItemEditor items={selectedInvoice.items || []} onChange={() => { }} readOnly={true}/>
                             </div>
+
+                            {/* BILL PAYMENT & ALLOCATION SUMMARY CARD */}
+                            {(() => {
+                                const invOut = getInvoiceOutstanding(selectedInvoice.id);
+                                return (
+                                    <div className="space-y-4">
+                                        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Receipt className="w-4 h-4 text-emerald-600" />
+                                                    <h4 className="font-bold text-slate-800 uppercase tracking-wider text-xs">
+                                                        Sales Allocation & Bill Settlement Summary
+                                                    </h4>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    {selectedInvoice.status !== 'Cancelled' && (
+                                                        <button
+                                                            onClick={() => {
+                                                                const currentTotal = selectedInvoice.totalSalesValue !== undefined
+                                                                    ? Number(selectedInvoice.totalSalesValue)
+                                                                    : (Number(selectedInvoice.total) + Number(selectedInvoice.cashAmount || 0));
+                                                                const currentFormal = selectedInvoice.formalInvoiceAmount !== undefined
+                                                                    ? Number(selectedInvoice.formalInvoiceAmount)
+                                                                    : Number(selectedInvoice.total);
+                                                                const currentCash = Number(selectedInvoice.cashAmount || 0);
+
+                                                                setAllocModalTotal(currentTotal);
+                                                                setAllocModalFormal(currentFormal);
+                                                                setAllocModalCash(currentCash);
+                                                                setAllocModalReason('');
+                                                                setAllocationModalInvoice(selectedInvoice);
+                                                            }}
+                                                            className="px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                                        >
+                                                            <Edit className="w-3 h-3" /> Adjust Split
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Row 1: Sales Value Allocation Split */}
+                                            <div className="bg-white p-3 rounded-lg border border-slate-200">
+                                                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 mb-2 flex items-center justify-between">
+                                                    <span>Sales Value & Cash Allocation Split</span>
+                                                    <span className="font-mono text-slate-400 normal-case">Formula: Total Sales = Formal Tax Invoice + Cash Receipt</span>
+                                                </div>
+                                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                                                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                                        <span className="text-[10px] text-slate-500 font-semibold uppercase block truncate">Total Sales Value</span>
+                                                        <strong className="font-mono text-slate-900 block">{formatCurrency(invOut.totalSalesValue)}</strong>
+                                                    </div>
+                                                    <div className="bg-blue-50/70 p-2 rounded border border-blue-200">
+                                                        <span className="text-[10px] text-blue-700 font-semibold uppercase block truncate">Formal Invoice</span>
+                                                        <strong className="font-mono text-blue-900 block">{formatCurrency(invOut.formalInvoiceAmount)}</strong>
+                                                        <span className="text-[9px] text-blue-600 block">(Tax Invoice)</span>
+                                                    </div>
+                                                    <div className="bg-amber-50/70 p-2 rounded border border-amber-200">
+                                                        <span className="text-[10px] text-amber-800 font-semibold uppercase block truncate">Cash Receipt</span>
+                                                        <strong className="font-mono text-amber-900 block">{formatCurrency(invOut.cashAmount)}</strong>
+                                                        <span className="text-[9px] text-amber-600 block">(Unbilled Cash)</span>
+                                                    </div>
+                                                    <div className="bg-slate-50 p-2 rounded border border-slate-200">
+                                                        <span className="text-[10px] text-slate-500 font-semibold uppercase block truncate">Total Allocated</span>
+                                                        <strong className="font-mono text-slate-800 block">{formatCurrency(invOut.totalAllocated)}</strong>
+                                                        <span className="text-[9px] text-slate-500 block">(Formal + Cash)</span>
+                                                    </div>
+                                                    <div className="bg-emerald-50/70 p-2 rounded border border-emerald-200">
+                                                        <span className="text-[10px] text-emerald-800 font-semibold uppercase block truncate">Remaining</span>
+                                                        <strong className="font-mono text-emerald-900 block">{formatCurrency(invOut.remaining)}</strong>
+                                                        <span className="text-[9px] text-emerald-700 block">(Unallocated)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Row 2: Bill Payment & Receivables Status */}
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                                <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                                                    <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">Taxable Value</span>
+                                                    <strong className="font-mono text-slate-700 text-xs block">{formatCurrency(invOut.taxableAmount)}</strong>
+                                                </div>
+                                                <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                                                    <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">Total GST</span>
+                                                    <strong className="font-mono text-slate-700 text-xs block">{formatCurrency(invOut.gst)}</strong>
+                                                </div>
+                                                <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200">
+                                                    <span className="text-[10px] text-emerald-700 uppercase font-semibold block truncate">Paid Against Invoice</span>
+                                                    <strong className="font-mono text-emerald-700 text-xs block">{formatCurrency(invOut.paidAgainstInvoice)}</strong>
+                                                    <span className="text-[9px] text-emerald-600 block">(With-Bill Settled)</span>
+                                                </div>
+                                                <div className={`p-2.5 rounded-lg border ${invOut.outstanding > 0.01 ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                                                    <span className={`text-[10px] uppercase font-bold block truncate ${invOut.outstanding > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>Invoice Outstanding</span>
+                                                    <strong className={`font-mono text-xs block font-extrabold ${invOut.outstanding > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                                        {formatCurrency(invOut.outstanding)}
+                                                    </strong>
+                                                    <span className={`text-[9px] block ${invOut.outstanding > 0.01 ? 'text-rose-600 font-semibold' : 'text-emerald-600'}`}>
+                                                        {invOut.outstanding > 0.01 ? 'Balance Due' : 'Fully Settled'}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <p className="text-[11px] text-slate-500 italic">
+                                                * Note: Without-Bill Cash is tracked under Cash Receipts and credits customer AR balance in ledger, but does not satisfy formal Tax Invoice liability.
+                                            </p>
+                                        </div>
+
+                                        {/* REVISION HISTORY CARD */}
+                                        {selectedInvoice.revisions && selectedInvoice.revisions.length > 0 && (
+                                            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                                                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Clock className="w-4 h-4 text-blue-600" />
+                                                        <h4 className="font-bold text-slate-800 uppercase tracking-wider text-xs">
+                                                            Allocation Revision History ({selectedInvoice.revisions.length})
+                                                        </h4>
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-500 font-semibold">
+                                                        Permanent Audit Trail
+                                                    </span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-xs">
+                                                        <thead>
+                                                            <tr className="border-b border-slate-200 text-[10px] uppercase text-slate-500 font-semibold">
+                                                                <th className="py-1.5 px-2">Rev #</th>
+                                                                <th className="py-1.5 px-2">Date & Time</th>
+                                                                <th className="py-1.5 px-2">Invoice Amount</th>
+                                                                <th className="py-1.5 px-2">Cash Receipt</th>
+                                                                <th className="py-1.5 px-2">Difference</th>
+                                                                <th className="py-1.5 px-2">Reason</th>
+                                                                <th className="py-1.5 px-2">Changed By</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-slate-100">
+                                                            {selectedInvoice.revisions.map((rev) => (
+                                                                <tr key={rev.id || rev.revisionNumber} className="hover:bg-white/80">
+                                                                    <td className="py-2 px-2 font-mono font-bold text-slate-800">#{rev.revisionNumber}</td>
+                                                                    <td className="py-2 px-2 text-slate-600">{new Date(rev.createdAt).toLocaleString()}</td>
+                                                                    <td className="py-2 px-2 font-mono">
+                                                                        <span className="line-through text-slate-400 mr-1">{formatCurrency(rev.oldInvoiceAmount)}</span>
+                                                                        <span className="font-bold text-slate-800">→ {formatCurrency(rev.newInvoiceAmount)}</span>
+                                                                    </td>
+                                                                    <td className="py-2 px-2 font-mono">
+                                                                        <span className="line-through text-slate-400 mr-1">{formatCurrency(rev.oldCashAmount)}</span>
+                                                                        <span className="font-bold text-amber-700">→ {formatCurrency(rev.newCashAmount)}</span>
+                                                                    </td>
+                                                                    <td className={`py-2 px-2 font-mono font-bold ${Number(rev.difference) < 0 ? 'text-rose-600' : Number(rev.difference) > 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
+                                                                        {Number(rev.difference) > 0 ? `+${formatCurrency(rev.difference)}` : formatCurrency(rev.difference)}
+                                                                    </td>
+                                                                    <td className="py-2 px-2 text-slate-700 max-w-xs truncate" title={rev.reason}>{rev.reason || '—'}</td>
+                                                                    <td className="py-2 px-2 text-slate-500">{rev.changedByName || rev.changedBy || 'System'}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
-                            <div className="font-mono text-xs">
-                                Total: <strong className="text-slate-900">{formatCurrency(selectedInvoice.total)}</strong> | Paid: <strong className="text-emerald-700">{formatCurrency(selectedInvoice.paidAmount || 0)}</strong>
+                            <div className="font-mono text-xs flex flex-wrap items-center gap-2 sm:gap-3">
+                                <span>Total: <strong className="text-slate-900">{formatCurrency(selectedInvoice.total)}</strong></span>
+                                <span className="text-slate-300">|</span>
+                                <span>With-Bill Paid: <strong className="text-emerald-700">{formatCurrency(getInvoiceOutstanding(selectedInvoice.id).paidAgainstInvoice)}</strong></span>
+                                <span className="text-slate-300">|</span>
+                                <span>Cash: <strong className="text-amber-700">{formatCurrency(getInvoiceOutstanding(selectedInvoice.id).withoutBillCash)}</strong></span>
+                                <span className="text-slate-300">|</span>
+                                <span>Due: <strong className="text-rose-700">{formatCurrency(getInvoiceOutstanding(selectedInvoice.id).outstanding)}</strong></span>
                             </div>
                             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                                 {(!selectedInvoice.finalized || selectedInvoice.status === 'Draft') && (
@@ -996,6 +1399,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             <Check size={12}/> Finalize Invoice
                                         </button>
                                     </>
+                                )}
+
+                                {selectedInvoice.status !== 'Cancelled' && (
+                                    <button
+                                        onClick={() => handleOpenAllocationModal(selectedInvoice)}
+                                        className="px-3.5 py-1.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                                    >
+                                        <SlidersHorizontal size={12}/> Adjust Allocation Split
+                                    </button>
                                 )}
 
                                 {selectedInvoice.status !== 'Cancelled' && (
@@ -1134,8 +1546,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     <span className="font-mono font-bold text-slate-900">{formatCurrency(showPaymentModal.total)}</span>
                                 </div>
                                 <div className="flex justify-between text-rose-600 font-semibold border-t border-slate-200 pt-1">
-                                    <span>Balance Due:</span>
-                                    <span className="font-mono">{formatCurrency(getInvoiceOutstanding(showPaymentModal.id).balanceDue)}</span>
+                                    <span>Invoice Outstanding:</span>
+                                    <span className="font-mono font-bold">{formatCurrency(getInvoiceOutstanding(showPaymentModal.id).balanceDue)}</span>
                                 </div>
                             </div>
 
@@ -1187,6 +1599,203 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* Official Printable Commercial Tax Invoice Document */}
             <PrintInvoiceModal isOpen={Boolean(printInvoiceTarget)} onClose={() => setPrintInvoiceTarget(null)} invoice={printInvoiceTarget} balanceDue={printInvoiceTarget ? getInvoiceOutstanding(printInvoiceTarget.id).balanceDue : 0}/>
+
+            {/* ADJUST ALLOCATION SPLIT MODAL */}
+            {allocationModalInvoice && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-4 sm:p-6 text-xs flex flex-col max-h-[95vh] overflow-y-auto">
+                        <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                            <div className="flex items-center gap-2">
+                                <SlidersHorizontal className="w-5 h-5 text-indigo-600"/>
+                                <div>
+                                    <h3 className="font-bold text-base text-[#1F2E4A]">Adjust Allocation Split</h3>
+                                    <p className="text-[11px] text-slate-500 font-mono">
+                                        {allocationModalInvoice.invoiceNumber} • {allocationModalInvoice.customer}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => { setAllocationModalInvoice(null); setErrorMessage(''); }}
+                                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+                            >
+                                <X size={18}/>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSaveAllocation} className="py-4 space-y-4">
+                            {/* Notice banner for finalized vs draft */}
+                            {allocationModalInvoice.finalized ? (
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+                                    <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                                        <AlertCircle size={15} className="shrink-0 text-amber-600"/>
+                                        <span>Finalized Commercial Invoice Notice</span>
+                                    </div>
+                                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                                        This invoice is finalized. Modifying the formal invoice amount will automatically issue an adjusting <strong>Credit Note</strong> (if reducing) or <strong>Debit Adjustment</strong> (if increasing), update the unbilled cash receipt, and preserve a permanent audit revision record.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1.5">
+                                    <div className="flex items-center gap-2 text-blue-900 font-bold text-xs">
+                                        <CheckCircle2 size={15} className="shrink-0 text-blue-600"/>
+                                        <span>Draft Invoice Recalculation</span>
+                                    </div>
+                                    <p className="text-[11px] text-blue-800 leading-relaxed">
+                                        Line item rates will be proportionally scaled to match the new formal invoice amount while keeping the original catalog prices safely preserved.
+                                    </p>
+                                </div>
+                            )}
+
+                            {errorMessage && (
+                                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2">
+                                    <AlertCircle size={16} className="shrink-0 text-rose-600"/>
+                                    <span>{errorMessage}</span>
+                                </div>
+                            )}
+
+                            {/* Input fields */}
+                            <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="font-bold text-slate-700">Total Sales Value (₹)</label>
+                                        <span className="text-[10px] text-slate-500 font-medium">Formal + Cash ceiling</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="1"
+                                        value={allocModalTotal}
+                                        onChange={(e) => {
+                                            const val = Number(e.target.value) || 0;
+                                            setAllocModalTotal(val);
+                                            if (allocModalFormal <= val) {
+                                                setAllocModalCash(Math.max(0, Math.round((val - allocModalFormal) * 100) / 100));
+                                            } else {
+                                                setAllocModalFormal(val);
+                                                setAllocModalCash(0);
+                                            }
+                                        }}
+                                        className="w-full p-2 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 text-sm"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="font-bold text-blue-800">Formal Tax Invoice (₹)</label>
+                                            <span className="text-[10px] text-blue-600 font-medium">Billed with GST</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0.01"
+                                            max={allocModalTotal}
+                                            value={allocModalFormal}
+                                            onChange={(e) => {
+                                                const val = Number(e.target.value) || 0;
+                                                setAllocModalFormal(val);
+                                                setAllocModalCash(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                                            }}
+                                            className="w-full p-2 border border-blue-300 rounded-lg bg-white font-mono font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 text-sm"
+                                            required
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <label className="font-bold text-amber-800">Cash Receipt (₹)</label>
+                                            <span className="text-[10px] text-amber-600 font-medium">Without-Bill Cash</span>
+                                        </div>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            max={allocModalTotal}
+                                            value={allocModalCash}
+                                            onChange={(e) => {
+                                                const val = Number(e.target.value) || 0;
+                                                setAllocModalCash(val);
+                                                setAllocModalFormal(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                                            }}
+                                            className="w-full p-2 border border-amber-300 rounded-lg bg-white font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 text-sm"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Live Balance / Split Validation Status */}
+                                {(() => {
+                                    const sum = Math.round((Number(allocModalFormal) + Number(allocModalCash)) * 100) / 100;
+                                    const diff = Math.round((Number(allocModalTotal) - sum) * 100) / 100;
+                                    const isBalanced = Math.abs(diff) < 0.01;
+                                    const isExceeded = diff < -0.01;
+
+                                    if (isExceeded) {
+                                        return (
+                                            <div className="p-2 rounded bg-rose-50 border border-rose-200 text-rose-800 font-mono text-[11px] flex items-center justify-between">
+                                                <span className="font-bold flex items-center gap-1"><AlertCircle size={13}/> Over-allocated!</span>
+                                                <span>Exceeds Sales Value by {formatCurrency(Math.abs(diff))}</span>
+                                            </div>
+                                        );
+                                    }
+                                    if (isBalanced) {
+                                        return (
+                                            <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono text-[11px] flex items-center justify-between">
+                                                <span className="font-bold flex items-center gap-1"><CheckCircle2 size={13}/> Perfectly Balanced</span>
+                                                <span>{formatCurrency(allocModalFormal)} + {formatCurrency(allocModalCash)} = {formatCurrency(allocModalTotal)}</span>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-800 font-mono text-[11px] flex items-center justify-between">
+                                            <span className="font-semibold">Unallocated Remaining:</span>
+                                            <span className="font-bold">{formatCurrency(diff)}</span>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+
+                            {/* Reason field (mandatory if finalized) */}
+                            <div>
+                                <div className="flex justify-between items-center mb-1">
+                                    <label className="font-bold text-slate-700">
+                                        Reason for Split Adjustment {allocationModalInvoice.finalized && <span className="text-rose-600">*</span>}
+                                    </label>
+                                    <span className="text-[10px] text-slate-400">Logged in revision history</span>
+                                </div>
+                                <textarea
+                                    rows={2}
+                                    value={allocModalReason}
+                                    onChange={(e) => setAllocModalReason(e.target.value)}
+                                    placeholder={allocationModalInvoice.finalized ? "Required: e.g., Customer requested ₹20,000 cash receipt and ₹80,000 tax invoice" : "Optional notes for this revision..."}
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                                    required={allocationModalInvoice.finalized}
+                                />
+                            </div>
+
+                            {/* Footer Buttons */}
+                            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                                <Button variant="outline" type="button" onClick={() => { setAllocationModalInvoice(null); setErrorMessage(''); }} disabled={allocSubmitting}>
+                                    Cancel
+                                </Button>
+                                <button
+                                    type="submit"
+                                    disabled={allocSubmitting || (allocModalFormal + allocModalCash > allocModalTotal + 0.01) || allocModalFormal <= 0}
+                                    className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-sm cursor-pointer flex items-center gap-1.5"
+                                >
+                                    {allocSubmitting ? (
+                                        <>Updating Split...</>
+                                    ) : (
+                                        <>
+                                            <Check size={14}/> Apply Allocation Split
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

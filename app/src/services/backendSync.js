@@ -347,7 +347,26 @@ export const RESOURCES = {
   // Sales pipeline (api.md §5)
   estimates: documentResource('/sales/estimates/', { numberField: 'estimateNumber' }),
   quotations: documentResource('/sales/quotations/', { numberField: 'quotationNumber' }),
-  salesOrders: documentResource('/sales/orders/', { numberField: 'orderNumber' }),
+  salesOrders: (() => {
+    const base = documentResource('/sales/orders/', { numberField: 'orderNumber' });
+    return {
+      ...base,
+      toApi: (doc) => compact({
+        ...base.toApi(doc),
+        totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
+        formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
+        cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        totalSalesValue: row.totalSalesValue !== undefined ? num(row.totalSalesValue) : undefined,
+        formalInvoiceAmount: row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined,
+        cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : undefined,
+        invoice: row.invoice,
+        cashReceipt: row.cashReceipt,
+      }),
+    };
+  })(),
   proformaInvoices: documentResource('/sales/proforma-invoices/', { numberField: 'piNumber' }),
   deliveryChallans: documentResource('/sales/challans/', { numberField: 'challanNumber' }),
   invoices: (() => {
@@ -357,13 +376,49 @@ export const RESOURCES = {
       // api.md §5.7: an invoice posts as a Draft unless the create says
       // otherwise. The UI decides that up front, so carry the flag through —
       // finalizing is what allocates the number and posts stock and ledger.
-      toApi: (doc) => ({
+      toApi: (doc) => compact({
         ...base.toApi(doc),
+        salesOrderId: doc.salesOrderId || doc.salesOrder || undefined,
+        deliveryChallanId: doc.deliveryChallanId || doc.deliveryChallan || undefined,
+        proformaInvoiceId: doc.proformaInvoiceId || doc.proformaInvoice || undefined,
+        totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
+        formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
+        cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
         finalize: doc.finalized === true || (doc.status && doc.status !== 'Draft'),
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        salesOrderId: row.salesOrderId,
+        deliveryChallanId: row.deliveryChallanId,
+        proformaInvoiceId: row.proformaInvoiceId,
+        totalSalesValue: row.totalSalesValue !== undefined ? num(row.totalSalesValue) : undefined,
+        formalInvoiceAmount: row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined,
+        cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : 0,
+        totalAllocated: row.totalAllocated !== undefined ? num(row.totalAllocated) : undefined,
+        remainingAmount: row.remainingAmount !== undefined ? num(row.remainingAmount) : 0,
+        revisions: row.revisions || [],
+        cashReceipt: row.cashReceipt || null,
       }),
     };
   })(),
-  salesReturns: documentResource('/sales/returns/', { numberField: 'returnNumber' }),
+  salesReturns: (() => {
+    const base = documentResource('/sales/returns/', { numberField: 'returnNumber' });
+    return {
+      ...base,
+      toApi: (r) => compact({
+        ...base.toApi(r),
+        salesInvoiceId: r.salesInvoiceId || r.invoiceId || r.invoice_id || undefined,
+        reason: r.reason || undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        creditNoteNumber: row.credit_note_number || row.creditNoteNumber,
+        invoiceId: row.salesInvoiceId || row.sales_invoice,
+        salesInvoiceId: row.salesInvoiceId || row.sales_invoice,
+        reason: row.reason,
+      }),
+    };
+  })(),
   warranties: {
     path: '/sales/warranties/',
     toApi: (w) => compact({
@@ -431,21 +486,59 @@ export const RESOURCES = {
 
   paymentIns: {
     path: '/sales/payments/',
-    toApi: (p) => compact({
-      customerId: p.customerId || p.partyId,
-      date: isoOut(p.date) || isoOut('Today'),
-      amount: num(p.amount),
-      mode: p.mode || 'Bank Transfer',
-      bankAccountId: p.bankAccountId || undefined,
-      referenceNumber: p.reference || p.referenceNumber || undefined,
-      notes: p.notes || undefined,
-      invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
+    toApi: (p) => {
+      let mode = p.mode || 'Cash';
+      const mLow = String(mode).toLowerCase();
+      if (mLow.includes('wire') || mLow.includes('bank') || mLow.includes('transfer')) mode = 'Bank';
+      else if (mLow.includes('upi')) mode = 'UPI';
+      else if (mLow.includes('cheque') || mLow.includes('check')) mode = 'Cheque';
+      else if (mLow.includes('card')) mode = 'Card';
+      else if (mLow.includes('cash')) mode = 'Cash';
+
+      return compact({
+        customerId: p.customerId || p.partyId,
+        date: isoOut(p.date) || isoOut('Today'),
+        amount: num(p.amount),
+        mode,
+        paymentType: p.paymentType || 'WITH_BILL',
+        bankAccountId: p.bankAccountId || undefined,
+        referenceNumber: p.reference || p.referenceNumber || undefined,
+        description: p.description || undefined,
+        notes: p.notes || undefined,
+        invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
+        salesOrderId: p.salesOrderId || p.linkedSalesOrderId || undefined,
+      });
+    },
+    fromApi: (row) => ({
+      ...row,
+      date: displayIn(row.date),
+      customer: row.customerName,
+      reference: row.referenceNumber,
+      paymentType: row.paymentType || 'WITH_BILL',
+      invoiceId: row.invoiceId,
+      salesOrderId: row.salesOrderId,
+      salesOrderNumber: row.salesOrderNumber,
+      _synced: true,
+    }),
+  },
+  cashPaymentReceipts: {
+    path: '/sales/cash-receipts/',
+    toApi: (r) => compact({
+      customerId: r.customerId || r.partyId,
+      date: isoOut(r.date) || isoOut('Today'),
+      amount: num(r.amount),
+      paymentMode: r.paymentMode || r.mode || 'Cash',
+      referenceNumber: r.referenceNumber || r.reference || undefined,
+      description: r.description || undefined,
+      notes: r.notes || undefined,
+      invoiceId: r.invoiceId || undefined,
     }),
     fromApi: (row) => ({
       ...row,
       date: displayIn(row.date),
       customer: row.customerName,
       reference: row.referenceNumber,
+      paymentMode: row.paymentMode || 'Cash',
       _synced: true,
     }),
   },
@@ -605,7 +698,7 @@ export const PULL_ORDER = [
   'categories', 'units', 'locations', 'items',
   'parties', 'customers', 'vendors',
   'estimates', 'quotations', 'salesOrders', 'proformaInvoices',
-  'deliveryChallans', 'invoices', 'paymentIns', 'salesReturns', 'warranties',
+  'deliveryChallans', 'invoices', 'paymentIns', 'cashPaymentReceipts', 'salesReturns', 'warranties',
   'purchaseOrders', 'purchaseBills', 'paymentOuts', 'purchaseReturns', 'expenses',
   'transfers', 'serviceUsages', 'valuationItems', 'monthEndAudits',
   'inventoryMovements', 'faultyParts', 'zoneRequests',
@@ -725,6 +818,13 @@ export async function pushDelete(key, id) {
   if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
   await api.delete(`${resource.path}${id}/`);
   return true;
+}
+
+export async function pushAction(key, id, action, data = {}) {
+  const resource = RESOURCES[key];
+  if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
+  const body = await api.post(`${resource.path}${id}/${action}/`, data);
+  return resource.fromApi ? resource.fromApi(body) : body;
 }
 
 /**

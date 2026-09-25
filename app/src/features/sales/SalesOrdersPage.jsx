@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban, Layers } from 'lucide-react';
+import { Plus, ShoppingCart, CheckCircle, Truck, Receipt, X, ShieldAlert, Copy, Printer, DollarSign, Clock, CheckCircle2, Maximize2, Minimize2, FileSpreadsheet, Ban, Layers, SlidersHorizontal, Eye, AlertCircle, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -12,6 +12,7 @@ import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCa
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderModal';
+import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 import { usePmsStore } from '../../stores/pmsStore';
 import { CreateProjectModal } from '../pms/projects/components/CreateProjectModal';
 const salesOrderGuide = {
@@ -34,7 +35,7 @@ const salesOrderGuide = {
 };
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { salesOrders, customers, addSalesOrder, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
+    const { salesOrders, customers, addSalesOrder, updateSalesOrderAllocation, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
     const pmsProjects = usePmsStore((s) => s.projects || []);
     const [pmsModalOrder, setPmsModalOrder] = useState(null);
     const [stageFilter, setStageFilter] = useState('All');
@@ -53,10 +54,124 @@ export const SalesOrdersPage = () => {
     const creditLimit = selectedCustomer?.creditLimit || 50000;
     const isCreditExceeded = selectedCustomer ? (selectedCustomer.balance + totalAmt) > creditLimit : false;
 
+    // Two sections: Invoice & Cash Receipt split
+    const [totalSalesValueInput, setTotalSalesValueInput] = useState(0);
+    const [formalInvoiceAmountInput, setFormalInvoiceAmountInput] = useState(0);
+    const [cashAmountInput, setCashAmountInput] = useState(0);
+    const [autoBalanceSplit, setAutoBalanceSplit] = useState(true);
+    const [createInvoiceNow, setCreateInvoiceNow] = useState(true);
+    const [invoiceStatusInput, setInvoiceStatusInput] = useState('Draft');
+    const [invoiceDueDateInput, setInvoiceDueDateInput] = useState(() => addDaysISO(getCurrentISODate(), 30));
+    const [createCashReceiptNow, setCreateCashReceiptNow] = useState(true);
+    const [cashModeInput, setCashModeInput] = useState('Cash');
+    const [cashRefInput, setCashRefInput] = useState('');
+    const [activeReceipt, setActiveReceipt] = useState(null);
+
+    // Allocation adjustment modal for existing Sales Order
+    const [allocationModalOrder, setAllocationModalOrder] = useState(null);
+    const [allocModalFormal, setAllocModalFormal] = useState(0);
+    const [allocModalCash, setAllocModalCash] = useState(0);
+    const [allocModalTotal, setAllocModalTotal] = useState(0);
+    const [allocModalReason, setAllocModalReason] = useState('');
+    const [allocSubmitting, setAllocSubmitting] = useState(false);
+    const [allocErrorMessage, setAllocErrorMessage] = useState('');
+
+    useEffect(() => {
+        if (!showAddModal) return;
+        const computed = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
+        const rounded = Math.round(computed * 100) / 100;
+        setTotalSalesValueInput(rounded);
+        if (rounded > 0 && formalInvoiceAmountInput === 0 && cashAmountInput === 0) {
+            setFormalInvoiceAmountInput(rounded);
+            setCashAmountInput(0);
+        }
+    }, [lineItems, showAddModal]);
+
+    const handleInvoiceAmountChange = (val) => {
+        const numVal = Number(val) || 0;
+        setFormalInvoiceAmountInput(numVal);
+        if (autoBalanceSplit) {
+            const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+            setCashAmountInput(rem);
+        }
+    };
+
+    const handleCashAmountChange = (val) => {
+        const numVal = Number(val) || 0;
+        setCashAmountInput(numVal);
+        if (autoBalanceSplit) {
+            const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+            setFormalInvoiceAmountInput(rem);
+        }
+    };
+
+    const handleOpenAllocationModal = (order) => {
+        const total = Number(order.totalSalesValue || order.amount || order.total || 0);
+        const formal = Number(order.formalInvoiceAmount !== undefined ? order.formalInvoiceAmount : (order.invoice?.total ?? 0));
+        const cash = Number(order.cashAmount !== undefined ? order.cashAmount : (order.cashReceipt?.amount ?? 0));
+
+        setAllocationModalOrder(order);
+        setAllocModalTotal(total);
+        setAllocModalFormal(formal);
+        setAllocModalCash(cash);
+        setAllocModalReason('');
+        setAllocErrorMessage('');
+    };
+
+    const handleSaveAllocation = async (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        if (!allocationModalOrder) return;
+
+        const formal = Math.round(Number(allocModalFormal) * 100) / 100;
+        const cash = Math.round(Number(allocModalCash) * 100) / 100;
+        const total = Math.round(Number(allocModalTotal) * 100) / 100;
+
+        if (formal + cash > total + 0.01) {
+            setAllocErrorMessage('Invoice + Cash Receipt cannot exceed Total Order Value.');
+            return;
+        }
+
+        setAllocSubmitting(true);
+        setAllocErrorMessage('');
+        try {
+            const updated = await updateSalesOrderAllocation(allocationModalOrder.id, {
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+                totalSalesValue: total,
+                reason: allocModalReason || 'Manual SO split allocation adjustment',
+            });
+
+            if (selectedOrder && selectedOrder.id === allocationModalOrder.id) {
+                setSelectedOrder((prev) => ({
+                    ...prev,
+                    totalSalesValue: total,
+                    formalInvoiceAmount: formal,
+                    cashAmount: cash,
+                }));
+            }
+            setAllocationModalOrder(null);
+        } catch (err) {
+            console.error('Failed to update sales order split:', err);
+            setAllocErrorMessage(err.message || 'Failed to update allocation.');
+        } finally {
+            setAllocSubmitting(false);
+        }
+    };
+
     const handleOpenCreateModal = () => {
         setSelectedCustomerId(customers[0]?.id || '');
         setDeliveryDate(addDaysISO(getCurrentISODate(), 10));
         setLineItems([]);
+        setTotalSalesValueInput(0);
+        setFormalInvoiceAmountInput(0);
+        setCashAmountInput(0);
+        setAutoBalanceSplit(true);
+        setCreateInvoiceNow(true);
+        setInvoiceStatusInput('Draft');
+        setInvoiceDueDateInput(addDaysISO(getCurrentISODate(), 30));
+        setCreateCashReceiptNow(true);
+        setCashModeInput('Cash');
+        setCashRefInput(`CASH-${Date.now().toString().slice(-4)}`);
         setIsFullscreen(false);
         setShowAddModal(true);
     };
@@ -76,20 +191,38 @@ export const SalesOrdersPage = () => {
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         })));
+        setFormalInvoiceAmountInput(order.formalInvoiceAmount || 0);
+        setCashAmountInput(order.cashAmount || 0);
         setIsFullscreen(false);
         setShowAddModal(true);
     };
     const handleCreate = (e) => {
         e.preventDefault();
         const cust = selectedCustomer || customers[0];
+        const effectiveOrderAmt = totalAmt > 0 ? totalAmt : (Number(totalSalesValueInput) || 0);
+
+        if (formalInvoiceAmountInput + cashAmountInput > effectiveOrderAmt + 0.01) {
+            alert('Formal Invoice + Cash Receipt amount cannot exceed Total Order Value.');
+            return;
+        }
+
         addSalesOrder({
             customerId: cust?.id,
             customer: cust?.name || 'Walk-in Customer',
-            amount: totalAmt > 0 ? totalAmt : 0,
+            amount: effectiveOrderAmt,
+            totalSalesValue: effectiveOrderAmt,
+            formalInvoiceAmount: formalInvoiceAmountInput,
+            cashAmount: cashAmountInput,
+            createInvoiceNow: createInvoiceNow && formalInvoiceAmountInput > 0,
+            createCashReceiptNow: createCashReceiptNow && cashAmountInput > 0,
+            invoiceStatus: invoiceStatusInput,
+            invoiceDueDate: invoiceDueDateInput,
+            cashMode: cashModeInput,
+            cashRef: cashRefInput || `CASH-${Date.now().toString().slice(-4)}`,
             deliveryDate: deliveryDate || addDaysISO(getCurrentISODate(), 10),
             stage: 'Draft',
             status: 'Draft',
-            paymentStatus: 'Unpaid',
+            paymentStatus: cashAmountInput >= effectiveOrderAmt ? 'Paid' : (cashAmountInput > 0 ? 'Partial' : 'Unpaid'),
             items: lineItems,
         });
         handleCloseCreateModal();
@@ -331,12 +464,35 @@ export const SalesOrdersPage = () => {
         },
         {
             key: 'amount',
-            header: 'Order Value',
+            header: 'Order Value & Split',
             align: 'right',
-            width: '12%',
-            render: (o) => (<span className="font-mono font-bold text-text whitespace-nowrap">
-          {formatCurrency(o.amount ?? o.total ?? 0)}
-        </span>),
+            width: '15%',
+            render: (o) => {
+                const total = o.amount ?? o.total ?? 0;
+                const formal = o.formalInvoiceAmount !== undefined ? o.formalInvoiceAmount : (o.invoice?.total ?? null);
+                const cash = o.cashAmount !== undefined ? o.cashAmount : (o.cashReceipt?.amount ?? null);
+                return (
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className="font-mono font-bold text-slate-900 whitespace-nowrap">
+                      {formatCurrency(total)}
+                    </span>
+                    {(formal !== null || cash !== null) && (
+                      <div className="flex items-center gap-1 text-[10px] font-mono">
+                        {formal !== null && Number(formal) > 0 && (
+                          <span className="text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-200" title="Formal Tax Invoice">
+                            Inv: {formatCurrency(formal)}
+                          </span>
+                        )}
+                        {cash !== null && Number(cash) > 0 && (
+                          <span className="text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200" title="Cash Receipt">
+                            Cash: {formatCurrency(cash)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+            },
         },
         {
             key: 'stage',
@@ -375,6 +531,14 @@ export const SalesOrdersPage = () => {
             render: (o) => {
                 const isCancelled = o.stage === 'Cancelled' || o.status === 'Cancelled';
                 return (<div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <button onClick={() => setSelectedOrder(o)} className="p-1 text-muted hover:text-blue-600 hover:bg-blue-50 rounded-lg cursor-pointer transition-colors" title="View Sales Order Details & Allocation Split">
+              <Eye size={13}/>
+            </button>
+            {!isCancelled && (
+              <button onClick={() => handleOpenAllocationModal(o)} className="p-1 text-muted hover:text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer transition-colors" title="Adjust Order Split Allocation (Formal vs Cash)">
+                <SlidersHorizontal size={13}/>
+              </button>
+            )}
             <button onClick={() => setPrintSalesOrderTarget(o)} className="p-1 text-muted hover:text-primary hover:bg-soft rounded-lg cursor-pointer transition-colors" title="Print Official Sales Order Confirmation">
               <Printer size={13}/>
             </button>
@@ -537,6 +701,262 @@ export const SalesOrdersPage = () => {
             }}/>
               </div>
 
+              {/* TWO SECTIONS: FORMAL INVOICE & CASH RECEIPT ALLOCATION */}
+              <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+                {/* Header with Title & Live Balance Status */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-primary" />
+                      <h4 className="font-bold text-slate-800 text-sm">
+                        Order Split Allocation: Formal Invoice & Cash Receipt
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Manually decide how much amount is allocated to the formal tax invoice and how much into cash receipt.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-[11px] font-semibold text-slate-600 flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={autoBalanceSplit}
+                        onChange={(e) => setAutoBalanceSplit(e.target.checked)}
+                        className="rounded text-primary focus:ring-primary w-3.5 h-3.5"
+                      />
+                      <span>Auto-balance amounts</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Quick Split Preset Buttons & Balance Bar */}
+                <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs">
+                      <span className="text-slate-500">Total Order Value: </span>
+                      <strong className="font-mono text-slate-900 font-bold">{formatCurrency(totalAmt)}</strong>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] text-slate-400 font-medium">Quick Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => { setFormalInvoiceAmountInput(totalAmt); setCashAmountInput(0); }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer"
+                      >
+                        100% Invoice
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setFormalInvoiceAmountInput(0); setCashAmountInput(totalAmt); }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 cursor-pointer"
+                      >
+                        100% Cash
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const f = Math.round(totalAmt * 0.7 * 100) / 100;
+                          setFormalInvoiceAmountInput(f);
+                          setCashAmountInput(Math.round((totalAmt - f) * 100) / 100);
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 cursor-pointer"
+                      >
+                        70% / 30%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const f = Math.round(totalAmt * 0.5 * 100) / 100;
+                          setFormalInvoiceAmountInput(f);
+                          setCashAmountInput(Math.round((totalAmt - f) * 100) / 100);
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                      >
+                        50% / 50%
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Balance Status indicator */}
+                  {(() => {
+                    const sum = Math.round((Number(formalInvoiceAmountInput) + Number(cashAmountInput)) * 100) / 100;
+                    const diff = Math.round((Number(totalAmt) - sum) * 100) / 100;
+                    if (diff < -0.01) {
+                      return (
+                        <div className="p-2 bg-rose-50 border border-rose-200 rounded text-rose-800 text-[11px] font-mono flex items-center justify-between">
+                          <span className="font-bold flex items-center gap-1"><ShieldAlert size={13}/> Over-allocated!</span>
+                          <span>Sum ({formatCurrency(sum)}) exceeds Order Value by {formatCurrency(Math.abs(diff))}</span>
+                        </div>
+                      );
+                    }
+                    if (Math.abs(diff) < 0.01 && totalAmt > 0) {
+                      return (
+                        <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 text-[11px] font-mono flex items-center justify-between">
+                          <span className="font-bold flex items-center gap-1"><CheckCircle2 size={13}/> 100% Balanced</span>
+                          <span>Invoice {formatCurrency(formalInvoiceAmountInput)} + Cash {formatCurrency(cashAmountInput)} = {formatCurrency(totalAmt)}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-[11px] font-mono flex items-center justify-between">
+                        <span className="font-semibold">Unallocated Order Value:</span>
+                        <span className="font-bold">{formatCurrency(diff)} remaining</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* THE TWO SECTIONS: SIDE BY SIDE IN GRID */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* SECTION 1: FORMAL TAX INVOICE */}
+                  <div className="bg-white p-4 rounded-xl border-2 border-blue-200 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-blue-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+                          <Receipt size={16}/>
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-blue-950 text-xs">Section 1: Formal Invoice</h5>
+                          <span className="text-[10px] text-blue-600 font-semibold">Tax Billing & Accounts Receivable</span>
+                        </div>
+                      </div>
+                      <label className="text-[11px] font-bold text-blue-900 flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={createInvoiceNow}
+                          onChange={(e) => setCreateInvoiceNow(e.target.checked)}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                        />
+                        <span>Create Invoice</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-slate-700 text-xs">Invoice Amount (₹) *</label>
+                        <span className="text-[10px] text-slate-400 font-medium">Billed with GST</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formalInvoiceAmountInput}
+                          onChange={(e) => handleInvoiceAmountChange(e.target.value)}
+                          className="w-full p-2 border border-blue-300 rounded-lg bg-blue-50/30 text-blue-950 font-mono font-bold text-sm focus:ring-2 focus:ring-blue-500"
+                          placeholder="0.00"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono">
+                          {totalAmt > 0 ? `${Math.round((formalInvoiceAmountInput / totalAmt) * 100)}%` : '0%'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Invoice Status</label>
+                        <select
+                          value={invoiceStatusInput}
+                          onChange={(e) => setInvoiceStatusInput(e.target.value)}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                        >
+                          <option value="Draft">Draft (Editable)</option>
+                          <option value="Finalized">Finalized (Post AR)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Due Date</label>
+                        <input
+                          type="date"
+                          value={invoiceDueDateInput}
+                          onChange={(e) => setInvoiceDueDateInput(e.target.value)}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 italic">
+                      * Generates an official Tax Invoice linked to this SO with proportional item rates.
+                    </p>
+                  </div>
+
+                  {/* SECTION 2: CASH RECEIPT */}
+                  <div className="bg-white p-4 rounded-xl border-2 border-amber-200 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-amber-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 font-bold">
+                          <DollarSign size={16}/>
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-amber-950 text-xs">Section 2: Cash Receipt</h5>
+                          <span className="text-[10px] text-amber-600 font-semibold">Without-Bill / Cash Collection</span>
+                        </div>
+                      </div>
+                      <label className="text-[11px] font-bold text-amber-900 flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={createCashReceiptNow}
+                          onChange={(e) => setCreateCashReceiptNow(e.target.checked)}
+                          className="rounded text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
+                        />
+                        <span>Record Receipt</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-slate-700 text-xs">Cash Receipt Amount (₹) *</label>
+                        <span className="text-[10px] text-slate-400 font-medium">Unbilled Cash</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={cashAmountInput}
+                          onChange={(e) => handleCashAmountChange(e.target.value)}
+                          className="w-full p-2 border border-amber-300 rounded-lg bg-amber-50/30 text-amber-950 font-mono font-bold text-sm focus:ring-2 focus:ring-amber-500"
+                          placeholder="0.00"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-amber-600 font-mono">
+                          {totalAmt > 0 ? `${Math.round((cashAmountInput / totalAmt) * 100)}%` : '0%'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Payment Mode</label>
+                        <select
+                          value={cashModeInput}
+                          onChange={(e) => setCashModeInput(e.target.value)}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                        >
+                          <option value="Cash">Cash In Hand</option>
+                          <option value="Bank">Bank Transfer</option>
+                          <option value="UPI">UPI</option>
+                          <option value="Cheque">Cheque</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Reference / Voucher #</label>
+                        <input
+                          type="text"
+                          value={cashRefInput}
+                          onChange={(e) => setCashRefInput(e.target.value)}
+                          placeholder="CASH-SO-..."
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 italic">
+                      * Issues a Cash Receipt voucher and immediately credits customer ledger balance.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
                   Cancel
@@ -584,6 +1004,218 @@ export const SalesOrdersPage = () => {
 
               {/* Connected Docs Card */}
               <RelatedDocumentsCard documents={getOrderRelatedDocs(selectedOrder)}/>
+
+              {/* TWO SECTIONS: FORMAL INVOICE & CASH RECEIPT SUMMARY */}
+              {(() => {
+                const totalOrderVal = Number(selectedOrder.totalSalesValue || selectedOrder.amount || selectedOrder.total || 0);
+                const formalAmt = Number(selectedOrder.formalInvoiceAmount !== undefined ? selectedOrder.formalInvoiceAmount : (selectedOrder.invoice?.total ?? 0));
+                const cashAmt = Number(selectedOrder.cashAmount !== undefined ? selectedOrder.cashAmount : (selectedOrder.cashReceipt?.amount ?? 0));
+                const linkedInv = invoices.find((i) => i.salesOrderId === selectedOrder.id || i.linkedSo === selectedOrder.orderNumber || (selectedOrder.invoiceId && i.id === selectedOrder.invoiceId));
+                const linkedPmt = paymentIns.find((p) => p.salesOrderId === selectedOrder.id || p.salesOrderNumber === selectedOrder.orderNumber || (selectedOrder.cashReceiptId && p.id === selectedOrder.cashReceiptId));
+                const totalAlloc = Math.round((formalAmt + cashAmt) * 100) / 100;
+                const unalloc = Math.max(0, Math.round((totalOrderVal - totalAlloc) * 100) / 100);
+
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-primary" />
+                        <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                          Order Split Allocation & Financial Breakdown
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedOrder.stage !== 'Cancelled' && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAllocationModal(selectedOrder)}
+                            className="px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                          >
+                            <SlidersHorizontal size={12}/> Adjust Split
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Breakdown KPI Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                        <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">Total Order Value</span>
+                        <strong className="font-mono text-slate-900 text-xs block font-bold">{formatCurrency(totalOrderVal)}</strong>
+                        <span className="text-[9px] text-slate-400 block">Gross Committed</span>
+                      </div>
+                      <div className="bg-blue-50/70 p-2.5 rounded-xl border border-blue-200">
+                        <span className="text-[10px] text-blue-800 uppercase font-semibold block truncate">Formal Invoice</span>
+                        <strong className="font-mono text-blue-900 text-xs block font-bold">{formatCurrency(formalAmt)}</strong>
+                        <span className="text-[9px] text-blue-700 block">
+                          {totalOrderVal > 0 ? `${Math.round((formalAmt / totalOrderVal) * 100)}% Billed` : '0%'}
+                        </span>
+                      </div>
+                      <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-200">
+                        <span className="text-[10px] text-amber-800 uppercase font-semibold block truncate">Cash Receipt</span>
+                        <strong className="font-mono text-amber-900 text-xs block font-bold">{formatCurrency(cashAmt)}</strong>
+                        <span className="text-[9px] text-amber-700 block">
+                          {totalOrderVal > 0 ? `${Math.round((cashAmt / totalOrderVal) * 100)}% Cash` : '0%'}
+                        </span>
+                      </div>
+                      <div className={`p-2.5 rounded-xl border ${unalloc > 0.01 ? 'bg-slate-100 border-slate-300' : 'bg-emerald-50 border-emerald-200'}`}>
+                        <span className={`text-[10px] uppercase font-semibold block truncate ${unalloc > 0.01 ? 'text-slate-600' : 'text-emerald-700'}`}>
+                          {unalloc > 0.01 ? 'Unallocated' : 'Allocation Status'}
+                        </span>
+                        <strong className={`font-mono text-xs block font-bold ${unalloc > 0.01 ? 'text-slate-700' : 'text-emerald-800'}`}>
+                          {unalloc > 0.01 ? formatCurrency(unalloc) : '100% Balanced'}
+                        </strong>
+                        <span className="text-[9px] block text-slate-500">
+                          {unalloc > 0.01 ? 'Remaining to split' : 'Formal + Cash = Total'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* TWO SECTION CARDS: FORMAL INVOICE & CASH RECEIPT */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Section 1 Card */}
+                      <div className="bg-white p-3.5 rounded-xl border border-blue-200 space-y-2">
+                        <div className="flex items-center justify-between border-b border-blue-50 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Receipt className="w-4 h-4 text-blue-600"/>
+                            <span className="font-bold text-xs text-blue-900">Section 1: Formal Tax Invoice</span>
+                          </div>
+                          {linkedInv && <StatusBadge status={linkedInv.status || 'Draft'}/>}
+                        </div>
+
+                        {linkedInv ? (
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Invoice Number:</span>
+                              <strong className="font-mono text-blue-700 font-bold">{linkedInv.invoiceNumber}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Invoice Amount:</span>
+                              <span className="font-mono font-bold text-slate-800">{formatCurrency(linkedInv.total)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Invoice Due / Balance:</span>
+                              <span className={`font-mono font-bold ${(linkedInv.balanceDue ?? linkedInv.total) > 0.01 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                {formatCurrency(linkedInv.balanceDue ?? linkedInv.total)}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedOrder(null);
+                                navigate('/sales/invoices');
+                              }}
+                              className="w-full mt-2 py-1 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-semibold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <ExternalLink size={11}/> View Formal Invoice in Register
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 py-1">
+                            <p className="text-[11px] text-slate-500">
+                              Allocated Amount: <strong className="font-mono text-slate-800">{formatCurrency(formalAmt)}</strong>
+                              <span className="block text-[10px] text-slate-400">Formal invoice has not yet been generated for this order.</span>
+                            </p>
+                            {formalAmt > 0 && selectedOrder.stage !== 'Cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  convertSalesOrderToInvoice(selectedOrder.id);
+                                  setSelectedOrder(null);
+                                  navigate('/sales/invoices');
+                                }}
+                                className="w-full py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                              >
+                                <Receipt size={12}/> Generate Formal Invoice ({formatCurrency(formalAmt)})
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 2 Card */}
+                      <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">
+                        <div className="flex items-center justify-between border-b border-amber-50 pb-2">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-amber-600"/>
+                            <span className="font-bold text-xs text-amber-900">Section 2: Cash Receipt</span>
+                          </div>
+                          {linkedPmt && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Settled
+                            </span>
+                          )}
+                        </div>
+
+                        {linkedPmt ? (
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Voucher / Receipt #:</span>
+                              <strong className="font-mono text-amber-800 font-bold">{linkedPmt.receiptNumber || linkedPmt.paymentNumber}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Receipt Amount:</span>
+                              <span className="font-mono font-bold text-emerald-700">{formatCurrency(linkedPmt.amount)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Mode & Ref:</span>
+                              <span className="text-slate-700 font-mono text-[11px]">
+                                {linkedPmt.mode || 'Cash'} • {linkedPmt.reference || linkedPmt.referenceNumber || 'Cash'}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveReceipt({
+                                  receiptNumber: linkedPmt.receiptNumber || linkedPmt.paymentNumber || `RCPT-${Date.now().toString().slice(-4)}`,
+                                  invoiceNumber: selectedOrder.orderNumber,
+                                  customer: selectedOrder.customer,
+                                  amount: linkedPmt.amount,
+                                  date: formatDateDDMMYYYY(linkedPmt.date || 'Today'),
+                                  paymentMode: linkedPmt.mode || 'Cash',
+                                  reference: linkedPmt.reference || linkedPmt.referenceNumber || `CASH-${selectedOrder.orderNumber}`,
+                                });
+                              }}
+                              className="w-full mt-2 py-1 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded font-semibold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Printer size={11}/> Print / View Cash Receipt Voucher
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 py-1">
+                            <p className="text-[11px] text-slate-500">
+                              Allocated Amount: <strong className="font-mono text-slate-800">{formatCurrency(cashAmt)}</strong>
+                              <span className="block text-[10px] text-slate-400">Cash receipt has not yet been collected for this order.</span>
+                            </p>
+                            {cashAmt > 0 && selectedOrder.stage !== 'Cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const cust = customers.find((c) => c.id === selectedOrder.customerId || c.name === selectedOrder.customer) || customers[0];
+                                  addPaymentIn({
+                                    customerId: cust?.id,
+                                    customer: cust?.name || selectedOrder.customer,
+                                    amount: cashAmt,
+                                    mode: 'Cash',
+                                    paymentType: 'WITHOUT_BILL',
+                                    salesOrderId: selectedOrder.id,
+                                    salesOrderNumber: selectedOrder.orderNumber,
+                                    reference: `CASH-${selectedOrder.orderNumber}`,
+                                    notes: `Cash receipt allocated with Sales Order ${selectedOrder.orderNumber}`,
+                                  });
+                                }}
+                                className="w-full py-1 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                              >
+                                <DollarSign size={12}/> Record Cash Receipt ({formatCurrency(cashAmt)})
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Order Line Items Table */}
               <div className="space-y-3">
@@ -681,6 +1313,13 @@ export const SalesOrdersPage = () => {
                         Generate Sales Invoice
                       </Button>)}
                     <button
+                      type="button"
+                      onClick={() => handleOpenAllocationModal(selectedOrder)}
+                      className="px-3 py-1.5 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-semibold text-xs flex items-center gap-1 cursor-pointer shadow-2xs"
+                    >
+                      <SlidersHorizontal size={12}/> Adjust Split
+                    </button>
+                    <button
                       onClick={() => {
                         const target = selectedOrder;
                         setSelectedOrder(null);
@@ -755,5 +1394,173 @@ export const SalesOrdersPage = () => {
           navigate(`/pms/projects/${id}`);
         }}
       />
+
+      {/* ADJUST SALES ORDER ALLOCATION SPLIT MODAL */}
+      {allocationModalOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-4 sm:p-6 text-xs flex flex-col max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <SlidersHorizontal className="w-5 h-5 text-indigo-600"/>
+                <div>
+                  <h3 className="font-bold text-base text-[#1F2E4A]">Adjust Order Split Allocation</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {allocationModalOrder.orderNumber} • {allocationModalOrder.customer}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setAllocationModalOrder(null); setAllocErrorMessage(''); }}
+                className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
+              >
+                <X size={18}/>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAllocation} className="py-4 space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl space-y-1">
+                <div className="flex items-center gap-2 text-blue-900 font-bold text-xs">
+                  <Layers size={15} className="text-blue-600"/>
+                  <span>Sales Order Split Adjustment</span>
+                </div>
+                <p className="text-[11px] text-blue-800 leading-relaxed">
+                  Decide how much of this order value is assigned to the formal tax invoice and how much into cash receipt.
+                </p>
+              </div>
+
+              {allocErrorMessage && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2">
+                  <AlertCircle size={16} className="shrink-0 text-rose-600"/>
+                  <span>{allocErrorMessage}</span>
+                </div>
+              )}
+
+              <div className="space-y-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <div>
+                  <div className="flex justify-between items-center mb-1">
+                    <label className="font-bold text-slate-700">Total Order Value (₹)</label>
+                    <span className="text-[10px] text-slate-500">Gross order amount</span>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={allocModalTotal}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 0;
+                      setAllocModalTotal(val);
+                      if (allocModalFormal <= val) {
+                        setAllocModalCash(Math.max(0, Math.round((val - allocModalFormal) * 100) / 100));
+                      } else {
+                        setAllocModalFormal(val);
+                        setAllocModalCash(0);
+                      }
+                    }}
+                    className="w-full p-2 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 text-sm"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-blue-800">Formal Invoice (₹)</label>
+                      <span className="text-[10px] text-blue-600 font-medium">Billed with GST</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={allocModalTotal}
+                      value={allocModalFormal}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setAllocModalFormal(val);
+                        setAllocModalCash(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                      }}
+                      className="w-full p-2 border border-blue-300 rounded-lg bg-white font-mono font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-amber-800">Cash Receipt (₹)</label>
+                      <span className="text-[10px] text-amber-600 font-medium">Without-Bill Cash</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={allocModalTotal}
+                      value={allocModalCash}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setAllocModalCash(val);
+                        setAllocModalFormal(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                      }}
+                      className="w-full p-2 border border-amber-300 rounded-lg bg-white font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Validation calculation */}
+                {(() => {
+                  const sum = Math.round((Number(allocModalFormal) + Number(allocModalCash)) * 100) / 100;
+                  const diff = Math.round((Number(allocModalTotal) - sum) * 100) / 100;
+                  if (diff < -0.01) {
+                    return (
+                      <div className="p-2 rounded bg-rose-50 border border-rose-200 text-rose-800 font-mono text-[11px] flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1"><AlertCircle size={13}/> Over-allocated!</span>
+                        <span>Exceeds Order Value by {formatCurrency(Math.abs(diff))}</span>
+                      </div>
+                    );
+                  }
+                  if (Math.abs(diff) < 0.01) {
+                    return (
+                      <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono text-[11px] flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1"><CheckCircle2 size={13}/> Perfectly Balanced</span>
+                        <span>{formatCurrency(allocModalFormal)} + {formatCurrency(allocModalCash)} = {formatCurrency(allocModalTotal)}</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-800 font-mono text-[11px] flex items-center justify-between">
+                      <span className="font-semibold">Unallocated Remaining:</span>
+                      <span className="font-bold">{formatCurrency(diff)}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Reason / Notes for Split Adjustment</label>
+                <input
+                  type="text"
+                  value={allocModalReason}
+                  onChange={(e) => setAllocModalReason(e.target.value)}
+                  placeholder="e.g., Client requested ₹30,000 cash receipt and balance formal invoice"
+                  className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <Button variant="outline" type="button" onClick={() => { setAllocationModalOrder(null); setAllocErrorMessage(''); }} disabled={allocSubmitting}>
+                  Cancel
+                </Button>
+                <button
+                  type="submit"
+                  disabled={allocSubmitting || (allocModalFormal + allocModalCash > allocModalTotal + 0.01)}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  {allocSubmitting ? 'Updating...' : 'Save Order Split'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Instant Settle / View Payment Receipt Voucher Modal */}
+      <PaymentReceiptModal receipt={activeReceipt} onClose={() => setActiveReceipt(null)}/>
     </div>);
 };

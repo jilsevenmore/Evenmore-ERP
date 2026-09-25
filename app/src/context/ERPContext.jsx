@@ -11,6 +11,7 @@ import {
     pushCreate,
     pushUpdate,
     pushDelete,
+    pushAction,
     pullCompanyProfile,
     isServerId,
     describeError,
@@ -103,6 +104,7 @@ export const ERPProvider = ({ children, }) => {
     const [salesOrders, setSalesOrders] = useState([]);
     const [deliveryChallans, setDeliveryChallans] = useState([]);
     const [paymentIns, setPaymentIns] = useState([]);
+    const [cashPaymentReceipts, setCashPaymentReceipts] = useState([]);
     const [salesReturns, setSalesReturns] = useState([]);
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [purchaseBills, setPurchaseBills] = useState([]);
@@ -178,6 +180,7 @@ export const ERPProvider = ({ children, }) => {
         deliveryChallans: setDeliveryChallans,
         invoices: setInvoices,
         paymentIns: setPaymentIns,
+        cashPaymentReceipts: setCashPaymentReceipts,
         salesReturns: setSalesReturns,
         purchaseOrders: setPurchaseOrders,
         purchaseBills: setPurchaseBills,
@@ -527,15 +530,38 @@ export const ERPProvider = ({ children, }) => {
         });
         // 2. Payments (Credit - decreases AR)
         paymentIns.forEach((p) => {
+            if (p.status === 'Cancelled' || p.status === 'Voided') return;
             if (p.customer?.toLowerCase() === custName.toLowerCase() || (cust && p.customerId === cust.id)) {
+                const isWithoutBill = p.paymentType === 'WITHOUT_BILL';
                 entries.push({
                     id: `led-pay-${p.id}`,
                     date: p.date,
-                    type: 'Payment Received',
-                    reference: p.receiptNumber,
-                    description: `Settlement via ${p.mode || 'Bank'} (${p.reference || 'Ref'})`,
+                    type: isWithoutBill ? 'Cash Receipt' : 'With-Bill Pay',
+                    reference: isWithoutBill
+                        ? (p.cashReceipt?.receiptNumber || p.receiptNumber || 'CPR-00045')
+                        : (p.paymentNumber || p.receiptNumber || 'PAY-00451'),
+                    description: isWithoutBill
+                        ? `Cash Receipt (Without Bill) - ${p.description || p.reference || 'Cash Settlement'}`
+                        : `Settlement against ${p.invoiceNumber || 'Invoice'} via ${p.mode || 'Bank'} (${p.reference || 'Ref'})`,
                     debit: 0,
-                    credit: p.amount,
+                    credit: Number(p.amount) || 0,
+                    balance: 0,
+                });
+            }
+        });
+        // Also capture any cashPaymentReceipts not already represented in paymentIns
+        cashPaymentReceipts.forEach((r) => {
+            if (r.status === 'CANCELLED' || r.status === 'VOIDED') return;
+            const alreadyIn = paymentIns.some((p) => p.receiptNumber === r.receiptNumber || p.id === r.paymentId);
+            if (!alreadyIn && (r.customer?.toLowerCase() === custName.toLowerCase() || (cust && r.customerId === cust.id))) {
+                entries.push({
+                    id: `led-cpr-${r.id}`,
+                    date: r.date,
+                    type: 'Cash Receipt',
+                    reference: r.receiptNumber || 'CPR-00045',
+                    description: `Cash Receipt (Without Bill) - ${r.description || r.referenceNumber || 'Cash Settlement'}`,
+                    debit: 0,
+                    credit: Number(r.amount) || 0,
                     balance: 0,
                 });
             }
@@ -629,27 +655,82 @@ export const ERPProvider = ({ children, }) => {
         });
     };
     const getInvoiceOutstanding = (invoiceIdOrNum) => {
-        if (!invoiceIdOrNum) return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
+        if (!invoiceIdOrNum) return { total: 0, taxableAmount: 0, gst: 0, paid: 0, paidAgainstInvoice: 0, withoutBillCash: 0, totalReceived: 0, balanceDue: 0, outstanding: 0, status: 'Unpaid' };
         const query = String(invoiceIdOrNum).toLowerCase();
         const inv = invoices.find((i) => i?.id === invoiceIdOrNum || (i?.invoiceNumber && String(i.invoiceNumber ?? '').toLowerCase() === query));
         if (!inv)
-            return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
-        // Sum all payments received for this invoice
-        const relatedPayments = paymentIns.filter((p) => p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()));
-        const paid = relatedPayments.reduce((acc, p) => acc + (p.amount || 0), 0) + (inv.paidAmount && relatedPayments.length === 0 ? inv.paidAmount : 0);
-        const total = inv.total || 0;
-        const balanceDue = Math.max(0, total - paid);
+            return { total: 0, taxableAmount: 0, gst: 0, paid: 0, paidAgainstInvoice: 0, withoutBillCash: 0, totalReceived: 0, balanceDue: 0, outstanding: 0, status: 'Unpaid' };
+        
+        // Sum all valid with-bill payments received for this invoice (exclude cancelled/voided and without-bill cash)
+        const relatedWithBillPayments = paymentIns.filter((p) => 
+            p.status !== 'Cancelled' && 
+            p.status !== 'Voided' && 
+            p.paymentType !== 'WITHOUT_BILL' &&
+            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()))
+        );
+        const paidAgainstInvoice = relatedWithBillPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0) + 
+            (inv.paidAmount && relatedWithBillPayments.length === 0 ? Number(inv.paidAmount) : 0);
+
+        // Without-Bill cash received for this invoice
+        const relatedCashReceipts = cashPaymentReceipts.filter((r) => 
+            r.status !== 'CANCELLED' && 
+            r.status !== 'VOIDED' &&
+            (r.invoiceId === inv.id || (r.invoiceNumber && inv.invoiceNumber && String(r.invoiceNumber).toLowerCase() === String(inv.invoiceNumber).toLowerCase()))
+        );
+        const relatedWithoutBillPayments = paymentIns.filter((p) => 
+            p.status !== 'Cancelled' && 
+            p.status !== 'Voided' && 
+            p.paymentType === 'WITHOUT_BILL' &&
+            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()))
+        );
+        const withoutBillCash = relatedCashReceipts.length > 0 
+            ? relatedCashReceipts.reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+            : relatedWithoutBillPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+
+        const total = Number(inv.total || inv.grandTotal || 0);
+        const taxableAmount = Number(inv.taxableValue || inv.taxable_value || inv.subtotal || 0);
+        const gst = Number(inv.totalTax || inv.total_tax || ((inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0)) || Math.max(0, total - taxableAmount));
+        
+        // Important: Invoice Outstanding = Invoice Total - Valid With-Bill Payments
+        // Without-Bill Cash does NOT reduce invoice outstanding!
+        const balanceDue = Math.max(0, total - paidAgainstInvoice);
+        const outstanding = balanceDue;
+        const totalReceived = paidAgainstInvoice + withoutBillCash;
+
         let status = 'Unpaid';
         if (balanceDue <= 0.01) {
             status = 'Paid';
         }
-        else if (paid > 0) {
+        else if (paidAgainstInvoice > 0) {
             status = 'Partially Paid';
         }
         else {
             status = inv.status === 'Overdue' ? 'Overdue' : 'Unpaid';
         }
-        return { total, paid, balanceDue, status };
+
+        const cashAmt = inv.cashAmount !== undefined ? Number(inv.cashAmount) : withoutBillCash;
+        const formalAmt = inv.formalInvoiceAmount !== undefined ? Number(inv.formalInvoiceAmount) : total;
+        const totalSales = inv.totalSalesValue !== undefined ? Number(inv.totalSalesValue) : (formalAmt + cashAmt);
+        const totalAlloc = formalAmt + cashAmt;
+        const remaining = Math.max(0, totalSales - totalAlloc);
+
+        return { 
+            total, 
+            taxableAmount, 
+            gst, 
+            paid: paidAgainstInvoice, 
+            paidAgainstInvoice, 
+            withoutBillCash, 
+            totalReceived, 
+            balanceDue, 
+            outstanding, 
+            status,
+            totalSalesValue: totalSales,
+            formalInvoiceAmount: formalAmt,
+            cashAmount: cashAmt,
+            totalAllocated: totalAlloc,
+            remaining,
+        };
     };
     const getBillOutstanding = (billIdOrNum) => {
         if (!billIdOrNum) return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
@@ -955,6 +1036,13 @@ export const ERPProvider = ({ children, }) => {
             paidAmount: isPaid ? total : (newInvoice.paidAmount || 0),
             amountPaid: isPaid ? total : (newInvoice.paidAmount || 0),
             balanceDue: isPaid ? 0 : Math.max(0, total - (newInvoice.paidAmount || 0)),
+            totalSalesValue: newInvoice.totalSalesValue !== undefined ? Number(newInvoice.totalSalesValue) : (newInvoice.formalInvoiceAmount !== undefined ? (Number(newInvoice.formalInvoiceAmount) + (Number(newInvoice.cashAmount) || 0)) : total),
+            formalInvoiceAmount: newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total,
+            cashAmount: Number(newInvoice.cashAmount) || 0,
+            totalAllocated: (newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total) + (Number(newInvoice.cashAmount) || 0),
+            remainingAmount: Math.max(0, (newInvoice.totalSalesValue !== undefined ? Number(newInvoice.totalSalesValue) : total) - ((newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total) + (Number(newInvoice.cashAmount) || 0))),
+            revisions: newInvoice.revisions || [],
+            cashReceipt: newInvoice.cashReceipt || null,
             notes: newInvoice.notes || 'Sales Invoice',
             dispatchedViaChallan: Boolean(newInvoice.dispatchedViaChallan),
         };
@@ -1108,12 +1196,18 @@ export const ERPProvider = ({ children, }) => {
                 grandTotal: total,
                 amount: total,
                 balanceDue: total,
+                totalSalesValue: updates.totalSalesValue !== undefined ? Number(updates.totalSalesValue) : inv.totalSalesValue,
+                formalInvoiceAmount: updates.formalInvoiceAmount !== undefined ? Number(updates.formalInvoiceAmount) : (updates.total !== undefined ? Number(updates.total) : inv.formalInvoiceAmount),
+                cashAmount: updates.cashAmount !== undefined ? Number(updates.cashAmount) : inv.cashAmount,
                 billingAddress: updates.billingAddress ? createAddressSnapshot(updates.billingAddress) : inv.billingAddress,
                 shippingAddress: updates.shippingAddress ? createAddressSnapshot(updates.shippingAddress) : inv.shippingAddress,
             };
             return updatedInv;
         }));
-        if (updatedInv) showToast(`Draft Invoice ${updatedInv.invoiceNumber} updated.`);
+        if (updatedInv) {
+            showToast(`Draft Invoice ${updatedInv.invoiceNumber} updated.`);
+            persistUpdate('invoices', invoiceId, updates, setInvoices);
+        }
         return updatedInv;
     };
 
@@ -1194,11 +1288,23 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [je, ...prev]);
+
+        if (isBackendEnabled() && isServerId(invoiceId)) {
+            pushAction('invoices', invoiceId, 'finalize')
+                .then((serverRecord) => {
+                    if (serverRecord) reconcile(setInvoices, invoiceId, serverRecord);
+                })
+                .catch((err) => {
+                    console.warn('[ERP] could not finalize invoice on server:', err);
+                    showToast(`Finalized locally only — ${describeError(err)}`);
+                });
+        }
+
         showToast(`Invoice ${finalized.invoiceNumber} finalized and posted to General Ledger.`);
         return finalized;
     };
 
-    const cancelSalesInvoice = (invoiceId) => {
+    const cancelSalesInvoice = (invoiceId, reason = 'Cancelled by user') => {
         const inv = invoices.find((i) => i.id === invoiceId);
         if (!inv) return { success: false, reason: 'not_found', message: 'Invoice not found.' };
         if (inv.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
@@ -1265,8 +1371,67 @@ export const ERPProvider = ({ children, }) => {
         }
 
         setInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, status: 'Cancelled' } : i));
+
+        if (isBackendEnabled() && isServerId(invoiceId)) {
+            pushAction('invoices', invoiceId, 'cancel', { reason })
+                .then((serverRecord) => {
+                    if (serverRecord) reconcile(setInvoices, invoiceId, serverRecord);
+                })
+                .catch((err) => {
+                    console.warn('[ERP] could not cancel invoice on server:', err);
+                    showToast(`Cancelled locally only — ${describeError(err)}`);
+                });
+        }
+
         showToast(`Invoice ${inv.invoiceNumber} cancelled.`);
         return { success: true, message: `Invoice ${inv.invoiceNumber} cancelled.` };
+    };
+
+    const updateSalesAllocation = async (invoiceId, { formalInvoiceAmount, cashAmount, totalSalesValue, reason } = {}) => {
+        const inv = invoices.find((i) => i.id === invoiceId);
+        if (!inv) return null;
+
+        if (isBackendEnabled() && isServerId(invoiceId)) {
+            try {
+                const serverRecord = await pushAction('invoices', invoiceId, 'allocate-split', {
+                    formalInvoiceAmount,
+                    cashAmount,
+                    totalSalesValue,
+                    reason,
+                });
+                if (serverRecord) {
+                    reconcile(setInvoices, invoiceId, serverRecord);
+                    refreshFromBackend();
+                    showToast('Sales allocation split updated successfully.');
+                    return serverRecord;
+                }
+            } catch (err) {
+                console.error('[ERP] allocate-split failed:', err);
+                showToast(`Failed to update allocation: ${describeError(err)}`);
+                throw err;
+            }
+        }
+
+        const formal = formalInvoiceAmount !== undefined ? Number(formalInvoiceAmount) : (Number(inv.formalInvoiceAmount) || Number(inv.total) || 0);
+        const cash = cashAmount !== undefined ? Number(cashAmount) : (Number(inv.cashAmount) || 0);
+        const total = totalSalesValue !== undefined ? Number(totalSalesValue) : (formal + cash);
+
+        let updated = null;
+        setInvoices((prev) => prev.map((item) => {
+            if (item.id !== invoiceId) return item;
+            updated = {
+                ...item,
+                totalSalesValue: total,
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+                total: formal,
+                grandTotal: formal,
+                balanceDue: Math.max(0, formal - (item.paidAmount || 0)),
+            };
+            return updated;
+        }));
+        showToast('Sales allocation split updated locally.');
+        return updated;
     };
 
     const updateInvoiceStatus = (id, newStatus) => {
@@ -2207,6 +2372,10 @@ export const ERPProvider = ({ children, }) => {
     const addSalesOrder = (order) => {
         const orderAmt = order.amount ||
             (order.items ? order.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+        const totalSalesVal = order.totalSalesValue !== undefined ? Number(order.totalSalesValue) : orderAmt;
+        const formalInvoiceAmt = order.formalInvoiceAmount !== undefined ? Number(order.formalInvoiceAmount) : 0;
+        const cashAmt = order.cashAmount !== undefined ? Number(order.cashAmount) : 0;
+
         const defaultAddresses = resolvePartyAddresses(order.customerId, order.customer);
         const formattedItems = (order.items || []).map((line, idx) => ({
             ...line,
@@ -2236,17 +2405,129 @@ export const ERPProvider = ({ children, }) => {
             date: formatDateDDMMYYYY(order.date || 'Today'),
             deliveryDate: order.deliveryDate || addDaysISO(getCurrentISODate(), 10),
             amount: orderAmt,
+            totalSalesValue: totalSalesVal,
+            formalInvoiceAmount: formalInvoiceAmt,
+            cashAmount: cashAmt,
             stage: order.stage || 'Draft',
             status: order.stage || 'Draft',
-            paymentStatus: order.paymentStatus || 'Unpaid',
+            paymentStatus: (formalInvoiceAmt > 0 || cashAmt > 0) ? (cashAmt >= orderAmt ? 'Paid' : 'Partial') : (order.paymentStatus || 'Unpaid'),
             items: formattedItems,
             lineItems: formattedItems,
             notes: order.notes || '',
         };
+
+        // If formal invoice amount > 0, generate the linked Sales Invoice
+        if ((order.createInvoiceNow || formalInvoiceAmt > 0) && formalInvoiceAmt > 0) {
+            const scaleRatio = (orderAmt > 0 && Math.abs(formalInvoiceAmt - orderAmt) > 0.01)
+                ? (formalInvoiceAmt / orderAmt)
+                : 1;
+
+            const invoiceItems = formattedItems.map((line) => {
+                const originalRate = Number(line.rate || 0);
+                const scaledRate = Math.round(originalRate * scaleRatio * 100) / 100;
+                const qty = Number(line.qty || line.orderedQty || 1);
+                return {
+                    ...line,
+                    rate: scaledRate,
+                    originalRate,
+                    amount: Math.round(scaledRate * qty * 100) / 100,
+                };
+            });
+
+            const invoicePayload = {
+                customerId: order.customerId,
+                customer: order.customer || 'Acme Corp',
+                billingAddress: newOrder.billingAddress,
+                shippingAddress: newOrder.shippingAddress,
+                salesOrderId: newOrder.id,
+                linkedSo: newOrder.orderNumber,
+                date: newOrder.date,
+                dueDate: order.invoiceDueDate || addDaysISO(getCurrentISODate(), 30),
+                status: order.invoiceStatus || 'Draft',
+                finalized: order.invoiceStatus === 'Finalized',
+                items: invoiceItems,
+                lineItems: invoiceItems,
+                total: formalInvoiceAmt,
+                grandTotal: formalInvoiceAmt,
+                amount: formalInvoiceAmt,
+                totalSalesValue: totalSalesVal,
+                formalInvoiceAmount: formalInvoiceAmt,
+                cashAmount: cashAmt,
+                notes: `Formal Tax Invoice generated directly with Sales Order ${newOrder.orderNumber}.`,
+            };
+
+            const createdInv = createInvoice(invoicePayload);
+            if (createdInv) {
+                newOrder.invoiceId = createdInv.id;
+                newOrder.invoiceNumber = createdInv.invoiceNumber;
+            }
+        }
+
+        // If cash amount > 0, generate the linked Cash Receipt (Without-Bill PaymentIn)
+        if ((order.createCashReceiptNow || cashAmt > 0) && cashAmt > 0) {
+            const createdCash = addPaymentIn({
+                customerId: order.customerId,
+                customer: order.customer || 'Acme Corp',
+                amount: cashAmt,
+                mode: order.cashMode || 'Cash',
+                paymentType: 'WITHOUT_BILL',
+                salesOrderId: newOrder.id,
+                salesOrderNumber: newOrder.orderNumber,
+                reference: order.cashRef || `CASH-${newOrder.orderNumber}`,
+                notes: `Cash receipt allocated with Sales Order ${newOrder.orderNumber}`,
+            });
+            if (createdCash) {
+                newOrder.cashReceiptId = createdCash.id;
+                newOrder.cashReceiptNumber = createdCash.receiptNumber || createdCash.paymentNumber;
+            }
+        }
+
         setSalesOrders((prev) => [newOrder, ...prev]);
-        showToast(`Sales Order ${newOrder.orderNumber} created.`);
+        showToast(`Sales Order ${newOrder.orderNumber} created with split allocation.`);
         persistCreate('salesOrders', newOrder, setSalesOrders);
         return newOrder;
+    };
+
+    const updateSalesOrderAllocation = async (orderId, { formalInvoiceAmount, cashAmount, totalSalesValue, reason } = {}) => {
+        const order = salesOrders.find((o) => o.id === orderId);
+        if (!order) return null;
+
+        const formal = formalInvoiceAmount !== undefined ? Number(formalInvoiceAmount) : (Number(order.formalInvoiceAmount) || 0);
+        const cash = cashAmount !== undefined ? Number(cashAmount) : (Number(order.cashAmount) || 0);
+        const total = totalSalesValue !== undefined ? Number(totalSalesValue) : (Number(order.totalSalesValue) || Number(order.amount) || (formal + cash));
+
+        if (isBackendEnabled() && isServerId(orderId)) {
+            try {
+                const serverRecord = await pushAction('salesOrders', orderId, 'allocate-split', {
+                    formalInvoiceAmount: formal,
+                    cashAmount: cash,
+                    totalSalesValue: total,
+                    reason,
+                });
+                if (serverRecord) {
+                    reconcile(setSalesOrders, orderId, serverRecord);
+                    refreshFromBackend();
+                    showToast('Sales order split updated successfully.');
+                    return serverRecord;
+                }
+            } catch (err) {
+                console.error('[ERP] salesOrders allocate-split failed:', err);
+            }
+        }
+
+        let updated = null;
+        setSalesOrders((prev) => prev.map((item) => {
+            if (item.id !== orderId) return item;
+            updated = {
+                ...item,
+                totalSalesValue: total,
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+            };
+            return updated;
+        }));
+        showToast('Sales order split updated locally.');
+        return updated;
     };
     const updateSalesOrderStage = (id, stage) => {
         setSalesOrders((prev) => prev.map((o) => (o.id === id ? { ...o, stage, status: stage } : o)));
@@ -2674,10 +2955,12 @@ export const ERPProvider = ({ children, }) => {
             return null;
         }
 
+        const isWithoutBill = pay.paymentType === 'WITHOUT_BILL';
+
         let targetInv = null;
         if (pay.invoiceId || pay.invoiceNumber) {
             targetInv = invoices.find((i) => i.id === pay.invoiceId || i.invoiceNumber === pay.invoiceNumber);
-            if (targetInv) {
+            if (targetInv && !isWithoutBill) {
                 if (targetInv.status === 'Cancelled') {
                     showToast('Cannot record payment against a cancelled invoice.');
                     return null;
@@ -2698,21 +2981,113 @@ export const ERPProvider = ({ children, }) => {
             }
         }
 
+        const custName = pay.customer || targetInv?.customer || 'Walk-in Customer';
+        const custId = pay.customerId || targetInv?.customerId;
+
+        if (isWithoutBill) {
+            // WITHOUT BILL / CASH RECEIPT FLOW
+            const cprNum = pay.receiptNumber || `CPR-2026-${String(cashPaymentReceipts.length + paymentIns.length + 1).padStart(4, '0')}`;
+            const payNum = pay.paymentNumber || `PAY-IN-2026-${String(paymentIns.length + 90).padStart(3, '0')}`;
+
+            const newCashReceipt = {
+                id: pay.id || `cpr-${Date.now()}`,
+                receiptNumber: cprNum,
+                customerId: custId,
+                customer: custName,
+                invoiceId: targetInv?.id || pay.invoiceId || null,
+                invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || null,
+                date: pay.date || getCurrentDateFormatted(),
+                amount: payAmt,
+                paymentMode: pay.mode || 'Cash',
+                referenceNumber: pay.reference || cprNum,
+                description: pay.description || 'Without-Bill Cash Payment',
+                notes: pay.notes || '',
+                status: 'RECEIVED',
+                createdBy: 'Admin',
+                createdAt: new Date().toISOString(),
+            };
+
+            const newPay = {
+                id: pay.id || `pay-${Date.now()}`,
+                paymentNumber: payNum,
+                receiptNumber: cprNum,
+                paymentType: 'WITHOUT_BILL',
+                customerId: custId,
+                customer: custName,
+                invoiceId: targetInv?.id || pay.invoiceId || null,
+                invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || null,
+                date: pay.date || getCurrentDateFormatted(),
+                mode: pay.mode || 'Cash',
+                amount: payAmt,
+                reference: pay.reference || cprNum,
+                description: pay.description || 'Without-Bill Cash Payment',
+                notes: pay.notes || '',
+                status: 'Paid',
+                cashReceipt: newCashReceipt,
+            };
+
+            setCashPaymentReceipts((prev) => [newCashReceipt, ...prev]);
+            setPaymentIns((prev) => [newPay, ...prev]);
+
+            // Adjust customer balance
+            if (custName) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === custName.toLowerCase() || (custId && c.id === custId)
+                        ? { ...c, balance: Math.max(0, (c.balance || 0) - payAmt) }
+                        : c
+                ));
+            }
+
+            // Adjust cash/bank
+            setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: (acc.balance || 0) + payAmt } : acc));
+
+            // Auto-create Journal Entry
+            const newJe = {
+                id: `je-${Date.now()}`,
+                entryNumber: `JE-2026-${String(journalEntries.length + 85).padStart(3, '0')}`,
+                date: newPay.date,
+                description: `Cash Receipt (Without Bill) from ${custName}: ${pay.description || 'Direct Settlement'}`,
+                reference: cprNum,
+                debitAccount: '1010 - Cash & Bank',
+                creditAccount: '1210 - Accounts Receivable',
+                amount: payAmt,
+                status: 'Posted',
+            };
+            setJournalEntries((prev) => [newJe, ...prev]);
+            showToast(`Recorded Without-Bill Cash Receipt ${cprNum} of ${formatCurrency(payAmt)}`);
+
+            // Persisting paymentIns with paymentType="WITHOUT_BILL" creates the cash receipt atomically on the server
+            persistCreate('paymentIns', newPay, setPaymentIns, {
+                onServer: (serverRecord) => {
+                    if (serverRecord?.cashReceipt) {
+                        reconcile(setCashPaymentReceipts, newCashReceipt.id, serverRecord.cashReceipt);
+                    }
+                },
+            });
+            return newPay;
+        }
+
+        // WITH-BILL FLOW
+        const payNum = pay.paymentNumber || `PAY-IN-2026-${String(paymentIns.length + 90).padStart(3, '0')}`;
         const newPay = {
             id: pay.id || `pay-${Date.now()}`,
-            receiptNumber: pay.receiptNumber ||
-                `RCP-2026-${String(paymentIns.length + 90).padStart(3, '0')}`,
-            customerId: pay.customerId || targetInv?.customerId,
-            customer: pay.customer || targetInv?.customer || 'Acme Corp',
-            invoiceId: pay.invoiceId || targetInv?.id,
-            invoiceNumber: pay.invoiceNumber || targetInv?.invoiceNumber || 'INV-2026-001',
+            receiptNumber: pay.receiptNumber || payNum,
+            paymentNumber: payNum,
+            paymentType: 'WITH_BILL',
+            customerId: custId,
+            customer: custName,
+            invoiceId: targetInv?.id || pay.invoiceId,
+            invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || 'INV-2026-001',
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'Bank Transfer',
             amount: payAmt,
             reference: pay.reference || 'WIRE-49821',
+            description: pay.description || '',
+            notes: pay.notes || '',
             status: 'Paid',
         };
         setPaymentIns((prev) => [newPay, ...prev]);
+
         // Update invoice payment tracking and dynamic status
         if (newPay.invoiceNumber || newPay.invoiceId) {
             setInvoices((prev) => prev.map((inv) => {
@@ -2733,20 +3108,25 @@ export const ERPProvider = ({ children, }) => {
                 return inv;
             }));
         }
+
         // Adjust customer balance
-        if (newPay.customer) {
-            setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
-                ? { ...c, balance: Math.max(0, c.balance - payAmt) }
-                : c));
+        if (custName) {
+            setCustomers((prev) => prev.map((c) =>
+                String(c.name ?? '').toLowerCase() === custName.toLowerCase() || (custId && c.id === custId)
+                    ? { ...c, balance: Math.max(0, (c.balance || 0) - payAmt) }
+                    : c
+            ));
         }
+
         // Add to Operating Bank Account
-        setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: acc.balance + payAmt } : acc));
+        setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: (acc.balance || 0) + payAmt } : acc));
+
         // Auto-create Journal Entry
         const newJe = {
             id: `je-${Date.now()}`,
             entryNumber: `JE-2026-${String(journalEntries.length + 85).padStart(3, '0')}`,
             date: newPay.date,
-            description: `Payment Received from ${newPay.customer} against ${newPay.invoiceNumber || 'Account'}`,
+            description: `Payment Received from ${custName} against ${newPay.invoiceNumber || 'Account'}`,
             reference: newPay.receiptNumber,
             debitAccount: '1010 - Cash & Bank',
             creditAccount: '1210 - Accounts Receivable',
@@ -2754,9 +3134,195 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        showToast(`Recorded receipt of ${formatCurrency(payAmt)} from ${newPay.customer}`);
+        showToast(`Recorded receipt of ${formatCurrency(payAmt)} from ${custName}`);
         persistCreate('paymentIns', newPay, setPaymentIns);
         return newPay;
+    };
+
+    const cancelPaymentIn = (payId, reason = 'Cancelled by user') => {
+        let targetPay = null;
+        setPaymentIns((prev) => prev.map((p) => {
+            if (p.id === payId || p.paymentNumber === payId || p.receiptNumber === payId) {
+                targetPay = {
+                    ...p,
+                    status: 'Cancelled',
+                    cancelledAt: new Date().toISOString(),
+                    cancelledBy: 'Admin',
+                    cancellationReason: reason,
+                };
+                return targetPay;
+            }
+            return p;
+        }));
+
+        if (targetPay) {
+            const payAmt = Number(targetPay.amount) || 0;
+            // Restore customer balance
+            if (targetPay.customer || targetPay.customerId) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === String(targetPay.customer ?? '').toLowerCase() ||
+                    (targetPay.customerId && c.id === targetPay.customerId)
+                        ? { ...c, balance: (c.balance || 0) + payAmt }
+                        : c
+                ));
+            }
+            // If With-Bill, restore invoice outstanding
+            if (targetPay.paymentType !== 'WITHOUT_BILL' && (targetPay.invoiceId || targetPay.invoiceNumber)) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetPay.invoiceId || inv.invoiceNumber === targetPay.invoiceNumber) {
+                        const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
+                        const updatedPaid = Math.max(0, currentPaid - payAmt);
+                        const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
+                        const isFull = updatedPaid >= (totalInvoice - 0.01);
+                        const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
+                        return {
+                            ...inv,
+                            paidAmount: updatedPaid,
+                            amountPaid: updatedPaid,
+                            balanceDue: Math.max(0, totalInvoice - updatedPaid),
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
+            // If linked cash receipt, cancel it too
+            if (targetPay.cashReceipt || targetPay.paymentType === 'WITHOUT_BILL') {
+                setCashPaymentReceipts((prev) => prev.map((r) =>
+                    r.receiptNumber === targetPay.receiptNumber || r.paymentId === targetPay.id
+                        ? { ...r, status: 'CANCELLED', cancellationReason: reason, cancelledAt: new Date().toISOString() }
+                        : r
+                ));
+            }
+            showToast(`Payment ${targetPay.receiptNumber || targetPay.paymentNumber} cancelled.`);
+            if (isBackendEnabled() && isServerId(targetPay.id)) {
+                pushAction('paymentIns', targetPay.id, 'cancel', { reason })
+                    .then((serverRecord) => {
+                        if (serverRecord) reconcile(setPaymentIns, targetPay.id, serverRecord);
+                    })
+                    .catch((err) => {
+                        console.warn('[ERP] cancel payment failed on server:', err);
+                        persistUpdate('paymentIns', targetPay.id, targetPay, setPaymentIns);
+                    });
+            } else {
+                persistUpdate('paymentIns', targetPay.id, targetPay, setPaymentIns);
+            }
+        }
+        return targetPay;
+    };
+
+    const cancelCashPaymentReceipt = (receiptId, reason = 'Cancelled by user') => {
+        let targetReceipt = null;
+        setCashPaymentReceipts((prev) => prev.map((r) => {
+            if (r.id === receiptId || r.receiptNumber === receiptId) {
+                targetReceipt = {
+                    ...r,
+                    status: 'CANCELLED',
+                    cancelledAt: new Date().toISOString(),
+                    cancelledBy: 'Admin',
+                    cancellationReason: reason,
+                };
+                return targetReceipt;
+            }
+            return r;
+        }));
+
+        if (targetReceipt) {
+            const amt = Number(targetReceipt.amount) || 0;
+            // Restore customer balance
+            if (targetReceipt.customer || targetReceipt.customerId) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === String(targetReceipt.customer ?? '').toLowerCase() ||
+                    (targetReceipt.customerId && c.id === targetReceipt.customerId)
+                        ? { ...c, balance: (c.balance || 0) + amt }
+                        : c
+                ));
+            }
+            // Cancel linked paymentIn
+            setPaymentIns((prev) => prev.map((p) =>
+                p.receiptNumber === targetReceipt.receiptNumber || p.id === targetReceipt.paymentId
+                    ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
+                    : p
+            ));
+            showToast(`Cash Receipt ${targetReceipt.receiptNumber} cancelled.`);
+            if (isBackendEnabled() && isServerId(targetReceipt.id)) {
+                pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason })
+                    .then((serverRecord) => {
+                        if (serverRecord) reconcile(setCashPaymentReceipts, targetReceipt.id, serverRecord);
+                    })
+                    .catch((err) => {
+                        console.warn('[ERP] cancel cash receipt failed on server:', err);
+                        persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+                    });
+            } else {
+                persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+            }
+        }
+        return targetReceipt;
+    };
+
+    const voidCashPaymentReceipt = (receiptId, reason = 'Voided by user') => {
+        let targetReceipt = null;
+        setCashPaymentReceipts((prev) => prev.map((r) => {
+            if (r.id === receiptId || r.receiptNumber === receiptId) {
+                targetReceipt = {
+                    ...r,
+                    status: 'VOIDED',
+                    cancelledAt: new Date().toISOString(),
+                    cancelledBy: 'Admin',
+                    cancellationReason: reason,
+                };
+                return targetReceipt;
+            }
+            return r;
+        }));
+
+        if (targetReceipt) {
+            const amt = Number(targetReceipt.amount) || 0;
+            if (targetReceipt.customer || targetReceipt.customerId) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === String(targetReceipt.customer ?? '').toLowerCase() ||
+                    (targetReceipt.customerId && c.id === targetReceipt.customerId)
+                        ? { ...c, balance: (c.balance || 0) + amt }
+                        : c
+                ));
+            }
+            setPaymentIns((prev) => prev.map((p) =>
+                p.receiptNumber === targetReceipt.receiptNumber || p.id === targetReceipt.paymentId
+                    ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
+                    : p
+            ));
+            showToast(`Cash Receipt ${targetReceipt.receiptNumber} voided.`);
+            if (isBackendEnabled() && isServerId(targetReceipt.id)) {
+                pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason, void: true })
+                    .then((serverRecord) => {
+                        if (serverRecord) reconcile(setCashPaymentReceipts, targetReceipt.id, serverRecord);
+                    })
+                    .catch((err) => {
+                        console.warn('[ERP] void cash receipt failed on server:', err);
+                        persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+                    });
+            } else {
+                persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+            }
+        }
+        return targetReceipt;
+    };
+
+    const updateCashPaymentReceipt = (receiptId, updates) => {
+        let updated = null;
+        setCashPaymentReceipts((prev) => prev.map((r) => {
+            if (r.id === receiptId || r.receiptNumber === receiptId) {
+                updated = { ...r, ...updates, updatedAt: new Date().toISOString() };
+                return updated;
+            }
+            return r;
+        }));
+        if (updated) {
+            showToast(`Cash Receipt ${updated.receiptNumber} updated.`);
+            persistUpdate('cashPaymentReceipts', updated.id, updated, setCashPaymentReceipts);
+        }
+        return updated;
     };
     const addSalesReturn = (ret) => {
         const inv = invoices.find((i) => i.id === ret.invoiceId || i.invoiceNumber === ret.invoiceRef);
@@ -4503,6 +5069,7 @@ export const ERPProvider = ({ children, }) => {
             deleteProformaInvoice,
             deliveryChallans,
             paymentIns,
+            cashPaymentReceipts,
             salesReturns,
             purchaseOrders,
             purchaseBills,
@@ -4547,6 +5114,7 @@ export const ERPProvider = ({ children, }) => {
             updateDraftInvoice,
             finalizeInvoice,
             cancelSalesInvoice,
+            updateSalesAllocation,
             updateInvoiceStatus,
             addZoneRequest,
             updateZoneRequest,
@@ -4567,6 +5135,7 @@ export const ERPProvider = ({ children, }) => {
             convertQuotationToDeliveryChallan,
             convertQuotationToSalesOrder,
             addSalesOrder,
+            updateSalesOrderAllocation,
             updateSalesOrderStage,
             cancelSalesOrder,
             convertSalesOrderToInvoice,
@@ -4575,6 +5144,10 @@ export const ERPProvider = ({ children, }) => {
             updateDeliveryChallanStatus,
             cancelDeliveryChallan,
             addPaymentIn,
+            cancelPaymentIn,
+            cancelCashPaymentReceipt,
+            voidCashPaymentReceipt,
+            updateCashPaymentReceipt,
             addSalesReturn,
             cancelSalesReturn,
             addPurchaseOrder,
