@@ -545,6 +545,8 @@ export const AUDIT_EVENT_TYPES = [
   { action: "DELAY_RESOLVED", label: "Delay Resolved" },
   { action: "STAGE_HANDOFF", label: "Stage Handoff" },
   { action: "PROJECT_COMPLETED", label: "Project Completed" },
+  { action: "CHAT_FILE_SHARED", label: "File Shared in Chat" },
+  { action: "CHAT_MESSAGE_DELETED", label: "Chat Message Deleted" },
 ];
 
 /** Filter an audit trail by event type and free text. */

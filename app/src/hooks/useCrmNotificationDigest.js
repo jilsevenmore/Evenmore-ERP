@@ -56,12 +56,13 @@ function buildEventNotifications({ eventItems, now }) {
       id: `crm-event-${entry.id}`,
       eventId: entry.id,
       title: entry.title,
-      subtitle: EVENT_ENTITY_LABELS[entry.entityType] || 'CRM',
-      desc: entry.message || entry.title,
+      subtitle: EVENT_ENTITY_LABELS[entry.entityType] || (entry.category === 'pms' ? 'PMS' : 'CRM'),
+      desc: entry.message || entry.body || entry.title,
       time: formatEventTime(entry.createdAt, now),
       tone: 'info',
-      unread: entry.status !== 'read',
-      path: entry.path || '/crm',
+      // Server rows carry `read` and put the deep link in `payload.path`.
+      unread: entry.status !== 'read' && entry.read !== true,
+      path: entry.path || entry.payload?.path || '/crm',
       bucket: 'crm-event',
     }));
 }
