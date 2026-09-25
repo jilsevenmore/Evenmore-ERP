@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -30,12 +30,15 @@ import {
   ChevronRight,
   Ban,
   Download,
-  Trash2
+  Trash2,
+  SlidersHorizontal,
+  ExternalLink,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintProformaInvoiceModal } from '../../components/common/PrintProformaInvoiceModal';
+import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 
 const proformaGuide = {
   title: 'Proforma Invoices',
@@ -98,15 +101,20 @@ export const ProformaInvoicesPage = () => {
     proformaInvoices = [],
     addProformaInvoice,
     updateProformaInvoice,
+    updateProformaInvoiceAllocation,
     updateProformaInvoiceStatus,
     convertProformaToInvoice,
     deleteProformaInvoice,
     customers = [],
     salesOrders = [],
     invoices = [],
+    paymentIns = [],
+    addPaymentIn,
     formatCurrency,
     formatDateDDMMYYYY,
     getCurrentDateFormatted,
+    getCurrentISODate,
+    addDaysISO,
     companyProfile,
   } = useERP();
 
@@ -136,6 +144,28 @@ export const ProformaInvoicesPage = () => {
   );
   const [lineItems, setLineItems] = useState([]);
 
+  // Two sections: Invoice & Cash Receipt split
+  const [totalSalesValueInput, setTotalSalesValueInput] = useState(0);
+  const [formalInvoiceAmountInput, setFormalInvoiceAmountInput] = useState(0);
+  const [cashAmountInput, setCashAmountInput] = useState(0);
+  const [autoBalanceSplit, setAutoBalanceSplit] = useState(true);
+  const [createInvoiceNow, setCreateInvoiceNow] = useState(true);
+  const [invoiceStatusInput, setInvoiceStatusInput] = useState('Draft');
+  const [invoiceDueDateInput, setInvoiceDueDateInput] = useState(() => (addDaysISO && getCurrentISODate ? addDaysISO(getCurrentISODate(), 30) : new Date(Date.now() + 30*86400000).toISOString().split('T')[0]));
+  const [createCashReceiptNow, setCreateCashReceiptNow] = useState(true);
+  const [cashModeInput, setCashModeInput] = useState('Cash');
+  const [cashRefInput, setCashRefInput] = useState('');
+  const [activeReceipt, setActiveReceipt] = useState(null);
+
+  // Allocation adjustment modal for existing Proforma Invoice
+  const [allocationModalPi, setAllocationModalPi] = useState(null);
+  const [allocModalFormal, setAllocModalFormal] = useState(0);
+  const [allocModalCash, setAllocModalCash] = useState(0);
+  const [allocModalTotal, setAllocModalTotal] = useState(0);
+  const [allocModalReason, setAllocModalReason] = useState('');
+  const [allocSubmitting, setAllocSubmitting] = useState(false);
+  const [allocErrorMessage, setAllocErrorMessage] = useState('');
+
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
 
   // Recalculate totals
@@ -154,6 +184,87 @@ export const ProformaInvoicesPage = () => {
   const sgst = !isInterState ? Math.round(taxableAmount * (taxRate / 2) * 100) / 100 : 0;
   const igst = isInterState ? Math.round(taxableAmount * taxRate * 100) / 100 : 0;
   const grandTotal = Math.round((taxableAmount + cgst + sgst + igst + Number(otherCharges || 0)) * 100) / 100;
+
+  useEffect(() => {
+    if (!showCreateModal) return;
+    const rounded = Math.round(grandTotal * 100) / 100;
+    setTotalSalesValueInput(rounded);
+    if (rounded > 0 && formalInvoiceAmountInput === 0 && cashAmountInput === 0) {
+      setFormalInvoiceAmountInput(rounded);
+      setCashAmountInput(0);
+    }
+  }, [grandTotal, showCreateModal]);
+
+  const handleInvoiceAmountChange = (val) => {
+    const numVal = Number(val) || 0;
+    setFormalInvoiceAmountInput(numVal);
+    if (autoBalanceSplit) {
+      const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+      setCashAmountInput(rem);
+    }
+  };
+
+  const handleCashAmountChange = (val) => {
+    const numVal = Number(val) || 0;
+    setCashAmountInput(numVal);
+    if (autoBalanceSplit) {
+      const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+      setFormalInvoiceAmountInput(rem);
+    }
+  };
+
+  const handleOpenAllocationModal = (pi) => {
+    const total = Number(pi.totalSalesValue || pi.grandTotal || pi.total || 0);
+    const formal = Number(pi.formalInvoiceAmount !== undefined ? pi.formalInvoiceAmount : (pi.invoice?.total ?? 0));
+    const cash = Number(pi.cashAmount !== undefined ? pi.cashAmount : (pi.cashReceipt?.amount ?? 0));
+
+    setAllocationModalPi(pi);
+    setAllocModalTotal(total);
+    setAllocModalFormal(formal);
+    setAllocModalCash(cash);
+    setAllocModalReason('');
+    setAllocErrorMessage('');
+  };
+
+  const handleSaveAllocation = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!allocationModalPi) return;
+
+    const formal = Math.round(Number(allocModalFormal) * 100) / 100;
+    const cash = Math.round(Number(allocModalCash) * 100) / 100;
+    const total = Math.round(Number(allocModalTotal) * 100) / 100;
+
+    if (formal + cash > total + 0.01) {
+      setAllocErrorMessage('Invoice + Cash Receipt cannot exceed Total Proforma Value.');
+      return;
+    }
+
+    setAllocSubmitting(true);
+    setAllocErrorMessage('');
+    try {
+      const updated = await updateProformaInvoiceAllocation(allocationModalPi.id, {
+        formalInvoiceAmount: formal,
+        cashAmount: cash,
+        totalSalesValue: total,
+        reason: allocModalReason || 'Manual PI split allocation adjustment',
+      });
+
+      if (selectedPi && selectedPi.id === allocationModalPi.id) {
+        setSelectedPi((prev) => ({
+          ...prev,
+          totalSalesValue: total,
+          formalInvoiceAmount: formal,
+          cashAmount: cash,
+        }));
+      }
+      setAllocationModalPi(null);
+    } catch (err) {
+      console.error('Failed to update proforma invoice split:', err);
+      setAllocErrorMessage(err.message || 'Failed to update allocation.');
+    } finally {
+      setAllocSubmitting(false);
+    }
+  };
 
   // Sync Customer info on customer select
   const handleCustomerChange = (custId) => {
@@ -212,6 +323,16 @@ export const ProformaInvoicesPage = () => {
     setLineItems([]);
     setEditingPi(null);
     setIsFullscreen(false);
+    setFormalInvoiceAmountInput(0);
+    setCashAmountInput(0);
+    setTotalSalesValueInput(0);
+    setAutoBalanceSplit(true);
+    setCreateInvoiceNow(true);
+    setInvoiceStatusInput('Draft');
+    setInvoiceDueDateInput(addDaysISO && getCurrentISODate ? addDaysISO(getCurrentISODate(), 30) : new Date(Date.now() + 30*86400000).toISOString().split('T')[0]);
+    setCreateCashReceiptNow(true);
+    setCashModeInput('Cash');
+    setCashRefInput('');
     setShowCreateModal(true);
   };
 
@@ -232,6 +353,16 @@ export const ProformaInvoicesPage = () => {
     setLineItems(pi.items || []);
     setEditingPi(pi);
     setIsFullscreen(false);
+    const total = Number(pi.totalSalesValue || pi.grandTotal || pi.total || 0);
+    const formal = Number(pi.formalInvoiceAmount !== undefined ? pi.formalInvoiceAmount : (pi.invoice?.total ?? total));
+    const cash = Number(pi.cashAmount !== undefined ? pi.cashAmount : (pi.cashReceipt?.amount ?? 0));
+    setTotalSalesValueInput(total);
+    setFormalInvoiceAmountInput(formal);
+    setCashAmountInput(cash);
+    setCashModeInput(pi.cashReceipt?.mode || 'Cash');
+    setCashRefInput(pi.cashReceipt?.reference || '');
+    setCreateInvoiceNow(false);
+    setCreateCashReceiptNow(false);
     setShowCreateModal(true);
   };
 
@@ -271,6 +402,12 @@ export const ProformaInvoicesPage = () => {
   const handleSave = (status = 'Draft') => {
     const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
     const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
+
+    const effectivePiAmt = grandTotal > 0 ? grandTotal : 5900;
+    if (formalInvoiceAmountInput + cashAmountInput > effectivePiAmt + 0.01) {
+      alert('Validation Error: Formal Invoice + Cash Receipt cannot exceed Total Proforma Value.');
+      return;
+    }
 
     // Compute milestone amounts
     const computedSchedule = paymentSchedule.map((s) => ({
@@ -317,6 +454,15 @@ export const ProformaInvoicesPage = () => {
       roundOff: 0,
       total: grandTotal > 0 ? grandTotal : 5900,
       grandTotal: grandTotal > 0 ? grandTotal : 5900,
+      totalSalesValue: totalSalesValueInput || effectivePiAmt,
+      formalInvoiceAmount: formalInvoiceAmountInput,
+      cashAmount: cashAmountInput,
+      createInvoiceNow: createInvoiceNow && formalInvoiceAmountInput > 0,
+      invoiceStatus: invoiceStatusInput,
+      invoiceDueDate: invoiceDueDateInput,
+      createCashReceiptNow: createCashReceiptNow && cashAmountInput > 0,
+      cashMode: cashModeInput,
+      cashRef: cashRefInput,
       notes,
       termsAndConditions,
     };
@@ -440,14 +586,35 @@ export const ProformaInvoicesPage = () => {
     },
     {
       key: 'amount',
-      header: 'Grand Total',
+      header: 'PI Value & Split',
       align: 'right',
-      width: '10%',
-      render: (pi) => (
-        <span className="font-mono font-bold text-text whitespace-nowrap">
-          {formatCurrency(pi.grandTotal ?? pi.total ?? 0)}
-        </span>
-      ),
+      width: '15%',
+      render: (pi) => {
+        const total = pi.grandTotal ?? pi.total ?? 0;
+        const formal = pi.formalInvoiceAmount !== undefined ? pi.formalInvoiceAmount : (pi.invoice?.total ?? null);
+        const cash = pi.cashAmount !== undefined ? pi.cashAmount : (pi.cashReceipt?.amount ?? null);
+        return (
+          <div className="flex flex-col items-end gap-0.5">
+            <span className="font-mono font-bold text-slate-900 whitespace-nowrap">
+              {formatCurrency(total)}
+            </span>
+            {(formal !== null || cash !== null) && (
+              <div className="flex items-center gap-1 text-[10px] font-mono">
+                {formal !== null && Number(formal) > 0 && (
+                  <span className="text-blue-700 bg-blue-50 px-1 py-0.2 rounded border border-blue-200" title="Formal Tax Invoice">
+                    Inv: {formatCurrency(formal)}
+                  </span>
+                )}
+                {cash !== null && Number(cash) > 0 && (
+                  <span className="text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200" title="Cash Receipt">
+                    Cash: {formatCurrency(cash)}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: 'status',
@@ -479,7 +646,7 @@ export const ProformaInvoicesPage = () => {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      width: '12%',
+      width: '14%',
       render: (pi) => (
         <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           <button
@@ -489,6 +656,15 @@ export const ProformaInvoicesPage = () => {
           >
             <Eye size={13} />
           </button>
+          {pi.status !== 'Converted' && pi.status !== 'Cancelled' && (
+            <button
+              onClick={() => handleOpenAllocationModal(pi)}
+              className="p-1.5 text-muted hover:text-indigo-600 hover:bg-indigo-50 rounded-lg cursor-pointer transition-colors"
+              title="Adjust Proforma Split Allocation (Formal vs Cash)"
+            >
+              <SlidersHorizontal size={13} />
+            </button>
+          )}
           <button
             onClick={() => setPrintPiTarget(pi)}
             className="p-1.5 text-muted hover:text-primary hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
@@ -916,6 +1092,260 @@ export const ProformaInvoicesPage = () => {
                 </div>
               </div>
 
+              {/* TWO SECTIONS: INVOICE & CASH RECEIPT SPLIT */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-primary" />
+                      <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                        Split Allocation: Formal Invoice & Cash Receipt
+                      </h4>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-slate-600 flex items-center gap-1.5 cursor-pointer font-medium">
+                        <input
+                          type="checkbox"
+                          checked={autoBalanceSplit}
+                          onChange={(e) => setAutoBalanceSplit(e.target.checked)}
+                          className="rounded text-primary focus:ring-primary w-3.5 h-3.5"
+                        />
+                        <span>Auto-balance with Total PI Value</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <span className="text-slate-500">
+                      Total PI Value: <strong className="font-mono text-slate-800 font-bold">{formatCurrency(grandTotal)}</strong>
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] text-slate-400">Presets:</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormalInvoiceAmountInput(grandTotal);
+                          setCashAmountInput(0);
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 cursor-pointer"
+                      >
+                        100% Invoice
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormalInvoiceAmountInput(0);
+                          setCashAmountInput(grandTotal);
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 cursor-pointer"
+                      >
+                        100% Cash
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const f = Math.round(grandTotal * 0.7 * 100) / 100;
+                          setFormalInvoiceAmountInput(f);
+                          setCashAmountInput(Math.round((grandTotal - f) * 100) / 100);
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                      >
+                        70% / 30%
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const f = Math.round(grandTotal * 0.5 * 100) / 100;
+                          setFormalInvoiceAmountInput(f);
+                          setCashAmountInput(Math.round((grandTotal - f) * 100) / 100);
+                        }}
+                        className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                      >
+                        50% / 50%
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Balance Status indicator */}
+                  {(() => {
+                    const sum = Math.round((Number(formalInvoiceAmountInput) + Number(cashAmountInput)) * 100) / 100;
+                    const diff = Math.round((Number(grandTotal) - sum) * 100) / 100;
+                    if (diff < -0.01) {
+                      return (
+                        <div className="p-2 bg-rose-50 border border-rose-200 rounded text-rose-800 text-[11px] font-mono flex items-center justify-between">
+                          <span className="font-bold flex items-center gap-1"><ShieldAlert size={13}/> Over-allocated!</span>
+                          <span>Sum ({formatCurrency(sum)}) exceeds PI Value by {formatCurrency(Math.abs(diff))}</span>
+                        </div>
+                      );
+                    }
+                    if (Math.abs(diff) < 0.01 && grandTotal > 0) {
+                      return (
+                        <div className="p-2 bg-emerald-50 border border-emerald-200 rounded text-emerald-800 text-[11px] font-mono flex items-center justify-between">
+                          <span className="font-bold flex items-center gap-1"><CheckCircle2 size={13}/> 100% Balanced</span>
+                          <span>Invoice {formatCurrency(formalInvoiceAmountInput)} + Cash {formatCurrency(cashAmountInput)} = {formatCurrency(grandTotal)}</span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-[11px] font-mono flex items-center justify-between">
+                        <span className="font-semibold">Unallocated PI Value:</span>
+                        <span className="font-bold">{formatCurrency(diff)} remaining</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* THE TWO SECTIONS: SIDE BY SIDE IN GRID */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* SECTION 1: FORMAL TAX INVOICE */}
+                  <div className="bg-white p-4 rounded-xl border-2 border-blue-200 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-blue-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+                          <Receipt size={16}/>
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-blue-950 text-xs">Section 1: Formal Invoice</h5>
+                          <span className="text-[10px] text-blue-600 font-semibold">Tax Billing & Accounts Receivable</span>
+                        </div>
+                      </div>
+                      <label className="text-[11px] font-bold text-blue-900 flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={createInvoiceNow}
+                          onChange={(e) => setCreateInvoiceNow(e.target.checked)}
+                          className="rounded text-blue-600 focus:ring-blue-500 w-3.5 h-3.5"
+                        />
+                        <span>Create Invoice</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-slate-700 text-xs">Invoice Amount (₹) *</label>
+                        <span className="text-[10px] text-slate-400 font-medium">Billed with GST</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={formalInvoiceAmountInput}
+                          onChange={(e) => handleInvoiceAmountChange(e.target.value)}
+                          className="w-full p-2 border border-blue-300 rounded-lg bg-blue-50/30 text-blue-950 font-mono font-bold text-sm focus:ring-2 focus:ring-blue-500"
+                          placeholder="0.00"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-blue-600 font-mono">
+                          {grandTotal > 0 ? `${Math.round((formalInvoiceAmountInput / grandTotal) * 100)}%` : '0%'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Invoice Status</label>
+                        <select
+                          value={invoiceStatusInput}
+                          onChange={(e) => setInvoiceStatusInput(e.target.value)}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                        >
+                          <option value="Draft">Draft (Editable)</option>
+                          <option value="Finalized">Finalized (Post AR)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Due Date</label>
+                        <input
+                          type="date"
+                          value={invoiceDueDateInput}
+                          onChange={(e) => setInvoiceDueDateInput(e.target.value)}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 italic">
+                      * Generates an official Tax Invoice linked to this Proforma Invoice with proportional item rates.
+                    </p>
+                  </div>
+
+                  {/* SECTION 2: CASH RECEIPT */}
+                  <div className="bg-white p-4 rounded-xl border-2 border-amber-200 shadow-xs space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-amber-100">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 font-bold">
+                          <DollarSign size={16}/>
+                        </div>
+                        <div>
+                          <h5 className="font-bold text-amber-950 text-xs">Section 2: Cash Receipt</h5>
+                          <span className="text-[10px] text-amber-600 font-semibold">Without-Bill / Cash Collection</span>
+                        </div>
+                      </div>
+                      <label className="text-[11px] font-bold text-amber-900 flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={createCashReceiptNow}
+                          onChange={(e) => setCreateCashReceiptNow(e.target.checked)}
+                          className="rounded text-amber-600 focus:ring-amber-500 w-3.5 h-3.5"
+                        />
+                        <span>Record Receipt</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="font-bold text-slate-700 text-xs">Cash Receipt Amount (₹) *</label>
+                        <span className="text-[10px] text-slate-400 font-medium">Unbilled Cash</span>
+                      </div>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={cashAmountInput}
+                          onChange={(e) => handleCashAmountChange(e.target.value)}
+                          className="w-full p-2 border border-amber-300 rounded-lg bg-amber-50/30 text-amber-950 font-mono font-bold text-sm focus:ring-2 focus:ring-amber-500"
+                          placeholder="0.00"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-amber-600 font-mono">
+                          {grandTotal > 0 ? `${Math.round((cashAmountInput / grandTotal) * 100)}%` : '0%'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Payment Mode</label>
+                        <select
+                          value={cashModeInput}
+                          onChange={(e) => setCashModeInput(e.target.value)}
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 text-xs"
+                        >
+                          <option value="Cash">Cash In Hand</option>
+                          <option value="Bank">Bank Transfer</option>
+                          <option value="UPI">UPI</option>
+                          <option value="Cheque">Cheque</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-slate-500 block mb-0.5">Reference / Voucher #</label>
+                        <input
+                          type="text"
+                          value={cashRefInput}
+                          onChange={(e) => setCashRefInput(e.target.value)}
+                          placeholder="CASH-PI-..."
+                          className="w-full p-1.5 border border-slate-300 rounded bg-white text-slate-800 font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 italic">
+                      * Generates an official Without-Bill Cash Receipt Voucher linked to this Proforma Invoice.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               {/* Notes & Commercial Terms */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div>
@@ -1205,6 +1635,227 @@ export const ProformaInvoicesPage = () => {
                 </div>
               </div>
 
+              {/* TWO SECTIONS: FORMAL INVOICE & CASH RECEIPT SUMMARY */}
+              {(() => {
+                const totalPiVal = Number(selectedPi.totalSalesValue || selectedPi.grandTotal || selectedPi.total || 0);
+                const formalAmt = Number(selectedPi.formalInvoiceAmount !== undefined ? selectedPi.formalInvoiceAmount : (selectedPi.invoice?.total ?? 0));
+                const cashAmt = Number(selectedPi.cashAmount !== undefined ? selectedPi.cashAmount : (selectedPi.cashReceipt?.amount ?? 0));
+                const linkedInv = invoices.find((i) => i.proformaInvoiceId === selectedPi.id || i.linkedPi === selectedPi.proformaNumber || (selectedPi.invoiceId && i.id === selectedPi.invoiceId));
+                const linkedPmt = paymentIns.find((p) => p.proformaInvoiceId === selectedPi.id || p.proformaInvoiceNumber === selectedPi.proformaNumber || (selectedPi.cashReceiptId && p.id === selectedPi.cashReceiptId));
+                const totalAlloc = Math.round((formalAmt + cashAmt) * 100) / 100;
+                const unalloc = Math.max(0, Math.round((totalPiVal - totalAlloc) * 100) / 100);
+
+                return (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-primary" />
+                        <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider">
+                          Proforma Split Allocation & Financial Breakdown
+                        </h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedPi.status !== 'Converted' && selectedPi.status !== 'Cancelled' && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenAllocationModal(selectedPi)}
+                            className="px-2.5 py-1 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                          >
+                            <SlidersHorizontal size={12}/> Adjust Split
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Breakdown KPI Strip */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                        <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">Total PI Value</span>
+                        <strong className="font-mono text-slate-900 text-xs block font-bold">{formatCurrency(totalPiVal)}</strong>
+                        <span className="text-[9px] text-slate-400 block">Gross Commercial</span>
+                      </div>
+                      <div className="bg-blue-50/70 p-2.5 rounded-xl border border-blue-200">
+                        <span className="text-[10px] text-blue-800 uppercase font-semibold block truncate">Formal Invoice</span>
+                        <strong className="font-mono text-blue-900 text-xs block font-bold">{formatCurrency(formalAmt)}</strong>
+                        <span className="text-[9px] text-blue-700 block">
+                          {totalPiVal > 0 ? `${Math.round((formalAmt / totalPiVal) * 100)}% Billed` : '0%'}
+                        </span>
+                      </div>
+                      <div className="bg-amber-50/70 p-2.5 rounded-xl border border-amber-200">
+                        <span className="text-[10px] text-amber-800 uppercase font-semibold block truncate">Cash Receipt</span>
+                        <strong className="font-mono text-amber-900 text-xs block font-bold">{formatCurrency(cashAmt)}</strong>
+                        <span className="text-[9px] text-amber-700 block">
+                          {totalPiVal > 0 ? `${Math.round((cashAmt / totalPiVal) * 100)}% Cash` : '0%'}
+                        </span>
+                      </div>
+                      <div className={`p-2.5 rounded-xl border ${unalloc > 0.01 ? 'bg-slate-100 border-slate-300' : 'bg-emerald-50 border-emerald-200'}`}>
+                        <span className={`text-[10px] uppercase font-semibold block truncate ${unalloc > 0.01 ? 'text-slate-600' : 'text-emerald-700'}`}>
+                          {unalloc > 0.01 ? 'Unallocated' : 'Allocation Status'}
+                        </span>
+                        <strong className={`font-mono text-xs block font-bold ${unalloc > 0.01 ? 'text-slate-700' : 'text-emerald-800'}`}>
+                          {unalloc > 0.01 ? formatCurrency(unalloc) : '100% Balanced'}
+                        </strong>
+                        <span className="text-[9px] block text-slate-500">
+                          {unalloc > 0.01 ? 'Remaining to split' : 'Formal + Cash = Total'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* TWO SECTION CARDS: FORMAL INVOICE & CASH RECEIPT */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Section 1 Card */}
+                      <div className="bg-white p-3.5 rounded-xl border border-blue-200 space-y-2">
+                        <div className="flex items-center justify-between border-b border-blue-50 pb-2">
+                          <div className="flex items-center gap-2">
+                            <Receipt className="w-4 h-4 text-blue-600"/>
+                            <span className="font-bold text-xs text-blue-900">Section 1: Formal Tax Invoice</span>
+                          </div>
+                          {linkedInv && <StatusBadge status={linkedInv.status || 'Draft'}/>}
+                        </div>
+
+                        {linkedInv ? (
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Invoice Number:</span>
+                              <strong className="font-mono text-blue-700 font-bold">{linkedInv.invoiceNumber}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Invoice Amount:</span>
+                              <span className="font-mono font-bold text-slate-800">{formatCurrency(linkedInv.total)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Invoice Due / Balance:</span>
+                              <span className={`font-mono font-bold ${(linkedInv.balanceDue ?? linkedInv.total) > 0.01 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                {formatCurrency(linkedInv.balanceDue ?? linkedInv.total)}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedPi(null);
+                                navigate('/sales/invoices');
+                              }}
+                              className="w-full mt-2 py-1 px-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded font-semibold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <ExternalLink size={11}/> View Formal Invoice in Register
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 py-1">
+                            <p className="text-[11px] text-slate-500">
+                              Allocated Amount: <strong className="font-mono text-slate-800">{formatCurrency(formalAmt)}</strong>
+                              <span className="block text-[10px] text-slate-400">Formal invoice has not yet been generated for this proforma.</span>
+                            </p>
+                            {formalAmt > 0 && selectedPi.status !== 'Converted' && selectedPi.status !== 'Cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleDirectConvertToInvoice(selectedPi);
+                                  setSelectedPi(null);
+                                }}
+                                className="w-full py-1 px-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                              >
+                                <Receipt size={12}/> Generate Formal Invoice ({formatCurrency(formalAmt)})
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 2 Card */}
+                      <div className="bg-white p-3.5 rounded-xl border border-amber-200 space-y-2">
+                        <div className="flex items-center justify-between border-b border-amber-50 pb-2">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="w-4 h-4 text-amber-600"/>
+                            <span className="font-bold text-xs text-amber-900">Section 2: Cash Receipt</span>
+                          </div>
+                          {linkedPmt && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              Settled
+                            </span>
+                          )}
+                        </div>
+
+                        {linkedPmt ? (
+                          <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Voucher / Receipt #:</span>
+                              <strong className="font-mono text-amber-800 font-bold">{linkedPmt.receiptNumber || linkedPmt.paymentNumber}</strong>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Receipt Amount:</span>
+                              <span className="font-mono font-bold text-emerald-700">{formatCurrency(linkedPmt.amount)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-slate-500">Mode & Ref:</span>
+                              <span className="text-slate-700 font-mono text-[11px]">
+                                {linkedPmt.mode || 'Cash'} • {linkedPmt.reference || linkedPmt.referenceNumber || 'Cash'}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveReceipt({
+                                  receiptNumber: linkedPmt.receiptNumber || linkedPmt.paymentNumber || `RCPT-${Date.now().toString().slice(-4)}`,
+                                  invoiceNumber: selectedPi.proformaNumber,
+                                  customer: selectedPi.customer,
+                                  amount: linkedPmt.amount,
+                                  date: formatDateDDMMYYYY(linkedPmt.date || 'Today'),
+                                  paymentMode: linkedPmt.mode || 'Cash',
+                                  reference: linkedPmt.reference || linkedPmt.referenceNumber || `CASH-${selectedPi.proformaNumber}`,
+                                });
+                              }}
+                              className="w-full mt-2 py-1 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded font-semibold text-[11px] flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                            >
+                              <Printer size={11}/> Print / View Cash Receipt Voucher
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2 py-1">
+                            <p className="text-[11px] text-slate-500">
+                              Allocated Amount: <strong className="font-mono text-slate-800">{formatCurrency(cashAmt)}</strong>
+                              <span className="block text-[10px] text-slate-400">Cash receipt has not yet been collected for this proforma.</span>
+                            </p>
+                            {cashAmt > 0 && selectedPi.status !== 'Converted' && selectedPi.status !== 'Cancelled' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const created = addPaymentIn({
+                                    customerId: selectedPi.customerId,
+                                    customer: selectedPi.customer,
+                                    amount: cashAmt,
+                                    mode: 'Cash',
+                                    paymentType: 'WITHOUT_BILL',
+                                    proformaInvoiceId: selectedPi.id,
+                                    proformaInvoiceNumber: selectedPi.proformaNumber,
+                                    reference: `CASH-${selectedPi.proformaNumber}`,
+                                    notes: `Cash collection against Proforma Invoice ${selectedPi.proformaNumber}`,
+                                  });
+                                  if (created) {
+                                    setActiveReceipt({
+                                      receiptNumber: created.receiptNumber || created.paymentNumber || `RCPT-${Date.now().toString().slice(-4)}`,
+                                      invoiceNumber: selectedPi.proformaNumber,
+                                      customer: selectedPi.customer,
+                                      amount: cashAmt,
+                                      date: formatDateDDMMYYYY('Today'),
+                                      paymentMode: 'Cash',
+                                      reference: `CASH-${selectedPi.proformaNumber}`,
+                                    });
+                                  }
+                                }}
+                                className="w-full py-1 px-2 bg-amber-600 hover:bg-amber-700 text-white rounded font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer shadow-xs"
+                              >
+                                <DollarSign size={12}/> Record Cash Collection ({formatCurrency(cashAmt)})
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Notes & Commercial Terms */}
               {selectedPi.notes && (
                 <div className="p-3 rounded-xl border border-slate-200 bg-white text-[11px]">
@@ -1301,6 +1952,167 @@ export const ProformaInvoicesPage = () => {
         onClose={() => setPrintPiTarget(null)}
         proforma={printPiTarget}
       />
+
+      {/* ADJUST PROFORMA INVOICE ALLOCATION SPLIT MODAL */}
+      {allocationModalPi && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-4 sm:p-6 text-xs flex flex-col space-y-4 max-h-[95vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <SlidersHorizontal size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Adjust Proforma Invoice Split</h3>
+                  <p className="text-[11px] text-slate-500 font-mono">PI #{allocationModalPi.proformaNumber} • {allocationModalPi.customer}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setAllocationModalPi(null); setAllocErrorMessage(''); }}
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {allocErrorMessage && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{allocErrorMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAllocation} className="space-y-4">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Total Proforma Value (₹)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={allocModalTotal}
+                    onChange={(e) => {
+                      const val = Number(e.target.value) || 0;
+                      setAllocModalTotal(val);
+                      if (allocModalFormal <= val) {
+                        setAllocModalCash(Math.max(0, Math.round((val - allocModalFormal) * 100) / 100));
+                      } else {
+                        setAllocModalFormal(val);
+                        setAllocModalCash(0);
+                      }
+                    }}
+                    className="w-full p-2 border border-slate-300 rounded-lg bg-white font-mono font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500 text-sm"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-blue-800">Formal Invoice (₹)</label>
+                      <span className="text-[10px] text-blue-600 font-medium">Billed with GST</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={allocModalTotal}
+                      value={allocModalFormal}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setAllocModalFormal(val);
+                        setAllocModalCash(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                      }}
+                      className="w-full p-2 border border-blue-300 rounded-lg bg-white font-mono font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <label className="font-bold text-amber-800">Cash Receipt (₹)</label>
+                      <span className="text-[10px] text-amber-600 font-medium">Without-Bill Cash</span>
+                    </div>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max={allocModalTotal}
+                      value={allocModalCash}
+                      onChange={(e) => {
+                        const val = Number(e.target.value) || 0;
+                        setAllocModalCash(val);
+                        setAllocModalFormal(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                      }}
+                      className="w-full p-2 border border-amber-300 rounded-lg bg-white font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Validation calculation */}
+                {(() => {
+                  const sum = Math.round((Number(allocModalFormal) + Number(allocModalCash)) * 100) / 100;
+                  const diff = Math.round((Number(allocModalTotal) - sum) * 100) / 100;
+                  if (diff < -0.01) {
+                    return (
+                      <div className="p-2 rounded bg-rose-50 border border-rose-200 text-rose-800 font-mono text-[11px] flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1"><AlertCircle size={13}/> Over-allocated!</span>
+                        <span>Exceeds PI Value by {formatCurrency(Math.abs(diff))}</span>
+                      </div>
+                    );
+                  }
+                  if (Math.abs(diff) < 0.01) {
+                    return (
+                      <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono text-[11px] flex items-center justify-between">
+                        <span className="font-bold flex items-center gap-1"><CheckCircle2 size={13}/> Perfectly Balanced</span>
+                        <span>{formatCurrency(allocModalFormal)} + {formatCurrency(allocModalCash)} = {formatCurrency(allocModalTotal)}</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div className="p-2 rounded bg-amber-50 border border-amber-200 text-amber-800 font-mono text-[11px] flex items-center justify-between">
+                      <span className="font-semibold">Unallocated Remaining:</span>
+                      <span className="font-bold">{formatCurrency(diff)}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Reason / Notes for Split Adjustment</label>
+                <input
+                  type="text"
+                  value={allocModalReason}
+                  onChange={(e) => setAllocModalReason(e.target.value)}
+                  placeholder="e.g., Client requested ₹30,000 cash receipt and balance formal invoice"
+                  className="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <Button variant="outline" type="button" onClick={() => { setAllocationModalPi(null); setAllocErrorMessage(''); }} disabled={allocSubmitting}>
+                  Cancel
+                </Button>
+                <button
+                  type="submit"
+                  disabled={allocSubmitting || (allocModalFormal + allocModalCash > allocModalTotal + 0.01)}
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  {allocSubmitting ? 'Updating...' : 'Save Proforma Split'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cash Payment Receipt Modal */}
+      {activeReceipt && (
+        <PaymentReceiptModal
+          receipt={activeReceipt}
+          onClose={() => setActiveReceipt(null)}
+        />
+      )}
     </div>
   );
 };

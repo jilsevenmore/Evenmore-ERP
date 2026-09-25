@@ -367,7 +367,26 @@ export const RESOURCES = {
       }),
     };
   })(),
-  proformaInvoices: documentResource('/sales/proforma-invoices/', { numberField: 'piNumber' }),
+  proformaInvoices: (() => {
+    const base = documentResource('/sales/proforma-invoices/', { numberField: 'piNumber' });
+    return {
+      ...base,
+      toApi: (doc) => compact({
+        ...base.toApi(doc),
+        totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
+        formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
+        cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        totalSalesValue: row.totalSalesValue !== undefined ? num(row.totalSalesValue) : undefined,
+        formalInvoiceAmount: row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined,
+        cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : undefined,
+        invoice: row.invoice,
+        cashReceipt: row.cashReceipt,
+      }),
+    };
+  })(),
   deliveryChallans: documentResource('/sales/challans/', { numberField: 'challanNumber' }),
   invoices: (() => {
     const base = documentResource('/sales/invoices/', { numberField: 'invoiceNumber' });
@@ -508,6 +527,7 @@ export const RESOURCES = {
         notes: p.notes || undefined,
         invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
         salesOrderId: p.salesOrderId || p.linkedSalesOrderId || undefined,
+        proformaInvoiceId: p.proformaInvoiceId || p.linkedProformaInvoiceId || undefined,
       });
     },
     fromApi: (row) => ({
@@ -519,6 +539,8 @@ export const RESOURCES = {
       invoiceId: row.invoiceId,
       salesOrderId: row.salesOrderId,
       salesOrderNumber: row.salesOrderNumber,
+      proformaInvoiceId: row.proformaInvoiceId,
+      proformaInvoiceNumber: row.proformaInvoiceNumber,
       _synced: true,
     }),
   },

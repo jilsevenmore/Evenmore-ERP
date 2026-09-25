@@ -1451,6 +1451,10 @@ export const ERPProvider = ({ children, }) => {
         const roundOff = Number(pi.roundOff) || 0;
         const grandTotal = Number(pi.grandTotal || pi.total) || Math.round((taxableAmount + cgst + sgst + igst + otherCharges + roundOff) * 100) / 100;
 
+        const totalSalesVal = Number(pi.totalSalesValue !== undefined ? pi.totalSalesValue : grandTotal);
+        const formalInvoiceAmt = Number(pi.formalInvoiceAmount !== undefined ? pi.formalInvoiceAmount : (pi.cashAmount !== undefined ? Math.max(0, totalSalesVal - Number(pi.cashAmount)) : totalSalesVal));
+        const cashAmt = Number(pi.cashAmount !== undefined ? pi.cashAmount : Math.max(0, totalSalesVal - formalInvoiceAmt));
+
         const nextNumber = pi.proformaNumber || `PI-2026-${String(proformaInvoices.length + 5).padStart(3, '0')}`;
         const newPI = {
             id: pi.id || `pi-${Date.now()}`,
@@ -1500,12 +1504,81 @@ export const ERPProvider = ({ children, }) => {
             roundOff,
             grandTotal,
             total: grandTotal,
+            totalSalesValue: totalSalesVal,
+            formalInvoiceAmount: formalInvoiceAmt,
+            cashAmount: cashAmt,
             notes: pi.notes || 'Commercial Proforma Invoice.',
             termsAndConditions: pi.termsAndConditions || '',
         };
+
+        // If formal invoice creation requested, spawn linked Sales Invoice
+        if (pi.createInvoiceNow && formalInvoiceAmt > 0) {
+            const invoiceItems = (newPI.items && newPI.items.length > 0 ? newPI.items : [
+                {
+                    id: `li-inv-${Date.now()}`,
+                    description: `Formal Invoice for PI ${newPI.proformaNumber}`,
+                    qty: 1,
+                    unit: 'Unit',
+                    rate: formalInvoiceAmt,
+                    amount: formalInvoiceAmt,
+                }
+            ]).map(it => ({
+                ...it,
+                rate: (it.rate || it.amount) ? (Number(it.rate || it.amount) * (formalInvoiceAmt / (totalSalesVal || 1))) : formalInvoiceAmt,
+                amount: it.amount ? (Number(it.amount) * (formalInvoiceAmt / (totalSalesVal || 1))) : formalInvoiceAmt,
+            }));
+
+            const invoicePayload = {
+                customerId: pi.customerId,
+                customer: pi.customer || 'Acme Corp',
+                billingAddress: newPI.billingAddress,
+                shippingAddress: newPI.shippingAddress,
+                proformaInvoiceId: newPI.id,
+                linkedPi: newPI.proformaNumber,
+                date: newPI.date,
+                dueDate: pi.invoiceDueDate || addDaysISO(getCurrentISODate(), 30),
+                status: pi.invoiceStatus || 'Draft',
+                finalized: pi.invoiceStatus === 'Finalized',
+                items: invoiceItems,
+                lineItems: invoiceItems,
+                total: formalInvoiceAmt,
+                grandTotal: formalInvoiceAmt,
+                amount: formalInvoiceAmt,
+                totalSalesValue: totalSalesVal,
+                formalInvoiceAmount: formalInvoiceAmt,
+                cashAmount: cashAmt,
+                notes: `Formal Tax Invoice generated directly with Proforma Invoice ${newPI.proformaNumber}.`,
+            };
+
+            const createdInv = createInvoice(invoicePayload);
+            if (createdInv) {
+                newPI.invoiceId = createdInv.id;
+                newPI.invoiceNumber = createdInv.invoiceNumber;
+            }
+        }
+
+        // If cash amount > 0, generate the linked Cash Receipt (Without-Bill PaymentIn)
+        if ((pi.createCashReceiptNow || cashAmt > 0) && cashAmt > 0) {
+            const createdCash = addPaymentIn({
+                customerId: pi.customerId,
+                customer: pi.customer || 'Acme Corp',
+                amount: cashAmt,
+                mode: pi.cashMode || 'Cash',
+                paymentType: 'WITHOUT_BILL',
+                proformaInvoiceId: newPI.id,
+                proformaInvoiceNumber: newPI.proformaNumber,
+                reference: pi.cashRef || `CASH-${newPI.proformaNumber}`,
+                notes: `Cash receipt allocated with Proforma Invoice ${newPI.proformaNumber}`,
+            });
+            if (createdCash) {
+                newPI.cashReceiptId = createdCash.id;
+                newPI.cashReceiptNumber = createdCash.receiptNumber || createdCash.paymentNumber;
+            }
+        }
+
         const normalizedPI = normalizeProformaInvoices([newPI])[0];
         setProformaInvoices((prev) => [normalizedPI, ...prev]);
-        showToast(`Proforma Invoice ${normalizedPI.proformaNumber} created.`);
+        showToast(`Proforma Invoice ${normalizedPI.proformaNumber} created with split allocation.`);
         persistCreate('proformaInvoices', normalizedPI, setProformaInvoices);
         return normalizedPI;
     };
@@ -1518,6 +1591,48 @@ export const ERPProvider = ({ children, }) => {
         }));
         persistUpdate('proformaInvoices', id, updates, setProformaInvoices);
         showToast(`Proforma Invoice updated.`);
+    };
+
+    const updateProformaInvoiceAllocation = async (proformaId, { formalInvoiceAmount, cashAmount, totalSalesValue, reason } = {}) => {
+        const pi = proformaInvoices.find((p) => p.id === proformaId);
+        if (!pi) return null;
+
+        const formal = formalInvoiceAmount !== undefined ? Number(formalInvoiceAmount) : (Number(pi.formalInvoiceAmount) || 0);
+        const cash = cashAmount !== undefined ? Number(cashAmount) : (Number(pi.cashAmount) || 0);
+        const total = totalSalesValue !== undefined ? Number(totalSalesValue) : (Number(pi.totalSalesValue) || Number(pi.grandTotal || pi.total) || (formal + cash));
+
+        if (isBackendEnabled() && isServerId(proformaId)) {
+            try {
+                const serverRecord = await pushAction('proformaInvoices', proformaId, 'allocate-split', {
+                    formalInvoiceAmount: formal,
+                    cashAmount: cash,
+                    totalSalesValue: total,
+                    reason,
+                });
+                if (serverRecord) {
+                    reconcile(setProformaInvoices, proformaId, serverRecord);
+                    refreshFromBackend();
+                    showToast('Proforma invoice split updated successfully.');
+                    return serverRecord;
+                }
+            } catch (err) {
+                console.error('[ERP] proformaInvoices allocate-split failed:', err);
+            }
+        }
+
+        let updated = null;
+        setProformaInvoices((prev) => prev.map((item) => {
+            if (item.id !== proformaId) return item;
+            updated = {
+                ...item,
+                totalSalesValue: total,
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+            };
+            return updated;
+        }));
+        showToast('Proforma invoice split updated locally.');
+        return updated;
     };
 
     const updateProformaInvoiceStatus = (id, status) => {
@@ -5064,6 +5179,7 @@ export const ERPProvider = ({ children, }) => {
             proformaInvoices,
             addProformaInvoice,
             updateProformaInvoice,
+            updateProformaInvoiceAllocation,
             updateProformaInvoiceStatus,
             convertProformaToInvoice,
             deleteProformaInvoice,
