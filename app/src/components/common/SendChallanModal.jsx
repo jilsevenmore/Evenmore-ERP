@@ -11,18 +11,19 @@ export const SendChallanModal = ({
     onPreviewChallan = null,
     onSuccess,
 }) => {
-    const { customers, parties, updateDeliveryChallanStatus, updateWarrantyCard, showToast } = useERP();
+    const { customers, parties, updateDeliveryChallanStatus, updateWarrantyCard, showToast, companyProfile } = useERP();
+    const senderName = companyProfile?.name || '';
 
     const customerEmail = () => {
         if (!challan) return '';
         const cust =
             customers.find((c) => c.id === challan.customerId || c.name?.toLowerCase() === challan.customer?.toLowerCase()) ||
             parties.find((p) => p.id === challan.customerId || p.name?.toLowerCase() === challan.customer?.toLowerCase());
-        return cust?.email || 'receiving.dock@client.com';
+        return cust?.email || '';
     };
 
     const [recipientEmail, setRecipientEmail] = useState('');
-    const [ccEmail, setCcEmail] = useState('logistics@horizon-systems.io');
+    const [ccEmail, setCcEmail] = useState(companyProfile?.email || '');
     const [emailSubject, setEmailSubject] = useState('');
     const [emailBody, setEmailBody] = useState('');
     const [attachChallan, setAttachChallan] = useState(true);
@@ -41,20 +42,20 @@ export const SendChallanModal = ({
             const cust =
                 customers.find((c) => c.id === challan.customerId || c.name?.toLowerCase() === challan.customer?.toLowerCase()) ||
                 parties.find((p) => p.id === challan.customerId || p.name?.toLowerCase() === challan.customer?.toLowerCase());
-            const email = cust?.email || 'receiving.dock@client.com';
+            const email = cust?.email || '';
             
             setRecipientEmail(email);
-            setEmailSubject(`Logistics Waybill & Consignment Manifest ${challan.challanNumber} — ${challan.customer}`);
+            setEmailSubject(`Logistics Waybill & Consignment Manifest ${challan.challanNumber}${challan.customer ? ` — ${challan.customer}` : ''}`);
             setEmailBody(
-                `Dear ${challan.customer} Team,\n\nPlease find attached the official logistics Delivery Challan & Shipping Waybill (${challan.challanNumber}) for your recent consignment dispatch.${
+                `Dear ${challan.customer || 'Customer'} Team,\n\nPlease find attached the official logistics Delivery Challan & Shipping Waybill (${challan.challanNumber}) for your recent consignment dispatch.${
                     warrantyCard
                         ? `\n\nAlso attached is your official Customer Warranty Certificate (${warrantyCard.cardNumber}) covering the serialized equipment included in this delivery.`
                         : ''
-                }\n\nPlease inspect the packages and verify piece counts upon arrival.\n\nBest regards,\nHorizon Enterprise Logistics Dispatch Team`
+                }\n\nPlease inspect the packages and verify piece counts upon arrival.\n\nBest regards,${senderName ? `\n${senderName} Dispatch Team` : ''}`
             );
             setAttachWarranty(Boolean(warrantyCard && warrantyCard.documentStatus !== 'Cancelled'));
         }
-    }, [challan, warrantyCard, customers, parties]);
+    }, [challan, warrantyCard, customers, parties, senderName]);
 
     if (!isOpen || !challan) return null;
 

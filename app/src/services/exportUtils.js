@@ -1,5 +1,5 @@
 /**
- * Universal CSV and Print Export Utility for Horizon ERP
+ * Universal CSV and Print Export Utility for Evenmore ERP
  */
 export function exportToCSV(filename, headers, rows) {
     const escapeCell = (cell) => {

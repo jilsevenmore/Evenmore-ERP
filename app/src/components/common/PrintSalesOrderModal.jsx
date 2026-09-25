@@ -1,16 +1,17 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, ShoppingCart, Truck } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
 
 export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
-    // [PHASE-2E.1] profile-driven letterhead (was hardcoded EVENMORE / US strings)
-    const { companyProfile } = useERP();
-    const companyName = companyProfile?.name || 'EVENMORE ENTERPRISES';
-    const companyShort = (companyName || 'E').trim().charAt(0).toUpperCase() || 'E';
+    const { companyProfile, resolvePartyAddresses } = useERP();
+    const companyName = companyProfile?.name || '';
+    const companyShort = companyInitial(companyName);
     const gstin = companyProfile?.gstin || '';
     const pan = companyProfile?.pan || '';
-    const companyAddress = companyProfile?.address || '742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134';
-    const phone = companyProfile?.phone || '+1 (800) 555-0199';
+    const companyAddress = companyProfile?.address || '';
+    const taxLine = joinNonEmpty([gstin && `GSTIN: ${gstin}`, pan && `PAN: ${pan}`]);
+    const contactLine = joinNonEmpty([companyProfile?.email, companyProfile?.phone], ' | ');
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -43,6 +44,8 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
     }, 0);
 
     const grandTotal = subtotal + taxAmount;
+    const customerAddress = addressLines(order.billingAddress
+        || resolvePartyAddresses?.(order.customerId, order.customer)?.billing);
 
     return (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
@@ -80,23 +83,21 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                                    {companyShort}
-                                </div>
+                                {companyShort && (
+                                    <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
+                                        {companyShort}
+                                    </div>
+                                )}
                                 <div>
                                     <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
                                         {companyName}
                                     </h1>
-                                    <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                                        Steel Fabrication & MS Table Manufacturing
-                                    </p>
                                 </div>
                             </div>
-                            {/* [PHASE-2E.1] GSTIN now flows from companyProfile (was US-8849201-CORP) */}
                             <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                                <p>{companyAddress}</p>
-                                <p>GSTIN: {gstin || '—'}{pan ? ` • PAN: ${pan}` : ''}</p>
-                                <p>Order Desk: orders@sweven.in | Support: {phone}</p>
+                                {companyAddress && <p>{companyAddress}</p>}
+                                {taxLine && <p>{taxLine}</p>}
+                                {contactLine && <p>Order Desk: {contactLine}</p>}
                             </div>
                         </div>
 
@@ -134,9 +135,9 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
                             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                                 FULFILLMENT & SELLER
                             </span>
-                            <p className="text-sm font-bold text-slate-900">Evenmore Enterprise Logistics LLC</p>
-                            <p className="text-slate-600 text-[11px]">Primary Dispatch Hub: Dock 14B Central</p>
-                            <p className="text-slate-500 text-[11px]">Order Stage: {order.stage || 'In Production / Staging'}</p>
+                            <p className="text-sm font-bold text-slate-900">{companyName || '—'}</p>
+                            {companyAddress && <p className="text-slate-600 text-[11px]">{companyAddress}</p>}
+                            {order.stage && <p className="text-slate-500 text-[11px]">Order Stage: {order.stage}</p>}
                         </div>
 
                         {/* Buyer */}
@@ -144,10 +145,11 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
                             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                                 ORDERED BY (CLIENT ACCOUNT)
                             </span>
-                            <p className="text-sm font-bold text-slate-900">{order.customer || 'Client Account'}</p>
-                            <p className="text-slate-600 text-[11px]">Commercial Enterprise Customer</p>
-                            <p className="text-slate-500 text-[11px]">Payment Terms: Net 30 Commercial Credit</p>
-                            <p className="text-slate-500 text-[11px]">Shipping Method: Dedicated Freight Logistics</p>
+                            <p className="text-sm font-bold text-slate-900">{order.customer || '—'}</p>
+                            {customerAddress.map((line, i) => (
+                                <p key={i} className="text-slate-600 text-[11px]">{line}</p>
+                            ))}
+                            {order.paymentTerms && <p className="text-slate-500 text-[11px]">Payment Terms: {order.paymentTerms}</p>}
                         </div>
                     </div>
 
@@ -168,25 +170,15 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
                             <tbody className="divide-y divide-slate-200">
                                 {items.length === 0 ? (
                                     <tr>
-                                        <td className="py-2.5 px-3 text-center font-mono">1</td>
-                                        <td className="py-2.5 px-3">
-                                            <p className="font-bold text-slate-900">Commercial Equipment Package</p>
-                                        </td>
-                                        <td className="py-2.5 px-3 text-center font-mono">1</td>
-                                        <td className="py-2.5 px-3 text-right font-mono">${(totalAmount || 0).toFixed(2)}</td>
-                                        <td className="py-2.5 px-3 text-center text-slate-500">0%</td>
-                                        <td className="py-2.5 px-3 text-center text-slate-500">18%</td>
-                                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                                            ${(totalAmount || 0).toFixed(2)}
-                                        </td>
+                                        <td colSpan={7} className="py-4 px-3 text-center text-slate-400 italic">No line items.</td>
                                     </tr>
                                 ) : (
                                     items.map((it, idx) => {
-                                        const qty = it.qty || 1;
-                                        const rate = it.rate || 0;
-                                        const disc = it.discount || 0;
-                                        const tax = it.tax || 0;
-                                        const lineTotal = it.amount || (qty * rate * (1 - disc / 100) * (1 + tax / 100));
+                                        const qty = Number(it.qty) || 1;
+                                        const rate = Number(it.rate) || 0;
+                                        const disc = Number(it.discount) || 0;
+                                        const tax = Number(it.tax) || 0;
+                                        const lineTotal = Number(it.amount) || (qty * rate * (1 - disc / 100) * (1 + tax / 100));
                                         return (
                                             <tr key={idx} className="hover:bg-slate-50/50">
                                                 <td className="py-2.5 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
@@ -254,18 +246,18 @@ export const PrintSalesOrderModal = ({ isOpen, onClose, order }) => {
 
                         <div className="space-y-8">
                             <div className="border-b border-slate-400 pb-1 h-12 flex items-end justify-center">
-                                <span className="font-mono text-slate-400 text-[10px] italic">Evenmore Operations Approval</span>
+                                <span className="font-mono text-slate-400 text-[10px] italic">Operations Approval</span>
                             </div>
                             <div>
                                 <p className="font-bold text-slate-900">Director of Supply Chain & Operations</p>
-                                <p className="text-[10px] text-slate-500">Evenmore Enterprise Logistics LLC</p>
+                                {companyName && <p className="text-[10px] text-slate-500">{companyName}</p>}
                             </div>
                         </div>
                     </div>
 
                     {/* Footer Notice */}
                     <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">
-                        Official Order Commitment Record. For order inquiries or expediting, contact orders@evenmore-erp.com.
+                        Official Order Commitment Record.{contactLine ? ` For order inquiries or expediting, contact ${contactLine}.` : ''}
                     </div>
                 </div>
                 </div>

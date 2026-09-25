@@ -1,12 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  ChevronLeft,
-  ChevronRight,
   ZoomIn,
   ZoomOut,
   MessageSquare,
   Send,
   FileText,
+  FileQuestion,
   Image as ImageIcon,
   Download,
   ExternalLink,
@@ -14,17 +13,12 @@ import {
 import { resolveFileUrl } from '../../../services/api';
 
 /**
- * MockPdfViewer — proof renderer with photo/PDF support and comment stream.
+ * ProofViewer — proof renderer with photo/PDF support and comment stream.
  *
- * Renders real uploaded photos and PDFs when available from user uploads,
- * or gracefully displays a technical schematic blueprint for simulated mock proofs.
+ * Renders the uploaded photo or PDF. A version whose file cannot be shown
+ * inline (no file stored, or a type the browser cannot preview) gets an explicit
+ * "no preview" state; the comment thread works either way.
  */
-
-function pageCountFor(doc) {
-  // Deterministic per file so paging is stable across re-renders.
-  const seed = (doc?.fileName ?? '').split('').reduce((n, c) => n + c.charCodeAt(0), 0);
-  return 2 + (seed % 3); // 2–4 pages
-}
 
 function commentStamp(value) {
   const d = new Date(value);
@@ -32,26 +26,22 @@ function commentStamp(value) {
   return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-const SHEET_META = [
-  ['Scale', '1:20'],
-  ['Material', 'SS-304'],
-  ['Sheet', '2 mm'],
-  ['Tolerance', '±0.1 mm'],
-];
+/** The URL a document's file can be read from, or null when it has none. */
+function fileSourceFor(doc) {
+  if (doc?.fileData) return doc.fileData;
+  const url = doc?.previewUrl;
+  // Rows written before real uploads carried a '/mock/' placeholder path.
+  if (!url || url.startsWith('/mock/')) return null;
+  return resolveFileUrl(url);
+}
 
-export function MockPdfViewer({ document: doc, projectName, annotations = [], onAddAnnotation }) {
-  const [page, setPage] = useState(1);
+export function ProofViewer({ document: doc, annotations = [], onAddAnnotation }) {
   const [zoom, setZoom] = useState(1);
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState('');
 
-  const pages = useMemo(() => pageCountFor(doc), [doc]);
-  const safePage = Math.min(page, pages);
-
-  const fileSource =
-    doc?.fileData ||
-    (doc?.previewUrl && !doc.previewUrl.startsWith('/mock/') ? resolveFileUrl(doc.previewUrl) : null);
+  const fileSource = fileSourceFor(doc);
   const hasRealFile = Boolean(fileSource);
   const isImage =
     doc?.fileType?.startsWith('image/') ||
@@ -84,7 +74,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
     setSourceState('ready');
     setSourceStatus(null);
     setPdfBlobUrl(null);
-    if (!fileSource || !hasRealFile || fileSource.startsWith('data:')) return;
+    if (!fileSource || fileSource.startsWith('data:') || (!isPdf && !isImage)) return;
     let cancelled = false;
     let objectUrl = null;
     const request = isPdf ? fetch(fileSource) : fetch(fileSource, { headers: { Range: 'bytes=0-0' } });
@@ -111,7 +101,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [fileSource, hasRealFile, isPdf]);
+  }, [fileSource, isPdf, isImage]);
 
   // data: URLs (a fresh local upload) are same-origin already.
   const pdfFrameSrc = fileSource?.startsWith('data:') ? fileSource : pdfBlobUrl;
@@ -136,6 +126,27 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
     }
   }
 
+  function renderFileActions() {
+    return (
+      <div className="flex items-center gap-2 mt-4">
+        <button
+          type="button"
+          onClick={handleOpenExternal}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700"
+        >
+          <ExternalLink size={12} /> Open in new tab
+        </button>
+        <a
+          href={fileSource}
+          download={doc.fileName}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce5f4] bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:text-blue-600"
+        >
+          <Download size={12} /> Download
+        </a>
+      </div>
+    );
+  }
+
   function renderSourceFallback() {
     return (
       <div className="p-6 sm:p-10 bg-slate-100 flex flex-col items-center justify-center text-center min-h-[380px]">
@@ -146,22 +157,23 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
         <p className="text-[11px] text-slate-500 mt-1 max-w-sm">
           The file itself is fine — open it directly instead.
         </p>
-        <div className="flex items-center gap-2 mt-4">
-          <button
-            type="button"
-            onClick={handleOpenExternal}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-blue-700"
-          >
-            <ExternalLink size={12} /> Open in new tab
-          </button>
-          <a
-            href={fileSource}
-            download={doc.fileName}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce5f4] bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 hover:text-blue-600"
-          >
-            <Download size={12} /> Download
-          </a>
-        </div>
+        {renderFileActions()}
+      </div>
+    );
+  }
+
+  function renderNoPreview() {
+    return (
+      <div className="p-6 sm:p-10 bg-slate-100 flex flex-col items-center justify-center text-center min-h-[340px]">
+        <FileQuestion size={26} className="text-slate-300 mb-3" />
+        <p className="text-xs font-bold text-slate-700">No preview available</p>
+        <p className="text-[11px] text-slate-500 mt-1 max-w-sm break-all">{doc.fileName}</p>
+        <p className="text-[11px] text-slate-500 mt-1 max-w-sm">
+          {hasRealFile
+            ? 'This file type cannot be shown inline — open or download it instead.'
+            : 'No file is stored for this version. Upload a new version to attach one.'}
+        </p>
+        {hasRealFile && renderFileActions()}
       </div>
     );
   }
@@ -182,7 +194,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
     setPosting(true);
     setPostError('');
     try {
-      await onAddAnnotation?.({ page: safePage, text });
+      await onAddAnnotation?.({ page: null, text });
       setDraft('');
     } catch (err) {
       setPostError(err?.message || 'Your comment could not be sent. Please try again.');
@@ -191,11 +203,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
     }
   }
 
-  // A real PDF/photo scrolls in its own viewer, so there is no page to pin to:
-  // show the whole thread. The schematic sheets page, so filter by sheet there.
-  const pageComments = hasRealFile
-    ? annotations
-    : annotations.filter((a) => !a.page || a.page === safePage);
+  const canPreview = hasRealFile && (isImage || isPdf);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-4">
@@ -215,7 +223,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 shrink-0">
               v{doc.version}.0
             </span>
-            {hasRealFile && (
+            {canPreview && (
               <span
                 className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
                   isImage
@@ -229,7 +237,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {(!hasRealFile || isImage) && (
+            {canPreview && isImage && (
               <>
                 <button
                   type="button"
@@ -261,36 +269,9 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
               </>
             )}
 
-            {!hasRealFile && (
-              <>
-                <span className="w-px h-4 bg-slate-200 mx-1" />
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={safePage <= 1}
-                  aria-label="Previous page"
-                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <span className="text-[10px] font-semibold text-slate-600" data-test="pdf-page">
-                  {safePage} / {pages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setPage((p) => Math.min(pages, p + 1))}
-                  disabled={safePage >= pages}
-                  aria-label="Next page"
-                  className="p-1 rounded text-slate-500 hover:bg-white disabled:opacity-30"
-                >
-                  <ChevronRight size={14} />
-                </button>
-              </>
-            )}
-
             {hasRealFile && (
               <>
-                <span className="w-px h-4 bg-slate-200 mx-1" />
+                {canPreview && isImage && <span className="w-px h-4 bg-slate-200 mx-1" />}
                 <a
                   href={fileSource}
                   download={doc.fileName}
@@ -312,8 +293,8 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
           </div>
         </div>
 
-        {/* Content Viewer: Real Photo, Real PDF, or Fallback Blueprint */}
-        {hasRealFile && isImage ? (
+        {/* Content: photo, PDF, or an explicit no-preview state */}
+        {canPreview && isImage ? (
           sourceState === 'failed' ? (
             renderSourceFallback()
           ) : (
@@ -330,7 +311,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
               />
             </div>
           )
-        ) : hasRealFile && isPdf ? (
+        ) : canPreview && isPdf ? (
           sourceState === 'failed' ? (
             renderSourceFallback()
           ) : (
@@ -350,61 +331,16 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
             </div>
           )
         ) : (
-          /* Mock sheet fallback */
-          <div className="p-3 sm:p-5 bg-slate-100 flex justify-center-safe lg:justify-center overflow-auto" style={{ minHeight: 340 }}>
-            <div
-              className="bg-white border border-slate-300 shadow-sm"
-              style={{
-                width: 460 * zoom,
-                minHeight: 300 * zoom,
-                transition: 'width 0.2s ease',
-                padding: 16 * zoom,
-              }}
-            >
-              <div className="border-2 border-slate-800 h-full flex flex-col" style={{ minHeight: 268 * zoom }}>
-                <div className="border-b-2 border-slate-800 px-3 py-2 text-center">
-                  <p className="font-bold text-slate-800 tracking-wide" style={{ fontSize: 11 * zoom }}>
-                    TECHNICAL BLUEPRINT — {(projectName ?? 'ASSEMBLY').toUpperCase()}
-                  </p>
-                </div>
-
-                <div className="flex-1 flex items-center justify-center p-4">
-                  {/* A deliberately schematic drawing, not a fake screenshot. */}
-                  <svg viewBox="0 0 200 120" style={{ width: 240 * zoom, height: 144 * zoom }} role="img" aria-label="Schematic drawing">
-                    <rect x="20" y="20" width="160" height="80" fill="none" stroke="#334155" strokeWidth="2" />
-                    <rect x="34" y="34" width="60" height="52" fill="none" stroke="#94a3b8" strokeWidth="1" strokeDasharray="3 2" />
-                    <circle cx="140" cy="46" r="8" fill="none" stroke="#334155" strokeWidth="1.5" />
-                    <circle cx="140" cy="76" r="8" fill="none" stroke="#334155" strokeWidth="1.5" />
-                    <line x1="20" y1="110" x2="180" y2="110" stroke="#64748b" strokeWidth="0.8" />
-                    <text x="100" y="117" textAnchor="middle" fontSize="7" fill="#64748b">2200 mm</text>
-                    <text x="46" y="64" fontSize="7" fill="#94a3b8">PANEL {safePage}</text>
-                  </svg>
-                </div>
-
-                <div className="border-t-2 border-slate-800 px-3 py-1.5 flex flex-wrap gap-x-4 gap-y-0.5">
-                  {SHEET_META.map(([k, v]) => (
-                    <span key={k} className="text-slate-600" style={{ fontSize: 8 * zoom }}>
-                      <strong>{k}:</strong> {v}
-                    </span>
-                  ))}
-                  <span className="text-slate-400 ml-auto" style={{ fontSize: 8 * zoom }}>
-                    Sheet {safePage} of {pages}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+          renderNoPreview()
         )}
       </div>
 
       {/* Comment stream */}
-      <aside className="rounded-xl border border-[#dce5f4] bg-white flex flex-col" style={{ maxHeight: hasRealFile ? 'min(58vh, 620px)' : 420, minHeight: 320 }}>
+      <aside className="rounded-xl border border-[#dce5f4] bg-white flex flex-col" style={{ maxHeight: canPreview ? 'min(58vh, 620px)' : 420, minHeight: 320 }}>
         <header className="flex items-center gap-1.5 px-3 py-2 border-b border-[#dce5f4]">
           <MessageSquare size={12} className="text-slate-400" />
           <span className="text-[11px] font-bold text-slate-700">Comments</span>
-          <span className="text-[10px] text-slate-400 ml-auto">
-            {hasRealFile ? `${annotations.length}` : `page ${safePage}`}
-          </span>
+          <span className="text-[10px] text-slate-400 ml-auto">{annotations.length}</span>
         </header>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
@@ -423,13 +359,11 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
             </div>
           )}
 
-          {pageComments.length === 0 && !doc.comments && !doc.revisionReason && (
-            <p className="text-[11px] text-slate-400 text-center py-6">
-              {hasRealFile ? 'No comments on this drawing yet.' : 'No comments on this page yet.'}
-            </p>
+          {annotations.length === 0 && !doc.comments && !doc.revisionReason && (
+            <p className="text-[11px] text-slate-400 text-center py-6">No comments on this drawing yet.</p>
           )}
 
-          {pageComments.map((a) => {
+          {annotations.map((a) => {
             const fromClient = a.authorType === 'Client';
             return (
               <div
@@ -464,7 +398,7 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
                 type="text"
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder={hasRealFile ? 'Add a comment…' : `Comment on page ${safePage}…`}
+                placeholder="Add a comment…"
                 aria-label="Add a comment"
                 maxLength={4000}
                 className="flex-1 min-w-0 text-[11px] rounded-lg border border-[#dce5f4] px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
@@ -485,4 +419,4 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
   );
 }
 
-export default MockPdfViewer;
+export default ProofViewer;

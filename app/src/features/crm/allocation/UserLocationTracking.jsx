@@ -1,5 +1,7 @@
 import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from 'react';
+import { useCrmStore } from '../../../stores/crmStore';
+import { avatarColorFor } from '../../../services/crmSync';
 import {
   Search,
   MapPin,
@@ -34,37 +36,49 @@ import {
   PhoneCall,
 } from 'lucide-react';
 
-const DEPTS = ['Sales & Marketing', 'Operations', 'Support'];
 const PER_PAGE_OPTIONS = [5, 10, 20];
 
-const STAFF = [
-  { id: 'EMP-01', name: 'Anuska Shah', short: 'Anuska', dept: 'Sales & Marketing', role: 'TCE', phone: '+91 98111 22334', status: 'Online', lastSeen: 'Just now', x: 38, y: 52, color: '#2563eb', loc: '4th Mission St, San Francisco, CA 94105, USA', dist: '0.02 km', worked: '10:24h', idle: '12m', atSite: 'At Client', battery: 78 },
-  { id: 'EMP-02', name: 'Rahul Verma', short: 'Rahul', dept: 'Sales & Marketing', role: 'BDE', phone: '+91 98234 11223', status: 'Online', lastSeen: '2 min ago', x: 55, y: 38, color: '#7c3aed', loc: 'Market St, San Francisco, CA, USA', dist: '0.4 km', worked: '08:10h', idle: '05m', atSite: 'Travel', battery: 64 },
-  { id: 'EMP-03', name: 'Priya Mehta', short: 'Priya', dept: 'Sales & Marketing', role: 'TCE', phone: '+91 98455 33445', status: 'Online', lastSeen: '1 min ago', x: 66, y: 55, color: '#0d9488', loc: 'Mission District, San Francisco, CA, USA', dist: '1.1 km', worked: '09:02h', idle: '20m', atSite: 'Office', battery: 82 },
-  { id: 'EMP-04', name: 'David Patel', short: 'David', dept: 'Operations', role: 'ASM', phone: '+91 98777 88990', status: 'Online', lastSeen: '4 min ago', x: 28, y: 30, color: '#ea580c', loc: 'Richmond District, San Francisco, CA, USA', dist: '2.3 km', worked: '07:45h', idle: '08m', atSite: 'Travel', battery: 55 },
-  { id: 'EMP-05', name: 'Sneha Iyer', short: 'Sneha', dept: 'Support', role: 'SSE', phone: '+91 98111 99887', status: 'Online', lastSeen: '6 min ago', x: 48, y: 68, color: '#db2777', loc: 'Bernal Heights, San Francisco, CA, USA', dist: '0.8 km', worked: '06:30h', idle: '15m', atSite: 'At Client', battery: 71 },
-  { id: 'EMP-06', name: 'Amit Rao', short: 'Amit', dept: 'Operations', role: 'SSE', phone: '+91 97654 32109', status: 'Offline', lastSeen: '1 hour ago', x: 72, y: 30, color: '#64748b', loc: 'Downtown, San Francisco, CA, USA', dist: '3.5 km', worked: '05:12h', idle: '48m', atSite: 'Idle', battery: 32 },
-  { id: 'EMP-07', name: 'Kavya Nair', short: 'Kavya', dept: 'Sales & Marketing', role: 'BDE', phone: '+91 96543 21098', status: 'Offline', lastSeen: '3 hours ago', x: 22, y: 62, color: '#64748b', loc: 'Sunset District, San Francisco, CA, USA', dist: '4.0 km', worked: '04:05h', idle: '62m', atSite: 'Idle', battery: 21 },
-  { id: 'EMP-08', name: 'Vikram Singh', short: 'Vikram', dept: 'Support', role: 'TCE', phone: '+91 95432 10987', status: 'Offline', lastSeen: 'Yesterday', x: 60, y: 74, color: '#64748b', loc: 'Bayview, San Francisco, CA, USA', dist: '5.2 km', worked: '03:40h', idle: '90m', atSite: 'Off Duty', battery: 12 },
-];
+/**
+ * The CRM roster as trackable staff. There is no location feed yet, so every
+ * person starts without coordinates, activity or device data — the map and the
+ * history panels show their empty states until one exists.
+ */
+function toStaff(member) {
+  const name = String(member?.name || '').trim();
+  return {
+    id: String(member?.id ?? member?.email ?? name),
+    name,
+    short: name.split(' ')[0] || name,
+    dept: member?.department || '',
+    role: member?.designation || member?.role || '',
+    phone: member?.phone || '',
+    status: member?.online ? 'Online' : 'Offline',
+    lastSeen: member?.lastSeen || '—',
+    x: member?.x ?? null,
+    y: member?.y ?? null,
+    color: avatarColorFor(member?.id ?? name),
+    loc: member?.location || '',
+    dist: member?.distance || '—',
+    worked: member?.worked || '—',
+    idle: member?.idle || '—',
+    atSite: member?.atSite || '—',
+    battery: member?.battery ?? null,
+    activity: Array.isArray(member?.activity) ? member.activity : [],
+    logs: Array.isArray(member?.logs) ? member.logs : [],
+  };
+}
 
-const ACTIVITY = [
-  { time: '10:24 AM', title: 'At Client Location', sub: 'Met client at San Francisco', tone: '#2563eb' },
-  { time: '01:02 AM', title: 'Travel', sub: 'Moving (28 km/h)', tone: '#7c3aed' },
-  { time: '02:42 AM', title: 'Office', sub: 'Checked in at office', tone: '#0d9488' },
-  { time: '01:45 PM', title: 'Idle', sub: 'No movement for 12 minutes', tone: '#f59e0b' },
-];
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
-const FULL_LOGS = [
-  { time: '09:00 AM', status: 'Checked In', loc: 'Headquarters • Office Premises', battery: '100%', speed: '0 km/h', duration: '45m' },
-  { time: '09:45 AM', status: 'In Transit', loc: 'Market St to 4th Mission St', battery: '96%', speed: '34 km/h', duration: '20m' },
-  { time: '10:05 AM', status: 'At Client Location', loc: '4th Mission St, San Francisco', battery: '91%', speed: '0 km/h', duration: '2h 15m' },
-  { time: '12:20 PM', status: 'Lunch / Break', loc: 'Union Square Cafe Area', battery: '84%', speed: '0 km/h', duration: '40m' },
-  { time: '01:00 PM', status: 'Site Visit Phase 2', loc: 'Bernal Heights Tech Hub', battery: '78%', speed: '24 km/h', duration: '1h 30m' },
-];
+function nowLabel() {
+  return new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
 function initials(name) {
-  return name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase();
+  return String(name || '').split(' ').filter(Boolean).map((p) => p[0]).join('').slice(0, 2).toUpperCase();
 }
 
 function downloadCsv(filename, rows) {
@@ -81,19 +95,32 @@ function downloadCsv(filename, rows) {
 }
 
 export default function UserLocationTracking() {
+  const roster = useCrmStore((s) => s.teamMembers);
+  const STAFF = useMemo(() => {
+    const seen = new Set();
+    return (roster || [])
+      .filter((m) => {
+        const key = String(m?.id ?? m?.email ?? m?.name ?? '');
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map(toStaff);
+  }, [roster]);
+  const DEPTS = useMemo(() => [...new Set(STAFF.map((s) => s.dept).filter(Boolean))], [STAFF]);
   const [search, setSearch] = useState('');
   const [dept, setDept] = useState('All');
   const [status, setStatus] = useState('All');
   const [mapType, setMapType] = useState('map');
   const [zoom, setZoom] = useState(1);
   const [live, setLive] = useState(true);
-  const [selectedId, setSelectedId] = useState('EMP-01');
+  const [selectedId, setSelectedId] = useState('');
   const [tab, setTab] = useState('live');
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [reportsOpen, setReportsOpen] = useState(false);
-  const [date, setDate] = useState('2026-09-11');
-  const [updatedAt, setUpdatedAt] = useState('11 Sep 2026, 10:30 AM');
+  const [date, setDate] = useState(todayISO);
+  const [updatedAt, setUpdatedAt] = useState(nowLabel);
   const [ping, setPing] = useState(0);
 
   const [toastMessage, setToastMessage] = useState(null);
@@ -101,13 +128,13 @@ export default function UserLocationTracking() {
   const [activeMessageStaff, setActiveMessageStaff] = useState(null);
   const [messageText, setMessageText] = useState('');
   const [historyModalStaff, setHistoryModalStaff] = useState(null);
-  const [historyDate, setHistoryDate] = useState('2026-09-11');
+  const [historyDate, setHistoryDate] = useState(todayISO);
 
   useEffect(() => {
     if (!live) return;
     const t = setInterval(() => {
       setPing((p) => p + 1);
-      setUpdatedAt(new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }));
+      setUpdatedAt(nowLabel());
     }, 10000);
     return () => clearInterval(t);
   }, [live]);
@@ -125,11 +152,13 @@ export default function UserLocationTracking() {
       if (!q) return true;
       return (s.name + ' ' + s.id + ' ' + s.phone).toLowerCase().includes(q);
     });
-  }, [search, dept, status]);
+  }, [STAFF, search, dept, status]);
 
   const online = STAFF.filter((s) => s.status === 'Online');
   const offline = STAFF.filter((s) => s.status !== 'Online');
-  const selected = STAFF.find((s) => s.id === selectedId) || filtered[0] || STAFF[0];
+  const selected = STAFF.find((s) => s.id === selectedId) || filtered[0] || STAFF[0] || null;
+  const located = filtered.filter((s) => s.x != null && s.y != null);
+  const pct = (n) => `${STAFF.length ? ((n / STAFF.length) * 100).toFixed(1) : '0.0'}%`;
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, totalPages);
@@ -151,6 +180,11 @@ export default function UserLocationTracking() {
 
   function handleStartCall() {
     if (!activeCallStaff) return;
+    if (!activeCallStaff.phone) {
+      showToast(`No phone number on record for ${activeCallStaff.name}.`);
+      setActiveCallStaff(null);
+      return;
+    }
     showToast(`Dialing call to ${activeCallStaff.name} (${activeCallStaff.phone})...`);
     window.open(`tel:${activeCallStaff.phone.replace(/\s+/g, '')}`);
     setActiveCallStaff(null);
@@ -169,6 +203,7 @@ export default function UserLocationTracking() {
   }
 
   function handleOpenHistory(staff) {
+    if (!staff && !selected) return;
     setHistoryModalStaff(staff || selected);
   }
 
@@ -230,10 +265,10 @@ export default function UserLocationTracking() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
         <CrmKpiCard label="Total Employees" value={STAFF.length} icon={Users} tone="blue" />
-        <CrmKpiCard label="Online Now" value={online.length} icon={Wifi} tone="emerald"> <em className="not-italic text-[10px] font-bold text-emerald-600">23.8%</em></CrmKpiCard>
-        <CrmKpiCard label="Offline" value={offline.length} icon={WifiOff} tone="rose"> <em className="not-italic text-[10px] font-bold text-slate-400">76.2%</em></CrmKpiCard>
-        <CrmKpiCard label="Tracked with Location" value={STAFF.length - 3} icon={Navigation} tone="purple" />
-        <CrmKpiCard label="Out of Office" value="3" icon={Briefcase} tone="amber" />
+        <CrmKpiCard label="Online Now" value={online.length} icon={Wifi} tone="emerald"> <em className="not-italic text-[10px] font-bold text-emerald-600">{pct(online.length)}</em></CrmKpiCard>
+        <CrmKpiCard label="Offline" value={offline.length} icon={WifiOff} tone="rose"> <em className="not-italic text-[10px] font-bold text-slate-400">{pct(offline.length)}</em></CrmKpiCard>
+        <CrmKpiCard label="Tracked with Location" value={STAFF.filter((s) => s.x != null && s.y != null).length} icon={Navigation} tone="purple" />
+        <CrmKpiCard label="Out of Office" value={STAFF.filter((s) => s.atSite === 'Out of Office').length} icon={Briefcase} tone="amber" />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-2.5">
@@ -289,7 +324,7 @@ export default function UserLocationTracking() {
                 ))}
               </svg>
               <div className="absolute inset-0 transition-transform" style={{ transform: `scale(${zoom})` }}>
-                {filtered.map((s, i) => (
+                {located.map((s) => (
                   <button
                     key={s.id + ping}
                     type="button"
@@ -301,7 +336,7 @@ export default function UserLocationTracking() {
                       <span className="w-5 h-5 rounded-full grid place-items-center text-[8px] font-bold text-white" style={{ background: s.color }}>{initials(s.name)}</span>
                       {s.short}
                     </span>
-                    <span className="text-[9px] font-mono text-slate-500 bg-white/80 rounded px-1">{i + 1} min ago</span>
+                    <span className="text-[9px] font-mono text-slate-500 bg-white/80 rounded px-1">{s.lastSeen}</span>
                     <span className={`w-0 h-0 border-l-[7px] border-r-[7px] border-t-[10px] border-l-transparent border-r-transparent ${s.status === 'Online' ? 'border-t-emerald-500' : 'border-t-slate-400'}`} />
                   </button>
                 ))}
@@ -311,7 +346,12 @@ export default function UserLocationTracking() {
                 <button type="button" onClick={() => setZoom((z) => Math.max(0.6, +(z - 0.2).toFixed(1)))} className="w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50 cursor-pointer" aria-label="Zoom out"><Minus size={15} /></button>
               </div>
               <button type="button" onClick={() => setZoom(1)} className="absolute left-3 bottom-3 w-8 h-8 grid place-items-center bg-white border border-slate-200 rounded-lg shadow-sm text-slate-600 hover:bg-slate-50 cursor-pointer" aria-label="Reset view"><Crosshair size={15} /></button>
-              <span className="absolute right-3 bottom-3 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-white/85 rounded-md px-2 py-1 border border-slate-200"><Layers size={11} /> {filtered.length} markers</span>
+              {located.length === 0 && (
+                <div className="absolute inset-0 grid place-items-center pointer-events-none">
+                  <span className="text-[11px] font-semibold text-slate-500 bg-white/85 rounded-lg px-3 py-1.5 border border-slate-200">No live location data yet</span>
+                </div>
+              )}
+              <span className="absolute right-3 bottom-3 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500 bg-white/85 rounded-md px-2 py-1 border border-slate-200"><Layers size={11} /> {located.length} markers</span>
             </div>
           </div>
 
@@ -343,7 +383,7 @@ export default function UserLocationTracking() {
                         </span>
                       </td>
                       <td className="px-2 py-2.5 text-slate-500">{s.dept}<span className="block text-[10px] text-slate-400">{s.role}</span></td>
-                      <td className="px-2 py-2.5 text-slate-500 font-mono text-[11px]">{s.phone}</td>
+                      <td className="px-2 py-2.5 text-slate-500 font-mono text-[11px]">{s.phone || '—'}</td>
                       <td className="px-2 py-2.5">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${s.status === 'Online' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-rose-50 text-rose-500 border-rose-200'}`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'Online' ? 'bg-emerald-500' : 'bg-rose-500'}`} />{s.status}
@@ -360,13 +400,13 @@ export default function UserLocationTracking() {
                     </tr>
                   ))}
                   {pageItems.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No employees match the filters.</td></tr>
+                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">{STAFF.length === 0 ? 'No users on the CRM roster yet.' : 'No employees match the filters.'}</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             <div className="flex items-center justify-between px-4 py-2.5 border-t border-slate-100 text-[11px] text-slate-500 pr-20 sm:pr-24">
-              <span>Showing {(safePage - 1) * perPage + 1} to {Math.min(safePage * perPage, filtered.length)} of {filtered.length} users</span>
+              <span>Showing {filtered.length ? (safePage - 1) * perPage + 1 : 0} to {Math.min(safePage * perPage, filtered.length)} of {filtered.length} users</span>
               <span className="flex items-center gap-1.5">
                 <button type="button" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)} className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-50 cursor-pointer"><ChevronLeft size={13} /></button>
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
@@ -381,15 +421,20 @@ export default function UserLocationTracking() {
           </div>
         </div>
 
+        {!selected ? (
+          <div className="bg-white border border-slate-200 rounded-2xl h-fit xl:sticky xl:top-4 p-6 text-center text-xs text-slate-400">
+            Select a user to see their location details.
+          </div>
+        ) : (
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden h-fit xl:sticky xl:top-4">
           <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-100">
             <span className="w-9 h-9 rounded-full grid place-items-center text-xs font-bold text-white shrink-0" style={{ background: selected.color }}>{initials(selected.name)}</span>
             <div className="flex-1 min-w-0">
               <strong className="block text-sm text-slate-900 truncate">{selected.name}</strong>
-              <span className="block text-[10px] text-slate-400 truncate">{selected.dept} | {selected.role}</span>
+              <span className="block text-[10px] text-slate-400 truncate">{[selected.dept, selected.role].filter(Boolean).join(' | ')}</span>
             </div>
             <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${selected.status === 'Online' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>{selected.status}</span>
-            <button type="button" onClick={() => setSelectedId(filtered[0]?.id || 'EMP-01')} className="text-slate-300 hover:text-slate-500 cursor-pointer"><X size={15} /></button>
+            <button type="button" onClick={() => setSelectedId(filtered[0]?.id || '')} className="text-slate-300 hover:text-slate-500 cursor-pointer"><X size={15} /></button>
           </div>
           <div className="flex gap-1 px-4 pt-3 text-[11px] font-bold">
             {[['live', 'Live Info'], ['history', 'Activity History'], ['timeline', 'Timeline']].map(([k, label]) => (
@@ -401,7 +446,7 @@ export default function UserLocationTracking() {
               <div className="space-y-3">
                 <div className="rounded-xl border border-slate-200 p-3">
                   <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5"><MapPin size={13} className="text-blue-500" /> Current Location</p>
-                  <p className="text-[11px] text-slate-500 mt-1">{selected.loc}</p>
+                  <p className="text-[11px] text-slate-500 mt-1">{selected.loc || 'Location not available'}</p>
                   <button type="button" onClick={() => handleLocateStaff(selected)} className="text-[11px] font-bold text-blue-600 mt-1 cursor-pointer">View on Map</button>
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 text-center">
@@ -412,15 +457,18 @@ export default function UserLocationTracking() {
                 </div>
                 <div className="grid grid-cols-2 gap-2.5 text-[11px]">
                   <div className="rounded-xl border border-slate-200 p-2.5"><p className="text-slate-400 text-[10px]">Location Status</p><strong className="text-emerald-600 flex items-center gap-1 mt-0.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{selected.atSite}</strong></div>
-                  <div className="rounded-xl border border-slate-200 p-2.5"><p className="text-slate-400 text-[10px]">Battery</p><strong className="text-slate-800 flex items-center gap-1 mt-0.5"><Battery size={13} className="text-emerald-500" />{selected.battery}%</strong></div>
+                  <div className="rounded-xl border border-slate-200 p-2.5"><p className="text-slate-400 text-[10px]">Battery</p><strong className="text-slate-800 flex items-center gap-1 mt-0.5"><Battery size={13} className="text-emerald-500" />{selected.battery != null ? `${selected.battery}%` : '—'}</strong></div>
                 </div>
               </div>
             )}
             {tab !== 'live' && (
               <div className="space-y-0">
                 <p className="text-[11px] font-bold text-slate-500 mb-2">Today's Activity</p>
-                {ACTIVITY.map((a) => (
-                  <div key={a.title} className="flex gap-2.5 pb-3.5 relative">
+                {selected.activity.length === 0 && (
+                  <p className="text-[11px] text-slate-400 pb-2">No activity recorded today.</p>
+                )}
+                {selected.activity.map((a, idx) => (
+                  <div key={a.id || idx} className="flex gap-2.5 pb-3.5 relative">
                     <span className="flex flex-col items-center">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.tone }} />
                       <span className="w-px flex-1 bg-slate-200" />
@@ -436,6 +484,7 @@ export default function UserLocationTracking() {
             <button type="button" onClick={() => handleOpenHistory(selected)} className="w-full mt-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition cursor-pointer">View Full History</button>
           </div>
         </div>
+        )}
       </div>
 
       {activeCallStaff && (
@@ -445,9 +494,9 @@ export default function UserLocationTracking() {
               {initials(activeCallStaff.name)}
             </div>
             <h3 className="text-base font-bold text-slate-900">{activeCallStaff.name}</h3>
-            <p className="text-xs text-slate-500 mt-0.5">{activeCallStaff.dept} • {activeCallStaff.role}</p>
+            <p className="text-xs text-slate-500 mt-0.5">{[activeCallStaff.dept, activeCallStaff.role].filter(Boolean).join(' • ')}</p>
             <div className="my-4 p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs font-mono font-bold text-blue-700 flex items-center justify-center gap-2">
-              <PhoneCall size={15} className="animate-bounce" /> {activeCallStaff.phone}
+              <PhoneCall size={15} className="animate-bounce" /> {activeCallStaff.phone || 'No phone number on record'}
             </div>
             <div className="flex gap-2.5 pt-2">
               <button type="button" onClick={() => setActiveCallStaff(null)} className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition cursor-pointer">
@@ -520,7 +569,7 @@ export default function UserLocationTracking() {
                 </span>
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">{historyModalStaff.name} — Full Location History</h3>
-                  <p className="text-[11px] text-slate-500">{historyModalStaff.dept} • {historyModalStaff.role} • {historyModalStaff.phone}</p>
+                  <p className="text-[11px] text-slate-500">{[historyModalStaff.dept, historyModalStaff.role, historyModalStaff.phone].filter(Boolean).join(' • ')}</p>
                 </div>
               </div>
               <button type="button" onClick={() => setHistoryModalStaff(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X size={18} /></button>
@@ -541,7 +590,7 @@ export default function UserLocationTracking() {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
                   <Footprints size={16} className="mx-auto text-blue-600 mb-1" />
                   <span className="block text-[10px] text-slate-400">Total Distance</span>
-                  <strong className="text-xs font-bold text-slate-800">14.8 km</strong>
+                  <strong className="text-xs font-bold text-slate-800">{historyModalStaff.dist}</strong>
                 </div>
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
                   <Timer size={16} className="mx-auto text-purple-600 mb-1" />
@@ -556,7 +605,7 @@ export default function UserLocationTracking() {
                 <div className="bg-slate-50 border border-slate-200 rounded-xl p-2.5">
                   <Battery size={16} className="mx-auto text-emerald-600 mb-1" />
                   <span className="block text-[10px] text-slate-400 font-medium">Battery Level</span>
-                  <strong className="text-xs font-bold text-slate-800">{historyModalStaff.battery}%</strong>
+                  <strong className="text-xs font-bold text-slate-800">{historyModalStaff.battery != null ? `${historyModalStaff.battery}%` : '—'}</strong>
                 </div>
               </div>
 
@@ -573,7 +622,10 @@ export default function UserLocationTracking() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-[11px]">
-                      {FULL_LOGS.map((log, idx) => (
+                      {historyModalStaff.logs.length === 0 && (
+                        <tr><td colSpan={4} className="px-3 py-6 text-center text-slate-400">No location history for this date.</td></tr>
+                      )}
+                      {historyModalStaff.logs.map((log, idx) => (
                         <tr key={idx} className="hover:bg-slate-50/70">
                           <td className="px-3 py-2.5 font-mono text-slate-500 font-semibold">{log.time}</td>
                           <td className="px-3 py-2.5 font-bold text-slate-800">{log.status}</td>
@@ -587,7 +639,7 @@ export default function UserLocationTracking() {
               </div>
             </div>
             <div className="flex justify-between items-center px-5 py-3.5 bg-slate-50 border-t border-slate-100">
-              <button type="button" onClick={() => downloadCsv(`location_history_${historyModalStaff.id}.csv`, [['Time', 'Status', 'Location', 'Battery'], ...FULL_LOGS.map((l) => [l.time, l.status, l.loc, l.battery])])} className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
+              <button type="button" onClick={() => downloadCsv(`location_history_${historyModalStaff.id}.csv`, [['Time', 'Status', 'Location', 'Battery'], ...historyModalStaff.logs.map((l) => [l.time, l.status, l.loc, l.battery])])} className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer">
                 <Download size={13} /> Export Route Log
               </button>
               <button type="button" onClick={() => setHistoryModalStaff(null)} className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer">

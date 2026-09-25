@@ -177,11 +177,7 @@ function inferCategoryFromFilename(filename) {
 export function DocumentsPage() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees);
-  const currentUser = useAppStore((s) => s.currentUser) || {
-    name: "Adarsh Gupta",
-    role: "Operations Admin",
-    email: "admin@evenmore.io",
-  };
+  const currentUser = useAppStore((s) => s.currentUser) || {};
 
   const {
     documents,
@@ -202,13 +198,16 @@ export function DocumentsPage() {
 
   // Employee-wise tab state
   const [selectedEmpName, setSelectedEmpName] = useState(
-    employees[0]?.name || "Priya Patel"
+    employees[0]?.name || ""
   );
+  useEffect(() => {
+    if (!selectedEmpName && employees[0]?.name) setSelectedEmpName(employees[0].name);
+  }, [employees, selectedEmpName]);
   const [empSearch, setEmpSearch] = useState("");
   const [empCategoryFilter, setEmpCategoryFilter] = useState("All");
 
   // My Documents user override
-  const [myDocUser, setMyDocUser] = useState(currentUser?.name || "Adarsh Gupta");
+  const [myDocUser, setMyDocUser] = useState(currentUser?.name || "");
   const [myDocCategoryFilter, setMyDocCategoryFilter] = useState("All");
 
   // Modals state
@@ -269,13 +268,13 @@ export function DocumentsPage() {
   const currentSelectedEmployee = useMemo(() => {
     return (
       employees.find((e) => e.name === selectedEmpName) || {
-        id: "EMP-CUSTOM",
-        name: selectedEmpName,
-        designation: "Team Member",
-        department: "General",
-        email: `${selectedEmpName.toLowerCase().replace(/\s+/g, ".")}@company.com`,
-        joining: "Jan 15, 2023",
-        status: "Active",
+        id: "—",
+        name: selectedEmpName || "No employee selected",
+        designation: "—",
+        department: "—",
+        email: "",
+        joining: "—",
+        status: "—",
         avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(selectedEmpName)}`,
       }
     );
@@ -340,7 +339,7 @@ export function DocumentsPage() {
           version: "v1.0",
           expiry: "—",
           status: "Valid",
-          fileType: "PDF",
+          fileType: (file.name.split(".").pop() || "").toUpperCase(),
           fileSize: `${sizeInMb} MB`,
           uploadedBy: currentUser?.name,
           description: `Selected from device: ${file.name} (uploaded on ${new Date().toISOString().slice(0, 10)}).`,
@@ -798,7 +797,7 @@ export function DocumentsPage() {
                             <span className="text-[10px] bg-rose-50 text-rose-700 px-1.5 py-0.2 rounded border border-rose-200 font-bold">PDF</span>
                             <span>{d.version || "v1.0"}</span>
                           </div>
-                          <div className="text-[11px] text-muted">{d.fileSize || "1.2 MB"}</div>
+                          <div className="text-[11px] text-muted">{d.fileSize || "—"}</div>
                         </td>
 
                         <td className="py-3.5 px-5 text-slate-700">
@@ -1097,7 +1096,7 @@ export function DocumentsPage() {
                             <span>•</span>
                             <span>Format: <b className="text-rose-700">PDF</b></span>
                             <span>•</span>
-                            <span>Size: <b>{doc.fileSize || "1.2 MB"}</b></span>
+                            <span>Size: <b>{doc.fileSize || "—"}</b></span>
                             <span>•</span>
                             <span>
                               Expiry:{" "}
@@ -1331,7 +1330,7 @@ export function DocumentsPage() {
 
                   <div className="mt-4 pt-3 border-t border-bdr/60">
                     <div className="flex items-center justify-between text-[11.5px] text-muted mb-3">
-                      <span>Format: <b className="text-rose-700">PDF</b> ({doc.fileSize || "1.2 MB"})</span>
+                      <span>Format: <b className="text-rose-700">{doc.fileType || "—"}</b> ({doc.fileSize || "—"})</span>
                       <span>
                         Expiry:{" "}
                         <b
@@ -1446,7 +1445,7 @@ export function DocumentsPage() {
               </div>
 
               <div className="text-right text-[12px] text-muted space-y-0.5">
-                <div>Format: <b className="text-rose-700">PDF</b> ({previewDoc.fileSize || "1.2 MB"})</div>
+                <div>Format: <b className="text-rose-700">{previewDoc.fileType || "—"}</b> ({previewDoc.fileSize || "—"})</div>
                 <div>Updated: <b className="text-slate-800">{previewDoc.updatedOn}</b></div>
                 <div>Expiry: <b className="text-slate-800">{previewDoc.expiry || "Permanent"}</b></div>
               </div>

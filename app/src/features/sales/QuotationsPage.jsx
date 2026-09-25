@@ -221,7 +221,7 @@ export const QuotationsPage = () => {
         const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
         addQuotation({
             customerId: cust?.id,
-            customer: cust?.name || 'Acme Corp',
+            customer: cust?.name || '',
             leadId: leadRequest?.leadId || '',
             leadName: leadRequest?.leadName || '',
             dealId: leadRequest?.fromDeal ? leadRequest.dealId : undefined,
@@ -292,7 +292,7 @@ export const QuotationsPage = () => {
                     <option value="" disabled>Select a customer account</option>
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
+                        {c.name}{c.code ? ` (${c.code})` : ''} - Balance: ₹{Number(c.balance || 0).toFixed(2)}
                       </option>
                     ))}
                   </select>
@@ -304,13 +304,13 @@ export const QuotationsPage = () => {
                         <div className="flex items-center justify-between font-bold text-slate-800">
                           <span>{cust.name}</span>
                           <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                            Limit: ₹{(cust.creditLimit || 50000).toLocaleString('en-IN')}
+                            Limit: {cust.creditLimit ? `₹${Number(cust.creditLimit).toLocaleString('en-IN')}` : '—'}
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                          <span>POC: <strong>{cust.contactPerson || 'Account Lead'}</strong></span>
-                          <span>Email: {cust.email}</span>
-                          <span>Phone: {cust.phone}</span>
+                          <span>POC: <strong>{cust.contactPerson || '—'}</strong></span>
+                          <span>Email: {cust.email || '—'}</span>
+                          <span>Phone: {cust.phone || '—'}</span>
                         </div>
                       </div>
                     );

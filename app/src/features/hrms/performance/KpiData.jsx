@@ -29,8 +29,8 @@ export default function KpiData() {
 
   const [form, setForm] = useState({
     name: "",
-    department: "Engineering",
-    designation: "Senior Engineer",
+    department: "",
+    designation: "",
     assignedEmployee: "All in Department",
     target: "",
     measurementType: "Percentage",
@@ -64,10 +64,10 @@ export default function KpiData() {
   function openAdd() {
     setForm({
       name: "",
-      department: "Engineering",
-      designation: "Senior Engineer",
+      department: "",
+      designation: "",
       assignedEmployee: "All in Department",
-      target: "≥ 90%",
+      target: "",
       measurementType: "Percentage",
       weight: 15,
       status: "Active",
@@ -197,21 +197,11 @@ export default function KpiData() {
 
   const deptOpts = [
     { value: "All", label: "All Departments" },
-    { value: "Engineering", label: "Engineering" },
-    { value: "Design", label: "Design" },
-    { value: "Marketing", label: "Marketing" },
-    { value: "HR", label: "HR" },
-    { value: "Finance", label: "Finance" },
-    { value: "Operations", label: "Operations" },
+    ...[...new Set([...employees.map((e) => e.department), ...kpis.map((r) => r.department)].filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
   ];
   const desigOpts = [
     { value: "All", label: "All Designations" },
-    { value: "Senior Engineer", label: "Senior Engineer" },
-    { value: "DevOps Engineer", label: "DevOps Engineer" },
-    { value: "Product Designer", label: "Product Designer" },
-    { value: "Brand Strategist", label: "Brand Strategist" },
-    { value: "Analyst", label: "Analyst" },
-    { value: "HR Manager", label: "HR Manager" },
+    ...[...new Set([...employees.map((e) => e.designation || e.role), ...kpis.map((r) => r.designation)].filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
   ];
   const statusOpts = [
     { value: "All", label: "All Statuses" },
@@ -238,32 +228,34 @@ export default function KpiData() {
 
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-slate-500">Department *</span>
-          <select
+          <input
+            list="kpi-dept-options"
             value={form.department}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
+            placeholder="Enter department"
             className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
+          />
+          <datalist id="kpi-dept-options">
             {deptOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value} />
             ))}
-          </select>
+          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-slate-500">Designation *</span>
-          <select
+          <input
+            list="kpi-desig-options"
             value={form.designation}
             onChange={(e) => setForm({ ...form, designation: e.target.value })}
+            placeholder="Enter designation"
             className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
+          />
+          <datalist id="kpi-desig-options">
             {desigOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value} />
             ))}
-          </select>
+          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">
@@ -396,7 +388,7 @@ export default function KpiData() {
           </>
         }
       >
-        <FormFields />
+        {FormFields()}
       </Modal>
 
       {/* Edit Modal */}
@@ -413,7 +405,7 @@ export default function KpiData() {
           </>
         }
       >
-        <FormFields />
+        {FormFields()}
       </Modal>
 
       {/* View Drawer */}

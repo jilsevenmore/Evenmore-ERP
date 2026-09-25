@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
+import { useAppStore } from "./appStore";
+
+/** Who an audit line is attributed to when the caller does not say. */
+const actorName = () => useAppStore.getState().currentUser?.name || "HR Admin";
 
 const POLICIES_STORAGE_KEY = "hrms_company_policies_v1";
 const CATEGORIES_STORAGE_KEY = "hrms_policy_categories_v1";
@@ -67,7 +71,7 @@ const usePolicyStoreBase = create((set, get) => ({
         {
           version: data.version || "v1.0",
           effectiveDate: data.effectiveDate || today,
-          updatedBy: data.author || "Adarsh Gupta",
+          updatedBy: data.author || actorName(),
           summary: data.summary || "Initial policy creation.",
           status,
         },
@@ -75,7 +79,7 @@ const usePolicyStoreBase = create((set, get) => ({
       activityLog: [
         {
           date: `${today} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-          actor: data.author || "Adarsh Gupta",
+          actor: data.author || actorName(),
           action: submitForApproval ? "Created and submitted policy for approval" : "Created policy draft",
         },
       ],
@@ -100,7 +104,7 @@ const usePolicyStoreBase = create((set, get) => ({
         activityLog: [
           {
             date: `${today} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-            actor: updates.actor || "Adarsh Gupta",
+            actor: updates.actor || actorName(),
             action: updates.actionLogText || `Updated policy details (${Object.keys(updates).filter(k => k !== 'activityLog' && k !== 'versionHistory').join(', ')})`,
           },
           ...(p.activityLog || []),
@@ -111,7 +115,7 @@ const usePolicyStoreBase = create((set, get) => ({
     get().persistPolicies(updated);
   },
 
-  approvePolicy: (id, actor = "Adarsh Gupta") => {
+  approvePolicy: (id, actor = actorName()) => {
     const state = get();
     const today = new Date().toISOString().slice(0, 10);
     const updated = state.policies.map((p) => {
@@ -139,7 +143,7 @@ const usePolicyStoreBase = create((set, get) => ({
     get().persistPolicies(updated);
   },
 
-  rejectPolicy: (id, reason = "", actor = "Adarsh Gupta") => {
+  rejectPolicy: (id, reason = "", actor = actorName()) => {
     const state = get();
     const today = new Date().toISOString().slice(0, 10);
     const updated = state.policies.map((p) => {
@@ -162,7 +166,7 @@ const usePolicyStoreBase = create((set, get) => ({
     get().persistPolicies(updated);
   },
 
-  publishPolicy: (id, actor = "Adarsh Gupta") => {
+  publishPolicy: (id, actor = actorName()) => {
     const state = get();
     const today = new Date().toISOString().slice(0, 10);
     const updated = state.policies.map((p) => {
@@ -185,7 +189,7 @@ const usePolicyStoreBase = create((set, get) => ({
     get().persistPolicies(updated);
   },
 
-  archivePolicy: (id, actor = "Adarsh Gupta") => {
+  archivePolicy: (id, actor = actorName()) => {
     const state = get();
     const today = new Date().toISOString().slice(0, 10);
     const updated = state.policies.map((p) => {
@@ -208,7 +212,7 @@ const usePolicyStoreBase = create((set, get) => ({
     get().persistPolicies(updated);
   },
 
-  restorePolicy: (id, actor = "Adarsh Gupta") => {
+  restorePolicy: (id, actor = actorName()) => {
     const state = get();
     const today = new Date().toISOString().slice(0, 10);
     const updated = state.policies.map((p) => {
@@ -248,7 +252,7 @@ const usePolicyStoreBase = create((set, get) => ({
         {
           version: newVersionData.version || `v${(parseFloat(p.version.replace("v", "")) + 0.1).toFixed(1)}`,
           effectiveDate: newVersionData.effectiveDate || today,
-          updatedBy: newVersionData.author || "Adarsh Gupta",
+          updatedBy: newVersionData.author || actorName(),
           summary: newVersionData.summary || "New version release",
           status: newVersionData.approvalRequired ? "Pending Approval" : "Active",
         },
@@ -268,7 +272,7 @@ const usePolicyStoreBase = create((set, get) => ({
         activityLog: [
           {
             date: `${today} ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-            actor: newVersionData.author || "Adarsh Gupta",
+            actor: newVersionData.author || actorName(),
             action: `Created new version ${newVersionData.version || "update"} (${newVersionData.approvalRequired ? "Submitted for approval" : "Directly activated"})`,
           },
           ...(p.activityLog || []),
@@ -311,7 +315,7 @@ const usePolicyStoreBase = create((set, get) => ({
   },
 
   // ── Acknowledgements Actions ───────────────────────────────
-  acknowledgePolicy: (policyId, employeeName = "Adarsh Gupta", employeeId = "EMP-USR", dept = "Operations") => {
+  acknowledgePolicy: (policyId, employeeName = actorName(), employeeId = "", dept = "") => {
     const state = get();
     const policy = state.policies.find((p) => p.id === policyId);
     const now = new Date();
@@ -347,7 +351,7 @@ const usePolicyStoreBase = create((set, get) => ({
     get().persistAcks(updatedAcks);
   },
 
-  // Resets to initial sample fixtures if user clears or wants clean reset
+  // Discard local state and re-read the policy library from the server
   resetAll: () => {
     set({
       policies: [],

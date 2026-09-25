@@ -54,7 +54,7 @@ const PrintLabelModalOriginal = ({ isOpen, onClose, part, }) => {
           <div className="w-full bg-white border-2 border-black p-4 rounded text-black font-sans text-xs space-y-3 shadow-md print:shadow-none">
             <div className="flex justify-between items-start border-b-2 border-black pb-2">
               <div>
-                <p className="text-[10px] uppercase font-bold tracking-wider text-gray-600">Horizon RMA Logistics</p>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-gray-600">RMA Logistics</p>
                 <h4 className="text-base font-extrabold tracking-tight">RETURN MERCHANDISE AUTH</h4>
               </div>
               <div className="text-right">
@@ -91,7 +91,7 @@ const PrintLabelModalOriginal = ({ isOpen, onClose, part, }) => {
             </div>
             <div className="border-t border-dashed border-gray-400 pt-2 text-[10px] text-gray-600">
               <p className="truncate font-mono">Diag: {part.notes || 'System diagnostic check attached.'}</p>
-              <p className="text-[9px] text-gray-500 mt-1">Issued: {part.date} • Horizon Warehouse Dept.</p>
+              <p className="text-[9px] text-gray-500 mt-1">Issued: {part.date} • Warehouse Dept.</p>
             </div>
           </div>
         </div>

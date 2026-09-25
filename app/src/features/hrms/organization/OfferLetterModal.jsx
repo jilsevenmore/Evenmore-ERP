@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useAppStore } from "../../../stores/appStore";
+import { useERP } from "../../../context/ERPContext";
 import {
   X,
   Printer,
@@ -23,6 +25,8 @@ export default function OfferLetterModal({
   onUpdateOffer,
   onConfirmOffer,
 }) {
+  const currentUser = useAppStore((s) => s.currentUser);
+  const { companyProfile } = useERP();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -40,7 +44,7 @@ export default function OfferLetterModal({
     if (offer) {
       const existing = offer.letterContent;
       setFormData({
-        refNumber: existing?.refNumber || `EV/OFFER/2024/${offer.id || "101"}`,
+        refNumber: existing?.refNumber || `EV/OFFER/${new Date().getFullYear()}/${offer.id || "101"}`,
         issueDate:
           existing?.issueDate ||
           offer.sentDate ||
@@ -49,12 +53,12 @@ export default function OfferLetterModal({
         email: offer.email || "",
         position: offer.position || "",
         jobType: existing?.jobType || offer.jobType || "Full-time",
-        dept: offer.dept || "Engineering",
-        salary: existing?.salary || offer.salary || "$95,000 / annum",
-        location: existing?.location || offer.location || "New York HQ",
+        dept: offer.dept || "",
+        salary: existing?.salary || offer.salary || "",
+        location: existing?.location || offer.location || "",
         workMode: existing?.workMode || offer.workMode || "Hybrid",
-        joiningDate: offer.joiningDate || "2024-11-01",
-        reportingManager: offer.reportingManager || "David Park (CTO)",
+        joiningDate: offer.joiningDate || "",
+        reportingManager: offer.reportingManager || "",
         probationPeriod: existing?.probationPeriod || offer.probationPeriod || "3 Months",
         acceptanceDeadline:
           existing?.acceptanceDeadline ||
@@ -63,15 +67,15 @@ export default function OfferLetterModal({
         note:
           existing?.note ||
           "Please review the terms above and sign below to confirm your acceptance. We look forward to welcoming you to the team!",
-        signatoryName: existing?.signatoryName || "Ayesha Khan",
+        signatoryName: existing?.signatoryName || currentUser?.name || "",
         signatoryTitle: existing?.signatoryTitle || "Head of People & Culture",
-        companyName: "Evenmore Technologies Inc.",
-        companyAddress: "100 Innovation Parkway, New York, NY 10001 • hr@evenmore.io",
+        companyName: companyProfile?.name || "",
+        companyAddress: [companyProfile?.address, companyProfile?.email].filter(Boolean).join(" • "),
       });
       setIsEditing(false);
       setSavedSuccess(false);
     }
-  }, [offer]);
+  }, [offer, currentUser?.name, companyProfile?.name, companyProfile?.address, companyProfile?.email]);
 
   if (!isOpen || !offer || !formData) return null;
 

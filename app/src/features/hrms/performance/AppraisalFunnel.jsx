@@ -144,7 +144,7 @@ export default function AppraisalFunnel() {
             </p>
             <div className="mt-1 flex flex-wrap gap-2">
               <span className="px-3 py-1 bg-[#fffbeb] border border-[#fef08a] text-[#b45309] rounded-full text-[12px] font-medium">
-                Stage SLA: 3 days remaining
+                {bottleneckStage.currentPending} pending in stage
               </span>
             </div>
           </div>

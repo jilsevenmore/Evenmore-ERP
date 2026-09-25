@@ -31,7 +31,7 @@ export default function GoalTracking() {
   const [editRow, setEditRow] = useState(null);
   const [viewRow, setViewRow] = useState(null);
   const [deleteRow, setDeleteRow] = useState(null);
-  const [form, setForm] = useState({ employee: "", goal: "", target: "", current: "", progress: 30, due: "31 Dec 2024", status: "In Progress", department: "Engineering" });
+  const [form, setForm] = useState({ employee: "", goal: "", target: "", current: "", progress: 0, due: "", status: "In Progress", department: "" });
   const filtered = useMemo(() => data.filter((r) => {
     if (search && !`${r.employee} ${r.goal}`.toLowerCase().includes(search.toLowerCase())) return false;
     if (employee !== "All" && r.employee !== employee) return false;
@@ -49,7 +49,7 @@ export default function GoalTracking() {
       showToast("Goal updated successfully.");
       setEditRow(null);
     } else {
-      setData((d) => [{ id: `GOAL-${String(d.length + 1).padStart(2, "0")}`, employee: form.employee, avatar: "https://i.pravatar.cc/100?img=15", department: form.department, goal: form.goal, target: form.target, current: form.current, progress: Number(form.progress), due: form.due, status: form.status }, ...d]);
+      setData((d) => [{ id: `GOAL-${String(d.length + 1).padStart(2, "0")}`, employee: form.employee, avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(form.employee)}`, department: form.department, goal: form.goal, target: form.target, current: form.current, progress: Number(form.progress), due: form.due, status: form.status }, ...d]);
       showToast("Goal created successfully.");
       setAddOpen(false);
     }
@@ -113,7 +113,7 @@ export default function GoalTracking() {
           <p className="text-[13px] text-muted">Track and manage individual employee goals, progress bars, and completion deadlines.</p>
         </div>
         <Button onClick={() => {
-    setForm({ employee: "", goal: "", target: "", current: "", progress: 30, due: "31 Dec 2024", status: "In Progress", department: "Engineering" });
+    setForm({ employee: "", goal: "", target: "", current: "", progress: 0, due: "", status: "In Progress", department: "" });
     setAddOpen(true);
   }}>+ Add Goal</Button></div>
       <FilterBar
@@ -126,7 +126,7 @@ export default function GoalTracking() {
         onChange: setEmployee,
         options: [{ value: "All", label: "All Employees" }, ...employees.map((e) => ({ value: e.name, label: e.name }))],
       },
-      { label: "Department", value: dept, onChange: setDept, options: [{ value: "All", label: "All Departments" }, { value: "Engineering", label: "Engineering" }, { value: "Design", label: "Design" }, { value: "Marketing", label: "Marketing" }] },
+      { label: "Department", value: dept, onChange: setDept, options: [{ value: "All", label: "All Departments" }, ...[...new Set([...employees.map((e) => e.department), ...data.map((r) => r.department)].filter(Boolean))].map((d) => ({ value: d, label: d }))] },
       { label: "Status", value: status, onChange: setStatus, options: [{ value: "All", label: "All Status" }, { value: "Not Started", label: "Not Started" }, { value: "In Progress", label: "In Progress" }, { value: "At Risk", label: "At Risk" }, { value: "Completed", label: "Completed" }] }
     ]}
     onClear={() => {

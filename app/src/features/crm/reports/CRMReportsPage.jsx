@@ -407,39 +407,24 @@ export default function CRMReportsPage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-4">
-        <CrmKpiCard label="Total Active Leads" value={totalLeads} icon={Users} tone="blue">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 12%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+        <CrmKpiCard label="Total Active Leads" value={totalLeads - lostLeads.length} icon={Users} tone="blue">
+          <div className="text-[11px] mt-0.5 text-slate-400">{totalLeads} total leads</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="New Leads" value={leads.filter((l) => l.status === 'New').length || 1} icon={UserPlus} tone="emerald">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 2%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+        <CrmKpiCard label="New Leads" value={leads.filter((l) => l.status === 'New').length} icon={UserPlus} tone="emerald">
+          <div className="text-[11px] mt-0.5 text-slate-400">in the New stage</div>
         </CrmKpiCard>
 
         <CrmKpiCard label="Pending Tasks" value={pendingTasks.length} icon={Clock} tone="amber">
-            <div className="text-[11px] font-semibold text-rose-500 mt-0.5 flex items-center gap-1">
-              <span>↓ 4%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">{overdueTasks.length} overdue</div>
         </CrmKpiCard>
 
         <CrmKpiCard label="Deals in Pipeline" value={deals.length} icon={TrendingUp} tone="purple">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 15%</span>
-              <span className="text-slate-400 font-normal">Rs 1.72 Cr</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">{formatINR(dealValue)}</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="Total Revenue Expected" value="$17,355,083.00" symbol="$" tone="rose">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 22%</span>
-              <span className="text-slate-400 font-normal">$5,884.00 due</span>
-          </div>
+        <CrmKpiCard label="Total Revenue Expected" value={formatINR(leadValue)} symbol="Rs" tone="rose">
+          <div className="text-[11px] mt-0.5 text-slate-400">from lead amounts</div>
         </CrmKpiCard>
       </div>
 

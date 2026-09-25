@@ -47,6 +47,10 @@ export default function Dashboard() {
     getMetrics,
   } = usePerformanceStore();
 
+  const currentUser = useAppStore((s) => s.currentUser);
+  const employeeViewName = simulatedEmployeeName || currentUser?.name || "";
+  const managerViewName = simulatedManagerName || currentUser?.name || "";
+
   const metrics = getMetrics();
   const metricIcons = [CalendarCheck, Clock, CheckCircle2, Star, Activity, AlertTriangle];
 
@@ -77,11 +81,11 @@ export default function Dashboard() {
     let list = appraisals;
     if (role === "Employee") {
       list = appraisals.filter(
-        (a) => String(a.employee ?? '').toLowerCase() === simulatedEmployeeName.toLowerCase()
+        (a) => String(a.employee ?? '').toLowerCase() === employeeViewName.toLowerCase()
       );
     } else if (role === "Manager") {
       list = appraisals.filter(
-        (a) => String(a.reviewer ?? '').toLowerCase() === simulatedManagerName.toLowerCase()
+        (a) => String(a.reviewer ?? '').toLowerCase() === managerViewName.toLowerCase()
       );
     }
 
@@ -89,7 +93,7 @@ export default function Dashboard() {
       list = list.filter((a) => a.stage === stageFilter);
     }
     return list;
-  }, [appraisals, role, simulatedEmployeeName, simulatedManagerName, stageFilter]);
+  }, [appraisals, role, employeeViewName, managerViewName, stageFilter]);
 
   // Stage distribution counts
   const stageCounts = useMemo(() => {
@@ -106,11 +110,17 @@ export default function Dashboard() {
   // Open Add Cycle Modal
   const handleOpenNewCycle = () => {
     setEditingCycle(null);
+    const now = new Date();
+    const q = Math.floor(now.getMonth() / 3);
+    const qStart = new Date(now.getFullYear(), q * 3, 1);
+    const qEnd = new Date(now.getFullYear(), q * 3 + 3, 0);
+    const isoOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const labelOf = (d) => d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     setCycleForm({
-      name: `Q${Math.min(4, Math.floor(new Date().getMonth() / 3) + 1)} ${new Date().getFullYear()} Review Cycle`,
-      reviewPeriod: "01 Oct 2024 – 31 Dec 2024",
-      startDate: "2024-10-01",
-      endDate: "2024-12-31",
+      name: `Q${q + 1} ${now.getFullYear()} Review Cycle`,
+      reviewPeriod: `${labelOf(qStart)} – ${labelOf(qEnd)}`,
+      startDate: isoOf(qStart),
+      endDate: isoOf(qEnd),
       reviewFrequency: "Quarterly",
       status: "Active",
       description: "Appraisal cycle for quarterly performance evaluation and calibration.",
@@ -274,7 +284,7 @@ export default function Dashboard() {
           <div>
             <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Simulated Role Perspective</div>
             <div className="text-[13px] font-medium text-slate-800">
-              Viewing as: <span className="font-bold text-blue-600">{role}</span> {role === "Employee" && `(${simulatedEmployeeName})`}{role === "Manager" && `(${simulatedManagerName})`}
+              Viewing as: <span className="font-bold text-blue-600">{role}</span> {role === "Employee" && `(${employeeViewName})`}{role === "Manager" && `(${managerViewName})`}
             </div>
           </div>
         </div>
@@ -408,9 +418,9 @@ export default function Dashboard() {
             </h2>
             <p className="text-[12.5px] text-slate-500">
               {role === "Employee"
-                ? `Current evaluation progress for ${simulatedEmployeeName}`
+                ? `Current evaluation progress for ${employeeViewName}`
                 : role === "Manager"
-                ? `Direct reports assigned to reviewer ${simulatedManagerName}`
+                ? `Direct reports assigned to reviewer ${managerViewName}`
                 : "Live 4-stage review progression across all departments"}
             </p>
           </div>
@@ -599,7 +609,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <span className="text-[11px] text-slate-400 block">Total Appraisals</span>
-                <span className="font-medium text-slate-800">{viewingCycle.appraisalCount || 24}</span>
+                <span className="font-medium text-slate-800">{viewingCycle.appraisalCount || appraisals.filter((a) => a.cycleId === viewingCycle.id || a.cycle === viewingCycle.name).length}</span>
               </div>
             </div>
 

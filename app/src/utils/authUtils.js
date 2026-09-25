@@ -39,7 +39,7 @@ export function isTokenValid(token) {
     }
   }
 
-  // 2. Fallback / mock token: verify stored expiration timestamp if set
+  // 2. Opaque (non-JWT) token: verify stored expiration timestamp if set
   try {
     const exp = localStorage.getItem(TOKEN_EXPIRES_KEY);
     if (exp) {

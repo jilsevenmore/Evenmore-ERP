@@ -116,7 +116,9 @@ export const ProformaInvoicesPage = () => {
     getCurrentISODate,
     addDaysISO,
     companyProfile,
+    bankAccounts = [],
   } = useERP();
+  const remitBank = bankAccounts.find((a) => a.accountNumber && a.isActive !== false) || null;
 
   const [statusFilter, setStatusFilter] = useState('All');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -177,8 +179,13 @@ export const ProformaInvoicesPage = () => {
   }, 0);
   const taxableAmount = Math.max(0, subtotal - discountTotal);
   
-  // Tax logic: Check if customer is intra-state (Maharashtra 27) or inter-state
-  const isInterState = selectedCustomer?.placeOfSupply && !selectedCustomer.placeOfSupply.includes('27') && !selectedCustomer.placeOfSupply.includes('Maharashtra');
+  // Tax logic: customer place of supply vs the company's own state (intra-state when unknown)
+  const homeStateCode = companyProfile?.stateCode || '';
+  const homeState = companyProfile?.state || '';
+  const posText = selectedCustomer?.placeOfSupply || '';
+  const isInterState = Boolean(posText && (homeStateCode || homeState)
+    && !(homeStateCode && posText.includes(homeStateCode))
+    && !(homeState && posText.toLowerCase().includes(homeState.toLowerCase())));
   const taxRate = 0.18; // standard 18% GST
   const cgst = !isInterState ? Math.round(taxableAmount * (taxRate / 2) * 100) / 100 : 0;
   const sgst = !isInterState ? Math.round(taxableAmount * (taxRate / 2) * 100) / 100 : 0;
@@ -311,8 +318,8 @@ export const ProformaInvoicesPage = () => {
     setValidUntil('30 Days');
     setLinkedSoId('None');
     setContactPerson(cust?.contactPerson || '');
-    setBillingAddress(cust?.billingAddress || { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' });
-    setShippingAddress(cust?.shippingAddress || { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' });
+    setBillingAddress(cust?.billingAddress || { line1: '', city: '', state: '', pincode: '' });
+    setShippingAddress(cust?.shippingAddress || { line1: '', city: '', state: '', pincode: '' });
     setPaymentPresetKey('50_50');
     setPaymentSchedule(PAYMENT_PRESETS['50_50'].schedules);
     setOtherCharges(0);
@@ -403,7 +410,7 @@ export const ProformaInvoicesPage = () => {
     const cust = customers.find((c) => c.id === selectedCustomerId) || customers[0];
     const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
 
-    const effectivePiAmt = grandTotal > 0 ? grandTotal : 5900;
+    const effectivePiAmt = grandTotal;
     if (formalInvoiceAmountInput + cashAmountInput > effectivePiAmt + 0.01) {
       alert('Validation Error: Formal Invoice + Cash Receipt cannot exceed Total Proforma Value.');
       return;
@@ -419,7 +426,7 @@ export const ProformaInvoicesPage = () => {
       id: editingPi ? editingPi.id : undefined,
       proformaNumber: proformaNumber || `PI-2026-${String(proformaInvoices.length + 101).padStart(3, '0')}`,
       customerId: cust?.id,
-      customer: cust?.name || 'Acme Corp',
+      customer: cust?.name || '',
       customerContact: contactPerson || cust?.contactPerson || '',
       billingAddress,
       shippingAddress,
@@ -430,30 +437,17 @@ export const ProformaInvoicesPage = () => {
       status: editingPi ? (status || editingPi.status) : status,
       paymentTerms: PAYMENT_PRESETS[paymentPresetKey]?.label || 'Custom Milestone Schedule',
       paymentSchedule: computedSchedule,
-      items: lineItems.length > 0 ? lineItems : [
-        {
-          id: `li-pi-${Date.now()}`,
-          description: 'Standard Order Merchandise Package',
-          qty: 1,
-          unit: 'Unit',
-          rate: 5000,
-          discount: 0,
-          tax: 18,
-          taxAmount: 900,
-          amount: 5900,
-          warrantyStatus: 'Pending Final Invoicing / Commissioning',
-        },
-      ],
-      subtotal: subtotal > 0 ? subtotal : 5000,
+      items: lineItems,
+      subtotal,
       discountTotal,
-      taxableAmount: taxableAmount > 0 ? taxableAmount : 5000,
+      taxableAmount,
       cgst,
       sgst,
       igst,
       otherCharges: Number(otherCharges || 0),
       roundOff: 0,
-      total: grandTotal > 0 ? grandTotal : 5900,
-      grandTotal: grandTotal > 0 ? grandTotal : 5900,
+      total: grandTotal,
+      grandTotal,
       totalSalesValue: totalSalesValueInput || effectivePiAmt,
       formalInvoiceAmount: formalInvoiceAmountInput,
       cashAmount: cashAmountInput,
@@ -843,7 +837,7 @@ export const ProformaInvoicesPage = () => {
                   >
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
+                        {c.name}{c.code ? ` (${c.code})` : ''} - Balance: ₹{Number(c.balance || 0).toFixed(2)}
                       </option>
                     ))}
                   </select>
@@ -852,13 +846,13 @@ export const ProformaInvoicesPage = () => {
                       <div className="flex items-center justify-between font-bold text-slate-800">
                         <span>{selectedCustomer.name}</span>
                         <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                          Credit Limit: ₹{(selectedCustomer.creditLimit || 50000).toLocaleString('en-IN')}
+                          Credit Limit: {selectedCustomer.creditLimit ? `₹${Number(selectedCustomer.creditLimit).toLocaleString('en-IN')}` : '—'}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                        <span>POC: <strong>{contactPerson || selectedCustomer.contactPerson || 'Account Lead'}</strong></span>
-                        <span>Email: {selectedCustomer.email}</span>
-                        <span>Place of Supply: {selectedCustomer.placeOfSupply || 'Maharashtra (27)'}</span>
+                        <span>POC: <strong>{contactPerson || selectedCustomer.contactPerson || '—'}</strong></span>
+                        <span>Email: {selectedCustomer.email || '—'}</span>
+                        <span>Place of Supply: {selectedCustomer.placeOfSupply || '—'}</span>
                       </div>
                     </div>
                   )}
@@ -1486,11 +1480,18 @@ export const ProformaInvoicesPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-4 rounded-xl border border-slate-200 bg-white">
                 <div>
                   {/* [PHASE-2E.1] company identity from companyProfile (was hardcoded Evenmore strings) */}
-                  <h4 className="font-extrabold text-sm text-[#1F2E4A] mb-1">{companyProfile?.name || 'EVENMORE ERP MEDICAL & SYSTEMS'}</h4>
+                  <h4 className="font-extrabold text-sm text-[#1F2E4A] mb-1">{companyProfile?.name || ''}</h4>
                   <p className="text-slate-600 text-[11px] leading-relaxed">
-                    {companyProfile?.address || 'Corporate Towers, Sector 62, Electronic City<br />Bengaluru, Karnataka - 560100, India'}<br />
-                    <strong>GSTIN:</strong> {companyProfile?.gstin || '29AABCU9912E1Z8'} • <strong>PAN:</strong> {companyProfile?.pan || 'AABCU9912E'}<br />
-                    <strong>Email:</strong> billing@sweven.in • <strong>Phone:</strong> {companyProfile?.phone || '+91 80 4920 1100'}
+                    {companyProfile?.address && (<>{companyProfile.address}<br /></>)}
+                    {(companyProfile?.gstin || companyProfile?.pan) && (<>
+                      {companyProfile?.gstin && <><strong>GSTIN:</strong> {companyProfile.gstin}</>}
+                      {companyProfile?.gstin && companyProfile?.pan && ' • '}
+                      {companyProfile?.pan && <><strong>PAN:</strong> {companyProfile.pan}</>}
+                      <br />
+                    </>)}
+                    {companyProfile?.email && <><strong>Email:</strong> {companyProfile.email}</>}
+                    {companyProfile?.email && companyProfile?.phone && ' • '}
+                    {companyProfile?.phone && <><strong>Phone:</strong> {companyProfile.phone}</>}
                   </p>
                 </div>
 
@@ -1498,9 +1499,11 @@ export const ProformaInvoicesPage = () => {
                   <h4 className="font-bold text-xs uppercase text-slate-400 mb-1">PROFORMA INVOICE RECIPIENT</h4>
                   <p className="font-bold text-sm text-slate-800">{selectedPi.customer}</p>
                   <p className="text-slate-600 text-[11px] leading-relaxed">
-                    {selectedPi.billingAddress?.line1 || 'Main Facility Center'}<br />
-                    {selectedPi.billingAddress?.city || 'Mumbai'}, {selectedPi.billingAddress?.state || 'Maharashtra'} - {selectedPi.billingAddress?.pincode || '400001'}<br />
-                    <strong>Contact:</strong> {selectedPi.customerContact || 'Primary Lead'}
+                    {selectedPi.billingAddress?.line1 && (<>{selectedPi.billingAddress.line1}<br /></>)}
+                    {[selectedPi.billingAddress?.city, selectedPi.billingAddress?.state].filter(Boolean).join(', ')}
+                    {selectedPi.billingAddress?.pincode ? ` - ${selectedPi.billingAddress.pincode}` : ''}
+                    {(selectedPi.billingAddress?.city || selectedPi.billingAddress?.state || selectedPi.billingAddress?.pincode) && <br />}
+                    {selectedPi.customerContact && <><strong>Contact:</strong> {selectedPi.customerContact}</>}
                   </p>
                 </div>
               </div>
@@ -1593,11 +1596,19 @@ export const ProformaInvoicesPage = () => {
                   </div>
 
                   {/* Wire Transfer Banking Info */}
-                  <div className="p-2.5 rounded bg-blue-50 border border-blue-200 text-[10px] text-blue-900 space-y-0.5">
-                    <p className="font-bold uppercase tracking-wider text-blue-800">Bank Wire Details for Deposit:</p>
-                    <p><strong>Bank:</strong> HDFC Bank Ltd • <strong>A/C:</strong> 992810029311 • <strong>IFSC:</strong> HDFC0001245</p>
-                    <p><strong>Beneficiary:</strong> Evenmore Medical Systems Private Limited</p>
-                  </div>
+                  {remitBank && (
+                    <div className="p-2.5 rounded bg-blue-50 border border-blue-200 text-[10px] text-blue-900 space-y-0.5">
+                      <p className="font-bold uppercase tracking-wider text-blue-800">Bank Wire Details for Deposit:</p>
+                      <p>
+                        {remitBank.bankName && <><strong>Bank:</strong> {remitBank.bankName} • </>}
+                        <strong>A/C:</strong> {remitBank.accountNumber}
+                        {remitBank.ifsc && <> • <strong>IFSC:</strong> {remitBank.ifsc}</>}
+                      </p>
+                      {(companyProfile?.legalName || companyProfile?.name) && (
+                        <p><strong>Beneficiary:</strong> {companyProfile.legalName || companyProfile.name}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Financial Summary */}

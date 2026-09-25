@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Clock, CheckCircle2, TrendingUp, BatteryCharging, MoreVertical, X, Check, AlertCircle, Warehouse, Plus, } from 'lucide-react';
 import { CreateZoneRequestModal } from './CreateZoneRequestModal';
 export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, searchTerm = '', }) => {
-    const [selectedRequestId, setSelectedRequestId] = useState(requests[0]?.id || 'req-8042');
+    const [selectedRequestId, setSelectedRequestId] = useState(requests[0]?.id || '');
     const [isDetailOpen, setIsDetailOpen] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [toastMessage, setToastMessage] = useState(null);
@@ -16,7 +16,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
     const approvedCount = requests.filter((r) => r.status === 'Approved').length;
     const fulfilledCount = requests.filter((r) => r.status === 'Fulfilled').length;
     const total = requests.length;
-    const fulfillmentRate = total > 0 ? Math.round((fulfilledCount / total) * 100) : 94;
+    const fulfillmentRate = total > 0 ? Math.round((fulfilledCount / total) * 100) : 0;
     const filteredRequests = requests.filter((r) => {
         if (!searchTerm.trim())
             return true;
@@ -83,10 +83,10 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
           <div className="bg-white p-4 rounded-lg border border-[#E1E1E1] flex items-center justify-between shadow-2xs">
             <div>
               <p className="text-xs text-[#5a6062] font-semibold uppercase tracking-wider">
-                Approved Today
+                Approved
               </p>
               <p className="text-2xl font-bold mt-1 text-[#2d3335]">
-                {approvedCount + 20}
+                {approvedCount}
               </p>
             </div>
             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
@@ -244,7 +244,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
                     Request Rejected
                   </p>
                   <p className="text-xs text-red-700 mt-0.5">
-                    Declined due to priority schedule constraints.
+                    This requisition was declined.
                   </p>
                 </div>
               </div>)}
@@ -264,7 +264,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
               <div>
                 <p className="text-xs text-[#5a6062] mb-1">Target Zone</p>
                 <p className="font-medium text-[#2d3335] text-xs">
-                  {selectedRequest.targetSector}
+                  {selectedRequest.targetSector || selectedRequest.zone || '—'}
                 </p>
               </div>
 
@@ -279,7 +279,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
                       {selectedRequest.product}
                     </p>
                     <p className="text-[11px] text-[#5a6062] font-mono">
-                      SKU: {selectedRequest.sku}
+                      SKU: {selectedRequest.sku || '—'}
                     </p>
                   </div>
                   <div className="text-right">
@@ -296,7 +296,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
             <div>
               <p className="text-xs text-[#5a6062] mb-2 font-medium">Request Notes</p>
               <div className="p-3 bg-white border border-[#E1E1E1] rounded text-xs text-[#5a6062] italic shadow-2xs leading-relaxed">
-                "{selectedRequest.notes}"
+                {selectedRequest.notes ? `"${selectedRequest.notes}"` : 'No notes provided.'}
               </div>
             </div>
 
@@ -309,7 +309,7 @@ export const ZoneRequestsView = ({ requests, onRequestUpdate, onAddRequest, sear
               <div className="flex items-center justify-between text-xs bg-white p-2.5 rounded border border-[#E1E1E1]">
                 <span className="text-[#2d3335] font-medium">Main Warehouse</span>
                 <span className="font-semibold text-green-700">
-                  {selectedRequest.warehouseStock} Available
+                  {Number(selectedRequest.warehouseStock) || 0} Available
                 </span>
               </div>
             </div>

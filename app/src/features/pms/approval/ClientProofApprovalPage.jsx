@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AlertCircle, Check, RefreshCw, Building2, FileText, ShieldCheck, Clock, Ban,
-  Link2Off, CalendarClock, Package,
+  Link2Off, CalendarClock, Package, WifiOff,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { MockPdfViewer } from '../components/MockPdfViewer';
-import { usePmsStore, validateApprovalDecision } from '../../../stores/pmsStore';
-import { useProofShareStore, shareBlockReason } from '../../../stores/proofShareStore';
+import { ProofViewer } from '../components/ProofViewer';
+import { validateApprovalDecision } from '../../../stores/pmsStore';
+import { shareBlockReason } from '../../../stores/proofShareStore';
 import { fetchPublicShare, decidePublicShare, postPublicComment, toAnnotation } from '../../../services/pmsSync';
 import { formatCurrency } from '../../../utils/currencyUtils';
 
@@ -16,12 +16,9 @@ import { formatCurrency } from '../../../utils/currencyUtils';
  *
  * Renders outside the app shell: no sidebar, no topbar, nothing that assumes the
  * viewer is a staff member. It carries the drawing, the order and product
- * details, and the two decisions the client can make. The decision is written
- * through pmsStore.decideDocument, so the stage status, the approval thread and
- * the audit trail all update exactly as the internal portal would leave them.
- *
- * With no backend the token resolves against this browser's localStorage, so a
- * link opens on the machine that issued it.
+ * details, and the two decisions the client can make. Everything goes through
+ * the public approval API, so the stage status, the approval thread and the
+ * audit trail update exactly as the internal portal would leave them.
  */
 
 const fieldClass =
@@ -91,6 +88,8 @@ function PortalNotice({ icon: Icon, tone, title, body, detail }) {
 /** Map a public-API failure to the terminal state it means. */
 function blockFromError(err) {
   const msg = `${err?.message || ''}`.toLowerCase();
+  // No answer at all (network down, server error) says nothing about the link.
+  if (!err?.status || err.status >= 500) return 'unreachable';
   if (err?.status === 409) {
     if (msg.includes('revok')) return 'revoked';
     if (msg.includes('expir')) return 'expired';
@@ -151,21 +150,13 @@ function remoteFromPayload(token, P) {
 export default function ClientProofApprovalPage() {
   const { token } = useParams();
 
-  const projects = usePmsStore((s) => s.projects);
-  const decideDocument = usePmsStore((s) => s.decideDocument);
-  const shares = useProofShareStore((s) => s.shares);
-  const markOpened = useProofShareStore((s) => s.markOpened);
-  const recordDecision = useProofShareStore((s) => s.recordDecision);
-
-  const localShare = useMemo(() => shares.find((s) => s.token === token) ?? null, [shares, token]);
-
   // The link is resolved through the public API — always. The recipient is a
   // client on their own device with no account, so this must not depend on a
   // staff session (gating it on one made every sent link read "not valid").
-  // Only when the server does not know the token (offline / demo mode) does
-  // the page fall back to the copy this browser issued.
+  // A token the server does not know is simply not a valid link.
   const [remote, setRemote] = useState(null);
-  const [remoteState, setRemoteState] = useState(token ? 'loading' : 'invalid'); // loading|ready|invalid|expired|revoked
+  const [remoteState, setRemoteState] = useState(token ? 'loading' : 'invalid'); // loading|ready|invalid|expired|revoked|unreachable
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -184,30 +175,13 @@ export default function ClientProofApprovalPage() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, attempt]);
 
-  const useLocal = !remote && remoteState === 'invalid' && Boolean(localShare);
-  const share = remote?.share ?? (useLocal ? localShare : null);
+  const share = remote?.share ?? null;
   const block = shareBlockReason(share);
-
-  const project = useMemo(
-    () => (useLocal
-      ? projects.find((p) => p.id === localShare.projectId) ?? null
-      : remote?.project ?? null),
-    [useLocal, localShare, projects, remote]
-  );
-  const stage = useMemo(
-    () => (useLocal
-      ? project?.stages?.find((s) => s.id === localShare.stageId) ?? null
-      : remote?.stage ?? null),
-    [useLocal, localShare, project, remote]
-  );
-  const doc = useMemo(
-    () => (useLocal
-      ? stage?.documents?.find((d) => d.id === localShare.documentId) ?? null
-      : remote?.doc ?? null),
-    [useLocal, localShare, stage, remote]
-  );
+  const project = remote?.project ?? null;
+  const stage = remote?.stage ?? null;
+  const doc = remote?.doc ?? null;
 
   const [decision, setDecision] = useState('Approved');
   const [approverName, setApproverName] = useState('');
@@ -215,33 +189,18 @@ export default function ClientProofApprovalPage() {
   const [revisionReason, setRevisionReason] = useState('');
   const [errors, setErrors] = useState({});
   const [receipt, setReceipt] = useState(null);
-  // Local mode (no backend) keeps the thread in memory; public mode uses the server's.
-  const [localThread, setLocalThread] = useState([]);
-  const thread = remote ? remote.comments : localThread;
+  const thread = remote?.comments ?? [];
 
   /** The client's side of the review thread — lands next to the team's notes. */
   async function addThreadComment({ page, text }) {
     const author = approverName.trim() || share?.recipientName || 'Client';
-    if (remote) {
-      const rows = await postPublicComment(share.token, { text, page, authorName: author });
-      if (rows) setRemote((prev) => (prev ? { ...prev, comments: rows.map(toAnnotation) } : prev));
-      return;
-    }
-    setLocalThread((prev) => [
-      ...prev,
-      { id: `${Date.now()}`, page, text, author, authorType: 'Client', createdAt: new Date().toISOString() },
-    ]);
+    const rows = await postPublicComment(share.token, { text, page, authorName: author });
+    if (rows) setRemote((prev) => (prev ? { ...prev, comments: rows.map(toAnnotation) } : prev));
   }
 
   useEffect(() => {
     if (share?.recipientName) setApproverName(share.recipientName);
   }, [share?.recipientName]);
-
-  // Stamp the open so the project manager can see the client has looked at it.
-  // Local mode only — the server stamps public opens on first fetch itself.
-  useEffect(() => {
-    if (useLocal && !block) markOpened(localShare.token);
-  }, [useLocal, localShare, block, markOpened]);
 
   const isRevision = decision === 'Need Improvement';
 
@@ -257,62 +216,34 @@ export default function ClientProofApprovalPage() {
 
     const by = approverName.trim();
 
-    // Public mode: the client has no account, so the decision travels with
-    // the link token instead of the staff write path.
-    if (remote) {
-      decidePublicShare(share.token, {
-        decision: value,
-        decidedBy: by,
-        comments: comments.trim(),
-        revisionReason: revisionReason.trim(),
+    // The client has no account, so the decision travels with the link token
+    // instead of the staff write path.
+    decidePublicShare(share.token, {
+      decision: value,
+      decidedBy: by,
+      comments: comments.trim(),
+      revisionReason: revisionReason.trim(),
+    })
+      .then((res) => {
+        setRemote((prev) => (prev ? {
+          ...prev,
+          share: {
+            ...prev.share,
+            decision: value,
+            decidedAt: res?.decidedAt ?? new Date().toISOString(),
+            decidedBy: by,
+            revisionReason: revisionReason.trim(),
+          },
+        } : prev));
+        setReceipt({ decision: value, at: new Date().toISOString(), by });
       })
-        .then((res) => {
-          setRemote((prev) => (prev ? {
-            ...prev,
-            share: {
-              ...prev.share,
-              decision: value,
-              decidedAt: res?.decidedAt ?? new Date().toISOString(),
-              decidedBy: by,
-              revisionReason: revisionReason.trim(),
-            },
-          } : prev));
-          setReceipt({ decision: value, at: new Date().toISOString(), by });
-        })
-        .catch((err) => {
-          if (err?.status === 404 || err?.status === 409) {
-            setRemoteState(blockFromError(err));
-          } else {
-            setErrors({ submit: err.message });
-          }
-        });
-      return;
-    }
-
-    try {
-      decideDocument(
-        project.id,
-        stage.id,
-        doc.id,
-        value,
-        {
-          comments: comments.trim(),
-          revisionReason: revisionReason.trim(),
-          approverName: by,
-          approverType: 'Client',
-        },
-        { id: 'client-portal', name: by }
-      );
-      recordDecision(share.token, {
-        decision: value,
-        decidedBy: by,
-        comments: comments.trim(),
-        revisionReason: revisionReason.trim(),
+      .catch((err) => {
+        if (err?.status === 404 || err?.status === 409) {
+          setRemoteState(blockFromError(err));
+        } else {
+          setErrors({ submit: err.message });
+        }
       });
-      setReceipt({ decision: value, at: new Date().toISOString(), by });
-    } catch (err) {
-      setErrors({ submit: err.message });
-    }
   }
 
   // ── Terminal states ──
@@ -324,6 +255,22 @@ export default function ClientProofApprovalPage() {
         tone={{ bg: '#f6f9ff', fg: '#1f6bff' }}
         title="Checking this link…"
         body="Fetching the drawing and approval details."
+      />
+    );
+  }
+
+  if (remoteState === 'unreachable') {
+    return (
+      <PortalNotice
+        icon={WifiOff}
+        tone={{ bg: '#f1f5f9', fg: '#64748b' }}
+        title="We couldn't load this link"
+        body="The approval server did not respond. Check your connection and try again in a moment."
+        detail={
+          <Button type="button" size="sm" icon={RefreshCw} onClick={() => setAttempt((n) => n + 1)}>
+            Try again
+          </Button>
+        }
       />
     );
   }
@@ -350,7 +297,7 @@ export default function ClientProofApprovalPage() {
         icon={Link2Off}
         tone={{ bg: '#f1f5f9', fg: '#64748b' }}
         title="This approval link is not valid"
-        body="The link may have been mistyped, or it was issued from a different device. Ask your project manager to send a fresh one."
+        body="The link may have been mistyped, or it is no longer active. Ask your project manager to send a fresh one."
       />
     );
   }
@@ -525,9 +472,8 @@ export default function ClientProofApprovalPage() {
       )}
 
       {/* The drawing itself, with the review thread beside it */}
-      <MockPdfViewer
+      <ProofViewer
         document={doc}
-        projectName={productDetails.productName}
         annotations={thread}
         onAddAnnotation={addThreadComment}
       />

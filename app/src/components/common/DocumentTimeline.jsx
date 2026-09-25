@@ -33,8 +33,8 @@ export const DocumentTimeline = ({ steps, className = '', }) => {
                   {step.docNumber && (<p className="text-[11px] font-mono text-slate-600 font-medium">
                       {step.docNumber}
                     </p>)}
-                  {step.amount !== undefined && (<p className="text-[11px] font-mono font-semibold text-slate-700">
-                      ${step.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {step.amount != null && (<p className="text-[11px] font-mono font-semibold text-slate-700">
+                      ${(Number(step.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </p>)}
                   {step.date && (<p className="text-[10px] text-slate-400">{step.date}</p>)}
                 </div>

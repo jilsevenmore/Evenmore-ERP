@@ -118,7 +118,7 @@ export const PaymentInPage = () => {
             setMode('Bank Transfer');
         } else {
             setSelectedCustomerId(customers[0]?.id || '');
-            setAmount(1000);
+            setAmount(0);
             setMode('Cash');
             setDescription('Cash advance / counter settlement');
         }
@@ -141,13 +141,17 @@ export const PaymentInPage = () => {
         try {
             if (paymentType === 'WITH_BILL') {
                 const inv = invoices.find((i) => i.id === selectedInvoiceId) || invoices[0];
+                if (!inv) {
+                    alert('Please select an invoice to record this payment against.');
+                    return;
+                }
                 const cust = customers.find((c) => c.name === inv?.customer || c.id === inv?.customerId);
                 const created = addPaymentIn({
                     paymentType: 'WITH_BILL',
                     customerId: cust?.id,
                     customer: inv?.customer || cust?.name || 'Walk-in Customer',
                     invoiceId: inv?.id,
-                    invoiceNumber: inv?.invoiceNumber || 'INV-2026-001',
+                    invoiceNumber: inv?.invoiceNumber || '',
                     date: getCurrentDateFormatted(),
                     mode,
                     amount: numAmount,
@@ -418,7 +422,7 @@ export const PaymentInPage = () => {
             key: 'createdBy',
             header: 'Created By',
             width: '10%',
-            render: (r) => <span className="text-[11px] text-slate-500 font-medium truncate block">{r.createdBy || 'Admin'}</span>,
+            render: (r) => <span className="text-[11px] text-slate-500 font-medium truncate block">{r.createdBy || '—'}</span>,
         },
         {
             key: 'actions',
@@ -953,7 +957,7 @@ export const PaymentInPage = () => {
                                 </div>
                                 <div>
                                     <span className="text-slate-400 text-[10px] block">Created By</span>
-                                    <span>{viewReceipt.createdBy || 'Admin'}</span>
+                                    <span>{viewReceipt.createdBy || '—'}</span>
                                 </div>
                             </div>
 

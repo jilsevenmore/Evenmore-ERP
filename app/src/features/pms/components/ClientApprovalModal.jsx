@@ -5,11 +5,11 @@ import { Button } from '../../../components/ui/Button';
 import { usePmsStore, validateApprovalDecision } from '../../../stores/pmsStore';
 
 /**
- * ClientApprovalModal — the client approval simulator.
+ * ClientApprovalModal — record the client's decision on a circulated proof.
  *
- * Stands in for an external client portal so both outcomes can be exercised
- * without a backend. "Need Improvement" demands a revision reason; the store
- * enforces that too, so the rule holds even if this dialog is bypassed.
+ * For a decision the client gave outside the approval link (email, phone, in
+ * person). "Need Improvement" demands a revision reason; the store enforces
+ * that too, so the rule holds even if this dialog is bypassed.
  */
 
 const fieldClass =
@@ -75,7 +75,7 @@ export function ClientApprovalModal({ isOpen, onClose, project, stage, document:
       isOpen={isOpen}
       onClose={onClose}
       title="Client Approval Portal"
-      subtitle="Simulated client-facing review"
+      subtitle="Record the client's decision on this proof"
       size="lg"
       footer={
         <>

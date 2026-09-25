@@ -260,22 +260,13 @@ export async function deleteTask(projectId, stageId, taskId) {
 
 export async function addDocument(projectId, stageId, payload) {
   if (!isBackendEnabled()) return null;
-  let fileId = payload?.fileId;
-  if (!fileId) {
-    const fallbackBlob = new Blob(
-      [`%PDF-1.4\n% Proof: ${payload?.fileName || 'design'}\n`],
-      { type: 'application/pdf' }
-    );
-    fileId = await uploadFileToBackend(
-      fallbackBlob,
-      payload?.fileName || 'design.pdf',
-      'pms_document'
-    );
-  }
+  // A proof version is its file — never register one without the upload.
+  const fileId = payload?.fileId;
+  if (!fileId) throw new Error('The proof file was not uploaded.');
 
   const backendPayload = {
     fileId,
-    docKey: payload?.docKey || payload?.fileName || 'design.pdf',
+    docKey: payload?.docKey || payload?.fileName,
     comments: payload?.comments || '',
     is_proof: payload?.is_proof ?? true,
   };

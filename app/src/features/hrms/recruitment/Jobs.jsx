@@ -43,6 +43,10 @@ const JOBS_GUIDE = {
   ],
 };
 
+function todayLabel() {
+  return new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
 export default function Jobs() {
   const { jobs, addJob, updateJob, deleteJob } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
@@ -54,6 +58,16 @@ export default function Jobs() {
   const [branch, setBranch] = useState("All");
   const [status, setStatus] = useState("All");
   const [workMode, setWorkMode] = useState("All");
+
+  const employees = useAppStore((s) => s.employees || []);
+  const departmentOptions = useMemo(
+    () => [...new Set([...employees.map((e) => e.department), ...jobs.map((j) => j.department)].filter(Boolean))],
+    [employees, jobs]
+  );
+  const branchOptions = useMemo(
+    () => [...new Set(jobs.map((j) => j.branch || j.location).filter(Boolean))],
+    [jobs]
+  );
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -67,19 +81,19 @@ export default function Jobs() {
   const [form, setForm] = useState({
     title: "",
     code: "",
-    department: "Engineering",
-    branch: "New York",
+    department: "",
+    branch: "",
     employmentType: "Full-time",
-    experience: "3-5 years",
+    experience: "",
     openings: 1,
     description: "",
     responsibilities: "",
     requiredSkills: "",
-    location: "New York",
+    location: "",
     workMode: "Hybrid",
-    recruiter: "Ayesha Khan",
-    hiringManager: "David Park",
-    startDate: "01 Oct 2024",
+    recruiter: "",
+    hiringManager: "",
+    startDate: todayLabel(),
   });
 
   const filtered = useMemo(() => {
@@ -102,19 +116,19 @@ export default function Jobs() {
     setForm({
       title: "",
       code: "",
-      department: "Engineering",
-      branch: "New York",
+      department: "",
+      branch: "",
       employmentType: "Full-time",
-      experience: "3-5 years",
+      experience: "",
       openings: 1,
       description: "",
       responsibilities: "",
       requiredSkills: "",
-      location: "New York",
+      location: "",
       workMode: "Hybrid",
-      recruiter: "Ayesha Khan",
-      hiringManager: "David Park",
-      startDate: "01 Oct 2024",
+      recruiter: "",
+      hiringManager: "",
+      startDate: todayLabel(),
     });
     setDrawerOpen(true);
   }
@@ -155,7 +169,7 @@ export default function Jobs() {
         title: form.title,
         code: form.code || `CODE-${Date.now()}`,
         department: form.department,
-        branch: form.branch,
+        branch: form.branch || form.location,
         employmentType: form.employmentType,
         experience: form.experience,
         openings: Number(form.openings),
@@ -175,21 +189,20 @@ export default function Jobs() {
         title: form.title,
         code: form.code || `JOB-${Date.now()}`,
         department: form.department,
-        branch: form.branch,
+        branch: form.branch || form.location,
         employmentType: form.employmentType,
         experience: form.experience,
         openings: Number(form.openings),
         applicants: 0,
         interviews: 0,
         startDate: form.startDate,
-        createdAt: "09 Sep 2026",
+        createdAt: todayLabel(),
         status: publish ? "Open" : "Draft",
         recruiter: form.recruiter,
         hiringManager: form.hiringManager,
         description: form.description,
         responsibilities: form.responsibilities,
         requiredSkills: form.requiredSkills,
-        salaryRange: "$80k",
         location: form.location,
       });
       showToast(publish ? "Job opening created successfully." : "Draft saved");
@@ -381,12 +394,11 @@ export default function Jobs() {
           className="h-9 pl-3 pr-8 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer transition appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat"
         >
           <option value="All">All Departments</option>
-          <option value="Engineering">Engineering</option>
-          <option value="Design">Design</option>
-          <option value="HR">HR</option>
-          <option value="Marketing">Marketing</option>
-          <option value="Finance">Finance</option>
-          <option value="Operations">Operations</option>
+          {departmentOptions.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
         </select>
 
         <select
@@ -395,9 +407,11 @@ export default function Jobs() {
           className="h-9 pl-3 pr-8 bg-soft border border-border rounded-xl text-xs font-semibold text-text focus:outline-none focus:border-primary cursor-pointer transition appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2364748b%22%20stroke-width%3D%222.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:14px_14px] bg-[right_10px_center] bg-no-repeat"
         >
           <option value="All">All Branches</option>
-          <option value="New York">New York</option>
-          <option value="London">London</option>
-          <option value="Dubai">Dubai</option>
+          {branchOptions.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
         </select>
 
         <select
@@ -502,18 +516,18 @@ export default function Jobs() {
 
               <label className="flex flex-col gap-1">
                 <span className="font-semibold text-text text-xs">Department *</span>
-                <select
+                <input
+                  list="job-dept-options"
                   value={form.department}
                   onChange={(e) => setForm({ ...form, department: e.target.value })}
-                  className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
-                >
-                  <option>Engineering</option>
-                  <option>Design</option>
-                  <option>HR</option>
-                  <option>Finance</option>
-                  <option>Marketing</option>
-                  <option>Operations</option>
-                </select>
+                  className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                  placeholder="Enter department"
+                />
+                <datalist id="job-dept-options">
+                  {departmentOptions.map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
               </label>
 
               <label className="flex flex-col gap-1">

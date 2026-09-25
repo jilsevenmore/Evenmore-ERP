@@ -166,6 +166,11 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
 
   if (!project || !stage || !doc) return null;
 
+  // Rows written before real uploads carried a '/mock/' placeholder path.
+  const hasFile = Boolean(
+    doc.fileKey || doc.fileId || doc.fileData || (doc.previewUrl && !doc.previewUrl.startsWith('/mock/'))
+  );
+
   return (
     <Modal
       isOpen={isOpen}
@@ -218,13 +223,13 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
                 <span className="font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600">
                   v{doc.version}.0
                 </span>
-                {doc.fileKey || doc.fileData || (doc.previewUrl && !doc.previewUrl.startsWith('/mock/')) ? (
+                {hasFile ? (
                   <span className="font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                     File attached
                   </span>
                 ) : (
                   <span className="font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                    Schematic preview
+                    No file attached
                   </span>
                 )}
               </p>

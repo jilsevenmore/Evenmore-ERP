@@ -29,7 +29,7 @@ const challanGuide = {
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
 export const DeliveryChallansPage = () => {
-    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId } = useERP();
+    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId, companyProfile } = useERP();
     const location = useLocation();
     React.useEffect(() => {
         if (location.state?.challanId) setSelectedChallan(deliveryChallans.find(dc => dc.id === location.state.challanId) || null);
@@ -171,9 +171,9 @@ export const DeliveryChallansPage = () => {
             challanNumber: draftChallan?.challanNumber || `DC-2026-${String(deliveryChallans.length + 45).padStart(3, '0')}`,
             salesOrderId: draftChallan ? undefined : order?.id,
             sourceSalesOrderId: draftChallan ? undefined : order?.id,
-            salesOrderNumber: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
-            sourceSalesOrderNumber: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
-            linkedSo: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
+            salesOrderNumber: order?.orderNumber || '',
+            sourceSalesOrderNumber: order?.orderNumber || '',
+            linkedSo: order?.orderNumber || '',
             customerId: order?.customerId,
             customer: order?.customer || 'Walk-in Customer',
             dispatchDate: new Date().toISOString().split('T')[0],
@@ -256,9 +256,11 @@ export const DeliveryChallansPage = () => {
             render: (c) => (
               <div>
                 <span className="font-bold text-text block">{c.customer}</span>
-                <span className="text-[10px] text-muted flex items-center gap-0.5">
-                  <MapPin size={10}/> Dock Receiving Bay
-                </span>
+                {(c.shippingAddress?.city || c.shippingAddress?.state) && (
+                  <span className="text-[10px] text-muted flex items-center gap-0.5">
+                    <MapPin size={10}/> {[c.shippingAddress?.city, c.shippingAddress?.state].filter(Boolean).join(', ')}
+                  </span>
+                )}
               </div>
             ),
         },
@@ -276,7 +278,7 @@ export const DeliveryChallansPage = () => {
               <div>
                 <p className="font-semibold text-text">{c.transporter}</p>
                 <span className="font-mono text-[10px] text-muted">
-                  {c.vehicleNo || c.trackingNumber || 'TRK-DIRECT'}
+                  {c.vehicleNo || c.trackingNumber || '—'}
                 </span>
               </div>
             ),
@@ -551,7 +553,7 @@ export const DeliveryChallansPage = () => {
                           <tr key={item.id || idx} className={`hover:bg-slate-50/70 ${isOverLimit ? 'bg-rose-50/50' : isShort ? 'bg-amber-50/30' : ''}`}>
                             <td className="p-2.5">
                               <p className="font-semibold text-slate-800">{item.description || item.name}</p>
-                              <span className="font-mono text-[10px] text-slate-400">SKU: {item.itemSku || mi?.sku || 'GEN-SKU'}</span>
+                              <span className="font-mono text-[10px] text-slate-400">SKU: {item.itemSku || mi?.sku || '—'}</span>
                             </td>
                             <td className="p-2.5 text-center">
                               <div className="font-mono text-[11px] text-slate-700">
@@ -690,9 +692,11 @@ export const DeliveryChallansPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div className="space-y-1">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Shipper / Dispatch From</span>
-                  <p className="font-bold text-slate-900">Horizon Global Logistics & Warehousing Hub</p>
-                  <p className="text-slate-600">452 Industrial Parkway, Dock 14B</p>
-                  <p className="text-slate-600">Seattle, WA 98101 • United States</p>
+                  <p className="font-bold text-slate-900">{companyProfile?.name || '—'}</p>
+                  {companyProfile?.address && <p className="text-slate-600">{companyProfile.address}</p>}
+                  {(selectedChallan.dispatchLocation || selectedChallan.location) && (
+                    <p className="text-slate-600">Dispatch Location: {selectedChallan.dispatchLocation || selectedChallan.location}</p>
+                  )}
                 </div>
                 <div className="space-y-1 sm:border-l sm:border-slate-200 sm:pl-4">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Consignee / Deliver To (Shipping Address)</span>
@@ -701,12 +705,12 @@ export const DeliveryChallansPage = () => {
                     <div className="text-slate-600 text-[11px] leading-tight mt-1">
                       <p>{selectedChallan.shippingAddress.line1}</p>
                       {selectedChallan.shippingAddress.line2 && <p>{selectedChallan.shippingAddress.line2}</p>}
-                      <p>{selectedChallan.shippingAddress.city}, {selectedChallan.shippingAddress.state} {selectedChallan.shippingAddress.pincode}</p>
+                      <p>{[selectedChallan.shippingAddress.city, selectedChallan.shippingAddress.state, selectedChallan.shippingAddress.pincode].filter(Boolean).join(', ')}</p>
                     </div>
                   ) : (
-                    <p className="text-slate-600">Customer Receiving Facility / Inbound Dock</p>
+                    <p className="text-slate-600">No shipping address on record</p>
                   )}
-                  <p className="text-slate-600 mt-1">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo || selectedChallan.sourceQuotationNumber}</strong></p>
+                  <p className="text-slate-600 mt-1">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo || selectedChallan.sourceQuotationNumber || '—'}</strong></p>
                 </div>
               </div>
 
@@ -966,7 +970,7 @@ export const DeliveryChallansPage = () => {
                         <tr key={it.id || idx} className="hover:bg-slate-50/60">
                           <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
                           <td className="p-2.5 font-semibold text-slate-800">{it.description || it.name}</td>
-                          <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || 'SKU-LOG-01'}</td>
+                          <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || '—'}</td>
                           <td className="p-2.5 text-center font-bold text-slate-900">{it.qty}</td>
                           <td className="p-2.5">
                             {it.selectedSerials && it.selectedSerials.length > 0 ? (

@@ -35,7 +35,7 @@ const salesOrderGuide = {
 };
 export const SalesOrdersPage = () => {
     const navigate = useNavigate();
-    const { salesOrders, customers, addSalesOrder, updateSalesOrderAllocation, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
+    const { salesOrders, customers, addSalesOrder, updateSalesOrderAllocation, updateSalesOrderStage, cancelSalesOrder, convertSalesOrderToInvoice, convertSalesOrderToChallan, addProformaInvoice, proformaInvoices = [], deliveryChallans, invoices, paymentIns, addPaymentIn, formatCurrency, formatDateDDMMYYYY, getCurrentISODate, addDaysISO } = useERP();
     const pmsProjects = usePmsStore((s) => s.projects || []);
     const [pmsModalOrder, setPmsModalOrder] = useState(null);
     const [stageFilter, setStageFilter] = useState('All');
@@ -51,8 +51,8 @@ export const SalesOrdersPage = () => {
     const [autoPOState, setAutoPOState] = useState({ isOpen: false });
     const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
     const totalAmt = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
-    const creditLimit = selectedCustomer?.creditLimit || 50000;
-    const isCreditExceeded = selectedCustomer ? (selectedCustomer.balance + totalAmt) > creditLimit : false;
+    const creditLimit = Number(selectedCustomer?.creditLimit) || 0;
+    const isCreditExceeded = selectedCustomer && creditLimit > 0 ? ((selectedCustomer.balance || 0) + totalAmt) > creditLimit : false;
 
     // Two sections: Invoice & Cash Receipt split
     const [totalSalesValueInput, setTotalSalesValueInput] = useState(0);
@@ -253,34 +253,34 @@ export const SalesOrdersPage = () => {
         const rawItems = (order.items && order.items.length > 0) ? order.items.map((it, idx) => ({
             id: `pi-it-${Date.now()}-${idx}`,
             itemId: it.id || it.itemId || `item-${idx}`,
-            productName: it.description || it.productName || it.name || 'Industrial Machine Equipment',
-            productCode: it.productCode || it.sku || `SKU-SO-${idx + 1}`,
-            description: it.description || 'Pre-dispatch proforma billing unit',
+            productName: it.description || it.productName || it.name || '',
+            productCode: it.productCode || it.sku || '',
+            description: it.description || '',
             qty: it.qty || 1,
             unit: it.unit || 'pcs',
-            unitPrice: it.rate || it.unitPrice || it.amount || 10000,
+            unitPrice: it.rate || it.unitPrice || it.amount || 0,
             discountPercent: it.discountPercent || 0,
             discountAmount: it.discountAmount || 0,
             taxRate: it.taxRate || 18,
-            taxAmount: (it.qty || 1) * (it.rate || it.unitPrice || 10000) * ((it.taxRate || 18) / 100),
-            lineTotal: ((it.qty || 1) * (it.rate || it.unitPrice || 10000)) * (1 + ((it.taxRate || 18) / 100)),
+            taxAmount: (it.qty || 1) * (it.rate || it.unitPrice || it.amount || 0) * ((it.taxRate || 18) / 100),
+            lineTotal: ((it.qty || 1) * (it.rate || it.unitPrice || it.amount || 0)) * (1 + ((it.taxRate || 18) / 100)),
             isMachine: it.isMachine ?? true,
             warrantyStatus: 'Pending Final Invoicing / Commissioning',
         })) : [
             {
                 id: `pi-it-${Date.now()}-1`,
-                itemId: 'item-mach-01',
-                productName: 'CNC High-Precision Milling Machine X500',
-                productCode: 'CNC-M-500',
-                description: 'Industrial 5-axis vertical machining center',
+                itemId: '',
+                productName: `Sales Order ${order.orderNumber || ''}`.trim(),
+                productCode: '',
+                description: '',
                 qty: 1,
-                unit: 'set',
-                unitPrice: order.amount || 450000,
+                unit: 'pcs',
+                unitPrice: Number(order.amount) || 0,
                 discountPercent: 0,
                 discountAmount: 0,
                 taxRate: 18,
-                taxAmount: (order.amount || 450000) * 0.18,
-                lineTotal: (order.amount || 450000) * 1.18,
+                taxAmount: (Number(order.amount) || 0) * 0.18,
+                lineTotal: (Number(order.amount) || 0) * 1.18,
                 isMachine: true,
                 warrantyStatus: 'Pending Final Invoicing / Commissioning',
             }
@@ -296,9 +296,9 @@ export const SalesOrdersPage = () => {
             piDate: new Date().toISOString().split('T')[0],
             customerId: cust?.id || order.customerId,
             customer: cust?.name || order.customer,
-            customerContact: cust?.contactPerson || 'Procurement Lead',
-            billingAddress: cust?.billingAddress || cust?.address || 'Industrial Area Phase 2, New Delhi, 110020',
-            shippingAddress: cust?.shippingAddress || cust?.address || 'Plant 4, Industrial Zone, Gurgaon, HR',
+            customerContact: cust?.contactPerson || '',
+            billingAddress: cust?.billingAddress || cust?.address || '',
+            shippingAddress: cust?.shippingAddress || cust?.address || '',
             referenceSo: order.orderNumber,
             salesOrderId: order.id,
             paymentPreset: '50-40-10',
@@ -652,7 +652,7 @@ export const SalesOrdersPage = () => {
                   <select required value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
                     {customers.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
+                        {c.name}{c.code ? ` (${c.code})` : ''} - Balance: ₹{Number(c.balance || 0).toFixed(2)}
                       </option>
                     ))}
                   </select>
@@ -661,11 +661,11 @@ export const SalesOrdersPage = () => {
                       <div className="flex items-center justify-between font-bold text-slate-800">
                         <span>{selectedCustomer.name}</span>
                         <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                          Credit Limit: ₹{(selectedCustomer.creditLimit || 50000).toLocaleString('en-IN')}
+                          Credit Limit: {selectedCustomer.creditLimit ? `₹${Number(selectedCustomer.creditLimit).toLocaleString('en-IN')}` : '—'}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                        <span>POC: <strong>{selectedCustomer.contactPerson || 'Account Lead'}</strong></span>
+                        <span>POC: <strong>{selectedCustomer.contactPerson || '—'}</strong></span>
                         <span>Email: {selectedCustomer.email}</span>
                         <span>Phone: {selectedCustomer.phone}</span>
                         <span>Outstanding: ₹{(selectedCustomer.balance || 0).toLocaleString('en-IN')}</span>
@@ -1280,14 +1280,14 @@ export const SalesOrdersPage = () => {
                   <div>
                     <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Billed To (Snapshot)</span>
                     <p className="font-semibold text-slate-800">{selectedOrder.customer}</p>
-                    <p className="text-slate-600">{selectedOrder.billingAddress?.line1 || 'Main Facility'}</p>
-                    <p className="text-slate-600">{selectedOrder.billingAddress?.city || 'Mumbai'}, {selectedOrder.billingAddress?.state || 'Maharashtra'} {selectedOrder.billingAddress?.pincode}</p>
+                    <p className="text-slate-600">{selectedOrder.billingAddress?.line1 || ''}</p>
+                    <p className="text-slate-600">{[selectedOrder.billingAddress?.city, selectedOrder.billingAddress?.state, selectedOrder.billingAddress?.pincode].filter(Boolean).join(', ')}</p>
                   </div>
                   <div>
                     <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Shipped To (Snapshot)</span>
                     <p className="font-semibold text-slate-800">{selectedOrder.customer}</p>
-                    <p className="text-slate-600">{selectedOrder.shippingAddress?.line1 || selectedOrder.billingAddress?.line1 || 'Destination Facility'}</p>
-                    <p className="text-slate-600">{selectedOrder.shippingAddress?.city || selectedOrder.billingAddress?.city || 'Mumbai'}, {selectedOrder.shippingAddress?.state || selectedOrder.billingAddress?.state || 'Maharashtra'} {selectedOrder.shippingAddress?.pincode}</p>
+                    <p className="text-slate-600">{selectedOrder.shippingAddress?.line1 || selectedOrder.billingAddress?.line1 || ''}</p>
+                    <p className="text-slate-600">{[selectedOrder.shippingAddress?.city || selectedOrder.billingAddress?.city, selectedOrder.shippingAddress?.state || selectedOrder.billingAddress?.state, selectedOrder.shippingAddress?.pincode].filter(Boolean).join(', ')}</p>
                   </div>
                 </div>
               </div>

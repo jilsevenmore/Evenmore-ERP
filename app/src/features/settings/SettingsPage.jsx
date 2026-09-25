@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import { Building, Bell, Database, Save, Check, RotateCcw, AlertTriangle, MapPin, Phone, Hash } from 'lucide-react';
 export const SettingsPage = () => {
     const {
-        resetDemoData,
+        resetBusinessData,
         exportDatabaseSnapshot,
         importDatabaseSnapshot,
         currency: globalCurrency,
@@ -14,7 +14,7 @@ export const SettingsPage = () => {
         showToast,
     } = useERP();
     const [saved, setSaved] = useState(false);
-    const [companyName, setCompanyName] = useState(companyProfile?.name || 'Sweven Fabricators Pvt Ltd');
+    const [companyName, setCompanyName] = useState(companyProfile?.name || '');
     const [gstin, setGstin] = useState(companyProfile?.gstin || '');
     const [pan, setPan] = useState(companyProfile?.pan || '');
     const [address, setAddress] = useState(companyProfile?.address || '');
@@ -24,6 +24,15 @@ export const SettingsPage = () => {
     const [autoReorder, setAutoReorder] = useState(true);
     const [emailAlerts, setEmailAlerts] = useState(true);
     const [showConfirmReset, setShowConfirmReset] = useState(false);
+    const [resetting, setResetting] = useState(false);
+    // The profile arrives from the server after mount; show it once it does.
+    useEffect(() => {
+        setCompanyName(companyProfile?.name || '');
+        setGstin(companyProfile?.gstin || '');
+        setPan(companyProfile?.pan || '');
+        setAddress(companyProfile?.address || '');
+        setPhone(companyProfile?.phone || '');
+    }, [companyProfile]);
     const handleSave = (e) => {
         e.preventDefault();
         setGlobalCurrency(currency);
@@ -39,8 +48,10 @@ export const SettingsPage = () => {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
     };
-    const handleResetData = () => {
-        resetDemoData();
+    const handleResetData = async () => {
+        setResetting(true);
+        const ok = await resetBusinessData();
+        if (!ok) setResetting(false);
         setShowConfirmReset(false);
     };
     return (<div className="space-y-6 max-w-4xl">
@@ -193,12 +204,12 @@ export const SettingsPage = () => {
           </div>
         </div>
 
-        {/* Factory Reset */}
+        {/* Reset data */}
         <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
           <div>
-            <p className="font-semibold text-rose-800">Factory Reset & Re-Seed</p>
+            <p className="font-semibold text-rose-800">Reset Data</p>
             <p className="text-slate-500 text-[11px]">
-              Erase local modifications and restore clean factory demo records.
+              Permanently erase all business data (customers, vendors, items, orders, invoices, accounts and module records) and start with an empty database. Download a backup first if you may need it.
             </p>
           </div>
           {!showConfirmReset ? (
@@ -207,23 +218,25 @@ export const SettingsPage = () => {
               onClick={() => setShowConfirmReset(true)}
               className="px-3.5 py-1.5 text-xs font-semibold text-rose-700 bg-rose-50 border border-rose-200 hover:bg-rose-100 rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
             >
-              <RotateCcw className="w-3.5 h-3.5"/> Reset to Factory Seed
+              <RotateCcw className="w-3.5 h-3.5"/> Reset Data
             </button>
           ) : (
             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => setShowConfirmReset(false)}
-                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer"
+                disabled={resetting}
+                className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleResetData}
-                className="px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer"
+                disabled={resetting}
+                className="px-4 py-1.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
               >
-                <AlertTriangle className="w-3.5 h-3.5"/> Confirm Factory Reset
+                <AlertTriangle className="w-3.5 h-3.5"/> {resetting ? 'Erasing…' : 'Yes, Erase All Data'}
               </button>
             </div>
           )}

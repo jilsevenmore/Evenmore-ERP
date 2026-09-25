@@ -1,6 +1,11 @@
 import { useState, useMemo } from "react";
 import { FileSpreadsheet, Download, ChevronDown } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
+import { usePayrollStore } from "../../../stores/payrollStore";
+import { usePerformanceStore } from "../../../stores/performanceStore";
+import { useTrainingStore } from "../../../stores/trainingStore";
+import { useAssetStore } from "../../../stores/assetStore";
+import { toISODate } from "../../../utils/dateUtils";
 
 const TABS = [
   "Employee",
@@ -14,245 +19,65 @@ const TABS = [
   "Department",
 ];
 
-const DATE_RANGE_OPTIONS = [
-  "Jan 2024 - Dec 2024 (Annual)",
-  "H1 2024 (Jan - Jun)",
-  "H2 2024 (Jul - Dec)",
-  "Q1 2024 (Jan - Mar)",
-  "Q2 2024 (Apr - Jun)",
-  "Q3 2024 (Jul - Sep)",
-  "Q4 2024 (Oct - Dec)",
-  "Q3 - Q4 2024",
-];
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const YEAR = new Date().getFullYear();
+const CURRENT_MONTH_IDX = new Date().getMonth();
 
 const DATE_RANGE_MAP = {
-  "Jan 2024 - Dec 2024 (Annual)": [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ],
-  "H1 2024 (Jan - Jun)": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-  "H2 2024 (Jul - Dec)": ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-  "Q1 2024 (Jan - Mar)": ["Jan", "Feb", "Mar"],
-  "Q2 2024 (Apr - Jun)": ["Apr", "May", "Jun"],
-  "Q3 2024 (Jul - Sep)": ["Jul", "Aug", "Sep"],
-  "Q4 2024 (Oct - Dec)": ["Oct", "Nov", "Dec"],
-  "Q3 - Q4 2024": ["Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  [`Jan ${YEAR} - Dec ${YEAR} (Annual)`]: MONTH_LABELS,
+  [`H1 ${YEAR} (Jan - Jun)`]: MONTH_LABELS.slice(0, 6),
+  [`H2 ${YEAR} (Jul - Dec)`]: MONTH_LABELS.slice(6),
+  [`Q1 ${YEAR} (Jan - Mar)`]: MONTH_LABELS.slice(0, 3),
+  [`Q2 ${YEAR} (Apr - Jun)`]: MONTH_LABELS.slice(3, 6),
+  [`Q3 ${YEAR} (Jul - Sep)`]: MONTH_LABELS.slice(6, 9),
+  [`Q4 ${YEAR} (Oct - Dec)`]: MONTH_LABELS.slice(9),
+  [`Q3 - Q4 ${YEAR}`]: MONTH_LABELS.slice(6),
+};
+const DATE_RANGE_OPTIONS = Object.keys(DATE_RANGE_MAP);
+
+const TAB_META = {
+  Employee: { yAxisPrefix: "Y-Axis: Total Workforce Volume", seriesNames: ["Full Time", "Contract", "Interns"] },
+  Attendance: { yAxisPrefix: "Y-Axis: Attendance Records", seriesNames: ["On-Site", "Remote", "Half Day"] },
+  Leave: { yAxisPrefix: "Y-Axis: Total Leave Applications", seriesNames: ["Paid / Annual", "Casual / Sick", "Unpaid"] },
+  Payroll: { yAxisPrefix: "Y-Axis: Gross Disbursement (in ₹)", seriesNames: ["Salaries", "Allowances", "Overtime & Bonus"] },
+  Performance: { yAxisPrefix: "Y-Axis: Completed Review Cycles", seriesNames: ["Exceeds", "Meets Expectations", "Needs Improvement"] },
+  Recruitment: { yAxisPrefix: "Y-Axis: Candidate Pipeline", seriesNames: ["Sourced", "Interviewed", "Offers Accepted"] },
+  Training: { yAxisPrefix: "Y-Axis: Total Enrollments", seriesNames: ["Technical", "Leadership", "Compliance"] },
+  Asset: { yAxisPrefix: "Y-Axis: Total Assets Registered", seriesNames: ["Laptops", "Monitors & Accessories", "Mobile / Test Devices"] },
+  Department: { yAxisPrefix: "Y-Axis: Headcount by Division", seriesNames: [] },
 };
 
-const DEPARTMENT_PROFILES = {
-  "All Departments": {
-    ratio: 1.0,
-    DepartmentSeries: ["Engineering", "Sales & Ops", "Product & Design"],
-  },
-  Engineering: {
-    ratio: 0.42,
-    DepartmentSeries: ["Backend & Infra", "Frontend & Mobile", "QA & DevOps"],
-  },
-  Design: {
-    ratio: 0.12,
-    DepartmentSeries: ["UI / UX Design", "Brand & Motion", "Design Systems"],
-  },
-  Product: {
-    ratio: 0.15,
-    DepartmentSeries: ["Product Strategy", "Technical PM", "UX Research"],
-  },
-  Operations: {
-    ratio: 0.18,
-    DepartmentSeries: ["People Ops", "IT & Workplace", "Compliance"],
-  },
-  "HR & People": {
-    ratio: 0.08,
-    DepartmentSeries: ["Talent Acquisition", "HR Admin", "L&D & Culture"],
-  },
-  "Sales & Marketing": {
-    ratio: 0.16,
-    DepartmentSeries: ["Inbound Sales", "Digital Marketing", "Content & Growth"],
-  },
+/** Month index (0-11) of a date in the current year, or -1. */
+function monthOf(value) {
+  const iso = toISODate(value);
+  if (!iso) return -1;
+  const [y, m] = iso.split("-").map(Number);
+  return y === YEAR ? m - 1 : -1;
+}
+
+/** Month index a row counts from for cumulative headcount (-1 = before this year, 12 = never). */
+function startMonthOf(value) {
+  const iso = toISODate(value);
+  if (!iso) return -1;
+  const [y, m] = iso.split("-").map(Number);
+  if (y < YEAR) return -1;
+  if (y > YEAR) return 12;
+  return m - 1;
+}
+
+const has = (value, ...needles) => {
+  const lower = String(value || "").toLowerCase();
+  return needles.some((n) => lower.includes(n));
 };
 
-// Base data templates across all 12 months
-const TAB_DATA_TEMPLATES = {
-  Employee: {
-    yAxisPrefix: "Y-Axis: Total Workforce Volume",
-    defaultGrowth: "+14.6% YTD",
-    seriesNames: ["Full Time", "Contract", "Interns"],
-    baseScaleMax: 1400,
-    months: [
-      { month: "Jan", s1: 680, s2: 380, s3: 160 },
-      { month: "Feb", s1: 720, s2: 410, s3: 190 },
-      { month: "Mar", s1: 820, s2: 480, s3: 240 },
-      { month: "Apr", s1: 910, s2: 520, s3: 280 },
-      { month: "May", s1: 880, s2: 560, s3: 310 },
-      { month: "Jun", s1: 940, s2: 630, s3: 350 },
-      { month: "Jul", s1: 1040, s2: 680, s3: 370 },
-      { month: "Aug", s1: 1060, s2: 740, s3: 420 },
-      { month: "Sep", s1: 1110, s2: 810, s3: 490 },
-      { month: "Oct", s1: 1140, s2: 860, s3: 520 },
-      { month: "Nov", s1: 1020, s2: 790, s3: 410 },
-      { month: "Dec", s1: 1080, s2: 830, s3: 450 },
-    ],
-  },
-  Attendance: {
-    yAxisPrefix: "Y-Axis: Daily Attendance Headcount",
-    defaultGrowth: "+3.8% MoM",
-    seriesNames: ["On-Site", "Remote", "Half Day"],
-    baseScaleMax: 1200,
-    months: [
-      { month: "Jan", s1: 620, s2: 180, s3: 45 },
-      { month: "Feb", s1: 650, s2: 190, s3: 40 },
-      { month: "Mar", s1: 710, s2: 210, s3: 35 },
-      { month: "Apr", s1: 780, s2: 230, s3: 30 },
-      { month: "May", s1: 760, s2: 240, s3: 35 },
-      { month: "Jun", s1: 820, s2: 250, s3: 28 },
-      { month: "Jul", s1: 890, s2: 260, s3: 25 },
-      { month: "Aug", s1: 920, s2: 270, s3: 22 },
-      { month: "Sep", s1: 960, s2: 280, s3: 20 },
-      { month: "Oct", s1: 990, s2: 290, s3: 18 },
-      { month: "Nov", s1: 880, s2: 260, s3: 24 },
-      { month: "Dec", s1: 910, s2: 270, s3: 22 },
-    ],
-  },
-  Leave: {
-    yAxisPrefix: "Y-Axis: Total Leave Applications",
-    defaultGrowth: "-5.2% MoM",
-    seriesNames: ["Paid / Annual", "Casual / Sick", "Unpaid"],
-    baseScaleMax: 250,
-    months: [
-      { month: "Jan", s1: 120, s2: 60, s3: 15 },
-      { month: "Feb", s1: 95, s2: 45, s3: 10 },
-      { month: "Mar", s1: 110, s2: 55, s3: 12 },
-      { month: "Apr", s1: 130, s2: 70, s3: 18 },
-      { month: "May", s1: 140, s2: 80, s3: 20 },
-      { month: "Jun", s1: 155, s2: 75, s3: 22 },
-      { month: "Jul", s1: 165, s2: 85, s3: 25 },
-      { month: "Aug", s1: 170, s2: 90, s3: 22 },
-      { month: "Sep", s1: 145, s2: 65, s3: 15 },
-      { month: "Oct", s1: 135, s2: 55, s3: 12 },
-      { month: "Nov", s1: 125, s2: 50, s3: 10 },
-      { month: "Dec", s1: 190, s2: 80, s3: 25 },
-    ],
-  },
-  Payroll: {
-    yAxisPrefix: "Y-Axis: Gross Disbursement (in ₹ Lakhs)",
-    defaultGrowth: "+18.2% YTD",
-    seriesNames: ["Salaries", "Allowances", "Overtime & Bonus"],
-    baseScaleMax: 600,
-    months: [
-      { month: "Jan", s1: 320, s2: 120, s3: 40 },
-      { month: "Feb", s1: 330, s2: 125, s3: 45 },
-      { month: "Mar", s1: 350, s2: 130, s3: 65 },
-      { month: "Apr", s1: 380, s2: 140, s3: 50 },
-      { month: "May", s1: 390, s2: 145, s3: 55 },
-      { month: "Jun", s1: 410, s2: 150, s3: 60 },
-      { month: "Jul", s1: 430, s2: 155, s3: 65 },
-      { month: "Aug", s1: 450, s2: 160, s3: 70 },
-      { month: "Sep", s1: 470, s2: 165, s3: 80 },
-      { month: "Oct", s1: 490, s2: 170, s3: 85 },
-      { month: "Nov", s1: 460, s2: 160, s3: 70 },
-      { month: "Dec", s1: 520, s2: 180, s3: 95 },
-    ],
-  },
-  Performance: {
-    yAxisPrefix: "Y-Axis: Completed Review Cycles",
-    defaultGrowth: "+22.4% vs Q3",
-    seriesNames: ["Exceeds", "Meets Expectations", "Needs Improvement"],
-    baseScaleMax: 300,
-    months: [
-      { month: "Jan", s1: 45, s2: 140, s3: 20 },
-      { month: "Feb", s1: 50, s2: 150, s3: 18 },
-      { month: "Mar", s1: 60, s2: 170, s3: 22 },
-      { month: "Apr", s1: 65, s2: 180, s3: 20 },
-      { month: "May", s1: 70, s2: 190, s3: 15 },
-      { month: "Jun", s1: 80, s2: 210, s3: 18 },
-      { month: "Jul", s1: 85, s2: 215, s3: 17 },
-      { month: "Aug", s1: 90, s2: 220, s3: 16 },
-      { month: "Sep", s1: 95, s2: 230, s3: 14 },
-      { month: "Oct", s1: 105, s2: 240, s3: 12 },
-      { month: "Nov", s1: 85, s2: 200, s3: 15 },
-      { month: "Dec", s1: 110, s2: 250, s3: 10 },
-    ],
-  },
-  Recruitment: {
-    yAxisPrefix: "Y-Axis: Candidate Pipeline",
-    defaultGrowth: "+31.0% YTD",
-    seriesNames: ["Sourced", "Interviewed", "Offers Accepted"],
-    baseScaleMax: 500,
-    months: [
-      { month: "Jan", s1: 220, s2: 90, s3: 24 },
-      { month: "Feb", s1: 240, s2: 110, s3: 28 },
-      { month: "Mar", s1: 280, s2: 130, s3: 35 },
-      { month: "Apr", s1: 310, s2: 140, s3: 40 },
-      { month: "May", s1: 290, s2: 135, s3: 38 },
-      { month: "Jun", s1: 340, s2: 160, s3: 45 },
-      { month: "Jul", s1: 360, s2: 175, s3: 50 },
-      { month: "Aug", s1: 390, s2: 190, s3: 56 },
-      { month: "Sep", s1: 420, s2: 210, s3: 62 },
-      { month: "Oct", s1: 440, s2: 225, s3: 68 },
-      { month: "Nov", s1: 380, s2: 180, s3: 48 },
-      { month: "Dec", s1: 410, s2: 200, s3: 55 },
-    ],
-  },
-  Training: {
-    yAxisPrefix: "Y-Axis: Total Enrollments & Badges",
-    defaultGrowth: "+19.5% YTD",
-    seriesNames: ["Technical", "Leadership", "Compliance"],
-    baseScaleMax: 400,
-    months: [
-      { month: "Jan", s1: 140, s2: 60, s3: 90 },
-      { month: "Feb", s1: 160, s2: 70, s3: 95 },
-      { month: "Mar", s1: 180, s2: 85, s3: 110 },
-      { month: "Apr", s1: 200, s2: 90, s3: 120 },
-      { month: "May", s1: 190, s2: 80, s3: 115 },
-      { month: "Jun", s1: 220, s2: 100, s3: 130 },
-      { month: "Jul", s1: 230, s2: 110, s3: 140 },
-      { month: "Aug", s1: 250, s2: 115, s3: 145 },
-      { month: "Sep", s1: 270, s2: 125, s3: 155 },
-      { month: "Oct", s1: 280, s2: 130, s3: 160 },
-      { month: "Nov", s1: 240, s2: 105, s3: 135 },
-      { month: "Dec", s1: 260, s2: 120, s3: 150 },
-    ],
-  },
-  Asset: {
-    yAxisPrefix: "Y-Axis: Total Active Assets Allocated",
-    defaultGrowth: "+12.1% YTD",
-    seriesNames: ["Laptops", "Monitors & Accessories", "Mobile / Test Devices"],
-    baseScaleMax: 1200,
-    months: [
-      { month: "Jan", s1: 450, s2: 320, s3: 120 },
-      { month: "Feb", s1: 480, s2: 340, s3: 130 },
-      { month: "Mar", s1: 520, s2: 380, s3: 150 },
-      { month: "Apr", s1: 560, s2: 410, s3: 165 },
-      { month: "May", s1: 580, s2: 430, s3: 175 },
-      { month: "Jun", s1: 620, s2: 460, s3: 190 },
-      { month: "Jul", s1: 670, s2: 490, s3: 205 },
-      { month: "Aug", s1: 710, s2: 520, s3: 220 },
-      { month: "Sep", s1: 760, s2: 560, s3: 240 },
-      { month: "Oct", s1: 790, s2: 590, s3: 250 },
-      { month: "Nov", s1: 720, s2: 530, s3: 225 },
-      { month: "Dec", s1: 750, s2: 550, s3: 235 },
-    ],
-  },
-  Department: {
-    yAxisPrefix: "Y-Axis: Headcount by Division",
-    defaultGrowth: "+8.4% YTD",
-    seriesNames: ["Engineering", "Sales & Ops", "Product & Design"],
-    baseScaleMax: 800,
-    months: [
-      { month: "Jan", s1: 380, s2: 240, s3: 140 },
-      { month: "Feb", s1: 400, s2: 255, s3: 150 },
-      { month: "Mar", s1: 430, s2: 270, s3: 165 },
-      { month: "Apr", s1: 460, s2: 290, s3: 180 },
-      { month: "May", s1: 475, s2: 300, s3: 190 },
-      { month: "Jun", s1: 510, s2: 320, s3: 205 },
-      { month: "Jul", s1: 540, s2: 340, s3: 220 },
-      { month: "Aug", s1: 565, s2: 360, s3: 235 },
-      { month: "Sep", s1: 590, s2: 380, s3: 250 },
-      { month: "Oct", s1: 610, s2: 395, s3: 260 },
-      { month: "Nov", s1: 550, s2: 350, s3: 230 },
-      { month: "Dec", s1: 580, s2: 370, s3: 245 },
-    ],
-  },
+const amount = (value) => {
+  const n = Number(String(value ?? "").replace(/[^0-9.-]+/g, ""));
+  return Number.isFinite(n) ? n : 0;
 };
+
+const deptOf = (row) => row.department || row.dept || "";
+
+const isFutureMonth = (month) => MONTH_LABELS.indexOf(month) > CURRENT_MONTH_IDX;
 
 export default function AnalyticsVolumeChart() {
   const showToast = useAppStore((s) => s.showToast || s.setToast);
@@ -260,72 +85,139 @@ export default function AnalyticsVolumeChart() {
   const leaves = useAppStore((s) => s.leaves || []);
   const attendance = useAppStore((s) => s.attendance || []);
   const candidates = useAppStore((s) => s.candidates || []);
+  const payroll = usePayrollStore((s) => s.employees || []);
+  const appraisals = usePerformanceStore((s) => s.appraisals || []);
+  const trainings = useTrainingStore((s) => s.trainings || []);
+  const assets = useAssetStore((s) => s.assets || []);
 
   const [activeTab, setActiveTab] = useState("Employee");
   const [department, setDepartment] = useState("All Departments");
-  const [dateRange, setDateRange] = useState("Jan 2024 - Dec 2024 (Annual)");
-  const [selectedMonth, setSelectedMonth] = useState("Oct");
+  const [dateRange, setDateRange] = useState(DATE_RANGE_OPTIONS[0]);
+  const [selectedMonth, setSelectedMonth] = useState(MONTH_LABELS[CURRENT_MONTH_IDX]);
   const [hoveredData, setHoveredData] = useState(null);
 
-  // Profile and ratio for current department
-  const deptProfile = DEPARTMENT_PROFILES[department] || DEPARTMENT_PROFILES["All Departments"];
-  const baseTemplate = TAB_DATA_TEMPLATES[activeTab] || TAB_DATA_TEMPLATES.Employee;
+  const baseTemplate = TAB_META[activeTab] || TAB_META.Employee;
 
-  // Series names (customized if on Department tab for specific department)
+  const departmentOptions = useMemo(
+    () => [...new Set(employees.map(deptOf).filter(Boolean))].sort(),
+    [employees]
+  );
+
+  const employeeDept = useMemo(() => {
+    const map = new Map();
+    employees.forEach((e) => {
+      if (e.name) map.set(e.name, deptOf(e));
+      if (e.id !== undefined) map.set(String(e.id), deptOf(e));
+    });
+    return map;
+  }, [employees]);
+
+  const inDept = (row, nameKey = "employee") => {
+    if (department === "All Departments") return true;
+    const d = deptOf(row) || employeeDept.get(String(row.employeeId ?? "")) || employeeDept.get(row[nameKey]) || "";
+    return d === department;
+  };
+
+  const topDepartments = useMemo(() => {
+    const counts = {};
+    employees.forEach((e) => {
+      const d = deptOf(e);
+      if (d) counts[d] = (counts[d] || 0) + 1;
+    });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([d]) => d);
+  }, [employees]);
+
   const seriesNames = useMemo(() => {
-    if (activeTab === "Department" && deptProfile.DepartmentSeries) {
-      return deptProfile.DepartmentSeries;
+    if (activeTab === "Department") {
+      const names = [...topDepartments];
+      while (names.length < 3) names.push("—");
+      return names;
     }
     return baseTemplate.seriesNames;
-  }, [activeTab, deptProfile, baseTemplate]);
+  }, [activeTab, topDepartments, baseTemplate]);
 
-  // Live store boosts for October (the active current month)
-  const storeBoosts = useMemo(() => {
-    const empBonus = Math.max(0, employees.length - 8) * 12;
-    const leaveBonus = Math.max(0, leaves.length - 2) * 6;
-    const attBonus = Math.max(0, attendance.length - 4) * 8;
-    const candBonus = Math.max(0, candidates.length - 3) * 10;
-    return { empBonus, leaveBonus, attBonus, candBonus };
-  }, [employees, leaves, attendance, candidates]);
-
-  // Generate processed months data scaled by department and live store values
+  // Monthly series built from the live records for the current year.
   const processedMonths = useMemo(() => {
-    const ratio = deptProfile.ratio;
-    return baseTemplate.months.map((m) => {
-      let boost1 = 0;
-      let boost2 = 0;
-      let boost3 = 0;
+    const buckets = MONTH_LABELS.map((month) => ({ month, s1: 0, s2: 0, s3: 0 }));
+    const add = (idx, key, value = 1) => {
+      if (idx >= 0 && idx < 12) buckets[idx][key] += value;
+    };
+    const addFrom = (idx, key) => {
+      for (let i = Math.max(0, idx); i < 12; i += 1) buckets[i][key] += 1;
+    };
 
-      // Apply live store data to current month (Oct)
-      if (m.month === "Oct") {
-        if (activeTab === "Employee") {
-          boost1 = storeBoosts.empBonus;
-        } else if (activeTab === "Leave") {
-          boost1 = storeBoosts.leaveBonus;
-        } else if (activeTab === "Attendance") {
-          boost1 = storeBoosts.attBonus;
-        } else if (activeTab === "Recruitment") {
-          boost1 = storeBoosts.candBonus;
-        }
-      }
+    if (activeTab === "Employee") {
+      employees.filter((e) => inDept(e)).forEach((e) => {
+        const type = e.employmentType || e.jobType || "";
+        const key = has(type, "intern") ? "s3" : has(type, "contract", "consult", "freelance") ? "s2" : "s1";
+        addFrom(startMonthOf(e.joiningDate || e.doj), key);
+      });
+    } else if (activeTab === "Department") {
+      employees.forEach((e) => {
+        const idx = topDepartments.indexOf(deptOf(e));
+        if (idx >= 0) addFrom(startMonthOf(e.joiningDate || e.doj), `s${idx + 1}`);
+      });
+    } else if (activeTab === "Attendance") {
+      attendance.filter((r) => inDept(r)).forEach((r) => {
+        const idx = monthOf(r.date);
+        if (r.status === "WFH") add(idx, "s2");
+        else if (r.status === "Half Day") add(idx, "s3");
+        else if (r.status === "Present" || r.status === "Late") add(idx, "s1");
+      });
+    } else if (activeTab === "Leave") {
+      leaves.filter((l) => inDept(l)).forEach((l) => {
+        const idx = monthOf(l.fromDate || l.from);
+        const type = l.type || l.leaveType || "";
+        if (has(type, "unpaid", "loss of pay", "lop")) add(idx, "s3");
+        else if (has(type, "casual", "sick", "medical")) add(idx, "s2");
+        else add(idx, "s1");
+      });
+    } else if (activeTab === "Payroll") {
+      payroll.filter((p) => inDept(p, "name")).forEach((p) => {
+        const idx = monthOf(p.paymentDate) >= 0
+          ? monthOf(p.paymentDate)
+          : Number(p.year) === YEAR && p.month ? MONTH_LABELS.findIndex((m) => String(p.month).toLowerCase().startsWith(m.toLowerCase())) : -1;
+        add(idx, "s1", Math.round(amount(p.earnedSalary ?? p.standardSalary)));
+        add(idx, "s2", Math.round(amount(p.additionalEarnings ?? p.allowances)));
+        add(idx, "s3", Math.round(amount(p.overtime) + amount(p.bonus)));
+      });
+    } else if (activeTab === "Performance") {
+      appraisals.filter((a) => inDept(a)).forEach((a) => {
+        if (a.status !== "Completed" && a.status !== "Approved") return;
+        const idx = monthOf(a.hrReview?.approvedAt || a.due);
+        const r = Number(a.rating) || 0;
+        add(idx, r >= 3.8 ? "s1" : r >= 3 ? "s2" : "s3");
+      });
+    } else if (activeTab === "Recruitment") {
+      candidates.forEach((c) => {
+        if (department !== "All Departments" && c.department && c.department !== department) return;
+        const idx = monthOf(c.appliedDate || c.applied || c.createdAt);
+        add(idx, "s1");
+        if (c.interviewStatus || has(c.stage, "interview", "offer", "hired")) add(idx, "s2");
+        if (has(c.stage, "hired")) add(idx, "s3");
+      });
+    } else if (activeTab === "Training") {
+      trainings.filter((t) => inDept(t)).forEach((t) => {
+        const idx = monthOf(t.startDate || t.start);
+        const key = has(t.type, "leader", "management") ? "s2" : has(t.type, "compliance", "policy", "safety") ? "s3" : "s1";
+        add(idx, key, Number(t.participants) || 1);
+      });
+    } else if (activeTab === "Asset") {
+      assets.forEach((a) => {
+        if (department !== "All Departments" && a.dept !== department) return;
+        const idx = monthOf(a.purchaseDate || a.history?.[a.history.length - 1]?.date);
+        const key = has(a.category, "mobile", "phone", "tablet", "device") ? "s3" : has(a.category, "laptop") ? "s1" : "s2";
+        add(idx, key);
+      });
+    }
 
-      const s1 = Math.max(1, Math.round((m.s1 + boost1) * ratio));
-      const s2 = Math.max(1, Math.round((m.s2 + boost2) * ratio));
-      const s3 = Math.max(1, Math.round((m.s3 + boost3) * ratio));
-
-      return {
-        month: m.month,
-        s1,
-        s2,
-        s3,
-        total: s1 + s2 + s3,
-      };
-    });
-  }, [baseTemplate, deptProfile, activeTab, storeBoosts]);
+    return buckets.map((b) => ({ ...b, total: b.s1 + b.s2 + b.s3 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, department, employees, leaves, attendance, candidates, payroll, appraisals, trainings, assets, topDepartments, employeeDept]);
 
   // Filter months according to selected Date Range
   const visibleMonthsData = useMemo(() => {
-    const allowed = DATE_RANGE_MAP[dateRange] || DATE_RANGE_MAP["Jan 2024 - Dec 2024 (Annual)"];
+    const allowed = DATE_RANGE_MAP[dateRange] || MONTH_LABELS;
     return processedMonths.filter((m) => allowed.includes(m.month));
   }, [processedMonths, dateRange]);
 
@@ -333,14 +225,16 @@ export default function AnalyticsVolumeChart() {
   const activeSelectedMonth = useMemo(() => {
     const hasMonth = visibleMonthsData.some((m) => m.month === selectedMonth);
     if (hasMonth) return selectedMonth;
-    return visibleMonthsData[visibleMonthsData.length - 1]?.month || "Oct";
+    return visibleMonthsData[visibleMonthsData.length - 1]?.month || MONTH_LABELS[CURRENT_MONTH_IDX];
   }, [visibleMonthsData, selectedMonth]);
 
   // Dynamic ScaleMax based on the maximum value in visible range
   const dynamicScaleMax = useMemo(() => {
     const maxVal = Math.max(
+      1,
       ...visibleMonthsData.map((m) => Math.max(m.s1, m.s2, m.s3, 1))
     );
+    if (maxVal <= 10) return 10;
     if (maxVal <= 50) return 50;
     if (maxVal <= 100) return 100;
     if (maxVal <= 250) return 250;
@@ -355,7 +249,7 @@ export default function AnalyticsVolumeChart() {
     if (visibleMonthsData.length < 2) return "+0.0%";
     const first = visibleMonthsData[0].total;
     // Compare with the last non-future month (or last available month)
-    const validMonths = visibleMonthsData.filter((m) => m.month !== "Nov" && m.month !== "Dec");
+    const validMonths = visibleMonthsData.filter((m) => !isFutureMonth(m.month));
     const lastTarget = validMonths.length > 0 ? validMonths[validMonths.length - 1].total : visibleMonthsData[visibleMonthsData.length - 1].total;
     if (!first) return "+0.0%";
     const diff = ((lastTarget - first) / first) * 100;
@@ -471,12 +365,11 @@ export default function AnalyticsVolumeChart() {
                 className="appearance-none pl-3 pr-8 py-1.5 bg-white border border-[#cbd5e1] rounded-xl text-[12.5px] font-medium text-[#1e293b] focus:outline-none focus:border-[#1F2E4A] cursor-pointer hover:border-[#94a3b8]"
               >
                 <option value="All Departments">All Departments</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Design">Design</option>
-                <option value="Product">Product</option>
-                <option value="Operations">Operations</option>
-                <option value="HR & People">HR &amp; People</option>
-                <option value="Sales & Marketing">Sales &amp; Marketing</option>
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </select>
               <ChevronDown
                 size={14}
@@ -542,12 +435,12 @@ export default function AnalyticsVolumeChart() {
           {/* Month Columns */}
           {visibleMonthsData.map((item, idx) => {
             const isSelected = activeSelectedMonth === item.month;
-            const isFuture = item.month === "Nov" || item.month === "Dec";
+            const isFuture = isFutureMonth(item.month);
 
             // Relative heights based on dynamicScaleMax
-            const h1 = Math.min(100, Math.max(10, (item.s1 / dynamicScaleMax) * 100));
-            const h2 = Math.min(100, Math.max(8, (item.s2 / dynamicScaleMax) * 100));
-            const h3 = Math.min(100, Math.max(6, (item.s3 / dynamicScaleMax) * 100));
+            const h1 = Math.min(100, (item.s1 / dynamicScaleMax) * 100);
+            const h2 = Math.min(100, (item.s2 / dynamicScaleMax) * 100);
+            const h3 = Math.min(100, (item.s3 / dynamicScaleMax) * 100);
 
             return (
               <div
@@ -564,7 +457,7 @@ export default function AnalyticsVolumeChart() {
                 {hoveredData && hoveredData.month === item.month && (
                   <div className="absolute -top-20 z-30 bg-[#0f172a] text-white text-[11px] rounded-lg px-3 py-2 shadow-xl whitespace-nowrap flex flex-col pointer-events-none transition-all">
                     <div className="flex items-center justify-between gap-4 font-bold border-b border-white/20 pb-1 mb-1">
-                      <span>{item.month} 2024</span>
+                      <span>{item.month} {YEAR}</span>
                       <span className="text-[#94a3b8] font-normal">{department}</span>
                     </div>
                     <div className="flex items-center justify-between gap-4 text-[#e2e8f0]">

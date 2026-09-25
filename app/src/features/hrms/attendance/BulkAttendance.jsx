@@ -7,20 +7,6 @@ import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { bulkAttendance, isBackendEnabled } from "../../../services/hrmsSync";
 
-const INITIAL_EMPLOYEES = [
-  { id: "EMP1024", name: "Priya Patel", dept: "Engineering", status: "Present", avatar: "https://randomuser.me/api/portraits/women/44.jpg" },
-  { id: "EMP1025", name: "Marcus Chen", dept: "Design", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/32.jpg" },
-  { id: "EMP1026", name: "Liam Cooper", dept: "Engineering", status: "Absent", avatar: "https://randomuser.me/api/portraits/men/75.jpg" },
-  { id: "EMP1027", name: "Sarah Wilson", dept: "Marketing", status: "WFH", avatar: "https://randomuser.me/api/portraits/women/68.jpg" },
-  { id: "EMP1028", name: "James Wilson", dept: "Finance", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/54.jpg" },
-  { id: "EMP1029", name: "Ayesha Khan", dept: "HR", status: "WFH", avatar: "https://randomuser.me/api/portraits/women/24.jpg" },
-  { id: "EMP1030", name: "David Park", dept: "Engineering", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/46.jpg" },
-  { id: "EMP1031", name: "Chen Li", dept: "Operations", status: "WFH", avatar: "https://randomuser.me/api/portraits/women/33.jpg" },
-  { id: "EMP1032", name: "Rahul Verma", dept: "Design", status: "WFH", avatar: "https://randomuser.me/api/portraits/men/62.jpg" },
-];
-
-const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations"];
-const LOCATIONS = ["All", "Bangalore", "Mumbai", "Delhi", "Hyderabad"];
 const SHIFTS = ["All", "General", "Flexible", "Night"];
 const STATUS_OPTIONS = ["Present", "Absent", "Late", "Half Day", "WFH", "On Leave"];
 
@@ -38,7 +24,7 @@ export default function BulkAttendance() {
   const storeRecords = useAttendanceStore((s) => s.records);
   const bulkUpdateStore = useAttendanceStore((s) => s.bulkUpdate);
 
-  const [date, setDate] = useState("2024-10-11");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dept, setDept] = useState("All");
   const [location, setLocation] = useState("All");
   const [shift, setShift] = useState("All");
@@ -54,7 +40,7 @@ export default function BulkAttendance() {
         avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
       }));
     }
-    return INITIAL_EMPLOYEES;
+    return [];
   });
 
   const storeEmployees = useAppStore((s) => s.employees);
@@ -75,13 +61,22 @@ export default function BulkAttendance() {
         storeEmployees.map((emp, i) => ({
           id: emp.empId || emp.id || `EMP${1024 + i}`,
           name: emp.name,
-          dept: emp.department || "Engineering",
+          dept: emp.department || "",
           status: "Present",
           avatar: emp.avatar || `https://i.pravatar.cc/100?u=${emp.id || emp.name}`,
         }))
       );
     }
   }, [storeRecords, storeEmployees]);
+
+  const DEPARTMENTS = useMemo(
+    () => ["All", ...new Set(employees.map((e) => e.dept).filter(Boolean))],
+    [employees]
+  );
+  const LOCATIONS = useMemo(
+    () => ["All", ...new Set((storeEmployees || []).map((e) => e.location).filter(Boolean))],
+    [storeEmployees]
+  );
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState("Present");

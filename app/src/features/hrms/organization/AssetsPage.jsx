@@ -111,10 +111,18 @@ export function AssetsPage() {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [fulfillAssetId, setFulfillAssetId] = useState("");
 
+  const assetDeptOptions = [
+    ...new Set([
+      "General",
+      ...(employees || []).map((e) => e.department).filter(Boolean),
+      ...assets.map((a) => a.dept).filter(Boolean),
+    ]),
+  ];
+
   const [requestForm, setRequestForm] = useState({
     employeeName: "",
     employeeId: "",
-    dept: "Engineering",
+    dept: "General",
     category: "Laptop",
     assetName: "",
     reason: "",
@@ -131,7 +139,7 @@ export function AssetsPage() {
     category: "Laptop",
     serialNumber: "",
     assignedTo: "",
-    dept: "Engineering",
+    dept: "General",
     status: "Available",
     condition: "Excellent",
     purchaseDate: new Date().toISOString().slice(0, 10),
@@ -143,7 +151,7 @@ export function AssetsPage() {
   const [assignForm, setAssignForm] = useState({
     employeeName: "",
     employeeId: "",
-    dept: "Engineering",
+    dept: "General",
     notes: "",
   });
 
@@ -184,7 +192,7 @@ export function AssetsPage() {
       category: "Laptop",
       serialNumber: "",
       assignedTo: "",
-      dept: "Engineering",
+      dept: "General",
       status: "Available",
       condition: "Excellent",
       purchaseDate: new Date().toISOString().slice(0, 10),
@@ -674,14 +682,11 @@ export function AssetsPage() {
               className="h-9 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy"
             >
               <option value="All">All Departments</option>
-              <option value="Engineering">Engineering</option>
-              <option value="Design">Design</option>
-              <option value="Product">Product</option>
-              <option value="Marketing">Marketing</option>
-              <option value="HR">HR</option>
-              <option value="Finance">Finance</option>
-              <option value="Operations">Operations</option>
-              <option value="IT Support">IT Support</option>
+              {assetDeptOptions.map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -1234,14 +1239,11 @@ export function AssetsPage() {
                 onChange={(e) => setAssetForm({ ...assetForm, dept: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
               >
-                <option value="Engineering">Engineering</option>
-                <option value="Design">Design</option>
-                <option value="Product">Product</option>
-                <option value="Marketing">Marketing</option>
-                <option value="HR">HR</option>
-                <option value="Finance">Finance</option>
-                <option value="Operations">Operations</option>
-                <option value="IT Support">IT Support</option>
+                {assetDeptOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -1405,14 +1407,11 @@ export function AssetsPage() {
                 onChange={(e) => setAssetForm({ ...assetForm, dept: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
               >
-                <option value="Engineering">Engineering</option>
-                <option value="Design">Design</option>
-                <option value="Product">Product</option>
-                <option value="Marketing">Marketing</option>
-                <option value="HR">HR</option>
-                <option value="Finance">Finance</option>
-                <option value="Operations">Operations</option>
-                <option value="IT Support">IT Support</option>
+                {assetDeptOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -1815,14 +1814,11 @@ export function AssetsPage() {
                 onChange={(e) => setRequestForm({ ...requestForm, dept: e.target.value })}
                 className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
               >
-                <option value="Engineering">Engineering</option>
-                <option value="Design">Design</option>
-                <option value="Product">Product</option>
-                <option value="Marketing">Marketing</option>
-                <option value="HR">HR</option>
-                <option value="Finance">Finance</option>
-                <option value="Operations">Operations</option>
-                <option value="IT Support">IT Support</option>
+                {assetDeptOptions.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

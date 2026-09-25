@@ -346,8 +346,6 @@ const usePayrollStoreBase = create((set, get) => ({
       {
         id: Date.now(),
         status: "Active",
-        baseMin: "₹45,000",
-        baseMax: "₹70,000",
         ...newStruct,
       },
     ];

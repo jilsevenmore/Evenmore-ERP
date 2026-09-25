@@ -121,7 +121,7 @@ export default function Trainers({ embedded = false, onBack }) {
         search={search}
         onSearch={setSearch}
         selects={[
-          { label: "Specialization", value: spec, onChange: setSpec, options: [{ value: "All", label: "All Specializations" }, { value: "Leadership", label: "Leadership" }, { value: "Engineering", label: "Engineering" }, { value: "Design", label: "Design" }, { value: "Marketing", label: "Marketing" }] },
+          { label: "Specialization", value: spec, onChange: setSpec, options: [{ value: "All", label: "All Specializations" }, ...[...new Set(["Leadership", "Engineering", "Design", "Marketing", ...trainers.map((t) => t.specialization).filter(Boolean)])].map((v) => ({ value: v, label: v }))] },
           { label: "Status", value: status, onChange: setStatus, options: [{ value: "All", label: "All Status" }, { value: "Active", label: "Active" }, { value: "On Leave", label: "On Leave" }, { value: "Inactive", label: "Inactive" }] }
         ]}
         onClear={() => {

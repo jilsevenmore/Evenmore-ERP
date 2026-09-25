@@ -324,7 +324,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                         <td className={`py-2 px-3 text-right font-mono font-bold ${m.quantity > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {m.quantity > 0 ? `+${m.quantity}` : m.quantity} {item.uom}
                         </td>
-                        <td className="py-2 px-3 text-slate-500 text-[11px]">{m.locationName || 'Main Warehouse'}</td>
+                        <td className="py-2 px-3 text-slate-500 text-[11px]">{m.locationName || '—'}</td>
                         <td className="py-2 px-3 text-slate-500 text-[11px] max-w-xs">
                           {m.serials && m.serials.length > 0 ? (
                             <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">

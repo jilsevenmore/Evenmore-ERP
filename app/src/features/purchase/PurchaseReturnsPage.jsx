@@ -68,8 +68,8 @@ export const PurchaseReturnsPage = () => {
             return {
                 id: line.id || `prt-line-${idx}`,
                 itemId: line.itemId,
-                sku: line.sku || line.itemSku || 'SKU-HW',
-                description: line.name || line.description || 'Hardware Item',
+                sku: line.sku || line.itemSku || '',
+                description: line.name || line.description || '',
                 isWeightItem,
                 theoreticalWeight,
                 returnedWeight: isWeightItem ? Number((theoreticalWeight * (returnableQty > 0 ? 1 : 0)).toFixed(3)) : undefined,
@@ -126,11 +126,11 @@ export const PurchaseReturnsPage = () => {
 
         addPurchaseReturn({
             vendorId: vend?.id || bill?.vendorId,
-            vendor: bill?.vendor || vend?.name || 'Delta Controls & Hydraulics',
+            vendor: bill?.vendor || vend?.name || '',
             billId: bill?.id,
-            billRef: bill?.billNumber || 'PB-2026-015',
+            billRef: bill?.billNumber || '',
             date: getCurrentDateFormatted(),
-            amount: totalAmt > 0 ? totalAmt : 500,
+            amount: totalAmt,
             reason,
             status: 'Pending Credit',
             items: activeLines,
@@ -167,7 +167,7 @@ export const PurchaseReturnsPage = () => {
             key: 'billRef',
             header: 'Matched Bill Ref',
             width: '14%',
-            render: (r) => <span className="font-mono text-primary font-semibold whitespace-nowrap">{r.billRef || 'PB-INTAKE'}</span>,
+            render: (r) => <span className="font-mono text-primary font-semibold whitespace-nowrap">{r.billRef || '—'}</span>,
         },
         {
             key: 'date',

@@ -76,7 +76,7 @@ export const ReportsPage = () => {
             return {
                 name,
                 revenue,
-                code: customerObj?.code || 'CUST',
+                code: customerObj?.code || '—',
                 invoiceCount: invoices.filter((inv) => inv.customer === name).length,
             };
         })
@@ -482,13 +482,14 @@ export const ReportsPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
+                  {customerAging.length === 0 && (<tr><td colSpan={7} className="p-6 text-center text-slate-500">No customers recorded yet.</td></tr>)}
                   {customerAging.map((row) => (<tr key={row.customer.id} className="hover:bg-slate-50/70">
                       <td className="p-2.5">
                         <p className="font-semibold text-slate-800">{row.customer.name}</p>
-                        <span className="text-[10px] text-slate-400 font-mono">Code: {row.customer.code}</span>
+                        {row.customer.code && <span className="text-[10px] text-slate-400 font-mono">Code: {row.customer.code}</span>}
                       </td>
                       <td className="p-2.5 text-right font-mono text-slate-600">
-                        {formatCurrency(row.customer.creditLimit || 50000)}
+                        {row.customer.creditLimit ? formatCurrency(row.customer.creditLimit) : '—'}
                       </td>
                       <td className="p-2.5 text-right font-mono font-bold text-slate-900">
                         {formatCurrency(row.balance)}
@@ -555,6 +556,7 @@ export const ReportsPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
+                  {purchaseBills.length === 0 && (<tr><td colSpan={6} className="p-6 text-center text-slate-500">No purchase bills recorded yet.</td></tr>)}
                   {purchaseBills.map((b) => {
                       const outstanding = (getBillOutstanding?.(b.id)?.balanceDue)
                           ?? Math.max(0, Number(b.total ?? b.amount ?? 0) - Number(b.paidAmount ?? b.amountPaid ?? 0));

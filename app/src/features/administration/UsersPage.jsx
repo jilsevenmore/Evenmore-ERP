@@ -109,7 +109,7 @@ export function UsersPage() {
   const [currentPage, setCurrentPage] = useState(1);
 
   // ── Selected User for Side Drawer ────────────────────────────
-  const [selectedUserId, setSelectedUserId] = useState('usr-1');
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
 
   // ── Modals State ─────────────────────────────────────────────
@@ -129,8 +129,8 @@ export function UsersPage() {
     department: 'Sales',
     status: 'Active',
     employeeId: '',
-    location: 'Mumbai, India',
-    reportingManager: 'Jayesh Nair',
+    location: '',
+    reportingManager: '',
     permissions: ['View Leads', 'Create Tasks', 'Manage Deals'],
   });
 
@@ -229,8 +229,8 @@ export function UsersPage() {
       department: 'Sales',
       status: 'Active',
       employeeId: `EMP00${nextEmpNum < 10 ? '0' + nextEmpNum : nextEmpNum}`,
-      location: 'Mumbai, India',
-      reportingManager: 'Jayesh Nair',
+      location: '',
+      reportingManager: '',
       permissions: ['View Leads', 'Manage Deals', 'Create Tasks', 'View Reports'],
     });
     setIsCreateModalOpen(true);
@@ -727,7 +727,7 @@ export function UsersPage() {
               </div>
               <div className="flex items-center gap-2.5">
                 <Phone size={14} className="text-slate-400 flex-shrink-0" />
-                <span>{activeUser.phone || '+91 98765 43210'}</span>
+                <span>{activeUser.phone || '—'}</span>
               </div>
               <div className="flex items-center gap-2.5">
                 <Calendar size={14} className="text-slate-400 flex-shrink-0" />
@@ -803,11 +803,11 @@ export function UsersPage() {
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-500">Location</span>
-                  <span className="font-semibold text-slate-800">{activeUser.location}</span>
+                  <span className="font-semibold text-slate-800">{activeUser.location || '—'}</span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-500">Reporting Manager</span>
-                  <span className="font-semibold text-slate-800">{activeUser.reportingManager}</span>
+                  <span className="font-semibold text-slate-800">{activeUser.reportingManager || '—'}</span>
                 </div>
               </div>
             </div>

@@ -27,21 +27,25 @@ export const TransfersPage = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [sourceLocId, setSourceLocId] = useState(locations[0]?.id || '');
     const [destLocId, setDestLocId] = useState(locations[1]?.id || '');
-    const [shippedBy, setShippedBy] = useState('Forklift Operator');
+    const [shippedBy, setShippedBy] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const handleCreate = (e) => {
         e.preventDefault();
         const src = locations.find((l) => l.id === sourceLocId) || locations[0];
         const dst = locations.find((l) => l.id === destLocId) || locations[1];
+        if (!src || !dst) {
+            alert('Set up at least two locations before creating a transfer.');
+            return;
+        }
         addTransfer({
             sourceLocationId: src?.id,
-            sourceLocation: src?.name || 'Main Central Warehouse',
+            sourceLocation: src?.name || '',
             destLocationId: dst?.id,
-            destLocation: dst?.name || 'Assembly Bay Zone A',
+            destLocation: dst?.name || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            itemsCount: lineItems.length > 0 ? lineItems.length : 1,
+            itemsCount: lineItems.length,
             status: 'In Transit',
-            shippedBy: shippedBy || 'Logistics Clerk',
+            shippedBy: shippedBy || '',
             items: lineItems,
         });
         setShowAddModal(false);
@@ -127,7 +131,7 @@ export const TransfersPage = () => {
         <StatCard label="Total Transfer Manifests" value={`${transfers.length} Moves`} icon={ArrowLeftRight} />
         <StatCard label="In-Transit Active" value={`${inTransitCount} En Route`} icon={Truck} trend={{ positive: inTransitCount === 0, text: inTransitCount > 0 ? 'Awaiting intake' : 'All delivered' }} highlight={inTransitCount > 0} />
         <StatCard label="Completed Intakes" value={`${receivedCount} Restocked`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
-        <StatCard label="Active Facilities" value={`${locations.length} Warehouses`} icon={MapPin} subtext="Main, Bay A, Bay B" />
+        <StatCard label="Active Facilities" value={`${locations.length} Warehouses`} icon={MapPin} subtext={locations.slice(0, 3).map((l) => l.name).filter(Boolean).join(', ') || 'No locations yet'} />
       </div>
 
       <DataTable title="Inter-Facility Stock Transfer Log" columns={columns} data={transfers} keyExtractor={(t) => t.id} searchPlaceholder="Search transfer #, source, or destination..." searchFilter={(t, term) => String(t.transferNumber ?? '').toLowerCase().includes(term) ||

@@ -56,7 +56,7 @@ function downloadPayslipPdf(p) {
   const empId = clean(p.empId || "EMP-000");
   const role = clean(p.role || "Team Member");
   const dept = clean(p.department || "General");
-  const month = clean(p.month || "October 2024");
+  const month = clean(p.month || currentMonthLabel());
   const bank = clean(p.bank || "Direct Deposit Verified");
 
   const std = Number(p.standardSalary || 0);
@@ -189,7 +189,7 @@ function printPayslip(p) {
   const basic = Number(p.basic || Math.round(earned * 0.6));
   const hra = Number(p.hra || Math.round(earned * 0.25));
   const allowances = Number(p.allowances || Math.max(0, earned - basic - hra));
-  const month = p.month || "October 2024";
+  const month = p.month || currentMonthLabel();
 
   const html = `
     <!DOCTYPE html>
@@ -239,7 +239,7 @@ function printPayslip(p) {
             <div class="label">Disbursal & Attendance</div>
             <div class="val">${p.bank || "Direct Deposit (Verified)"}</div>
             <div style="color: #475569; font-size: 12px; margin-top: 2px;">Working Schedule: ${attended} Present / ${totalD} Days (${absent}d absent) • ${dailyH}h/day (${totalH}h target)</div>
-            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">Disbursement Date: ${p.paymentDate || "Oct 31, 2024"} • Rate: INR ${perDay}/day (INR ${hourlyR}/hr)</div>
+            <div style="color: #64748b; font-size: 11.5px; margin-top: 4px;">Disbursement Date: ${p.paymentDate || "—"} • Rate: INR ${perDay}/day (INR ${hourlyR}/hr)</div>
           </div>
         </div>
 
@@ -323,15 +323,23 @@ function printPayslip(p) {
   }
 }
 
+function currentMonthLabel() {
+  return new Date().toLocaleString("en-GB", { month: "long", year: "numeric" });
+}
+
+function recentPeriods(count = 6) {
+  const now = new Date();
+  return Array.from({ length: count }, (_, i) =>
+    new Date(now.getFullYear(), now.getMonth() - i, 1).toLocaleString("en-GB", { month: "long", year: "numeric" })
+  );
+}
+
 export default function Payroll() {
   const showToast = useAppStore((s) => s.showToast);
   const storeLeaves = useAppStore((s) => s.leaves || []);
   const storeEncashments = useAppStore((s) => s.encashments || []);
-  const currentUser = useAppStore((s) => s.currentUser) || {
-    name: "Adarsh Gupta",
-    role: "Operations Admin",
-    email: "admin@evenmore.io",
-  };
+  const currentUser = useAppStore((s) => s.currentUser) || {};
+  const directoryEmployees = useAppStore((s) => s.employees || []);
 
   const {
     employees: payrollEmployees,
@@ -375,7 +383,7 @@ export default function Payroll() {
   const [showRunModal, setShowRunModal] = useState(false);
   const [runSuccess, setRunSuccess] = useState(false);
   const [showAddStructureModal, setShowAddStructureModal] = useState(false);
-  const [newStructure, setNewStructure] = useState({ name: "", department: "Engineering", employees: "" });
+  const [newStructure, setNewStructure] = useState({ name: "", department: "", employees: "" });
 
   // Lifecycle transition & Payslip generator modal state
   const [showLifecycleModal, setShowLifecycleModal] = useState(false);
@@ -395,7 +403,20 @@ export default function Payroll() {
   const [editDeductions, setEditDeductions] = useState(0);
 
   // Switcher for Own Salary perspective
-  const [activeOwnUser, setActiveOwnUser] = useState(currentUser?.name || "Adarsh Gupta");
+  const [activeOwnUser, setActiveOwnUser] = useState(currentUser?.name || "");
+
+  const periodOptions = useMemo(() => {
+    const list = recentPeriods(6);
+    return currentPeriod && !list.includes(currentPeriod) ? [currentPeriod, ...list] : list;
+  }, [currentPeriod]);
+
+  const payrollDepartments = useMemo(
+    () => [...new Set([
+      ...payrollEmployees.map((p) => p.department),
+      ...directoryEmployees.map((e) => e.department),
+    ].filter(Boolean))].sort(),
+    [payrollEmployees, directoryEmployees]
+  );
 
   // Dynamic calculations with approved leaves & attendance integration
   const computedEmployeePayrolls = useMemo(() => {
@@ -658,9 +679,9 @@ export default function Payroll() {
     addStructure({
       name: newStructure.name,
       department: newStructure.department,
-      employees: Number(newStructure.employees) || 12,
+      employees: Number(newStructure.employees) || 0,
     });
-    setNewStructure({ name: "", department: "Engineering", employees: "" });
+    setNewStructure({ name: "", department: "", employees: "" });
     setShowAddStructureModal(false);
     showToast("New salary structure added successfully");
   };
@@ -764,9 +785,11 @@ export default function Payroll() {
             }}
             className="h-10 px-3 bg-white border border-bdr rounded-xl text-[13px] font-medium text-slate-700 shadow-xs focus:outline-none focus:border-navy cursor-pointer"
           >
-            <option value="October 2024">October 2024</option>
-            <option value="September 2024">September 2024</option>
-            <option value="August 2024">August 2024</option>
+            {periodOptions.map((period) => (
+              <option key={period} value={period}>
+                {period}
+              </option>
+            ))}
           </select>
 
           <button
@@ -1031,6 +1054,9 @@ export default function Payroll() {
               </div>
 
               <div className="divide-y divide-bdr/40">
+                {structures.length === 0 && (
+                  <div className="py-4 text-center text-[12.5px] text-muted">No salary bands yet.</div>
+                )}
                 {structures.map((item) => (
                   <div key={item.id} className="py-2.5 flex items-center justify-between text-[13px]">
                     <div>
@@ -1038,9 +1064,9 @@ export default function Payroll() {
                       <div className="text-[11px] text-muted">{item.department}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-slate-800">{item.baseMin} - {item.baseMax}</div>
+                      <div className="font-semibold text-slate-800">{item.baseMin || item.baseMax ? `${item.baseMin || "—"} - ${item.baseMax || "—"}` : "—"}</div>
                       <span className="text-[10.5px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
-                        {item.employees} staff active
+                        {item.employees || 0} staff active
                       </span>
                     </div>
                   </div>
@@ -1235,13 +1261,11 @@ export default function Payroll() {
                 className="h-9.5 px-3 bg-off border border-bdr rounded-xl text-[12.5px] text-slate-700 focus:outline-none focus:border-navy cursor-pointer"
               >
                 <option value="All">All Departments</option>
-                <option value="Engineering">Engineering</option>
-                <option value="Design">Design</option>
-                <option value="Finance">Finance</option>
-                <option value="Marketing">Marketing</option>
-                <option value="Human Resources">Human Resources</option>
-                <option value="Executive">Executive</option>
-                <option value="Operations">Operations</option>
+                {payrollDepartments.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
               </select>
 
               <select
@@ -1420,7 +1444,7 @@ export default function Payroll() {
                                 </span>
                                 <div className="text-muted text-[10px] flex items-center gap-1 mt-0.5">
                                   <Calendar size={10} />
-                                  <span>{p.paymentDate || "Oct 31, 2024"}</span>
+                                  <span>{p.paymentDate || "—"}</span>
                                 </div>
                               </div>
                             )}
@@ -1485,7 +1509,13 @@ export default function Payroll() {
       {/* =========================================================================
           TAB 4: OWN SALARY (PERSONAL PORTAL & EXACT FORMULA BREAKDOWN)
          ========================================================================= */}
-      {activeTab === "own" && (
+      {activeTab === "own" && !ownRecord && (
+        <div className="bg-white border border-bdr rounded-2xl p-10 shadow-xs text-center text-[13px] text-muted">
+          No payslip found for this pay cycle yet.
+        </div>
+      )}
+
+      {activeTab === "own" && ownRecord && (
         <div className="flex flex-col gap-5">
           {/* Minimal Clean Hero Card */}
           <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
@@ -1516,7 +1546,7 @@ export default function Payroll() {
                 <div className="text-[11.5px] text-muted mt-1.5">
                   Direct deposit: <b className="text-slate-800">{ownRecord.bank}</b>
                   {ownRecord.status === "Paid" && (
-                    <span> • Disbursed on <b className="text-emerald-700">{ownRecord.paymentDate || "Oct 31, 2024"}</b></span>
+                    <span> • Disbursed on <b className="text-emerald-700">{ownRecord.paymentDate || "—"}</b></span>
                   )}
                 </div>
               </div>
@@ -1532,7 +1562,7 @@ export default function Payroll() {
                 </span>
                 {ownRecord.status === "Paid" && (
                   <span className="block text-[11px] text-emerald-700 font-semibold mt-1">
-                    Disbursed on {ownRecord.paymentDate || "Oct 31, 2024"}
+                    Disbursed on {ownRecord.paymentDate || "—"}
                   </span>
                 )}
               </div>
@@ -1664,7 +1694,7 @@ export default function Payroll() {
                 <div>
                   <span className="text-muted block text-[11px]">Payment Date</span>
                   <span className="font-semibold text-slate-800">
-                    {ownRecord.paymentDate || "Oct 31, 2024"}
+                    {ownRecord.paymentDate || "—"}
                   </span>
                 </div>
                 <div>
@@ -1964,7 +1994,7 @@ export default function Payroll() {
                   <div className="flex justify-between">
                     <span className="text-muted">Payment Date:</span>
                     <span className="font-medium text-slate-800">
-                      {selectedPayslip.paymentDate || "Oct 31, 2024"}
+                      {selectedPayslip.paymentDate || "—"}
                     </span>
                   </div>
                 </div>
@@ -2333,19 +2363,18 @@ export default function Payroll() {
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1">
                     Department
                   </label>
-                  <select
+                  <input
+                    list="payroll-structure-depts"
+                    placeholder="Enter department"
                     value={newStructure.department}
                     onChange={(e) => setNewStructure({ ...newStructure, department: e.target.value })}
-                    className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[12.5px] focus:outline-none focus:border-navy cursor-pointer"
-                  >
-                    <option value="Engineering">Engineering</option>
-                    <option value="Design">Design</option>
-                    <option value="Finance">Finance</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Human Resources">Human Resources</option>
-                    <option value="Executive">Executive</option>
-                    <option value="Operations">Operations</option>
-                  </select>
+                    className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[12.5px] focus:outline-none focus:border-navy"
+                  />
+                  <datalist id="payroll-structure-depts">
+                    {payrollDepartments.map((d) => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
                 </div>
 
                 <div>

@@ -2,16 +2,20 @@ import React, { useEffect } from 'react';
 import { X, Printer, ShieldCheck, FileCheck, Award, Send, Check } from 'lucide-react';
 import { formatDisplayDate, getWarrantyStatusStyle, formatWarrantyPeriod } from '../../utils/warrantyUtils';
 import { useERP } from '../../context/ERPContext';
+import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
 
 export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null }) => {
-    // [PHASE-2E.1] company identity flows from companyProfile (was hardcoded Horizon US strings)
     const { companyProfile } = useERP();
-    const companyName = companyProfile?.name || 'Horizon Enterprise Logistics';
-    const companyShort = (companyName || 'H').trim().charAt(0).toUpperCase() || 'H';
+    const companyName = companyProfile?.name || '';
+    const companyShort = companyInitial(companyName);
     const gstin = companyProfile?.gstin || '';
     const pan = companyProfile?.pan || '';
-    const companyAddress = companyProfile?.address || '742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134 • USA';
-    const phone = companyProfile?.phone || '+1 (800) 555-0199';
+    const companyAddress = companyProfile?.address || '';
+    const registryLine = joinNonEmpty([
+        gstin && `Corporate Registry: ${gstin}`,
+        pan && `PAN: ${pan}`,
+        (companyProfile?.email || companyProfile?.phone) && `Support: ${joinNonEmpty([companyProfile?.email, companyProfile?.phone], ' | ')}`,
+    ]);
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -81,22 +85,20 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-5">
                         <div className="space-y-1.5">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xl font-mono shadow-sm">
-                                    {companyShort}
-                                </div>
+                                {companyShort && (
+                                    <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold text-xl font-mono shadow-sm">
+                                        {companyShort}
+                                    </div>
+                                )}
                                 <div>
                                     <h1 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight uppercase">
                                         {companyName}
                                     </h1>
-                                    <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                                        Industrial Systems & Equipment Quality Division
-                                    </p>
                                 </div>
                             </div>
-                            {/* [PHASE-2E.1] company GSTIN now from companyProfile (was US-8849201-CORP) */}
                             <div className="text-[11px] text-slate-500 space-y-0.5 pt-1">
-                                <p>{companyAddress}</p>
-                                <p>Corporate Registry: {gstin || '—'}{pan ? ` • PAN: ${pan}` : ''} • Support: support@sweven.in | {phone}</p>
+                                {companyAddress && <p>{companyAddress}</p>}
+                                {registryLine && <p>{registryLine}</p>}
                             </div>
                         </div>
 
@@ -131,21 +133,16 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
                                 Issued To / Equipment Consignee
                             </span>
-                            <p className="font-bold text-sm text-slate-900">{warrantyCard.customerName}</p>
+                            <p className="font-bold text-sm text-slate-900">{warrantyCard.customerName || '—'}</p>
                             {warrantyCard.customerCode && (
                                 <span className="font-mono text-[10px] text-slate-500 block">
                                     Customer Code: {warrantyCard.customerCode}
                                 </span>
                             )}
                             <div className="text-[11px] text-slate-600 leading-tight pt-1">
-                                {warrantyCard.shippingAddress ? (
-                                    <>
-                                        <p>{warrantyCard.shippingAddress.line1}</p>
-                                        <p>{warrantyCard.shippingAddress.city}, {warrantyCard.shippingAddress.state} {warrantyCard.shippingAddress.pincode}</p>
-                                    </>
-                                ) : (
-                                    <p>Site Receiving Location • Dock 14B</p>
-                                )}
+                                {addressLines(warrantyCard.shippingAddress).map((line, i) => (
+                                    <p key={i}>{line}</p>
+                                ))}
                                 {warrantyCard.email && <p className="text-slate-500 pt-0.5">Email: {warrantyCard.email}</p>}
                                 {warrantyCard.phone && <p className="text-slate-500">Phone: {warrantyCard.phone}</p>}
                                 {warrantyCard.gstin && <p className="font-mono text-[10px] text-slate-500">GSTIN / Tax ID: {warrantyCard.gstin}</p>}
@@ -159,7 +156,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                             <div className="space-y-1.5 text-[11px] pt-1">
                                 <div className="flex items-center justify-between py-0.5 border-b border-slate-200/80">
                                     <span className="text-slate-500">Delivery Challan:</span>
-                                    <strong className="font-mono text-slate-900">{warrantyCard.challanNumber || 'DC-2026-0045'}</strong>
+                                    <strong className="font-mono text-slate-900">{warrantyCard.challanNumber || '—'}</strong>
                                 </div>
                                 <div className="flex items-center justify-between py-0.5 border-b border-slate-200/80">
                                     <span className="text-slate-500">Dispatch / Delivery Date:</span>
@@ -171,7 +168,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                                 </div>
                                 <div className="flex items-center justify-between py-0.5">
                                     <span className="text-slate-500">Linked Sales Order:</span>
-                                    <strong className="font-mono text-slate-900">{warrantyCard.salesOrderNumber || 'SO-DIRECT'}</strong>
+                                    <strong className="font-mono text-slate-900">{warrantyCard.salesOrderNumber || '—'}</strong>
                                 </div>
                             </div>
                         </div>
@@ -198,7 +195,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                                         <div>
                                             <h4 className="font-bold text-sm text-slate-900">{item.name || item.description}</h4>
                                             <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono mt-0.5">
-                                                <span>SKU: {item.sku || item.itemSku || 'GEN-SKU'}</span>
+                                                {(item.sku || item.itemSku) && <span>SKU: {item.sku || item.itemSku}</span>}
                                                 {item.modelNumber && <span>• Model: {item.modelNumber}</span>}
                                                 <span>• Qty: {item.quantity || 1} Unit(s)</span>
                                             </div>
@@ -257,7 +254,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                                                     {item.components.map((comp, cIdx) => (
                                                         <tr key={comp.id || cIdx} className="hover:bg-slate-50/50">
                                                             <td className="py-2 px-3 font-medium text-slate-800">{comp.name}</td>
-                                                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{comp.sku || 'PART-SKU'}</td>
+                                                            <td className="py-2 px-3 font-mono text-[10px] text-slate-500">{comp.sku || '—'}</td>
                                                             <td className="py-2 px-3 font-mono text-[10px] text-slate-700">
                                                                 {comp.serialNumber || (comp.isSerialized ? 'Pending Inscription' : 'Non-Serialized')}
                                                             </td>
@@ -295,7 +292,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                                 Quality Assurance / Authorized Signatory
                             </span>
                             <div className="h-9 border-b border-slate-300 flex items-end pb-1 font-mono text-xs text-slate-800 font-bold">
-                                {warrantyCard.authorizedBy || 'Horizon Quality Assurance Dept.'}
+                                {warrantyCard.authorizedBy || (companyName ? `${companyName} Quality Assurance` : '')}
                             </div>
                             <p className="text-[10px] text-slate-400">
                                 Equipment inspected, serialized, and authorized under warranty standards.
@@ -307,7 +304,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                                 Customer Verification & Acknowledgment
                             </span>
                             <div className="h-9 border-b border-emerald-300 flex items-end pb-1 font-mono text-xs text-emerald-900">
-                                {warrantyCard.customerName} (Authorized Receiver)
+                                {warrantyCard.customerName ? `${warrantyCard.customerName} (Authorized Receiver)` : 'Authorized Receiver'}
                             </div>
                             <p className="text-[10px] text-slate-400">
                                 Received in intact condition with complete component registry.
@@ -320,7 +317,7 @@ export const WarrantyCardModal = ({ isOpen, onClose, warrantyCard, onSend = null
                 {/* Footer Controls (Screen Only) */}
                 <div className="px-4 sm:px-6 py-3.5 border-t border-slate-200 bg-white flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 no-print shrink-0">
                     <div className="text-xs text-slate-500">
-                        Certificate ID: <span className="font-mono font-bold text-slate-800">{warrantyCard.id}</span> • Linked DC: <span className="font-mono text-slate-800">{warrantyCard.challanNumber}</span>
+                        Certificate ID: <span className="font-mono font-bold text-slate-800">{warrantyCard.id}</span> • Linked DC: <span className="font-mono text-slate-800">{warrantyCard.challanNumber || '—'}</span>
                     </div>
                     <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                         {onSend && !isCancelled && (

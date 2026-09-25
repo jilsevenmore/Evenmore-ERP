@@ -331,7 +331,7 @@ export const RESOURCES = {
     }),
     fromApi: (row) => ({
       ...row,
-      manager: row.manager || 'Operations Lead',
+      manager: row.manager || '',
       capacityPct: row.capacityPct ?? 0,
       _synced: true,
     }),
@@ -911,6 +911,14 @@ export async function pullCompanyProfile() {
     console.warn('[backendSync] pull company profile failed:', err?.message || err);
     return null;
   }
+}
+
+/**
+ * `POST /settings/reset-demo-data/` — erase this tenant's business data on the
+ * server. Nothing is re-seeded: every screen starts empty afterwards.
+ */
+export async function resetTenantData() {
+  return api.post('/settings/reset-demo-data/');
 }
 
 /**

@@ -93,7 +93,7 @@ export default function Applications() {
       render: (r) => (
         <div className="flex items-center gap-1.5 text-[12px] text-slate-600 dark:text-slate-300">
           <Calendar size={13} className="text-slate-400" />
-          <span>{r.appliedDate || "12 Sep 2026"}</span>
+          <span>{r.appliedDate || "—"}</span>
         </div>
       ),
     },
@@ -141,7 +141,7 @@ export default function Applications() {
       header: "Assigned Recruiter",
       render: (r) => (
         <span className="text-[12px] text-slate-600 dark:text-slate-300">
-          {r.recruiter || "Kavita Rao"}
+          {r.recruiter || "—"}
         </span>
       ),
     },

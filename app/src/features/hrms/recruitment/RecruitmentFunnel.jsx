@@ -47,6 +47,18 @@ export default function RecruitmentFunnel() {
   const max = counts.Applications || 1;
   const conversionRate = Math.round((counts.Hired / max) * 100);
 
+  const stageRows = funnelData.length > 0
+    ? funnelData
+    : Object.entries(counts).map(([stage, count]) => ({ stage, count }));
+
+  const stageOrder = Object.keys(counts);
+  const largestDrop = stageOrder.slice(1).reduce((best, stage, i) => {
+    const prevCount = counts[stageOrder[i]];
+    if (!prevCount) return best;
+    const pct = Math.round(((prevCount - counts[stage]) / prevCount) * 100);
+    return !best || pct > best.pct ? { from: stageOrder[i], to: stage, pct } : best;
+  }, null);
+
   return (
     <div className="space-y-6">
       {/* Top Page Header */}
@@ -81,7 +93,7 @@ export default function RecruitmentFunnel() {
               {conversionRate}%
             </div>
             <div className="text-[11.5px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium">
-              Healthy benchmark (&gt; 10%)
+              {conversionRate > 10 ? "Healthy benchmark (> 10%)" : "Benchmark: > 10%"}
             </div>
           </div>
           <div className="p-2.5 rounded-xl border text-indigo-600 bg-indigo-50 dark:bg-indigo-950/30 border-indigo-200/60">
@@ -95,10 +107,10 @@ export default function RecruitmentFunnel() {
               Largest Funnel Drop-off
             </div>
             <div className="text-lg font-bold text-rose-600 dark:text-rose-400 mt-1">
-              Screening → Interview
+              {largestDrop && largestDrop.pct > 0 ? `${largestDrop.from} → ${largestDrop.to}` : "—"}
             </div>
             <div className="text-[11.5px] text-slate-500 dark:text-slate-400 mt-0.5">
-              -35% attrition rate
+              {largestDrop && largestDrop.pct > 0 ? `-${largestDrop.pct}% attrition rate` : "No drop-off recorded yet"}
             </div>
           </div>
           <div className="p-2.5 rounded-xl border text-rose-600 bg-rose-50 dark:bg-rose-950/30 border-rose-200/60">
@@ -137,10 +149,10 @@ export default function RecruitmentFunnel() {
         </div>
 
         <div className="space-y-3">
-          {funnelData.map((s, i) => {
-            const count = counts[s.stage] ?? s.count;
+          {stageRows.map((s, i) => {
+            const count = counts[s.stage] ?? s.count ?? 0;
             const pct = Math.round((count / max) * 100);
-            const prev = i > 0 ? funnelData[i - 1] : null;
+            const prev = i > 0 ? stageRows[i - 1] : null;
             const drop = prev ? (counts[prev.stage] ?? prev.count) - count : 0;
 
             return (
@@ -184,7 +196,7 @@ export default function RecruitmentFunnel() {
                 </div>
 
                 <div className="w-24 text-right text-[11.5px] text-slate-400 hidden sm:block">
-                  Avg 3.2 days
+                  {s.avgDays != null ? `Avg ${s.avgDays} days` : "—"}
                 </div>
               </div>
             );

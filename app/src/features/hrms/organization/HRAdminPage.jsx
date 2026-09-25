@@ -59,10 +59,16 @@ import OfferLetterModal from "./OfferLetterModal";
 import GenerateOfferModal from "./GenerateOfferModal";
 import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { useERP } from "../../../context/ERPContext";
+
+const isoToday = () => new Date().toISOString().split("T")[0];
+const isoInDays = (days) => new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
 
 export default function HRAdminPage({ defaultTab }) {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees || []);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const { companyProfile } = useERP();
   const { candidates, addOffer } = useRecruitmentStore();
   const updateEmployeeStatus = useAppStore((s) => s.updateEmployeeStatus);
   const addCalendarEvent = useCalendarStore((s) => s.addEvent);
@@ -96,6 +102,10 @@ export default function HRAdminPage({ defaultTab }) {
   // Core Data Lists
   // Teams, approval chains and terminations are HRMS collections.
   const [departmentsConfig, setDepartmentsConfig] = useState([]);
+  const hrDeptOptions = [...new Set([
+    ...departmentsConfig.map((d) => d.name),
+    ...employees.map((e) => e.department),
+  ].filter(Boolean))];
   const [teams, setTeams] = useState([]);
   const [approvalChains, setApprovalChains] = useState([]);
   const [terminations, setTerminations] = useState([]);
@@ -152,7 +162,7 @@ export default function HRAdminPage({ defaultTab }) {
   // Modals (Add / Edit)
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [editingTeam, setEditingTeam] = useState(null);
-  const [newTeam, setNewTeam] = useState({ name: "", lead: "", members: 1, approver: "", dept: "Engineering" });
+  const [newTeam, setNewTeam] = useState({ name: "", lead: "", members: 1, approver: "", dept: "" });
 
   const [isChainModalOpen, setIsChainModalOpen] = useState(false);
   const [editingChain, setEditingChain] = useState(null);
@@ -162,11 +172,11 @@ export default function HRAdminPage({ defaultTab }) {
   const [newTermination, setNewTermination] = useState({
     employee: "",
     employeeId: "",
-    dept: "Engineering",
+    dept: "",
     role: "",
     terminationType: "Involuntary (Performance)",
-    noticeDate: "2024-10-11",
-    exitDate: "2024-11-11",
+    noticeDate: isoToday(),
+    exitDate: isoInDays(30),
     severance: "1 Month Gross",
     reason: "",
   });
@@ -175,10 +185,10 @@ export default function HRAdminPage({ defaultTab }) {
   const [newResignation, setNewResignation] = useState({
     employee: "",
     employeeId: "",
-    dept: "Engineering",
+    dept: "",
     role: "",
-    submittedDate: "2024-10-11",
-    lastWorkingDay: "2024-12-11",
+    submittedDate: isoToday(),
+    lastWorkingDay: isoInDays(60),
     noticePeriod: "60 Days",
     handoverTo: "",
     reason: "",
@@ -190,7 +200,7 @@ export default function HRAdminPage({ defaultTab }) {
     against: "",
     category: "Workplace Harassment / POSH",
     priority: "High",
-    assignedInvestigator: "Ayesha Khan (HR Director)",
+    assignedInvestigator: "",
     summary: "",
   });
 
@@ -198,15 +208,15 @@ export default function HRAdminPage({ defaultTab }) {
   const [editingHoliday, setEditingHoliday] = useState(null);
   const [newHoliday, setNewHoliday] = useState({
     name: "",
-    date: "2024-11-01",
-    day: "Friday",
+    date: isoToday(),
+    day: new Date().toLocaleDateString("en-US", { weekday: "long" }),
     type: "National Gazetted",
     appliesTo: "All Locations",
   });
 
   // Org Settings State
   const [orgSettings, setOrgSettings] = useState({
-    companyName: "Evenmore Infotech Ltd.",
+    companyName: companyProfile?.name || "",
     workWeek: "Monday - Friday (5 Days)",
     timezone: "IST (UTC +05:30) — Asia/Kolkata",
     fiscalYearStart: "April 01",
@@ -219,7 +229,7 @@ export default function HRAdminPage({ defaultTab }) {
   // ── Team Handlers ──────────────────────────────────────────
   const handleOpenAddTeam = () => {
     setEditingTeam(null);
-    setNewTeam({ name: "", lead: "", members: 1, approver: "", dept: "Engineering" });
+    setNewTeam({ name: "", lead: "", members: 1, approver: "", dept: "" });
     setIsTeamModalOpen(true);
   };
 
@@ -384,7 +394,7 @@ export default function HRAdminPage({ defaultTab }) {
     setNewTermination({
       employee: "",
       employeeId: "",
-      dept: "Engineering",
+      dept: "",
       role: "",
       terminationType: "Involuntary (Performance)",
       noticeDate: new Date().toISOString().split("T")[0],
@@ -468,10 +478,10 @@ export default function HRAdminPage({ defaultTab }) {
     setNewResignation({
       employee: "",
       employeeId: "",
-      dept: "Engineering",
+      dept: "",
       role: "",
-      submittedDate: "2024-10-11",
-      lastWorkingDay: "2024-12-11",
+      submittedDate: isoToday(),
+      lastWorkingDay: isoInDays(60),
       noticePeriod: "60 Days",
       handoverTo: "",
       reason: "",
@@ -507,7 +517,7 @@ export default function HRAdminPage({ defaultTab }) {
     const created = {
       id: `GRV-${300 + complaints.length + 1}`,
       ...newComplaint,
-      filedOn: "2024-10-11",
+      filedOn: isoToday(),
       status: "Open",
     };
     setComplaints([created, ...complaints]);
@@ -524,7 +534,7 @@ export default function HRAdminPage({ defaultTab }) {
       against: "",
       category: "Workplace Harassment / POSH",
       priority: "High",
-      assignedInvestigator: "Ayesha Khan (HR Director)",
+      assignedInvestigator: "",
       summary: "",
     });
     showToast(`Grievance ticket ${created.id} registered`);
@@ -552,7 +562,7 @@ export default function HRAdminPage({ defaultTab }) {
   // ── Holiday Handlers ───────────────────────────────────────
   const handleOpenAddHoliday = () => {
     setEditingHoliday(null);
-    setNewHoliday({ name: "", date: "2024-11-01", day: "Friday", type: "National Gazetted", appliesTo: "All Locations" });
+    setNewHoliday({ name: "", date: isoToday(), day: new Date().toLocaleDateString("en-US", { weekday: "long" }), type: "National Gazetted", appliesTo: "All Locations" });
     setIsHolidayModalOpen(true);
   };
 
@@ -703,7 +713,7 @@ export default function HRAdminPage({ defaultTab }) {
     },
     {
       id: "holidays",
-      label: "Holidays (2024)",
+      label: `Holidays (${new Date().getFullYear()})`,
       count: holidays.length,
       subtext: "Gazetted & opt",
       icon: Calendar,
@@ -1836,7 +1846,7 @@ export default function HRAdminPage({ defaultTab }) {
           <div className="p-4 border-b border-bdr flex flex-wrap items-center justify-between gap-3 bg-off/50">
             <div>
               <span className="text-[13px] font-semibold text-slate-800">
-                Annual Enterprise Holiday Schedule (2024–2025)
+                Annual Enterprise Holiday Schedule ({new Date().getFullYear()}–{new Date().getFullYear() + 1})
               </span>
               <p className="text-[11.5px] text-muted">Synchronized across Personal Calendar &amp; Attendance modules</p>
             </div>
@@ -2366,7 +2376,7 @@ export default function HRAdminPage({ defaultTab }) {
                 <Sparkles size={15} className="text-purple-700 shrink-0" />
                 <span>
                   <b>Current Active Rollover Pool:</b>{" "}
-                  {Object.entries(carriedForwardLeaves || {}).map(([emp, d]) => `${emp}: ${d}d`).join(", ") || "Ayesha Khan: 6d, Priya Patel: 8d, Liam Cooper: 4d"}
+                  {Object.entries(carriedForwardLeaves || {}).map(([emp, d]) => `${emp}: ${d}d`).join(", ") || "None yet"}
                 </span>
               </div>
               <span className="text-[11px] font-semibold text-purple-700 bg-white px-2 py-0.5 rounded-md border border-purple-200">
@@ -2408,18 +2418,13 @@ export default function HRAdminPage({ defaultTab }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
-                  <select
+                  <input
+                    list="hr-dept-options"
                     value={newTeam.dept}
                     onChange={(e) => setNewTeam({ ...newTeam, dept: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
-                  >
-                    <option>Engineering</option>
-                    <option>HR</option>
-                    <option>Finance</option>
-                    <option>Design</option>
-                    <option>Marketing</option>
-                    <option>Operations</option>
-                  </select>
+                    placeholder="Enter department"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  />
                 </div>
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Headcount</label>
@@ -2643,18 +2648,13 @@ export default function HRAdminPage({ defaultTab }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
-                  <select
+                  <input
+                    list="hr-dept-options"
                     value={newTermination.dept}
                     onChange={(e) => setNewTermination({ ...newTermination, dept: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
-                  >
-                    <option>Engineering</option>
-                    <option>Sales &amp; Marketing</option>
-                    <option>Operations</option>
-                    <option>HR</option>
-                    <option>Finance</option>
-                    <option>Design</option>
-                  </select>
+                    placeholder="Enter department"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  />
                 </div>
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Designation / Role</label>
@@ -2817,18 +2817,13 @@ export default function HRAdminPage({ defaultTab }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Department</label>
-                  <select
+                  <input
+                    list="hr-dept-options"
                     value={newResignation.dept}
                     onChange={(e) => setNewResignation({ ...newResignation, dept: e.target.value })}
-                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
-                  >
-                    <option>Engineering</option>
-                    <option>Design</option>
-                    <option>HR</option>
-                    <option>Finance</option>
-                    <option>Marketing</option>
-                    <option>Operations</option>
-                  </select>
+                    placeholder="Enter department"
+                    className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  />
                 </div>
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">Role / Designation</label>
@@ -2990,8 +2985,7 @@ export default function HRAdminPage({ defaultTab }) {
                   onChange={(e) => setNewComplaint({ ...newComplaint, assignedInvestigator: e.target.value })}
                   className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer"
                 >
-                  <option value="Ayesha Khan (HR Director)">Ayesha Khan (HR Director)</option>
-                  <option value="Sarah Mitchell (CEO)">Sarah Mitchell (CEO)</option>
+                  <option value="">{currentUser?.name ? `${currentUser.name} (You)` : "Select investigator"}</option>
                   {employees.map((e) => (
                     <option key={e.id || e.name} value={`${e.name} (${e.designation})`}>
                       {e.name} ({e.designation})
@@ -3124,6 +3118,12 @@ export default function HRAdminPage({ defaultTab }) {
       )}
 
       {/* ── Modal: Termination Letter Live Editor & PDF ── */}
+      <datalist id="hr-dept-options">
+        {hrDeptOptions.map((d) => (
+          <option key={d} value={d} />
+        ))}
+      </datalist>
+
       <TerminationLetterModal
         isOpen={isTerminationLetterModalOpen}
         onClose={() => setIsTerminationLetterModalOpen(false)}

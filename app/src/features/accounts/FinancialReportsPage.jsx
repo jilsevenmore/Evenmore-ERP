@@ -36,8 +36,12 @@ export function FinancialReportsPage() {
   const netIncome = grossProfit - totalExpenses;
   const profitMargin = totalRevenue > 0 ? ((netIncome / totalRevenue) * 100).toFixed(1) : '0.0';
 
+  const activeInvoiceCount = invoices.filter(i => i.status !== 'Cancelled').length;
+  const fyStartYear = new Date().getMonth() >= 3 ? new Date().getFullYear() : new Date().getFullYear() - 1;
+  const fyLabel = `FY ${fyStartYear}-${String(fyStartYear + 1).slice(-2)}`;
+
   const stats = [
-    { label: 'Total Revenue', value: formatCurrency(totalRevenue), icon: 'dollar', tone: 'blue', trend: '+12.5%' },
+    { label: 'Total Revenue', value: formatCurrency(totalRevenue), icon: 'dollar', tone: 'blue', trend: `${activeInvoiceCount} invoice${activeInvoiceCount === 1 ? '' : 's'}` },
     { label: 'Cost of Goods', value: formatCurrency(totalCOGS), icon: 'cart', tone: 'amber' },
     { label: 'Operating Expenses', value: formatCurrency(totalExpenses), icon: 'file', tone: 'pink' },
     { label: 'Net Profit', value: formatCurrency(netIncome), icon: 'chart', tone: netIncome >= 0 ? 'green' : 'pink', trend: `${profitMargin}% margin` },
@@ -231,7 +235,7 @@ export function FinancialReportsPage() {
               </button>
             ))}
           </div>
-          <span style={{ fontSize: 13, color: '#64748b' }}>Period: Current Fiscal Year (2026)</span>
+          <span style={{ fontSize: 13, color: '#64748b' }}>Period: Current Fiscal Year ({fyLabel})</span>
         </div>
 
         {reportType === 'pl' && (
@@ -295,7 +299,7 @@ export function FinancialReportsPage() {
         {reportType === 'budget' && (
           <div>
             <div style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Budget vs Actual (FY 2026)</h3>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Budget vs Actual ({fyLabel})</h3>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Annual budgets compared against actual expenses and COGS derived from live transactions. Over-budget lines are flagged.</p>
             </div>
             <div className="overflow-x-auto">
@@ -311,6 +315,9 @@ export function FinancialReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {budgetRows.length === 0 && (
+                    <tr><td colSpan={6} className="py-6 px-3 text-center text-slate-500">No budgets configured yet.</td></tr>
+                  )}
                   {budgetRows.map((r) => (
                     <tr key={r.id} className={`hover:bg-slate-50 ${r.isOver ? 'bg-rose-50/50' : ''}`}>
                       <td className="py-2 px-3 font-semibold text-slate-800">{r.name}</td>
@@ -319,7 +326,7 @@ export function FinancialReportsPage() {
                       <td className={`py-2 px-3 text-right font-mono font-bold ${r.isOver ? 'text-rose-600' : 'text-emerald-700'}`}>
                         {r.variance < 0 ? '−' : '+'}{formatCurrency(Math.abs(r.variance))}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-600">{r.utilization}%</td>
+                      <td className="py-2 px-3 text-right font-mono text-slate-600">{r.utilization === '—' ? '—' : `${r.utilization}%`}</td>
                       <td className="py-2 px-3 text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${r.isOver ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
                           {r.isOver ? 'Over Budget' : 'Within Budget'}
@@ -330,7 +337,7 @@ export function FinancialReportsPage() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-[11px] text-slate-400 italic">Budgets are annual and static; variance is computed against total expenses + COGS recorded so far in FY2026.</p>
+            <p className="mt-3 text-[11px] text-slate-400 italic">Budgets are annual and static; variance is computed against total expenses + COGS recorded so far in {fyLabel}.</p>
           </div>
         )}
 
@@ -343,9 +350,9 @@ export function FinancialReportsPage() {
             <DataTable
               columns={[
                 { key: 'invoiceNumber', label: 'Invoice #' },
-                { key: 'customerName', label: 'Customer' },
+                { key: 'customerName', label: 'Customer', render: (v, row) => v || row.customer || '—' },
                 { key: 'date', label: 'Date', render: (v) => formatDateDDMMYYYY(v) },
-                { key: 'grandTotal', label: 'Total', render: (v) => formatCurrency(Number(v || 0)) },
+                { key: 'grandTotal', label: 'Total', render: (v, row) => formatCurrency(Number(v ?? row.total ?? 0) || 0) },
                 { key: 'status', label: 'Status', render: (v) => <StatusBadge status={v} /> },
               ]}
               data={invoices}

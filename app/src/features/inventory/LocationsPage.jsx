@@ -14,11 +14,11 @@ export const LocationsPage = () => {
         e.preventDefault();
         addLocation({
             code: code || `LOC-${String(locations.length + 1).padStart(2, '0')}`,
-            name: name || 'New Facility Zone',
+            name: name.trim(),
             type,
-            capacityPct: 15,
+            capacityPct: 0,
             totalSkus: 0,
-            manager: manager || 'Carlos Mendoza',
+            manager: manager.trim(),
         });
         setShowAddModal(false);
         setCode('');
@@ -54,10 +54,10 @@ export const LocationsPage = () => {
             width: '20%',
             render: (l) => (<div className="flex items-center justify-center gap-2">
           <div className="w-24 bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
-            <div className={`h-full ${l.capacityPct > 85 ? 'bg-rose-500' : 'bg-primary'}`} style={{ width: `${l.capacityPct}%` }}/>
+            <div className={`h-full ${l.capacityPct > 85 ? 'bg-rose-500' : 'bg-primary'}`} style={{ width: `${Number(l.capacityPct) || 0}%` }}/>
           </div>
           <span className="font-mono text-xs font-semibold text-text">
-            {l.capacityPct}%
+            {Number(l.capacityPct) || 0}%
           </span>
         </div>),
         },
@@ -73,7 +73,7 @@ export const LocationsPage = () => {
             header: 'Zone Manager',
             width: '12%',
             render: (l) => (<span className="text-text-secondary flex items-center gap-1 text-xs">
-          <User size={12} className="text-muted"/> {l.manager}
+          <User size={12} className="text-muted"/> {l.manager || '—'}
         </span>),
         },
     ];

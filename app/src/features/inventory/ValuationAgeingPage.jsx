@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
+import { toISODate, daysBetween, getCurrentISODate } from '../../utils/dateUtils';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { DollarSign } from 'lucide-react';
@@ -10,23 +11,29 @@ const AGE_BRACKETS = [
     { max: 90, label: '61-90 Days', reserveRate: 0.1 },
     { max: Infinity, label: '90+ Days (Stale)', reserveRate: 0.2 },
 ];
-// Deterministic holding-age proxy: items carry no receipt date, so derive a
-// stable 0-119 day age from the item id. Qty and cost always come from live
-// inventory, so valuations stay reactive to stock and purchase changes.
-const holdingAgeDays = (id) => {
-    let h = 0;
-    for (let i = 0; i < id.length; i += 1) h = (h * 31 + id.charCodeAt(i)) % 120;
-    return h;
-};
 export const ValuationAgeingPage = () => {
-    const { items, formatCurrency } = useERP();
+    const { items, inventoryMovements = [], formatCurrency } = useERP();
     const [selectedBucket, setSelectedBucket] = useState('All');
     // Live valuation rows derived from current inventory (was hardcoded demo data).
+    // Holding age = days since the item's most recent inbound stock movement
+    // (falls back to the item's creation date; 0 when neither is known).
+    const lastInboundByItem = useMemo(() => {
+        const map = {};
+        (inventoryMovements || []).forEach((m) => {
+            if (!(Number(m.quantity) > 0)) return;
+            const iso = toISODate(m.date);
+            const key = m.itemId;
+            if (!key || !iso) return;
+            if (!map[key] || iso > map[key]) map[key] = iso;
+        });
+        return map;
+    }, [inventoryMovements]);
     const agingData = useMemo(() => (items || []).map((it) => {
         const qty = it.availableQty ?? it.stock ?? 0;
         const unitCost = it.costPrice ?? it.unitCost ?? 0;
         const totalValuation = Math.round(qty * unitCost * 100) / 100;
-        const ageDays = holdingAgeDays(String(it.id));
+        const receivedOn = lastInboundByItem[it.id] || toISODate(it.createdAt || it.created_at);
+        const ageDays = Math.max(0, (receivedOn ? daysBetween(receivedOn, getCurrentISODate()) : 0) || 0);
         const bracket = AGE_BRACKETS.find((b) => ageDays <= b.max);
         const depreciationReserve = Math.round(totalValuation * bracket.reserveRate * 100) / 100;
         return {
@@ -41,7 +48,7 @@ export const ValuationAgeingPage = () => {
             agingBucket: bracket.label,
             depreciationReserve,
         };
-    }), [items]);
+    }), [items, lastInboundByItem]);
     const totalValuation = agingData.reduce((acc, i) => acc + i.totalValuation, 0);
     const totalDepreciation = agingData.reduce((acc, i) => acc + i.depreciationReserve, 0);
     const currentStockValue = agingData

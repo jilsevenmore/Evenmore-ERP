@@ -8,6 +8,7 @@ import { useERP } from '../../context/ERPContext';
 // Reason: the ERP dashboard should compute from live ERP state (invoices, paymentIns,
 //   purchaseBills, items, calculateItemStock), not from static CRM fixture data.
 // import { toISODate, getCurrentISODate } from '../../utils/dateUtils';
+import { toISODate } from '../../utils/dateUtils';
 import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown } from 'lucide-react';
 function buildChart(values, width, height, padding) {
   const max = Math.max(...values);
@@ -70,10 +71,10 @@ export const DashboardPage = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const revenueByMonth = last6Months.map((mk) => invoices
-    .filter((inv) => monthKey(inv.date) === mk || monthKey(inv.dueDate) === mk)
+    .filter((inv) => inv.status !== 'Cancelled' && monthKey(toISODate(inv.date)) === mk)
     .reduce((sum, inv) => sum + (Number(inv.total ?? inv.amount) || 0), 0));
   const overview = {
-    headline: `${invoices.length} tax invoices booked across the last 6 months`,
+    headline: `${invoices.filter((inv) => last6Months.includes(monthKey(toISODate(inv.date)))).length} tax invoices booked across the last 6 months`,
     period: 'Last 6 Months',
     summary: 'Invoiced value trend by month. Filter or open Sales > Invoices for details.',
     series: last6Months.map((mk, i) => ({ month: mk.split('-')[1], value: revenueByMonth[i] })),
@@ -106,13 +107,17 @@ export const DashboardPage = () => {
     currentAngle += angle;
     return segment;
   });
-  const recentActivity = invoices.slice(0, 3).map((inv) => ({
-    icon: invoices.length ? 'check' : 'task',
-    tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
-    title: inv.customer || 'Customer',
-    person: `${inv.invoiceNumber} • ${inv.status}`,
-    time: inv.date,
-  }));
+  const recentActivity = [...invoices]
+    .sort((a, b) => toISODate(b.date).localeCompare(toISODate(a.date)))
+    .slice(0, 3)
+    .map((inv) => ({
+      key: inv.id || inv.invoiceNumber,
+      icon: 'task',
+      tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
+      title: inv.customer || '—',
+      person: [inv.invoiceNumber, inv.status].filter(Boolean).join(' • '),
+      time: inv.date || '',
+    }));
   const enriched = items.map((itm) => {
     const calc = calculateItemStock(itm.id);
     let status = 'Optimal';
@@ -171,10 +176,10 @@ export const DashboardPage = () => {
     { label: 'Purchase', desc: `${purchaseOrders.length} Orders | ${purchaseBills.length} Bills`, to: '/purchase/orders', icon: Truck, tone: 'amber', count: purchaseOrders.length, tag: 'POs' },
     { label: 'Inventory', desc: `${items.length} SKUs | ${lowStockItems.length} Low Stock`, to: '/inventory/items', icon: Package, tone: 'purple', count: items.length, tag: 'SKUs' },
     { label: 'Parties', desc: `${parties.length} Parties | ${customers.length} Customers`, to: '/parties', icon: Building2, tone: 'teal', count: parties.length, tag: 'Parties' },
-    { label: 'Accounts', desc: `Bank $${Math.round(bankBalance).toLocaleString()} | ${invoices.length} Invoices`, to: '/accounts/cash-bank', icon: Wallet, tone: 'blue', count: bankAccounts.length, tag: 'Accounts' },
-    { label: 'HRMS', desc: 'Employees | Attendance | Payroll', to: '/hrms/dashboard', icon: UserCheck, tone: 'green', count: 48, tag: 'Staff' },
-    { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', count: 12, tag: 'Reports' },
-    { label: 'Administration', desc: 'Users | Roles | Settings', to: '/administration/users', icon: Shield, tone: 'amber', count: 3, tag: 'Admin' },
+    { label: 'Accounts', desc: `Bank ₹${Math.round(bankBalance).toLocaleString()} | ${invoices.length} Invoices`, to: '/accounts/cash-bank', icon: Wallet, tone: 'blue', count: bankAccounts.length, tag: 'Accounts' },
+    { label: 'HRMS', desc: 'Employees | Attendance | Payroll', to: '/hrms/dashboard', icon: UserCheck, tone: 'green', tag: 'Staff' },
+    { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', tag: 'Reports' },
+    { label: 'Administration', desc: 'Users | Roles | Settings', to: '/administration/users', icon: Shield, tone: 'amber', tag: 'Admin' },
   ];
 
   const fmt = (n) => Number(n || 0).toLocaleString();
@@ -348,7 +353,7 @@ export const DashboardPage = () => {
                   <span className="flex items-center gap-1.5 sm:gap-2">
                     <strong className="text-xs sm:text-sm font-bold text-text truncate">{m.label}</strong>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
-                      {m.count} {m.tag}
+                      {m.count != null ? `${m.count} ${m.tag}` : m.tag}
                     </span>
                   </span>
                   <span className="block text-[11px] text-muted truncate mt-0.5">{m.desc}</span>
@@ -408,8 +413,8 @@ export const DashboardPage = () => {
             </div>
             <small className="dashboard-stat-trend">
               <TrendingUp size={13} className="shrink-0" />
-              <b className="shrink-0">100%</b>
-              <em className="truncate">live count</em>
+              <b className="shrink-0">{fmt(quotations.filter((q) => ['Confirmed', 'Converted', 'Invoiced'].includes(q.status)).length)}</b>
+              <em className="truncate">converted</em>
             </small>
           </article>
           <article className="dashboard-stat">
@@ -501,6 +506,7 @@ export const DashboardPage = () => {
               </div>
               <div className="donut-legend">
                 {/* ── [PHASE-1-DASHBOARD] was: dashboardData.taskStatus.map(...) — now ERP taskStatus ── */}
+                {taskStatus.length === 0 && <p className="text-xs text-muted">No invoices yet.</p>}
                 {taskStatus.map((item) => (
                   <div key={item.key} className="legend-row">
                     <div className="legend-meta">
@@ -514,11 +520,12 @@ export const DashboardPage = () => {
             </div>
             <div className="activity-list mt-4 pt-3 border-t border-border">
               {/* ── [PHASE-1-DASHBOARD] was: dashboardData.recentActivity.slice(0,3) — now ERP recentActivity ── */}
+              {recentActivity.length === 0 && <p className="text-xs text-muted text-center py-2">No recent invoice activity.</p>}
               {recentActivity.map((item) => {
                 const Icon = ACTIVITY_ICONS[item.icon] || UserPlus;
                 const style = CARD_STYLES[item.tone] || CARD_STYLES.blue;
                 return (
-                  <div key={`${item.title}-${item.person}`} className="activity-item">
+                  <div key={item.key} className="activity-item">
                     <span className="activity-badge" style={{ background: style.bg, color: style.fg }}>
                       <Icon size={16} />
                     </span>
@@ -625,11 +632,12 @@ export const DashboardPage = () => {
                 </Link>
               </div>
               <div className="space-y-2 text-xs">
+                {salesOrders.length === 0 && <p className="text-[11px] text-muted">No sales orders yet.</p>}
                 {salesOrders.slice(0, 3).map((o) => (
                   <div key={o.id} className="p-2.5 sm:p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs font-bold text-text truncate">{o.orderNumber || o.id}</p>
-                      <p className="text-[11px] text-muted truncate">{o.customer} • ₹{fmt(o.amount || 0)}</p>
+                      <p className="text-[11px] text-muted truncate">{o.customer || '—'} • ₹{fmt(o.amount || o.total || 0)}</p>
                     </div>
                     <StatusBadge status={o.stage || o.status || 'Draft'} />
                   </div>
@@ -649,11 +657,12 @@ export const DashboardPage = () => {
                 </Link>
               </div>
               <div className="space-y-2 text-xs">
+                {purchaseOrders.length === 0 && <p className="text-[11px] text-muted">No purchase orders yet.</p>}
                 {purchaseOrders.slice(0, 3).map((o) => (
                   <div key={o.id} className="p-2.5 sm:p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs font-bold text-text truncate">{o.orderNumber || o.poNumber || o.id}</p>
-                      <p className="text-[11px] text-muted truncate">{o.vendor} • ₹{fmt(o.total || o.amount || 0)}</p>
+                      <p className="text-[11px] text-muted truncate">{o.vendor || '—'} • ₹{fmt(o.total || o.amount || 0)}</p>
                     </div>
                     <StatusBadge status={o.status || 'Draft'} />
                   </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Upload, Send, ShieldCheck, Layers, Check, RefreshCw, Clock, AlertCircle, Link2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
-import { MockPdfViewer } from '../../components/MockPdfViewer';
+import { ProofViewer } from '../../components/ProofViewer';
 import { ClientApprovalModal } from '../../components/ClientApprovalModal';
 import { ShareProofModal } from '../../approval/ShareProofModal';
 import { UploadProofModal } from './UploadProofModal';
@@ -32,6 +32,15 @@ const STEP_COPY = {
   approved: { label: 'Approved — handoff unlocked', tone: '#065f46' },
   'needs-revision': { label: 'Revision requested — upload a new version', tone: '#9a3412' },
 };
+
+function sizeLabel(value) {
+  if (value == null || value === '') return '—';
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes)) return String(value);
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 function stamp(value) {
   if (!value) return '—';
@@ -214,7 +223,7 @@ export function DocumentsProofTab({ project }) {
               disabled={isClosed || !workflow?.canDecide}
               title={
                 workflow?.canDecide
-                  ? 'Open the client approval simulator'
+                  ? "Record the client's decision on this version"
                   : 'Available once the proof has been sent to the client'
               }
               onClick={() => setApprovalOpen(true)}
@@ -307,9 +316,8 @@ export function DocumentsProofTab({ project }) {
 
           {/* Preview + comments */}
           <div className="space-y-3">
-            <MockPdfViewer
+            <ProofViewer
               document={selected}
-              projectName={project.productDetails?.productName}
               annotations={annotations[selected?.id] ?? []}
               onAddAnnotation={addComment}
             />
@@ -319,7 +327,7 @@ export function DocumentsProofTab({ project }) {
                 {[
                   ['Uploaded by', selected?.uploadedBy?.name ?? '—'],
                   ['Uploaded at', stamp(selected?.uploadedAt)],
-                  ['Size', selected?.fileSize ?? '—'],
+                  ['Size', sizeLabel(selected?.fileSize)],
                   ['Status', selected?.approvalStatus ?? '—'],
                 ].map(([k, v]) => (
                   <div key={k} className="min-w-0">

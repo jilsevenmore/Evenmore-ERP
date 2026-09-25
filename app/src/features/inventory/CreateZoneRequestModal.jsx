@@ -1,34 +1,37 @@
 import React, { useState } from 'react';
 import { X, Check, GitPullRequest } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
+import { useAppStore } from '../../stores/appStore';
 export const CreateZoneRequestModal = ({ isOpen, onClose, onSubmit, }) => {
-    const [requestedBy, setRequestedBy] = useState('Sarah Jenkins');
+    const { items = [], calculateItemStock } = useERP();
+    const currentUser = useAppStore((s) => s.currentUser);
+    const [requestedBy, setRequestedBy] = useState(currentUser?.name || '');
     const [zone, setZone] = useState('Zone A');
-    const [product, setProduct] = useState('12V Battery Pack');
-    const [sku, setSku] = useState('BAT-12V-HD');
-    const [qty, setQty] = useState(5);
+    const [product, setProduct] = useState('');
+    const [sku, setSku] = useState('');
+    const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState('');
     if (!isOpen)
         return null;
-    const productOptions = [
-        { name: '12V Battery Pack', sku: 'BAT-12V-HD' },
-        { name: 'Sensor Array V2', sku: 'SNS-ARR-V2' },
-        { name: 'Industrial Lubricant (L)', sku: 'LUB-IND-1L' },
-        { name: 'HEPA Filters', sku: 'FLT-HP-400' },
-        { name: 'Cooling Fans', sku: 'FAN-120MM-PWM' },
-        { name: 'Replacement Gears', sku: 'GR-STEEL-45T' },
-        { name: 'Fiber Patch Cord 5m', sku: 'FBR-LC-05' },
-        { name: 'SFP+ 10G Transceiver', sku: 'SFP-10G-SR' },
-    ];
+    const productOptions = items
+        .filter((i) => i.name)
+        .map((i) => ({ id: i.id, name: i.name, sku: i.sku || '' }));
+    const selectedProduct = productOptions.find((p) => p.name === product) || productOptions[0] || null;
     const handleProductChange = (prodName) => {
         setProduct(prodName);
         const found = productOptions.find((p) => p.name === prodName);
-        if (found)
-            setSku(found.sku);
+        setSku(found?.sku || '');
     };
     const handleSubmit = (e) => {
         e.preventDefault();
-        const initials = requestedBy
+        if (!selectedProduct) {
+            alert('Add inventory items before raising a zone stock request.');
+            return;
+        }
+        const requester = (requestedBy || currentUser?.name || '').trim();
+        const initials = requester
             .split(' ')
+            .filter(Boolean)
             .map((n) => n[0])
             .join('')
             .substring(0, 2)
@@ -38,21 +41,28 @@ export const CreateZoneRequestModal = ({ isOpen, onClose, onSubmit, }) => {
             month: 'short',
             day: 'numeric',
         }) + `, ${today.getHours().toString().padStart(2, '0')}:${today.getMinutes().toString().padStart(2, '0')}`;
-        const reqNum = `#REQ-${Math.floor(8000 + Math.random() * 900)}`;
+        const reqNum = `#REQ-${Date.now().toString().slice(-5)}`;
+        let warehouseStock = 0;
+        try {
+            warehouseStock = Number(calculateItemStock?.(selectedProduct.id)?.available) || 0;
+        }
+        catch {
+            warehouseStock = 0;
+        }
         onSubmit({
             requestNumber: reqNum,
-            requestedBy,
-            avatarInitials: initials || 'SJ',
-            product,
-            sku,
+            requestedBy: requester,
+            avatarInitials: initials,
+            product: selectedProduct.name,
+            sku: sku || selectedProduct.sku,
             qty: Number(qty) || 1,
             zone,
-            targetSector: `${zone} (Sector ${Math.floor(1 + Math.random() * 8)})`,
+            targetSector: zone,
             date: formattedDate,
             submittedAt: `Submitted ${formattedDate}`,
             status: 'Requested',
-            notes: notes.trim() || 'Restock request initiated by floor engineer.',
-            warehouseStock: Math.floor(25 + Math.random() * 60),
+            notes: notes.trim(),
+            warehouseStock,
             managerSignoffNeeded: zone === 'Zone A' || zone === 'Zone D',
         });
         onClose();
@@ -80,13 +90,7 @@ export const CreateZoneRequestModal = ({ isOpen, onClose, onSubmit, }) => {
               <label className="block text-xs font-semibold text-[#1F2E4A] uppercase tracking-wider mb-1">
                 Requested By
               </label>
-              <select value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} className="w-full border border-[#CED4DA] rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#0CB1AC] bg-white">
-                <option value="Sarah Jenkins">Sarah Jenkins (Tech Lead)</option>
-                <option value="Marcus Cole">Marcus Cole (Line Manager)</option>
-                <option value="Elena Rostova">Elena Rostova (Machinist)</option>
-                <option value="David Chen">David Chen (Cleanroom Spec)</option>
-                <option value="James Wilson">James Wilson (Conveyor Maint)</option>
-              </select>
+              <input type="text" required value={requestedBy} onChange={(e) => setRequestedBy(e.target.value)} placeholder="Requester name" className="w-full border border-[#CED4DA] rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#0CB1AC] bg-white"/>
             </div>
             <div>
               <label className="block text-xs font-semibold text-[#1F2E4A] uppercase tracking-wider mb-1">
@@ -107,9 +111,10 @@ export const CreateZoneRequestModal = ({ isOpen, onClose, onSubmit, }) => {
               <label className="block text-xs font-semibold text-[#1F2E4A] uppercase tracking-wider mb-1">
                 Product
               </label>
-              <select value={product} onChange={(e) => handleProductChange(e.target.value)} className="w-full border border-[#CED4DA] rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#0CB1AC] bg-white">
-                {productOptions.map((p) => (<option key={p.sku} value={p.name}>
-                    {p.name} ({p.sku})
+              <select value={selectedProduct?.name || ''} onChange={(e) => handleProductChange(e.target.value)} disabled={productOptions.length === 0} className="w-full border border-[#CED4DA] rounded px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#0CB1AC] bg-white">
+                {productOptions.length === 0 && <option value="">No inventory items yet</option>}
+                {productOptions.map((p) => (<option key={p.id || p.name} value={p.name}>
+                    {p.name}{p.sku ? ` (${p.sku})` : ''}
                   </option>))}
               </select>
             </div>

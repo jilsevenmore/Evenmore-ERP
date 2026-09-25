@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useAppStore } from "../../../stores/appStore";
+import { useERP } from "../../../context/ERPContext";
 import {
   X,
   Printer,
@@ -19,6 +21,8 @@ export default function TerminationLetterModal({
   termination,
   onUpdateTermination,
 }) {
+  const currentUser = useAppStore((s) => s.currentUser);
+  const { companyProfile } = useERP();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -38,7 +42,7 @@ export default function TerminationLetterModal({
       setFormData({
         refNumber:
           existing?.refNumber ||
-          `EV/TRM/2024/${termination.id || "101"}`,
+          `EV/TRM/${new Date().getFullYear()}/${termination.id || "101"}`,
         issueDate:
           existing?.issueDate ||
           termination.noticeDate ||
@@ -61,15 +65,15 @@ export default function TerminationLetterModal({
         handoverInstruction:
           existing?.handoverInstruction ||
           "Please return all company property (laptop, access badge, keycards, files) to IT & Operations before your final day. All standard confidentiality agreements remain binding.",
-        signatoryName: existing?.signatoryName || "Ayesha Khan",
+        signatoryName: existing?.signatoryName || currentUser?.name || "",
         signatoryTitle: existing?.signatoryTitle || "Head of People Operations",
-        companyName: "Evenmore Technologies Inc.",
-        companyAddress: "100 Innovation Parkway, New York, NY 10001 • hr@evenmore.io",
+        companyName: companyProfile?.name || "",
+        companyAddress: [companyProfile?.address, companyProfile?.email].filter(Boolean).join(" • "),
       });
       setIsEditing(false);
       setSavedSuccess(false);
     }
-  }, [termination]);
+  }, [termination, currentUser?.name, companyProfile?.name, companyProfile?.address, companyProfile?.email]);
 
   if (!isOpen || !termination || !formData) return null;
 

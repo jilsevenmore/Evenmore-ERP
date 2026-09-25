@@ -2,12 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useERP } from '../context/ERPContext';
 import { useIdleReady } from './useIdleReady';
 import { loadEventNotifications, NOTIFICATION_EVENT } from '../services/crmEventNotifications';
+import { useCrmStore } from '../stores/crmStore';
 
 const CRM_EVENT = 'crm:data-updated';
-const LEADS_STORAGE_KEY = 'evenmore-crm-leads-v1';
-const LEAD_DETAIL_STORAGE_KEY = 'evenmore-crm-lead-details-v1';
-const TASK_ALLOCATION_STORAGE_KEY = 'crm-task-allocation-v1';
-const CRM_TASKS_STORAGE_KEY = 'evenmore-crm-tasks-v1';
+const EMPTY_ROWS = [];
 
 const EVENT_ENTITY_LABELS = {
   lead: 'Lead',
@@ -17,23 +15,20 @@ const EVENT_ENTITY_LABELS = {
   contract: 'Contract',
 };
 
-function readStoredValue(key, fallback) {
-  try {
-    if (typeof localStorage === 'undefined') return fallback;
-    const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function loadCrmSnapshot() {
-  return {
-    leadRows: readStoredValue(LEADS_STORAGE_KEY, []),
-    leadDetails: readStoredValue(LEAD_DETAIL_STORAGE_KEY, {}),
-    allocationTasks: readStoredValue(TASK_ALLOCATION_STORAGE_KEY, []),
-    eventItems: loadEventNotifications(),
-  };
+/** The CRM task list, grouped by lead in the `{ [leadId]: { tasks } }` shape the reminders read. */
+function groupTasksByLead(tasks) {
+  const byLead = {};
+  (tasks || []).forEach((task) => {
+    if (!task || task.leadId == null) return;
+    const key = String(task.leadId);
+    if (!byLead[key]) byLead[key] = { tasks: [] };
+    byLead[key].tasks.push({
+      ...task,
+      dueAt: task.dueAt || task.dueDate,
+      assignee: task.assignee || (task.owner !== 'Unassigned' ? task.owner : ''),
+    });
+  });
+  return byLead;
 }
 
 function formatEventTime(value, now) {
@@ -77,14 +72,16 @@ function parseCrmDate(value) {
   const direct = new Date(text);
   if (!Number.isNaN(direct.getTime())) return direct;
 
-  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:,\s*|\s+)(\d{1,2}):(\d{2})(?:\s*([AP]M))?$/i);
+  const match = text.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:(?:,\s*|\s+)(\d{1,2}):(\d{2})(?:\s*([AP]M))?)?$/i);
   if (!match) return null;
 
   const day = Number(match[1]);
   const month = Number(match[2]);
   const year = Number(match[3]);
-  let hour = Number(match[4]);
-  const minute = Number(match[5]);
+  // A date with no time is due by the end of that day.
+  const hasTime = match[4] !== undefined;
+  let hour = hasTime ? Number(match[4]) : 23;
+  const minute = hasTime ? Number(match[5]) : 59;
   const meridiem = String(match[6] || '').toUpperCase();
 
   if (meridiem === 'PM' && hour < 12) hour += 12;
@@ -180,7 +177,7 @@ function buildAllocationReminders({ allocationTasks, now }) {
     .filter(Boolean);
 }
 
-function buildWorkflowNotifications({ leadRows, quotations, deliveryChallans }) {
+function buildWorkflowNotifications({ leadRows, crmTasks, quotations, deliveryChallans }) {
   const notifications = [];
   const unmappedLeads = (leadRows || []).filter((lead) => !String(lead.owner || '').trim());
 
@@ -248,7 +245,6 @@ function buildWorkflowNotifications({ leadRows, quotations, deliveryChallans }) 
   }
 
   // Unassigned automation tasks — warn admin to assign an employee
-  const crmTasks = readStoredValue(CRM_TASKS_STORAGE_KEY, []);
   const unassignedAutoTasks = (crmTasks || []).filter(
     (t) =>
       t &&
@@ -285,14 +281,14 @@ function sortItems(items, now) {
   });
 }
 
-function buildCrmNotificationDigest({ leadRows, leadDetails, allocationTasks, quotations, deliveryChallans, eventItems, now }) {
+function buildCrmNotificationDigest({ leadRows, leadDetails, crmTasks, quotations, deliveryChallans, eventItems, now }) {
   const reminders = sortItems([
     ...buildLeadTaskReminders({ leadRows, leadDetails, now }),
     // ...buildAllocationReminders({ allocationTasks, now }), // Hidden: Task Allocation duplicates Tasks List
   ], now);
   const notifications = [
     ...buildEventNotifications({ eventItems, now }),
-    ...buildWorkflowNotifications({ leadRows, quotations, deliveryChallans }),
+    ...buildWorkflowNotifications({ leadRows, crmTasks, quotations, deliveryChallans }),
   ];
   const urgentReminders = reminders.filter((item) => item.tone === 'overdue' || item.tone === 'today');
   const todayReminders = reminders.filter((item) => item.tone === 'today');
@@ -320,10 +316,12 @@ export function useCrmNotificationDigest() {
   const erp = useERP() || {};
   const digestReady = useIdleReady();
   const { quotations, deliveryChallans } = digestReady ? erp : {};
-  const [snapshot, setSnapshot] = useState(() => loadCrmSnapshot());
+  const leadRows = useCrmStore((s) => s.leads) || EMPTY_ROWS;
+  const crmTasks = useCrmStore((s) => s.tasks) || EMPTY_ROWS;
+  const [eventItems, setEventItems] = useState(() => loadEventNotifications());
 
   useEffect(() => {
-    const sync = () => setSnapshot(loadCrmSnapshot());
+    const sync = () => setEventItems(loadEventNotifications());
     sync();
 
     window.addEventListener(CRM_EVENT, sync);
@@ -341,14 +339,14 @@ export function useCrmNotificationDigest() {
 
   return useMemo(
     () => buildCrmNotificationDigest({
-      leadRows: snapshot.leadRows,
-      leadDetails: snapshot.leadDetails,
-      allocationTasks: snapshot.allocationTasks,
+      leadRows,
+      leadDetails: groupTasksByLead(crmTasks),
+      crmTasks,
       quotations,
       deliveryChallans,
-      eventItems: snapshot.eventItems,
+      eventItems,
       now: new Date(),
     }),
-    [deliveryChallans, quotations, snapshot]
+    [deliveryChallans, quotations, leadRows, crmTasks, eventItems]
   );
 }

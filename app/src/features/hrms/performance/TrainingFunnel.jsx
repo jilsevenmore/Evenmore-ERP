@@ -41,6 +41,7 @@ const STAGE_DROP_STYLES = {
 export default function TrainingFunnel({ embedded = false, onBack }) {
   const navigate = useNavigate();
   const showToast = useAppStore((s) => s.showToast);
+  const employees = useAppStore((s) => s.employees || []);
 
   const {
     trainings,
@@ -73,14 +74,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
   const [form, setForm] = useState({
     name: "",
     trainer: "Unassigned",
-    department: "Engineering",
+    department: "General",
     type: "Technical",
     stage: "Requested",
-    cost: 25000,
-    participants: 12,
-    start: "18 Oct 2024",
-    end: "19 Oct 2024",
-    location: "Training Hall A",
+    cost: 0,
+    participants: 1,
+    start: "",
+    end: "",
+    location: "",
     description: "",
   });
 
@@ -160,14 +161,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
     setForm({
       name: "",
       trainer: "Unassigned",
-      department: "Engineering",
+      department: "General",
       type: "Technical",
       stage,
-      cost: 25000,
-      participants: 12,
-      start: "18 Oct 2024",
-      end: "19 Oct 2024",
-      location: "Training Hall A",
+      cost: 0,
+      participants: 1,
+      start: "",
+      end: "",
+      location: "",
       description: "",
     });
     setModalOpen(true);
@@ -178,7 +179,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
     setForm({
       name: item.name || "",
       trainer: item.trainer || "Unassigned",
-      department: item.department || "Engineering",
+      department: item.department || "General",
       type: item.type || "Technical",
       stage: item.stage || "Requested",
       cost: item.cost || 0,
@@ -218,13 +219,11 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
   const departmentsList = [
     "All",
-    "Engineering",
-    "Product",
-    "Design",
-    "HR",
-    "Finance",
-    "Marketing",
-    "Operations",
+    ...new Set([
+      "General",
+      ...employees.map((e) => e.department).filter(Boolean),
+      ...trainings.map((t) => t.department).filter(Boolean),
+    ]),
   ];
 
   return (
@@ -635,14 +634,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
           <button
             type="button"
             onClick={() => {
-              if (confirm("Reset training funnel data to initial realistic defaults?")) {
+              if (confirm("Discard unsaved local changes and reload training data from the server?")) {
                 resetToDefaults();
-                showToast("Training data reset to defaults");
+                showToast("Training data reloaded");
               }
             }}
             className="text-[11.5px] text-muted hover:text-slate-800 underline decoration-dotted transition"
           >
-            Reset Seed Data
+            Reload Data
           </button>
         </div>
       </div>

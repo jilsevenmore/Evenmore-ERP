@@ -1,7 +1,8 @@
 import { loadDeals, DEALS_STORAGE_KEY } from './dealService.js';
 import { crmStorage } from './crmStorage.js';
 
-export const PROJECTS_STORAGE_KEY = 'evenmore-crm-projects-v1';
+// v2: the v1 blob held projects for deals that no longer exist on the server.
+export const PROJECTS_STORAGE_KEY = 'evenmore-crm-projects-v2';
 const DETAILS_KEY = 'evenmore-crm-lead-details-v1';
 const sameId = (a, b) => a != null && b != null && String(a) === String(b);
 

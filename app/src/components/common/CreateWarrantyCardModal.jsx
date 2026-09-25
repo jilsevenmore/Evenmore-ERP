@@ -45,7 +45,9 @@ export const CreateWarrantyCardModal = ({
         addWarrantyCard,
         updateWarrantyCard,
         showToast,
+        companyProfile,
     } = useERP();
+    const defaultAuthorizedBy = companyProfile?.name ? `${companyProfile.name} Quality Assurance` : '';
 
     // Dismiss on Escape
     useEffect(() => {
@@ -62,10 +64,10 @@ export const CreateWarrantyCardModal = ({
             customers.find((c) => c.id === challan.customerId || c.name?.toLowerCase() === challan.customer?.toLowerCase()) ||
             parties.find((p) => p.id === challan.customerId || p.name?.toLowerCase() === challan.customer?.toLowerCase()) ||
             {
-                name: challan.customer || 'Customer',
-                code: 'CUST-AUTO',
-                email: 'customer@client.com',
-                phone: '+1 (555) 000-0000',
+                name: challan.customer || '',
+                code: '',
+                email: '',
+                phone: '',
             }
         );
     }, [challan, customers, parties]);
@@ -107,8 +109,8 @@ export const CreateWarrantyCardModal = ({
                     id: `comp-${Date.now()}-${idx}-${bIdx}`,
                     partItemId: bp.partItemId,
                     name: partItem?.name || `Component ${bIdx + 1}`,
-                    sku: partItem?.sku || `PART-${bIdx + 1}`,
-                    serialNumber: partItem?.serialNumbers?.[bIdx] || `SN-COMP-${String(bIdx + 1).padStart(3, '0')}`,
+                    sku: partItem?.sku || '',
+                    serialNumber: partItem?.serialNumbers?.[bIdx] || '',
                     isSerialized: partItem?.trackingMode === 'Serial',
                     warrantyPeriod: partItem?.warrantyPeriod ?? 2,
                     warrantyUnit: partItem?.warrantyUnit || 'Years',
@@ -120,8 +122,8 @@ export const CreateWarrantyCardModal = ({
             return {
                 id: line.id || `wi-${Date.now()}-${idx}`,
                 itemId: mi?.id || line.itemId,
-                sku: mi?.sku || line.itemSku || line.sku || 'SKU-EQUIP',
-                name: mi?.name || line.name || line.description || 'Industrial Equipment',
+                sku: mi?.sku || line.itemSku || line.sku || '',
+                name: mi?.name || line.name || line.description || line.itemSku || line.sku || '',
                 description: line.description || mi?.description || '',
                 quantity: Number(line.qty || line.dispatchedQty) || 1,
                 serialNumbers: serials,
@@ -146,7 +148,7 @@ export const CreateWarrantyCardModal = ({
     });
     const [itemsList, setItemsList] = useState(existingCard?.items ?? initialItems);
     const [termsAndConditions, setTermsAndConditions] = useState(existingCard?.termsAndConditions || DEFAULT_WARRANTY_TERMS);
-    const [authorizedBy, setAuthorizedBy] = useState(existingCard?.authorizedBy || 'Horizon Quality Assurance Dept.');
+    const [authorizedBy, setAuthorizedBy] = useState(existingCard?.authorizedBy || defaultAuthorizedBy);
     const [isOverride, setIsOverride] = useState(Boolean(existingCard?.isOverride));
     const [activeTab, setActiveTab] = useState('coverage'); // 'coverage' | 'components' | 'terms'
 
@@ -159,7 +161,7 @@ export const CreateWarrantyCardModal = ({
             setCustomStartDate(formatDateToISO(existingCard.startDate || new Date()));
             setItemsList(existingCard.items || []);
             setTermsAndConditions(existingCard.termsAndConditions || DEFAULT_WARRANTY_TERMS);
-            setAuthorizedBy(existingCard.authorizedBy || 'Horizon Quality Assurance Dept.');
+            setAuthorizedBy(existingCard.authorizedBy || defaultAuthorizedBy);
             setIsOverride(Boolean(existingCard.isOverride));
         } else if (challan) {
             setItemsList(initialItems);
@@ -169,7 +171,7 @@ export const CreateWarrantyCardModal = ({
             setWarrantyStartEvent(initialItems[0]?.warrantyStartEvent || 'Delivery');
             setCustomStartDate(formatDateToISO(challan.dispatchDate || challan.date || new Date()));
         }
-    }, [existingCard, challan, initialItems]);
+    }, [existingCard, challan, initialItems, defaultAuthorizedBy]);
 
     // Computed Start Date based on Start Event
     const computedStartDate = useMemo(() => {
@@ -214,9 +216,9 @@ export const CreateWarrantyCardModal = ({
         const comps = [...(item.components || [])];
         comps.push({
             id: `comp-custom-${Date.now()}`,
-            name: 'New Modular Component',
-            sku: 'PART-CUSTOM',
-            serialNumber: `SN-COMP-${String(comps.length + 1).padStart(3, '0')}`,
+            name: 'New Component',
+            sku: '',
+            serialNumber: '',
             isSerialized: true,
             warrantyPeriod: 2,
             warrantyUnit: 'Years',
@@ -261,20 +263,20 @@ export const CreateWarrantyCardModal = ({
             id: existingCard?.id || `wc-${Date.now()}`,
             cardNumber: existingCard?.cardNumber || `WC-2026-${String(warranties.length + 100).padStart(5, '0')}`,
             customerId: challan.customerId || matchedCustomer?.id,
-            customerName: challan.customer || matchedCustomer?.name || 'Acme Corp',
-            customerCode: matchedCustomer?.code || 'CUST-001',
+            customerName: challan.customer || matchedCustomer?.name || '',
+            customerCode: matchedCustomer?.code || '',
             contactPerson: matchedCustomer?.contactPerson || '',
-            email: matchedCustomer?.email || 'customer@client.com',
+            email: matchedCustomer?.email || '',
             phone: matchedCustomer?.phone || '',
-            billingAddress: matchedCustomer?.billingAddress || challan.shippingAddress || { line1: 'Corporate HQ Receiving Bay', city: 'San Jose', state: 'CA', pincode: '95134' },
-            shippingAddress: challan.shippingAddress || matchedCustomer?.shippingAddress || { line1: 'Dock Receiving Facility', city: 'San Jose', state: 'CA', pincode: '95134' },
+            billingAddress: matchedCustomer?.billingAddress || challan.shippingAddress || null,
+            shippingAddress: challan.shippingAddress || matchedCustomer?.shippingAddress || null,
             gstin: matchedCustomer?.gstin || challan.gstin || '',
             deliveryChallanId: challan.id,
             challanNumber: challan.challanNumber,
             deliveryDate: challan.dispatchDate || challan.date,
-            deliveryLocation: challan.locationName || challan.locationId || 'Main Warehouse',
+            deliveryLocation: challan.locationName || challan.locationId || '',
             invoiceId: matchedInvoice?.id || challan.invoiceId || undefined,
-            invoiceNumber: matchedInvoice?.invoiceNumber || (challan.invoiceId ? 'INV-LINKED' : 'Not linked yet'),
+            invoiceNumber: matchedInvoice?.invoiceNumber || '',
             invoiceDate: matchedInvoice?.date || undefined,
             salesOrderId: challan.salesOrderId,
             salesOrderNumber: challan.salesOrderNumber || challan.linkedSo,
@@ -347,7 +349,7 @@ export const CreateWarrantyCardModal = ({
                         <div className="min-w-0 flex-1">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Customer / Consignee</span>
                             <strong className="text-xs text-slate-900 block truncate">{challan.customer}</strong>
-                            <span className="text-[11px] text-slate-500 block truncate">{matchedCustomer?.email || 'customer@client.com'}</span>
+                            <span className="text-[11px] text-slate-500 block truncate">{matchedCustomer?.email || '—'}</span>
                         </div>
                     </div>
 
@@ -781,7 +783,7 @@ export const CreateWarrantyCardModal = ({
                                         value={authorizedBy}
                                         onChange={(e) => setAuthorizedBy(e.target.value)}
                                         className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-white text-slate-800 text-xs font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none shadow-2xs"
-                                        placeholder="e.g. Horizon Quality Assurance Dept."
+                                        placeholder="e.g. Quality Assurance Dept."
                                     />
                                     <span className="text-[10px] text-slate-400 block">Appears in the signature verification box</span>
                                 </div>
@@ -792,7 +794,8 @@ export const CreateWarrantyCardModal = ({
                                     </label>
                                     <input
                                         type="email"
-                                        value={matchedCustomer?.email || 'customer@client.com'}
+                                        value={matchedCustomer?.email || ''}
+                                        placeholder="No email on the customer record"
                                         disabled
                                         className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-slate-100/80 text-slate-600 text-xs font-mono"
                                     />

@@ -45,7 +45,7 @@ export const VendorsPage = () => {
         phone: '',
         paymentTerms: 'Net 30',
     });
-    const totalPayable = vendors.reduce((sum, v) => sum + v.balance, 0);
+    const totalPayable = vendors.reduce((sum, v) => sum + (Number(v.balance) || 0), 0);
     const columns = [
         {
             header: 'Code',
@@ -141,9 +141,9 @@ export const VendorsPage = () => {
             code: newVend.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
             name: newVend.name,
             category: newVend.category || 'Hardware',
-            contactPerson: newVend.contactPerson || 'Vendor Account Rep',
-            email: newVend.email || 'orders@supplier.com',
-            phone: newVend.phone || '+1 (800) 000-0000',
+            contactPerson: newVend.contactPerson || '',
+            email: newVend.email || '',
+            phone: newVend.phone || '',
             balance: 0,
             paymentTerms: newVend.paymentTerms || 'Net 30',
             status: 'Active',

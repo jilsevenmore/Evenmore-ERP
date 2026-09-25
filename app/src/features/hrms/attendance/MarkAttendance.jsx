@@ -6,143 +6,31 @@ import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
-const INITIAL_EMPLOYEES = [
-  {
-    id: "EMP1024",
-    name: "Priya Patel",
-    dept: "Engineering",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Present",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-  },
-  {
-    id: "EMP1025",
-    name: "Marcus Chen",
-    dept: "Design",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Present",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-  },
-  {
-    id: "EMP1026",
-    name: "Liam Cooper",
-    dept: "Engineering",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Late",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/men/75.jpg",
-  },
-  {
-    id: "EMP1027",
-    name: "Sarah Wilson",
-    dept: "Marketing",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Absent",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-  },
-  {
-    id: "EMP1028",
-    name: "James Wilson",
-    dept: "Finance",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "WFH",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/men/54.jpg",
-  },
-  {
-    id: "EMP1029",
-    name: "Ayesha Khan",
-    dept: "HR",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "On Leave",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/women/24.jpg",
-  },
-  {
-    id: "EMP1030",
-    name: "David Park",
-    dept: "Engineering",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Present",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/men/46.jpg",
-  },
-  {
-    id: "EMP1031",
-    name: "Chen Li",
-    dept: "Operations",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Present",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/women/33.jpg",
-  },
-  {
-    id: "EMP1032",
-    name: "Rahul Verma",
-    dept: "Design",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Late",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/men/62.jpg",
-  },
-  {
-    id: "EMP1033",
-    name: "Ana Silva",
-    dept: "Marketing",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "Absent",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/women/51.jpg",
-  },
-  {
-    id: "EMP1034",
-    name: "Tariq Al-Mansoor",
-    dept: "HR",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "WFH",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/men/82.jpg",
-  },
-  {
-    id: "EMP1035",
-    name: "Sofia Reyes",
-    dept: "Finance",
-    checkIn: "09:02",
-    checkOut: "18:04",
-    status: "On Leave",
-    remarks: "",
-    checked: false,
-    avatar: "https://randomuser.me/api/portraits/women/63.jpg",
-  },
-];
+function buildRows(storeRecords, storeEmployees) {
+  if (storeRecords && storeRecords.length > 0) {
+    return storeRecords.map((r) => ({
+      ...r,
+      avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+      remarks: r.remarks || "",
+      checked: false,
+    }));
+  }
+  return (storeEmployees || []).map((emp, i) => {
+    const empId = emp.empId || emp.id || `EMP${1024 + i}`;
+    return {
+      id: empId,
+      name: emp.name,
+      dept: emp.department || "",
+      checkIn: "09:00",
+      checkOut: "18:00",
+      status: "Present",
+      remarks: "",
+      checked: false,
+      avatar: emp.avatar || `https://i.pravatar.cc/100?u=${empId}`,
+    };
+  });
+}
 
-const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations"];
-const LOCATIONS = ["All", "Bangalore", "Mumbai", "Delhi", "Hyderabad"];
 const SHIFTS = ["All", "General", "Flexible", "Night"];
 const STATUSES = ["Present", "Late", "Absent", "WFH", "Half Day", "On Leave"];
 
@@ -152,26 +40,25 @@ export default function MarkAttendance() {
   const saveDailyAttendance = useAttendanceStore((s) => s.saveDailyAttendance);
   const bulkUpdateStore = useAttendanceStore((s) => s.bulkUpdate);
 
-  const [date, setDate] = useState("2024-10-11");
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dept, setDept] = useState("All");
   const [location, setLocation] = useState("All");
   const [shift, setShift] = useState("All");
 
-  const [rows, setRows] = useState(() => {
-    if (storeRecords && storeRecords.length > 0) {
-      return storeRecords.map((r) => ({
-        ...r,
-        avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
-        remarks: r.remarks || "",
-        checked: false,
-      }));
-    }
-    return INITIAL_EMPLOYEES;
-  });
+  const storeEmployees = useAppStore((s) => s.employees);
+
+  const [rows, setRows] = useState(() => buildRows(storeRecords, storeEmployees));
 
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const storeEmployees = useAppStore((s) => s.employees);
+  const DEPARTMENTS = useMemo(
+    () => ["All", ...new Set(rows.map((r) => r.dept).filter(Boolean))],
+    [rows]
+  );
+  const LOCATIONS = useMemo(
+    () => ["All", ...new Set((storeEmployees || []).map((e) => e.location).filter(Boolean))],
+    [storeEmployees]
+  );
 
   // Sync rows if store records or employees change
   useEffect(() => {
@@ -195,7 +82,7 @@ export default function MarkAttendance() {
           return {
             id: empId,
             name: emp.name,
-            dept: emp.department || 'Engineering',
+            dept: emp.department || '',
             checkIn: '09:00',
             checkOut: '18:00',
             status: 'Present',
@@ -407,7 +294,7 @@ export default function MarkAttendance() {
         <div className="mark-footer">
           <button
             type="button"
-            onClick={() => setRows(INITIAL_EMPLOYEES)}
+            onClick={() => setRows(buildRows(storeRecords, storeEmployees))}
             className="mark-btn-cancel"
           >
             Cancel

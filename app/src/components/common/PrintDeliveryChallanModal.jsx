@@ -1,16 +1,17 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, Truck, ShieldCheck, FileText, MapPin } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
 
 export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
-    // [PHASE-2E.1] profile-driven letterhead (was hardcoded EVENMORE / US strings)
-    const { companyProfile } = useERP();
-    const companyName = companyProfile?.name || 'EVENMORE ENTERPRISES';
-    const companyShort = (companyName || 'E').trim().charAt(0).toUpperCase() || 'E';
+    const { companyProfile, resolvePartyAddresses } = useERP();
+    const companyName = companyProfile?.name || '';
+    const companyShort = companyInitial(companyName);
     const gstin = companyProfile?.gstin || '';
     const pan = companyProfile?.pan || '';
-    const companyAddress = companyProfile?.address || '742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134';
-    const phone = companyProfile?.phone || '+1 (800) 555-0199';
+    const companyAddress = companyProfile?.address || '';
+    const phone = companyProfile?.phone || '';
+    const taxLine = joinNonEmpty([gstin && `GSTIN: ${gstin}`, pan && `PAN: ${pan}`, phone && `Logistics Desk: ${phone}`]);
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -25,7 +26,10 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
     };
 
     const items = challan.items || [];
-    const totalUnits = items.reduce((sum, it) => sum + (it.qty || it.dispatchedQty || it.quantity || 1), 0);
+    const totalUnits = items.reduce((sum, it) => sum + (Number(it.qty || it.dispatchedQty || it.quantity) || 1), 0);
+    const soRef = challan.soRef || challan.salesOrderRef || '';
+    const consigneeAddress = addressLines(challan.shippingAddress
+        || resolvePartyAddresses?.(challan.customerId, challan.customer)?.shipping);
 
     return (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
@@ -63,22 +67,20 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                                    {companyShort}
-                                </div>
+                                {companyShort && (
+                                    <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
+                                        {companyShort}
+                                    </div>
+                                )}
                                 <div>
                                     <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
                                         {companyName}
                                     </h1>
-                                    <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                                        Steel Fabrication & MS Table Manufacturing
-                                    </p>
                                 </div>
                             </div>
-                            {/* [PHASE-2E.1] GSTIN now flows from companyProfile (was US-8849201-CORP) */}
                             <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                                <p>{companyAddress}</p>
-                                <p>Tax Registration / GSTIN: {gstin || '—'}{pan ? ` • PAN: ${pan}` : ''} • Logistics Desk: {phone}</p>
+                                {companyAddress && <p>{companyAddress}</p>}
+                                {taxLine && <p>{taxLine}</p>}
                             </div>
                         </div>
 
@@ -92,12 +94,16 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                 <p className="text-xs text-slate-600">
                                     Dispatch Date: <strong className="text-slate-900">{challan.date || new Date().toLocaleDateString('en-GB')}</strong>
                                 </p>
-                                <p className="text-xs text-slate-600">
-                                    Linked Sales Order: <strong className="text-slate-900">{challan.soRef || challan.salesOrderRef || 'SO-2026-004'}</strong>
-                                </p>
-                                <p className="text-xs text-blue-700 font-semibold">
-                                    Waybill / LR #: {challan.lrNumber || 'LR-88392-EXP'}
-                                </p>
+                                {soRef && (
+                                    <p className="text-xs text-slate-600">
+                                        Linked Sales Order: <strong className="text-slate-900">{soRef}</strong>
+                                    </p>
+                                )}
+                                {challan.lrNumber && (
+                                    <p className="text-xs text-blue-700 font-semibold">
+                                        Waybill / LR #: {challan.lrNumber}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Status Badge */}
@@ -116,10 +122,8 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                                 SHIPPER / DISPATCH FROM
                             </span>
-                            <p className="text-sm font-bold text-slate-900">Evenmore Logistics Hub Dock 14B</p>
-                            <p className="text-slate-600 text-[11px]">452 Industrial Parkway, Bay A-1</p>
-                            <p className="text-slate-500 text-[11px]">Seattle, WA 98101 • United States</p>
-                            <p className="text-slate-500 text-[11px]">Dispatch Supervisor: Central Hub Controller</p>
+                            <p className="text-sm font-bold text-slate-900">{companyName || '—'}</p>
+                            {companyAddress && <p className="text-slate-600 text-[11px]">{companyAddress}</p>}
                         </div>
 
                         {/* Consignee */}
@@ -127,10 +131,10 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                                 CONSIGNEE / SHIP TO
                             </span>
-                            <p className="text-sm font-bold text-slate-900">{challan.customer || 'Client Organization'}</p>
-                            <p className="text-slate-600 text-[11px]">Commercial Delivery Destination</p>
-                            <p className="text-slate-500 text-[11px]">Destination Dock / Unloading Bay</p>
-                            <p className="text-slate-500 text-[11px]">Receiving Contact: Authorized Warehouse Clerk</p>
+                            <p className="text-sm font-bold text-slate-900">{challan.customer || '—'}</p>
+                            {consigneeAddress.map((line, i) => (
+                                <p key={i} className="text-slate-600 text-[11px]">{line}</p>
+                            ))}
                         </div>
                     </div>
 
@@ -138,19 +142,19 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                     <div className="grid grid-cols-4 gap-3 bg-slate-100/70 p-3 rounded-lg border border-slate-200 text-[11px]">
                         <div>
                             <span className="text-[10px] font-bold uppercase text-slate-400 block">Transporter / Fleet</span>
-                            <strong className="text-slate-900">{challan.transporter || 'Express Line Freight Logistics'}</strong>
+                            <strong className="text-slate-900">{challan.transporter || '—'}</strong>
                         </div>
                         <div>
                             <span className="text-[10px] font-bold uppercase text-slate-400 block">Vehicle / Container #</span>
-                            <strong className="font-mono text-slate-900">{challan.vehicleNumber || 'WA-982-TRK'}</strong>
+                            <strong className="font-mono text-slate-900">{challan.vehicleNumber || challan.vehicleNo || '—'}</strong>
                         </div>
                         <div>
                             <span className="text-[10px] font-bold uppercase text-slate-400 block">Driver Name</span>
-                            <strong className="text-slate-900">{challan.driverName || 'David Miller'}</strong>
+                            <strong className="text-slate-900">{challan.driverName || '—'}</strong>
                         </div>
                         <div>
                             <span className="text-[10px] font-bold uppercase text-slate-400 block">Driver Contact</span>
-                            <strong className="font-mono text-slate-900">{challan.driverPhone || '+1 (555) 902-3341'}</strong>
+                            <strong className="font-mono text-slate-900">{challan.driverPhone || '—'}</strong>
                         </div>
                     </div>
 
@@ -170,14 +174,7 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                             <tbody className="divide-y divide-slate-200">
                                 {items.length === 0 ? (
                                     <tr>
-                                        <td className="py-2.5 px-3 text-center font-mono">1</td>
-                                        <td className="py-2.5 px-3">
-                                            <p className="font-bold text-slate-900">Commercial Consignment Batch</p>
-                                        </td>
-                                        <td className="py-2.5 px-3 text-center font-mono text-slate-600">SN-2026-PKG-01</td>
-                                        <td className="py-2.5 px-3 text-center font-mono font-bold">1 Unit</td>
-                                        <td className="py-2.5 px-3 text-center text-slate-600">Secure Crate</td>
-                                        <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">Verified OK</td>
+                                        <td colSpan={6} className="py-4 px-3 text-center text-slate-400 italic">No line items on this challan.</td>
                                     </tr>
                                 ) : (
                                     items.map((it, idx) => {
@@ -192,16 +189,16 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                                     )}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-mono text-slate-600">
-                                                    {it.serialNumber || `SN-${String(idx + 1).padStart(4, '0')}`}
+                                                    {it.serialNumber || '—'}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
                                                     {qty} {it.unit || 'Units'}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center text-slate-600">
-                                                    {it.packaging || 'Crate / Box'}
+                                                    {it.packaging || '—'}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center text-emerald-700 font-bold">
-                                                    Verified (100%)
+                                                    {it.qcStatus || ''}
                                                 </td>
                                             </tr>
                                         );
@@ -215,9 +212,6 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                     <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
                         <div className="text-slate-600">
                             Total Physical Units Dispatched: <strong className="text-slate-900 font-mono font-bold">{totalUnits} units</strong>
-                        </div>
-                        <div className="text-slate-600">
-                            Consignment Insurance: <strong className="text-emerald-700">100% In-Transit Coverage Registered</strong>
                         </div>
                     </div>
 

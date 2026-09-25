@@ -14,6 +14,7 @@ import {
     pushAction,
     pushConvert,
     pullCompanyProfile,
+    resetTenantData,
     isServerId,
     describeError,
     CHALLAN_TRACK_STATUSES,
@@ -121,28 +122,24 @@ export const ERPProvider = ({ children, }) => {
     const [bankAccounts, setBankAccounts] = useState([]);
     const [journalEntries, setJournalEntries] = useState([]);
     // ── [PHASE-2C] QC quality standards master (steel: dimensional + weight + surface checks)
-    //   Seed rows model Sweven's metal-intake checks; used to guide GRN QC review.
-    const defaultQualityStandards = [
-        { id: 'qs-ms-angle', name: 'MS Angle – Structural', category: 'Structural Steel', checks: ['Dimension tolerance ±2 mm', 'Weight variance within tolerance %', 'Surface: no scale / spalling', 'Check length, leg, thickness, mass'], tolerancePct: 2, active: true },
-        { id: 'qs-chequered', name: 'Chequered Plate – MS', category: 'Flat Steel', checks: ['Thickness per IS 2062', 'Chequer height 1.0–1.4 mm', 'Flatness ≤ 4 mm bow per 1 m', 'Mass per theoretical kg'], tolerancePct: 3, active: true },
-        { id: 'qs-hr-sheet', name: 'HR Sheet / Coil', category: 'Flat Steel', checks: ['Gauge per IS 1079', 'Edges trimmed, no oil stains', 'Width tolerance ±2 mm', 'Weighed on receipt'], tolerancePct: 2, active: true },
-        { id: 'qs-sq-pipe', name: 'Square Pipe – Structural', category: 'Structural Steel', checks: ['Section size per IS 4923', 'Wall thickness ±5%', 'Bend/straightness check', 'Weight variance within tolerance %'], tolerancePct: 2.5, active: true },
-    ];
-    const [qualityStandards, setQualityStandards] = useState(defaultQualityStandards);
+    const [qualityStandards, setQualityStandards] = useState([]);
     const [inventoryMovements, setInventoryMovements] = useState([]);
     const [warranties, setWarranties] = useState([]);
     const [currency, setCurrencyState] = useState(() => {
         return localStorage.getItem('evenmore_currency') || 'INR (₹)';
     });
+    // Filled from /settings/company-profile/ once signed in; empty until then.
     const [companyProfile, setCompanyProfileState] = useState({
-        // [PHASE-2E.1] Sweven demo company default — Maharashtra GSTIN so intra-state
-        //   prints show CGST+SGST split and the letterhead carries GSTIN/PAN/address.
-        //   Editable from Settings → Company Profile. Keep `name` aligned with app branding.
-        name: 'Sweven Fabricators Pvt Ltd',
-        gstin: '27AABCU9912E1Z8',
-        pan: 'AABCU9912E',
-        address: 'Plot 14, MIDC Industrial Area, Waluj, Aurangabad, Maharashtra 431136',
-        phone: '+91 80 4920 1100',
+        name: '',
+        legalName: '',
+        gstin: '',
+        pan: '',
+        address: '',
+        addressParts: {},
+        state: '',
+        stateCode: '',
+        phone: '',
+        email: '',
     });
     const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
@@ -514,13 +511,25 @@ export const ERPProvider = ({ children, }) => {
     };
 
     /**
-     * Discard anything held locally and re-read every collection. What used to
-     * restore a shipped demo set now asks the server, which is the only place
-     * this data exists.
+     * Erase this tenant's business data on the server and start the app over
+     * on the empty database. A full reload is what guarantees no screen or
+     * module store is still holding rows that no longer exist.
      */
-    const resetDemoData = async () => {
-        await refreshFromBackend();
-        showToast('Reloaded from the server.');
+    const resetBusinessData = async () => {
+        if (!isBackendEnabled()) {
+            showToast('Sign in to reset data.');
+            return false;
+        }
+        try {
+            await resetTenantData();
+        } catch (err) {
+            console.error('Failed to reset data:', err);
+            showToast(`Could not reset data — ${describeError(err)}`);
+            return false;
+        }
+        showToast('All business data erased. Reloading…');
+        setTimeout(() => window.location.reload(), 800);
+        return true;
     };
 
     // ---------------- DOMAIN QUERIES ----------------
@@ -597,8 +606,8 @@ export const ERPProvider = ({ children, }) => {
                     date: p.date,
                     type: isWithoutBill ? 'Cash Receipt' : 'With-Bill Pay',
                     reference: isWithoutBill
-                        ? (p.cashReceipt?.receiptNumber || p.receiptNumber || 'CPR-00045')
-                        : (p.paymentNumber || p.receiptNumber || 'PAY-00451'),
+                        ? (p.cashReceipt?.receiptNumber || p.receiptNumber || '')
+                        : (p.paymentNumber || p.receiptNumber || ''),
                     description: isWithoutBill
                         ? `Cash Receipt (Without Bill) - ${p.description || p.reference || 'Cash Settlement'}`
                         : `Settlement against ${p.invoiceNumber || 'Invoice'} via ${p.mode || 'Bank'} (${p.reference || 'Ref'})`,
@@ -617,7 +626,7 @@ export const ERPProvider = ({ children, }) => {
                     id: `led-cpr-${r.id}`,
                     date: r.date,
                     type: 'Cash Receipt',
-                    reference: r.receiptNumber || 'CPR-00045',
+                    reference: r.receiptNumber || '',
                     description: `Cash Receipt (Without Bill) - ${r.description || r.referenceNumber || 'Cash Settlement'}`,
                     debit: 0,
                     credit: Number(r.amount) || 0,
@@ -822,7 +831,7 @@ export const ERPProvider = ({ children, }) => {
             itemSku: mov.itemSku,
             itemName: mov.itemName,
             locationId: mov.locationId || 'loc-1',
-            locationName: mov.locationName || 'Main Central Hub',
+            locationName: mov.locationName || '',
             type: mov.type,
             quantity: mov.quantity,
             unitCost: mov.unitCost || 0,
@@ -871,19 +880,19 @@ export const ERPProvider = ({ children, }) => {
                 `RMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
             date: newPart.date || getCurrentDateFormatted(),
             product: newPart.product || 'Unknown Hardware Item',
-            sku: newPart.sku || 'SKU-GEN-01',
-            serialNumber: newPart.serialNumber || 'SN-UNKNOWN',
+            sku: newPart.sku || '',
+            serialNumber: newPart.serialNumber || '',
             qty: newPart.qty || 1,
-            vendor: newPart.vendor || 'Direct Vendor',
+            vendor: newPart.vendor || '',
             status: 'Reported',
-            notes: newPart.notes || 'Defect reported.',
-            initiatedBy: newPart.initiatedBy || 'System Admin',
+            notes: newPart.notes || '',
+            initiatedBy: newPart.initiatedBy || '',
             timeline: [
                 {
                     id: 'tl-1',
                     title: 'Fault Reported',
                     timestamp: `${newPart.date || getCurrentDateFormatted()} • Just now`,
-                    description: newPart.notes || 'Diagnostic logs attached.',
+                    description: newPart.notes || '',
                     status: 'completed',
                 },
                 {
@@ -1002,8 +1011,8 @@ export const ERPProvider = ({ children, }) => {
                     id: `item-${Date.now()}`,
                     description: 'Standard Order Merchandise',
                     qty: 1,
-                    rate: newInvoice.subtotal || newInvoice.total || 1000,
-                    amount: newInvoice.subtotal || newInvoice.total || 1000,
+                    rate: newInvoice.subtotal || newInvoice.total || 0,
+                    amount: newInvoice.subtotal || newInvoice.total || 0,
                 },
             ];
 
@@ -1068,7 +1077,7 @@ export const ERPProvider = ({ children, }) => {
             id: newInvoice.id || `inv-${Date.now()}`,
             invoiceNumber: newInvoice.invoiceNumber || `INV-2026-${String(invoices.length + 101).padStart(3, '0')}`,
             customerId: newInvoice.customerId || cust?.id,
-            customer: newInvoice.customer || cust?.name || 'Acme Corp',
+            customer: newInvoice.customer || cust?.name || '',
             billingAddress,
             shippingAddress,
             linkedSo: newInvoice.linkedSo || newInvoice.salesOrderId,
@@ -1505,7 +1514,7 @@ export const ERPProvider = ({ children, }) => {
 
     // ── PROFORMA INVOICES ACTIONS ──────────────────────────────────────────────
     const addProformaInvoice = (pi) => {
-        const subtotal = Number(pi.subtotal) || (pi.items ? pi.items.reduce((sum, it) => sum + (Number(it.rate || 0) * Number(it.qty || 1)), 0) : 0) || 5000;
+        const subtotal = Number(pi.subtotal) || (pi.items ? pi.items.reduce((sum, it) => sum + (Number(it.rate || 0) * Number(it.qty || 1)), 0) : 0) || 0;
         const discountTotal = Number(pi.discountTotal) || 0;
         const taxableAmount = Math.max(0, subtotal - discountTotal);
         const cgst = pi.cgst !== undefined ? Number(pi.cgst) : Math.round(taxableAmount * 0.09 * 100) / 100;
@@ -1524,7 +1533,7 @@ export const ERPProvider = ({ children, }) => {
             id: pi.id || `pi-${Date.now()}`,
             proformaNumber: nextNumber,
             customerId: pi.customerId,
-            customer: pi.customer || 'Acme Corp',
+            customer: pi.customer || '',
             customerContact: pi.customerContact || '',
             billingAddress: pi.billingAddress || null,
             shippingAddress: pi.shippingAddress || null,
@@ -1594,7 +1603,7 @@ export const ERPProvider = ({ children, }) => {
 
             const invoicePayload = {
                 customerId: pi.customerId,
-                customer: pi.customer || 'Acme Corp',
+                customer: pi.customer || '',
                 billingAddress: newPI.billingAddress,
                 shippingAddress: newPI.shippingAddress,
                 proformaInvoiceId: newPI.id,
@@ -1625,7 +1634,7 @@ export const ERPProvider = ({ children, }) => {
         if ((pi.createCashReceiptNow || cashAmt > 0) && cashAmt > 0) {
             const createdCash = addPaymentIn({
                 customerId: pi.customerId,
-                customer: pi.customer || 'Acme Corp',
+                customer: pi.customer || '',
                 amount: cashAmt,
                 mode: pi.cashMode || 'Cash',
                 paymentType: 'WITHOUT_BILL',
@@ -1729,7 +1738,7 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: createAddressSnapshot(pi.billingAddress),
             shippingAddress: createAddressSnapshot(pi.shippingAddress),
             salesOrderId: pi.salesOrderId,
-            linkedSo: pi.linkedSo || (pi.salesOrderId ? `SO-2026-${String(invoices.length + 101).padStart(4, '0')}` : 'Direct Proforma'),
+            linkedSo: pi.linkedSo || (pi.salesOrderId ? (salesOrders.find((so) => so.id === pi.salesOrderId)?.orderNumber || '') : 'Direct Proforma'),
             proformaInvoiceId: pi.id,
             linkedPi: pi.proformaNumber,
             date: getCurrentDateFormatted(),
@@ -1777,18 +1786,18 @@ export const ERPProvider = ({ children, }) => {
             id: `req-${Date.now()}`,
             requestNumber: newReq.requestNumber ||
                 `#REQ-${Math.floor(8000 + Math.random() * 900)}`,
-            requestedBy: newReq.requestedBy || 'Sarah Jenkins',
-            avatarInitials: newReq.avatarInitials || 'SJ',
-            product: newReq.product || 'Standard Spare Component',
-            sku: newReq.sku || 'SKU-STD-01',
+            requestedBy: newReq.requestedBy || '',
+            avatarInitials: newReq.avatarInitials || String(newReq.requestedBy || '').split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase(),
+            product: newReq.product || '',
+            sku: newReq.sku || '',
             qty: newReq.qty || 1,
             zone: newReq.zone || 'Zone A',
             targetSector: newReq.targetSector || 'Zone A (Main)',
             date: newReq.date || getCurrentDateFormatted(),
             submittedAt: newReq.submittedAt || 'Submitted just now',
             status: 'Requested',
-            notes: newReq.notes || 'Emergency requisition.',
-            warehouseStock: newReq.warehouseStock || 50,
+            notes: newReq.notes || '',
+            warehouseStock: newReq.warehouseStock ?? 0,
             managerSignoffNeeded: true,
         };
         setZoneRequests((prev) => [req, ...prev]);
@@ -1872,7 +1881,7 @@ export const ERPProvider = ({ children, }) => {
             reorderLevel: item.reorderLevel ?? 5,
             costPrice: item.costPrice ?? 50,
             sellingPrice: item.sellingPrice ?? 90,
-            location: item.location || 'Main Central Warehouse',
+            location: item.location || '',
             status: isService ? 'Optimal' : (calculatedQty <= (item.reorderLevel ?? 5) / 2 ? 'Critical' : calculatedQty <= (item.reorderLevel ?? 5) ? 'Low Stock' : 'Optimal'),
             customFieldValues: item.customFieldValues || {},
         };
@@ -1991,8 +2000,8 @@ export const ERPProvider = ({ children, }) => {
             code: p.code || `PARTY-${String(parties.length + 1).padStart(3, '0')}`,
             type: p.type || 'Customer',
             name: p.name || 'New Enterprise Partner',
-            phone: p.phone || '+1 (555) 000-0000',
-            email: p.email || 'billing@partner.com',
+            phone: p.phone || '',
+            email: p.email || '',
             gstTreatment: p.gstTreatment || 'Registered Business',
             gstin: p.gstin || '',
             placeOfSupply: p.placeOfSupply || 'Maharashtra (27)',
@@ -2011,20 +2020,8 @@ export const ERPProvider = ({ children, }) => {
             accountHolderName: p.accountHolderName || '',
             openingBalance: p.openingBalance ?? 0,
             balance: p.balance ?? (p.openingBalance ?? 0),
-            billingAddress: p.billingAddress || {
-                line1: 'Corporate Headquarters',
-                line2: '',
-                city: 'Mumbai',
-                state: 'Maharashtra',
-                pincode: '400001',
-            },
-            shippingAddress: p.shippingAddress || {
-                line1: 'Corporate Headquarters',
-                line2: '',
-                city: 'Mumbai',
-                state: 'Maharashtra',
-                pincode: '400001',
-            },
+            billingAddress: p.billingAddress || { line1: '', line2: '', city: '', state: '', pincode: '' },
+            shippingAddress: p.shippingAddress || { line1: '', line2: '', city: '', state: '', pincode: '' },
             contacts: p.contacts && p.contacts.length > 0 ? p.contacts : [
                 { id: `cnt-${Date.now()}`, name: p.name || 'Primary POC', role: 'Business Executive', phone: p.phone || '', email: p.email || '' },
             ],
@@ -2178,9 +2175,9 @@ export const ERPProvider = ({ children, }) => {
             id: cust.id || `cust-${Date.now()}`,
             code: cust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
             name: cust.name || 'New Client Account',
-            contactPerson: cust.contactPerson || 'Account Executive',
-            email: cust.email || 'billing@client.com',
-            phone: cust.phone || '+1 (555) 000-0000',
+            contactPerson: cust.contactPerson || '',
+            email: cust.email || '',
+            phone: cust.phone || '',
             balance: cust.balance ?? 0,
             creditLimit: cust.creditLimit ?? 25000,
             status: cust.status || 'Active',
@@ -2215,8 +2212,8 @@ export const ERPProvider = ({ children, }) => {
                 balance: newCust.balance ?? 0,
                 creditLimit: newCust.creditLimit ?? 25000,
                 status: newCust.status || 'Active',
-                billingAddress: { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
-                shippingAddress: { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+                billingAddress: { line1: '', city: '', state: '', pincode: '' },
+                shippingAddress: { line1: '', city: '', state: '', pincode: '' },
                 contacts: [{ id: `cnt-${Date.now()}`, name: newCust.contactPerson || newCust.name, role: 'Primary Contact', phone: newCust.phone, email: newCust.email }],
             };
             return [newParty, ...prev];
@@ -2242,9 +2239,9 @@ export const ERPProvider = ({ children, }) => {
             code: ven.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
             name: ven.name || 'New Supplier Entity',
             category: ven.category || 'Direct Hardware',
-            contactPerson: ven.contactPerson || 'Vendor Rep',
-            email: ven.email || 'sales@vendor.com',
-            phone: ven.phone || '+1 (555) 000-0000',
+            contactPerson: ven.contactPerson || '',
+            email: ven.email || '',
+            phone: ven.phone || '',
             balance: ven.balance ?? 0,
             paymentTerms: ven.paymentTerms || 'Net 30',
             status: ven.status || 'Active',
@@ -2280,8 +2277,8 @@ export const ERPProvider = ({ children, }) => {
                 balance: newVendor.balance ?? 0,
                 paymentTerms: newVendor.paymentTerms || 'Net 30',
                 status: newVendor.status || 'Active',
-                billingAddress: { line1: 'Supplier Facility', city: 'Delhi', state: 'Delhi', pincode: '110001' },
-                shippingAddress: { line1: 'Supplier Facility', city: 'Delhi', state: 'Delhi', pincode: '110001' },
+                billingAddress: { line1: '', city: '', state: '', pincode: '' },
+                shippingAddress: { line1: '', city: '', state: '', pincode: '' },
                 contacts: [{ id: `cnt-${Date.now()}`, name: newVendor.contactPerson || newVendor.name, role: 'Sales Contact', phone: newVendor.phone, email: newVendor.email }],
             };
             return [newParty, ...prev];
@@ -2330,13 +2327,13 @@ export const ERPProvider = ({ children, }) => {
 
     const addEstimate = (est) => {
         const estAmount = est.amount ||
-            (est.items ? est.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+            (est.items ? est.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
         const defaultAddresses = resolvePartyAddresses(est.customerId, est.customer);
         const newEst = {
             id: est.id || `est-${Date.now()}`,
             estimateNumber: est.estimateNumber || `EST-2026-${String(estimates.length + 1).padStart(3, '0')}`,
             customerId: est.customerId,
-            customer: est.customer || 'Acme Corp',
+            customer: est.customer || '',
             billingAddress: createAddressSnapshot(est.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(est.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(est.date || 'Today'),
@@ -2412,7 +2409,7 @@ export const ERPProvider = ({ children, }) => {
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
-            customer: quote.customer || 'Acme Corp',
+            customer: quote.customer || '',
             billingAddress: createAddressSnapshot(quote.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(quote.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(quote.date || 'Today'),
@@ -2594,7 +2591,7 @@ export const ERPProvider = ({ children, }) => {
     };
     const addSalesOrder = (order) => {
         const orderAmt = order.amount ||
-            (order.items ? order.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+            (order.items ? order.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
         const totalSalesVal = order.totalSalesValue !== undefined ? Number(order.totalSalesValue) : orderAmt;
         const formalInvoiceAmt = order.formalInvoiceAmount !== undefined ? Number(order.formalInvoiceAmount) : 0;
         const cashAmt = order.cashAmount !== undefined ? Number(order.cashAmount) : 0;
@@ -2622,7 +2619,7 @@ export const ERPProvider = ({ children, }) => {
             sourceEstimateId: order.sourceEstimateId,
             sourceEstimateNumber: order.sourceEstimateNumber,
             customerId: order.customerId,
-            customer: order.customer || 'Acme Corp',
+            customer: order.customer || '',
             billingAddress: createAddressSnapshot(order.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(order.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(order.date || 'Today'),
@@ -2659,7 +2656,7 @@ export const ERPProvider = ({ children, }) => {
 
             const invoicePayload = {
                 customerId: order.customerId,
-                customer: order.customer || 'Acme Corp',
+                customer: order.customer || '',
                 billingAddress: newOrder.billingAddress,
                 shippingAddress: newOrder.shippingAddress,
                 salesOrderId: newOrder.id,
@@ -2690,7 +2687,7 @@ export const ERPProvider = ({ children, }) => {
         if ((order.createCashReceiptNow || cashAmt > 0) && cashAmt > 0) {
             const createdCash = addPaymentIn({
                 customerId: order.customerId,
-                customer: order.customer || 'Acme Corp',
+                customer: order.customer || '',
                 amount: cashAmt,
                 mode: order.cashMode || 'Cash',
                 paymentType: 'WITHOUT_BILL',
@@ -2883,10 +2880,10 @@ export const ERPProvider = ({ children, }) => {
                     description: `Fulfillment of ${order.orderNumber}`,
                     name: `Fulfillment of ${order.orderNumber}`,
                     qty: 1,
-                    rate: order.amount ?? 1000,
+                    rate: order.amount ?? 0,
                     discount: 0,
                     tax: 18,
-                    amount: order.amount ?? 1000,
+                    amount: order.amount ?? 0,
                 },
             ];
 
@@ -2966,10 +2963,10 @@ export const ERPProvider = ({ children, }) => {
             sourceQuotationNumber: challan.sourceQuotationNumber,
             leadId: challan.leadId,
             dealId: challan.dealId,
-            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
-            linkedSo: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
+            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || '',
+            linkedSo: challan.salesOrderNumber || challan.linkedSo || '',
             customerId: challan.customerId,
-            customer: challan.customer || 'Acme Corp',
+            customer: challan.customer || '',
             billingAddress: createAddressSnapshot(challan.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(challan.shippingAddress) || defaultAddresses.shipping,
             date: challan.date || getCurrentISODate(),
@@ -3349,11 +3346,11 @@ export const ERPProvider = ({ children, }) => {
             customerId: custId,
             customer: custName,
             invoiceId: targetInv?.id || pay.invoiceId,
-            invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || 'INV-2026-001',
+            invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || '',
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'Bank Transfer',
             amount: payAmt,
-            reference: pay.reference || 'WIRE-49821',
+            reference: pay.reference || '',
             description: pay.description || '',
             notes: pay.notes || '',
             status: 'Paid',
@@ -3663,11 +3660,11 @@ export const ERPProvider = ({ children, }) => {
             id: ret.id || `sr-${Date.now()}`,
             returnNumber: ret.returnNumber || `SR-2026-${String(salesReturns.length + 13).padStart(3, '0')}`,
             customerId: ret.customerId || inv?.customerId,
-            customer: ret.customer || inv?.customer || 'Cyberdyne Systems',
+            customer: ret.customer || inv?.customer || '',
             billingAddress: createAddressSnapshot(ret.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(ret.shippingAddress) || defaultAddresses.shipping,
             invoiceId: ret.invoiceId || inv?.id,
-            invoiceRef: ret.invoiceRef || inv?.invoiceNumber || 'INV-2026-002',
+            invoiceRef: ret.invoiceRef || inv?.invoiceNumber || '',
             date: ret.date || getCurrentDateFormatted(),
             amount: totalAmount,
             reason: ret.reason || 'Customer Return',
@@ -3806,14 +3803,14 @@ export const ERPProvider = ({ children, }) => {
     const addPurchaseOrder = (po) => {
         const poLines = po.items || po.lineItems || [];
         const poAmt = po.amount ||
-            (poLines.length > 0 ? poLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 2500;
+            (poLines.length > 0 ? poLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
         const defaultAddresses = resolveVendorPartyAddresses(po.vendorId, po.vendor);
         const newPo = {
             id: po.id || `po-${Date.now()}`,
             poNumber: po.poNumber ||
                 `PO-2026-${String(purchaseOrders.length + 201).padStart(4, '0')}`,
             vendorId: po.vendorId,
-            vendor: po.vendor || 'Arrow Electronics Supply',
+            vendor: po.vendor || '',
             billingAddress: createAddressSnapshot(po.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(po.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(po.date || 'Today'),
@@ -3937,7 +3934,7 @@ export const ERPProvider = ({ children, }) => {
                 amount: Math.round(l.remainingQty * (l.rate || 0) * 100) / 100,
             }));
 
-        const billAmt = billLines.reduce((sum, it) => sum + (it.amount || it.qty * (it.rate || 0)), 0) || (po.amount ?? 5000);
+        const billAmt = billLines.reduce((sum, it) => sum + (it.amount || it.qty * (it.rate || 0)), 0) || (po.amount ?? 0);
         const defaultAddresses = resolveVendorPartyAddresses(po.vendorId, po.vendor);
         const newBill = {
             id: `pb-${Date.now()}`,
@@ -4046,17 +4043,17 @@ export const ERPProvider = ({ children, }) => {
     const addPurchaseBill = (bill) => {
         const billLines = bill.items || bill.lineItems || [];
         const billAmt = bill.total || bill.amount ||
-            (billLines.length > 0 ? billLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+            (billLines.length > 0 ? billLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
         const defaultAddresses = resolveVendorPartyAddresses(bill.vendorId, bill.vendor);
         const newBill = {
             id: bill.id || `pb-${Date.now()}`,
             billNumber: bill.billNumber ||
                 `PB-2026-${String(purchaseBills.length + 16).padStart(3, '0')}`,
             purchaseOrderId: bill.purchaseOrderId,
-            poRef: bill.poRef || 'PO-2026-0210',
-            linkedPo: bill.linkedPo || bill.poRef || 'PO-2026-0210',
+            poRef: bill.poRef || '',
+            linkedPo: bill.linkedPo || bill.poRef || '',
             vendorId: bill.vendorId,
-            vendor: bill.vendor || 'Cisco Systems Direct',
+            vendor: bill.vendor || '',
             billingAddress: createAddressSnapshot(bill.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(bill.shippingAddress) || defaultAddresses.shipping,
             billDate: bill.billDate || getCurrentDateFormatted(),
@@ -4393,7 +4390,7 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Vendor bill marked as ${status}.`);
     };
     const addPaymentOut = (pay) => {
-        const payAmt = Number(pay.amount) || 1000;
+        const payAmt = Number(pay.amount) || 0;
         // ── [PHASE-2D] Payment classification: Advance (against PO, no bill yet) vs Final/Bill ──
         // Old code always treated the disbursement as a bill settlement. Sweven releases
         //   advances to suppliers (steel on credit) which later adjust against the bill.
@@ -4426,9 +4423,9 @@ export const ERPProvider = ({ children, }) => {
             voucherNumber: pay.voucherNumber ||
                 `VOU-2026-${String(paymentOuts.length + 93).padStart(3, '0')}`,
             vendorId: pay.vendorId || targetBill?.vendorId,
-            vendor: pay.vendor || targetBill?.vendor || 'Arrow Electronics Supply',
+            vendor: pay.vendor || targetBill?.vendor || '',
             billId: isAdvance ? undefined : (pay.billId || targetBill?.id),
-            billNumber: isAdvance ? undefined : (pay.billNumber || targetBill?.billNumber || 'PB-2026-015'),
+            billNumber: isAdvance ? undefined : (pay.billNumber || targetBill?.billNumber || ''),
             // [PHASE-2D] link advances to the purchase order they fund
             poId: pay.poId || targetPo?.id,
             poNumber: pay.poNumber || targetPo?.poNumber,
@@ -4437,7 +4434,7 @@ export const ERPProvider = ({ children, }) => {
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'ACH',
             amount: payAmt,
-            reference: pay.reference || 'ACH-994821',
+            reference: pay.reference || '',
             status: 'Paid',
         };
         setPaymentOuts((prev) => [newPay, ...prev]);
@@ -4670,15 +4667,7 @@ export const ERPProvider = ({ children, }) => {
         return newTr;
     };
     // ── [PHASE-2E] Budgets master: planned amounts by account/category ──
-    const defaultBudgets = [
-        { id: 'bud-rent', name: 'Office & Warehouse Rent', category: 'Facility', annualAmount: 360000, account: '5020 - Rent', active: true },
-        { id: 'bud-salary', name: 'Staff Salaries', category: 'Payroll', annualAmount: 2400000, account: '5010 - Salaries', active: true },
-        { id: 'bud-raw', name: 'Raw Material (MS Steel)', category: 'COGS', annualAmount: 5000000, account: '5030 - Raw Material', active: true },
-        { id: 'bud-utilities', name: 'Electricity & Power', category: 'Utilities', annualAmount: 480000, account: '5040 - Utilities', active: true },
-        { id: 'bud-freight', name: 'Freight & Logistics', category: 'Logistics', annualAmount: 720000, account: '5050 - Freight', active: true },
-        { id: 'bud-office', name: 'Office & Admin Supplies', category: 'Admin', annualAmount: 120000, account: '5060 - Office Supplies', active: true },
-    ];
-    const [budgets, setBudgets] = useState(defaultBudgets);
+    const [budgets, setBudgets] = useState([]);
     const addBudget = (b) => {
         const newB = { id: b.id || `bud-${Date.now()}`, name: b.name || 'New Budget', category: b.category || 'General', annualAmount: Number(b.annualAmount) || 0, account: b.account || '5xxx - Expense', active: b.active !== false };
         setBudgets((prev) => [newB, ...prev]);
@@ -4728,7 +4717,7 @@ export const ERPProvider = ({ children, }) => {
         }
 
         const calculatedTotal = returnLines.reduce((sum, it) => sum + it.amount, 0);
-        const retAmt = calculatedTotal > 0 ? calculatedTotal : (ret.amount ?? 500);
+        const retAmt = calculatedTotal > 0 ? calculatedTotal : (ret.amount ?? 0);
         const defaultAddresses = resolveVendorPartyAddresses(ret.vendorId || bill?.vendorId, ret.vendor || bill?.vendor);
 
         const newDebit = {
@@ -4736,11 +4725,11 @@ export const ERPProvider = ({ children, }) => {
             debitNoteNumber: ret.debitNoteNumber ||
                 `DN-2026-${String(purchaseReturns.length + 10).padStart(3, '0')}`,
             vendorId: ret.vendorId || bill?.vendorId,
-            vendor: ret.vendor || bill?.vendor || 'Delta Controls & Hydraulics',
+            vendor: ret.vendor || bill?.vendor || '',
             billingAddress: createAddressSnapshot(ret.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(ret.shippingAddress) || defaultAddresses.shipping,
             billId: ret.billId || bill?.id,
-            billRef: ret.billRef || bill?.billNumber || 'PB-2026-015',
+            billRef: ret.billRef || bill?.billNumber || '',
             date: ret.date || getCurrentDateFormatted(),
             amount: retAmt,
             reason: ret.reason || 'Damaged goods on intake inspection',
@@ -4878,8 +4867,8 @@ export const ERPProvider = ({ children, }) => {
                 `EXP-2026-${String(expenses.length + 119).padStart(3, '0')}`,
             category: exp.category || 'Logistics',
             date: exp.date || getCurrentDateFormatted(),
-            payee: exp.payee || 'Freight Logistics Inc',
-            amount: exp.amount ?? 150,
+            payee: exp.payee || '',
+            amount: exp.amount ?? 0,
             paidVia: exp.paidVia || 'Corporate Card',
             taxDeductible: exp.taxDeductible ?? true,
         };
@@ -4913,7 +4902,7 @@ export const ERPProvider = ({ children, }) => {
             type: loc.type || 'Assembly Bay',
             capacityPct: loc.capacityPct ?? 15,
             totalSkus: 0,
-            manager: loc.manager || 'Operations Lead',
+            manager: loc.manager || '',
         };
         setLocations((prev) => [...prev, newLoc]);
         showToast(`Location ${newLoc.name} established.`);
@@ -4925,13 +4914,13 @@ export const ERPProvider = ({ children, }) => {
             id: tr.id || `tr-${Date.now()}`,
             transferNumber: tr.transferNumber || `TR-${Math.floor(9900 + Math.random() * 90)}`,
             sourceLocationId: tr.sourceLocationId,
-            sourceLocation: tr.sourceLocation || 'Main Central Warehouse',
+            sourceLocation: tr.sourceLocation || '',
             destLocationId: tr.destLocationId,
-            destLocation: tr.destLocation || 'Assembly Bay Zone A',
+            destLocation: tr.destLocation || '',
             date: tr.date || getCurrentDateFormatted(),
             itemsCount: tr.itemsCount ?? 1,
             status: tr.status || 'In Transit',
-            shippedBy: tr.shippedBy || 'Logistics Clerk',
+            shippedBy: tr.shippedBy || '',
             items: tr.items || [],
         };
         setTransfers((prev) => [newTr, ...prev]);
@@ -4982,12 +4971,12 @@ export const ERPProvider = ({ children, }) => {
         const newUsage = {
             id: usage.id || `su-${Date.now()}`,
             ticketNumber: usage.ticketNumber || `TKT-${Math.floor(9000 + Math.random() * 900)}`,
-            technician: usage.technician || 'Liam Vance',
+            technician: usage.technician || '',
             itemId: usage.itemId,
-            sku: usage.sku || 'CAB-6-01',
+            sku: usage.sku || '',
             qtyUsed: usage.qtyUsed ?? 1,
             date: usage.date || getCurrentDateFormatted(),
-            purpose: usage.purpose || 'Rack cabling replacement',
+            purpose: usage.purpose || '',
         };
         setServiceUsages((prev) => [newUsage, ...prev]);
         // Record SERVICE_USAGE movement
@@ -5014,8 +5003,8 @@ export const ERPProvider = ({ children, }) => {
             id: acc.id || `ba-${Date.now()}`,
             accountName: acc.accountName || 'Operating Account',
             bankName: acc.bankName || 'Commercial Bank',
-            accountNumber: acc.accountNumber || `•••• ${Math.floor(1000 + Math.random() * 9000)}`,
-            balance: acc.balance ?? 10000,
+            accountNumber: acc.accountNumber || '',
+            balance: acc.balance ?? 0,
             currency: acc.currency || 'USD',
         };
         setBankAccounts((prev) => [...prev, newAcc]);
@@ -5031,7 +5020,7 @@ export const ERPProvider = ({ children, }) => {
             reference: entry.reference || 'MANUAL-ADJ',
             debitAccount: entry.debitAccount || '1010 - Cash & Bank',
             creditAccount: entry.creditAccount || '4010 - Sales Revenue',
-            amount: entry.amount ?? 1000,
+            amount: entry.amount ?? 0,
             status: 'Posted',
         };
         setJournalEntries((prev) => [newEntry, ...prev]);
@@ -5460,7 +5449,7 @@ export const ERPProvider = ({ children, }) => {
             addServiceUsage,
             addBankAccount,
             addJournalEntry,
-            resetDemoData: resetDatabaseToDefaults,
+            resetBusinessData,
             exportDatabaseSnapshot,
             importDatabaseSnapshot,
             resetDatabaseToDefaults,

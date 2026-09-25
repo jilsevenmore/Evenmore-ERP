@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, Check } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
+import { useAppStore } from '../../stores/appStore';
 export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
+    const { vendors = [] } = useERP();
+    const currentUser = useAppStore((s) => s.currentUser);
     const [product, setProduct] = useState('');
-    const [vendor, setVendor] = useState('Cisco Direct');
+    const [vendor, setVendor] = useState('');
     const [serialNumber, setSerialNumber] = useState('');
     const [qty, setQty] = useState(1);
     const [notes, setNotes] = useState('');
@@ -27,11 +31,11 @@ export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
             vendor,
             serialNumber,
             qty: Number(qty) || 1,
-            notes: notes.trim() || 'Initiated by System Admin via Faulty Parts Loop.',
+            notes: notes.trim(),
             status: 'Reported',
             date: formattedDate,
             rmaNumber: randomRMA,
-            initiatedBy: 'System Admin',
+            initiatedBy: currentUser?.name || '',
         });
         onClose();
     };
@@ -92,13 +96,8 @@ export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
               Vendor / Distributor
             </label>
             <select value={vendor} onChange={(e) => setVendor(e.target.value)} className="w-full border border-[#CED4DA] rounded px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-[#1F2E4A] bg-white">
-              <option value="Cisco Direct">Cisco Direct</option>
-              <option value="Dell Technologies">Dell Technologies</option>
-              <option value="CDW">CDW</option>
-              <option value="Grainger">Grainger</option>
-              <option value="Ingram Micro">Ingram Micro</option>
-              <option value="Tech Data">Tech Data</option>
-              <option value="Arrow Electronics">Arrow Electronics</option>
+              <option value="">{vendors.length === 0 ? 'No vendors yet' : 'Select vendor'}</option>
+              {vendors.map((v) => (<option key={v.id || v.name} value={v.name}>{v.name}</option>))}
             </select>
           </div>
 

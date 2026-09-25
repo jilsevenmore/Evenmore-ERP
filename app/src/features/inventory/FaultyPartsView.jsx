@@ -3,7 +3,7 @@ import { Plus, Printer, Edit2, CheckCircle2, Truck, X, Save, FileText } from 'lu
 import { ReportFaultyModal } from './ReportFaultyModal';
 import { PrintLabelModal } from './PrintLabelModal';
 export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdatePartNotes, searchTerm = '', }) => {
-    const [selectedPartId, setSelectedPartId] = useState(parts[0]?.id || 'fp-1');
+    const [selectedPartId, setSelectedPartId] = useState(parts[0]?.id || '');
     const [isReportModalOpen, setIsReportModalOpen] = useState(false);
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
     const [isEditNotesModalOpen, setIsEditNotesModalOpen] = useState(false);
@@ -142,7 +142,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
               {selectedPart.product}
             </h3>
             <p className="text-sm text-[#343A40] mt-1 font-mono text-xs">
-              S/N: {selectedPart.serialNumber} • Qty: {selectedPart.qty}
+              S/N: {selectedPart.serialNumber || '—'} • Qty: {selectedPart.qty ?? selectedPart.quantity ?? 0}
             </p>
 
             <div className="flex gap-2 mt-4">
@@ -175,14 +175,13 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                 <div className="timeline-dot completed"/>
                 <div className="pl-3">
                   <div className="text-xs text-[#343A40] mb-0.5">
-                    {selectedPart.date} • 09:41 AM
+                    {selectedPart.date || selectedPart.reportedOn || '—'}
                   </div>
                   <div className="font-semibold text-[#1F2E4A] text-sm">
                     Fault Reported
                   </div>
                   <div className="text-xs text-[#343A40] mt-1.5 bg-[#F8F9FA] p-2.5 rounded border border-[#CED4DA] leading-relaxed">
-                    {selectedPart.notes ||
-                'Port 12-24 failing PoE negotiation. Diagnostic logs attached. Initiated by System Admin.'}
+                    {selectedPart.notes || selectedPart.reason || 'No diagnostic notes recorded.'}
                   </div>
                 </div>
               </div>
@@ -201,7 +200,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                   <div className="text-xs text-[#343A40] mb-0.5">
                     {selectedPart.status === 'Reported'
                 ? 'Pending Action'
-                : 'Shipped Oct 25, 2023'}
+                : selectedPart.shippedDate ? `Shipped ${selectedPart.shippedDate}` : 'Shipped'}
                   </div>
                   <div className="font-semibold text-[#1F2E4A] text-sm">
                     Ship to Vendor
@@ -211,9 +210,9 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                         <Truck className="w-3.5 h-3.5"/>
                         Mark as Shipped
                       </button>
-                    </div>) : (<p className="text-xs text-[#5a6062] mt-1">
-                      Carrier: FedEx Logistics (Tracking: FX-90812301)
-                    </p>)}
+                    </div>) : ((selectedPart.carrier || selectedPart.trackingNumber) ? (<p className="text-xs text-[#5a6062] mt-1">
+                      {[selectedPart.carrier && `Carrier: ${selectedPart.carrier}`, selectedPart.trackingNumber && `Tracking: ${selectedPart.trackingNumber}`].filter(Boolean).join(' • ')}
+                    </p>) : null)}
                 </div>
               </div>
 
@@ -227,8 +226,8 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                 <div className="pl-3">
                   <div className="text-xs text-[#343A40] mb-0.5">
                     {selectedPart.status === 'Sent for Replacement'
-                ? 'In Review • ETA 3 days'
-                : 'Expected: Oct 28, 2023'}
+                ? 'In Review'
+                : selectedPart.status === 'Reported' ? 'Pending Shipment' : 'Completed'}
                   </div>
                   <div className="font-semibold text-[#1F2E4A] text-sm">
                     Vendor Assessment

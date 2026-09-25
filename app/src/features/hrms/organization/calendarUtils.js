@@ -162,8 +162,9 @@ export function exportEventsToICS(events, calendarName = "HRMS-Calendar") {
   ];
 
   events.forEach((ev) => {
-    const startStr = ev.startDate || ev.date || "2024-10-01";
-    const endStr = ev.endDate || ev.startDate || ev.date || "2024-10-01";
+    const fallback = new Date().toISOString().slice(0, 10);
+    const startStr = ev.startDate || ev.date || fallback;
+    const endStr = ev.endDate || ev.startDate || ev.date || fallback;
     const icsStart = formatICSDate(startStr, ev.time);
     const icsEnd = formatICSDate(endStr, ev.time);
 

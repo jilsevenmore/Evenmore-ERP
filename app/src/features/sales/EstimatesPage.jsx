@@ -97,7 +97,7 @@ export const EstimatesPage = () => {
             sourceEstimateId: estimate.id,
             sourceEstimateNumber: estimate.estimateNumber,
             customerId: cust?.id || '',
-            customer: cust?.name || estimate.customer || 'Client Account',
+            customer: cust?.name || estimate.customer || '',
             leadId: estimate.leadId || '',
             leadName: estimate.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -234,12 +234,12 @@ export const EstimatesPage = () => {
             id: `est-${Date.now()}`,
             estimateNumber: `EST-2026-${String(estimates.length + 3).padStart(3, '0')}`,
             customerId: cust?.id || '',
-            customer: cust?.name || 'Acme Corp',
+            customer: cust?.name || '',
             leadId: leadRequest?.leadId || '',
             leadName: leadRequest?.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             validUntil: validUntil || '15 Days',
-            amount: computedTotal > 0 ? computedTotal : 1500,
+            amount: computedTotal,
             status: 'Draft',
             items: lineItems,
         };
@@ -334,7 +334,7 @@ export const EstimatesPage = () => {
                                     >
                                         {customers.map((c) => (
                                             <option key={c.id} value={c.id}>
-                                                {c.name} ({c.code}) - Balance: ₹{c.balance.toFixed(2)}
+                                                {c.name}{c.code ? ` (${c.code})` : ''} - Balance: ₹{Number(c.balance || 0).toFixed(2)}
                                             </option>
                                         ))}
                                     </select>
@@ -343,13 +343,13 @@ export const EstimatesPage = () => {
                                             <div className="flex items-center justify-between font-bold text-slate-800">
                                                 <span>{selectedCustomer.name}</span>
                                                 <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                                                    Credit Limit: ₹{(selectedCustomer.creditLimit || 50000).toLocaleString('en-IN')}
+                                                    Credit Limit: {selectedCustomer.creditLimit ? `₹${Number(selectedCustomer.creditLimit).toLocaleString('en-IN')}` : '—'}
                                                 </span>
                                             </div>
                                             <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                                                <span>POC: <strong>{selectedCustomer.contactPerson || 'Account Lead'}</strong></span>
-                                                <span>Email: {selectedCustomer.email}</span>
-                                                <span>Phone: {selectedCustomer.phone}</span>
+                                                <span>POC: <strong>{selectedCustomer.contactPerson || '—'}</strong></span>
+                                                <span>Email: {selectedCustomer.email || '—'}</span>
+                                                <span>Phone: {selectedCustomer.phone || '—'}</span>
                                                 <span>Outstanding: ₹{(selectedCustomer.balance || 0).toLocaleString('en-IN')}</span>
                                             </div>
                                         </div>

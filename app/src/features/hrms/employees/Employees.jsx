@@ -1,102 +1,13 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { hrmsSync } from "../../../services/hrmsSync";
 
-const MOCK_EMPLOYEES = [
-  {
-    id: "EMP1024",
-    name: "Priya Patel",
-    email: "priya.p@company.com",
-    designation: "Senior Engineer",
-    department: "Engineering",
-    location: "Bangalore",
-    joining: "Mar 15, 2022",
-    status: "Active",
-    img: "https://randomuser.me/api/portraits/women/44.jpg",
-  },
-  {
-    id: "EMP1025",
-    name: "Marcus Chen",
-    email: "marcus.c@company.com",
-    designation: "Lead Designer",
-    department: "Design",
-    location: "Mumbai",
-    joining: "Jan 10, 2021",
-    status: "Active",
-    img: "https://randomuser.me/api/portraits/men/32.jpg",
-  },
-  {
-    id: "EMP1026",
-    name: "Liam Cooper",
-    email: "liam.c@company.com",
-    designation: "DevOps Engineer",
-    department: "Engineering",
-    location: "Bangalore",
-    joining: "Jun 01, 2023",
-    status: "On Leave",
-    img: "https://randomuser.me/api/portraits/men/75.jpg",
-  },
-  {
-    id: "EMP1027",
-    name: "Elena Rostova",
-    email: "elena.r@company.com",
-    designation: "Brand Strategist",
-    department: "Marketing",
-    location: "Delhi",
-    joining: "Aug 20, 2022",
-    status: "Active",
-    img: "https://randomuser.me/api/portraits/women/68.jpg",
-  },
-  {
-    id: "EMP1028",
-    name: "James Wilson",
-    email: "james.w@company.com",
-    designation: "Finance Manager",
-    department: "Finance",
-    location: "Mumbai",
-    joining: "Feb 14, 2020",
-    status: "Probation",
-    img: "https://randomuser.me/api/portraits/men/54.jpg",
-  },
-  {
-    id: "EMP1029",
-    name: "Sophia Lindqvist",
-    email: "sophia.l@company.com",
-    designation: "System Architect",
-    department: "Engineering",
-    location: "Bangalore",
-    joining: "Nov 05, 2023",
-    status: "Active",
-    img: "https://randomuser.me/api/portraits/women/33.jpg",
-  },
-  {
-    id: "EMP1030",
-    name: "Tariq Al-Mansoor",
-    email: "tariq.a@company.com",
-    designation: "People Ops Lead",
-    department: "HR",
-    location: "Hyderabad",
-    joining: "Jul 18, 2023",
-    status: "Active",
-    img: "https://randomuser.me/api/portraits/men/46.jpg",
-  },
-  {
-    id: "EMP1031",
-    name: "Ayesha Khan",
-    email: "ayesha.k@company.com",
-    designation: "Product Manager",
-    department: "Operations",
-    location: "Delhi",
-    joining: "Jan 03, 2020",
-    status: "Active",
-    img: "https://randomuser.me/api/portraits/women/24.jpg",
-  },
-];
+const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "" };
 
-const DEPARTMENTS = ["All", "Engineering", "Design", "Marketing", "Finance", "HR", "Operations", "Sales"];
 const STATUSES = ["All", "Active", "On Leave", "Probation"];
 
 const statusStyles = {
@@ -125,13 +36,21 @@ export default function Employees() {
     }));
   }, [storeEmployees]);
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    designation: "Senior Engineer",
-    dept: "Engineering",
-    location: "Mumbai",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
+
+  const [orgDepartments, setOrgDepartments] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    hrmsSync.pull("departments").then((rows) => {
+      if (!cancelled && rows) setOrgDepartments(rows.map((d) => d.name).filter(Boolean));
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const DEPARTMENTS = useMemo(
+    () => ["All", ...new Set([...orgDepartments, ...employees.map((e) => e.department).filter(Boolean)])],
+    [orgDepartments, employees]
+  );
 
   const filtered = useMemo(
     () =>
@@ -158,13 +77,11 @@ export default function Employees() {
       location: form.location,
       joining: new Date().toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" }),
       status: "Active",
-      avatar: `https://randomuser.me/api/portraits/${employees.length % 2 === 0 ? "women" : "men"}/${(employees.length * 7) % 90}.jpg`,
-      img: `https://randomuser.me/api/portraits/${employees.length % 2 === 0 ? "women" : "men"}/${(employees.length * 7) % 90}.jpg`,
     };
     addStoreEmployee(next);
     setToast("Employee added successfully.");
     setShowForm(false);
-    setForm({ name: "", email: "", designation: "Senior Engineer", dept: "Engineering", location: "Mumbai" });
+    setForm(EMPTY_FORM);
   }
 
   function handleDelete(id, name) {
@@ -461,20 +378,24 @@ export default function Employees() {
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Department</label>
-              <select
-                className="form-select"
+              <input
+                className="form-input"
+                list="emp-dept-options"
+                placeholder="Enter department"
                 value={form.dept}
                 onChange={(e) => setForm({ ...form, dept: e.target.value })}
-              >
+              />
+              <datalist id="emp-dept-options">
                 {DEPARTMENTS.slice(1).map((d) => (
-                  <option key={d}>{d}</option>
+                  <option key={d} value={d} />
                 ))}
-              </select>
+              </datalist>
             </div>
             <div className="form-group">
               <label className="form-label">Designation</label>
               <input
                 className="form-input"
+                placeholder="Enter designation"
                 value={form.designation}
                 onChange={(e) => setForm({ ...form, designation: e.target.value })}
               />
@@ -484,6 +405,7 @@ export default function Employees() {
             <label className="form-label">Location</label>
             <input
               className="form-input"
+              placeholder="Enter location"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
             />

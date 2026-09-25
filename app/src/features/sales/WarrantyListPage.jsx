@@ -122,7 +122,7 @@ export const WarrantyListPage = () => {
             render: (w) => (
                 <div>
                     <strong className="text-text block font-bold">{w.customerName}</strong>
-                    <span className="font-mono text-[10px] text-muted">{w.customerCode || 'CUST'}</span>
+                    {w.customerCode && <span className="font-mono text-[10px] text-muted">{w.customerCode}</span>}
                 </div>
             ),
         },
@@ -135,9 +135,9 @@ export const WarrantyListPage = () => {
                 const otherCount = (w.items?.length || 1) - 1;
                 return (
                     <div>
-                        <span className="font-semibold text-text block">{firstItem.name || 'Industrial Equipment'}</span>
+                        <span className="font-semibold text-text block">{firstItem.name || '—'}</span>
                         <div className="flex items-center gap-1.5 text-[10px] text-muted font-mono">
-                            <span>SKU: {firstItem.sku || 'SKU'}</span>
+                            <span>SKU: {firstItem.sku || '—'}</span>
                             {otherCount > 0 && (
                                 <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1 rounded font-bold">
                                     +{otherCount} more

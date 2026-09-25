@@ -19,11 +19,37 @@ function formatAmount(value) {
 }
 
 function getStatusTone(status) {
-  const normalized = status.toLowerCase();
+  const normalized = String(status || "").toLowerCase();
   if (normalized.includes("qualified")) return "green";
   if (normalized.includes("contact")) return "blue";
   if (normalized.includes("lost") || normalized.includes("junk")) return "red";
   return "pink";
+}
+
+function displayPhone(phone) {
+  const value = String(phone || "").trim();
+  if (!value) return "";
+  return value.startsWith("+") ? value : `+91 ${value}`;
+}
+
+function displayAddress(lead) {
+  return [lead?.address, lead?.city, lead?.state, lead?.country].filter(Boolean).join(", ");
+}
+
+/**
+ * Where a lead sits on the illustrated map: an explicit `mapX`/`mapY`, else its
+ * saved coordinates projected onto the drawing. Leads without either get no pin.
+ */
+function mapPosition(lead) {
+  const num = (v) => (v === null || v === undefined || v === "" ? NaN : Number(v));
+  const x = num(lead?.mapX);
+  const y = num(lead?.mapY);
+  if (Number.isFinite(x) && Number.isFinite(y)) return { x, y };
+  const lat = num(lead?.latitude);
+  const lng = num(lead?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const clamp = (v) => Math.min(95, Math.max(3, v));
+  return { x: clamp(38 + (lng - 72.57) * 23), y: clamp(16 + (23.02 - lat) * 14.2) };
 }
 
 export default function LeadMapView({
@@ -83,6 +109,10 @@ export default function LeadMapView({
   }
 
   const showDetailPane = Boolean(activeLead) && detailClosedId !== activeLead.id;
+  const pinnedRows = rows
+    .map((row) => ({ row, pos: mapPosition(row) }))
+    .filter((entry) => entry.pos);
+  const activePos = activeLead ? mapPosition(activeLead) : null;
 
   return (
     <section className="leads-map-page">
@@ -97,6 +127,9 @@ export default function LeadMapView({
           </div>
 
           <div className="leads-map-listing">
+            {pagedRows.length === 0 && (
+              <p style={{ padding: "16px", fontSize: 12, color: "#94a3b8" }}>No leads to show.</p>
+            )}
             {pagedRows.map((row) => (
               <div
                 key={row.id}
@@ -116,9 +149,9 @@ export default function LeadMapView({
                 >
                   <LeadAvatar lead={row} className="leads-map-list-avatar" />
                   <div className="leads-map-list-copy">
-                    <strong>{row.name.replace(" (Sample)", "")}</strong>
+                    <strong>{row.name}</strong>
                     <span>{row.company}</span>
-                    <small>{row.city}, {row.state}</small>
+                    <small>{[row.city, row.state].filter(Boolean).join(", ")}</small>
                   </div>
                   <b className={`leads-map-list-amount ${getStatusTone(row.status)}`}>
                     {formatAmount(row.amount)}
@@ -211,12 +244,12 @@ export default function LeadMapView({
             <div className="map-route map-route-three" />
             <div className="map-route map-route-four" />
 
-            {rows.map((row, index) => (
+            {pinnedRows.map(({ row, pos }) => (
               <button
                 key={row.id}
                 type="button"
                 className={`leads-map-marker-pro ${getStatusTone(row.status)}`}
-                style={{ left: `${row.mapX}%`, top: `${row.mapY}%` }}
+                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                 onClick={() => selectLead(row.id)}
                 aria-label={`Show ${row.name} on map`}
               >
@@ -224,26 +257,25 @@ export default function LeadMapView({
                   <LeadAvatar lead={row} className="leads-map-marker-avatar" />
                 </span>
                 <span className="leads-map-marker-pill">{formatAmount(row.amount)}</span>
-                {index === 1 && <span className="leads-map-cluster-bubble">3</span>}
               </button>
             ))}
 
-            {activeLead && (
+            {activeLead && activePos && (
               <div
                 className="leads-map-info-card"
-                style={{ left: `min(calc(${activeLead.mapX}% + 4%), calc(100% - 260px))`, top: `calc(${activeLead.mapY}% + 2%)` }}
+                style={{ left: `min(calc(${activePos.x}% + 4%), calc(100% - 260px))`, top: `calc(${activePos.y}% + 2%)` }}
               >
                 <div className="leads-map-info-head">
                   <LeadAvatar lead={activeLead} className="leads-map-info-avatar" />
                   <div>
-                    <strong>{activeLead.name.replace(" (Sample)", "")}</strong>
+                    <strong>{activeLead.name}</strong>
                     <span>{activeLead.company}</span>
                   </div>
                 </div>
                 <ul className="leads-map-info-list">
-                  <li><MapPin size={14} /> 123, {activeLead.city} Industrial Estate, {activeLead.state}, {activeLead.country}</li>
-                  <li><Phone size={14} /> +91 {activeLead.phone}</li>
-                  <li><Mail size={14} /> {activeLead.email}</li>
+                  {displayAddress(activeLead) && <li><MapPin size={14} /> {displayAddress(activeLead)}</li>}
+                  {displayPhone(activeLead.phone) && <li><Phone size={14} /> {displayPhone(activeLead.phone)}</li>}
+                  {activeLead.email && <li><Mail size={14} /> {activeLead.email}</li>}
                 </ul>
                 <button type="button" className="leads-map-link-btn" onClick={() => onOpenLead(activeLead)}>
                   View Details
@@ -277,7 +309,7 @@ export default function LeadMapView({
               <div className="leads-map-detail-profile">
                 <LeadAvatar lead={activeLead} className="leads-map-detail-avatar" />
                 <div>
-                  <strong>{activeLead.name.replace(" (Sample)", "")}</strong>
+                  <strong>{activeLead.name}</strong>
                   <span>{activeLead.company}</span>
                 </div>
               </div>
@@ -288,16 +320,16 @@ export default function LeadMapView({
               </div>
 
               <ul className="leads-map-detail-contact">
-                <li><Phone size={15} /> +91 {activeLead.phone}</li>
-                <li><Mail size={15} /> {activeLead.email}</li>
-                <li><MapPin size={15} /> 123, {activeLead.city}, {activeLead.state}, {activeLead.country}</li>
+                <li><Phone size={15} /> {displayPhone(activeLead.phone) || "—"}</li>
+                <li><Mail size={15} /> {activeLead.email || "—"}</li>
+                <li><MapPin size={15} /> {displayAddress(activeLead) || "—"}</li>
               </ul>
 
               <div className="leads-map-detail-grid">
                 <div><span>Lead Source</span><strong>{activeLead.source}</strong></div>
                 <div><span>Assigned User</span><strong>{activeLead.owner}</strong></div>
                 <div><span>Created On</span><strong>{activeLead.createdOn}</strong></div>
-                <div><span>Pipeline</span><strong>Sales</strong></div>
+                <div><span>Pipeline</span><strong>{activeLead.pipeline || "Sales"}</strong></div>
               </div>
 
               <button type="button" className="btn-primary leads-map-detail-primary" onClick={() => onOpenLead(activeLead)}>

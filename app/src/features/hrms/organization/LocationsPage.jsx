@@ -6,16 +6,9 @@ import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Plus, MapPin, Search, Edit2, Trash2, Globe, Building } from 'lucide-react';
 
-const INITIAL_LOCATIONS = [
-  { id: 'LOC-01', name: 'Headquarters — New York', address: '350 5th Avenue, New York, NY 10118', timezone: 'EST • UTC-5', count: 342, type: 'Headquarters' },
-  { id: 'LOC-02', name: 'London Regional Office', address: '1 Canada Square, Canary Wharf, London E14 5AB', timezone: 'GMT • UTC+0', count: 128, type: 'Branch' },
-  { id: 'LOC-03', name: 'Dubai Operations Hub', address: 'DIFC Gate Precinct 4, Level 12, Dubai, UAE', timezone: 'GST • UTC+4', count: 84, type: 'Branch' },
-  { id: 'LOC-04', name: 'Distributed / Remote', address: 'Global remote workforce across 14 countries', timezone: 'Multiple Zones', count: 694, type: 'Remote' },
-];
-
 export function LocationsPage() {
   const showToast = useAppStore((s) => s.showToast);
-  const [locations, setLocations] = useState(INITIAL_LOCATIONS);
+  const [locations, setLocations] = useState([]);
   const [q, setQ] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newLoc, setNewLoc] = useState({ name: '', address: '', timezone: 'EST • UTC-5', type: 'Branch' });
@@ -25,7 +18,7 @@ export function LocationsPage() {
     (async () => {
       try {
         const rows = await hrmsSync.pull('locations');
-        if (active && Array.isArray(rows) && rows.length > 0) {
+        if (active && Array.isArray(rows)) {
           setLocations(rows);
         }
       } catch (err) {
@@ -112,6 +105,11 @@ export function LocationsPage() {
 
       {/* Grid of Location Cards */}
       <div className="grid md:grid-cols-2 gap-5">
+        {filtered.length === 0 && (
+          <div className="md:col-span-2 bg-white border border-bdr rounded-xl p-8 text-center text-muted text-[13px]">
+            {locations.length === 0 ? 'No locations yet. Add your first office or workspace.' : 'No locations match your search.'}
+          </div>
+        )}
         {filtered.map((l) => (
           <div
             key={l.id}
@@ -162,7 +160,7 @@ export function LocationsPage() {
                 {l.timezone}
               </span>
               <span className="px-2.5 py-1 bg-off border border-bdr rounded-full text-slate-700 font-medium">
-                {l.count} staff members
+                {l.count ?? 0} staff members
               </span>
             </div>
           </div>

@@ -28,7 +28,7 @@ const useDocumentStoreBase = create((set, get) => ({
     const newDoc = {
       id: `DOC-${String(count).padStart(3, "0")}`,
       version: "v1.0",
-      fileSize: "1.1 MB",
+      fileSize: "",
       fileType: "PDF",
       updatedOn: new Date().toISOString().slice(0, 10),
       status: "Valid",

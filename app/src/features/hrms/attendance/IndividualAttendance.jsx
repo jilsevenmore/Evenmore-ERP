@@ -6,60 +6,37 @@ import Modal from "../../../components/ui/Modal";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
-const DEFAULT_EMPLOYEES = [
-  {
-    id: "EMP1024",
-    name: "Priya Patel",
-    designation: "Senior Engineer",
-    dept: "Engineering",
-    manager: "David Park",
-    status: "Active",
-    avatar: "https://randomuser.me/api/portraits/women/44.jpg",
-  },
-  {
-    id: "EMP1025",
-    name: "Marcus Chen",
-    designation: "Lead Designer",
-    dept: "Design",
-    manager: "David Park",
-    status: "Active",
-    avatar: "https://randomuser.me/api/portraits/men/32.jpg",
-  },
-  {
-    id: "EMP1026",
-    name: "Liam Cooper",
-    designation: "DevOps Engineer",
-    dept: "Engineering",
-    manager: "David Park",
-    status: "On Leave",
-    avatar: "https://randomuser.me/api/portraits/men/75.jpg",
-  },
-  {
-    id: "EMP1027",
-    name: "Sarah Wilson",
-    designation: "Brand Strategist",
-    dept: "Marketing",
-    manager: "David Park",
-    status: "Active",
-    avatar: "https://randomuser.me/api/portraits/women/68.jpg",
-  },
-];
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const THIS_YEAR = new Date().getFullYear();
+const YEARS = Array.from({ length: 5 }, (_, i) => String(THIS_YEAR - i));
 
-const MONTHS = ["October", "September", "August", "July", "June", "May"];
-const YEARS = ["2024", "2023"];
+function parseRecordDate(value) {
+  if (!value) return null;
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  m = /^(\d{2})\/(\d{2})\/(\d{4})/.exec(value);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
-const SAMPLE_RECORDS = [
-  { date: "01 Oct 2024", day: "Tue", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "Flexible", status: "Present", remarks: "—" },
-  { date: "02 Oct 2024", day: "Wed", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "General", status: "Present", remarks: "—" },
-  { date: "03 Oct 2024", day: "Thu", checkIn: "09:18", checkOut: "18:04", workHours: "08:32", shift: "General", status: "Late", remarks: "Grace 10 min" },
-  { date: "04 Oct 2024", day: "Fri", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "Flexible", status: "Present", remarks: "—" },
-  { date: "05 Oct 2024", day: "Sat", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "General", status: "WFH", remarks: "—" },
-  { date: "06 Oct 2024", day: "Sun", checkIn: "—", checkOut: "—", workHours: "—", shift: "General", status: "Absent", remarks: "—" },
-  { date: "07 Oct 2024", day: "Mon", checkIn: "09:02", checkOut: "18:04", workHours: "08:32", shift: "Flexible", status: "Present", remarks: "—" },
-  { date: "08 Oct 2024", day: "Tue", checkIn: "09:00", checkOut: "18:00", workHours: "08:30", shift: "General", status: "Present", remarks: "—" },
-  { date: "09 Oct 2024", day: "Wed", checkIn: "09:05", checkOut: "18:10", workHours: "08:35", shift: "General", status: "Present", remarks: "—" },
-  { date: "10 Oct 2024", day: "Thu", checkIn: "—", checkOut: "—", workHours: "—", shift: "General", status: "On Leave", remarks: "Planned Annual" },
-];
+function toHHMM(value) {
+  if (!value) return "—";
+  const m = /(\d{1,2}):(\d{2})/.exec(String(value));
+  return m ? `${m[1].padStart(2, "0")}:${m[2]}` : String(value);
+}
+
+function minutesOf(value) {
+  const m = /(\d{1,2}):(\d{2})/.exec(String(value || ""));
+  return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+}
+
+function workedMinutes(r) {
+  const a = minutesOf(r.checkIn);
+  const b = minutesOf(r.checkOut);
+  return a !== null && b !== null && b > a ? b - a : 0;
+}
 
 const statusStyles = {
   Present: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
@@ -76,54 +53,102 @@ export default function IndividualAttendance() {
   const storeRecords = useAttendanceStore((s) => s.records || []);
   const updateStoreRecord = useAttendanceStore((s) => s.updateRecord);
 
-  const employeesList = useMemo(() => {
-    if (storeEmployees && storeEmployees.length > 0) {
-      return storeEmployees.map((e) => ({
-        id: e.id || `EMP${e.employeeId || "1024"}`,
+  const employeesList = useMemo(
+    () =>
+      (storeEmployees || []).map((e) => ({
+        id: e.id || e.empId || e.employeeId,
+        empId: e.empId || "",
         name: e.name,
         designation: e.designation || e.role || "Employee",
-        dept: e.department || e.dept || "General",
-        manager: e.manager || "HR Manager",
+        dept: e.department || e.dept || "—",
+        manager: e.manager || e.reportingManager || "—",
+        location: e.location || e.workLocation || "—",
         status: e.status || "Active",
         avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
-      }));
-    }
-    return DEFAULT_EMPLOYEES;
-  }, [storeEmployees]);
+      })),
+    [storeEmployees]
+  );
 
-  const [selectedEmpId, setSelectedEmpId] = useState(() => employeesList[0]?.id || "EMP1024");
-  const [selectedMonth, setSelectedMonth] = useState("October");
-  const [selectedYear, setSelectedYear] = useState("2024");
+  const now = new Date();
+  const [selectedEmpId, setSelectedEmpId] = useState(() => employeesList[0]?.id || "");
+  const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
+  const [selectedYear, setSelectedYear] = useState(String(now.getFullYear()));
   const [viewMode, setViewMode] = useState("Table");
 
-  const [records, setRecords] = useState(SAMPLE_RECORDS);
+  const [localEdits, setLocalEdits] = useState({});
   const [editItem, setEditItem] = useState(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   const currentEmp = useMemo(
-    () => employeesList.find((e) => e.id === selectedEmpId) || employeesList[0] || DEFAULT_EMPLOYEES[0],
+    () =>
+      employeesList.find((e) => e.id === selectedEmpId) ||
+      employeesList[0] || {
+        id: "",
+        name: "No employee selected",
+        designation: "—",
+        dept: "—",
+        manager: "—",
+        location: "—",
+        status: "—",
+        avatar: "",
+      },
     [employeesList, selectedEmpId]
   );
 
+  const records = useMemo(() => {
+    if (!currentEmp.id) return [];
+    const monthIdx = MONTHS.indexOf(selectedMonth);
+    const yearNum = Number(selectedYear);
+    return (storeRecords || [])
+      .filter((r) => {
+        const matchesEmp =
+          String(r.employeeId ?? "") === String(currentEmp.id) ||
+          (currentEmp.empId && String(r.id ?? "") === String(currentEmp.empId)) ||
+          String(r.id ?? "") === String(currentEmp.id) ||
+          (currentEmp.name && (r.employee === currentEmp.name || r.name === currentEmp.name));
+        if (!matchesEmp) return false;
+        const d = parseRecordDate(r.date);
+        return d && d.getMonth() === monthIdx && d.getFullYear() === yearNum;
+      })
+      .map((r) => {
+        const d = parseRecordDate(r.date);
+        const key = `${r.id ?? ""}|${r.date}`;
+        const mins = workedMinutes(r);
+        const base = {
+          key,
+          recordId: r.id,
+          sortTime: d.getTime(),
+          date: d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+          day: DAY_NAMES[d.getDay()],
+          checkIn: toHHMM(r.checkIn),
+          checkOut: toHHMM(r.checkOut),
+          workHours: r.workHours || (mins ? `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}` : "—"),
+          shift: r.shift || "General",
+          status: r.status || "Present",
+          remarks: r.remarks || r.notes || "",
+        };
+        return localEdits[key] ? { ...base, ...localEdits[key] } : base;
+      })
+      .sort((a, b) => a.sortTime - b.sortTime);
+  }, [storeRecords, currentEmp, selectedMonth, selectedYear, localEdits]);
+
   const stats = useMemo(() => {
+    const overtimeMins = records.reduce((sum, r) => sum + Math.max(0, workedMinutes(r) - 8 * 60), 0);
     return {
       present: records.filter((r) => r.status === "Present").length,
       absent: records.filter((r) => r.status === "Absent").length,
       late: records.filter((r) => r.status === "Late").length,
       leave: records.filter((r) => r.status === "On Leave").length,
       wfh: records.filter((r) => r.status === "WFH").length,
-      overtime: "6h",
+      overtime: `${Math.round(overtimeMins / 60)}h`,
     };
   }, [records]);
 
   const handleEditSave = () => {
     if (!editItem) return;
-    setRecords((prev) =>
-      prev.map((r) => (r.date === editItem.date ? { ...r, ...editItem } : r))
-    );
-    // If this date corresponds to the active record in store, sync it
-    if (updateStoreRecord) {
-      updateStoreRecord(selectedEmpId, {
+    setLocalEdits((prev) => ({ ...prev, [editItem.key]: { ...editItem } }));
+    if (updateStoreRecord && editItem.recordId !== undefined) {
+      updateStoreRecord(editItem.recordId, {
         checkIn: editItem.checkIn,
         checkOut: editItem.checkOut,
         status: editItem.status,
@@ -157,13 +182,14 @@ export default function IndividualAttendance() {
       <div className="ind-card ind-filter-card">
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <select
-            value={selectedEmpId}
+            value={currentEmp.id}
             onChange={(e) => setSelectedEmpId(e.target.value)}
             className="ind-select ind-select-emp"
           >
+            {employeesList.length === 0 && <option value="">No employees</option>}
             {employeesList.map((e) => (
               <option key={e.id} value={e.id}>
-                {e.name} — {e.id}
+                {e.name} — {e.empId || e.id}
               </option>
             ))}
           </select>
@@ -215,7 +241,7 @@ export default function IndividualAttendance() {
       {/* Hero Employee Card */}
       <div className="ind-card ind-hero-card">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <img src={currentEmp.avatar} alt={currentEmp.name} className="ind-hero-avatar" />
+          {currentEmp.avatar && <img src={currentEmp.avatar} alt={currentEmp.name} className="ind-hero-avatar" />}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111827" }}>
@@ -234,6 +260,7 @@ export default function IndividualAttendance() {
           type="button"
           onClick={() => setShowProfileModal(true)}
           className="ind-btn-view-emp"
+          disabled={!currentEmp.id}
         >
           View Employee
         </button>
@@ -286,8 +313,15 @@ export default function IndividualAttendance() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r, i) => (
-                  <tr key={i}>
+                {records.length === 0 && (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                      No attendance records for {selectedMonth} {selectedYear}.
+                    </td>
+                  </tr>
+                )}
+                {records.map((r) => (
+                  <tr key={r.key}>
                     <td className="ind-date">{r.date}</td>
                     <td style={{ color: "#374151" }}>{r.day}</td>
                     <td className="ind-time">{r.checkIn}</td>
@@ -323,8 +357,13 @@ export default function IndividualAttendance() {
                 {d}
               </div>
             ))}
+            {records.length === 0 && (
+              <div style={{ gridColumn: "1 / -1", textAlign: "center", color: "#6b7280", padding: "24px" }}>
+                No attendance records for {selectedMonth} {selectedYear}.
+              </div>
+            )}
             {records.map((r, i) => (
-              <div key={i} className="ind-cal-cell" onClick={() => setEditItem({ ...r })}>
+              <div key={r.key} className="ind-cal-cell" onClick={() => setEditItem({ ...r })}>
                 <span style={{ fontSize: "11px", fontWeight: 600, color: "#475569" }}>
                   {i + 1}
                 </span>
@@ -415,7 +454,7 @@ export default function IndividualAttendance() {
         }
       >
         <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
-          <img src={currentEmp.avatar} alt={currentEmp.name} style={{ width: 60, height: 60, borderRadius: 999 }} />
+          {currentEmp.avatar && <img src={currentEmp.avatar} alt={currentEmp.name} style={{ width: 60, height: 60, borderRadius: 999 }} />}
           <div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{currentEmp.name}</h3>
             <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b" }}>{currentEmp.id} • {currentEmp.designation}</p>
@@ -425,7 +464,7 @@ export default function IndividualAttendance() {
           <div><strong>Department:</strong> {currentEmp.dept}</div>
           <div><strong>Reporting Manager:</strong> {currentEmp.manager}</div>
           <div><strong>Employment Status:</strong> {currentEmp.status}</div>
-          <div><strong>Work Location:</strong> Bangalore HQ</div>
+          <div><strong>Work Location:</strong> {currentEmp.location}</div>
         </div>
       </Modal>
 

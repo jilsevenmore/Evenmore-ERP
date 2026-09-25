@@ -8,6 +8,8 @@ export default function GenerateOfferModal({
   onSubmit,
 }) {
   const candidates = useRecruitmentStore((s) => s.candidates || []);
+  const jobs = useRecruitmentStore((s) => s.jobs || []);
+  const departmentOptions = [...new Set(jobs.map((j) => j.department).filter(Boolean))];
   const hiredCandidates = candidates.filter(
     (c) => c.stage === "Hired" || c.stage === "Offer"
   );
@@ -19,13 +21,13 @@ export default function GenerateOfferModal({
     email: "",
     position: "",
     jobType: "Full-time",
-    dept: "Engineering",
-    salary: "$95,000 / annum",
-    location: "New York HQ",
+    dept: "",
+    salary: "",
+    location: "",
     workMode: "Hybrid",
     joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
     expiryDate: new Date(Date.now() + 7 * 86400000).toISOString().split("T")[0],
-    reportingManager: "David Park (CTO)",
+    reportingManager: "",
     probationPeriod: "3 Months",
   });
 
@@ -38,13 +40,7 @@ export default function GenerateOfferModal({
 
     const cand = candidates.find((c) => c.id === candId);
     if (cand) {
-      let dept = "Engineering";
-      const pos = cand.position?.toLowerCase() || "";
-      if (pos.includes("design") || pos.includes("ui") || pos.includes("ux")) dept = "Design";
-      else if (pos.includes("hr") || pos.includes("people") || pos.includes("talent")) dept = "HR";
-      else if (pos.includes("finance") || pos.includes("account")) dept = "Finance";
-      else if (pos.includes("marketing") || pos.includes("brand") || pos.includes("sales")) dept = "Sales & Marketing";
-      else if (pos.includes("ops") || pos.includes("operations")) dept = "Operations";
+      const job = jobs.find((j) => j.id === cand.jobId || j.title === cand.position);
 
       setFormData((prev) => ({
         ...prev,
@@ -53,7 +49,8 @@ export default function GenerateOfferModal({
         email: cand.email,
         position: cand.position,
         location: cand.location || prev.location,
-        dept,
+        dept: job?.department || prev.dept,
+        reportingManager: job?.hiringManager || prev.reportingManager,
       }));
     }
   };
@@ -224,20 +221,20 @@ export default function GenerateOfferModal({
               <label className="block font-semibold text-slate-700 mb-1">
                 Department
               </label>
-              <select
+              <input
+                list="gen-offer-depts"
                 value={formData.dept}
                 onChange={(e) =>
                   setFormData({ ...formData, dept: e.target.value })
                 }
+                placeholder="Enter department"
                 className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
-              >
-                <option>Engineering</option>
-                <option>Design</option>
-                <option>HR</option>
-                <option>Finance</option>
-                <option>Sales & Marketing</option>
-                <option>Operations</option>
-              </select>
+              />
+              <datalist id="gen-offer-depts">
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
             </div>
           </div>
 

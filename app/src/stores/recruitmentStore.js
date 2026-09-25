@@ -88,8 +88,8 @@ const useRecruitmentStoreBase = create((set) => ({
 
       const enrichedCand = {
         ...c,
-        jobId: matchedJob?.id || c.jobId || "JOB-001",
-        position: matchedJob?.title || c.position || "Senior Backend Developer",
+        jobId: matchedJob?.id || c.jobId || "",
+        position: matchedJob?.title || c.position || "",
       };
 
       const ns = [enrichedCand, ...st.candidates];

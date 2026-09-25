@@ -100,7 +100,7 @@ export function toggleSelectAll(selected, rows) {
   return allIn ? list.filter((id) => !ids.includes(id)) : [...new Set([...list, ...ids])];
 }
 
-// ── Filtering & Mock Data ────────────────────────────────────────────────
+// ── Filtering ────────────────────────────────────────────────────────────
 
 export function toggleValue(list, value) {
   const arr = Array.isArray(list) ? list : [];
@@ -139,71 +139,58 @@ export function getStatusTone(status) {
   return 'slate';
 }
 
-export function buildUsers(lead) {
-  const owner = lead?.owner || 'David Patel';
-  return [
-    { id: 1, name: owner, role: 'Account Owner', email: 'david@evenmore.io', status: 'Active', color: '#2F6FED', leadCompany: lead?.company },
-    { id: 2, name: 'Priya Mehta', role: 'Sales Executive', email: 'priya@evenmore.io', status: 'Active', color: '#7C3AED', leadCompany: lead?.company },
-    { id: 3, name: 'Rohit Sharma', role: 'Technical Lead', email: 'rohit@evenmore.io', status: 'Active', color: '#059669', leadCompany: lead?.company },
-    { id: 4, name: 'Sarah Chen', role: 'Sales Support Executive', email: 'sarah@evenmore.io', status: 'Active', color: '#EA580C', leadCompany: lead?.company },
-    { id: 5, name: 'Alex Rivera', role: 'BDE', email: 'alex@evenmore.io', status: 'Active', color: '#0891B2', leadCompany: lead?.company },
-  ];
+export function buildUsers(lead, members = []) {
+  const list = [];
+  if (lead?.owner) {
+    list.push({ id: lead.ownerId || 'owner', name: lead.owner, role: 'Account Owner', email: lead.ownerEmail || '', status: 'Active', color: '#2F6FED', leadCompany: lead?.company });
+  }
+  (Array.isArray(members) ? members : []).forEach((m) => {
+    if (!m?.name || list.some((u) => u.name === m.name)) return;
+    list.push({ id: m.id, name: m.name, role: m.role || '', email: m.email || '', status: m.status || 'Active', color: m.color || '#64748B', leadCompany: lead?.company });
+  });
+  return list;
 }
 
-export function buildProducts() {
-  return [
-    { id: 1, name: 'Endoscopy Vision Machine', sku: 'EVM-2026', price: 120000, qty: 1, status: 'Active', category: 'Imaging' },
-    { id: 2, name: 'High-Definition Surgical Monitor 4K', sku: 'MON-4K-01', price: 45000, qty: 1, status: 'Active', category: 'Display' },
-    { id: 3, name: 'Surgical Light Head', sku: 'SLH-09', price: 28000, qty: 1, status: 'Active', category: 'Lighting' },
-  ];
+export function buildProducts(lead) {
+  return Array.isArray(lead?.products) ? lead.products : [];
 }
 
 export function buildSentFiles(lead) {
-  const company = lead?.company || 'Hirapara Industries';
-  const owner = lead?.owner || 'David Patel';
-  return [
-    { id: `file-${lead?.id || 0}-1`, type: 'image', name: `${company} Front Desk.jpg`, size: '2.4 MB', sentOn: 'Aug 26, 2026', sentBy: owner, description: 'Shared for location confirmation.' },
-    { id: `file-${lead?.id || 0}-2`, type: 'document', name: `${company} Product Quotation.pdf`, size: '860 KB', sentOn: 'Aug 28, 2026', sentBy: owner, description: 'Final quotation document.' },
-  ];
+  return Array.isArray(lead?.files) ? lead.files : [];
 }
 
-export function buildDiscussionThreads(lead) {
-  const assignedUsers = buildUsers(lead).slice(0, 4);
-  const leadName = String(lead?.name || 'Lead').replace(' (Sample)', '');
+export function buildDiscussionThreads(lead, members = []) {
+  const assignedUsers = buildUsers(lead, members).slice(0, 4);
+  const leadName = String(lead?.name || 'Lead');
   return [
     {
       id: `lead-${lead?.id || 0}`,
       kind: 'lead',
       name: leadName,
-      subtitle: lead?.company,
+      subtitle: lead?.company || '',
       badge: lead?.status,
-      time: 'Just now',
-      note: `Lead ${leadName} needs a final follow-up.`,
-      messages: [
-        { id: `lead-${lead?.id || 0}-1`, side: 'in', sender: leadName, body: `Hi team, please share the quotation for ${lead?.company}.`, time: '10:30 AM' },
-        { id: `lead-${lead?.id || 0}-2`, side: 'out', sender: 'You', body: 'Quotation draft is ready.', time: '10:42 AM' },
-      ],
+      time: '',
+      note: '',
+      messages: [],
     },
-    ...assignedUsers.map((user, index) => ({
+    ...assignedUsers.map((user) => ({
       id: `user-${lead?.id || 0}-${user.id}`,
       kind: 'user',
       name: user.name,
       subtitle: user.role,
       badge: user.status,
       color: user.color,
-      time: `${index + 1}:1${index} PM`,
-      note: `${user.name} is assigned for support on this lead.`,
-      messages: [
-        { id: `user-${lead?.id || 0}-${user.id}-1`, side: 'in', sender: user.name, body: 'Checked the requirement. Will highlight use cases in the next call.', time: `${index + 1}:1${index} PM` },
-      ],
+      time: '',
+      note: '',
+      messages: [],
     })),
   ];
 }
 
 export function fieldRows(lead = {}) {
   return [
-    ['Company', lead.company || 'Hirapara Industries'],
-    ['Title', lead.jobTitle || 'Managing Director'],
+    ['Company', lead.company || ''],
+    ['Title', lead.jobTitle || ''],
     ['Email', lead.email],
     ['Phone', lead.phone],
     ['Amount', formatAmount(lead.amount)],
@@ -215,7 +202,7 @@ export function addressRows(lead = {}) {
     ['City', lead.city],
     ['State', lead.state],
     ['Country', lead.country],
-    ['Zip Code', `39${4200 + (lead.id || 0)}`],
+    ['Zip Code', lead.zipCode || lead.pincode || ''],
   ];
 }
 

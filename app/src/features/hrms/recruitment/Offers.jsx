@@ -26,7 +26,7 @@ import {
 import OfferLetterModal from "../organization/OfferLetterModal";
 
 export default function Offers() {
-  const { offers, addOffer, updateOffer, candidates, changeStage } = useRecruitmentStore();
+  const { offers, addOffer, updateOffer, candidates, jobs = [], changeStage } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,12 +37,12 @@ export default function Offers() {
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [form, setForm] = useState({
-    candidateId: "CAND-005",
-    job: "HR Manager",
-    salary: "$95,000",
-    joiningDate: "01 Oct 2024",
-    expiry: "15 Sep 2024",
-    benefits: "Health, 401k",
+    candidateId: "",
+    job: "",
+    salary: "",
+    joiningDate: "",
+    expiry: "",
+    benefits: "",
     notes: "",
   });
 
@@ -78,12 +78,12 @@ export default function Offers() {
   function openCreate() {
     setEditing(null);
     setForm({
-      candidateId: "CAND-005",
-      job: "HR Manager",
-      salary: "$95,000",
-      joiningDate: "01 Oct 2024",
-      expiry: "15 Sep 2024",
-      benefits: "Health, 401k",
+      candidateId: "",
+      job: "",
+      salary: "",
+      joiningDate: "",
+      expiry: "",
+      benefits: "",
       notes: "",
     });
     setDrawerOpen(true);
@@ -91,26 +91,21 @@ export default function Offers() {
 
   function handleOpenLetterModal(offerItem) {
     const cand = candidates.find((c) => c.id === offerItem.candidateId);
+    const matchedJob = jobs.find((j) => j.id === cand?.jobId || j.title === offerItem.position);
     setSelectedOfferForLetter({
       id: offerItem.id,
       candidateId: offerItem.candidateId,
       candidateName: offerItem.candidateName,
-      email:
-        cand?.email ||
-        `${String(offerItem.candidateName ?? '').toLowerCase().replace(/\s+/g, ".")}@example.com`,
+      email: cand?.email || "",
       position: offerItem.position,
       jobType: offerItem.jobType || "Full-time",
-      dept: offerItem.position?.includes("Design")
-        ? "Design"
-        : offerItem.position?.includes("HR")
-        ? "HR"
-        : "Engineering",
+      dept: offerItem.dept || matchedJob?.department || "",
       salary: offerItem.salary,
-      location: cand?.location || "New York HQ",
+      location: offerItem.location || cand?.location || "",
       workMode: "Hybrid",
       sentDate: offerItem.sentDate || new Date().toISOString().split("T")[0],
-      joiningDate: offerItem.joiningDate || "01 Oct 2024",
-      reportingManager: "David Park (CTO)",
+      joiningDate: offerItem.joiningDate || "",
+      reportingManager: offerItem.reportingManager || matchedJob?.hiringManager || "",
       probationPeriod: "3 Months",
       status: offerItem.status,
     });
@@ -157,7 +152,7 @@ export default function Offers() {
         avatar: cand.avatar || "https://i.pravatar.cc/100?img=15",
         position: form.job,
         salary: form.salary,
-        sentDate: "09 Sep 2026",
+        sentDate: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
         joiningDate: form.joiningDate,
         status: "Pending",
         expiry: form.expiry,

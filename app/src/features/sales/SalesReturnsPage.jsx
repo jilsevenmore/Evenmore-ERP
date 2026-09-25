@@ -254,11 +254,11 @@ export const SalesReturnsPage = () => {
 
         addSalesReturn({
             customerId: cust?.id || inv?.customerId,
-            customer: inv?.customer || cust?.name || 'Cyberdyne Systems',
+            customer: inv?.customer || cust?.name || '',
             billingAddress: inv?.billingAddress,
             shippingAddress: inv?.shippingAddress,
             invoiceId: inv?.id,
-            invoiceRef: inv?.invoiceNumber || 'INV-2026-002',
+            invoiceRef: inv?.invoiceNumber || '',
             date: getCurrentDateFormatted(),
             amount: Math.round(totalCreditAmount * 100) / 100,
             reason,
@@ -655,7 +655,7 @@ export const SalesReturnsPage = () => {
 
                             <div>
                                 <span className="text-slate-400 text-[10px] uppercase font-semibold block mb-1">Reason for Return</span>
-                                <p className="p-2 bg-slate-50 rounded border border-slate-200 text-slate-700">{viewReturn.reason || 'Client order adjustment'}</p>
+                                <p className="p-2 bg-slate-50 rounded border border-slate-200 text-slate-700">{viewReturn.reason || '—'}</p>
                             </div>
 
                             {/* Line Items */}

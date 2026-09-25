@@ -42,11 +42,37 @@ import {
 import { loadDeals, saveDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
+import { useAppStore } from '../../../stores/appStore';
+import { toISODate } from '../../../utils/dateUtils';
 
 const STAGES = ['Draft', 'Sent', 'Open', 'Won', 'Lost'];
-const PRODUCTS = ['All Products', 'Diamond Jewelry', 'Gold Ornaments', 'Silver Collection', 'Laser Machine', 'CNC Spindle', 'AMC Service'];
-const SOURCES = ['All Sources', 'Website', 'Referral', 'Walk-in', 'Trade Show', 'Cold Call', 'Social Media'];
-const USERS = ['All Users', 'Priya Patel', 'Jayesh Patel', 'Kavita Desai', 'Hetal Patel', 'Rohit Sharma', 'Amit Kumar', 'Utsav Faldu', 'Dr. Meera', 'Ankush Jain', 'Nikhil Patil', 'Mr. Kamlesh Dhumadiya'];
+const DEFAULT_SOURCES = ['Website', 'Referral', 'Walk-in', 'Trade Show', 'Cold Call', 'Social Media'];
+const DATE_RANGES = ['All Time', 'Last 30 Days', 'This Quarter', 'This Year'];
+
+function uniqueLabels(values) {
+  return [...new Set(values.map((v) => String(v || '').trim()).filter(Boolean))];
+}
+
+/** Whether a deal's date falls inside one of the `DATE_RANGES` windows. */
+function inDateRange(deal, range) {
+  if (!range || range === 'All Time') return true;
+  const iso = toISODate(deal.createdAt ? String(deal.createdAt).slice(0, 10) : deal.date);
+  if (!iso) return false;
+  const now = new Date();
+  let start;
+  if (range === 'Last 30 Days') start = new Date(now.getTime() - 30 * 86400000);
+  else if (range === 'This Quarter') start = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+  else if (range === 'This Year') start = new Date(now.getFullYear(), 0, 1);
+  else return true;
+  return iso >= toISODate(start);
+}
+
+function formatCompactINR(value) {
+  const n = Number(value) || 0;
+  if (n >= 10000000) return `₹ ${(n / 10000000).toFixed(2)} Cr`;
+  if (n >= 100000) return `₹ ${(n / 100000).toFixed(1)} Lakh`;
+  return `₹ ${Math.round(n).toLocaleString('en-IN')}`;
+}
 
 const STAGE_STYLES = {
   Draft: {
@@ -124,9 +150,12 @@ function formatStageSummary(totalAmount, count) {
 }
 
 export default function DealsPage() {
-  const { addQuotation, addSalesOrder, customers } = useERP() || {};
+  const { addQuotation, addSalesOrder, customers, items: catalogItems } = useERP() || {};
   const navigate = useNavigate();
   const storeDeals = useCrmStore((s) => s.deals);
+  const teamMembers = useCrmStore((s) => s.teamMembers);
+  const storeSources = useCrmStore((s) => s.sources);
+  const currentUserName = useAppStore((s) => s.currentUser?.name);
   const [deals, setDeals] = useState([]);
 
   useEffect(() => { setDeals(storeDeals); }, [storeDeals]);
@@ -154,7 +183,7 @@ export default function DealsPage() {
   const [selectedStage, setSelectedStage] = useState('All Stages');
   const [selectedSource, setSelectedSource] = useState('All Sources');
   const [selectedUser, setSelectedUser] = useState('All Users');
-  const [dateRange, setDateRange] = useState('01 Sep 2025 - 30 Sep 2025');
+  const [dateRange, setDateRange] = useState('All Time');
   const [viewMode, setViewMode] = useState('kanban');
 
   const [expandedColumns, setExpandedColumns] = useState({});
@@ -185,6 +214,19 @@ export default function DealsPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
+  const PRODUCTS = useMemo(
+    () => ['All Products', ...uniqueLabels([...(catalogItems || []).map((item) => item?.name), ...deals.map((d) => d.product)])],
+    [catalogItems, deals],
+  );
+  const SOURCES = useMemo(
+    () => ['All Sources', ...uniqueLabels([...(storeSources || []).map((src) => src?.name), ...DEFAULT_SOURCES, ...deals.map((d) => d.source)])],
+    [storeSources, deals],
+  );
+  const USERS = useMemo(
+    () => ['All Users', ...uniqueLabels([...(teamMembers || []).map((m) => m?.name), currentUserName, ...deals.map((d) => d.assignedUser)])],
+    [teamMembers, currentUserName, deals],
+  );
+
   const filteredDeals = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return deals.filter((d) => {
@@ -192,26 +234,30 @@ export default function DealsPage() {
       if (selectedStage !== 'All Stages' && d.stage !== selectedStage) return false;
       if (selectedSource !== 'All Sources' && d.source !== selectedSource) return false;
       if (selectedUser !== 'All Users' && d.assignedUser !== selectedUser) return false;
+      if (!inDateRange(d, dateRange)) return false;
       if (q && !`${d.name} ${d.client} ${d.phone} ${d.product}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [deals, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser]);
+  }, [deals, searchQuery, selectedProduct, selectedStage, selectedSource, selectedUser, dateRange]);
 
   const stats = useMemo(() => {
-    const totalDeals = 48;
-    const totalValue = '₹ 1.72 Cr';
-    const wonDeals = 18;
-    const avgDealSize = '₹ 9.6 Lakh';
-    const conversionRate = '37%';
+    const totalDeals = deals.length;
+    const valueSum = deals.reduce((sum, d) => sum + (Number(d.price) || 0), 0);
+    const wonList = deals.filter((d) => d.stage === 'Won');
+    const lostDeals = deals.filter((d) => d.stage === 'Lost').length;
+    const closedDeals = wonList.length + lostDeals;
 
     return {
       totalDeals,
-      totalValue,
-      wonDeals,
-      avgDealSize,
-      conversionRate,
+      totalValue: formatCompactINR(valueSum),
+      wonDeals: wonList.length,
+      avgDealSize: formatCompactINR(totalDeals ? valueSum / totalDeals : 0),
+      conversionRate: `${closedDeals ? Math.round((wonList.length / closedDeals) * 100) : 0}%`,
+      openDeals: totalDeals - closedDeals,
+      wonValue: formatCompactINR(wonList.reduce((sum, d) => sum + (Number(d.price) || 0), 0)),
+      lostDeals,
     };
-  }, []);
+  }, [deals]);
 
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -219,7 +265,7 @@ export default function DealsPage() {
     setSelectedStage('All Stages');
     setSelectedSource('All Sources');
     setSelectedUser('All Users');
-    setDateRange('01 Sep 2025 - 30 Sep 2025');
+    setDateRange('All Time');
     showNotification('Filters reset.');
   };
 
@@ -229,7 +275,7 @@ export default function DealsPage() {
     if (selectedStage !== 'All Stages') count += 1;
     if (selectedSource !== 'All Sources') count += 1;
     if (selectedUser !== 'All Users') count += 1;
-    if (dateRange !== '01 Sep 2025 - 30 Sep 2025') count += 1;
+    if (dateRange !== 'All Time') count += 1;
     return count;
   }, [dateRange, selectedProduct, selectedSource, selectedStage, selectedUser]);
 
@@ -272,7 +318,7 @@ export default function DealsPage() {
       selectedStage !== 'All Stages' ? `Stage: ${selectedStage}` : '',
       selectedSource !== 'All Sources' ? `Source: ${selectedSource}` : '',
       selectedUser !== 'All Users' ? `Assigned User: ${selectedUser}` : '',
-      dateRange !== '01 Sep 2025 - 30 Sep 2025' ? `Date Range: ${dateRange}` : '',
+      dateRange !== 'All Time' ? `Date Range: ${dateRange}` : '',
       searchQuery.trim() ? `Search: ${searchQuery.trim()}` : '',
     ].filter(Boolean);
     const summaryValue = filteredDeals.reduce((sum, deal) => sum + (Number(deal.price) || 0), 0);
@@ -359,10 +405,10 @@ export default function DealsPage() {
       price: deal.price,
       client: deal.client,
       phone: deal.phone,
-      product: deal.product || 'Diamond Jewelry',
+      product: deal.product || '',
       stage: deal.stage || 'Draft',
       source: deal.source || 'Website',
-      assignedUser: deal.assignedUser || 'Priya Patel',
+      assignedUser: deal.assignedUser || '',
       date: deal.date ?? '',
       tag: deal.tag || '',
     });
@@ -486,7 +532,7 @@ export default function DealsPage() {
 
     const quote = addQuotation?.({
       customerId: matchedCustomer?.id,
-      customer: deal.client || matchedCustomer?.name || 'Acme Corp',
+      customer: deal.client || matchedCustomer?.name || '',
       dealId: String(deal.id || ''),
       dealName: deal.name || '',
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -525,7 +571,7 @@ export default function DealsPage() {
 
     const order = addSalesOrder?.({
       customerId: matchedCustomer?.id,
-      customer: deal.client || matchedCustomer?.name || 'Acme Corp',
+      customer: deal.client || matchedCustomer?.name || '',
       dealId: String(deal.id || ''),
       dealName: deal.name || '',
       amount: dealAmount,
@@ -644,38 +690,23 @@ export default function DealsPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <CrmKpiCard label="Total Deals" value={stats.totalDeals} icon={Handshake} tone="blue">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 12%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">{stats.openDeals} open</div>
         </CrmKpiCard>
 
         <CrmKpiCard label="Total Value" value={stats.totalValue} symbol="₹" tone="emerald">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 18%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">across all stages</div>
         </CrmKpiCard>
 
         <CrmKpiCard label="Won Deals" value={stats.wonDeals} icon={Trophy} tone="amber">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 25%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">{stats.wonValue} won</div>
         </CrmKpiCard>
 
         <CrmKpiCard label="Average Deal Size" value={stats.avgDealSize} icon={Clock} tone="purple">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 14%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">per deal</div>
         </CrmKpiCard>
 
         <CrmKpiCard label="Conversion Rate" value={stats.conversionRate} icon={TrendingUp} tone="rose">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 6%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">won of closed ({stats.lostDeals} lost)</div>
         </CrmKpiCard>
       </div>
 
@@ -835,10 +866,9 @@ export default function DealsPage() {
                   onChange={(e) => setDateRange(e.target.value)}
                   className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-700 appearance-none focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="01 Sep 2025 - 30 Sep 2025">01 Sep 2025 - 30 Sep 2025</option>
-                  <option value="Last 30 Days">Last 30 Days</option>
-                  <option value="This Quarter">This Quarter</option>
-                  <option value="This Year">This Year</option>
+                  {DATE_RANGES.map((range) => (
+                    <option key={range} value={range}>{range}</option>
+                  ))}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               </div>
@@ -1328,6 +1358,7 @@ export default function DealsPage() {
                     onChange={(e) => setFormState({ ...formState, product: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
                   >
+                    <option value="">Select product</option>
                     {PRODUCTS.filter((p) => p !== 'All Products').map((p) => (
                       <option key={p} value={p}>
                         {p}
@@ -1373,6 +1404,7 @@ export default function DealsPage() {
                     onChange={(e) => setFormState({ ...formState, assignedUser: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
                   >
+                    <option value="">Select user</option>
                     {USERS.filter((u) => u !== 'All Users').map((u) => (
                       <option key={u} value={u}>
                         {u}

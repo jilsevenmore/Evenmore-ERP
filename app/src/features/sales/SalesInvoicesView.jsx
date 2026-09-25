@@ -50,6 +50,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         getCurrentDateFormatted,
         getCurrentISODate,
         addDaysISO,
+        companyProfile,
     } = useERP();
 
     const [filterText, setFilterText] = useState('');
@@ -72,7 +73,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     // Payment Form state
     const [payAmount, setPayAmount] = useState(0);
     const [payMode, setPayMode] = useState('Bank Transfer');
-    const [payRef, setPayRef] = useState('WIRE-2026');
+    const [payRef, setPayRef] = useState('');
 
     // Create/Edit Invoice Form state
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
@@ -104,11 +105,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const cust = customers.find((c) => c.id === custId) || customers[0];
         const party = parties.find((p) => p.id === custId || p.name?.toLowerCase() === cust?.name?.toLowerCase());
         const bill = party?.billingAddress || cust?.billingAddress || {
-            line1: cust?.address || 'Industrial Area Phase 2',
+            line1: cust?.address || '',
             line2: '',
-            city: cust?.city || 'Mumbai',
-            state: cust?.state || 'Maharashtra',
-            pincode: cust?.pincode || '400001',
+            city: cust?.city || '',
+            state: cust?.state || '',
+            pincode: cust?.pincode || '',
             country: 'India',
         };
         const ship = party?.shippingAddress || cust?.shippingAddress || bill;
@@ -227,23 +228,18 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
         const pi = proformaInvoices.find((p) => p.id === linkedPiId || p.proformaNumber === linkedPiId);
 
-        const pos = party?.placeOfSupply || cust?.placeOfSupply || 'Maharashtra (27)';
-        const isInterState = !pos.toLowerCase().includes('maharashtra') && !pos.includes('27');
+        const pos = party?.placeOfSupply || cust?.placeOfSupply || '';
+        const homeStateCode = companyProfile?.stateCode || '';
+        const homeState = String(companyProfile?.state || '').toLowerCase();
+        const isInterState = Boolean(pos && (homeStateCode || homeState)
+            && !(homeStateCode && pos.includes(homeStateCode))
+            && !(homeState && pos.toLowerCase().includes(homeState)));
 
         let subtotal = 0;
         let discountTotal = 0;
         let totalTax = 0;
 
-        const effectiveItems = lineItems.length > 0 ? lineItems : [
-            {
-                id: `line-${Date.now()}`,
-                description: 'Standard IT Merchandise Fulfillment',
-                qty: 1,
-                rate: 1000,
-                tax: 18,
-                amount: 1000,
-            },
-        ];
+        const effectiveItems = lineItems;
 
         effectiveItems.forEach((it) => {
             const lineSub = Number(it.rate || 0) * Number(it.qty || 1);
@@ -318,7 +314,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const newInvoicePayload = {
             invoiceNumber: nextNumber,
             customerId: cust?.id,
-            customer: cust?.name || 'Acme Corp',
+            customer: cust?.name || '',
             billingAddress,
             shippingAddress: effectiveShipAddress,
             salesOrderId: so?.id,
@@ -1177,14 +1173,14 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 <div>
                                     <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Billed To (Snapshot)</span>
                                     <p className="font-semibold text-slate-800">{selectedInvoice.customer}</p>
-                                    <p className="text-slate-600">{selectedInvoice.billingAddress?.line1 || 'Headquarters'}</p>
-                                    <p className="text-slate-600">{selectedInvoice.billingAddress?.city || 'Mumbai'}, {selectedInvoice.billingAddress?.state || 'Maharashtra'} {selectedInvoice.billingAddress?.pincode}</p>
+                                    <p className="text-slate-600">{selectedInvoice.billingAddress?.line1 || ''}</p>
+                                    <p className="text-slate-600">{[selectedInvoice.billingAddress?.city, selectedInvoice.billingAddress?.state, selectedInvoice.billingAddress?.pincode].filter(Boolean).join(', ')}</p>
                                 </div>
                                 <div>
                                     <span className="font-bold text-slate-700 uppercase text-[10px] text-muted block">Shipped To (Snapshot)</span>
                                     <p className="font-semibold text-slate-800">{selectedInvoice.customer}</p>
-                                    <p className="text-slate-600">{selectedInvoice.shippingAddress?.line1 || selectedInvoice.billingAddress?.line1 || 'Destination Facility'}</p>
-                                    <p className="text-slate-600">{selectedInvoice.shippingAddress?.city || selectedInvoice.billingAddress?.city || 'Mumbai'}, {selectedInvoice.shippingAddress?.state || selectedInvoice.billingAddress?.state || 'Maharashtra'} {selectedInvoice.shippingAddress?.pincode}</p>
+                                    <p className="text-slate-600">{selectedInvoice.shippingAddress?.line1 || selectedInvoice.billingAddress?.line1 || ''}</p>
+                                    <p className="text-slate-600">{[selectedInvoice.shippingAddress?.city || selectedInvoice.billingAddress?.city, selectedInvoice.shippingAddress?.state || selectedInvoice.billingAddress?.state, selectedInvoice.shippingAddress?.pincode].filter(Boolean).join(', ')}</p>
                                 </div>
                             </div>
 
