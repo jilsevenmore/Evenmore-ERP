@@ -12,9 +12,11 @@ import {
     pushUpdate,
     pushDelete,
     pushAction,
+    pushConvert,
     pullCompanyProfile,
     isServerId,
     describeError,
+    CHALLAN_TRACK_STATUSES,
 } from '../services/backendSync';
 // ── [PHASE-2E.1] steel-category → HSN default map (Sweven fabrication master) ──
 //   Falls back to 7216 (angles/shapes/sections) unless the category matches a known steel family.
@@ -452,6 +454,63 @@ export const ERPProvider = ({ children, }) => {
             console.warn(`[ERP] could not delete ${key}:`, err);
             showToast(`Delete not saved to server — ${describeError(err)}`);
         });
+    };
+
+    /**
+     * Persist a state change that the server models as an action rather than a
+     * field edit (`/cancel/`, `/track/`, …) — posted documents are read-only
+     * there, so a PATCH would be refused.
+     */
+    const persistAction = (key, id, action, data, setter, what) => {
+        if (!isBackendEnabled() || !isServerId(id)) return;
+        pushAction(key, id, action, data)
+            .then((serverRecord) => {
+                if (serverRecord && setter) reconcile(setter, id, serverRecord);
+            })
+            .catch((err) => {
+                console.warn(`[ERP] ${key} ${action} failed:`, err);
+                showToast(`${what} not saved to server — ${describeError(err)}`);
+            });
+    };
+
+    /**
+     * Persist a record through a server workflow instead of a plain create — a
+     * pipeline conversion, or create-then-dispatch. `run` makes the calls and
+     * resolves to the server's copy of the row held locally under `localId`.
+     */
+    const persistVia = (setter, localId, what, run) => {
+        if (!isBackendEnabled()) return;
+        run()
+            .then((serverRecord) => {
+                if (serverRecord) reconcile(setter, localId, serverRecord);
+            })
+            .catch((err) => {
+                console.warn(`[ERP] could not save ${what}:`, err);
+                markSyncFailure(setter, localId, err);
+                showToast(`${what} saved locally only — ${describeError(err)}`);
+            });
+    };
+
+    /**
+     * Order lines to hand to `/sales/orders/{id}/convert-to-*`, or `null` when
+     * the order or any line exists only locally — the server can then only be
+     * given a plain create, without the line-level link that tracks fulfilment.
+     */
+    const orderConversionLines = (order, lines, basis = 'dispatch') => {
+        if (!order || !isServerId(order.id)) return null;
+        const orderLines = new Map((order.items || order.lineItems || []).map((l) => [String(l.id), l]));
+        if (!(lines || []).every((l) => isServerId(l.id) && orderLines.has(String(l.id)))) return null;
+        const picked = (lines || []).map((l) => {
+            // Never ask for more than the order still has open — the server
+            // refuses over-dispatch / over-invoicing and would reject the lot.
+            const src = orderLines.get(String(l.id));
+            const ordered = Number(src.orderedQty ?? src.qty) || 0;
+            const done = Number(basis === 'invoice' ? src.invoicedQty : src.deliveredQty) || 0;
+            const qty = Math.min(Number(l.qty) || 0, Math.max(0, ordered - done));
+            const serials = l.selectedSerials || l.serialNumbers || (l.serialNumber ? [l.serialNumber] : []);
+            return { lineId: l.id, qty, ...(serials.length ? { serials: serials.slice(0, qty) } : {}) };
+        }).filter((l) => l.qty > 0);
+        return picked.length ? picked : null;
     };
 
     /**
@@ -930,7 +989,12 @@ export const ERPProvider = ({ children, }) => {
         }));
     };
 
-    const createInvoice = (newInvoice) => {
+    /**
+     * @param opts.persist  false when the caller persists through a server
+     *                      conversion instead (convert-to-invoice), so the
+     *                      invoice is not also created a second time.
+     */
+    const createInvoice = (newInvoice, { persist = true } = {}) => {
         const invItems = newInvoice.items && newInvoice.items.length > 0
             ? newInvoice.items
             : [
@@ -1109,7 +1173,7 @@ export const ERPProvider = ({ children, }) => {
         // the same work authoritatively — allocates INV-…, recomputes the
         // totals, posts the SALE movements and the Dr Debtors / Cr Sales entry —
         // and its reply replaces the optimistic row.
-        persistCreate('invoices', invoice, setInvoices);
+        if (persist) persistCreate('invoices', invoice, setInvoices);
 
         return invoice;
     };
@@ -1637,6 +1701,7 @@ export const ERPProvider = ({ children, }) => {
 
     const updateProformaInvoiceStatus = (id, status) => {
         setProformaInvoices((prev) => prev.map((pi) => (pi.id === id ? { ...pi, status } : pi)));
+        persistUpdate('proformaInvoices', id, { status }, setProformaInvoices);
         showToast(`Proforma status updated to ${status}.`);
     };
 
@@ -1682,7 +1747,19 @@ export const ERPProvider = ({ children, }) => {
             paymentTerms: pi.paymentTerms || 'Net 30',
         };
 
-        createInvoice(newInvoice);
+        const localInvoice = createInvoice(newInvoice, { persist: false });
+        if (isServerId(pi.id)) {
+            // The server clones the proforma into a linked Draft invoice and
+            // marks the proforma Converted; lines edited on the way in replace
+            // the cloned ones while the invoice is still a draft.
+            persistVia(setInvoices, newInvoice.id, `Invoice from ${pi.proformaNumber}`, async () => {
+                const created = await pushConvert('proformaInvoices', pi.id, 'convert-to-invoice', 'invoices');
+                if (!created || !invoiceOverrides.items) return created;
+                return (await pushUpdate('invoices', created.id, { lineItems: targetItems })) || created;
+            });
+        } else {
+            persistCreate('invoices', localInvoice, setInvoices);
+        }
 
         // Update Proforma status to Converted
         setProformaInvoices((prev) => prev.map((p) => (p.id === proformaId ? {
@@ -2281,7 +2358,11 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: updates.billingAddress ? createAddressSnapshot(updates.billingAddress) : e.billingAddress,
             shippingAddress: updates.shippingAddress ? createAddressSnapshot(updates.shippingAddress) : e.shippingAddress,
         } : e)));
-        persistUpdate('estimates', id, updates, setEstimates);
+        // 'Converted' is set by the server's convert-to-quotation (see
+        // addQuotation); sending it here too would race that conversion.
+        const { status, ...rest } = updates || {};
+        const toPersist = status === 'Converted' ? rest : updates;
+        if (Object.keys(toPersist || {}).length) persistUpdate('estimates', id, toPersist, setEstimates);
         showToast(`Estimate updated.`);
     };
     const deleteEstimate = (id) => {
@@ -2345,7 +2426,14 @@ export const ERPProvider = ({ children, }) => {
         };
         setQuotations((prev) => [newQ, ...prev]);
         showToast(`Quotation ${newQ.quoteNumber} issued.`);
-        persistCreate('quotations', newQ, setQuotations);
+        if (isServerId(newQ.sourceEstimateId)) {
+            // From an estimate: the server's conversion clones it, links the two
+            // and marks the estimate Converted (api.md §5.2) in one step.
+            persistVia(setQuotations, newQ.id, `Quotation from ${newQ.sourceEstimateNumber || 'estimate'}`,
+                () => pushConvert('estimates', newQ.sourceEstimateId, 'convert-to-quotation', 'quotations'));
+        } else {
+            persistCreate('quotations', newQ, setQuotations);
+        }
         return newQ;
     };
     const recordQuotationActivity = (id, type) => {
@@ -2400,11 +2488,19 @@ export const ERPProvider = ({ children, }) => {
         });
         setQuotations(prev => prev.map(q => q.id === id ? { ...q, deliveryChallanId: challan.id,
             activity: [...(q.activity || []), { id: crypto.randomUUID(), type: `Delivery challan ${challan.challanNumber} created`, quotationId: id, timestamp: new Date().toISOString() }] } : q));
+        // addDeliveryChallan keeps drafts local; this one is a real document.
+        if (isServerId(quote.id)) {
+            persistVia(setDeliveryChallans, challan.id, `Challan from ${quote.quoteNumber}`,
+                () => pushConvert('quotations', quote.id, 'convert-to-challan', 'deliveryChallans'));
+        } else {
+            persistCreate('deliveryChallans', challan, setDeliveryChallans);
+        }
         return challan;
     };
     const updateQuotationStatus = (id, status) => {
         const target = quotations.find((q) => String(q.id) === String(id));
         setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+        persistUpdate('quotations', id, { status }, setQuotations);
         if (target && target.status !== 'Sent' && status === 'Sent') {
             emitCrmEvent({
                 type: CRM_EVENT_TYPES.QUOTATION_SENT,
@@ -2423,7 +2519,10 @@ export const ERPProvider = ({ children, }) => {
         const quote = quotations.find((q) => q.id === quoteId);
         if (!quote)
             return undefined;
-        updateQuotationStatus(quoteId, 'Confirmed');
+        // Local only: the server's convert-to-order below moves the quotation on
+        // itself (to Converted, which reads back as 'Confirmed'); a PATCH racing
+        // it would be refused once the quotation is no longer a draft.
+        setQuotations((prev) => prev.map((q) => (q.id === quoteId ? { ...q, status: 'Confirmed' } : q)));
         const orderItems = quote.items && quote.items.length > 0 ? quote.items.map((line, idx) => ({
             id: line.id || `item-${Date.now()}-${idx}`,
             itemId: line.itemId || '',
@@ -2481,6 +2580,15 @@ export const ERPProvider = ({ children, }) => {
             lineItems: orderItems,
         };
         setSalesOrders((prev) => [newOrder, ...prev]);
+        if (isServerId(quote.id)) {
+            persistVia(setSalesOrders, newOrder.id, `Sales order from ${quote.quoteNumber}`, async () => {
+                const created = await pushConvert('quotations', quote.id, 'convert-to-order', 'salesOrders');
+                // The server opens it as a Draft; the UI confirms on conversion.
+                return created && ((await pushUpdate('salesOrders', created.id, { stage: 'Confirmed' })) || created);
+            });
+        } else {
+            persistCreate('salesOrders', newOrder, setSalesOrders);
+        }
         showToast(`Quote ${quote.quoteNumber} converted to Sales Order ${newOrder.orderNumber}!`);
         return newOrder;
     };
@@ -2646,14 +2754,17 @@ export const ERPProvider = ({ children, }) => {
     };
     const updateSalesOrderStage = (id, stage) => {
         setSalesOrders((prev) => prev.map((o) => (o.id === id ? { ...o, stage, status: stage } : o)));
+        // Draft → Confirmed is where the server enforces the credit limit.
+        persistUpdate('salesOrders', id, { stage }, setSalesOrders);
     };
-    const cancelSalesOrder = (orderId) => {
+    const cancelSalesOrder = (orderId, reason = 'Cancelled by user') => {
         const order = salesOrders.find((o) => o.id === orderId);
         if (!order) return { success: false, message: 'Order not found.' };
         if (order.stage === 'Cancelled' || order.status === 'Cancelled') {
             return { success: true, message: 'Already cancelled.' };
         }
         setSalesOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, stage: 'Cancelled', status: 'Cancelled' } : o)));
+        persistAction('salesOrders', orderId, 'cancel', { reason }, setSalesOrders, `Cancellation of ${order.orderNumber}`);
         showToast(`Sales Order ${order.orderNumber} cancelled.`);
         return { success: true, message: `Sales Order ${order.orderNumber} cancelled.` };
     };
@@ -2801,7 +2912,18 @@ export const ERPProvider = ({ children, }) => {
             dispatchedViaChallan: hasChallan,
         };
 
-        const createdInvoice = createInvoice(newInvoice);
+        const createdInvoice = createInvoice(newInvoice, { persist: false });
+        const conversionLines = orderConversionLines(order, itemsList, 'invoice');
+        if (conversionLines) {
+            // Line-linked on the server, so finalizing bumps the order's
+            // invoicedQty and skips stock a challan already moved.
+            persistVia(setInvoices, createdInvoice.id, `Invoice for ${order.orderNumber}`, async () => {
+                const draft = await pushConvert('salesOrders', order.id, 'convert-to-invoice', 'invoices', { lines: conversionLines });
+                return draft && ((await pushAction('invoices', draft.id, 'finalize')) || draft);
+            });
+        } else {
+            persistCreate('invoices', createdInvoice, setInvoices);
+        }
 
         // Update SO line items invoicedQty and stage
         setSalesOrders((prev) => prev.map((o) => {
@@ -2941,7 +3063,35 @@ export const ERPProvider = ({ children, }) => {
         }
 
         showToast(`Delivery Challan ${newChallan.challanNumber} issued.`);
-        persistCreate('deliveryChallans', newChallan, setDeliveryChallans);
+        // Server side a challan is created as a Draft and only `/dispatch/`
+        // posts its stock (and bumps the order's dispatchedQty); a create alone
+        // would leave it a Draft that reads back over the local 'In Transit'.
+        persistVia(setDeliveryChallans, newChallan.id, `Challan ${newChallan.challanNumber}`, async () => {
+            const transport = {
+                transporter: newChallan.transporter,
+                vehicleNo: newChallan.vehicleNo,
+                dispatchDate: newChallan.dispatchDate,
+            };
+            let serverId;
+            const order = salesOrders.find((o) => o.id === newChallan.salesOrderId);
+            const conversionLines = !previous && orderConversionLines(order, newChallan.items);
+            if (previous && isServerId(previous.id)) {
+                // A server draft (e.g. from a quotation): bring it up to date first.
+                await pushUpdate('deliveryChallans', previous.id, { ...transport, lineItems: newChallan.items });
+                serverId = previous.id;
+            } else if (conversionLines) {
+                // Line-linked to the order, so its fulfilment is tracked server side.
+                const draft = await pushConvert('salesOrders', order.id, 'convert-to-challan', 'deliveryChallans', { lines: conversionLines });
+                serverId = draft?.id;
+                if (serverId) await pushUpdate('deliveryChallans', serverId, transport);
+            } else {
+                serverId = (await pushCreate('deliveryChallans', newChallan))?.id;
+            }
+            if (!serverId) return null;
+            const dispatched = await pushAction('deliveryChallans', serverId, 'dispatch');
+            const onward = CHALLAN_TRACK_STATUSES.includes(newChallan.status) && newChallan.status !== 'Dispatched';
+            return (onward && (await pushAction('deliveryChallans', serverId, 'track', { status: newChallan.status }))) || dispatched;
+        });
         return newChallan;
     };
     const updateDeliveryChallanStatus = (id, status) => {
@@ -2962,12 +3112,19 @@ export const ERPProvider = ({ children, }) => {
             }
             return { ...c, status };
         }));
+        if (CHALLAN_TRACK_STATUSES.includes(status)) {
+            persistAction('deliveryChallans', id, 'track', { status }, setDeliveryChallans, `Challan status ${status}`);
+        }
         showToast(`Challan updated to ${status}.`);
     };
-    const cancelDeliveryChallan = (challanId) => {
+    const cancelDeliveryChallan = (challanId, reason = 'Cancelled by user') => {
         const challan = deliveryChallans.find((c) => c.id === challanId);
         if (!challan) return { success: false, message: 'Challan not found.' };
         if (challan.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
+
+        // Server side this reverses the SALE movements, returns the serials and
+        // releases the order's dispatchedQty — the same work done locally below.
+        persistAction('deliveryChallans', challanId, 'cancel', { reason }, setDeliveryChallans, `Cancellation of ${challan.challanNumber}`);
 
         if (challan.status === 'Draft') {
             setDeliveryChallans(prev => prev.map(c => c.id === challanId ? { ...c, status: 'Cancelled' } : c));
@@ -3590,10 +3747,11 @@ export const ERPProvider = ({ children, }) => {
         return newRet;
     };
 
-    const cancelSalesReturn = (returnId) => {
+    const cancelSalesReturn = (returnId, reason = 'Cancelled by user') => {
         const sr = salesReturns.find((r) => r.id === returnId);
         if (!sr) return { success: false, message: 'Return not found.' };
         if (sr.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
+        persistAction('salesReturns', returnId, 'cancel', { reason }, setSalesReturns, `Cancellation of ${sr.returnNumber}`);
 
         // 1. Reverse inventory movements for Good/restocked items
         (sr.items || []).forEach((line) => {

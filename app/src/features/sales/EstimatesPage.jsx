@@ -93,6 +93,9 @@ export const EstimatesPage = () => {
             id: `quo-${Date.now()}`,
             quoteNumber: `QUO-2026-${String(Date.now()).slice(-3)}`,
             estimateRef: estimate.estimateNumber,
+            // Persisted as the quotation's `estimate` link (backendSync).
+            sourceEstimateId: estimate.id,
+            sourceEstimateNumber: estimate.estimateNumber,
             customerId: cust?.id || '',
             customer: cust?.name || estimate.customer || 'Client Account',
             leadId: estimate.leadId || '',

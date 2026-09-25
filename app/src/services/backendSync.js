@@ -75,7 +75,9 @@ function lineToApi(line, index) {
     parentLineId: line.parentLineId || undefined,
     isBomPart: line.isBomPart ?? undefined,
     isUserModified: line.isUserModified ?? undefined,
-    serials: Array.isArray(line.serials) ? line.serials : undefined,
+    // Dispatch/sale screens keep the picked units in `selectedSerials`.
+    serials: Array.isArray(line.serials) ? line.serials
+      : (Array.isArray(line.selectedSerials) && line.selectedSerials.length ? line.selectedSerials : undefined),
   });
 }
 
@@ -94,12 +96,15 @@ function lineFromApi(line) {
  * `partyField` is `partyId` on the sales side and `vendorId` on the purchase
  * side — api.md §6.2 names the same column differently there.
  */
-function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}) {
-  const lines = doc.lineItems || doc.items || [];
+function documentToApi(doc, { partyField = 'partyId', partyKeys = [], partial = false } = {}) {
+  // A PATCH carries only what changed. Sending `lineItems: []` there would
+  // replace — i.e. delete — every line of the draft (the server treats the list
+  // as the full set), and defaulting `date` would silently re-date it.
+  const lines = doc.lineItems || doc.items || (partial ? undefined : []);
   const partyId = partyKeys.map((k) => doc[k]).find(Boolean);
   return compact({
     [partyField]: partyId,
-    date: isoOut(doc.date) || isoOut('Today'),
+    date: isoOut(doc.date) || (partial ? undefined : isoOut('Today')),
     dueDate: isoOut(doc.dueDate),
     expectedDate: isoOut(doc.expectedDate || doc.deliveryDate),
     validUntil: isoOut(doc.validUntil || doc.validTill),
@@ -111,8 +116,31 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}) {
     otherCharges: doc.otherCharges !== undefined ? num(doc.otherCharges) : undefined,
     roundOff: doc.roundOff !== undefined ? num(doc.roundOff) : undefined,
     discountOverride: doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined,
-    lineItems: lines.map(lineToApi),
+    lineItems: lines ? lines.map(lineToApi) : undefined,
   });
+}
+
+/**
+ * An id the server can resolve, or nothing. Links to documents that only exist
+ * locally (`so-1758…`, or a document *number* some callers put in an id field)
+ * would fail the whole write with a 400, so they are left off instead.
+ */
+function serverRef(value) {
+  return isServerId(value) ? value : undefined;
+}
+
+/** A status the server's enum accepts, or nothing (the UI has a few of its own). */
+function knownStatus(value, allowed) {
+  return allowed.includes(value) ? value : undefined;
+}
+
+/** Copy `row[from]` onto `to` only when the server sent one, so a merge never blanks a local link. */
+function linkIn(row, pairs) {
+  const out = {};
+  Object.entries(pairs).forEach(([to, from]) => {
+    if (row[from]) out[to] = row[from];
+  });
+  return out;
 }
 
 /**
@@ -156,10 +184,18 @@ function documentResource(path, {
 } = {}) {
   return {
     path,
-    toApi: (doc) => documentToApi(doc, { partyField, partyKeys }),
+    toApi: (doc, opts = {}) => documentToApi(doc, { partyField, partyKeys, ...opts }),
     fromApi: (row) => documentFromApi(row, { numberField, partyLabel }),
   };
 }
+
+// Server enums (api.md Appendix A). Only these may be written as a status.
+const ESTIMATE_STATUSES = ['Draft', 'Sent', 'Accepted', 'Rejected', 'Converted', 'Expired'];
+const QUOTATION_STATUSES = ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired', 'Confirmed', 'Converted', 'Invoiced', 'Cancelled'];
+const ORDER_STAGES = ['Draft', 'Confirmed', 'Packing', 'Dispatched', 'Delivered', 'Invoiced', 'Cancelled'];
+const PROFORMA_STATUSES = ['Draft', 'Sent', 'Accepted', 'Converted', 'Expired', 'Cancelled'];
+/** Carrier progress after dispatch — `POST /sales/challans/{id}/track/`. */
+export const CHALLAN_TRACK_STATUSES = ['Dispatched', 'In Transit', 'Out for Delivery', 'Delivered'];
 
 // ── parties ─────────────────────────────────────────────────────────────────
 
@@ -345,14 +381,46 @@ export const RESOURCES = {
   },
 
   // Sales pipeline (api.md §5)
-  estimates: documentResource('/sales/estimates/', { numberField: 'estimateNumber' }),
-  quotations: documentResource('/sales/quotations/', { numberField: 'quotationNumber' }),
+  estimates: (() => {
+    const base = documentResource('/sales/estimates/', { numberField: 'estimateNumber' });
+    return {
+      ...base,
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        status: knownStatus(doc.status, ESTIMATE_STATUSES),
+      }),
+    };
+  })(),
+  quotations: (() => {
+    const base = documentResource('/sales/quotations/', { numberField: 'quotationNumber' });
+    return {
+      ...base,
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        status: knownStatus(doc.status, QUOTATION_STATUSES),
+        estimate: serverRef(doc.sourceEstimateId),
+      }),
+      fromApi: (row) => {
+        const mapped = base.fromApi(row);
+        return {
+          ...mapped,
+          // The screens number quotations as `quoteNumber`.
+          quoteNumber: row.quotationNumber,
+          // A quotation the server converted to an order is the UI's 'Confirmed'.
+          status: mapped.status === 'Converted' ? 'Confirmed' : mapped.status,
+          ...linkIn(row, { sourceEstimateId: 'estimate' }),
+        };
+      },
+    };
+  })(),
   salesOrders: (() => {
     const base = documentResource('/sales/orders/', { numberField: 'orderNumber' });
     return {
       ...base,
-      toApi: (doc) => compact({
-        ...base.toApi(doc),
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        stage: knownStatus(doc.stage, ORDER_STAGES),
+        quotation: serverRef(doc.quotationId || doc.sourceQuotationId),
         totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
         formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
         cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
@@ -364,15 +432,36 @@ export const RESOURCES = {
         cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : undefined,
         invoice: row.invoice,
         cashReceipt: row.cashReceipt,
+        ...linkIn(row, { quotationId: 'quotation', sourceQuotationId: 'quotation' }),
+        ...(() => {
+          // Fulfilment as the order screens read it; the server tracks it per
+          // line as dispatchedQty / invoicedQty (bumped by challans and invoices).
+          const lines = (row.lineItems || []).map((line) => {
+            const mapped = lineFromApi(line);
+            const ordered = num(line.qty);
+            const delivered = num(line.dispatchedQty);
+            return {
+              ...mapped,
+              orderedQty: ordered,
+              deliveredQty: delivered,
+              invoicedQty: num(line.invoicedQty),
+              remainingQty: Math.max(0, ordered - delivered),
+            };
+          });
+          return { items: lines, lineItems: lines };
+        })(),
       }),
     };
   })(),
   proformaInvoices: (() => {
-    const base = documentResource('/sales/proforma-invoices/', { numberField: 'piNumber' });
+    // The API names it `proformaNumber`; some screens still read `piNumber`.
+    const base = documentResource('/sales/proforma-invoices/', { numberField: 'proformaNumber' });
     return {
       ...base,
-      toApi: (doc) => compact({
-        ...base.toApi(doc),
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        status: knownStatus(doc.status, PROFORMA_STATUSES),
+        salesOrder: serverRef(doc.salesOrderId),
         totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
         formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
         cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
@@ -384,10 +473,37 @@ export const RESOURCES = {
         cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : undefined,
         invoice: row.invoice,
         cashReceipt: row.cashReceipt,
+        piNumber: row.proformaNumber,
+        ...linkIn(row, { salesOrderId: 'salesOrder' }),
       }),
     };
   })(),
-  deliveryChallans: documentResource('/sales/challans/', { numberField: 'challanNumber' }),
+  deliveryChallans: (() => {
+    const base = documentResource('/sales/challans/', { numberField: 'challanNumber' });
+    return {
+      ...base,
+      // No `status` here: a challan leaves Draft only through `/dispatch/`
+      // (which posts the stock) and moves on through `/track/`.
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        salesOrder: serverRef(doc.salesOrderId || doc.sourceSalesOrderId),
+        quotation: serverRef(doc.sourceQuotationId),
+        dispatchDate: isoOut(doc.dispatchDate),
+        transporter: doc.transporter || undefined,
+        vehicleNumber: doc.vehicleNo || doc.vehicleNumber || undefined,
+        lrNumber: doc.lrNumber || undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        ...linkIn(row, {
+          vehicleNo: 'vehicleNumber',
+          salesOrderId: 'salesOrder',
+          sourceSalesOrderId: 'salesOrder',
+          sourceQuotationId: 'quotation',
+        }),
+      }),
+    };
+  })(),
   invoices: (() => {
     const base = documentResource('/sales/invoices/', { numberField: 'invoiceNumber' });
     return {
@@ -395,11 +511,11 @@ export const RESOURCES = {
       // api.md §5.7: an invoice posts as a Draft unless the create says
       // otherwise. The UI decides that up front, so carry the flag through —
       // finalizing is what allocates the number and posts stock and ledger.
-      toApi: (doc) => compact({
-        ...base.toApi(doc),
-        salesOrderId: doc.salesOrderId || doc.salesOrder || undefined,
-        deliveryChallanId: doc.deliveryChallanId || doc.deliveryChallan || undefined,
-        proformaInvoiceId: doc.proformaInvoiceId || doc.proformaInvoice || undefined,
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        salesOrderId: serverRef(doc.salesOrderId || doc.salesOrder),
+        deliveryChallanId: serverRef(doc.deliveryChallanId || doc.deliveryChallan),
+        proformaInvoiceId: serverRef(doc.proformaInvoiceId || doc.proformaInvoice),
         totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
         formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
         cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
@@ -407,9 +523,11 @@ export const RESOURCES = {
       }),
       fromApi: (row) => ({
         ...base.fromApi(row),
-        salesOrderId: row.salesOrderId,
-        deliveryChallanId: row.deliveryChallanId,
-        proformaInvoiceId: row.proformaInvoiceId,
+        ...linkIn(row, {
+          salesOrderId: 'salesOrderId',
+          deliveryChallanId: 'deliveryChallanId',
+          proformaInvoiceId: 'proformaInvoiceId',
+        }),
         totalSalesValue: row.totalSalesValue !== undefined ? num(row.totalSalesValue) : undefined,
         formalInvoiceAmount: row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined,
         cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : 0,
@@ -424,8 +542,8 @@ export const RESOURCES = {
     const base = documentResource('/sales/returns/', { numberField: 'returnNumber' });
     return {
       ...base,
-      toApi: (r) => compact({
-        ...base.toApi(r),
+      toApi: (r, opts) => compact({
+        ...base.toApi(r, opts),
         salesInvoiceId: r.salesInvoiceId || r.invoiceId || r.invoice_id || undefined,
         reason: r.reason || undefined,
       }),
@@ -525,9 +643,9 @@ export const RESOURCES = {
         referenceNumber: p.reference || p.referenceNumber || undefined,
         description: p.description || undefined,
         notes: p.notes || undefined,
-        invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
-        salesOrderId: p.salesOrderId || p.linkedSalesOrderId || undefined,
-        proformaInvoiceId: p.proformaInvoiceId || p.linkedProformaInvoiceId || undefined,
+        invoiceId: serverRef(p.invoiceId || p.linkedInvoiceId),
+        salesOrderId: serverRef(p.salesOrderId || p.linkedSalesOrderId),
+        proformaInvoiceId: serverRef(p.proformaInvoiceId || p.linkedProformaInvoiceId),
       });
     },
     fromApi: (row) => ({
@@ -833,7 +951,7 @@ export async function pushCreate(key, record, { idempotencyKey } = {}) {
 export async function pushUpdate(key, id, updates) {
   const resource = RESOURCES[key];
   if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
-  const payload = resource.toApi(updates);
+  const payload = resource.toApi(updates, { partial: true });
   (resource.omitOnUpdate || []).forEach((field) => delete payload[field]);
   const body = await api.patch(`${resource.path}${id}/`, payload);
   return resource.fromApi ? resource.fromApi(body) : body;
@@ -851,6 +969,21 @@ export async function pushAction(key, id, action, data = {}) {
   if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
   const body = await api.post(`${resource.path}${id}/${action}/`, data);
   return resource.fromApi ? resource.fromApi(body) : body;
+}
+
+/**
+ * Run a pipeline conversion on the server (`POST /sales/quotations/{id}/convert-to-order/`
+ * and friends). The reply is the *new* document, so it is read with the target
+ * collection's mapping. The server does the numbering, links the two documents
+ * (header and, for orders, line by line) and moves the source on, in one
+ * transaction — which is why this is used instead of creating the target anew.
+ */
+export async function pushConvert(sourceKey, id, action, targetKey, data = {}) {
+  const source = RESOURCES[sourceKey];
+  const target = RESOURCES[targetKey];
+  if (!source || !target || !isBackendEnabled() || !isServerId(id)) return null;
+  const body = await api.post(`${source.path}${id}/${action}/`, data);
+  return target.fromApi ? target.fromApi(body) : body;
 }
 
 /**
