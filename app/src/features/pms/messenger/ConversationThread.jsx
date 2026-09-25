@@ -33,10 +33,22 @@ import {
  * their size on an inner <span>.
  */
 
-function Avatar({ name, color, size = 28 }) {
+export function OnlineDot({ online, className = '' }) {
+  if (!online) return null;
   return (
     <span
-      className="shrink-0 rounded-full flex items-center justify-center font-bold border"
+      title="Online"
+      aria-label="Online"
+      className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${className}`}
+      style={{ background: '#16a34a' }}
+    />
+  );
+}
+
+function Avatar({ name, color, size = 28, online = false }) {
+  return (
+    <span
+      className="relative shrink-0 rounded-full flex items-center justify-center font-bold border"
       style={{
         width: size,
         height: size,
@@ -47,6 +59,7 @@ function Avatar({ name, color, size = 28 }) {
       }}
     >
       {initials(name)}
+      <OnlineDot online={online} />
     </span>
   );
 }
@@ -90,7 +103,7 @@ function Attachment({ attachment }) {
   );
 }
 
-function MessageItem({ message, isOwn, currentUserId, highlighted, onReply, onEdit, onDelete }) {
+function MessageItem({ message, isOwn, online, currentUserId, highlighted, onReply, onEdit, onDelete }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.text);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -120,7 +133,7 @@ function MessageItem({ message, isOwn, currentUserId, highlighted, onReply, onEd
       id={`chat-message-${message.id}`}
       className={`group flex gap-2 ${isOwn ? 'flex-row-reverse' : ''}`}
     >
-      {!isOwn && <Avatar name={message.sender?.name} />}
+      {!isOwn && <Avatar name={message.sender?.name} online={online} />}
       <div className={`min-w-0 max-w-[85%] sm:max-w-[75%] flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
         <div className="flex items-center gap-1.5 mb-0.5">
           <span className="text-[11px] font-bold text-slate-700">{isOwn ? 'You' : message.sender?.name}</span>
@@ -272,6 +285,7 @@ function MessageItem({ message, isOwn, currentUserId, highlighted, onReply, onEd
 
 export function ConversationThread({
   conversation,
+  onlineIds = new Set(),
   thread,
   currentUserId,
   mentionCandidates,
@@ -347,7 +361,11 @@ export function ConversationThread({
           <ArrowLeft size={16} />
         </button>
         {conversation.kind === 'Direct' ? (
-          <Avatar name={conversation.title} size={30} />
+          <Avatar
+            name={conversation.title}
+            size={30}
+            online={conversation.members.some((m) => m.id !== currentUserId && onlineIds.has(m.id))}
+          />
         ) : (
           <span
             className="shrink-0 w-[30px] h-[30px] rounded-lg flex items-center justify-center"
@@ -384,7 +402,7 @@ export function ConversationThread({
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
               {conversation.members.map((m) => (
                 <li key={m.id} className="flex items-center gap-2 min-w-0">
-                  <Avatar name={m.name} size={22} />
+                  <Avatar name={m.name} size={22} online={onlineIds.has(m.id)} />
                   <span className="text-[11px] font-semibold text-slate-700 truncate">{m.name}</span>
                   {m.role === 'Project Manager' && (
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 shrink-0">PM</span>
@@ -450,6 +468,7 @@ export function ConversationThread({
                 key={m.id}
                 message={m}
                 isOwn={m.sender?.id === currentUserId}
+                online={onlineIds.has(m.sender?.id)}
                 currentUserId={currentUserId}
                 highlighted={m.id === highlightMessageId}
                 onReply={setReplyTo}

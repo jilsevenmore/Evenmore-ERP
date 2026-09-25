@@ -12,21 +12,25 @@ import {
   describeError,
 } from '../../../services/pmsSync';
 import { usePmsStore } from '../../../stores/pmsStore';
+import { onRealtime, useRealtimeStatus, watchProject } from '../../../services/realtime';
 
 /**
  * useProjectMessenger — one project's conversations and the open thread.
  *
- * The backend has no push channel, so this polls: the conversation list (for
- * unread counts) slowly while the Messenger tab is closed and faster while it
- * is open, and the open thread every few seconds with the server's `since`
- * cursor, which returns new, edited and deleted messages alike. Polling pauses
- * while the browser tab is hidden. A WebSocket later would replace the two
- * timers and nothing else.
+ * Push first, poll as the fallback. While the Socket.IO connection is up, the
+ * server's `chat:activity` event (ids only) triggers a re-read: the list for
+ * unread counts, and the open thread through the `since` cursor, which returns
+ * new, edited and deleted messages alike. While it is down, the same two reads
+ * run on timers instead, and a reconnect catches up once. Timers pause while
+ * the browser tab is hidden.
  */
 
 const LIST_POLL_IDLE_MS = 30000;
 const LIST_POLL_OPEN_MS = 10000;
+/** A safety net only: with the socket up, events drive the list. */
+const LIST_POLL_LIVE_MS = 120000;
 const THREAD_POLL_MS = 4000;
+const LIST_REFRESH_DEBOUNCE_MS = 250;
 
 const EMPTY_THREAD = { messages: [], hasMore: false, cursor: null, loaded: false, loading: false };
 
@@ -59,6 +63,7 @@ function useInterval(callback, delay) {
 export function useProjectMessenger(projectId, { open = false } = {}) {
   const showToast = usePmsStore((s) => s.showToast);
   const enabled = isBackendEnabled() && isServerId(projectId);
+  const live = useRealtimeStatus() === 'connected';
 
   const [conversations, setConversations] = useState([]);
   const [aggregates, setAggregates] = useState({});
@@ -100,7 +105,10 @@ export function useProjectMessenger(projectId, { open = false } = {}) {
     refreshConversations();
   }, [enabled, refreshConversations]);
 
-  useInterval(refreshConversations, enabled ? (open ? LIST_POLL_OPEN_MS : LIST_POLL_IDLE_MS) : null);
+  useInterval(
+    refreshConversations,
+    enabled ? (live ? LIST_POLL_LIVE_MS : open ? LIST_POLL_OPEN_MS : LIST_POLL_IDLE_MS) : null,
+  );
 
   const setUnread = useCallback((conversationId, count) => {
     setConversations((rows) =>
@@ -154,35 +162,81 @@ export function useProjectMessenger(projectId, { open = false } = {}) {
     [projectId, patchThread],
   );
 
-  const openConversation = useCallback(
-    (conversationId) => {
-      setActiveId(conversationId);
-      if (!conversationId) return;
-      if (!threadsRef.current[conversationId]?.loaded) loadThread(conversationId);
-      markRead(conversationId);
-    },
-    [loadThread, markRead],
-  );
+  // Read by the socket handlers, which outlive any one render.
+  const activeIdRef = useRef(activeId);
+  const openRef = useRef(open);
+  useEffect(() => {
+    activeIdRef.current = activeId;
+    openRef.current = open;
+  }, [activeId, open]);
 
-  const pollActiveThread = useCallback(async () => {
-    if (!activeId) return;
-    const current = threadsRef.current[activeId];
+  /** Bring a loaded thread up to date through the `since` cursor. */
+  const syncThread = useCallback(async (conversationId) => {
+    const current = threadsRef.current[conversationId];
     if (!current?.loaded || !current.cursor) return;
-    const body = await pullMessages(projectId, activeId, { since: current.cursor });
+    const body = await pullMessages(projectId, conversationId, { since: current.cursor });
     if (!body) return;
     const incoming = body.results ?? [];
     const known = new Set(current.messages.map((m) => m.id));
     const fresh = incoming.some((m) => !known.has(m.id));
-    patchThread(activeId, (thread) => ({
+    patchThread(conversationId, (thread) => ({
       ...thread,
       messages: mergeMessages(thread.messages, incoming),
       cursor: body.aggregates?.cursor ?? thread.cursor,
     }));
-    // The thread is on screen, so anything that just arrived is read.
-    if (fresh) markRead(activeId);
-  }, [activeId, projectId, patchThread, markRead]);
+    // On screen, so anything that just arrived is read.
+    if (fresh && openRef.current && activeIdRef.current === conversationId) markRead(conversationId);
+  }, [projectId, patchThread, markRead]);
 
-  useInterval(pollActiveThread, enabled && open && activeId ? THREAD_POLL_MS : null);
+  const openConversation = useCallback(
+    (conversationId) => {
+      setActiveId(conversationId);
+      activeIdRef.current = conversationId;
+      if (!conversationId) return;
+      // A thread cached from an earlier visit catches up; a new one loads.
+      if (threadsRef.current[conversationId]?.loaded) syncThread(conversationId);
+      else loadThread(conversationId);
+      markRead(conversationId);
+    },
+    [loadThread, syncThread, markRead],
+  );
+
+  const pollActiveThread = useCallback(() => {
+    if (activeId) syncThread(activeId);
+  }, [activeId, syncThread]);
+
+  useInterval(pollActiveThread, enabled && open && activeId && !live ? THREAD_POLL_MS : null);
+
+  // ── push ─────────────────────────────────────────────────────────────────
+  useEffect(() => (enabled ? watchProject(projectId) : undefined), [enabled, projectId]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    let listTimer = null;
+    const refreshSoon = () => {
+      clearTimeout(listTimer);
+      listTimer = setTimeout(refreshConversations, LIST_REFRESH_DEBOUNCE_MS);
+    };
+    const offActivity = onRealtime('chat:activity', ({ projectId: pid, conversationId } = {}) => {
+      if (pid !== projectId) return;
+      refreshSoon();
+      if (conversationId && threadsRef.current[conversationId]?.loaded) syncThread(conversationId);
+    });
+    const offRead = onRealtime('chat:read', ({ projectId: pid } = {}) => {
+      if (pid === projectId) refreshSoon();
+    });
+    // Whatever happened while the socket was down.
+    const offReconnect = onRealtime('realtime:connected', () => {
+      refreshSoon();
+      if (activeIdRef.current) syncThread(activeIdRef.current);
+    });
+    return () => {
+      clearTimeout(listTimer);
+      offActivity();
+      offRead();
+      offReconnect();
+    };
+  }, [enabled, projectId, refreshConversations, syncThread]);
 
   // ── writes ───────────────────────────────────────────────────────────────
   const touchConversation = useCallback((conversationId, message) => {
@@ -284,6 +338,7 @@ export function useProjectMessenger(projectId, { open = false } = {}) {
 
   return {
     status,
+    live,
     conversations,
     aggregates,
     totalUnread,

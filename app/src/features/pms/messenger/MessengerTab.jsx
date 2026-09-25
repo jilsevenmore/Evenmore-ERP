@@ -3,7 +3,8 @@ import { Hash, Users, Search, X, Plus, MessageSquare, WifiOff, Paperclip, Loader
 import { Button } from '../../../components/ui/Button';
 import { EmptyStatePms } from '../components/EmptyStatePms';
 import { searchMessages } from '../../../services/pmsSync';
-import { ConversationThread } from './ConversationThread';
+import { usePresence } from '../../../services/realtime';
+import { ConversationThread, OnlineDot } from './ConversationThread';
 import { initials, listTime } from './messengerFormat';
 
 /**
@@ -33,7 +34,7 @@ function SectionLabel({ children, action }) {
   );
 }
 
-function ConversationRow({ conversation, active, currentUserId, onOpen }) {
+function ConversationRow({ conversation, active, currentUserId, onlineIds, onOpen }) {
   const last = conversation.lastMessage;
   const isTeam = conversation.kind === 'Team';
   const Icon = conversation.kind === 'Project' ? Hash : Users;
@@ -51,8 +52,11 @@ function ConversationRow({ conversation, active, currentUserId, onOpen }) {
       >
         <div className="flex items-center gap-2">
           {conversation.kind === 'Direct' ? (
-            <span className="shrink-0 w-7 h-7 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-500 flex items-center justify-center">
+            <span className="relative shrink-0 w-7 h-7 rounded-full bg-slate-100 border border-slate-200 text-[10px] font-bold text-slate-500 flex items-center justify-center">
               {initials(conversation.title)}
+              <OnlineDot
+                online={conversation.members?.some((m) => m.id !== currentUserId && onlineIds?.has(m.id))}
+              />
             </span>
           ) : (
             <span
@@ -177,6 +181,10 @@ export function MessengerTab({ project, messenger, currentUserId, stageId, onSta
   const directs = conversations.filter((c) => c.kind === 'Direct');
 
   const directCandidates = (aggregates.projectMembers ?? []).filter((m) => m.id !== currentUserId);
+  const onlineIds = usePresence([
+    ...(aggregates.projectMembers ?? []).map((m) => m.id),
+    ...directs.flatMap((c) => (c.members ?? []).map((m) => m.id)),
+  ]);
 
   const mentionCandidates = useMemo(() => {
     if (!active) return [];
@@ -256,7 +264,17 @@ export function MessengerTab({ project, messenger, currentUserId, stageId, onSta
       >
         <header className="flex items-center justify-between mb-2.5">
           <h3 className="text-[11px] font-bold text-slate-700">Conversations</h3>
-          <UnreadBadge count={messenger.totalUnread} />
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex items-center gap-1 text-[10px] font-semibold"
+              style={{ color: messenger.live ? '#15803d' : '#94a3b8' }}
+              title={messenger.live ? 'Messages arrive instantly' : 'Reconnecting — checking for messages every few seconds'}
+            >
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: messenger.live ? '#16a34a' : '#cbd5e1' }} />
+              {messenger.live ? 'Live' : 'Syncing'}
+            </span>
+            <UnreadBadge count={messenger.totalUnread} />
+          </div>
         </header>
 
         <label className="relative block">
@@ -297,7 +315,7 @@ export function MessengerTab({ project, messenger, currentUserId, stageId, onSta
             {projectChat.length > 0 && (
               <ul className="space-y-1.5 mt-3" style={{ listStyle: 'none', marginBottom: 0, padding: 0 }}>
                 {projectChat.map((c) => (
-                  <ConversationRow key={c.id} conversation={c} active={c.id === activeId} currentUserId={currentUserId} onOpen={open} />
+                  <ConversationRow key={c.id} conversation={c} active={c.id === activeId} currentUserId={currentUserId} onlineIds={onlineIds} onOpen={open} />
                 ))}
               </ul>
             )}
@@ -307,7 +325,7 @@ export function MessengerTab({ project, messenger, currentUserId, stageId, onSta
                 <SectionLabel>Team Chats</SectionLabel>
                 <ul className="space-y-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                   {teams.map((c) => (
-                    <ConversationRow key={c.id} conversation={c} active={c.id === activeId} currentUserId={currentUserId} onOpen={open} />
+                    <ConversationRow key={c.id} conversation={c} active={c.id === activeId} currentUserId={currentUserId} onlineIds={onlineIds} onOpen={open} />
                   ))}
                 </ul>
               </>
@@ -348,8 +366,9 @@ export function MessengerTab({ project, messenger, currentUserId, stageId, onSta
                           }}
                           className="w-full text-left flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-white"
                         >
-                          <span className="w-5 h-5 rounded-full bg-white border border-slate-200 text-[9px] font-bold text-slate-500 flex items-center justify-center">
+                          <span className="relative w-5 h-5 rounded-full bg-white border border-slate-200 text-[9px] font-bold text-slate-500 flex items-center justify-center">
                             {initials(m.name)}
+                            <OnlineDot online={onlineIds.has(m.id)} />
                           </span>
                           <span className="text-[11px] font-semibold text-slate-700 truncate">{m.name}</span>
                           <span className="ml-auto text-[10px] text-slate-400 truncate">
@@ -364,7 +383,7 @@ export function MessengerTab({ project, messenger, currentUserId, stageId, onSta
                 {directs.length > 0 ? (
                   <ul className="space-y-1.5" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                     {directs.map((c) => (
-                      <ConversationRow key={c.id} conversation={c} active={c.id === activeId} currentUserId={currentUserId} onOpen={open} />
+                      <ConversationRow key={c.id} conversation={c} active={c.id === activeId} currentUserId={currentUserId} onlineIds={onlineIds} onOpen={open} />
                     ))}
                   </ul>
                 ) : (
@@ -380,6 +399,7 @@ export function MessengerTab({ project, messenger, currentUserId, stageId, onSta
       <div className={active ? '' : 'hidden lg:block'}>
         <ConversationThread
           conversation={active}
+          onlineIds={onlineIds}
           thread={activeThread}
           currentUserId={currentUserId}
           mentionCandidates={mentionCandidates}
