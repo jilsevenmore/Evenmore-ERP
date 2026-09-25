@@ -169,7 +169,7 @@ export const HRMS_RESOURCES = {
   interviews: dated('/hrms/interviews/', ['scheduledDate', 'date']),
   offers: dated('/hrms/offers/', ['offerDate', 'joiningDate']),
   onboarding: dated('/hrms/onboarding/', ['startDate']),
-  recruitmentQuestions: plain('/hrms/recruitment/questions/'),
+  // recruitmentQuestions: plain('/hrms/recruitment/questions/'),  // Hidden: Screening Questions out of scope; backend route commented out
 
   // ── performance ───────────────────────────────────────────────────────────
   appraisals: dated('/hrms/performance/appraisals/', ['dueDate', 'completedDate']),

@@ -211,6 +211,7 @@ export const SendChallanModal = ({
                             </label>
 
                             {/* Customer Warranty Card Document Card */}
+                            {/* Hidden: Warranty Cards out of scope; backend route commented out
                             {warrantyCard ? (
                                 <label className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors ${
                                     attachWarranty ? 'bg-emerald-50/60 border-emerald-300' : 'bg-slate-50 border-slate-200'
@@ -259,6 +260,7 @@ export const SendChallanModal = ({
                                     <span className="text-[10px] text-slate-400 italic">Optional</span>
                                 </div>
                             )}
+                            */}
                         </div>
                     </div>
 

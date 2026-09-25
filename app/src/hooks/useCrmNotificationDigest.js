@@ -287,7 +287,7 @@ function sortItems(items, now) {
 function buildCrmNotificationDigest({ leadRows, leadDetails, allocationTasks, quotations, deliveryChallans, eventItems, now }) {
   const reminders = sortItems([
     ...buildLeadTaskReminders({ leadRows, leadDetails, now }),
-    ...buildAllocationReminders({ allocationTasks, now }),
+    // ...buildAllocationReminders({ allocationTasks, now }), // Hidden: Task Allocation duplicates Tasks List
   ], now);
   const notifications = [
     ...buildEventNotifications({ eventItems, now }),

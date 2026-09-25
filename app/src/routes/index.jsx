@@ -12,8 +12,9 @@ const LeadFormBuilderPage = lazy(() => import('../features/crm/leads/LeadFormBui
 const LeadFormsPage = lazy(() => import('../features/crm/leads/LeadFormsPage'));
 const DynamicLeadFormPage = lazy(() => import('../features/crm/leads/DynamicLeadFormPage'));
 const TasksPage = lazy(() => import('../features/crm/tasks/TasksPage'));
-const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationPage'));
-const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
+// Hidden: Task Allocation duplicates Tasks List
+// const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationPage'));
+// const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
 const MasterTasksPage = lazy(() => import('../features/crm/tasks/MasterTasksPage'));
 const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage'));
 const TaskFormPage = lazy(() => import('../features/crm/tasks/TaskFormPage'));
@@ -24,7 +25,7 @@ const ContractsPage = lazy(() => import('../features/crm/contracts/ContractsPage
 const ContractDetailPage = lazy(() => import('../features/crm/contracts/ContractDetailPage'));
 const ProjectDetailPage = lazy(() => import('../features/crm/projects/ProjectDetailPage'));
 const DealsPage = lazy(() => import('../features/crm/deals/DealsPage'));
-const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAllocationPage'));
+// const UserAllocationPage = lazy(() => import('../features/crm/allocation/UserAllocationPage')); // Hidden: User Tracking out of scope
 const CRMSystemSetupPage = lazy(() => import('../features/crm/setup/CRMSystemSetupPage'));
 const CRMReportsPage = lazy(() => import('../features/crm/reports/CRMReportsPage'));
 
@@ -62,8 +63,8 @@ const InterviewDetails = lazy(() => import('../features/hrms/recruitment/Intervi
 const Applications = lazy(() => import('../features/hrms/recruitment/Applications'));
 const Offers = lazy(() => import('../features/hrms/recruitment/Offers'));
 const Onboarding = lazy(() => import('../features/hrms/recruitment/Onboarding'));
-const Career = lazy(() => import('../features/hrms/recruitment/Career'));
-const CustomQuestions = lazy(() => import('../features/hrms/recruitment/CustomQuestions'));
+// const Career = lazy(() => import('../features/hrms/recruitment/Career')); // Hidden: Career Portal out of scope
+// const CustomQuestions = lazy(() => import('../features/hrms/recruitment/CustomQuestions')); // Hidden: Screening Questions out of scope
 const RecruitmentFunnel = lazy(() => import('../features/hrms/recruitment/RecruitmentFunnel'));
 const PerformanceDashboard = lazy(() => import('../features/hrms/performance/Dashboard'));
 const Indicators = lazy(() => import('../features/hrms/performance/Indicators'));
@@ -96,7 +97,8 @@ const SalesInvoicesPage = lazy(() => import('../features/sales/SalesInvoicesPage
 const SalesReturnsPage = lazy(() => import('../features/sales/SalesReturnsPage').then(m => ({ default: m.SalesReturnsPage })));
 const PaymentInPage = lazy(() => import('../features/sales/PaymentInPage').then(m => ({ default: m.PaymentInPage })));
 const DeliveryChallansPage = lazy(() => import('../features/sales/DeliveryChallansPage').then(m => ({ default: m.DeliveryChallansPage })));
-const WarrantyListPage = lazy(() => import('../features/sales/WarrantyListPage').then(m => ({ default: m.WarrantyListPage })));
+// Hidden: Warranty Cards out of scope
+// const WarrantyListPage = lazy(() => import('../features/sales/WarrantyListPage').then(m => ({ default: m.WarrantyListPage })));
 
 // ── ERP — Purchase (Lazy Loaded) ──────────────────────────────
 const PurchaseOrdersPage = lazy(() => import('../features/purchase/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
@@ -115,9 +117,10 @@ const StockPositionPage = lazy(() => import('../features/inventory/StockPosition
 const TransfersPage = lazy(() => import('../features/inventory/TransfersPage').then(m => ({ default: m.TransfersPage })));
 const ERPLocationsPage = lazy(() => import('../features/inventory/LocationsPage').then(m => ({ default: m.LocationsPage })));
 const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage').then(m => ({ default: m.FaultyPartsPage })));
-const ServiceUsagePage = lazy(() => import('../features/inventory/ServiceUsagePage').then(m => ({ default: m.ServiceUsagePage })));
-const ZoneRequestsPage = lazy(() => import('../features/inventory/ZoneRequestsPage').then(m => ({ default: m.ZoneRequestsPage })));
-const ValuationAgeingPage = lazy(() => import('../features/inventory/ValuationAgeingPage').then(m => ({ default: m.ValuationAgeingPage })));
+// Hidden: Service Usage, Zone Requests, Valuation & Ageing out of scope
+// const ServiceUsagePage = lazy(() => import('../features/inventory/ServiceUsagePage').then(m => ({ default: m.ServiceUsagePage })));
+// const ZoneRequestsPage = lazy(() => import('../features/inventory/ZoneRequestsPage').then(m => ({ default: m.ZoneRequestsPage })));
+// const ValuationAgeingPage = lazy(() => import('../features/inventory/ValuationAgeingPage').then(m => ({ default: m.ValuationAgeingPage })));
 const MonthEndAuditPage = lazy(() => import('../features/inventory/MonthEndAuditPage').then(m => ({ default: m.MonthEndAuditPage })));
 
 // ── ERP — Parties (Lazy Loaded) ───────────────────────────────
@@ -233,15 +236,16 @@ const router = createBrowserRouter([
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
-      { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
-      { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
-      { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> },
+      // Hidden: Task Allocation duplicates Tasks List (crm/tasks)
+      // { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
+      // { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
+      // { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> }, // Hidden: duplicate of crm/leads/stage-tasks
       { path: 'crm/projects', element: <Page component={ProjectsPage} /> },
       { path: 'crm/contracts', element: <Page component={ContractsPage} /> },
       { path: 'crm/contracts/:id', element: <Page component={ContractDetailPage} /> },
       { path: 'crm/projects/:id', element: <Page component={ProjectDetailPage} /> },
       { path: 'crm/deals', element: <Page component={DealsPage} /> },
-      { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> },
+      // { path: 'crm/user-allocation', element: <Page component={UserAllocationPage} /> }, // Hidden: User Tracking & field GPS map out of scope
       { path: 'crm/system-setup', element: <Page component={CRMSystemSetupPage} /> },
       { path: 'crm/reports', element: <Page component={CRMReportsPage} /> },
       { path: 'crm/quotations', element: <Page component={QuotationsPage} /> },
@@ -268,8 +272,8 @@ const router = createBrowserRouter([
       { path: 'sales/returns', element: <Page component={SalesReturnsPage} /> },
       { path: 'sales/payments', element: <Page component={PaymentInPage} /> },
       { path: 'sales/delivery', element: <Page component={DeliveryChallansPage} /> },
-      { path: 'sales/warranty', element: <Page component={WarrantyListPage} /> },
-      { path: 'warranty', element: <Navigate to="/sales/warranty" replace /> },
+      // { path: 'sales/warranty', element: <Page component={WarrantyListPage} /> }, // Hidden: Warranty Cards out of scope
+      // { path: 'warranty', element: <Navigate to="/sales/warranty" replace /> },
 
       // ── Purchase ──────────────────────────────────────────
       { path: 'purchase', element: <Navigate to="/purchase/orders" replace /> },
@@ -303,9 +307,9 @@ const router = createBrowserRouter([
       { path: 'inventory/transfers', element: <Page component={TransfersPage} /> },
       { path: 'inventory/locations', element: <Page component={ERPLocationsPage} /> },
       { path: 'inventory/faulty-parts', element: <Page component={FaultyPartsPage} /> },
-      { path: 'inventory/service-usage', element: <Page component={ServiceUsagePage} /> },
-      { path: 'inventory/zone-requests', element: <Page component={ZoneRequestsPage} /> },
-      { path: 'inventory/valuation', element: <Page component={ValuationAgeingPage} /> },
+      // { path: 'inventory/service-usage', element: <Page component={ServiceUsagePage} /> }, // Hidden: Service Usage out of scope
+      // { path: 'inventory/zone-requests', element: <Page component={ZoneRequestsPage} /> }, // Hidden: Zone Requests out of scope
+      // { path: 'inventory/valuation', element: <Page component={ValuationAgeingPage} /> }, // Hidden: Valuation & Ageing out of scope
       { path: 'inventory/audit', element: <Page component={MonthEndAuditPage} /> },
 
       // ── Legacy Root Aliases ───────────────────────────────
@@ -353,8 +357,8 @@ const router = createBrowserRouter([
       { path: 'hrms/recruitment/applications', element: <Page component={Applications} /> },
       { path: 'hrms/recruitment/offers', element: <Page component={Offers} /> },
       { path: 'hrms/recruitment/onboarding', element: <Page component={Onboarding} /> },
-      { path: 'hrms/recruitment/career', element: <Page component={Career} /> },
-      { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> },
+      // { path: 'hrms/recruitment/career', element: <Page component={Career} /> }, // Hidden: Career Portal out of scope
+      // { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> }, // Hidden: Screening Questions out of scope
       // { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> }, // Hidden: Recruitment Funnel feature commented out
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },

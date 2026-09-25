@@ -80,7 +80,8 @@ export default function Topbar() {
   const alertsReady = useIdleReady();
   const items = alertsReady ? erp?.items : undefined;
   const deliveryChallans = alertsReady ? erp?.deliveryChallans : undefined;
-  const zoneRequests = alertsReady ? erp?.zoneRequests : undefined;
+  // const zoneRequests = alertsReady ? erp?.zoneRequests : undefined; // Hidden: Zone Requests out of scope
+  const zoneRequests = undefined;
   const salesInvoices = alertsReady ? erp?.invoices : undefined;
   const isCrmRoute = pathname === '/crm' || pathname.startsWith('/crm/');
 
@@ -112,16 +113,17 @@ export default function Topbar() {
         path: '/inventory/items',
       });
     }
-    if (pendingZoneRequests.length > 0) {
-      list.push({
-        id: 'zone-request-alert',
-        title: `Pending Zone Requests (${pendingZoneRequests.length})`,
-        desc: `Technician part requests awaiting warehouse dispatch approval.`,
-        time: 'New',
-        unread: true,
-        path: '/inventory/zone-requests',
-      });
-    }
+    // Hidden: Zone Requests out of scope
+    // if (pendingZoneRequests.length > 0) {
+    //   list.push({
+    //     id: 'zone-request-alert',
+    //     title: `Pending Zone Requests (${pendingZoneRequests.length})`,
+    //     desc: `Technician part requests awaiting warehouse dispatch approval.`,
+    //     time: 'New',
+    //     unread: true,
+    //     path: '/inventory/zone-requests',
+    //   });
+    // }
     if (inTransitChallans.length > 0) {
       list.push({
         id: 'transit-challan-alert',
@@ -143,7 +145,7 @@ export default function Topbar() {
       });
     }
     return list.length > 0 ? list : NOTIFICATIONS;
-  }, [lowStockItems, pendingZoneRequests, inTransitChallans, overdueInvoices]);
+  }, [lowStockItems, /* pendingZoneRequests, */ inTransitChallans, overdueInvoices]);
 
   const [notifTab, setNotifTab] = useState('all'); // 'all' | 'erp' | 'crm_reminders' | 'crm_workflow' | 'crm'
   const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);

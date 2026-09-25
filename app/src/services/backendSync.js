@@ -419,59 +419,60 @@ export const RESOURCES = {
       }),
     };
   })(),
-  warranties: {
-    path: '/sales/warranties/',
-    toApi: (w) => compact({
-      customerId: w.customerId || w.partyId || undefined,
-      contact_person: w.contactPerson || w.contact_person || undefined,
-      delivery_challan: w.deliveryChallanId || w.delivery_challan || undefined,
-      sales_invoice: w.salesInvoiceId || w.sales_invoice || undefined,
-      sales_order: w.salesOrderId || w.sales_order || undefined,
-      delivery_date: isoOut(w.deliveryDate || w.delivery_date),
-      delivery_location: w.deliveryLocation || w.delivery_location || undefined,
-      warranty_period: num(w.warrantyPeriod ?? w.warranty_period, 12),
-      warranty_unit: w.warrantyUnit || w.warranty_unit || 'Months',
-      warranty_start_event: w.warrantyStartEvent || w.warranty_start_event || 'dispatch',
-      start_date: isoOut(w.startDate || w.start_date),
-      expiry_date: isoOut(w.expiryDate || w.expiry_date),
-      expiring_soon_days: num(w.expiringSoonDays ?? w.expiring_soon_days, 30),
-      document_status: w.documentStatus || w.document_status || 'Generated',
-      suspended_reason: w.suspendedReason || w.suspendReason || w.suspended_reason || undefined,
-      cancelled_reason: w.cancelledReason || w.cancellationReason || w.cancelled_reason || undefined,
-      void_reason: w.voidReason || w.void_reason || undefined,
-      terms: w.terms || undefined,
-      notes: w.notes || undefined,
-      items: (w.items || []).map((it) => compact({
-        itemId: it.itemId || it.inventoryItemId || undefined,
-        sku: it.sku || undefined,
-        item_name: it.itemName || it.name || it.item_name || undefined,
-        qty: num(it.qty ?? it.quantity, 1),
-        serials: Array.isArray(it.serials) ? it.serials : (Array.isArray(it.serialNumbers) ? it.serialNumbers : (it.serialNumber ? [it.serialNumber] : undefined)),
-      })),
-    }),
-    fromApi: (row) => ({
-      ...row,
-      cardNumber: row.card_number || row.cardNumber,
-      customer: row.customerName || row.customer,
-      customerId: row.customerId,
-      deliveryChallanId: row.delivery_challan,
-      salesInvoiceId: row.sales_invoice,
-      salesOrderId: row.sales_order,
-      deliveryDate: displayIn(row.delivery_date),
-      startDate: displayIn(row.start_date),
-      expiryDate: displayIn(row.expiry_date),
-      warrantyPeriod: row.warranty_period,
-      warrantyUnit: row.warranty_unit,
-      documentStatus: row.document_status || 'Generated',
-      coverageStatus: row.coverageStatus,
-      items: (row.items || []).map((it) => ({
-        ...it,
-        name: it.item_name || it.name || '',
-        quantity: it.qty,
-      })),
-      _synced: true,
-    }),
-  },
+  // Hidden: Warranty Cards out of scope; backend route commented out -- restore by uncommenting this entry.
+  // warranties: {
+  //   path: '/sales/warranties/',
+  //   toApi: (w) => compact({
+  //     customerId: w.customerId || w.partyId || undefined,
+  //     contact_person: w.contactPerson || w.contact_person || undefined,
+  //     delivery_challan: w.deliveryChallanId || w.delivery_challan || undefined,
+  //     sales_invoice: w.salesInvoiceId || w.sales_invoice || undefined,
+  //     sales_order: w.salesOrderId || w.sales_order || undefined,
+  //     delivery_date: isoOut(w.deliveryDate || w.delivery_date),
+  //     delivery_location: w.deliveryLocation || w.delivery_location || undefined,
+  //     warranty_period: num(w.warrantyPeriod ?? w.warranty_period, 12),
+  //     warranty_unit: w.warrantyUnit || w.warranty_unit || 'Months',
+  //     warranty_start_event: w.warrantyStartEvent || w.warranty_start_event || 'dispatch',
+  //     start_date: isoOut(w.startDate || w.start_date),
+  //     expiry_date: isoOut(w.expiryDate || w.expiry_date),
+  //     expiring_soon_days: num(w.expiringSoonDays ?? w.expiring_soon_days, 30),
+  //     document_status: w.documentStatus || w.document_status || 'Generated',
+  //     suspended_reason: w.suspendedReason || w.suspendReason || w.suspended_reason || undefined,
+  //     cancelled_reason: w.cancelledReason || w.cancellationReason || w.cancelled_reason || undefined,
+  //     void_reason: w.voidReason || w.void_reason || undefined,
+  //     terms: w.terms || undefined,
+  //     notes: w.notes || undefined,
+  //     items: (w.items || []).map((it) => compact({
+  //       itemId: it.itemId || it.inventoryItemId || undefined,
+  //       sku: it.sku || undefined,
+  //       item_name: it.itemName || it.name || it.item_name || undefined,
+  //       qty: num(it.qty ?? it.quantity, 1),
+  //       serials: Array.isArray(it.serials) ? it.serials : (Array.isArray(it.serialNumbers) ? it.serialNumbers : (it.serialNumber ? [it.serialNumber] : undefined)),
+  //     })),
+  //   }),
+  //   fromApi: (row) => ({
+  //     ...row,
+  //     cardNumber: row.card_number || row.cardNumber,
+  //     customer: row.customerName || row.customer,
+  //     customerId: row.customerId,
+  //     deliveryChallanId: row.delivery_challan,
+  //     salesInvoiceId: row.sales_invoice,
+  //     salesOrderId: row.sales_order,
+  //     deliveryDate: displayIn(row.delivery_date),
+  //     startDate: displayIn(row.start_date),
+  //     expiryDate: displayIn(row.expiry_date),
+  //     warrantyPeriod: row.warranty_period,
+  //     warrantyUnit: row.warranty_unit,
+  //     documentStatus: row.document_status || 'Generated',
+  //     coverageStatus: row.coverageStatus,
+  //     items: (row.items || []).map((it) => ({
+  //       ...it,
+  //       name: it.item_name || it.name || '',
+  //       quantity: it.qty,
+  //     })),
+  //     _synced: true,
+  //   }),
+  // },
 
   // Purchase pipeline (api.md §6) — same documents, `vendorId` on the wire.
   purchaseOrders: documentResource('/purchase/orders/', {
@@ -593,22 +594,24 @@ export const RESOURCES = {
     fromApi: (row) => ({ ...row, date: displayIn(row.date), _synced: true }),
   },
 
-  serviceUsages: {
-    path: '/inventory/service-usage/',
-    toApi: (u) => compact({
-      itemId: u.itemId || undefined,
-      date: isoOut(u.date),
-      quantity: num(u.quantity ?? u.qty),
-      reference: u.reference || undefined,
-      notes: u.notes || undefined,
-    }),
-    fromApi: (row) => ({ ...row, date: displayIn(row.date), _synced: true }),
-  },
+  // Hidden: Service Usage out of scope; backend route commented out -- restore by uncommenting this entry.
+  // serviceUsages: {
+  //   path: '/inventory/service-usage/',
+  //   toApi: (u) => compact({
+  //     itemId: u.itemId || undefined,
+  //     date: isoOut(u.date),
+  //     quantity: num(u.quantity ?? u.qty),
+  //     reference: u.reference || undefined,
+  //     notes: u.notes || undefined,
+  //   }),
+  //   fromApi: (row) => ({ ...row, date: displayIn(row.date), _synced: true }),
+  // },
 
-  valuationItems: {
-    path: '/inventory/valuation/',
-    fromApi: (row) => ({ ...row, _synced: true }),
-  },
+  // Hidden: Valuation & Ageing out of scope; backend route commented out -- restore by uncommenting this entry.
+  // valuationItems: {
+  //   path: '/inventory/valuation/',
+  //   fromApi: (row) => ({ ...row, _synced: true }),
+  // },
 
   monthEndAudits: {
     path: '/inventory/audits/',
@@ -638,18 +641,19 @@ export const RESOURCES = {
     fromApi: (row) => ({ ...row, reportedOn: displayIn(row.reportedOn), _synced: true }),
   },
 
-  zoneRequests: {
-    path: '/inventory/zone-requests/',
-    toApi: (z) => compact({
-      itemId: z.itemId || undefined,
-      fromZone: z.fromZone || undefined,
-      toZone: z.toZone || undefined,
-      quantity: num(z.quantity ?? z.qty),
-      status: z.status || undefined,
-      notes: z.notes || undefined,
-    }),
-    fromApi: (row) => ({ ...row, _synced: true }),
-  },
+  // Hidden: Zone Requests out of scope; backend route commented out -- restore by uncommenting this entry.
+  // zoneRequests: {
+  //   path: '/inventory/zone-requests/',
+  //   toApi: (z) => compact({
+  //     itemId: z.itemId || undefined,
+  //     fromZone: z.fromZone || undefined,
+  //     toZone: z.toZone || undefined,
+  //     quantity: num(z.quantity ?? z.qty),
+  //     status: z.status || undefined,
+  //     notes: z.notes || undefined,
+  //   }),
+  //   fromApi: (row) => ({ ...row, _synced: true }),
+  // },
 
   bankAccounts: {
     path: '/accounts/bank-accounts/',
@@ -698,10 +702,10 @@ export const PULL_ORDER = [
   'categories', 'units', 'locations', 'items',
   'parties', 'customers', 'vendors',
   'estimates', 'quotations', 'salesOrders', 'proformaInvoices',
-  'deliveryChallans', 'invoices', 'paymentIns', 'cashPaymentReceipts', 'salesReturns', 'warranties',
+  'deliveryChallans', 'invoices', 'paymentIns', 'cashPaymentReceipts', 'salesReturns', /* 'warranties', -- hidden: out of scope */
   'purchaseOrders', 'purchaseBills', 'paymentOuts', 'purchaseReturns', 'expenses',
-  'transfers', 'serviceUsages', 'valuationItems', 'monthEndAudits',
-  'inventoryMovements', 'faultyParts', 'zoneRequests',
+  'transfers', /* 'serviceUsages', 'valuationItems', -- hidden: out of scope */ 'monthEndAudits',
+  'inventoryMovements', 'faultyParts', /* 'zoneRequests', -- hidden: out of scope */
   'bankAccounts', 'chartOfAccounts', 'journalEntries',
 ];
 

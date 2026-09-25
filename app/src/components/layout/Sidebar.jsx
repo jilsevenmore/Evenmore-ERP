@@ -101,10 +101,10 @@ const NAV = [
         defaultOpen: true,
         children: [
           { label: 'Tasks List', to: '/crm/tasks' },
-          { label: 'Task Allocation', to: '/crm/tasks/allocation' },
+          // { label: 'Task Allocation', to: '/crm/tasks/allocation' }, // Hidden: duplicate of Tasks List
         ],
       },
-      { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' },
+      // { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' }, // Hidden: User Tracking & field GPS map out of scope
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
       { label: 'Projects', icon: Briefcase, to: '/crm/projects' },
       { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
@@ -139,7 +139,7 @@ const NAV = [
       { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
-      { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' },
+      // { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' }, // Hidden: Warranty Cards out of scope
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
     ],
@@ -193,9 +193,9 @@ const NAV = [
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
       { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' },
-      { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' },
-      { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests', badgeKey: 'zone' },
-      { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' },
+      // { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' }, // Hidden: Service Usage out of scope
+      // { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests', badgeKey: 'zone' }, // Hidden: Zone Requests out of scope
+      // { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' }, // Hidden: Valuation & Ageing out of scope
       { label: 'Month-End Audit', icon: CalendarCheck, to: '/inventory/audit' },
     ],
   },
@@ -243,8 +243,8 @@ const NAV = [
           { label: 'Applications', to: '/hrms/recruitment/applications' },
           { label: 'Offers', to: '/hrms/recruitment/offers' },
           { label: 'Onboarding', to: '/hrms/recruitment/onboarding' },
-          { label: 'Career', to: '/hrms/recruitment/career' },
-          { label: 'Custom Questions', to: '/hrms/recruitment/questions' },
+          // { label: 'Career', to: '/hrms/recruitment/career' }, // Hidden: Career Portal out of scope
+          // { label: 'Custom Questions', to: '/hrms/recruitment/questions' }, // Hidden: Screening Questions out of scope
           // { label: 'Funnel', to: '/hrms/recruitment/funnel' }, // Hidden: Recruitment Funnel feature commented out
         ],
       },
@@ -581,7 +581,7 @@ export default function Sidebar() {
     const erp = useERP();
     // Reading these is what loads them, so they wait for the same idle moment.
     if (erp && shellReady) {
-      badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0;
+      // badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0; // Hidden: Zone Requests out of scope
       badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
     }
   } catch { }

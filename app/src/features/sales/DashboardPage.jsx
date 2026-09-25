@@ -785,6 +785,7 @@ export const DashboardPage = () => {
             </Link>
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-semibold">
+            {/* Hidden: User Tracking & Zone Requests out of scope
             <Link to="/crm/user-allocation" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <ListChecks size={13} className="text-primary shrink-0" />
               <span className="truncate">Allocation</span>
@@ -792,6 +793,7 @@ export const DashboardPage = () => {
             <Link to="/inventory/zone-requests" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <span className="truncate">Zone Requests ({pendingZoneReqs})</span>
             </Link>
+            */}
             <Link to="/inventory/transfers" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <ArrowLeftRight size={13} className="text-primary shrink-0" />
               <span className="truncate">Transfers ({pendingTransfers})</span>
