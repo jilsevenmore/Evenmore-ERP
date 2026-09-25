@@ -8,8 +8,7 @@ import { Button } from '../../../components/ui/Button';
 import { MockPdfViewer } from '../components/MockPdfViewer';
 import { usePmsStore, validateApprovalDecision } from '../../../stores/pmsStore';
 import { useProofShareStore, shareBlockReason } from '../../../stores/proofShareStore';
-import { fetchPublicShare, decidePublicShare } from '../../../services/pmsSync';
-import { isBackendEnabled } from '../../../services/resourceSync';
+import { fetchPublicShare, decidePublicShare, postPublicComment, toAnnotation } from '../../../services/pmsSync';
 import { formatCurrency } from '../../../utils/currencyUtils';
 
 /**
@@ -106,24 +105,33 @@ function remoteFromPayload(token, P) {
     share: {
       token,
       recipientName: P.recipientName ?? '',
-      message: '',
-      createdBy: '',
+      message: P.message ?? '',
+      createdBy: P.createdBy ?? '',
       expiresAt: P.expiresAt ?? null,
       openedAt: null,
       status: 'Active',
       decision: P.decision ?? null,
       decidedAt: P.decidedAt ?? null,
-      decidedBy: '',
-      revisionReason: '',
+      decidedBy: P.decidedBy ?? '',
+      revisionReason: P.revisionReason ?? '',
     },
     project: {
       id: P.project?.id ?? `remote-${token}`,
       code: P.project?.code ?? '',
       customerName: P.project?.customerName ?? '',
-      productDetails: { productName: P.project?.productName ?? '' },
-      crmOrderId: null,
-      expectedCompletionDate: null,
+      productDetails: {
+        productName: P.project?.productName ?? '',
+        specifications: P.project?.specifications ?? '',
+        // Decimals arrive as strings ("2.0000").
+        orderValue: P.project?.orderValue != null ? Number(P.project.orderValue) : null,
+        quantity: P.project?.quantity != null ? Number(P.project.quantity) : null,
+      },
+      orderItems: Array.isArray(P.project?.items) ? P.project.items : [],
+      crmOrderId: P.project?.orderNumber ?? null,
+      expectedCompletionDate: P.project?.expectedCompletionDate ?? null,
     },
+    company: P.company ?? null,
+    comments: Array.isArray(P.comments) ? P.comments.map(toAnnotation) : [],
     stage: P.stage
       ? { id: P.stage.id, sequence: P.stage.sequence, name: P.stage.name }
       : { id: `stage-${token}`, sequence: '', name: 'Design proof' },
@@ -151,15 +159,16 @@ export default function ClientProofApprovalPage() {
 
   const localShare = useMemo(() => shares.find((s) => s.token === token) ?? null, [shares, token]);
 
-  // Public mode: the link opened where the issuing browser's memory is
-  // unavailable (new tab, client device). Resolve it via the public API —
-  // the local store alone can never see it there.
+  // The link is resolved through the public API — always. The recipient is a
+  // client on their own device with no account, so this must not depend on a
+  // staff session (gating it on one made every sent link read "not valid").
+  // Only when the server does not know the token (offline / demo mode) does
+  // the page fall back to the copy this browser issued.
   const [remote, setRemote] = useState(null);
-  const [remoteState, setRemoteState] = useState('idle'); // idle|loading|ready|invalid|expired|revoked
+  const [remoteState, setRemoteState] = useState(token ? 'loading' : 'invalid'); // loading|ready|invalid|expired|revoked
 
   useEffect(() => {
-    if (localShare || !token || !isBackendEnabled()) return;
-    if (remote || remoteState !== 'idle') return;
+    if (!token) return undefined;
     let cancelled = false;
     setRemoteState('loading');
     fetchPublicShare(token)
@@ -175,28 +184,29 @@ export default function ClientProofApprovalPage() {
     return () => {
       cancelled = true;
     };
-  }, [localShare, token, remote, remoteState]);
+  }, [token]);
 
-  const share = localShare ?? remote?.share ?? null;
+  const useLocal = !remote && remoteState === 'invalid' && Boolean(localShare);
+  const share = remote?.share ?? (useLocal ? localShare : null);
   const block = shareBlockReason(share);
 
   const project = useMemo(
-    () => (localShare
+    () => (useLocal
       ? projects.find((p) => p.id === localShare.projectId) ?? null
       : remote?.project ?? null),
-    [localShare, projects, remote]
+    [useLocal, localShare, projects, remote]
   );
   const stage = useMemo(
-    () => (localShare
+    () => (useLocal
       ? project?.stages?.find((s) => s.id === localShare.stageId) ?? null
       : remote?.stage ?? null),
-    [localShare, project, remote]
+    [useLocal, localShare, project, remote]
   );
   const doc = useMemo(
-    () => (localShare
+    () => (useLocal
       ? stage?.documents?.find((d) => d.id === localShare.documentId) ?? null
       : remote?.doc ?? null),
-    [localShare, stage, remote]
+    [useLocal, localShare, stage, remote]
   );
 
   const [decision, setDecision] = useState('Approved');
@@ -205,6 +215,23 @@ export default function ClientProofApprovalPage() {
   const [revisionReason, setRevisionReason] = useState('');
   const [errors, setErrors] = useState({});
   const [receipt, setReceipt] = useState(null);
+  // Local mode (no backend) keeps the thread in memory; public mode uses the server's.
+  const [localThread, setLocalThread] = useState([]);
+  const thread = remote ? remote.comments : localThread;
+
+  /** The client's side of the review thread — lands next to the team's notes. */
+  async function addThreadComment({ page, text }) {
+    const author = approverName.trim() || share?.recipientName || 'Client';
+    if (remote) {
+      const rows = await postPublicComment(share.token, { text, page, authorName: author });
+      if (rows) setRemote((prev) => (prev ? { ...prev, comments: rows.map(toAnnotation) } : prev));
+      return;
+    }
+    setLocalThread((prev) => [
+      ...prev,
+      { id: `${Date.now()}`, page, text, author, authorType: 'Client', createdAt: new Date().toISOString() },
+    ]);
+  }
 
   useEffect(() => {
     if (share?.recipientName) setApproverName(share.recipientName);
@@ -213,8 +240,8 @@ export default function ClientProofApprovalPage() {
   // Stamp the open so the project manager can see the client has looked at it.
   // Local mode only — the server stamps public opens on first fetch itself.
   useEffect(() => {
-    if (localShare && !block) markOpened(localShare.token);
-  }, [localShare, block, markOpened]);
+    if (useLocal && !block) markOpened(localShare.token);
+  }, [useLocal, localShare, block, markOpened]);
 
   const isRevision = decision === 'Need Improvement';
 
@@ -232,7 +259,7 @@ export default function ClientProofApprovalPage() {
 
     // Public mode: the client has no account, so the decision travels with
     // the link token instead of the staff write path.
-    if (!localShare && remote) {
+    if (remote) {
       decidePublicShare(share.token, {
         decision: value,
         decidedBy: by,
@@ -463,11 +490,46 @@ export default function ClientProofApprovalPage() {
         </p>
       </section>
 
-      {/* The drawing itself */}
+      {/* What is being made — the order lines behind this design */}
+      {(project.orderItems ?? []).length > 0 && (
+        <section className="rounded-xl border border-[#dce5f4] bg-white shadow-2xs overflow-hidden">
+          <header className="flex items-center gap-1.5 px-5 py-3 border-b border-[#dce5f4]">
+            <Package size={13} className="text-blue-500" />
+            <h2 className="text-sm font-bold text-slate-800">Product description</h2>
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[11px]">
+              <thead className="bg-[#f6f9ff] text-[10px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-2 font-semibold">Product</th>
+                  <th className="px-3 py-2 font-semibold">Description</th>
+                  <th className="px-5 py-2 font-semibold text-right">Quantity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#eef2f8]">
+                {project.orderItems.map((item, i) => (
+                  <tr key={`${item.name}-${i}`}>
+                    <td className="px-5 py-2 font-semibold text-slate-800">{item.name || '—'}</td>
+                    <td className="px-3 py-2 text-slate-600 whitespace-pre-wrap">
+                      {item.description && item.description !== item.name ? item.description : '—'}
+                    </td>
+                    <td className="px-5 py-2 text-right text-slate-700 whitespace-nowrap">
+                      {Number(item.qty)} {item.uom || ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* The drawing itself, with the review thread beside it */}
       <MockPdfViewer
         document={doc}
         projectName={productDetails.productName}
-        readOnly
+        annotations={thread}
+        onAddAnnotation={addThreadComment}
       />
 
       {/* Decision */}

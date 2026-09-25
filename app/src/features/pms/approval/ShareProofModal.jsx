@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertCircle, Link2, Copy, Check, ExternalLink, Ban, Building2, FileText, Clock, Mail,
+  MessageCircle,
 } from 'lucide-react';
 import { Modal } from '../../../components/ui/Modal';
 import { Button } from '../../../components/ui/Button';
@@ -48,10 +49,17 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
   const [issued, setIssued] = useState(null);
   const [copied, setCopied] = useState(false);
   const [errors, setErrors] = useState({});
+  const [generating, setGenerating] = useState(false);
 
+  // Reset only when the modal opens or the version changes. Keyed on ids, not
+  // the objects: issuing a link circulates the proof, which rewrites the
+  // project in the store — keyed on the object, that wiped the freshly issued
+  // link (and the note) the moment it appeared.
+  const docId = doc?.id;
+  const customerName = project?.customerName ?? '';
   useEffect(() => {
     if (!isOpen) return;
-    setRecipientName(project?.customerName ?? '');
+    setRecipientName(customerName);
     setRecipientEmail('');
     setValidityDays(DEFAULT_VALIDITY_DAYS);
     setMessage('');
@@ -59,14 +67,35 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
     setCopied(false);
     setErrors({});
     // Pull this version's links so a live one shows instead of a blank form.
-    if (doc?.id) loadShares(doc.id).catch(() => {});
-  }, [isOpen, project, doc, loadShares]);
+    if (docId) loadShares(docId).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- customerName is the opening default only
+  }, [isOpen, docId, loadShares]);
 
   // An existing live link is what the modal shows first — no need to re-issue.
   // A row without a token can never open (e.g. issued before the token
   // mapping fix) — never let it masquerade as the live link.
   const active = issued ?? (existing?.token ? existing : null);
   const activeUrl = active ? shareUrlFor(active.token) : '';
+
+  // Ready-to-send wording for the email / WhatsApp buttons.
+  const productName = project?.productDetails?.productName || 'your order';
+  const sendTo = active?.recipientName || recipientName || project?.customerName || '';
+  const note = active?.message || message.trim();
+  const shareSubject = `Design approval: ${productName} (${project?.code || project?.id || ''})`;
+  const shareBody = [
+    `Hello${sendTo ? ` ${sendTo}` : ''},`,
+    '',
+    `Please review the design proof for ${productName} — ${doc?.fileName} (v${doc?.version}.0).`,
+    ...(note ? ['', note] : []),
+    '',
+    'You can view the drawing and product details, leave comments, and approve or reject it here:',
+    activeUrl,
+    '',
+    `This link is valid until ${stamp(active?.expiresAt)}.`,
+  ].join('\n');
+  const recipientEmailFor = active?.recipientEmail || recipientEmail.trim();
+  const mailtoHref = `mailto:${encodeURIComponent(recipientEmailFor)}?subject=${encodeURIComponent(shareSubject)}&body=${encodeURIComponent(shareBody)}`;
+  const whatsappHref = `https://wa.me/?text=${encodeURIComponent(shareBody)}`;
 
   async function copyLink() {
     try {
@@ -86,22 +115,41 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
       found.recipientEmail = 'That does not look like an email address.';
     }
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    if (Object.keys(found).length > 0 || generating) return;
 
-    const share = await createShare({
-      projectId: project.id,
-      stageId: stage.id,
-      documentId: doc.id,
-      documentVersion: doc.version,
-      fileName: doc.fileName,
-      fileKey: doc.fileKey ?? null,
-      mimeType: doc.mimeType ?? null,
-      recipientName: recipientName.trim(),
-      recipientEmail: recipientEmail.trim(),
-      createdBy: project.projectManager?.name ?? '',
-      validityDays: Number(validityDays) || DEFAULT_VALIDITY_DAYS,
-      message: message.trim(),
-    });
+    // A failed request used to reject unhandled — the button looked dead.
+    let share = null;
+    setGenerating(true);
+    try {
+      share = await createShare({
+        projectId: project.id,
+        stageId: stage.id,
+        documentId: doc.id,
+        documentVersion: doc.version,
+        fileName: doc.fileName,
+        fileKey: doc.fileKey ?? null,
+        mimeType: doc.mimeType ?? null,
+        recipientName: recipientName.trim(),
+        recipientEmail: recipientEmail.trim(),
+        createdBy: project.projectManager?.name ?? '',
+        validityDays: Number(validityDays) || DEFAULT_VALIDITY_DAYS,
+        message: message.trim(),
+      });
+    } catch (err) {
+      setErrors({ form: err?.message || 'The server could not issue a link. Please try again.' });
+      return;
+    } finally {
+      setGenerating(false);
+    }
+
+    if (!share || !share.token) {
+      setErrors({
+        form: share
+          ? 'The server could not issue a link. Please try again.'
+          : 'Approval links need the server — this project is not connected to the backend.',
+      });
+      return;
+    }
 
     // Issuing a link is the circulation. If the proof has not been sent yet,
     // open the approval record now so the stage reads "awaiting decision".
@@ -110,11 +158,6 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
         approverName: recipientName.trim(),
         actor: project.projectManager,
       });
-    }
-
-    if (!share || !share.token) {
-      setErrors({ recipientName: 'The server could not issue a link. Please try again.' });
-      return;
     }
 
     setIssued(share);
@@ -150,7 +193,9 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
         ) : (
           <>
             <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
-            <Button type="submit" form="pms-share-proof" icon={Link2}>Generate Link</Button>
+            <Button type="submit" form="pms-share-proof" icon={Link2} disabled={generating}>
+              {generating ? 'Generating…' : 'Generate Link'}
+            </Button>
           </>
         )
       }
@@ -173,7 +218,7 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
                 <span className="font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600">
                   v{doc.version}.0
                 </span>
-                {doc.fileKey ? (
+                {doc.fileKey || doc.fileData || (doc.previewUrl && !doc.previewUrl.startsWith('/mock/')) ? (
                   <span className="font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
                     File attached
                   </span>
@@ -188,7 +233,7 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
 
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 pt-3 border-t border-[#dce5f4]">
             {[
-              ['Project', project.id],
+              ['Project', project.code || project.id],
               ['CRM order', project.crmOrderId ?? '—'],
               ['Order value', formatCurrency(project.productDetails?.orderValue ?? 0)],
               ['Quantity', project.productDetails?.quantity ?? '—'],
@@ -240,6 +285,27 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
                   <AlertCircle size={11} /> {errors.copy}
                 </p>
               )}
+
+              {/* Send it — opens the mail app / WhatsApp with the message filled in */}
+              <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                <span className="text-[11px] font-semibold text-slate-500">Send via</span>
+                <a
+                  href={mailtoHref}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce5f4] bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                  title={recipientEmailFor ? `Email ${recipientEmailFor}` : 'Open an email with the link'}
+                >
+                  <Mail size={13} /> Email
+                </a>
+                <a
+                  href={whatsappHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#dce5f4] bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:border-emerald-300 hover:text-emerald-700"
+                  title="Share the link on WhatsApp"
+                >
+                  <MessageCircle size={13} /> WhatsApp
+                </a>
+              </div>
             </div>
 
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg border border-[#dce5f4] bg-white px-3 py-2.5">
@@ -259,9 +325,9 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
             <p className="flex items-start gap-1.5 text-[11px] text-slate-600 bg-[#f6f9ff] border border-[#dce5f4] rounded-lg px-3 py-2">
               <Clock size={12} className="shrink-0 mt-0.5 text-blue-500" />
               <span>
-                Anyone with this link can view the drawing and the order details, and record an
-                <strong> Approve</strong> or <strong> Reject</strong> decision once. The decision lands back on
-                this project exactly as the internal portal would record it.
+                Anyone with this link can view the drawing, the product description and the order
+                details, leave comments, and record an <strong> Approve</strong> or <strong> Reject</strong>{' '}
+                decision once. Comments and the decision land back on this project&apos;s Design Proofs tab.
               </span>
             </p>
           </>
@@ -340,6 +406,12 @@ export function ShareProofModal({ isOpen, onClose, project, stage, document: doc
                 Approve / Reject buttons. Any earlier live link for this version is revoked.
               </span>
             </p>
+
+            {errors.form && (
+              <p className="flex items-start gap-1.5 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                <AlertCircle size={12} className="shrink-0 mt-0.5" /> {errors.form}
+              </p>
+            )}
           </form>
         )}
       </div>

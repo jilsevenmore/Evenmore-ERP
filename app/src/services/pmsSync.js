@@ -344,6 +344,47 @@ export async function decidePublicShare(token, payload = {}) {
   return api.post(`/public/pms/approve/${token}/decide/`, payload);
 }
 
+// ── proof review thread (staff + client, one thread per version) ────────────
+
+function commentRows(body) {
+  return Array.isArray(body) ? body : (body?.results || []);
+}
+
+/** A thread row in the shape the proof viewer's comment panel renders. */
+export function toAnnotation(row) {
+  return {
+    id: row.id,
+    page: row.page ?? null,
+    text: row.text,
+    author: row.author,
+    authorType: row.authorType,
+    createdAt: row.createdAt,
+  };
+}
+
+/** `GET /pms/projects/{id}/documents/{docId}/comments/` */
+export async function pullDocumentComments(projectId, docId) {
+  if (!isBackendEnabled() || !isServerId(docId)) return null;
+  try {
+    return commentRows(await api.get(`${projectPath(projectId)}documents/${docId}/comments/`));
+  } catch (err) {
+    console.warn('[pmsSync] pull proof comments failed:', err?.message || err);
+    return null;
+  }
+}
+
+/** `POST …/comments/` `{ text, page }` — resolves to the whole thread. */
+export async function postDocumentComment(projectId, docId, payload) {
+  if (!isBackendEnabled() || !isServerId(docId)) return null;
+  return commentRows(await api.post(`${projectPath(projectId)}documents/${docId}/comments/`, payload));
+}
+
+/** `POST /public/pms/approve/{token}/comments/` — the client's note, no account needed. */
+export async function postPublicComment(token, payload) {
+  if (!token) return null;
+  return commentRows(await api.post(`/public/pms/approve/${token}/comments/`, payload));
+}
+
 // ── read-only views the server aggregates ───────────────────────────────────
 
 async function readAggregate(path, query, label) {

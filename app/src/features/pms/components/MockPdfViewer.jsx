@@ -11,6 +11,7 @@ import {
   Download,
   ExternalLink,
 } from 'lucide-react';
+import { resolveFileUrl } from '../../../services/api';
 
 /**
  * MockPdfViewer — proof renderer with photo/PDF support and comment stream.
@@ -25,6 +26,12 @@ function pageCountFor(doc) {
   return 2 + (seed % 3); // 2–4 pages
 }
 
+function commentStamp(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
 const SHEET_META = [
   ['Scale', '1:20'],
   ['Material', 'SS-304'],
@@ -36,13 +43,15 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
   const [page, setPage] = useState(1);
   const [zoom, setZoom] = useState(1);
   const [draft, setDraft] = useState('');
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState('');
 
   const pages = useMemo(() => pageCountFor(doc), [doc]);
   const safePage = Math.min(page, pages);
 
   const fileSource =
     doc?.fileData ||
-    (doc?.previewUrl && !doc.previewUrl.startsWith('/mock/') ? doc.previewUrl : null);
+    (doc?.previewUrl && !doc.previewUrl.startsWith('/mock/') ? resolveFileUrl(doc.previewUrl) : null);
   const hasRealFile = Boolean(fileSource);
   const isImage =
     doc?.fileType?.startsWith('image/') ||
@@ -56,31 +65,56 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
     /\.pdf($|\?)/i.test(fileSource || '');
 
   // The browser plugin gives no usable error when an iframe/img source is
-  // dead, so probe the URL with a 1-byte range GET. Same-origin token URLs
-  // need no auth headers; data: URLs (fresh local uploads) skip the probe.
-  // A 'failed' probe renders an explicit fallback with the HTTP status plus
-  // working open/download actions instead of a mysterious grey box.
+  // dead, so the source is fetched first; a 'failed' fetch renders an explicit
+  // fallback with the HTTP status plus working open/download actions instead
+  // of a mysterious grey box.
+  //
+  // PDFs are then shown from a local blob: URL rather than the file URL
+  // itself. The signed download URL is absolute (it names the API host, e.g.
+  // 127.0.0.1:8000 behind the dev proxy, or a separate API domain), so an
+  // <iframe> of it is cross-origin and the server's X-Frame-Options refuses to
+  // be framed — the broken-page icon. A blob belongs to this page's origin, so
+  // framing rules never apply, on any deployment. Images use <img>, which
+  // X-Frame-Options does not govern, so they only get the probe.
   const [sourceState, setSourceState] = useState('ready');
   const [sourceStatus, setSourceStatus] = useState(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState(null);
 
   useEffect(() => {
     setSourceState('ready');
     setSourceStatus(null);
+    setPdfBlobUrl(null);
     if (!fileSource || !hasRealFile || fileSource.startsWith('data:')) return;
     let cancelled = false;
-    fetch(fileSource, { headers: { Range: 'bytes=0-0' } })
-      .then((r) => {
+    let objectUrl = null;
+    const request = isPdf ? fetch(fileSource) : fetch(fileSource, { headers: { Range: 'bytes=0-0' } });
+    request
+      .then(async (r) => {
         if (cancelled) return;
         setSourceStatus(r.status);
-        if (!r.ok) setSourceState('failed');
+        if (!r.ok) {
+          setSourceState('failed');
+          return;
+        }
+        if (!isPdf) return;
+        // Typed explicitly: a file stored as octet-stream would otherwise
+        // download instead of rendering in the frame.
+        const blob = new Blob([await r.arrayBuffer()], { type: 'application/pdf' });
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPdfBlobUrl(objectUrl);
       })
       .catch(() => {
         if (!cancelled) setSourceState('failed');
       });
     return () => {
       cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [fileSource, hasRealFile]);
+  }, [fileSource, hasRealFile, isPdf]);
+
+  // data: URLs (a fresh local upload) are same-origin already.
+  const pdfFrameSrc = fileSource?.startsWith('data:') ? fileSource : pdfBlobUrl;
 
   function handleOpenExternal() {
     if (!fileSource) return;
@@ -141,15 +175,27 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
     );
   }
 
-  function submitComment(e) {
+  async function submitComment(e) {
     e.preventDefault();
     const text = draft.trim();
-    if (!text) return;
-    onAddAnnotation?.({ page: safePage, text });
-    setDraft('');
+    if (!text || posting) return;
+    setPosting(true);
+    setPostError('');
+    try {
+      await onAddAnnotation?.({ page: safePage, text });
+      setDraft('');
+    } catch (err) {
+      setPostError(err?.message || 'Your comment could not be sent. Please try again.');
+    } finally {
+      setPosting(false);
+    }
   }
 
-  const pageComments = annotations.filter((a) => a.page === safePage);
+  // A real PDF/photo scrolls in its own viewer, so there is no page to pin to:
+  // show the whole thread. The schematic sheets page, so filter by sheet there.
+  const pageComments = hasRealFile
+    ? annotations
+    : annotations.filter((a) => !a.page || a.page === safePage);
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-4">
@@ -289,11 +335,18 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
             renderSourceFallback()
           ) : (
             <div className="w-full bg-slate-100 min-h-[480px] h-[58vh] overflow-hidden">
-              <iframe
-                src={fileSource}
-                title={doc.fileName}
-                className="w-full h-full border-0"
-              />
+              {pdfFrameSrc ? (
+                <iframe
+                  src={pdfFrameSrc}
+                  title={doc.fileName}
+                  className="w-full h-full border-0"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-400">
+                  <FileText size={22} className="animate-pulse" />
+                  <span className="text-[11px]">Loading drawing…</span>
+                </div>
+              )}
             </div>
           )
         ) : (
@@ -345,11 +398,13 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
       </div>
 
       {/* Comment stream */}
-      <aside className="rounded-xl border border-[#dce5f4] bg-white flex flex-col" style={{ maxHeight: 420 }}>
+      <aside className="rounded-xl border border-[#dce5f4] bg-white flex flex-col" style={{ maxHeight: hasRealFile ? 'min(58vh, 620px)' : 420, minHeight: 320 }}>
         <header className="flex items-center gap-1.5 px-3 py-2 border-b border-[#dce5f4]">
           <MessageSquare size={12} className="text-slate-400" />
           <span className="text-[11px] font-bold text-slate-700">Comments</span>
-          <span className="text-[10px] text-slate-400 ml-auto">page {safePage}</span>
+          <span className="text-[10px] text-slate-400 ml-auto">
+            {hasRealFile ? `${annotations.length}` : `page ${safePage}`}
+          </span>
         </header>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2.5">
@@ -370,36 +425,61 @@ export function MockPdfViewer({ document: doc, projectName, annotations = [], on
 
           {pageComments.length === 0 && !doc.comments && !doc.revisionReason && (
             <p className="text-[11px] text-slate-400 text-center py-6">
-              No comments on this page yet.
+              {hasRealFile ? 'No comments on this drawing yet.' : 'No comments on this page yet.'}
             </p>
           )}
 
-          {pageComments.map((a) => (
-            <div key={a.id} className="rounded-lg border border-[#dce5f4] px-2.5 py-2">
-              <p className="text-[10px] font-bold text-slate-500 mb-0.5">{a.author ?? 'You'}</p>
-              <p className="text-[11px] text-slate-700">{a.text}</p>
-            </div>
-          ))}
+          {pageComments.map((a) => {
+            const fromClient = a.authorType === 'Client';
+            return (
+              <div
+                key={a.id}
+                className="rounded-lg border px-2.5 py-2"
+                style={fromClient ? { borderColor: '#fcd34d', background: '#fffbeb' } : { borderColor: '#dce5f4' }}
+              >
+                <p className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 mb-0.5">
+                  <span className="truncate">{a.author ?? 'You'}</span>
+                  {fromClient && (
+                    <span className="text-[9px] font-bold px-1.5 py-px rounded-full bg-amber-100 text-amber-800 shrink-0">
+                      Client
+                    </span>
+                  )}
+                  {a.createdAt && (
+                    <span className="ml-auto font-medium text-slate-400 shrink-0">{commentStamp(a.createdAt)}</span>
+                  )}
+                </p>
+                <p className="text-[11px] text-slate-700 whitespace-pre-wrap break-words">{a.text}</p>
+              </div>
+            );
+          })}
         </div>
 
-        <form onSubmit={submitComment} className="p-2.5 border-t border-[#dce5f4] flex gap-1.5">
-          <input
-            type="text"
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={`Comment on page ${safePage}…`}
-            aria-label="Add a comment"
-            className="flex-1 min-w-0 text-[11px] rounded-lg border border-[#dce5f4] px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
-          />
-          <button
-            type="submit"
-            disabled={!draft.trim()}
-            aria-label="Post comment"
-            className="p-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-30"
-          >
-            <Send size={12} />
-          </button>
-        </form>
+        {onAddAnnotation && (
+          <form onSubmit={submitComment} className="p-2.5 border-t border-[#dce5f4]">
+            {postError && (
+              <p className="text-[10.5px] text-rose-600 mb-1.5">{postError}</p>
+            )}
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={hasRealFile ? 'Add a comment…' : `Comment on page ${safePage}…`}
+                aria-label="Add a comment"
+                maxLength={4000}
+                className="flex-1 min-w-0 text-[11px] rounded-lg border border-[#dce5f4] px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+              />
+              <button
+                type="submit"
+                disabled={!draft.trim() || posting}
+                aria-label="Post comment"
+                className="p-1.5 rounded-lg bg-blue-600 text-white disabled:opacity-30"
+              >
+                <Send size={12} />
+              </button>
+            </div>
+          </form>
+        )}
       </aside>
     </div>
   );

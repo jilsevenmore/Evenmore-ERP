@@ -7,6 +7,8 @@ import { ClientApprovalModal } from '../../components/ClientApprovalModal';
 import { ShareProofModal } from '../../approval/ShareProofModal';
 import { UploadProofModal } from './UploadProofModal';
 import { usePmsStore, getProofWorkflowState } from '../../../../stores/pmsStore';
+import { pullDocumentComments, postDocumentComment, toAnnotation } from '../../../../services/pmsSync';
+import { isBackendEnabled, isServerId } from '../../../../services/resourceSync';
 
 /**
  * DocumentsProofTab — the design proofing centre.
@@ -82,6 +84,40 @@ export function DocumentsProofTab({ project }) {
       setVersionId(versions[0].id);
     }
   }, [versions, versionId]);
+
+  // The review thread lives on the server once the version does — the same
+  // thread the client writes to through the approval link.
+  const selectedId = selected?.id;
+  const threadIsRemote = isBackendEnabled() && isServerId(selectedId);
+  useEffect(() => {
+    if (!threadIsRemote) return undefined;
+    let cancelled = false;
+    const load = () => pullDocumentComments(project.id, selectedId).then((rows) => {
+      if (!cancelled && rows) setAnnotations((prev) => ({ ...prev, [selectedId]: rows.map(toAnnotation) }));
+    });
+    load();
+    // The client may be commenting through the link right now.
+    const timer = window.setInterval(load, 30000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [threadIsRemote, project.id, selectedId]);
+
+  async function addComment({ page, text }) {
+    if (threadIsRemote) {
+      const rows = await postDocumentComment(project.id, selectedId, { text, page });
+      if (rows) setAnnotations((prev) => ({ ...prev, [selectedId]: rows.map(toAnnotation) }));
+      return;
+    }
+    setAnnotations((prev) => ({
+      ...prev,
+      [selectedId]: [
+        ...(prev[selectedId] ?? []),
+        { id: `${Date.now()}`, page, text, author: project.projectManager?.name, createdAt: new Date().toISOString() },
+      ],
+    }));
+  }
 
   if (proofStages.length === 0) {
     return (
@@ -275,15 +311,7 @@ export function DocumentsProofTab({ project }) {
               document={selected}
               projectName={project.productDetails?.productName}
               annotations={annotations[selected?.id] ?? []}
-              onAddAnnotation={({ page, text }) =>
-                setAnnotations((prev) => ({
-                  ...prev,
-                  [selected.id]: [
-                    ...(prev[selected.id] ?? []),
-                    { id: `${Date.now()}`, page, text, author: project.projectManager?.name },
-                  ],
-                }))
-              }
+              onAddAnnotation={addComment}
             />
 
             <div className="rounded-xl border border-[#dce5f4] bg-white p-3 shadow-2xs">
