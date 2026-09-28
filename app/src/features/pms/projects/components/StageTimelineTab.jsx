@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, ListChecks, Send, FileText, ShieldCheck, Check, Clock, ArrowRightLeft, Percent, Plus } from 'lucide-react';
+import { Play, ListChecks, Send, FileText, ShieldCheck, Check, Clock, ArrowRightLeft, Percent, Plus, MessageSquare } from 'lucide-react';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { DynamicProgressBar } from '../../components/DynamicProgressBar';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
@@ -74,7 +74,7 @@ function GateBadge({ required, satisfied, label, icon: Icon }) {
   );
 }
 
-function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, onSubmit, onHandoff, readOnly }) {
+function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, onSubmit, onHandoff, onChat, chatUnread = 0, readOnly }) {
   const timing = getStageTiming(stage);
   const tone = DEPARTMENT_TONES[stage.department] ?? { bg: '#f1f5f9', fg: '#475569' };
 
@@ -245,6 +245,21 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
             >
               <ArrowRightLeft size={12} /> Hand Off
             </button>
+            {onChat && stage.department && (
+              <button
+                type="button"
+                onClick={() => onChat(stage)}
+                title={`Open the ${stage.department} team chat`}
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+              >
+                <MessageSquare size={12} /> Chat
+                {chatUnread > 0 && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-600 text-white">
+                    {chatUnread}
+                  </span>
+                )}
+              </button>
+            )}
             {isCurrent && (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 ml-auto">
                 <Clock size={11} /> Active stage
@@ -257,7 +272,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
   );
 }
 
-export function StageTimelineTab({ project, stageConfigs = [], onStart, onManageTasks, onSubmit, onHandoff }) {
+export function StageTimelineTab({ project, stageConfigs = [], onStart, onManageTasks, onSubmit, onHandoff, onChat, chatUnread = {} }) {
   const [isPercentagesOpen, setPercentagesOpen] = useState(false);
   const [isAddDynamicOpen, setAddDynamicOpen] = useState(false);
 
@@ -342,6 +357,8 @@ export function StageTimelineTab({ project, stageConfigs = [], onStart, onManage
               onManageTasks={onManageTasks}
               onSubmit={onSubmit}
               onHandoff={onHandoff}
+              onChat={onChat}
+              chatUnread={chatUnread[stage.department] ?? 0}
             />
           ))}
         </ol>

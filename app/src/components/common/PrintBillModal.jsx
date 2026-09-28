@@ -1,6 +1,13 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, ShieldCheck, FileText } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
+import { companyInitial, joinNonEmpty } from './printLetterhead';
 export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
+    const { companyProfile } = useERP();
+    const companyName = companyProfile?.name || '';
+    const companyAddress = companyProfile?.address || '';
+    const taxLine = joinNonEmpty([companyProfile?.gstin && `GSTIN: ${companyProfile.gstin}`, companyProfile?.pan && `PAN: ${companyProfile.pan}`]);
+    const contactLine = joinNonEmpty([companyProfile?.email && `Email: ${companyProfile.email}`, companyProfile?.phone && `Tel: ${companyProfile.phone}`], ' | ');
     // UX only: Esc dismisses. No logic changes.
     useEffect(() => {
         if (!isOpen) return;
@@ -16,6 +23,7 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
     const totalAmount = bill.total || bill.amount || 0;
     const isPaid = (balanceDue <= 0.01) || bill.status === 'Paid';
     const paidAmount = isPaid ? totalAmount : Math.max(0, totalAmount - balanceDue);
+    const poRef = bill.poRef || bill.linkedPo || '';
     return (<div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
       <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl max-w-4xl w-full my-auto overflow-hidden flex flex-col print:border-none print:shadow-none print:w-full print:max-w-none print:rounded-none">
         {/* Top Control Bar (Screen Only) */}
@@ -44,22 +52,19 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                  H
-                </div>
+                {companyName && (<div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
+                  {companyInitial(companyName)}
+                </div>)}
                 <div>
                   <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
-                    HORIZON ENTERPRISE LOGISTICS
+                    {companyName}
                   </h1>
-                  <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                    Commercial Intake & Inventory Management
-                  </p>
                 </div>
               </div>
               <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                <p>Corporate HQ: 742 Industrial Technology Way, Bldg 4</p>
-                <p>San Jose, CA 95134 • GST/Tax Reg: US-8849201-CORP</p>
-                <p>Email: finance@horizon-enterprise.internal | Tel: +1 (800) 555-0199</p>
+                {companyAddress && <p>{companyAddress}</p>}
+                {taxLine && <p>{taxLine}</p>}
+                {contactLine && <p>{contactLine}</p>}
               </div>
             </div>
 
@@ -76,9 +81,9 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                 <p className="text-xs text-slate-600">
                   Due Date: <strong className="text-slate-900">{bill.dueDate || 'Net 30 Days'}</strong>
                 </p>
-                <p className="text-xs text-blue-700 font-semibold">
-                  Matched PO: {bill.poRef || bill.linkedPo || 'PO-2026-0301'}
-                </p>
+                {poRef && (<p className="text-xs text-blue-700 font-semibold">
+                  Matched PO: {poRef}
+                </p>)}
               </div>
 
               {/* Status Stamp */}
@@ -107,11 +112,7 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                   <p>{bill.billingAddress.country || 'India'}</p>
                 </div>
               ) : (
-                <>
-                  <p className="text-slate-600 text-[11px]">Authorized Enterprise Hardware Supplier</p>
-                  <p className="text-slate-500 text-[11px]">Payment Terms: {bill.dueDate || 'Net 30'}</p>
-                  <p className="text-slate-500 text-[11px]">Account ID: VEND-{String(bill.vendor || 'VEN').slice(0, 3).toUpperCase()}-901</p>
-                </>
+                bill.dueDate ? <p className="text-slate-500 text-[11px]">Payment Due: {bill.dueDate}</p> : null
               )}
             </div>
 
@@ -120,7 +121,7 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 CONSIGNEE / SHIP TO
               </span>
-              <p className="text-sm font-bold text-slate-900">Horizon Enterprise Corp.</p>
+              <p className="text-sm font-bold text-slate-900">{companyName || '—'}</p>
               {bill.shippingAddress && (bill.shippingAddress.street || bill.shippingAddress.city) ? (
                 <div className="text-slate-600 text-[11px] leading-tight space-y-0.5 pt-0.5">
                   <p>{bill.shippingAddress.street}</p>
@@ -128,11 +129,7 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                   <p>{bill.shippingAddress.country || 'India'}</p>
                 </div>
               ) : (
-                <>
-                  <p className="text-slate-600 text-[11px]">Receiving Dock: Central Warehouse Bay A-1</p>
-                  <p className="text-slate-500 text-[11px]">Intake Verification: GRN 3-Way Matched (100%)</p>
-                  <p className="text-slate-500 text-[11px]">GL Account: 2010 - Accounts Payable Liability</p>
-                </>
+                companyAddress ? <p className="text-slate-600 text-[11px]">{companyAddress}</p> : null
               )}
             </div>
           </div>
@@ -157,8 +154,7 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                 {(!bill.items || bill.items.length === 0) ? (<tr>
                     <td className="py-2.5 px-3 text-center font-mono">1</td>
                     <td className="py-2.5 px-3">
-                      <p className="font-bold text-slate-900">Enterprise Hardware Intake</p>
-                      <p className="text-[10px] text-slate-500 font-mono">SKU-HW-DEFAULT • Storage Bay A-1</p>
+                      <p className="font-bold text-slate-900">{bill.description || 'Billed amount'}</p>
                     </td>
                     <td className="py-2.5 px-3 text-center font-mono font-semibold">1</td>
                     <td className="py-2.5 px-3 text-right font-mono">${totalAmount.toFixed(2)}</td>
@@ -170,13 +166,13 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                       <td className="py-2.5 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
                       <td className="py-2.5 px-3">
                         <p className="font-bold text-slate-900">{it.description || it.itemSku || 'Part Item'}</p>
-                        <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku || `SKU-PART-${idx + 1}`}</p>
+                        {it.itemSku && <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku}</p>}
                       </td>
                       <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{it.qty}</td>
-                      <td className="py-2.5 px-3 text-right font-mono">${it.rate.toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono">${Number(it.rate || 0).toFixed(2)}</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{it.tax || 0}%</td>
                       <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                        ${(it.amount || it.qty * it.rate).toFixed(2)}
+                        ${Number(it.amount || (Number(it.qty) || 0) * (Number(it.rate) || 0)).toFixed(2)}
                       </td>
                     </tr>)))}
               </tbody>
@@ -192,7 +188,9 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
                 Audit Verification Details
               </span>
               <p className="text-[10px] text-slate-500 leading-normal">
-                This bill has been matched against Purchase Order <strong>{bill.poRef || 'PO-2026'}</strong> and verified at the warehouse goods receiving dock. All items entered into physical stock.
+                {poRef
+                  ? <>This bill has been matched against Purchase Order <strong>{poRef}</strong> and verified at the warehouse goods receiving dock.</>
+                  : 'This bill is recorded against the supplier account for payables reconciliation.'}
               </p>
             </div>
 
@@ -233,7 +231,7 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
               </div>
               <div>
                 <p className="font-bold text-slate-900">Warehouse Receiving Dock Inspector</p>
-                <p className="text-[10px] text-slate-500">Horizon Logistics Receiving Authority</p>
+                {companyName && <p className="text-[10px] text-slate-500">{companyName}</p>}
               </div>
             </div>
 
@@ -243,14 +241,14 @@ export const PrintBillModal = ({ isOpen, onClose, bill, balanceDue = 0, }) => {
               </div>
               <div>
                 <p className="font-bold text-slate-900">Corporate Finance & Comptroller</p>
-                <p className="text-[10px] text-slate-500">Horizon Enterprise Finance Department</p>
+                {companyName && <p className="text-[10px] text-slate-500">{companyName}</p>}
               </div>
             </div>
           </div>
 
           {/* Footer Notice */}
           <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">
-            Official Enterprise Record generated by Horizon ERP v2.0 • Retain this voucher for tax compliance & financial auditing.
+            Official record generated by Evenmore ERP • Retain this voucher for tax compliance & financial auditing.
           </div>
         </div>
         </div>

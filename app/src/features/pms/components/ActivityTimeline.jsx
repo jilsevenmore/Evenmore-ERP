@@ -12,6 +12,8 @@ import {
   Sliders,
   CircleDot,
   PlayCircle,
+  Paperclip,
+  MessageSquareX,
 } from 'lucide-react';
 import { EmptyStatePms } from './EmptyStatePms';
 
@@ -39,6 +41,8 @@ const ACTION_NODES = {
   STAGE_HANDOFF: { icon: ArrowRight, bg: '#e0e7ff', fg: '#3730a3', label: 'Handoff' },
   STAGE_COMPLETED: { icon: CheckCheck, bg: '#dcfce7', fg: '#166534', label: 'Completed' },
   PROJECT_COMPLETED: { icon: CheckCheck, bg: '#dcfce7', fg: '#166534', label: 'Completed' },
+  CHAT_FILE_SHARED: { icon: Paperclip, bg: '#f3e8ff', fg: '#6b21a8', label: 'Shared' },
+  CHAT_MESSAGE_DELETED: { icon: MessageSquareX, bg: '#f1f5f9', fg: '#475569', label: 'Chat' },
 };
 
 const FALLBACK_NODE = { icon: CircleDot, bg: '#f1f5f9', fg: '#475569', label: 'Activity' };

@@ -92,12 +92,20 @@ function getPolicyStatusBadge(status) {
   }
 }
 
+const NO_USER = {};
+
 export function CompanyPolicyModule({ forcedSection }) {
   const location = useLocation();
   const navigate = useNavigate();
   const showToast = useAppStore((s) => s.showToast || s.setToast);
   const employees = useAppStore((s) => s.employees || []);
-  const currentUser = useAppStore((s) => s.currentUser || { name: "Adarsh Gupta", role: "Operations Admin" });
+  const sessionUser = useAppStore((s) => s.currentUser);
+  const currentUser = sessionUser || NO_USER;
+  const currentEmployee = employees.find(
+    (e) => (currentUser.employeeId && e.id === currentUser.employeeId) || (currentUser.name && e.name === currentUser.name)
+  );
+  const myEmployeeId = currentUser.employeeId || currentEmployee?.id || "";
+  const myDept = currentEmployee?.department || "";
 
   const {
     policies,
@@ -308,20 +316,20 @@ export function CompanyPolicyModule({ forcedSection }) {
   // Current user's pending acknowledgements
   const myPendingAcks = useMemo(() => {
     return acknowledgements.filter(
-      (a) => (a.employeeName === currentUser?.name || a.employeeId === "EMP-USR") && a.status !== "Acknowledged"
+      (a) => (a.employeeName === currentUser?.name || (myEmployeeId && a.employeeId === myEmployeeId)) && a.status !== "Acknowledged"
     );
-  }, [acknowledgements, currentUser]);
+  }, [acknowledgements, currentUser, myEmployeeId]);
 
   // Map policyId -> user has acknowledged
   const userAckMap = useMemo(() => {
     const map = {};
     acknowledgements
-      .filter((a) => (a.employeeName === currentUser?.name || a.employeeId === "EMP-USR") && a.status === "Acknowledged")
+      .filter((a) => (a.employeeName === currentUser?.name || (myEmployeeId && a.employeeId === myEmployeeId)) && a.status === "Acknowledged")
       .forEach((a) => {
         map[a.policyId] = true;
       });
     return map;
-  }, [acknowledgements, currentUser]);
+  }, [acknowledgements, currentUser, myEmployeeId]);
 
   // Filtered policies list based on activeSection & controls
   const filteredPolicies = useMemo(() => {
@@ -1117,7 +1125,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                             ) : (
                               <div>
                                 <div className="text-[11.5px] font-semibold text-slate-700">
-                                  {ackStats.pct}% ({ackStats.acked}/{ackStats.total || 1248})
+                                  {ackStats.pct}% ({ackStats.acked}/{ackStats.total || 0})
                                 </div>
                                 <div className="w-20 h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
                                   <div className="h-full bg-navy rounded-full" style={{ width: `${ackStats.pct}%` }} />
@@ -1430,7 +1438,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                 </thead>
                 <tbody className="divide-y divide-bdr/50">
                   {acknowledgements.map((ack) => {
-                    const isCurrentUser = ack.employeeName === currentUser?.name || ack.employeeId === "EMP-USR";
+                    const isCurrentUser = ack.employeeName === currentUser?.name || (myEmployeeId && ack.employeeId === myEmployeeId);
                     return (
                       <tr key={ack.id} className="hover:bg-off/60 transition">
                         <td className="py-3.5 px-5 font-semibold text-slate-900">
@@ -1468,7 +1476,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                             <button
                               type="button"
                               onClick={() => {
-                                acknowledgePolicy(ack.policyId, currentUser?.name, "EMP-USR", "Operations");
+                                acknowledgePolicy(ack.policyId, currentUser?.name, myEmployeeId, myDept);
                                 showToast?.(`Acknowledged ${ack.policyName}`);
                               }}
                               className="px-3 py-1 rounded-lg bg-navy text-white text-[11.5px] font-bold hover:bg-navy/90 transition shadow-xs cursor-pointer"
@@ -1507,7 +1515,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                   <button
                     type="button"
                     onClick={() => {
-                      acknowledgePolicy(viewPolicy.id, currentUser?.name, "EMP-USR", "Operations");
+                      acknowledgePolicy(viewPolicy.id, currentUser?.name, myEmployeeId, myDept);
                       showToast?.(`Acknowledged policy ${viewPolicy.name}`);
                     }}
                     className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[12.5px] font-semibold transition cursor-pointer flex items-center gap-1.5 shadow-xs"
@@ -1934,7 +1942,7 @@ export function CompanyPolicyModule({ forcedSection }) {
               type="button"
               onClick={() => {
                 if (ackModalPolicy) {
-                  acknowledgePolicy(ackModalPolicy.id, currentUser?.name, "EMP-USR", "Operations");
+                  acknowledgePolicy(ackModalPolicy.id, currentUser?.name, myEmployeeId, myDept);
                   showToast?.(`You have acknowledged "${ackModalPolicy.name}"`);
                   setAckModalPolicy(null);
                 }

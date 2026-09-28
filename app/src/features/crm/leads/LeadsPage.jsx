@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
 import { Users, UserPlus, Clock, TrendingUp } from 'lucide-react';
 import { useCrmStore } from '../../../stores/crmStore';
+import { formatCurrency } from '../../../utils/currencyUtils';
 import { describeError } from '../../../services/crmSync';
 import { exportToCSV } from '../../../services/exportUtils';
 import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
@@ -114,6 +115,21 @@ function getSortValue(lead, field) {
 export default function LeadsPage() {
   const navigate = useNavigate();
   const leadRows = useCrmStore((s) => s.leads);
+  const crmTasks = useCrmStore((s) => s.tasks);
+  const crmDeals = useCrmStore((s) => s.deals);
+  const leadKpis = useMemo(() => {
+    const currency = localStorage.getItem('evenmore_currency') || 'USD ($)';
+    const openDeals = crmDeals.filter((d) => d.stage !== 'Won' && d.stage !== 'Lost' && d.stage !== 'Declined');
+    return {
+      active: leadRows.filter((l) => !/lost/i.test(String(l.status || ''))).length,
+      fresh: leadRows.filter((l) => l.status === 'New' || l.status === 'New Lead').length,
+      pendingTasks: crmTasks.filter((t) => t.status !== 'Completed').length,
+      pipelineDeals: openDeals.length,
+      pipelineValue: formatCurrency(openDeals.reduce((sum, d) => sum + (Number(d.price) || 0), 0), currency, { noDecimals: true }),
+      expected: formatCurrency(leadRows.reduce((sum, l) => sum + (Number(l.amount) || 0), 0), currency),
+      symbol: (currency.match(/\(([^)]+)\)/) || [])[1] || '$',
+    };
+  }, [leadRows, crmTasks, crmDeals]);
   const crmLoading = useCrmStore((s) => s.status.loading);
   const crmError = useCrmStore((s) => s.status.error);
   const createLeadRecord = useCrmStore((s) => s.createLead);
@@ -495,39 +511,24 @@ export default function LeadsPage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-4">
-        <CrmKpiCard label="Total Active Leads" value={leadRows.length} icon={Users} tone="blue">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 12%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+        <CrmKpiCard label="Total Active Leads" value={leadKpis.active} icon={Users} tone="blue">
+          <div className="text-[11px] mt-0.5 text-slate-400">{leadRows.length} total leads</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="New Leads" value={leadRows.filter((l) => l.status === 'New').length || 1} icon={UserPlus} tone="emerald">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 2%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+        <CrmKpiCard label="New Leads" value={leadKpis.fresh} icon={UserPlus} tone="emerald">
+          <div className="text-[11px] mt-0.5 text-slate-400">in the New stage</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="Pending Tasks" value="3" icon={Clock} tone="amber">
-            <div className="text-[11px] font-semibold text-rose-500 mt-0.5 flex items-center gap-1">
-              <span>↓ 4%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+        <CrmKpiCard label="Pending Tasks" value={leadKpis.pendingTasks} icon={Clock} tone="amber">
+          <div className="text-[11px] mt-0.5 text-slate-400">not yet completed</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="Deals in Pipeline" value="6" icon={TrendingUp} tone="purple">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 15%</span>
-              <span className="text-slate-400 font-normal">Rs 1.72 Cr</span>
-          </div>
+        <CrmKpiCard label="Deals in Pipeline" value={leadKpis.pipelineDeals} icon={TrendingUp} tone="purple">
+          <div className="text-[11px] mt-0.5 text-slate-400">{leadKpis.pipelineValue}</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="Total Revenue Expected" value="$17,355,083.00" symbol="$" tone="rose">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 22%</span>
-              <span className="text-slate-400 font-normal">$5,884.00 due</span>
-          </div>
+        <CrmKpiCard label="Total Revenue Expected" value={leadKpis.expected} symbol={leadKpis.symbol} tone="rose">
+          <div className="text-[11px] mt-0.5 text-slate-400">from lead amounts</div>
         </CrmKpiCard>
       </div>
 

@@ -61,12 +61,12 @@ export default function JobDetails() {
   ];
 
   const timelineEvents = [
-    { title: "Job Requisition Created", date: job.createdAt || "15 Sep 2024", done: true },
-    { title: "Applications Intake Started", date: job.startDate || "01 Oct 2024", done: true },
-    { title: "First Candidate Interviews", date: "10 Oct 2024", done: true },
-    { title: "Candidate Shortlisting Round", date: "15 Oct 2024", done: applicants.some((a) => a.stage === "Shortlisted" || a.stage === "Offer" || a.stage === "Hired") },
-    { title: "Formal Offer Formulated", date: "20 Oct 2024", done: applicants.some((a) => a.stage === "Offer" || a.stage === "Hired") },
-    { title: "Candidate Hired & Onboarding", date: "25 Oct 2024", done: applicants.some((a) => a.stage === "Hired") },
+    { title: "Job Requisition Created", date: job.createdAt || "—", done: true },
+    { title: "Applications Intake Started", date: job.startDate || "—", done: applicants.length > 0 },
+    { title: "First Candidate Interviews", date: "—", done: applicants.some((a) => ["Interview", "Shortlisted", "Offer", "Hired"].includes(a.stage)) },
+    { title: "Candidate Shortlisting Round", date: "—", done: applicants.some((a) => a.stage === "Shortlisted" || a.stage === "Offer" || a.stage === "Hired") },
+    { title: "Formal Offer Formulated", date: "—", done: applicants.some((a) => a.stage === "Offer" || a.stage === "Hired") },
+    { title: "Candidate Hired & Onboarding", date: "—", done: applicants.some((a) => a.stage === "Hired") },
   ];
 
   return (
@@ -161,7 +161,7 @@ export default function JobDetails() {
                 Core Responsibilities
               </h3>
               <p className="text-xs text-text leading-relaxed whitespace-pre-line">
-                {job.responsibilities || "Design and implement production features, review architectural decisions, collaborate across product and engineering."}
+                {job.responsibilities || "No responsibilities listed."}
               </p>
             </div>
 
@@ -170,7 +170,8 @@ export default function JobDetails() {
                 Required Technical Skills
               </h3>
               <div className="flex flex-wrap gap-1.5 mt-2">
-                {(job.requiredSkills ? job.requiredSkills.split(",") : ["React", "TypeScript", "Node.js"]).map((sk) => (
+                {!job.requiredSkills && <span className="text-xs text-muted">Not specified</span>}
+                {(job.requiredSkills ? job.requiredSkills.split(",") : []).map((sk) => (
                   <span
                     key={sk}
                     className="text-xs font-semibold px-2.5 py-1 bg-soft border border-border rounded-lg text-text"
@@ -190,22 +191,22 @@ export default function JobDetails() {
             <div className="grid sm:grid-cols-2 gap-4 text-xs">
               <div className="bg-soft/50 border border-border/80 rounded-xl p-3">
                 <span className="text-[10px] font-bold uppercase text-muted block">Lead Recruiter</span>
-                <span className="font-bold text-text mt-0.5 block">{job.recruiter || "Ayesha Khan"}</span>
+                <span className="font-bold text-text mt-0.5 block">{job.recruiter || "—"}</span>
                 <span className="text-[11px] text-muted">Talent Acquisition Lead</span>
               </div>
               <div className="bg-soft/50 border border-border/80 rounded-xl p-3">
                 <span className="text-[10px] font-bold uppercase text-muted block">Hiring Manager</span>
-                <span className="font-bold text-text mt-0.5 block">{job.hiringManager || "David Park"}</span>
+                <span className="font-bold text-text mt-0.5 block">{job.hiringManager || "—"}</span>
                 <span className="text-[11px] text-muted">Department Lead</span>
               </div>
               <div className="bg-soft/50 border border-border/80 rounded-xl p-3">
                 <span className="text-[10px] font-bold uppercase text-muted block">Approved Compensation</span>
-                <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{job.salaryRange || "$85,000 - $115,000 / annum"}</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">{job.salaryRange || "—"}</span>
                 <span className="text-[11px] text-muted">Includes base + bonus</span>
               </div>
               <div className="bg-soft/50 border border-border/80 rounded-xl p-3">
                 <span className="text-[10px] font-bold uppercase text-muted block">Required Experience</span>
-                <span className="font-bold text-text mt-0.5 block">{job.experience || "3-5 years"}</span>
+                <span className="font-bold text-text mt-0.5 block">{job.experience || "—"}</span>
                 <span className="text-[11px] text-muted">Relevant industry background</span>
               </div>
             </div>

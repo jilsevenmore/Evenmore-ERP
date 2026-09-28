@@ -56,14 +56,14 @@ export default function TrainingDashboard({ initialTab }) {
   const completionRate =
     activeTrainings.length > 0
       ? Math.round((completedCount / activeTrainings.length) * 100)
-      : 74;
+      : 0;
 
   const stats = [
     { label: "Active Programs", value: String(activeTrainings.length), icon: BookOpen, color: "bg-[#eff6ff]", iconColor: "text-[#2563eb]" },
     { label: "Enrolled", value: String(totalEnrolled), icon: Users, color: "bg-[#f0fdf4]", iconColor: "text-[#15803d]" },
     { label: "Upcoming", value: String(upcomingCount), icon: Clock, color: "bg-[#fffbeb]", iconColor: "text-[#b45309]" },
     { label: "Completion", value: `${completionRate}%`, icon: TrendingUp, color: "bg-[#faf5ff]", iconColor: "text-[#7c3aed]" },
-    { label: "Certificates", value: String(Math.round(completedCount * 2.8) || 94), icon: Award, color: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
+    { label: "Certificates", value: String(trainings.filter((t) => ["Completed", "Evaluated"].includes(t.stage)).reduce((sum, t) => sum + (Number(t.certificates ?? t.participants) || 0), 0)), icon: Award, color: "bg-[#fef2f2]", iconColor: "text-[#dc2626]" },
   ];
 
   const recentPrograms = trainings.slice(0, 6);
@@ -87,11 +87,16 @@ export default function TrainingDashboard({ initialTab }) {
     );
   };
 
-  const upcomingSessions = [
-    { program: "Leadership Essentials & Coaching 101", session: "Module 1: Self Awareness & Delegation", date: "Oct 18, 9:00 AM", trainer: "Sarah Mitchell" },
-    { program: "Cloud Architecture & Kubernetes Security", session: "Zero-Trust Cluster Ingress", date: "Oct 25, 10:00 AM", trainer: "David Park" },
-    { program: "Design System & Figma Variables Deep Dive", session: "Multi-brand Tokens & Governance", date: "Oct 30, 9:30 AM", trainer: "Marcus Chen" },
-  ];
+  const upcomingSessions = trainings
+    .filter((t) => ["Scheduled", "Trainer Assigned", "Ongoing"].includes(t.stage))
+    .slice(0, 3)
+    .map((t) => ({
+      id: t.id,
+      program: t.name || t.title || "Training",
+      session: t.session || t.type || t.name || "Session",
+      date: [t.start || t.startDate, t.time].filter(Boolean).join(", ") || "—",
+      trainer: t.trainer || "Unassigned",
+    }));
 
   const tabs = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
@@ -266,6 +271,13 @@ export default function TrainingDashboard({ initialTab }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
+                    {recentPrograms.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="py-6 text-center text-[12.5px] text-slate-400">
+                          No training programs yet.
+                        </td>
+                      </tr>
+                    )}
                     {recentPrograms.map((p) => (
                       <tr key={p.id} className="hover:bg-slate-50/50 transition">
                         <td className="py-3 font-semibold text-slate-800">{p.name}</td>
@@ -292,8 +304,11 @@ export default function TrainingDashboard({ initialTab }) {
               <h3 className="text-[15px] font-bold text-slate-800 mb-4">Upcoming Sessions</h3>
 
               <div className="flex flex-col gap-3">
+                {upcomingSessions.length === 0 && (
+                  <div className="text-[12.5px] text-slate-400 text-center py-4">No upcoming sessions.</div>
+                )}
                 {upcomingSessions.map((s) => (
-                  <div key={s.session} className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3.5">
+                  <div key={s.id} className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-3.5">
                     <div className="text-[13px] font-semibold text-slate-800">{s.session}</div>
                     <div className="text-[12px] text-slate-500 mt-1">{s.program}</div>
                     <div className="flex items-center justify-between mt-2">

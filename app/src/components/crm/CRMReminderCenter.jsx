@@ -52,9 +52,11 @@ export function CRMReminderCenter() {
                 Open Tasks
                 <ArrowRight size={14} />
               </Link>
+              {/* Hidden: Task Allocation duplicates Tasks List
               <Link to="/crm/tasks/allocation" className="inline-flex h-10 items-center justify-center gap-2 rounded-[18px] border border-white/15 bg-white/8 px-4 text-[13px] font-semibold text-white transition hover:bg-white/14">
                 Task Allocation
               </Link>
+              */}
             </div>
           </div>
 

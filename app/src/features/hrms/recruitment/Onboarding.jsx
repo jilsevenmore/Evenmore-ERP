@@ -21,6 +21,7 @@ import {
 export default function Onboarding() {
   const {
     candidates,
+    jobs = [],
     offers,
     onboardedMap,
     verifiedDocsMap,
@@ -49,20 +50,17 @@ export default function Onboarding() {
 
     if (!isAlreadyEmployee) {
       const matchingOffer = offers.find((o) => o.candidateId === c.id);
+      const matchedJob = jobs.find((j) => j.id === c.jobId || j.title === c.position);
       const newEmp = {
         id: `EMP${1035 + (employees.length % 50)}`,
         name: c.name,
-        email: c.email || `${String(c.name ?? '').toLowerCase().replace(/\s+/g, ".")}@company.com`,
+        email: c.email || undefined,
         avatar: c.avatar || "https://i.pravatar.cc/100?img=15",
         img: c.avatar || "https://i.pravatar.cc/100?img=15",
-        designation: c.position || "Software Engineer",
-        department: c.position?.includes("Design")
-          ? "Design"
-          : c.position?.includes("HR")
-          ? "HR"
-          : "Engineering",
-        manager: matchingOffer?.reportingManager || "David Park",
-        location: c.location || "New York",
+        designation: c.position || "",
+        department: matchingOffer?.dept || matchedJob?.department || "",
+        manager: matchingOffer?.reportingManager || matchedJob?.hiringManager || "",
+        location: c.location || "",
         joining:
           matchingOffer?.joiningDate ||
           new Date().toLocaleDateString("en-IN", {
@@ -220,11 +218,11 @@ export default function Onboarding() {
                       <div className="text-[12.5px] text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap items-center gap-3">
                         <span>{c.position}</span>
                         <span>•</span>
-                        <span>Experience: {c.experience || "3+ yrs"}</span>
+                        <span>Experience: {c.experience || "—"}</span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
                           <Calendar size={12} className="text-slate-400" />
-                          <span>Joining: {matchingOffer?.joiningDate || "01 Oct 2026"}</span>
+                          <span>Joining: {matchingOffer?.joiningDate || "—"}</span>
                         </span>
                       </div>
                     </div>

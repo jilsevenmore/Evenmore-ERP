@@ -34,20 +34,14 @@ export default function Recruitment() {
       id: c.id,
       name: c.name,
       role: c.position,
-      dept: c.position?.includes("Design")
-        ? "Design"
-        : c.position?.includes("HR")
-        ? "HR"
-        : c.position?.includes("Finance")
-        ? "Finance"
-        : "Engineering",
+      dept: (jobs || []).find((j) => j.id === c.jobId || j.title === c.position)?.department || "—",
       stage: c.stage,
-      applied: c.appliedDate || "10 Sep 2026",
+      applied: c.appliedDate || "—",
       source: c.source || "Direct",
       status: c.stage === "Rejected" ? "Inactive" : "Active",
       avatar: c.avatar,
     }));
-  }, [candidates]);
+  }, [candidates, jobs]);
 
   const COLUMNS = [
     {

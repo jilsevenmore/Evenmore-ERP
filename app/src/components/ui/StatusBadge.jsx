@@ -71,6 +71,17 @@ const STATUS_MAP = {
   'HR Review': 'badge-purple',
   'Finalization': 'badge-green',
 
+  // PMS & Tracking
+  'Not Started': 'badge-gray',
+  'Assigned': 'badge-blue',
+  'Under Review': 'badge-purple',
+  'Need Improvement': 'badge-orange',
+  'At Risk': 'badge-orange',
+  'Delayed': 'badge-red',
+  'Blocked': 'badge-red',
+  'Upcoming': 'badge-gray',
+  'On Hold': 'badge-orange',
+
   // Valuation
   'Posted': 'badge-green',
   'Voided': 'badge-red',

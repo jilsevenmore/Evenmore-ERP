@@ -75,7 +75,9 @@ function lineToApi(line, index) {
     parentLineId: line.parentLineId || undefined,
     isBomPart: line.isBomPart ?? undefined,
     isUserModified: line.isUserModified ?? undefined,
-    serials: Array.isArray(line.serials) ? line.serials : undefined,
+    // Dispatch/sale screens keep the picked units in `selectedSerials`.
+    serials: Array.isArray(line.serials) ? line.serials
+      : (Array.isArray(line.selectedSerials) && line.selectedSerials.length ? line.selectedSerials : undefined),
   });
 }
 
@@ -94,12 +96,15 @@ function lineFromApi(line) {
  * `partyField` is `partyId` on the sales side and `vendorId` on the purchase
  * side — api.md §6.2 names the same column differently there.
  */
-function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}) {
-  const lines = doc.lineItems || doc.items || [];
+function documentToApi(doc, { partyField = 'partyId', partyKeys = [], partial = false } = {}) {
+  // A PATCH carries only what changed. Sending `lineItems: []` there would
+  // replace — i.e. delete — every line of the draft (the server treats the list
+  // as the full set), and defaulting `date` would silently re-date it.
+  const lines = doc.lineItems || doc.items || (partial ? undefined : []);
   const partyId = partyKeys.map((k) => doc[k]).find(Boolean);
   return compact({
     [partyField]: partyId,
-    date: isoOut(doc.date) || isoOut('Today'),
+    date: isoOut(doc.date) || (partial ? undefined : isoOut('Today')),
     dueDate: isoOut(doc.dueDate),
     expectedDate: isoOut(doc.expectedDate || doc.deliveryDate),
     validUntil: isoOut(doc.validUntil || doc.validTill),
@@ -111,8 +116,31 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [] } = {}) {
     otherCharges: doc.otherCharges !== undefined ? num(doc.otherCharges) : undefined,
     roundOff: doc.roundOff !== undefined ? num(doc.roundOff) : undefined,
     discountOverride: doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined,
-    lineItems: lines.map(lineToApi),
+    lineItems: lines ? lines.map(lineToApi) : undefined,
   });
+}
+
+/**
+ * An id the server can resolve, or nothing. Links to documents that only exist
+ * locally (`so-1758…`, or a document *number* some callers put in an id field)
+ * would fail the whole write with a 400, so they are left off instead.
+ */
+function serverRef(value) {
+  return isServerId(value) ? value : undefined;
+}
+
+/** A status the server's enum accepts, or nothing (the UI has a few of its own). */
+function knownStatus(value, allowed) {
+  return allowed.includes(value) ? value : undefined;
+}
+
+/** Copy `row[from]` onto `to` only when the server sent one, so a merge never blanks a local link. */
+function linkIn(row, pairs) {
+  const out = {};
+  Object.entries(pairs).forEach(([to, from]) => {
+    if (row[from]) out[to] = row[from];
+  });
+  return out;
 }
 
 /**
@@ -156,10 +184,18 @@ function documentResource(path, {
 } = {}) {
   return {
     path,
-    toApi: (doc) => documentToApi(doc, { partyField, partyKeys }),
+    toApi: (doc, opts = {}) => documentToApi(doc, { partyField, partyKeys, ...opts }),
     fromApi: (row) => documentFromApi(row, { numberField, partyLabel }),
   };
 }
+
+// Server enums (api.md Appendix A). Only these may be written as a status.
+const ESTIMATE_STATUSES = ['Draft', 'Sent', 'Accepted', 'Rejected', 'Converted', 'Expired'];
+const QUOTATION_STATUSES = ['Draft', 'Sent', 'Viewed', 'Accepted', 'Rejected', 'Expired', 'Confirmed', 'Converted', 'Invoiced', 'Cancelled'];
+const ORDER_STAGES = ['Draft', 'Confirmed', 'Packing', 'Dispatched', 'Delivered', 'Invoiced', 'Cancelled'];
+const PROFORMA_STATUSES = ['Draft', 'Sent', 'Accepted', 'Converted', 'Expired', 'Cancelled'];
+/** Carrier progress after dispatch — `POST /sales/challans/{id}/track/`. */
+export const CHALLAN_TRACK_STATUSES = ['Dispatched', 'In Transit', 'Out for Delivery', 'Delivered'];
 
 // ── parties ─────────────────────────────────────────────────────────────────
 
@@ -295,7 +331,7 @@ export const RESOURCES = {
     }),
     fromApi: (row) => ({
       ...row,
-      manager: row.manager || 'Operations Lead',
+      manager: row.manager || '',
       capacityPct: row.capacityPct ?? 0,
       _synced: true,
     }),
@@ -345,11 +381,129 @@ export const RESOURCES = {
   },
 
   // Sales pipeline (api.md §5)
-  estimates: documentResource('/sales/estimates/', { numberField: 'estimateNumber' }),
-  quotations: documentResource('/sales/quotations/', { numberField: 'quotationNumber' }),
-  salesOrders: documentResource('/sales/orders/', { numberField: 'orderNumber' }),
-  proformaInvoices: documentResource('/sales/proforma-invoices/', { numberField: 'piNumber' }),
-  deliveryChallans: documentResource('/sales/challans/', { numberField: 'challanNumber' }),
+  estimates: (() => {
+    const base = documentResource('/sales/estimates/', { numberField: 'estimateNumber' });
+    return {
+      ...base,
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        status: knownStatus(doc.status, ESTIMATE_STATUSES),
+      }),
+    };
+  })(),
+  quotations: (() => {
+    const base = documentResource('/sales/quotations/', { numberField: 'quotationNumber' });
+    return {
+      ...base,
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        status: knownStatus(doc.status, QUOTATION_STATUSES),
+        estimate: serverRef(doc.sourceEstimateId),
+      }),
+      fromApi: (row) => {
+        const mapped = base.fromApi(row);
+        return {
+          ...mapped,
+          // The screens number quotations as `quoteNumber`.
+          quoteNumber: row.quotationNumber,
+          // A quotation the server converted to an order is the UI's 'Confirmed'.
+          status: mapped.status === 'Converted' ? 'Confirmed' : mapped.status,
+          ...linkIn(row, { sourceEstimateId: 'estimate' }),
+        };
+      },
+    };
+  })(),
+  salesOrders: (() => {
+    const base = documentResource('/sales/orders/', { numberField: 'orderNumber' });
+    return {
+      ...base,
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        stage: knownStatus(doc.stage, ORDER_STAGES),
+        quotation: serverRef(doc.quotationId || doc.sourceQuotationId),
+        totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
+        formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
+        cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        totalSalesValue: row.totalSalesValue !== undefined ? num(row.totalSalesValue) : undefined,
+        formalInvoiceAmount: row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined,
+        cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : undefined,
+        invoice: row.invoice,
+        cashReceipt: row.cashReceipt,
+        ...linkIn(row, { quotationId: 'quotation', sourceQuotationId: 'quotation' }),
+        ...(() => {
+          // Fulfilment as the order screens read it; the server tracks it per
+          // line as dispatchedQty / invoicedQty (bumped by challans and invoices).
+          const lines = (row.lineItems || []).map((line) => {
+            const mapped = lineFromApi(line);
+            const ordered = num(line.qty);
+            const delivered = num(line.dispatchedQty);
+            return {
+              ...mapped,
+              orderedQty: ordered,
+              deliveredQty: delivered,
+              invoicedQty: num(line.invoicedQty),
+              remainingQty: Math.max(0, ordered - delivered),
+            };
+          });
+          return { items: lines, lineItems: lines };
+        })(),
+      }),
+    };
+  })(),
+  proformaInvoices: (() => {
+    // The API names it `proformaNumber`; some screens still read `piNumber`.
+    const base = documentResource('/sales/proforma-invoices/', { numberField: 'proformaNumber' });
+    return {
+      ...base,
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        status: knownStatus(doc.status, PROFORMA_STATUSES),
+        salesOrder: serverRef(doc.salesOrderId),
+        totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
+        formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
+        cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        totalSalesValue: row.totalSalesValue !== undefined ? num(row.totalSalesValue) : undefined,
+        formalInvoiceAmount: row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined,
+        cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : undefined,
+        invoice: row.invoice,
+        cashReceipt: row.cashReceipt,
+        piNumber: row.proformaNumber,
+        ...linkIn(row, { salesOrderId: 'salesOrder' }),
+      }),
+    };
+  })(),
+  deliveryChallans: (() => {
+    const base = documentResource('/sales/challans/', { numberField: 'challanNumber' });
+    return {
+      ...base,
+      // No `status` here: a challan leaves Draft only through `/dispatch/`
+      // (which posts the stock) and moves on through `/track/`.
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        salesOrder: serverRef(doc.salesOrderId || doc.sourceSalesOrderId),
+        quotation: serverRef(doc.sourceQuotationId),
+        dispatchDate: isoOut(doc.dispatchDate),
+        transporter: doc.transporter || undefined,
+        vehicleNumber: doc.vehicleNo || doc.vehicleNumber || undefined,
+        lrNumber: doc.lrNumber || undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        ...linkIn(row, {
+          vehicleNo: 'vehicleNumber',
+          salesOrderId: 'salesOrder',
+          sourceSalesOrderId: 'salesOrder',
+          sourceQuotationId: 'quotation',
+        }),
+      }),
+    };
+  })(),
   invoices: (() => {
     const base = documentResource('/sales/invoices/', { numberField: 'invoiceNumber' });
     return {
@@ -357,66 +511,105 @@ export const RESOURCES = {
       // api.md §5.7: an invoice posts as a Draft unless the create says
       // otherwise. The UI decides that up front, so carry the flag through —
       // finalizing is what allocates the number and posts stock and ledger.
-      toApi: (doc) => ({
-        ...base.toApi(doc),
+      toApi: (doc, opts) => compact({
+        ...base.toApi(doc, opts),
+        salesOrderId: serverRef(doc.salesOrderId || doc.salesOrder),
+        deliveryChallanId: serverRef(doc.deliveryChallanId || doc.deliveryChallan),
+        proformaInvoiceId: serverRef(doc.proformaInvoiceId || doc.proformaInvoice),
+        totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
+        formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
+        cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
         finalize: doc.finalized === true || (doc.status && doc.status !== 'Draft'),
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        ...linkIn(row, {
+          salesOrderId: 'salesOrderId',
+          deliveryChallanId: 'deliveryChallanId',
+          proformaInvoiceId: 'proformaInvoiceId',
+        }),
+        totalSalesValue: row.totalSalesValue !== undefined ? num(row.totalSalesValue) : undefined,
+        formalInvoiceAmount: row.formalInvoiceAmount !== undefined ? num(row.formalInvoiceAmount) : undefined,
+        cashAmount: row.cashAmount !== undefined ? num(row.cashAmount) : 0,
+        totalAllocated: row.totalAllocated !== undefined ? num(row.totalAllocated) : undefined,
+        remainingAmount: row.remainingAmount !== undefined ? num(row.remainingAmount) : 0,
+        revisions: row.revisions || [],
+        cashReceipt: row.cashReceipt || null,
       }),
     };
   })(),
-  salesReturns: documentResource('/sales/returns/', { numberField: 'returnNumber' }),
-  warranties: {
-    path: '/sales/warranties/',
-    toApi: (w) => compact({
-      customerId: w.customerId || w.partyId || undefined,
-      contact_person: w.contactPerson || w.contact_person || undefined,
-      delivery_challan: w.deliveryChallanId || w.delivery_challan || undefined,
-      sales_invoice: w.salesInvoiceId || w.sales_invoice || undefined,
-      sales_order: w.salesOrderId || w.sales_order || undefined,
-      delivery_date: isoOut(w.deliveryDate || w.delivery_date),
-      delivery_location: w.deliveryLocation || w.delivery_location || undefined,
-      warranty_period: num(w.warrantyPeriod ?? w.warranty_period, 12),
-      warranty_unit: w.warrantyUnit || w.warranty_unit || 'Months',
-      warranty_start_event: w.warrantyStartEvent || w.warranty_start_event || 'dispatch',
-      start_date: isoOut(w.startDate || w.start_date),
-      expiry_date: isoOut(w.expiryDate || w.expiry_date),
-      expiring_soon_days: num(w.expiringSoonDays ?? w.expiring_soon_days, 30),
-      document_status: w.documentStatus || w.document_status || 'Generated',
-      suspended_reason: w.suspendedReason || w.suspendReason || w.suspended_reason || undefined,
-      cancelled_reason: w.cancelledReason || w.cancellationReason || w.cancelled_reason || undefined,
-      void_reason: w.voidReason || w.void_reason || undefined,
-      terms: w.terms || undefined,
-      notes: w.notes || undefined,
-      items: (w.items || []).map((it) => compact({
-        itemId: it.itemId || it.inventoryItemId || undefined,
-        sku: it.sku || undefined,
-        item_name: it.itemName || it.name || it.item_name || undefined,
-        qty: num(it.qty ?? it.quantity, 1),
-        serials: Array.isArray(it.serials) ? it.serials : (Array.isArray(it.serialNumbers) ? it.serialNumbers : (it.serialNumber ? [it.serialNumber] : undefined)),
-      })),
-    }),
-    fromApi: (row) => ({
-      ...row,
-      cardNumber: row.card_number || row.cardNumber,
-      customer: row.customerName || row.customer,
-      customerId: row.customerId,
-      deliveryChallanId: row.delivery_challan,
-      salesInvoiceId: row.sales_invoice,
-      salesOrderId: row.sales_order,
-      deliveryDate: displayIn(row.delivery_date),
-      startDate: displayIn(row.start_date),
-      expiryDate: displayIn(row.expiry_date),
-      warrantyPeriod: row.warranty_period,
-      warrantyUnit: row.warranty_unit,
-      documentStatus: row.document_status || 'Generated',
-      coverageStatus: row.coverageStatus,
-      items: (row.items || []).map((it) => ({
-        ...it,
-        name: it.item_name || it.name || '',
-        quantity: it.qty,
-      })),
-      _synced: true,
-    }),
-  },
+  salesReturns: (() => {
+    const base = documentResource('/sales/returns/', { numberField: 'returnNumber' });
+    return {
+      ...base,
+      toApi: (r, opts) => compact({
+        ...base.toApi(r, opts),
+        salesInvoiceId: r.salesInvoiceId || r.invoiceId || r.invoice_id || undefined,
+        reason: r.reason || undefined,
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        creditNoteNumber: row.credit_note_number || row.creditNoteNumber,
+        invoiceId: row.salesInvoiceId || row.sales_invoice,
+        salesInvoiceId: row.salesInvoiceId || row.sales_invoice,
+        reason: row.reason,
+      }),
+    };
+  })(),
+  // Hidden: Warranty Cards out of scope; backend route commented out -- restore by uncommenting this entry.
+  // warranties: {
+  //   path: '/sales/warranties/',
+  //   toApi: (w) => compact({
+  //     customerId: w.customerId || w.partyId || undefined,
+  //     contact_person: w.contactPerson || w.contact_person || undefined,
+  //     delivery_challan: w.deliveryChallanId || w.delivery_challan || undefined,
+  //     sales_invoice: w.salesInvoiceId || w.sales_invoice || undefined,
+  //     sales_order: w.salesOrderId || w.sales_order || undefined,
+  //     delivery_date: isoOut(w.deliveryDate || w.delivery_date),
+  //     delivery_location: w.deliveryLocation || w.delivery_location || undefined,
+  //     warranty_period: num(w.warrantyPeriod ?? w.warranty_period, 12),
+  //     warranty_unit: w.warrantyUnit || w.warranty_unit || 'Months',
+  //     warranty_start_event: w.warrantyStartEvent || w.warranty_start_event || 'dispatch',
+  //     start_date: isoOut(w.startDate || w.start_date),
+  //     expiry_date: isoOut(w.expiryDate || w.expiry_date),
+  //     expiring_soon_days: num(w.expiringSoonDays ?? w.expiring_soon_days, 30),
+  //     document_status: w.documentStatus || w.document_status || 'Generated',
+  //     suspended_reason: w.suspendedReason || w.suspendReason || w.suspended_reason || undefined,
+  //     cancelled_reason: w.cancelledReason || w.cancellationReason || w.cancelled_reason || undefined,
+  //     void_reason: w.voidReason || w.void_reason || undefined,
+  //     terms: w.terms || undefined,
+  //     notes: w.notes || undefined,
+  //     items: (w.items || []).map((it) => compact({
+  //       itemId: it.itemId || it.inventoryItemId || undefined,
+  //       sku: it.sku || undefined,
+  //       item_name: it.itemName || it.name || it.item_name || undefined,
+  //       qty: num(it.qty ?? it.quantity, 1),
+  //       serials: Array.isArray(it.serials) ? it.serials : (Array.isArray(it.serialNumbers) ? it.serialNumbers : (it.serialNumber ? [it.serialNumber] : undefined)),
+  //     })),
+  //   }),
+  //   fromApi: (row) => ({
+  //     ...row,
+  //     cardNumber: row.card_number || row.cardNumber,
+  //     customer: row.customerName || row.customer,
+  //     customerId: row.customerId,
+  //     deliveryChallanId: row.delivery_challan,
+  //     salesInvoiceId: row.sales_invoice,
+  //     salesOrderId: row.sales_order,
+  //     deliveryDate: displayIn(row.delivery_date),
+  //     startDate: displayIn(row.start_date),
+  //     expiryDate: displayIn(row.expiry_date),
+  //     warrantyPeriod: row.warranty_period,
+  //     warrantyUnit: row.warranty_unit,
+  //     documentStatus: row.document_status || 'Generated',
+  //     coverageStatus: row.coverageStatus,
+  //     items: (row.items || []).map((it) => ({
+  //       ...it,
+  //       name: it.item_name || it.name || '',
+  //       quantity: it.qty,
+  //     })),
+  //     _synced: true,
+  //   }),
+  // },
 
   // Purchase pipeline (api.md §6) — same documents, `vendorId` on the wire.
   purchaseOrders: documentResource('/purchase/orders/', {
@@ -431,21 +624,62 @@ export const RESOURCES = {
 
   paymentIns: {
     path: '/sales/payments/',
-    toApi: (p) => compact({
-      customerId: p.customerId || p.partyId,
-      date: isoOut(p.date) || isoOut('Today'),
-      amount: num(p.amount),
-      mode: p.mode || 'Bank Transfer',
-      bankAccountId: p.bankAccountId || undefined,
-      referenceNumber: p.reference || p.referenceNumber || undefined,
-      notes: p.notes || undefined,
-      invoiceId: p.invoiceId || p.linkedInvoiceId || undefined,
+    toApi: (p) => {
+      let mode = p.mode || 'Cash';
+      const mLow = String(mode).toLowerCase();
+      if (mLow.includes('wire') || mLow.includes('bank') || mLow.includes('transfer')) mode = 'Bank';
+      else if (mLow.includes('upi')) mode = 'UPI';
+      else if (mLow.includes('cheque') || mLow.includes('check')) mode = 'Cheque';
+      else if (mLow.includes('card')) mode = 'Card';
+      else if (mLow.includes('cash')) mode = 'Cash';
+
+      return compact({
+        customerId: p.customerId || p.partyId,
+        date: isoOut(p.date) || isoOut('Today'),
+        amount: num(p.amount),
+        mode,
+        paymentType: p.paymentType || 'WITH_BILL',
+        bankAccountId: p.bankAccountId || undefined,
+        referenceNumber: p.reference || p.referenceNumber || undefined,
+        description: p.description || undefined,
+        notes: p.notes || undefined,
+        invoiceId: serverRef(p.invoiceId || p.linkedInvoiceId),
+        salesOrderId: serverRef(p.salesOrderId || p.linkedSalesOrderId),
+        proformaInvoiceId: serverRef(p.proformaInvoiceId || p.linkedProformaInvoiceId),
+      });
+    },
+    fromApi: (row) => ({
+      ...row,
+      date: displayIn(row.date),
+      customer: row.customerName,
+      reference: row.referenceNumber,
+      paymentType: row.paymentType || 'WITH_BILL',
+      invoiceId: row.invoiceId,
+      salesOrderId: row.salesOrderId,
+      salesOrderNumber: row.salesOrderNumber,
+      proformaInvoiceId: row.proformaInvoiceId,
+      proformaInvoiceNumber: row.proformaInvoiceNumber,
+      _synced: true,
+    }),
+  },
+  cashPaymentReceipts: {
+    path: '/sales/cash-receipts/',
+    toApi: (r) => compact({
+      customerId: r.customerId || r.partyId,
+      date: isoOut(r.date) || isoOut('Today'),
+      amount: num(r.amount),
+      paymentMode: r.paymentMode || r.mode || 'Cash',
+      referenceNumber: r.referenceNumber || r.reference || undefined,
+      description: r.description || undefined,
+      notes: r.notes || undefined,
+      invoiceId: r.invoiceId || undefined,
     }),
     fromApi: (row) => ({
       ...row,
       date: displayIn(row.date),
       customer: row.customerName,
       reference: row.referenceNumber,
+      paymentMode: row.paymentMode || 'Cash',
       _synced: true,
     }),
   },
@@ -500,22 +734,24 @@ export const RESOURCES = {
     fromApi: (row) => ({ ...row, date: displayIn(row.date), _synced: true }),
   },
 
-  serviceUsages: {
-    path: '/inventory/service-usage/',
-    toApi: (u) => compact({
-      itemId: u.itemId || undefined,
-      date: isoOut(u.date),
-      quantity: num(u.quantity ?? u.qty),
-      reference: u.reference || undefined,
-      notes: u.notes || undefined,
-    }),
-    fromApi: (row) => ({ ...row, date: displayIn(row.date), _synced: true }),
-  },
+  // Hidden: Service Usage out of scope; backend route commented out -- restore by uncommenting this entry.
+  // serviceUsages: {
+  //   path: '/inventory/service-usage/',
+  //   toApi: (u) => compact({
+  //     itemId: u.itemId || undefined,
+  //     date: isoOut(u.date),
+  //     quantity: num(u.quantity ?? u.qty),
+  //     reference: u.reference || undefined,
+  //     notes: u.notes || undefined,
+  //   }),
+  //   fromApi: (row) => ({ ...row, date: displayIn(row.date), _synced: true }),
+  // },
 
-  valuationItems: {
-    path: '/inventory/valuation/',
-    fromApi: (row) => ({ ...row, _synced: true }),
-  },
+  // Hidden: Valuation & Ageing out of scope; backend route commented out -- restore by uncommenting this entry.
+  // valuationItems: {
+  //   path: '/inventory/valuation/',
+  //   fromApi: (row) => ({ ...row, _synced: true }),
+  // },
 
   monthEndAudits: {
     path: '/inventory/audits/',
@@ -545,18 +781,19 @@ export const RESOURCES = {
     fromApi: (row) => ({ ...row, reportedOn: displayIn(row.reportedOn), _synced: true }),
   },
 
-  zoneRequests: {
-    path: '/inventory/zone-requests/',
-    toApi: (z) => compact({
-      itemId: z.itemId || undefined,
-      fromZone: z.fromZone || undefined,
-      toZone: z.toZone || undefined,
-      quantity: num(z.quantity ?? z.qty),
-      status: z.status || undefined,
-      notes: z.notes || undefined,
-    }),
-    fromApi: (row) => ({ ...row, _synced: true }),
-  },
+  // Hidden: Zone Requests out of scope; backend route commented out -- restore by uncommenting this entry.
+  // zoneRequests: {
+  //   path: '/inventory/zone-requests/',
+  //   toApi: (z) => compact({
+  //     itemId: z.itemId || undefined,
+  //     fromZone: z.fromZone || undefined,
+  //     toZone: z.toZone || undefined,
+  //     quantity: num(z.quantity ?? z.qty),
+  //     status: z.status || undefined,
+  //     notes: z.notes || undefined,
+  //   }),
+  //   fromApi: (row) => ({ ...row, _synced: true }),
+  // },
 
   bankAccounts: {
     path: '/accounts/bank-accounts/',
@@ -605,10 +842,10 @@ export const PULL_ORDER = [
   'categories', 'units', 'locations', 'items',
   'parties', 'customers', 'vendors',
   'estimates', 'quotations', 'salesOrders', 'proformaInvoices',
-  'deliveryChallans', 'invoices', 'paymentIns', 'salesReturns', 'warranties',
+  'deliveryChallans', 'invoices', 'paymentIns', 'cashPaymentReceipts', 'salesReturns', /* 'warranties', -- hidden: out of scope */
   'purchaseOrders', 'purchaseBills', 'paymentOuts', 'purchaseReturns', 'expenses',
-  'transfers', 'serviceUsages', 'valuationItems', 'monthEndAudits',
-  'inventoryMovements', 'faultyParts', 'zoneRequests',
+  'transfers', /* 'serviceUsages', 'valuationItems', -- hidden: out of scope */ 'monthEndAudits',
+  'inventoryMovements', 'faultyParts', /* 'zoneRequests', -- hidden: out of scope */
   'bankAccounts', 'chartOfAccounts', 'journalEntries',
 ];
 
@@ -677,6 +914,14 @@ export async function pullCompanyProfile() {
 }
 
 /**
+ * `POST /settings/reset-demo-data/` — erase this tenant's business data on the
+ * server. Nothing is re-seeded: every screen starts empty afterwards.
+ */
+export async function resetTenantData() {
+  return api.post('/settings/reset-demo-data/');
+}
+
+/**
  * Load everything the registry covers. Failures are per-collection.
  *
  * Thirty collections sent at once is a burst no development server needs to
@@ -714,7 +959,7 @@ export async function pushCreate(key, record, { idempotencyKey } = {}) {
 export async function pushUpdate(key, id, updates) {
   const resource = RESOURCES[key];
   if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
-  const payload = resource.toApi(updates);
+  const payload = resource.toApi(updates, { partial: true });
   (resource.omitOnUpdate || []).forEach((field) => delete payload[field]);
   const body = await api.patch(`${resource.path}${id}/`, payload);
   return resource.fromApi ? resource.fromApi(body) : body;
@@ -725,6 +970,28 @@ export async function pushDelete(key, id) {
   if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
   await api.delete(`${resource.path}${id}/`);
   return true;
+}
+
+export async function pushAction(key, id, action, data = {}) {
+  const resource = RESOURCES[key];
+  if (!resource || !isBackendEnabled() || !isServerId(id)) return null;
+  const body = await api.post(`${resource.path}${id}/${action}/`, data);
+  return resource.fromApi ? resource.fromApi(body) : body;
+}
+
+/**
+ * Run a pipeline conversion on the server (`POST /sales/quotations/{id}/convert-to-order/`
+ * and friends). The reply is the *new* document, so it is read with the target
+ * collection's mapping. The server does the numbering, links the two documents
+ * (header and, for orders, line by line) and moves the source on, in one
+ * transaction — which is why this is used instead of creating the target anew.
+ */
+export async function pushConvert(sourceKey, id, action, targetKey, data = {}) {
+  const source = RESOURCES[sourceKey];
+  const target = RESOURCES[targetKey];
+  if (!source || !target || !isBackendEnabled() || !isServerId(id)) return null;
+  const body = await api.post(`${source.path}${id}/${action}/`, data);
+  return target.fromApi ? target.fromApi(body) : body;
 }
 
 /**

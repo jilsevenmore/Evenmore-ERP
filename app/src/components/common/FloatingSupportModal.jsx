@@ -57,7 +57,7 @@ export function FloatingSupportModal() {
     e.preventDefault();
     if (!message.trim()) return;
     setSent(true);
-    setToast?.({ msg: 'Support request dispatched! Ticket #SPT-8942 generated.', type: 'success' });
+    setToast?.({ msg: 'Support request submitted.', type: 'success' });
     setTimeout(() => {
       setMessage('');
       setSubject('');

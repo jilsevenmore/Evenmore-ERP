@@ -1,21 +1,22 @@
 import React, { useEffect } from 'react';
 import { X, Printer, FileSpreadsheet, Clock, Info } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { addressLines, companyInitial, joinNonEmpty, pickPrintBankAccount } from './printLetterhead';
 
 export const PrintProformaInvoiceModal = ({
   isOpen,
   onClose,
   proforma,
 }) => {
-  // [PHASE-2E.1] company profile drives letterhead; GSTIN was hardcoded 29AABCU9912E1Z8
-  const { companyProfile } = useERP();
-  const companyName = companyProfile?.name || 'EVENMORE ERP MEDICAL & SYSTEMS';
-  const companyShort = (companyName || 'E').trim().charAt(0).toUpperCase() || 'E';
+  const { companyProfile, bankAccounts, resolvePartyAddresses } = useERP();
+  const companyName = companyProfile?.name || '';
+  const companyShort = companyInitial(companyName);
   const gstin = companyProfile?.gstin || '';
   const pan = companyProfile?.pan || '';
-  const companyAddress = companyProfile?.address || 'Corporate Towers, Sector 62, Electronic City • Bengaluru, Karnataka 560100';
-  const phone = companyProfile?.phone || '+91 80 4920 1100';
-  const companyStateCode = (gstin || '').slice(0, 2).toUpperCase();
+  const companyAddress = companyProfile?.address || '';
+  const contactLine = joinNonEmpty([companyProfile?.email, companyProfile?.phone], ' | ');
+  const profileStateCode = String(companyProfile?.stateCode || '');
+  const companyStateCode = (gstin.slice(0, 2) || (/^\d{2}$/.test(profileStateCode) ? profileStateCode : '')).toUpperCase();
   // Same as PrintInvoiceModal: evaluated while `proforma` is still null.
   const posRaw = String(proforma?.placeOfSupplyState || proforma?.placeOfSupply || proforma?.billingAddress?.state || '');
   const posMatch = posRaw.match(/(\d{2})/);
@@ -40,6 +41,10 @@ export const PrintProformaInvoiceModal = ({
   const taxableAmount = proforma.taxableAmount || items.reduce((sum, it) => sum + (Number(it.rate || 0) * Number(it.qty || 1)), 0);
   const taxAmount = proforma.taxAmount || (taxableAmount * 0.18);
   const grandTotal = proforma.grandTotal || proforma.total || (taxableAmount + taxAmount);
+  const halfTaxPct = taxableAmount > 0 ? ((taxAmount * 0.5) / taxableAmount * 100).toFixed(1) : 0;
+  const bank = pickPrintBankAccount(bankAccounts, companyProfile?.bankAccountId);
+  const customerAddress = addressLines(proforma.billingAddress
+    || resolvePartyAddresses?.(proforma.customerId, proforma.customer)?.billing);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:static print:bg-white print:backdrop-blur-none">
@@ -77,22 +82,27 @@ export const PrintProformaInvoiceModal = ({
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                  {companyShort}
-                </div>
+                {companyShort && (
+                  <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
+                    {companyShort}
+                  </div>
+                )}
                 <div>
                   <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
                     {companyName}
                   </h1>
-                  <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                    Steel Fabrication &amp; MS Table Manufacturing
-                  </p>
                 </div>
               </div>
               <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                <p>{companyAddress}</p>
-                <p>Tax Registration / GSTIN: <strong className="text-slate-700">{gstin || '—'}</strong>{pan ? <> • PAN: <strong className="text-slate-700">{pan}</strong></> : ''}</p>
-                <p>Commercial Billing Desk: billing@sweven.in | {phone}</p>
+                {companyAddress && <p>{companyAddress}</p>}
+                {(gstin || pan) && (
+                  <p>
+                    {gstin && <>Tax Registration / GSTIN: <strong className="text-slate-700">{gstin}</strong></>}
+                    {gstin && pan ? ' • ' : ''}
+                    {pan && <>PAN: <strong className="text-slate-700">{pan}</strong></>}
+                  </p>
+                )}
+                {contactLine && <p>Commercial Billing Desk: {contactLine}</p>}
               </div>
             </div>
 
@@ -106,9 +116,11 @@ export const PrintProformaInvoiceModal = ({
                 <p className="text-xs text-slate-600">
                   Proforma Date: <strong className="text-slate-900">{proforma.date}</strong>
                 </p>
-                <p className="text-xs text-slate-600">
-                  Validity Window: <strong className="text-slate-900">{proforma.validUntil || '30 Days'}</strong>
-                </p>
+                {proforma.validUntil && (
+                  <p className="text-xs text-slate-600">
+                    Validity Window: <strong className="text-slate-900">{proforma.validUntil}</strong>
+                  </p>
+                )}
                 <p className="text-xs text-blue-700 font-semibold">
                   Linked SO / Ref: {proforma.linkedSo || 'Direct PI'}
                 </p>
@@ -135,22 +147,20 @@ export const PrintProformaInvoiceModal = ({
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 ISSUED BY (SUPPLIER)
               </span>
-              {/* [PHASE-2E.1] GSTIN from companyProfile (was hardcoded 29AABCU9912E1Z8) */}
-              <p className="font-bold text-sm text-slate-900">{companyName}</p>
-              <p className="text-slate-600">{companyAddress}</p>
-              <p className="text-slate-600">GSTIN: {gstin || '—'}</p>
+              <p className="font-bold text-sm text-slate-900">{companyName || '—'}</p>
+              {companyAddress && <p className="text-slate-600">{companyAddress}</p>}
+              {gstin && <p className="text-slate-600">GSTIN: {gstin}</p>}
             </div>
 
             <div className="space-y-1 sm:border-l sm:border-slate-200 sm:pl-6">
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 PROFORMA INVOICE RECIPIENT (CUSTOMER)
               </span>
-              <p className="font-bold text-sm text-blue-900">{proforma.customer}</p>
-              <p className="text-slate-600">{proforma.billingAddress?.line1 || 'Main Facility Center'}</p>
-              <p className="text-slate-600">
-                {proforma.billingAddress?.city || 'Mumbai'}, {proforma.billingAddress?.state || 'Maharashtra'} - {proforma.billingAddress?.pincode || '400001'}
-              </p>
-              <p className="text-slate-600">Contact: <strong>{proforma.customerContact || 'Primary Procurement Desk'}</strong></p>
+              <p className="font-bold text-sm text-blue-900">{proforma.customer || '—'}</p>
+              {customerAddress.map((line, i) => (
+                <p key={i} className="text-slate-600">{line}</p>
+              ))}
+              {proforma.customerContact && <p className="text-slate-600">Contact: <strong>{proforma.customerContact}</strong></p>}
             </div>
           </div>
 
@@ -173,6 +183,11 @@ export const PrintProformaInvoiceModal = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
+                  {items.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-4 px-3 text-center text-slate-400 italic">No line items.</td>
+                    </tr>
+                  )}
                   {items.map((item, idx) => {
                     const rate = Number(item.rate || 0);
                     const qty = Number(item.qty || 1);
@@ -185,7 +200,7 @@ export const PrintProformaInvoiceModal = ({
                         <td className="py-2.5 px-3 text-slate-400 font-mono">{idx + 1}</td>
                         <td className="py-2.5 px-3">
                           <p className="font-bold text-slate-800">{item.name || item.description}</p>
-                          <p className="text-[10px] font-mono text-slate-400">SKU: {item.sku || item.itemSku || 'GEN-SKU'}</p>
+                          {(item.sku || item.itemSku) && <p className="text-[10px] font-mono text-slate-400">SKU: {item.sku || item.itemSku}</p>}
                         </td>
                         <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-900">{qty} {item.unit || 'Unit'}</td>
                         <td className="py-2.5 px-3 text-right font-mono text-slate-600">₹{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -231,11 +246,17 @@ export const PrintProformaInvoiceModal = ({
               </div>
 
               {/* Bank Remittance Details */}
-              <div className="p-2.5 bg-blue-50/60 rounded-lg border border-blue-200/80 text-[10px] text-blue-900">
-                <p className="font-bold uppercase tracking-wider text-blue-800 mb-0.5">Bank Wire Details for Advance Deposit:</p>
-                <p>Bank: <strong>HDFC Bank Ltd</strong> • A/C: <strong>092810029311</strong> • IFSC: <strong>HDFC0001245</strong></p>
-                <p>Beneficiary: <strong>{companyName}</strong></p>
-              </div>
+              {bank && (
+                <div className="p-2.5 bg-blue-50/60 rounded-lg border border-blue-200/80 text-[10px] text-blue-900">
+                  <p className="font-bold uppercase tracking-wider text-blue-800 mb-0.5">Bank Wire Details for Advance Deposit:</p>
+                  <p>
+                    {(bank.bankName || bank.name) && <>Bank: <strong>{bank.bankName || bank.name}</strong> • </>}
+                    A/C: <strong>{bank.accountNumber}</strong>
+                    {bank.ifsc && <> • IFSC: <strong>{bank.ifsc}</strong></>}
+                  </p>
+                  {companyName && <p>Beneficiary: <strong>{companyName}</strong></p>}
+                </div>
+              )}
             </div>
 
             {/* Calculations Breakdown */}
@@ -249,11 +270,11 @@ export const PrintProformaInvoiceModal = ({
                 isIntraState ? (
                   <>
                     <div className="flex justify-between text-slate-600">
-                      <span>CGST ({((taxAmount * 0.5) / taxableAmount * 100).toFixed(1)}%):</span>
+                      <span>CGST ({halfTaxPct}%):</span>
                       <span>₹{(taxAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                     <div className="flex justify-between text-slate-600">
-                      <span>SGST ({((taxAmount * 0.5) / taxableAmount * 100).toFixed(1)}%):</span>
+                      <span>SGST ({halfTaxPct}%):</span>
                       <span>₹{(taxAmount / 2).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   </>
@@ -286,7 +307,7 @@ export const PrintProformaInvoiceModal = ({
             <ol className="list-decimal pl-4 space-y-0.5 leading-normal">
               <li>This Proforma Invoice is a preliminary commercial offer and not a final tax invoice.</li>
               <li>Prices and discounts quoted are valid for 30 calendar days from the proforma date.</li>
-              <li>Equipment warranty becomes active only upon Final Tax Invoicing and clinical commissioning.</li>
+              <li>Equipment warranty becomes active only upon Final Tax Invoicing and commissioning.</li>
             </ol>
           </div>
 

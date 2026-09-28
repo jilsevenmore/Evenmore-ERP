@@ -1,18 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useCrmStore } from '../../../stores/crmStore';
+import { useERP } from '../../../context/ERPContext';
 import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X } from "lucide-react";
 
-const PRODUCT_OPTIONS = [
-  "Endoscopy System",
-  "OT Light",
-  "Patient Monitor",
-  "X-Ray Machine",
-  "Ventilator",
-];
-
-/** Who a lead can be assigned to, from `/crm/team-roster/`. */
+/** Who a lead can be assigned to, from `/crm/team-roster/` (one row per person). */
 function useUserOptions() {
-  return useCrmStore((s) => s.teamMembers);
+  const members = useCrmStore((s) => s.teamMembers);
+  return useMemo(() => {
+    const seen = new Set();
+    return (members || []).filter((member) => {
+      if (!member?.id || seen.has(member.id)) return false;
+      seen.add(member.id);
+      return true;
+    });
+  }, [members]);
+}
+
+/** Product names from the item master. */
+function useProductOptions() {
+  const { items } = useERP() || {};
+  return useMemo(
+    () => [...new Set((items || []).map((item) => item?.name).filter(Boolean))],
+    [items],
+  );
 }
 
 function MultiValueSelect({ label, placeholder, options, values, onChange }) {
@@ -140,6 +150,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   // The lookups the form offers, as configured on the server.
   const sources = useCrmStore((s) => s.sources);
   const userOptions = useUserOptions();
+  const productOptions = useProductOptions();
   const [ownerId, setOwnerId] = useState("");
   const [createdOn, setCreatedOn] = useState("");
   const [taskDate, setTaskDate] = useState("");
@@ -261,12 +272,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
           <h3 className="lead-create-section-title">Lead Information</h3>
           <label className="lead-create-field">
             <span>Lead Name *</span>
-            <select value={leadName} onChange={(event) => setLeadName(event.target.value)}>
-              <option value="" disabled>Enter lead name</option>
-              <option>Christopher Maclead</option>
-              <option>Carissa Kidman</option>
-              <option>James Merced</option>
-            </select>
+            <input type="text" placeholder="Enter lead name" value={leadName} onChange={(event) => setLeadName(event.target.value)} />
           </label>
 
           <div className="lead-create-field lead-create-photo-field">
@@ -355,7 +361,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
           <MultiValueSelect
             label="Products"
             placeholder="Select Products"
-            options={PRODUCT_OPTIONS}
+            options={productOptions}
             values={products}
             onChange={setProducts}
           />

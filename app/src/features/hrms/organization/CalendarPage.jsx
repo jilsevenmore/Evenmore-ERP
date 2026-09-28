@@ -39,10 +39,13 @@ export function CalendarPage() {
   // Active view: 'Month' | 'Week' | 'Schedule List'
   const [view, setView] = useState("Month");
 
-  // Navigation state - default to October 2024 for immediate context, or dynamic
-  const [activeYear, setActiveYear] = useState(2024);
-  const [activeMonth, setActiveMonth] = useState(9); // 0-indexed: 9 = October
-  const [selectedDate, setSelectedDate] = useState("2024-10-11");
+  // Navigation state - opens on today
+  const [activeYear, setActiveYear] = useState(() => new Date().getFullYear());
+  const [activeMonth, setActiveMonth] = useState(() => new Date().getMonth()); // 0-indexed
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
 
   // Filter state
   const [categoryFilter, setCategoryFilter] = useState("All");
@@ -206,9 +209,9 @@ export function CalendarPage() {
   };
 
   const handleResetDefaults = () => {
-    if (confirm("Reset calendar to default company events and holidays?")) {
+    if (confirm("Discard unsaved local changes and reload calendar events from the server?")) {
       resetToDefaults();
-      showToast("Calendar reset to defaults");
+      showToast("Calendar reloaded");
     }
   };
 
@@ -422,7 +425,7 @@ export function CalendarPage() {
                     onChange={(e) => setActiveYear(Number(e.target.value))}
                     className="font-bold text-[18px] text-slate-900 bg-transparent hover:bg-off rounded-lg px-2 py-0.5 border border-transparent hover:border-bdr focus:outline-none focus:border-navy cursor-pointer transition"
                   >
-                    {[2023, 2024, 2025, 2026, 2027].map((y) => (
+                    {Array.from({ length: 7 }, (_, i) => new Date().getFullYear() - 3 + i).map((y) => (
                       <option key={y} value={y}>
                         {y}
                       </option>
@@ -500,7 +503,7 @@ export function CalendarPage() {
               onClick={handleResetDefaults}
               className="text-[11px] text-muted hover:text-slate-800 underline decoration-dotted transition"
             >
-              Reset Seed Data
+              Reload Events
             </button>
           </div>
         </div>

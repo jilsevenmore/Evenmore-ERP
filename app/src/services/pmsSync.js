@@ -260,22 +260,13 @@ export async function deleteTask(projectId, stageId, taskId) {
 
 export async function addDocument(projectId, stageId, payload) {
   if (!isBackendEnabled()) return null;
-  let fileId = payload?.fileId;
-  if (!fileId) {
-    const fallbackBlob = new Blob(
-      [`%PDF-1.4\n% Proof: ${payload?.fileName || 'design'}\n`],
-      { type: 'application/pdf' }
-    );
-    fileId = await uploadFileToBackend(
-      fallbackBlob,
-      payload?.fileName || 'design.pdf',
-      'pms_document'
-    );
-  }
+  // A proof version is its file — never register one without the upload.
+  const fileId = payload?.fileId;
+  if (!fileId) throw new Error('The proof file was not uploaded.');
 
   const backendPayload = {
     fileId,
-    docKey: payload?.docKey || payload?.fileName || 'design.pdf',
+    docKey: payload?.docKey || payload?.fileName,
     comments: payload?.comments || '',
     is_proof: payload?.is_proof ?? true,
   };
@@ -342,6 +333,128 @@ export async function fetchPublicShare(token) {
 export async function decidePublicShare(token, payload = {}) {
   if (!token) return null;
   return api.post(`/public/pms/approve/${token}/decide/`, payload);
+}
+
+// ── proof review thread (staff + client, one thread per version) ────────────
+
+function commentRows(body) {
+  return Array.isArray(body) ? body : (body?.results || []);
+}
+
+/** A thread row in the shape the proof viewer's comment panel renders. */
+export function toAnnotation(row) {
+  return {
+    id: row.id,
+    page: row.page ?? null,
+    text: row.text,
+    author: row.author,
+    authorType: row.authorType,
+    createdAt: row.createdAt,
+  };
+}
+
+/** `GET /pms/projects/{id}/documents/{docId}/comments/` */
+export async function pullDocumentComments(projectId, docId) {
+  if (!isBackendEnabled() || !isServerId(docId)) return null;
+  try {
+    return commentRows(await api.get(`${projectPath(projectId)}documents/${docId}/comments/`));
+  } catch (err) {
+    console.warn('[pmsSync] pull proof comments failed:', err?.message || err);
+    return null;
+  }
+}
+
+/** `POST …/comments/` `{ text, page }` — resolves to the whole thread. */
+export async function postDocumentComment(projectId, docId, payload) {
+  if (!isBackendEnabled() || !isServerId(docId)) return null;
+  return commentRows(await api.post(`${projectPath(projectId)}documents/${docId}/comments/`, payload));
+}
+
+/** `POST /public/pms/approve/{token}/comments/` — the client's note, no account needed. */
+export async function postPublicComment(token, payload) {
+  if (!token) return null;
+  return commentRows(await api.post(`/public/pms/approve/${token}/comments/`, payload));
+}
+
+// ── messenger (project chat, team chats, direct messages) ───────────────────
+//
+// Chat lives on the server only: there is no local fallback, because a message
+// kept in one browser is a message nobody else reads. Reads return `null` when
+// the server did not answer, so the messenger keeps what it already shows.
+
+const conversationPath = (projectId, conversationId) =>
+  `${projectPath(projectId)}conversations/${conversationId}/`;
+
+/** `GET …/conversations/` — `{ results, aggregates: { totalUnread, projectMembers, … } }`. */
+export async function pullConversations(projectId) {
+  if (!isBackendEnabled() || !isServerId(projectId)) return null;
+  try {
+    return await api.get(`${projectPath(projectId)}conversations/`);
+  } catch (err) {
+    console.warn('[pmsSync] pull conversations failed:', err?.message || err);
+    return null;
+  }
+}
+
+/** `POST …/conversations/` `{ kind: 'Direct', userId }` — get or create a direct chat. */
+export async function startDirectConversation(projectId, userId) {
+  return api.post(`${projectPath(projectId)}conversations/`, { kind: 'Direct', userId });
+}
+
+/**
+ * `GET …/conversations/{cid}/messages/` — the newest page, `{ before }` for an
+ * older page, or `{ since: cursor }` for everything changed since the last poll.
+ */
+export async function pullMessages(projectId, conversationId, query = {}) {
+  if (!isBackendEnabled() || !isServerId(projectId)) return null;
+  try {
+    return await api.get(`${conversationPath(projectId, conversationId)}messages/`, { query });
+  } catch (err) {
+    console.warn('[pmsSync] pull messages failed:', err?.message || err);
+    return null;
+  }
+}
+
+/** Upload each file through the ordinary two-step flow, then send the ids. */
+export async function sendMessage(projectId, conversationId, { files = [], ...payload }) {
+  const attachmentIds = [];
+  for (const file of files) {
+    attachmentIds.push(await uploadFileToBackend(file, file.name, 'pms_document'));
+  }
+  return api.post(`${conversationPath(projectId, conversationId)}messages/`, {
+    ...payload,
+    attachmentIds,
+  });
+}
+
+export async function editMessage(projectId, conversationId, messageId, payload) {
+  return api.patch(`${conversationPath(projectId, conversationId)}messages/${messageId}/`, payload);
+}
+
+export async function deleteMessage(projectId, conversationId, messageId) {
+  return api.delete(`${conversationPath(projectId, conversationId)}messages/${messageId}/`);
+}
+
+/** `POST …/read/` — also clears this conversation's notifications in the bell. */
+export async function markConversationRead(projectId, conversationId) {
+  if (!isBackendEnabled()) return null;
+  try {
+    return await api.post(`${conversationPath(projectId, conversationId)}read/`, {});
+  } catch (err) {
+    console.warn('[pmsSync] mark read failed:', err?.message || err);
+    return null;
+  }
+}
+
+/** `GET …/messages/search/?q=` — text, sender and file name, across visible chats. */
+export async function searchMessages(projectId, q) {
+  if (!isBackendEnabled() || !isServerId(projectId)) return null;
+  try {
+    return await api.get(`${projectPath(projectId)}messages/search/`, { query: { q } });
+  } catch (err) {
+    console.warn('[pmsSync] message search failed:', err?.message || err);
+    return null;
+  }
 }
 
 // ── read-only views the server aggregates ───────────────────────────────────

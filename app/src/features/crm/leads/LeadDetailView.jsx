@@ -170,6 +170,27 @@ function statusClass(value) {
   return String(value || '').toLowerCase() === 'active' ? 'green' : 'amber';
 }
 
+/** Name of the signed-in user, for rows this screen stamps with an author. */
+function currentUserName() {
+  return useAppStore.getState().currentUser?.name || '';
+}
+
+/** Phone with the +91 prefix when a bare local number was stored; '' when unset. */
+function displayPhone(phone) {
+  const value = String(phone || '').trim();
+  if (!value) return '';
+  return value.startsWith('+') ? value : `+91 ${value}`;
+}
+
+function UserChip({ name, avatar }) {
+  if (avatar) return <img src={avatar} alt={name} className="w-5 h-5 rounded-full object-cover" />;
+  return (
+    <span className="w-5 h-5 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold flex items-center justify-center">
+      {getInitials(name)}
+    </span>
+  );
+}
+
 
 // ── helpers the drawer's tabs share ─────────────────────────────────────────
 
@@ -313,8 +334,8 @@ function formatNoteValue(currentValue, textarea, prefix, suffix = prefix, fallba
 
 function fieldRows(lead) {
   return [
-    ['Company', lead.company || 'Hirapara Industries'],
-    ['Title', lead.jobTitle || 'Managing Director'],
+    ['Company', lead.company || ''],
+    ['Title', lead.jobTitle || ''],
     ['Email', lead.email],
     ['Phone', lead.phone],
     ['Amount', formatAmount(lead.amount)],
@@ -326,7 +347,7 @@ function addressRows(lead) {
     ['City', lead.city],
     ['State', lead.state],
     ['Country', lead.country],
-    ['Zip Code', `39${4200 + (lead.id || 0)}`],
+    ['Zip Code', lead.zipCode || ''],
   ];
 }
 
@@ -344,7 +365,7 @@ function leadExportRows(lead) {
     ['City', lead.city],
     ['State', lead.state],
     ['Country', lead.country],
-    ['Zip Code', `39${4200 + (lead.id || 0)}`],
+    ['Zip Code', lead.zipCode || ''],
     ['Amount', formatAmount(lead.amount)],
   ];
 }
@@ -484,8 +505,8 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
       sourceType: String(newSource.source ?? '').toLowerCase(),
       details: newSource.details,
       date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      createdBy: 'David Patel',
-      avatar: 'https://i.pravatar.cc/160?img=68',
+      createdBy: currentUserName(),
+      avatar: '',
       color: '#1f6bff',
       icon: iconName,
     };
@@ -509,8 +530,8 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
       id: Date.now(),
       subject: newEmail.subject,
       date: now,
-      person: 'David Patel',
-      avatar: 'https://i.pravatar.cc/160?img=68',
+      person: currentUserName(),
+      avatar: '',
       status: 'Sent',
       statusColor: 'green',
     };
@@ -520,7 +541,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
       title: newEmail.subject,
       preview: bodyText || 'Direct email communication with client representative.',
       date: now,
-      author: 'David Patel',
+      author: currentUserName(),
       dotColor: '#10b981',
     };
     setEmails((current) => [addedEmail, ...current]);
@@ -639,7 +660,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
                       <td className="text-slate-500 font-mono text-xs whitespace-nowrap">{s.date}</td>
                       <td>
                         <div className="flex items-center gap-1.5">
-                          <img src={s.avatar} alt={s.createdBy} className="w-5 h-5 rounded-full object-cover" />
+                          <UserChip name={s.createdBy} avatar={s.avatar} />
                           <span className="text-xs font-medium">{s.createdBy}</span>
                         </div>
                       </td>
@@ -773,7 +794,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
                     <td className="text-slate-500 font-mono text-xs whitespace-nowrap">{e.date}</td>
                     <td>
                       <div className="flex items-center gap-1.5">
-                        <img src={e.avatar} alt={e.person} className="w-5 h-5 rounded-full object-cover" />
+                        <UserChip name={e.person} avatar={e.avatar} />
                         <span className="text-xs font-medium">{e.person}</span>
                       </div>
                     </td>
@@ -840,7 +861,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
               </div>
               <div className="text-right shrink-0">
                 <time className="text-[11px] font-mono block" style={{ color: 'var(--muted)' }}>{item.date}</time>
-                <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>by {item.author}</span>
+                {item.author && <span className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>by {item.author}</span>}
               </div>
             </div>
           ))}
@@ -881,7 +902,7 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
         name: file.name,
         size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
         sentOn: now,
-        sentBy: lead?.owner || 'David Patel',
+        sentBy: currentUserName() || lead?.owner || '',
         preview: imagePreview,
         downloadUrl: imagePreview,
         description: 'Uploaded from Files tab.',
@@ -977,7 +998,7 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [subject, setSubject] = useState('');
   const [callType, setCallType] = useState('Outbound');
-  const [assignee, setAssignee] = useState(() => lead?.owner || 'Priya Patel');
+  const [assignee, setAssignee] = useState(() => lead?.owner || currentUserName());
   const [description, setDescription] = useState('');
   const [outcome, setOutcome] = useState('Connected');
   const [duration, setDuration] = useState('');
@@ -1007,7 +1028,7 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
     const item = {
       id: `call-${Date.now()}`,
       date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      by: lead?.owner || 'David Patel',
+      by: currentUserName() || lead?.owner || '',
       phone: lead?.phone || '',
       direction: 'Outgoing',
       ...entry,
@@ -1067,7 +1088,7 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
           <button type="button" onClick={callNow} className="btn-primary btn-sm flex items-center gap-1.5 !bg-emerald-600 hover:!bg-emerald-700">
             <Phone size={13} /> Call Lead
           </button>
-          <button type="button" onClick={() => { setSubject(''); setCallType('Outbound'); setAssignee(lead?.owner || assigneeOptions[0] || 'Priya Patel'); setDescription(''); setIsAddOpen(true); }} title="Add Call" aria-label="Add Call" className="w-8 h-8 grid place-items-center rounded-md bg-[#1d3f6e] hover:bg-[#16325a] text-white transition">
+          <button type="button" onClick={() => { setSubject(''); setCallType('Outbound'); setAssignee(lead?.owner || assigneeOptions[0] || currentUserName()); setDescription(''); setIsAddOpen(true); }} title="Add Call" aria-label="Add Call" className="w-8 h-8 grid place-items-center rounded-md bg-[#1d3f6e] hover:bg-[#16325a] text-white transition">
             <Plus size={16} />
           </button>
         </div>
@@ -1252,7 +1273,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
     return [...new Set(names)];
   }, [initialState.users, lead?.owner, tasks]);
-  const defaultAssignee = assigneeOptions.includes('Utsav Faldu') ? 'Utsav Faldu' : (assigneeOptions[0] || '');
+  const defaultAssignee = assigneeOptions[0] || currentUserName();
   const [masterTaskOptions, setMasterTaskOptions] = useState(() => getMasterTaskOptions());
   React.useEffect(() => {
     setMasterTaskOptions(getMasterTaskOptions());
@@ -1920,14 +1941,14 @@ function EstimatesTab({ lead, onCountsChange }) {
     const total = (lineItems || []).reduce((sum, item) => sum + ((item.amount) || (Number(item.qty || 1) * Number(item.rate || 0))), 0);
     const created = {
       id: `est-${Date.now()}`,
-      estimateNumber: `EST-2026-${String((all.length || 0) + 3).padStart(3, '0')}`,
+      estimateNumber: `EST-${new Date().getFullYear()}-${String((all.length || 0) + 1).padStart(3, '0')}`,
       customerId: cust?.id || '',
-      customer: cust?.name || lead?.company || lead?.name || 'Acme Corp',
+      customer: cust?.name || lead?.company || lead?.name || '',
       leadId: String(lead?.id || ''),
       leadName: lead?.name || '',
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       validUntil: validUntil || '15 Days',
-      amount: total > 0 ? total : 1500,
+      amount: total,
       status: 'Draft',
       items: lineItems,
     };
@@ -2103,7 +2124,7 @@ function QuotationsTab({ lead, onActivity }) {
     setValidUntil('30 Days');
     setLineItems(nextItems.length > 0 ? nextItems : [{
       id: `quote-item-${Date.now()}`,
-      description: 'Commercial pricing proposal',
+      description: '',
       qty: 1,
       rate: 0,
       amount: 0,
@@ -2123,12 +2144,12 @@ function QuotationsTab({ lead, onActivity }) {
 
     const created = addQuotation?.({
       customerId: customer?.id,
-      customer: customer?.name || lead?.company || lead?.name || 'Acme Corp',
+      customer: customer?.name || lead?.company || lead?.name || '',
       leadId: String(lead?.id || ''),
       leadName: lead?.name || '',
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       validUntil: validUntil || '30 Days',
-      amount: computedTotal > 0 ? computedTotal : 1500,
+      amount: computedTotal,
       status: 'Draft',
       items: lineItems,
     });
@@ -2277,11 +2298,11 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
   const { deliveryChallans, salesOrders, addDeliveryChallan } = useERP() || {};
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [selectedSoId, setSelectedSoId] = useState('');
-  const [transporter, setTransporter] = useState('FedEx Freight Direct');
-  const [vehicleNo, setVehicleNo] = useState('TRK-9041-WA');
-  const [driverContact, setDriverContact] = useState('+1 (555) 349-2810');
-  const [totalPackages, setTotalPackages] = useState(4);
-  const [dispatchNote, setDispatchNote] = useState('Fragile electronic components. Handle with pallet forklift.');
+  const [transporter, setTransporter] = useState('');
+  const [vehicleNo, setVehicleNo] = useState('');
+  const [driverContact, setDriverContact] = useState('');
+  const [totalPackages, setTotalPackages] = useState(1);
+  const [dispatchNote, setDispatchNote] = useState('');
   const [lineItems, setLineItems] = useState([]);
 
   const linked = useMemo(() => {
@@ -2509,7 +2530,7 @@ function ActivityTab({ lead, items }) {
     ...linkedEstimates.map((e) => ({ id: `sys-est-${e.id}`, title: `Estimate ${e.estimateNumber} • ${e.status}`, time: e.date || '', color: '#f59e0b' })),
     ...linkedQuotations.map((q) => ({ id: `sys-q-${q.id}`, title: `Quotation ${q.quoteNumber} • ${q.status}`, time: q.date || '', color: '#10b981' })),
   ];
-  systemEntries.push(...linkedQuotations.flatMap(q => (q.activity || []).map(event => ({ id: event.id, title: `${q.quoteNumber} ? ${event.type}`, time: event.timestamp, color: '#10b981' }))));
+  systemEntries.push(...linkedQuotations.flatMap(q => (q.activity || []).map(event => ({ id: event.id, title: `${q.quoteNumber} • ${event.type}`, time: event.timestamp, color: '#10b981' }))));
   const total = entries.length + systemEntries.length;
   return (
     <div className="card p-5 space-y-4">
@@ -2566,7 +2587,10 @@ function ActivityTab({ lead, items }) {
 
 // ── Discussion & Notes Tab ────────────────────────────────────
 function DiscussionNotesTab({ lead, onActivity }) {
-  const initialThreads = useLeadDetailState(lead).threads;
+  const storedThreads = useLeadDetailState(lead).threads;
+  const initialThreads = storedThreads.length > 0
+    ? storedThreads
+    : [{ id: `lead-${lead?.id || 0}`, kind: 'lead', name: lead?.name || 'Lead', subtitle: lead?.company || '', note: '', messages: [] }];
   const [threads, setThreads] = useState(initialThreads);
   const [selectedThreadId, setSelectedThreadId] = useState(initialThreads[0]?.id ?? null);
   const [messageDraft, setMessageDraft] = useState('');
@@ -2577,7 +2601,7 @@ function DiscussionNotesTab({ lead, onActivity }) {
   const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? threads[0];
 
   function updateThreadMessages(threadId, updater) {
-    setThreads((current) => current.map((t) => (t.id === threadId ? { ...t, messages: updater(t.messages) } : t)));
+    setThreads((current) => current.map((t) => (t.id === threadId ? { ...t, messages: updater(t.messages || []) } : t)));
   }
 
   function appendSystemMessage(threadId, body) {
@@ -2659,7 +2683,10 @@ function DiscussionNotesTab({ lead, onActivity }) {
         </div>
         <div className="card p-4 space-y-3 lg:col-span-2">
           <div className="space-y-2">
-            {selectedThread.messages.map((m) => (
+            {(selectedThread.messages || []).length === 0 && (
+              <p className="text-xs text-slate-400">No messages yet.</p>
+            )}
+            {(selectedThread.messages || []).map((m) => (
               <div key={m.id} className={`text-xs p-2 rounded-lg ${m.side === 'out' ? 'bg-blue-50 ml-8' : 'bg-slate-100 mr-8'}`}>
                 <strong>{m.sender}</strong><p>{m.body}</p><span className="text-[10px] text-slate-400">{m.time}</span>
               </div>
@@ -2715,56 +2742,33 @@ function DiscussionNotesTab({ lead, onActivity }) {
 }
 
 // ── 2. General Tab ────────────────────────────────────────────
-function GeneralTab({ lead }) {
+function GeneralTab({ lead, activities = [] }) {
+  const nameParts = String(lead.name || '').trim().split(/\s+/).filter(Boolean);
+  const phone = displayPhone(lead.phone);
   const infoRows = [
-    ['Company', lead.company || 'Hirapara Industries'],
-    ['First Name', (lead.name || 'Chirag').split(' ')[0]],
-    ['Last Name', (lead.name || 'Hirapara').split(' ').slice(1).join(' ') || 'Hirapara'],
-    ['Title', lead.jobTitle || 'Managing Director'],
-    ['Email', lead.email || 'chirag@hirapara.com'],
-    ['Phone', `+91 ${lead.phone || '98765 43210'}`],
-    ['Mobile', `+91 ${lead.phone || '98765 43210'}`],
-    ['Lead Source', lead.source || 'Website'],
-    ['Lead Status', lead.status || 'Qualified'],
-    ['Industry', lead.industry || 'Manufacturing & Electronics'],
-    ['Annual Revenue', formatAmount(lead.amount || 185000)],
-    ['Website', `www.${(lead.company || 'hiraparaindustries').toLowerCase().replace(/[^a-z0-9]+/g, '')}.com`],
+    ['Company', lead.company || '—'],
+    ['First Name', nameParts[0] || '—'],
+    ['Last Name', nameParts.slice(1).join(' ') || '—'],
+    ['Title', lead.jobTitle || '—'],
+    ['Email', lead.email || '—'],
+    ['Phone', phone || '—'],
+    ['Mobile', displayPhone(lead.mobile || lead.phone) || '—'],
+    ['Lead Source', lead.source || '—'],
+    ['Lead Status', lead.status || '—'],
+    ['Industry', lead.industry || '—'],
+    ['Annual Revenue', formatAmount(lead.amount)],
+    ['Website', lead.website || '—'],
   ];
 
   const addressRows = [
-    ['Address', `123, Mumbai Industrial Estate`],
-    ['City', lead.city || 'Surat'],
-    ['State', lead.state || 'Gujarat'],
-    ['Country', lead.country || 'India'],
-    ['Zip Code', lead.zipCode || '394201'],
+    ['Address', lead.address || '—'],
+    ['City', lead.city || '—'],
+    ['State', lead.state || '—'],
+    ['Country', lead.country || '—'],
+    ['Zip Code', lead.zipCode || '—'],
   ];
 
-  const activities = [
-    {
-      id: 1,
-      title: 'Stage updated to Qualified',
-      time: '2 hours ago',
-      color: '#8b5cf6',
-    },
-    {
-      id: 2,
-      title: 'Task created - Follow up call',
-      time: '5 hours ago',
-      color: '#f59e0b',
-    },
-    {
-      id: 3,
-      title: 'Email sent to lead',
-      time: '1 day ago',
-      color: '#3b82f6',
-    },
-    {
-      id: 4,
-      title: 'Lead record updated',
-      time: '2 days ago',
-      color: '#10b981',
-    },
-  ];
+  const recentActivities = (activities || []).slice(0, 4);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 items-start">
@@ -2819,11 +2823,14 @@ function GeneralTab({ lead }) {
         </div>
 
         <div className="space-y-4">
-          {activities.map((item) => (
+          {recentActivities.length === 0 && (
+            <p className="text-xs text-slate-400">No activity recorded for this lead yet.</p>
+          )}
+          {recentActivities.map((item) => (
             <div key={item.id} className="flex items-start gap-3">
               <span
                 className="w-2.5 h-2.5 rounded-full mt-1 shrink-0"
-                style={{ backgroundColor: item.color }}
+                style={{ backgroundColor: item.color || '#3b82f6' }}
               />
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-slate-900 leading-snug">{item.title}</p>
@@ -3604,7 +3611,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       name: activeLeadData.company || activeLeadData.name,
       contactPerson: activeLeadData.name,
       email: activeLeadData.email,
-      phone: `+91 ${activeLeadData.phone}`,
+      phone: displayPhone(activeLeadData.phone),
       balance: 0,
       status: 'Active',
     });
@@ -3612,7 +3619,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     showToast?.(`Lead "${activeLeadData.name}" converted to Customer.`);
   };
 
-  const displayName = activeLeadData.name?.replace(/\s*\(Sample\)/i, '') || 'Christopher Maclead';
+  const displayName = activeLeadData.name || 'Untitled Lead';
+  const headerPhone = displayPhone(activeLeadData.phone);
+  const headerLocation = [activeLeadData.city, activeLeadData.state, activeLeadData.country].filter(Boolean).join(', ');
 
   return (
     <div className="space-y-4">
@@ -3689,24 +3698,30 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="flex items-center gap-4 min-w-0 lg:min-w-auto">
             <div className="w-16 h-16 rounded-full overflow-hidden shrink-0 shadow-xs border border-slate-100 ring-2 ring-slate-50">
-              <img
-                src={activeLeadData.photo || 'https://i.pravatar.cc/160?img=60'}
-                alt={displayName}
-                className="w-full h-full object-cover"
-              />
+              {activeLeadData.photo ? (
+                <img
+                  src={activeLeadData.photo}
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="w-full h-full flex items-center justify-center text-white text-lg font-bold" style={{ backgroundColor: activeLeadData.avatarColor || '#2F6FED' }}>
+                  {getInitials(displayName)}
+                </span>
+              )}
             </div>
             <div className="space-y-1 min-w-0 lg:min-w-auto">
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
                 <h1 className="text-xl font-bold text-slate-900 tracking-tight break-words">{displayName}</h1>
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  {isConverted ? 'Converted' : (activeLeadData.status || 'Qualified')}
+                  {isConverted ? 'Converted' : (activeLeadData.status || '—')}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium">{activeLeadData.company || 'Hirapara Industries'}</p>
+              {activeLeadData.company && <p className="text-xs text-slate-500 font-medium">{activeLeadData.company}</p>}
               <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500 pt-0.5">
-                <span className="flex items-center gap-1.5"><Phone size={13} className="text-slate-400" /> +91 {activeLeadData.phone || '98765 43210'}</span>
-                <span className="flex items-center gap-1.5 min-w-0 lg:min-w-auto break-all"><Mail size={13} className="text-slate-400 shrink-0 lg:shrink" /> {activeLeadData.email || 'chirag@hirapara.com'}</span>
-                <span className="flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" /> {activeLeadData.city || 'Surat'}, {activeLeadData.state || 'Gujarat'}, {activeLeadData.country || 'India'}</span>
+                {headerPhone && <span className="flex items-center gap-1.5"><Phone size={13} className="text-slate-400" /> {headerPhone}</span>}
+                {activeLeadData.email && <span className="flex items-center gap-1.5 min-w-0 lg:min-w-auto break-all"><Mail size={13} className="text-slate-400 shrink-0 lg:shrink" /> {activeLeadData.email}</span>}
+                {headerLocation && <span className="flex items-center gap-1.5"><MapPin size={13} className="text-slate-400" /> {headerLocation}</span>}
               </div>
             </div>
           </div>
@@ -3714,15 +3729,15 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 text-xs border-t md:border-t-0 md:border-l border-slate-100 pt-3 md:pt-0 md:pl-8">
             <div>
               <span className="text-[11px] text-slate-400 block font-normal mb-1">Lead Number</span>
-              <strong className="text-xs font-bold text-slate-900 font-mono">{activeLeadData.leadNumber || 'L00000185'}</strong>
+              <strong className="text-xs font-bold text-slate-900 font-mono">{activeLeadData.leadNumber || '—'}</strong>
             </div>
             <div>
               <span className="text-[11px] text-slate-400 block font-normal mb-1">Source</span>
-              <strong className="text-xs font-bold text-slate-900">{activeLeadData.source || 'Website'}</strong>
+              <strong className="text-xs font-bold text-slate-900">{activeLeadData.source || '—'}</strong>
             </div>
             <div>
               <span className="text-[11px] text-slate-400 block font-normal mb-1">Created On</span>
-              <strong className="text-xs font-bold text-slate-900">{activeLeadData.createdOn || '27/08/2026'}</strong>
+              <strong className="text-xs font-bold text-slate-900">{activeLeadData.createdOn || '—'}</strong>
             </div>
           </div>
         </div>
@@ -3758,7 +3773,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
       {/* Tab Content Display */}
       {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
-      {activeTab === 'General' && <GeneralTab lead={activeLeadData} />}
+      {activeTab === 'General' && <GeneralTab lead={activeLeadData} activities={activities} />}
       {activeTab === 'Users & Products' && <UsersProductsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'Discussion & Notes' && <DiscussionNotesTab lead={activeLeadData} onActivity={logActivity} />}
       {activeTab === 'Files' && <FilesTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}

@@ -46,12 +46,16 @@ export const GeneralLedgerPage = () => {
     const [reference, setReference] = useState('');
     const handleCreate = (e) => {
         e.preventDefault();
-        const parsedAmount = parseFloat(amount) || 1000;
+        const parsedAmount = parseFloat(amount);
+        if (!(parsedAmount > 0)) {
+            alert('Please enter a valid amount greater than zero.');
+            return;
+        }
         addJournalEntry({
             entryNumber: `JE-2026-${String(journalEntries.length + 80).padStart(3, '0')}`,
             date: getCurrentDateFormatted(),
             description: description || 'Manual Adjustment Entry',
-            reference: reference || 'MEMO-01',
+            reference: reference || '',
             debitAccount,
             creditAccount,
             amount: parsedAmount,
@@ -62,7 +66,7 @@ export const GeneralLedgerPage = () => {
         setAmount('');
         setReference('');
     };
-    const totalDebits = journalEntries.reduce((acc, e) => acc + e.amount, 0);
+    const totalDebits = journalEntries.reduce((acc, e) => acc + (Number(e.amount) || 0), 0);
     const totalCredits = totalDebits; // By double-entry definition
     const columns = [
         {

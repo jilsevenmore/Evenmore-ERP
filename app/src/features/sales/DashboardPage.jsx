@@ -1,13 +1,15 @@
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PageHeader } from '../../components/common/PageHeader';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
+import { useAppStore } from '../../stores/appStore';
 // ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
 // Before (kept for reference if the CRM dashboard panel is ever re-added):
 // Reason: the ERP dashboard should compute from live ERP state (invoices, paymentIns,
 //   purchaseBills, items, calculateItemStock), not from static CRM fixture data.
 // import { toISODate, getCurrentISODate } from '../../utils/dateUtils';
+import { toISODate } from '../../utils/dateUtils';
 import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown } from 'lucide-react';
 function buildChart(values, width, height, padding) {
   const max = Math.max(...values);
@@ -50,7 +52,13 @@ const CARD_STYLES = {
 };
 
 export const DashboardPage = () => {
-  const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock } = useERP();
+  const currentUser = useAppStore((s) => s.currentUser);
+  const isCustomer = currentUser?.isCustomer || currentUser?.role?.code === 'CU' || String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer';
+  if (isCustomer) {
+    return <Navigate to="/customer/projects" replace />;
+  }
+
+  const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock, cashPaymentReceipts, getInvoiceOutstanding } = useERP();
   // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──
   // Before (kept for reference): dashboardData.leadsOverview, dashboardData.taskStatus drove
   //   the chart + donut. Now we chart invoice revenue over the last 6 months and show
@@ -70,10 +78,10 @@ export const DashboardPage = () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
   const revenueByMonth = last6Months.map((mk) => invoices
-    .filter((inv) => monthKey(inv.date) === mk || monthKey(inv.dueDate) === mk)
+    .filter((inv) => inv.status !== 'Cancelled' && monthKey(toISODate(inv.date)) === mk)
     .reduce((sum, inv) => sum + (Number(inv.total ?? inv.amount) || 0), 0));
   const overview = {
-    headline: `${invoices.length} tax invoices booked across the last 6 months`,
+    headline: `${invoices.filter((inv) => last6Months.includes(monthKey(toISODate(inv.date)))).length} tax invoices booked across the last 6 months`,
     period: 'Last 6 Months',
     summary: 'Invoiced value trend by month. Filter or open Sales > Invoices for details.',
     series: last6Months.map((mk, i) => ({ month: mk.split('-')[1], value: revenueByMonth[i] })),
@@ -106,13 +114,17 @@ export const DashboardPage = () => {
     currentAngle += angle;
     return segment;
   });
-  const recentActivity = invoices.slice(0, 3).map((inv) => ({
-    icon: invoices.length ? 'check' : 'task',
-    tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
-    title: inv.customer || 'Customer',
-    person: `${inv.invoiceNumber} • ${inv.status}`,
-    time: inv.date,
-  }));
+  const recentActivity = [...invoices]
+    .sort((a, b) => toISODate(b.date).localeCompare(toISODate(a.date)))
+    .slice(0, 3)
+    .map((inv) => ({
+      key: inv.id || inv.invoiceNumber,
+      icon: 'task',
+      tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
+      title: inv.customer || '—',
+      person: [inv.invoiceNumber, inv.status].filter(Boolean).join(' • '),
+      time: inv.date || '',
+    }));
   const enriched = items.map((itm) => {
     const calc = calculateItemStock(itm.id);
     let status = 'Optimal';
@@ -136,6 +148,33 @@ export const DashboardPage = () => {
   const expenseTotal = expenses.reduce((a, e) => a + (e.amount || e.total || 0), 0);
   const bankBalance = bankAccounts.reduce((a, b) => a + (b.balance || b.currentBalance || 0), 0);
 
+  // ── [PHASE-4] Core Financial Metrics: Distinguishing Billed Sales vs Without-Bill Cash ──
+  const activeInvoices = invoices.filter((inv) => inv.status !== 'Cancelled');
+  const billedSales = activeInvoices.reduce((sum, inv) => sum + (Number(inv.grandTotal ?? inv.total ?? inv.amount) || 0), 0);
+  const gstTotal = activeInvoices.reduce((sum, inv) => {
+    const out = getInvoiceOutstanding ? getInvoiceOutstanding(inv.id) : null;
+    return sum + (out?.gst ?? Number(inv.taxAmount || 0));
+  }, 0);
+  const validWithBillPayments = paymentIns.filter(
+    (p) => p.paymentType !== 'WITHOUT_BILL' && p.status !== 'Cancelled' && p.status !== 'CANCELLED'
+  );
+  const withBillPaymentsTotal = validWithBillPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const validCashReceipts = (cashPaymentReceipts || []).filter(
+    (r) => r.status === 'RECEIVED' || (!r.status && r.status !== 'CANCELLED' && r.status !== 'VOIDED')
+  );
+  const withoutBillCashTotal = validCashReceipts.length > 0
+    ? validCashReceipts.reduce((sum, r) => sum + (Number(r.amount) || 0), 0)
+    : paymentIns.filter((p) => p.paymentType === 'WITHOUT_BILL' && p.status !== 'Cancelled').reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+  const totalPaymentsReceived = withBillPaymentsTotal + withoutBillCashTotal;
+  const totalInvoiceOutstanding = activeInvoices.reduce((sum, inv) => {
+    const out = getInvoiceOutstanding ? getInvoiceOutstanding(inv.id) : null;
+    return sum + (out?.outstanding ?? Math.max(0, (inv.total || 0) - (inv.paidAmount || 0)));
+  }, 0);
+  const overdueOrUnpaidCount = activeInvoices.filter((inv) => {
+    const out = getInvoiceOutstanding ? getInvoiceOutstanding(inv.id) : null;
+    return (out?.outstanding ?? (inv.total || 0)) > 0.01;
+  }).length;
+
   const modules = [
     // ── [PHASE-1-DASHBOARD] CRM module card now counts ERP quotations (was: leads) ──
     // Old: { label: 'CRM', desc: `${leads.length} Leads | Deals | Tasks`, ... count: leads.length, tag: 'Leads' }
@@ -144,10 +183,10 @@ export const DashboardPage = () => {
     { label: 'Purchase', desc: `${purchaseOrders.length} Orders | ${purchaseBills.length} Bills`, to: '/purchase/orders', icon: Truck, tone: 'amber', count: purchaseOrders.length, tag: 'POs' },
     { label: 'Inventory', desc: `${items.length} SKUs | ${lowStockItems.length} Low Stock`, to: '/inventory/items', icon: Package, tone: 'purple', count: items.length, tag: 'SKUs' },
     { label: 'Parties', desc: `${parties.length} Parties | ${customers.length} Customers`, to: '/parties', icon: Building2, tone: 'teal', count: parties.length, tag: 'Parties' },
-    { label: 'Accounts', desc: `Bank $${Math.round(bankBalance).toLocaleString()} | ${invoices.length} Invoices`, to: '/accounts/cash-bank', icon: Wallet, tone: 'blue', count: bankAccounts.length, tag: 'Accounts' },
-    { label: 'HRMS', desc: 'Employees | Attendance | Payroll', to: '/hrms/dashboard', icon: UserCheck, tone: 'green', count: 48, tag: 'Staff' },
-    { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', count: 12, tag: 'Reports' },
-    { label: 'Administration', desc: 'Users | Roles | Settings', to: '/administration/users', icon: Shield, tone: 'amber', count: 3, tag: 'Admin' },
+    { label: 'Accounts', desc: `Bank ₹${Math.round(bankBalance).toLocaleString()} | ${invoices.length} Invoices`, to: '/accounts/cash-bank', icon: Wallet, tone: 'blue', count: bankAccounts.length, tag: 'Accounts' },
+    { label: 'HRMS', desc: 'Employees | Attendance | Payroll', to: '/hrms/dashboard', icon: UserCheck, tone: 'green', tag: 'Staff' },
+    { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', tag: 'Reports' },
+    { label: 'Administration', desc: 'Users | Roles | Settings', to: '/administration/users', icon: Shield, tone: 'amber', tag: 'Admin' },
   ];
 
   const fmt = (n) => Number(n || 0).toLocaleString();
@@ -184,6 +223,110 @@ export const DashboardPage = () => {
         <StatCard label="Bank Balance" value={`₹${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note="net flow" />
       </div>
 
+      {/* ── [PHASE-4] Sales & Collections Financial Summary (Billed vs Without-Bill Cash) ── */}
+      <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
+          <div>
+            <h3 className="font-bold text-text text-sm sm:text-base flex items-center gap-2">
+              <Receipt size={17} className="text-primary" />
+              <span>Sales & Collections Financial Summary</span>
+            </h3>
+            <p className="text-[11px] sm:text-xs text-muted">
+              Distinguishing Billed Sales (GST Invoices) vs Unbilled Cash (Cash Payment Receipts)
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/sales/payments"
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+            >
+              <span>Manage Collections</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {/* 1. Billed Sales */}
+          <div className="p-3.5 rounded-xl border border-border bg-soft/70 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-muted uppercase tracking-wider block">Billed Sales</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-text block">
+                ₹{fmt(Math.round(billedSales))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-text-secondary">
+              {activeInvoices.length} Tax Invoices booked
+            </span>
+          </div>
+
+          {/* 2. GST Total */}
+          <div className="p-3.5 rounded-xl border border-blue-200/50 bg-blue-50/40 dark:bg-blue-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wider block">GST Tax</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-blue-800 dark:text-blue-300 block">
+                ₹{fmt(Math.round(gstTotal))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-blue-600/80 dark:text-blue-400/80">
+              Taxable: ₹{fmt(Math.round(Math.max(0, billedSales - gstTotal)))}
+            </span>
+          </div>
+
+          {/* 3. With-Bill Payments */}
+          <div className="p-3.5 rounded-xl border border-emerald-200/50 bg-emerald-50/40 dark:bg-emerald-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider block">With-Bill Payments</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-emerald-700 dark:text-emerald-300 block">
+                ₹{fmt(Math.round(withBillPaymentsTotal))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-emerald-600/80 dark:text-emerald-400/80">
+              {validWithBillPayments.length} payments allocated
+            </span>
+          </div>
+
+          {/* 4. Without-Bill Cash */}
+          <div className="p-3.5 rounded-xl border border-amber-200/50 bg-amber-50/40 dark:bg-amber-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-400 uppercase tracking-wider block">Without-Bill Cash</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-amber-800 dark:text-amber-300 block">
+                ₹{fmt(Math.round(withoutBillCashTotal))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-amber-700/80 dark:text-amber-400/80">
+              {validCashReceipts.length} Cash Receipts (CPR)
+            </span>
+          </div>
+
+          {/* 5. Total Payments Received */}
+          <div className="p-3.5 rounded-xl border border-purple-200/50 bg-purple-50/40 dark:bg-purple-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-400 uppercase tracking-wider block">Total Received</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-purple-800 dark:text-purple-300 block">
+                ₹{fmt(Math.round(totalPaymentsReceived))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-purple-600/80 dark:text-purple-400/80">
+              Billed + Cash desk receipts
+            </span>
+          </div>
+
+          {/* 6. Outstanding Invoices */}
+          <div className="p-3.5 rounded-xl border border-rose-200/50 bg-rose-50/40 dark:bg-rose-950/20 flex flex-col justify-between">
+            <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-400 uppercase tracking-wider block">Outstanding Invoices</span>
+            <div className="my-1.5">
+              <strong className="text-base sm:text-lg font-bold font-mono text-rose-700 dark:text-rose-300 block">
+                ₹{fmt(Math.round(totalInvoiceOutstanding))}
+              </strong>
+            </div>
+            <span className="text-[11px] text-rose-600/80 dark:text-rose-400/80">
+              {overdueOrUnpaidCount} open invoices due
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* All Modules Directory Grid */}
       <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
@@ -217,7 +360,7 @@ export const DashboardPage = () => {
                   <span className="flex items-center gap-1.5 sm:gap-2">
                     <strong className="text-xs sm:text-sm font-bold text-text truncate">{m.label}</strong>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
-                      {m.count} {m.tag}
+                      {m.count != null ? `${m.count} ${m.tag}` : m.tag}
                     </span>
                   </span>
                   <span className="block text-[11px] text-muted truncate mt-0.5">{m.desc}</span>
@@ -277,8 +420,8 @@ export const DashboardPage = () => {
             </div>
             <small className="dashboard-stat-trend">
               <TrendingUp size={13} className="shrink-0" />
-              <b className="shrink-0">100%</b>
-              <em className="truncate">live count</em>
+              <b className="shrink-0">{fmt(quotations.filter((q) => ['Confirmed', 'Converted', 'Invoiced'].includes(q.status)).length)}</b>
+              <em className="truncate">converted</em>
             </small>
           </article>
           <article className="dashboard-stat">
@@ -370,6 +513,7 @@ export const DashboardPage = () => {
               </div>
               <div className="donut-legend">
                 {/* ── [PHASE-1-DASHBOARD] was: dashboardData.taskStatus.map(...) — now ERP taskStatus ── */}
+                {taskStatus.length === 0 && <p className="text-xs text-muted">No invoices yet.</p>}
                 {taskStatus.map((item) => (
                   <div key={item.key} className="legend-row">
                     <div className="legend-meta">
@@ -383,11 +527,12 @@ export const DashboardPage = () => {
             </div>
             <div className="activity-list mt-4 pt-3 border-t border-border">
               {/* ── [PHASE-1-DASHBOARD] was: dashboardData.recentActivity.slice(0,3) — now ERP recentActivity ── */}
+              {recentActivity.length === 0 && <p className="text-xs text-muted text-center py-2">No recent invoice activity.</p>}
               {recentActivity.map((item) => {
                 const Icon = ACTIVITY_ICONS[item.icon] || UserPlus;
                 const style = CARD_STYLES[item.tone] || CARD_STYLES.blue;
                 return (
-                  <div key={`${item.title}-${item.person}`} className="activity-item">
+                  <div key={item.key} className="activity-item">
                     <span className="activity-badge" style={{ background: style.bg, color: style.fg }}>
                       <Icon size={16} />
                     </span>
@@ -494,11 +639,12 @@ export const DashboardPage = () => {
                 </Link>
               </div>
               <div className="space-y-2 text-xs">
+                {salesOrders.length === 0 && <p className="text-[11px] text-muted">No sales orders yet.</p>}
                 {salesOrders.slice(0, 3).map((o) => (
                   <div key={o.id} className="p-2.5 sm:p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs font-bold text-text truncate">{o.orderNumber || o.id}</p>
-                      <p className="text-[11px] text-muted truncate">{o.customer} • ₹{fmt(o.amount || 0)}</p>
+                      <p className="text-[11px] text-muted truncate">{o.customer || '—'} • ₹{fmt(o.amount || o.total || 0)}</p>
                     </div>
                     <StatusBadge status={o.stage || o.status || 'Draft'} />
                   </div>
@@ -518,11 +664,12 @@ export const DashboardPage = () => {
                 </Link>
               </div>
               <div className="space-y-2 text-xs">
+                {purchaseOrders.length === 0 && <p className="text-[11px] text-muted">No purchase orders yet.</p>}
                 {purchaseOrders.slice(0, 3).map((o) => (
                   <div key={o.id} className="p-2.5 sm:p-3 rounded-xl border border-border bg-soft/60 hover:bg-soft flex items-center justify-between gap-3 transition">
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs font-bold text-text truncate">{o.orderNumber || o.poNumber || o.id}</p>
-                      <p className="text-[11px] text-muted truncate">{o.vendor} • ₹{fmt(o.total || o.amount || 0)}</p>
+                      <p className="text-[11px] text-muted truncate">{o.vendor || '—'} • ₹{fmt(o.total || o.amount || 0)}</p>
                     </div>
                     <StatusBadge status={o.status || 'Draft'} />
                   </div>
@@ -654,6 +801,7 @@ export const DashboardPage = () => {
             </Link>
           </div>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-semibold">
+            {/* Hidden: User Tracking & Zone Requests out of scope
             <Link to="/crm/user-allocation" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <ListChecks size={13} className="text-primary shrink-0" />
               <span className="truncate">Allocation</span>
@@ -661,6 +809,7 @@ export const DashboardPage = () => {
             <Link to="/inventory/zone-requests" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <span className="truncate">Zone Requests ({pendingZoneReqs})</span>
             </Link>
+            */}
             <Link to="/inventory/transfers" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <ArrowLeftRight size={13} className="text-primary shrink-0" />
               <span className="truncate">Transfers ({pendingTransfers})</span>

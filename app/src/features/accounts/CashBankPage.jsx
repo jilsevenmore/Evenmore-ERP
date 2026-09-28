@@ -45,9 +45,9 @@ export const CashBankPage = () => {
         accountNumber: '',
         accountName: 'Operating Account',
         accountType: 'Current Operating',
-        balance: 10000,
+        balance: 0,
     });
-    const totalLiquidity = bankAccounts.reduce((sum, a) => sum + a.balance, 0);
+    const totalLiquidity = bankAccounts.reduce((sum, a) => sum + (Number(a.balance) || 0), 0);
     const columns = [
         {
             header: 'Financial Institution',
@@ -82,16 +82,18 @@ export const CashBankPage = () => {
             key: 'lastReconciled',
             align: 'center',
             render: (a) => (<span className="text-slate-500 text-xs">
-          {formatDateDDMMYYYY(a.lastReconciled || 'Oct 24, 2026')}
+          {a.lastReconciled ? formatDateDDMMYYYY(a.lastReconciled) : '—'}
         </span>),
         },
         {
             header: 'Status',
             key: 'status',
             align: 'center',
-            render: () => (<span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-          Connected
-        </span>),
+            render: (a) => (a.isActive === false ? (<span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          Inactive
+        </span>) : (<span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+          Active
+        </span>)),
         },
     ];
     const handleCreate = (e) => {
@@ -101,7 +103,7 @@ export const CashBankPage = () => {
         addBankAccount({
             bankName: newAcc.bankName,
             accountName: newAcc.accountName || newAcc.bankName,
-            accountNumber: newAcc.accountNumber || '•••• 1234',
+            accountNumber: newAcc.accountNumber || '',
             accountType: newAcc.accountType || 'Current Operating',
             // [PHASE-4] Sweven INR default (was hardcoded 'USD')
             currency: 'INR',

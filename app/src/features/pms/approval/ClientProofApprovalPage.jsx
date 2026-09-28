@@ -1,15 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import {
   AlertCircle, Check, RefreshCw, Building2, FileText, ShieldCheck, Clock, Ban,
-  Link2Off, CalendarClock, Package,
+  Link2Off, CalendarClock, Package, WifiOff,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
-import { MockPdfViewer } from '../components/MockPdfViewer';
-import { usePmsStore, validateApprovalDecision } from '../../../stores/pmsStore';
-import { useProofShareStore, shareBlockReason } from '../../../stores/proofShareStore';
-import { fetchPublicShare, decidePublicShare } from '../../../services/pmsSync';
-import { isBackendEnabled } from '../../../services/resourceSync';
+import { ProofViewer } from '../components/ProofViewer';
+import { validateApprovalDecision } from '../../../stores/pmsStore';
+import { shareBlockReason } from '../../../stores/proofShareStore';
+import { fetchPublicShare, decidePublicShare, postPublicComment, toAnnotation } from '../../../services/pmsSync';
 import { formatCurrency } from '../../../utils/currencyUtils';
 
 /**
@@ -17,12 +16,9 @@ import { formatCurrency } from '../../../utils/currencyUtils';
  *
  * Renders outside the app shell: no sidebar, no topbar, nothing that assumes the
  * viewer is a staff member. It carries the drawing, the order and product
- * details, and the two decisions the client can make. The decision is written
- * through pmsStore.decideDocument, so the stage status, the approval thread and
- * the audit trail all update exactly as the internal portal would leave them.
- *
- * With no backend the token resolves against this browser's localStorage, so a
- * link opens on the machine that issued it.
+ * details, and the two decisions the client can make. Everything goes through
+ * the public approval API, so the stage status, the approval thread and the
+ * audit trail update exactly as the internal portal would leave them.
  */
 
 const fieldClass =
@@ -92,6 +88,8 @@ function PortalNotice({ icon: Icon, tone, title, body, detail }) {
 /** Map a public-API failure to the terminal state it means. */
 function blockFromError(err) {
   const msg = `${err?.message || ''}`.toLowerCase();
+  // No answer at all (network down, server error) says nothing about the link.
+  if (!err?.status || err.status >= 500) return 'unreachable';
   if (err?.status === 409) {
     if (msg.includes('revok')) return 'revoked';
     if (msg.includes('expir')) return 'expired';
@@ -106,24 +104,33 @@ function remoteFromPayload(token, P) {
     share: {
       token,
       recipientName: P.recipientName ?? '',
-      message: '',
-      createdBy: '',
+      message: P.message ?? '',
+      createdBy: P.createdBy ?? '',
       expiresAt: P.expiresAt ?? null,
       openedAt: null,
       status: 'Active',
       decision: P.decision ?? null,
       decidedAt: P.decidedAt ?? null,
-      decidedBy: '',
-      revisionReason: '',
+      decidedBy: P.decidedBy ?? '',
+      revisionReason: P.revisionReason ?? '',
     },
     project: {
       id: P.project?.id ?? `remote-${token}`,
       code: P.project?.code ?? '',
       customerName: P.project?.customerName ?? '',
-      productDetails: { productName: P.project?.productName ?? '' },
-      crmOrderId: null,
-      expectedCompletionDate: null,
+      productDetails: {
+        productName: P.project?.productName ?? '',
+        specifications: P.project?.specifications ?? '',
+        // Decimals arrive as strings ("2.0000").
+        orderValue: P.project?.orderValue != null ? Number(P.project.orderValue) : null,
+        quantity: P.project?.quantity != null ? Number(P.project.quantity) : null,
+      },
+      orderItems: Array.isArray(P.project?.items) ? P.project.items : [],
+      crmOrderId: P.project?.orderNumber ?? null,
+      expectedCompletionDate: P.project?.expectedCompletionDate ?? null,
     },
+    company: P.company ?? null,
+    comments: Array.isArray(P.comments) ? P.comments.map(toAnnotation) : [],
     stage: P.stage
       ? { id: P.stage.id, sequence: P.stage.sequence, name: P.stage.name }
       : { id: `stage-${token}`, sequence: '', name: 'Design proof' },
@@ -143,23 +150,16 @@ function remoteFromPayload(token, P) {
 export default function ClientProofApprovalPage() {
   const { token } = useParams();
 
-  const projects = usePmsStore((s) => s.projects);
-  const decideDocument = usePmsStore((s) => s.decideDocument);
-  const shares = useProofShareStore((s) => s.shares);
-  const markOpened = useProofShareStore((s) => s.markOpened);
-  const recordDecision = useProofShareStore((s) => s.recordDecision);
-
-  const localShare = useMemo(() => shares.find((s) => s.token === token) ?? null, [shares, token]);
-
-  // Public mode: the link opened where the issuing browser's memory is
-  // unavailable (new tab, client device). Resolve it via the public API —
-  // the local store alone can never see it there.
+  // The link is resolved through the public API — always. The recipient is a
+  // client on their own device with no account, so this must not depend on a
+  // staff session (gating it on one made every sent link read "not valid").
+  // A token the server does not know is simply not a valid link.
   const [remote, setRemote] = useState(null);
-  const [remoteState, setRemoteState] = useState('idle'); // idle|loading|ready|invalid|expired|revoked
+  const [remoteState, setRemoteState] = useState(token ? 'loading' : 'invalid'); // loading|ready|invalid|expired|revoked|unreachable
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    if (localShare || !token || !isBackendEnabled()) return;
-    if (remote || remoteState !== 'idle') return;
+    if (!token) return undefined;
     let cancelled = false;
     setRemoteState('loading');
     fetchPublicShare(token)
@@ -175,29 +175,13 @@ export default function ClientProofApprovalPage() {
     return () => {
       cancelled = true;
     };
-  }, [localShare, token, remote, remoteState]);
+  }, [token, attempt]);
 
-  const share = localShare ?? remote?.share ?? null;
+  const share = remote?.share ?? null;
   const block = shareBlockReason(share);
-
-  const project = useMemo(
-    () => (localShare
-      ? projects.find((p) => p.id === localShare.projectId) ?? null
-      : remote?.project ?? null),
-    [localShare, projects, remote]
-  );
-  const stage = useMemo(
-    () => (localShare
-      ? project?.stages?.find((s) => s.id === localShare.stageId) ?? null
-      : remote?.stage ?? null),
-    [localShare, project, remote]
-  );
-  const doc = useMemo(
-    () => (localShare
-      ? stage?.documents?.find((d) => d.id === localShare.documentId) ?? null
-      : remote?.doc ?? null),
-    [localShare, stage, remote]
-  );
+  const project = remote?.project ?? null;
+  const stage = remote?.stage ?? null;
+  const doc = remote?.doc ?? null;
 
   const [decision, setDecision] = useState('Approved');
   const [approverName, setApproverName] = useState('');
@@ -205,16 +189,18 @@ export default function ClientProofApprovalPage() {
   const [revisionReason, setRevisionReason] = useState('');
   const [errors, setErrors] = useState({});
   const [receipt, setReceipt] = useState(null);
+  const thread = remote?.comments ?? [];
+
+  /** The client's side of the review thread — lands next to the team's notes. */
+  async function addThreadComment({ page, text }) {
+    const author = approverName.trim() || share?.recipientName || 'Client';
+    const rows = await postPublicComment(share.token, { text, page, authorName: author });
+    if (rows) setRemote((prev) => (prev ? { ...prev, comments: rows.map(toAnnotation) } : prev));
+  }
 
   useEffect(() => {
     if (share?.recipientName) setApproverName(share.recipientName);
   }, [share?.recipientName]);
-
-  // Stamp the open so the project manager can see the client has looked at it.
-  // Local mode only — the server stamps public opens on first fetch itself.
-  useEffect(() => {
-    if (localShare && !block) markOpened(localShare.token);
-  }, [localShare, block, markOpened]);
 
   const isRevision = decision === 'Need Improvement';
 
@@ -230,62 +216,34 @@ export default function ClientProofApprovalPage() {
 
     const by = approverName.trim();
 
-    // Public mode: the client has no account, so the decision travels with
-    // the link token instead of the staff write path.
-    if (!localShare && remote) {
-      decidePublicShare(share.token, {
-        decision: value,
-        decidedBy: by,
-        comments: comments.trim(),
-        revisionReason: revisionReason.trim(),
+    // The client has no account, so the decision travels with the link token
+    // instead of the staff write path.
+    decidePublicShare(share.token, {
+      decision: value,
+      decidedBy: by,
+      comments: comments.trim(),
+      revisionReason: revisionReason.trim(),
+    })
+      .then((res) => {
+        setRemote((prev) => (prev ? {
+          ...prev,
+          share: {
+            ...prev.share,
+            decision: value,
+            decidedAt: res?.decidedAt ?? new Date().toISOString(),
+            decidedBy: by,
+            revisionReason: revisionReason.trim(),
+          },
+        } : prev));
+        setReceipt({ decision: value, at: new Date().toISOString(), by });
       })
-        .then((res) => {
-          setRemote((prev) => (prev ? {
-            ...prev,
-            share: {
-              ...prev.share,
-              decision: value,
-              decidedAt: res?.decidedAt ?? new Date().toISOString(),
-              decidedBy: by,
-              revisionReason: revisionReason.trim(),
-            },
-          } : prev));
-          setReceipt({ decision: value, at: new Date().toISOString(), by });
-        })
-        .catch((err) => {
-          if (err?.status === 404 || err?.status === 409) {
-            setRemoteState(blockFromError(err));
-          } else {
-            setErrors({ submit: err.message });
-          }
-        });
-      return;
-    }
-
-    try {
-      decideDocument(
-        project.id,
-        stage.id,
-        doc.id,
-        value,
-        {
-          comments: comments.trim(),
-          revisionReason: revisionReason.trim(),
-          approverName: by,
-          approverType: 'Client',
-        },
-        { id: 'client-portal', name: by }
-      );
-      recordDecision(share.token, {
-        decision: value,
-        decidedBy: by,
-        comments: comments.trim(),
-        revisionReason: revisionReason.trim(),
+      .catch((err) => {
+        if (err?.status === 404 || err?.status === 409) {
+          setRemoteState(blockFromError(err));
+        } else {
+          setErrors({ submit: err.message });
+        }
       });
-      setReceipt({ decision: value, at: new Date().toISOString(), by });
-    } catch (err) {
-      setErrors({ submit: err.message });
-    }
   }
 
   // ── Terminal states ──
@@ -297,6 +255,22 @@ export default function ClientProofApprovalPage() {
         tone={{ bg: '#f6f9ff', fg: '#1f6bff' }}
         title="Checking this link…"
         body="Fetching the drawing and approval details."
+      />
+    );
+  }
+
+  if (remoteState === 'unreachable') {
+    return (
+      <PortalNotice
+        icon={WifiOff}
+        tone={{ bg: '#f1f5f9', fg: '#64748b' }}
+        title="We couldn't load this link"
+        body="The approval server did not respond. Check your connection and try again in a moment."
+        detail={
+          <Button type="button" size="sm" icon={RefreshCw} onClick={() => setAttempt((n) => n + 1)}>
+            Try again
+          </Button>
+        }
       />
     );
   }
@@ -323,7 +297,7 @@ export default function ClientProofApprovalPage() {
         icon={Link2Off}
         tone={{ bg: '#f1f5f9', fg: '#64748b' }}
         title="This approval link is not valid"
-        body="The link may have been mistyped, or it was issued from a different device. Ask your project manager to send a fresh one."
+        body="The link may have been mistyped, or it is no longer active. Ask your project manager to send a fresh one."
       />
     );
   }
@@ -463,11 +437,45 @@ export default function ClientProofApprovalPage() {
         </p>
       </section>
 
-      {/* The drawing itself */}
-      <MockPdfViewer
+      {/* What is being made — the order lines behind this design */}
+      {(project.orderItems ?? []).length > 0 && (
+        <section className="rounded-xl border border-[#dce5f4] bg-white shadow-2xs overflow-hidden">
+          <header className="flex items-center gap-1.5 px-5 py-3 border-b border-[#dce5f4]">
+            <Package size={13} className="text-blue-500" />
+            <h2 className="text-sm font-bold text-slate-800">Product description</h2>
+          </header>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[11px]">
+              <thead className="bg-[#f6f9ff] text-[10px] uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-2 font-semibold">Product</th>
+                  <th className="px-3 py-2 font-semibold">Description</th>
+                  <th className="px-5 py-2 font-semibold text-right">Quantity</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#eef2f8]">
+                {project.orderItems.map((item, i) => (
+                  <tr key={`${item.name}-${i}`}>
+                    <td className="px-5 py-2 font-semibold text-slate-800">{item.name || '—'}</td>
+                    <td className="px-3 py-2 text-slate-600 whitespace-pre-wrap">
+                      {item.description && item.description !== item.name ? item.description : '—'}
+                    </td>
+                    <td className="px-5 py-2 text-right text-slate-700 whitespace-nowrap">
+                      {Number(item.qty)} {item.uom || ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      {/* The drawing itself, with the review thread beside it */}
+      <ProofViewer
         document={doc}
-        projectName={productDetails.productName}
-        readOnly
+        annotations={thread}
+        onAddAnnotation={addThreadComment}
       />
 
       {/* Decision */}

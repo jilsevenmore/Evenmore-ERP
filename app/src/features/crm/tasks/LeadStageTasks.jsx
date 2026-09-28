@@ -82,18 +82,10 @@ const DEFAULT_TASK_OPTIONS = [
   "Negotiate pricing",
 ];
 
-function getDynamicTaskOptions() {
-  try {
-    const raw = localStorage.getItem('leadMasterTasksV1');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const names = parsed.map((m) => m.name).filter(Boolean);
-        return [...new Set([...DEFAULT_TASK_OPTIONS, ...names])];
-      }
-    }
-  } catch { /* ignore */ }
-  return DEFAULT_TASK_OPTIONS;
+/** The default task names plus every master task configured on the server. */
+function getDynamicTaskOptions(masterTasks = []) {
+  const names = (masterTasks || []).map((m) => m?.name || m?.title).filter(Boolean);
+  return [...new Set([...DEFAULT_TASK_OPTIONS, ...names])];
 }
 
 // Which pipeline the screen is looking at is a view preference, not data.
@@ -147,7 +139,8 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [stageDrafts, setStageDrafts] = useState({});
-  const taskOptions = useMemo(() => getDynamicTaskOptions(), []);
+  const masterTasks = useCrmStore((s) => s.masterTasks);
+  const taskOptions = useMemo(() => getDynamicTaskOptions(masterTasks), [masterTasks]);
 
 
   // An edit anywhere in the tree is written back as the flat task collection

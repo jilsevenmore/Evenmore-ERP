@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { defaultLeadFormSections } from "../../../data/crm/leadFormSchema";
+import { useCrmStore } from "../../../stores/crmStore";
+import { getActiveFormId, LEAD_FORM } from "../../../services/crmForms";
 
 function getFieldIcon(field) {
   if (field.type === "Email") return Mail;
@@ -122,26 +124,22 @@ export default function DynamicLeadFormPage({
   const handleBack = onBackToLeads || (() => navigate("/crm/leads"));
   const handleEdit = onEditLayout || (() => navigate("/crm/leads/form-builder"));
 
+  // The published lead form, from `/crm/forms/` — the same one the builder saves.
+  const storeForms = useCrmStore((s) => s.forms);
   const safeSections = useMemo(() => {
     if (Array.isArray(sections) && sections.length > 0 && sections !== defaultLeadFormSections) {
       return sections;
     }
 
-    try {
-      const raw =
-        localStorage.getItem("leadFormSections_v2") ||
-        localStorage.getItem("leadFormSections");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch {
+    const activeId = getActiveFormId();
+    const leadForms = (storeForms || []).filter((form) => (form.kind || LEAD_FORM) === LEAD_FORM);
+    const savedForm = (activeId ? leadForms.find((form) => String(form.id) === String(activeId)) : null) || leadForms[0] || null;
+    if (Array.isArray(savedForm?.sections) && savedForm.sections.length > 0) {
+      return savedForm.sections;
     }
 
     return Array.isArray(sections) && sections.length > 0 ? sections : defaultLeadFormSections;
-  }, [sections]);
+  }, [sections, storeForms]);
 
   return (
     <section className="w-full">

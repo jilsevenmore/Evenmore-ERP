@@ -1,8 +1,10 @@
 import CrmKpiCard from '../common/CrmKpiCard';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Users, UserPlus, Search, CheckCircle2, Award, Clock, ArrowUpRight, ShieldCheck, Mail, Phone, MapPin, ListChecks } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { useERP } from '../../../context/ERPContext';
+import { useCrmStore } from '../../../stores/crmStore';
+import { initials } from '../../../services/crmSync';
 import UserLocationTracking from './UserLocationTracking';
 
 /** Lower-cased text, safe on a field the server left unset. */
@@ -12,60 +14,46 @@ function text(value) {
 
 export default function UserAllocationPage() {
   const { formatCurrency } = useERP();
-  const [teamMembers, setTeamMembers] = useState([
-    {
-      id: 1,
-      name: 'David Patel',
-      role: 'Senior Sales Account Manager',
-      email: 'david@evenmore.io',
-      phone: '+91 98234 11223',
-      leadsAssigned: 28,
-      dealsClosed: 14,
-      conversionRate: '50.0%',
-      activePipeline: 485000,
-      avatar: 'https://i.pravatar.cc/160?img=68',
-      status: 'Online',
-    },
-    {
-      id: 2,
-      name: 'Priya Mehta',
-      role: 'Enterprise Accounts Executive',
-      email: 'priya@evenmore.io',
-      phone: '+91 98455 33445',
-      leadsAssigned: 32,
-      dealsClosed: 18,
-      conversionRate: '56.2%',
-      activePipeline: 620000,
-      avatar: 'https://i.pravatar.cc/160?img=47',
-      status: 'In Meeting',
-    },
-    {
-      id: 3,
-      name: 'Rohit Sharma',
-      role: 'Technical Pre-Sales Specialist',
-      email: 'rohit@evenmore.io',
-      phone: '+91 98777 88990',
-      leadsAssigned: 19,
-      dealsClosed: 9,
-      conversionRate: '47.4%',
-      activePipeline: 280000,
-      avatar: 'https://i.pravatar.cc/160?img=12',
-      status: 'Offline',
-    },
-    {
-      id: 4,
-      name: 'Ananya Deshmukh',
-      role: 'Customer Success & Inbound Leads',
-      email: 'ananya@evenmore.io',
-      phone: '+91 98111 22334',
-      leadsAssigned: 24,
-      dealsClosed: 11,
-      conversionRate: '45.8%',
-      activePipeline: 265000,
-      avatar: 'https://i.pravatar.cc/160?img=32',
-      status: 'Online',
-    },
-  ]);
+  const roster = useCrmStore((s) => s.teamMembers);
+  const leads = useCrmStore((s) => s.leads);
+  const deals = useCrmStore((s) => s.deals);
+  const [addedMembers, setAddedMembers] = useState([]);
+
+  // One row per person on the CRM roster, with workload counted from the
+  // leads and deals actually assigned to them.
+  const teamMembers = useMemo(() => {
+    const seen = new Set();
+    const people = [...(roster || []), ...addedMembers].filter((person) => {
+      const key = String(person?.id ?? person?.email ?? person?.name ?? '');
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return people.map((person) => {
+      const name = String(person.name || '').trim();
+      const owns = (value, id) => (id != null && person.id != null && String(id) === String(person.id)) || (name && String(value || '').trim() === name);
+      const assignedLeads = leads.filter((l) => owns(l.owner, l.ownerId));
+      const assignedDeals = deals.filter((d) => owns(d.assignedUser, d.ownerId));
+      const won = assignedDeals.filter((d) => d.stage === 'Won').length;
+      const closed = assignedDeals.filter((d) => d.stage === 'Won' || d.stage === 'Lost').length;
+      const pipeline = assignedDeals
+        .filter((d) => d.stage !== 'Won' && d.stage !== 'Lost' && d.stage !== 'Declined')
+        .reduce((sum, d) => sum + (Number(d.price) || 0), 0);
+      return {
+        id: person.id ?? person.email ?? name,
+        name,
+        role: person.designation || person.role || '',
+        email: person.email || '',
+        phone: person.phone || '',
+        avatar: person.avatar || '',
+        leadsAssigned: assignedLeads.length,
+        dealsClosed: won,
+        conversionRate: `${closed ? ((won / closed) * 100).toFixed(1) : '0.0'}%`,
+        activePipeline: pipeline,
+        status: person.status || 'Active',
+      };
+    });
+  }, [roster, addedMembers, leads, deals]);
 
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -74,12 +62,13 @@ export default function UserAllocationPage() {
     role: 'Sales Representative',
     email: '',
     phone: '',
-    avatar: 'https://i.pravatar.cc/160?img=33',
   });
 
-  const totalLeads = teamMembers.reduce((sum, m) => sum + m.leadsAssigned, 0);
   const totalDeals = teamMembers.reduce((sum, m) => sum + m.dealsClosed, 0);
   const totalPipeline = teamMembers.reduce((sum, m) => sum + m.activePipeline, 0);
+  const avgConversion = teamMembers.length
+    ? `${(teamMembers.reduce((sum, m) => sum + (parseFloat(m.conversionRate) || 0), 0) / teamMembers.length).toFixed(1)}%`
+    : '0.0%';
   const [view, setView] = useState('tracking');
 
   const filtered = teamMembers.filter(
@@ -93,18 +82,8 @@ export default function UserAllocationPage() {
     e.preventDefault();
     if (!newMember.name || !newMember.email) return;
 
-    const created = {
-      id: teamMembers.length + 1,
-      ...newMember,
-      leadsAssigned: 0,
-      dealsClosed: 0,
-      conversionRate: '0.0%',
-      activePipeline: 0,
-      status: 'Online',
-    };
-
-    setTeamMembers([...teamMembers, created]);
-    setNewMember({ name: '', role: 'Sales Representative', email: '', phone: '', avatar: 'https://i.pravatar.cc/160?img=33' });
+    setAddedMembers((current) => [...current, { id: `rep-${Date.now()}`, ...newMember, status: 'Active' }]);
+    setNewMember({ name: '', role: 'Sales Representative', email: '', phone: '' });
     setIsAddOpen(false);
   };
 
@@ -198,7 +177,7 @@ export default function UserAllocationPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <CrmKpiCard label="Active Representatives" value={teamMembers.length} icon={Users} tone="blue" />
         <CrmKpiCard label="Total Won Deals" value={totalDeals} icon={CheckCircle2} tone="emerald" />
-        <CrmKpiCard label="Avg. Conversion Rate" value="48.2%" icon={Award} tone="amber" />
+        <CrmKpiCard label="Avg. Conversion Rate" value={avgConversion} icon={Award} tone="amber" />
         <CrmKpiCard label="Allocated Pipeline" value={formatCurrency(totalPipeline, { noDecimals: true })} icon={ArrowUpRight} tone="purple" />
       </div>
 
@@ -233,11 +212,20 @@ export default function UserAllocationPage() {
               </tr>
             </thead>
             <tbody>
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="text-center text-slate-400 py-6">No representatives on the CRM roster yet.</td>
+                </tr>
+              )}
               {filtered.map((m) => (
                 <tr key={m.id}>
                   <td>
                     <div className="flex items-center gap-2.5">
-                      <img src={m.avatar} alt={m.name} className="w-8 h-8 rounded-full object-cover shadow-xs" />
+                      {m.avatar ? (
+                        <img src={m.avatar} alt={m.name} className="w-8 h-8 rounded-full object-cover shadow-xs" />
+                      ) : (
+                        <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 text-[11px] font-bold flex items-center justify-center shadow-xs">{initials(m.name)}</span>
+                      )}
                       <div>
                         <strong className="font-bold text-slate-800 dark:text-slate-200 block">{m.name}</strong>
                       </div>
@@ -246,8 +234,8 @@ export default function UserAllocationPage() {
                   <td className="text-slate-600 dark:text-slate-300 font-medium">{m.role}</td>
                   <td>
                     <div className="space-y-0.5 text-[11px] text-slate-500">
-                      <span className="flex items-center gap-1"><Mail size={11} /> {m.email}</span>
-                      <span className="flex items-center gap-1"><Phone size={11} /> {m.phone}</span>
+                      {m.email && <span className="flex items-center gap-1"><Mail size={11} /> {m.email}</span>}
+                      {m.phone && <span className="flex items-center gap-1"><Phone size={11} /> {m.phone}</span>}
                     </div>
                   </td>
                   <td className="font-bold font-mono text-center">{m.leadsAssigned}</td>
@@ -257,7 +245,7 @@ export default function UserAllocationPage() {
                   <td>
                     <span
                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        m.status === 'Online'
+                        m.status === 'Online' || m.status === 'Active'
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : m.status === 'In Meeting'
                           ? 'bg-amber-50 text-amber-700 border border-amber-200'

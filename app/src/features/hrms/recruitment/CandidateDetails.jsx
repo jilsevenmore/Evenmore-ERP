@@ -30,6 +30,7 @@ import OfferLetterModal from "../organization/OfferLetterModal";
 export default function CandidateDetails() {
   const { id } = useParams();
   const candidates = useRecruitmentStore((s) => s.candidates);
+  const jobs = useRecruitmentStore((s) => s.jobs || []);
   const interviews = useRecruitmentStore((s) => s.interviews);
   const offers = useRecruitmentStore((s) => s.offers || []);
   const addOffer = useRecruitmentStore((s) => s.addOffer);
@@ -70,12 +71,8 @@ export default function CandidateDetails() {
     if (existing) {
       setActiveOffer(existing);
     } else {
-      let dept = "Engineering";
-      const pos = (c.position || "").toLowerCase();
-      if (pos.includes("design") || pos.includes("ui")) dept = "Design";
-      else if (pos.includes("hr") || pos.includes("people")) dept = "HR";
-      else if (pos.includes("finance")) dept = "Finance";
-      else if (pos.includes("marketing")) dept = "Sales & Marketing";
+      const job = jobs.find((j) => j.id === c.jobId || j.title === c.position);
+      const dept = job?.department || "";
 
       setActiveOffer({
         id: `OFF-${Math.floor(100 + Math.random() * 900)}`,
@@ -85,12 +82,12 @@ export default function CandidateDetails() {
         position: c.position,
         jobType: "Full-time",
         dept,
-        salary: "$95,000 / annum",
-        location: c.location || "New York HQ",
+        salary: "",
+        location: c.location || "",
         workMode: "Hybrid",
         sentDate: new Date().toISOString().split("T")[0],
         joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
-        reportingManager: "David Park (CTO)",
+        reportingManager: job?.hiringManager || "",
         probationPeriod: "3 Months",
         status: "Pending",
       });

@@ -33,6 +33,7 @@ import {
 export default function Appraisal() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees) || [];
+  const currentUser = useAppStore((s) => s.currentUser);
 
   const {
     appraisals,
@@ -89,17 +90,24 @@ export default function Appraisal() {
   const [hrApproveRow, setHrApproveRow] = useState(null);
   const [hrComments, setHrComments] = useState("Calibrated across department benchmarks and approved.");
 
+  const employeeViewName = simulatedEmployeeName || currentUser?.name || "";
+  const managerViewName = simulatedManagerName || currentUser?.name || "";
+  const activeCycleName = String(cycles.find((c) => c.status === "Active")?.name || "")
+    .replace("Performance Cycle", "")
+    .replace("Appraisal Cycle", "")
+    .trim();
+
   // Add/Edit Form State
   const [form, setForm] = useState({
     employee: "",
-    cycle: "Q4 2024",
+    cycle: "",
     reviewer: "",
     rating: 4.0,
     status: "Draft",
     stage: "Self Review",
-    due: "15 Nov 2024",
-    department: "Engineering",
-    designation: "Senior Engineer",
+    due: "",
+    department: "",
+    designation: "",
   });
   const [formErrors, setFormErrors] = useState({});
 
@@ -108,17 +116,17 @@ export default function Appraisal() {
     return appraisals.filter((r) => {
       // History tab filter: only Completed/Archived appraisals or previous cycles
       if (tab === "history") {
-        if (r.status !== "Completed" && r.cycle === "Q4 2024") return false;
+        if (r.status !== "Completed" && r.cycle === activeCycleName) return false;
       } else {
         // Active tab: exclude old completed records from prior cycles
-        if (r.status === "Completed" && r.cycle !== "Q4 2024") return false;
+        if (r.status === "Completed" && r.cycle !== activeCycleName) return false;
       }
 
       // Role filter simulation
       if (role === "Employee") {
-        if (String(r.employee ?? '').toLowerCase() !== simulatedEmployeeName.toLowerCase()) return false;
+        if (String(r.employee ?? '').toLowerCase() !== employeeViewName.toLowerCase()) return false;
       } else if (role === "Manager") {
-        if (String(r.reviewer ?? '').toLowerCase() !== simulatedManagerName.toLowerCase()) return false;
+        if (String(r.reviewer ?? '').toLowerCase() !== managerViewName.toLowerCase()) return false;
       }
 
       if (search && !`${r.employee} ${r.cycle} ${r.reviewer} ${r.department}`.toLowerCase().includes(search.toLowerCase())) return false;
@@ -128,7 +136,7 @@ export default function Appraisal() {
       if (stageFilter !== "All" && r.stage !== stageFilter) return false;
       return true;
     });
-  }, [appraisals, tab, role, simulatedEmployeeName, simulatedManagerName, search, cycleFilter, deptFilter, statusFilter, stageFilter]);
+  }, [appraisals, tab, role, employeeViewName, managerViewName, activeCycleName, search, cycleFilter, deptFilter, statusFilter, stageFilter]);
 
   // Sync to Employee Profile
   function handleSyncToProfile(r) {
@@ -513,15 +521,15 @@ export default function Appraisal() {
             <Button
               onClick={() => {
                 setForm({
-                  employee: employees[0]?.name || "Priya Patel",
-                  cycle: cycles.find((c) => c.status === "Active")?.name.replace("Performance Cycle", "").trim() || "Q4 2024",
-                  reviewer: "David Park",
+                  employee: employees[0]?.name || "",
+                  cycle: activeCycleName || String(cycles[0]?.name || "").replace("Performance Cycle", "").replace("Appraisal Cycle", "").trim(),
+                  reviewer: "",
                   rating: 4.0,
                   status: "Draft",
                   stage: "Self Review",
-                  due: "15 Nov 2024",
-                  department: "Engineering",
-                  designation: "Senior Engineer",
+                  due: "",
+                  department: employees[0]?.department || "",
+                  designation: employees[0]?.designation || "",
                 });
                 setFormErrors({});
                 setAddOpen(true);
@@ -546,7 +554,7 @@ export default function Appraisal() {
           >
             Active Appraisals
             <span className="px-1.5 py-0.2 rounded-full text-[11px] bg-blue-50 text-blue-700 font-semibold">
-              {appraisals.filter((a) => a.status !== "Completed" || a.cycle === "Q4 2024").length}
+              {appraisals.filter((a) => a.status !== "Completed" || a.cycle === activeCycleName).length}
             </span>
           </button>
 
@@ -570,8 +578,8 @@ export default function Appraisal() {
         <div className="text-[12px] text-slate-500 hidden sm:flex items-center gap-1">
           <Info size={13} className="text-blue-500" />
           <span>
-            {role === "Employee" && `Showing reviews for employee: ${simulatedEmployeeName}`}
-            {role === "Manager" && `Showing reviews assigned to manager: ${simulatedManagerName}`}
+            {role === "Employee" && `Showing reviews for employee: ${employeeViewName}`}
+            {role === "Manager" && `Showing reviews assigned to manager: ${managerViewName}`}
             {role === "HR" && "Full administrative view across all departments"}
           </span>
         </div>
@@ -717,6 +725,7 @@ export default function Appraisal() {
               onChange={(e) => setForm({ ...form, cycle: e.target.value })}
               className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
             >
+              {cycles.length === 0 && <option value="">No review cycles</option>}
               {cycles.map((c) => (
                 <option key={c.id} value={c.name.replace("Performance Cycle", "").replace("Appraisal Cycle", "").trim()}>
                   {c.name}

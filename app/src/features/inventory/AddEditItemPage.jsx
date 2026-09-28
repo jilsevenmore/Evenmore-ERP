@@ -69,8 +69,8 @@ export const AddEditItemPage = () => {
   const [itemLifecycle, setItemLifecycle] = useState('Active');
   const [itemKind, setItemKind] = useState(queryKind === 'Machine' ? 'Machine' : (queryKind === 'Part' ? 'Part' : 'Standalone'));
   const [name, setName] = useState('');
-  const [category, setCategory] = useState(categories[0]?.name || 'Networking Hardware');
-  const [vendor, setVendor] = useState(vendors[0]?.name || 'Cisco Direct');
+  const [category, setCategory] = useState(categories[0]?.name || '');
+  const [vendor, setVendor] = useState(vendors[0]?.name || '');
 
   // Dynamic Units & Conversions
   const [purchaseUnit, setPurchaseUnit] = useState('Box');
@@ -121,12 +121,12 @@ export const AddEditItemPage = () => {
   const [imagePreview, setImagePreview] = useState('');
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
-  const [costPrice, setCostPrice] = useState('45.50');
-  const [sellingPrice, setSellingPrice] = useState('129.99');
-  const [availableQty, setAvailableQty] = useState('50');
-  const [reorderLevel, setReorderLevel] = useState('15');
-  const [location, setLocation] = useState(locations[0]?.name || 'Main Central Hub');
-  const [description, setDescription] = useState('High-performance industrial grade component designed for mission-critical operations with extended durability and certified specifications.');
+  const [costPrice, setCostPrice] = useState('');
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [availableQty, setAvailableQty] = useState('0');
+  const [reorderLevel, setReorderLevel] = useState('');
+  const [location, setLocation] = useState(locations[0]?.name || '');
+  const [description, setDescription] = useState('');
 
   // Dynamic Custom Field Values
   const [customFieldValues, setCustomFieldValues] = useState({});
@@ -198,8 +198,8 @@ export const AddEditItemPage = () => {
       setSku(existingItem.sku || existingItem.code || '');
       setName(existingItem.name);
       setItemKind(existingItem.itemKind || 'Standalone');
-      setCategory(existingItem.category || categories[0]?.name || 'Networking Hardware');
-      setVendor(existingItem.vendor || vendors[0]?.name || 'Cisco Direct');
+      setCategory(existingItem.category || categories[0]?.name || '');
+      setVendor(existingItem.vendor || vendors[0]?.name || '');
       setUom(existingItem.salesUnit || existingItem.uom || 'Pcs');
       setPurchaseUnit(existingItem.purchaseUnit || 'Box');
       setSalesUnit(existingItem.salesUnit || existingItem.uom || 'Pcs');
@@ -219,11 +219,11 @@ export const AddEditItemPage = () => {
       setSacCode(existingItem.sacCode || '');
       setSerialNumbersText((existingItem.serialNumbers || []).join('\n'));
       setImagePreview(existingItem.image || existingItem.imageUrl || '');
-      setCostPrice(String(existingItem.costPrice || existingItem.unitCost || '45.00'));
-      setSellingPrice(String(existingItem.sellingPrice || '120.00'));
+      setCostPrice(String(existingItem.costPrice ?? existingItem.unitCost ?? ''));
+      setSellingPrice(String(existingItem.sellingPrice ?? ''));
       setAvailableQty(String(existingItem.availableQty ?? existingItem.stock ?? '0'));
-      setReorderLevel(String(existingItem.reorderLevel || '10'));
-      setLocation(existingItem.location || locations[0]?.name || 'Main Central Hub');
+      setReorderLevel(String(existingItem.reorderLevel ?? ''));
+      setLocation(existingItem.location || locations[0]?.name || '');
       setDescription(existingItem.description || '');
       setItemLifecycle(existingItem.lifecycleStatus || 'Active');
       setStatus(existingItem.status || 'Optimal');
@@ -879,6 +879,7 @@ export const AddEditItemPage = () => {
                     onChange={(e) => handleCategoryChange(e.target.value)}
                     className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
                   >
+                    {categories.length === 0 && <option value="">No categories yet</option>}
                     {categories.map((c) => (
                       <option key={c.id} value={c.name}>
                         {c.name} {c.hasSubParts ? '(Machine Category)' : ''}
@@ -895,6 +896,7 @@ export const AddEditItemPage = () => {
                     onChange={(e) => setVendor(e.target.value)}
                     className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
                   >
+                    <option value="">{vendors.length === 0 ? 'No vendors yet' : '-- Select Vendor --'}</option>
                     {vendors.map((v) => (
                       <option key={v.id} value={v.name}>
                         {v.name}

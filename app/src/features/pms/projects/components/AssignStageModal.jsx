@@ -48,7 +48,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
   );
 
   const [stageId, setStageId] = useState('');
-  const [department, setDepartment] = useState('Design');
+  const [department, setDepartment] = useState('');
   const [userId, setUserId] = useState('');
   const [team, setTeam] = useState('');
   const [startAt, setStartAt] = useState(toLocalInput());
@@ -75,7 +75,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
     const predecessor = idx > 0 ? stages[idx - 1] : null;
 
     setStageId(first.id);
-    setDepartment(first.department ?? 'Design');
+    setDepartment(first.department ?? departmentNames[0] ?? '');
     setUserId(first.assignedUser?.id ?? '');
     setTeam(first.assignedTeam ?? '');
     setDuration(first.plannedDuration ?? 1);
@@ -88,7 +88,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
     setStatus('Assigned');
     setNotes('');
     setErrors({});
-  }, [isOpen, initialStageId, stages]);
+  }, [isOpen, initialStageId, stages, departmentNames]);
 
   // Re-seed when the user picks a different stage mid-dialog.
   function pickStage(nextId) {
@@ -97,7 +97,7 @@ export function AssignStageModal({ isOpen, onClose, project, initialStageId = nu
     if (!s) return;
     const idx = stages.findIndex((x) => x.id === nextId);
     const predecessor = idx > 0 ? stages[idx - 1] : null;
-    setDepartment(s.department ?? 'Design');
+    setDepartment(s.department ?? departmentNames[0] ?? '');
     setUserId(s.assignedUser?.id ?? '');
     setTeam(s.assignedTeam ?? '');
     setDuration(s.plannedDuration ?? 1);

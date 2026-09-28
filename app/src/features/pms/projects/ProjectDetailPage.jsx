@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History, MessagesSquare } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { EmptyStatePms } from '../components/EmptyStatePms';
 import { usePmsStore, getProjectRowMeta } from '../../../stores/pmsStore';
@@ -15,12 +15,19 @@ import { AssignStageModal } from './components/AssignStageModal';
 import { StageHandoffModal } from '../components/StageHandoffModal';
 import { CompleteProjectModal } from './components/CompleteProjectModal';
 import { PmsToast } from '../components/PmsToast';
+import { MessengerTab } from '../messenger/MessengerTab';
+import { useProjectMessenger } from '../messenger/useProjectMessenger';
+import { useAppStore } from '../../../stores/appStore';
 
 /**
  * ProjectDetailPage (/pms/projects/:id) — the project workspace.
  *
- * Six tabs over one project. All figures derive from the store, so an edit in
+ * Seven tabs over one project. All figures derive from the store, so an edit in
  * the Tasks tab moves the stage bar in Timeline and the hero gauge at once.
+ * Messenger is the exception: chat is server-only, read through
+ * useProjectMessenger, and its tab badge is the caller's unread count.
+ * `?tab=messenger&conversation=<id>` (the link in a chat notification) opens
+ * straight into that conversation.
  */
 
 const TABS = [
@@ -30,6 +37,7 @@ const TABS = [
   { id: 'documents', label: 'Design Proofs', icon: FileText },
   { id: 'approvals', label: 'Approvals', icon: ShieldCheck },
   { id: 'activity', label: 'Activity', icon: History },
+  { id: 'messenger', label: 'Messenger', icon: MessagesSquare },
 ];
 
 export default function ProjectDetailPage() {
@@ -42,7 +50,10 @@ export default function ProjectDetailPage() {
   const setStageStatus = usePmsStore((s) => s.setStageStatus);
   const updateTask = usePmsStore((s) => s.updateTask);
 
-  const [tab, setTab] = useState('timeline');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentUserId = useAppStore((s) => s.currentUser?.id);
+
+  const [tab, setTab] = useState(() => (searchParams.get('tab') === 'messenger' ? 'messenger' : 'timeline'));
   const [focusStageId, setFocusStageId] = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [assignStageId, setAssignStageId] = useState(null); // null = closed
@@ -50,6 +61,48 @@ export default function ProjectDetailPage() {
 
   const project = useMemo(() => projects.find((p) => p.id === id) ?? null, [projects, id]);
   const meta = useMemo(() => (project ? getProjectRowMeta(project) : null), [project]);
+
+  const messenger = useProjectMessenger(project?.id, { open: tab === 'messenger' });
+  const [chatStageId, setChatStageId] = useState(null);
+  const [highlightMessageId, setHighlightMessageId] = useState(null);
+  // A conversation to open once the list has loaded: an id, or a stage's team.
+  const [pendingChat, setPendingChat] = useState(null);
+
+  // Chat notifications link here with ?tab=messenger&conversation=<id>, which
+  // can arrive while the page is already open. Consume the params once.
+  useEffect(() => {
+    if (searchParams.get('tab') !== 'messenger') return;
+    const conversationId = searchParams.get('conversation');
+    setTab('messenger');
+    if (conversationId) setPendingChat({ conversationId });
+    setSearchParams({}, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  const { status: chatStatus, conversations, openConversation } = messenger;
+  useEffect(() => {
+    if (!pendingChat || chatStatus !== 'ready') return;
+    const { conversationId, stage } = pendingChat;
+    let target = conversationId ? conversations.find((c) => c.id === conversationId) : null;
+    if (stage) {
+      // The stage's team chat, or the Project Chat if the caller is not on that team.
+      target =
+        conversations.find(
+          (c) =>
+            c.kind === 'Team' &&
+            ((stage.departmentId && c.departmentId === stage.departmentId) || c.departmentName === stage.department),
+        ) ?? conversations.find((c) => c.kind === 'Project');
+    }
+    if (target) openConversation(target.id);
+    setPendingChat(null);
+  }, [pendingChat, chatStatus, conversations, openConversation]);
+
+  const chatUnreadByDepartment = useMemo(() => {
+    const map = {};
+    conversations.forEach((c) => {
+      if (c.kind === 'Team' && c.departmentName) map[c.departmentName] = c.unreadCount ?? 0;
+    });
+    return map;
+  }, [conversations]);
 
   const counts = useMemo(() => {
     if (!project) return {};
@@ -60,8 +113,9 @@ export default function ProjectDetailPage() {
       approvals: stages.reduce((n, s) => n + (s.approvals?.length ?? 0), 0),
       activity: project.activityLog?.length ?? 0,
       timeline: stages.length,
+      messenger: messenger.totalUnread,
     };
-  }, [project]);
+  }, [project, messenger.totalUnread]);
 
   if (!project) {
     return (
@@ -81,6 +135,13 @@ export default function ProjectDetailPage() {
   function handleManageTasks(stage) {
     setFocusStageId(stage.id);
     setTab('tasks');
+  }
+
+  function handleOpenStageChat(stage) {
+    setChatStageId(stage.id);
+    setHighlightMessageId(null);
+    setPendingChat({ stage });
+    setTab('messenger');
   }
 
   function handleSubmitStage(stage) {
@@ -151,6 +212,8 @@ export default function ProjectDetailPage() {
             onManageTasks={handleManageTasks}
             onSubmit={handleSubmitStage}
             onHandoff={(stage) => setHandoffStageId(stage.id)}
+            onChat={chatStatus === 'offline' ? undefined : handleOpenStageChat}
+            chatUnread={chatUnreadByDepartment}
           />
         )}
 
@@ -172,6 +235,17 @@ export default function ProjectDetailPage() {
         {tab === 'documents' && <DocumentsProofTab project={project} />}
         {tab === 'approvals' && <ApprovalsTab project={project} />}
         {tab === 'activity' && <ActivityAuditTab project={project} />}
+        {tab === 'messenger' && (
+          <MessengerTab
+            project={project}
+            messenger={messenger}
+            currentUserId={currentUserId}
+            stageId={chatStageId}
+            onStageChange={setChatStageId}
+            highlightMessageId={highlightMessageId}
+            onHighlight={setHighlightMessageId}
+          />
+        )}
       </div>
 
       <AssignStageModal

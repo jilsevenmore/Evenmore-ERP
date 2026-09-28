@@ -19,81 +19,31 @@ import {
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 
-const INITIAL_POLICIES = [
-  {
-    id: "POL-01",
-    title: "Remote & Hybrid Work Policy",
-    version: "v2.1",
-    status: "Published",
-    effectiveDate: "Sep 01, 2024",
-    author: "Ayesha Khan",
-    dept: "All Staff",
-    category: "Workplace",
-    ackedCount: 1048,
-    totalCount: 1248,
-    content: "Guidelines for core working hours, home office security protocols, communication standards, and hardware provisioning for distributed team members.",
-  },
-  {
-    id: "POL-02",
-    title: "Code of Conduct & Ethics",
-    version: "v3.0",
-    status: "Published",
-    effectiveDate: "Jan 15, 2024",
-    author: "Sarah Mitchell",
-    dept: "All Staff",
-    category: "Compliance",
-    ackedCount: 1210,
-    totalCount: 1248,
-    content: "Professional behavior standards, anti-harassment regulations, gift acceptance thresholds, and whistleblower protection guarantees.",
-  },
-  {
-    id: "POL-03",
-    title: "Information Security & Data Handling",
-    version: "v4.2",
-    status: "Published",
-    effectiveDate: "Jul 20, 2024",
-    author: "David Park",
-    dept: "Engineering & Operations",
-    category: "Security",
-    ackedCount: 940,
-    totalCount: 1020,
-    content: "Mandatory password lifecycles, VPN requirements, customer PII encryption requirements, and incident reporting protocols.",
-  },
-  {
-    id: "POL-04",
-    title: "Travel & Expense Reimbursement",
-    version: "v1.8",
-    status: "Published",
-    effectiveDate: "Aug 10, 2024",
-    author: "James Wilson",
-    dept: "Sales & Leadership",
-    category: "Finance",
-    ackedCount: 410,
-    totalCount: 460,
-    content: "Permissible per diem meal allowances, hotel tier restrictions, receipt submission deadlines, and corporate credit card usage guidelines.",
-  },
-  {
-    id: "POL-05",
-    title: "Annual & Special Leave Policy (2026)",
-    version: "v2.4",
-    status: "Under Review",
-    effectiveDate: "Pending Q4 Approval",
-    author: "Priya Patel",
-    dept: "All Staff",
-    category: "Leave & Benefits",
-    ackedCount: 0,
-    totalCount: 1248,
-    content: "Proposed carry-over balance expansion, parental leave enhancements, and revised delegation protocols during extended leaves.",
-  },
-];
+const EMPTY_POLICY = {
+  id: "",
+  title: "No policies published yet",
+  version: "—",
+  status: "—",
+  effectiveDate: "—",
+  author: "—",
+  dept: "—",
+  category: "—",
+  ackedCount: 0,
+  totalCount: 0,
+  content: "Publish a policy to see it here.",
+};
 
 export function LegacyCompanyPolicyPage() {
   const showToast = useAppStore((s) => s.showToast);
   const storePolicies = usePolicyStore((s) => s.policies);
-  const [policies, setPolicies] = useState(() => (storePolicies && storePolicies.length > 0 ? storePolicies : INITIAL_POLICIES));
+  const currentUser = useAppStore((s) => s.currentUser);
+  const employeeCount = useAppStore((s) => (s.employees || []).length);
+  const authorName = currentUser?.name || "HR";
+  const [policies, setPolicies] = useState(() => storePolicies || []);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
-  const [selectedPolicy, setSelectedPolicy] = useState(() => (storePolicies && storePolicies.length > 0 ? storePolicies[0] : INITIAL_POLICIES[0]));
+  const [selectedPolicyState, setSelectedPolicy] = useState(() => (storePolicies && storePolicies.length > 0 ? storePolicies[0] : null));
+  const selectedPolicy = selectedPolicyState || EMPTY_POLICY;
 
   useEffect(() => {
     if (storePolicies && storePolicies.length > 0) {
@@ -101,7 +51,7 @@ export function LegacyCompanyPolicyPage() {
       setSelectedPolicy((prev) => storePolicies.find((p) => p.id === prev?.id) || storePolicies[0]);
     }
   }, [storePolicies]);
-  const [acknowledgedMap, setAcknowledgedMap] = useState({ "POL-01": true });
+  const [acknowledgedMap, setAcknowledgedMap] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newPolicy, setNewPolicy] = useState({
     title: "",
@@ -139,16 +89,16 @@ export function LegacyCompanyPolicyPage() {
       version: newPolicy.version,
       content: newPolicy.content,
       status: "Published",
-      author: "Adarsh Gupta",
+      author: authorName,
     }) : null;
     const created = added || {
       id: `POL-0${policies.length + 1}`,
       ...newPolicy,
       status: "Published",
-      effectiveDate: "Oct 15, 2024",
-      author: "Adarsh Gupta",
-      ackedCount: 1,
-      totalCount: 1248,
+      effectiveDate: new Date().toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" }),
+      author: authorName,
+      ackedCount: 0,
+      totalCount: employeeCount,
     };
     setPolicies((prev) => [created, ...prev]);
     setSelectedPolicy(created);
@@ -158,7 +108,7 @@ export function LegacyCompanyPolicyPage() {
   };
 
   const currentAcked = acknowledgedMap[selectedPolicy.id];
-  const ackPercentage = Math.round((selectedPolicy.ackedCount / selectedPolicy.totalCount) * 100) || 0;
+  const ackPercentage = selectedPolicy.totalCount ? Math.round((selectedPolicy.ackedCount / selectedPolicy.totalCount) * 100) || 0 : 0;
 
   return (
     <div className="flex flex-col gap-6 w-full pb-12">
@@ -224,7 +174,7 @@ export function LegacyCompanyPolicyPage() {
               {ackPercentage}%
             </div>
             <div className="text-[11.5px] text-muted">
-              {selectedPolicy.ackedCount.toLocaleString()} of {selectedPolicy.totalCount.toLocaleString()} acknowledged
+              {Number(selectedPolicy.ackedCount || 0).toLocaleString()} of {Number(selectedPolicy.totalCount || 0).toLocaleString()} acknowledged
             </div>
             <div className="w-full h-2 bg-slate-200 rounded-full mt-2.5 overflow-hidden">
               <div
@@ -236,7 +186,7 @@ export function LegacyCompanyPolicyPage() {
             <div className="mt-4 pt-3 border-t border-bdr flex justify-end">
               <button
                 type="button"
-                onClick={() => handleAcknowledge(selectedPolicy.id)}
+                onClick={() => selectedPolicy.id && handleAcknowledge(selectedPolicy.id)}
                 className={`px-5 py-2 rounded-xl text-[13px] font-semibold transition ${
                   currentAcked
                     ? "bg-emerald-600 text-white cursor-default"

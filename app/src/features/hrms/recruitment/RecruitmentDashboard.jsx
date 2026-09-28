@@ -1,5 +1,6 @@
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAppStore } from "../../../stores/appStore";
+import { toISODate } from "../../../utils/dateUtils";
 import { useNavigate } from "react-router-dom";
 import { CandidatePipeline } from "../../../components/hrms/CandidatePipeline";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -52,11 +53,22 @@ export default function RecruitmentDashboard() {
   const pendingOffersCount = offers.filter((o) => o.status === "Pending").length;
   const hiredCount = candidates.filter((c) => c.stage === "Hired").length;
 
+  const todayISO = toISODate(new Date());
+  const weekAheadISO = toISODate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const interviewsTodayCount = interviews.filter((i) => i.status === "Scheduled" && toISODate(i.date) === todayISO).length;
+  const screeningCount = candidates.filter((c) => c.stage === "Screening").length;
+  const shortlistedCount = candidates.filter((c) => c.stage === "Shortlisted").length;
+  const appliedCount = candidates.filter((c) => !c.stage || c.stage === "Applied").length;
+  const closingSoonCount = jobs.filter((j) => {
+    const close = toISODate(j.closingDate || j.deadline || j.endDate);
+    return close && close >= todayISO && close <= weekAheadISO;
+  }).length;
+
   const kpis = [
     {
       label: "Open Positions",
       value: String(openPositionsCount),
-      sub: "+8.2% this month",
+      sub: `${jobs.length} total requisitions`,
       to: "/hrms/recruitment/jobs",
       icon: Briefcase,
       color: "blue",
@@ -67,7 +79,7 @@ export default function RecruitmentDashboard() {
     {
       label: "Total Candidates",
       value: String(candidates.length),
-      sub: "+12.5% vs last week",
+      sub: `${candidates.filter((c) => !["Hired", "Rejected"].includes(c.stage)).length} in active pipeline`,
       to: "/hrms/recruitment/candidates",
       icon: Users,
       color: "teal",
@@ -406,21 +418,21 @@ export default function RecruitmentDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {[
             {
-              title: "3 Interviews scheduled today",
+              title: `${interviewsTodayCount} Interviews scheduled today`,
               desc: "Ensure interview rooms and links are active.",
               to: "/hrms/recruitment/interviews",
               badge: "Action Required",
               badgeStyle: "bg-blue-50 text-blue-700 border-blue-200",
             },
             {
-              title: "5 Candidates waiting for screening",
+              title: `${screeningCount} Candidates waiting for screening`,
               desc: "Profiles submitted via Careers and LinkedIn.",
               to: "/hrms/recruitment/candidates",
               badge: "Review",
               badgeStyle: "bg-purple-50 text-purple-700 border-purple-200",
             },
             {
-              title: "2 Shortlisted candidates waiting for final round",
+              title: `${shortlistedCount} Shortlisted candidates waiting for final round`,
               desc: "Manager approvals submitted.",
               to: "/hrms/recruitment/candidates",
               badge: "Decision",
@@ -434,14 +446,14 @@ export default function RecruitmentDashboard() {
               badgeStyle: "bg-amber-50 text-amber-700 border-amber-200",
             },
             {
-              title: "2 Job openings closing within 7 days",
+              title: `${closingSoonCount} Job openings closing within 7 days`,
               desc: "Review final applicant counts.",
               to: "/hrms/recruitment/jobs",
               badge: "Closing Soon",
               badgeStyle: "bg-rose-50 text-rose-700 border-rose-200",
             },
             {
-              title: "3 Candidates awaiting recruiter response",
+              title: `${appliedCount} Candidates awaiting recruiter response`,
               desc: "Application acknowledgement pending.",
               to: "/hrms/recruitment/applications",
               badge: "Communication",
@@ -585,8 +597,8 @@ export default function RecruitmentDashboard() {
                     </div>
 
                     <div className="flex items-center gap-4 text-[11px] text-muted mt-2 pt-2 border-t border-border/60">
-                      <span>Tech Score: <b className="text-text">{c.technicalScore || 85}%</b></span>
-                      <span>HR Score: <b className="text-text">{c.hrScore || 90}%</b></span>
+                      <span>Tech Score: <b className="text-text">{c.technicalScore != null && c.technicalScore !== "" ? `${c.technicalScore}%` : "—"}</b></span>
+                      <span>HR Score: <b className="text-text">{c.hrScore != null && c.hrScore !== "" ? `${c.hrScore}%` : "—"}</b></span>
                     </div>
 
                     <div className="flex items-center justify-end gap-2 mt-2.5 pt-1">

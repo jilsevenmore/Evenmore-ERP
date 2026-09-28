@@ -6,20 +6,43 @@
 import React from 'react';
 import { AlertTriangle, Receipt, GitPullRequest, ArrowRight, ShieldCheck, ArrowUpRight, } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
-export const DashboardView = ({ onSelectScreen, faultyParts, invoices, zoneRequests, }) => {
-    const { formatCurrency } = useERP();
+import { toISODate } from '../../utils/dateUtils';
+export const DashboardView = ({ onSelectScreen, faultyParts = [], invoices = [], zoneRequests = [], }) => {
+    const { formatCurrency, companyProfile } = useERP();
     const reportedFaulty = faultyParts.filter((p) => p.status === 'Reported').length;
     const inProgressFaulty = faultyParts.filter((p) => p.status === 'Sent for Replacement').length;
     const totalInvoiceSum = invoices.reduce((s, i) => s + i.total, 0);
     const unpaidInvoices = invoices.filter((i) => i.status === 'Unpaid');
     const unpaidSum = unpaidInvoices.reduce((s, i) => s + i.total, 0);
     const pendingZoneReqs = zoneRequests.filter((r) => r.status === 'Requested').length;
+    const activeZones = [...new Set(zoneRequests.map((r) => r.zone).filter(Boolean))];
+    const latestBy = (rows) => [...rows].sort((a, b) => toISODate(b.date).localeCompare(toISODate(a.date)))[0];
+    const latestFaulty = latestBy(faultyParts);
+    const latestInvoice = latestBy(invoices);
+    const latestZoneReq = latestBy(zoneRequests);
+    const activity = [
+        latestFaulty && {
+            key: 'faulty', dot: 'bg-blue-500', screen: 'faulty-parts', cta: 'Inspect RMA', ctaClass: 'text-[#1F2E4A]',
+            title: `${latestFaulty.rmaNumber || 'RMA'} Registered: ${latestFaulty.product || '—'} (Qty: ${latestFaulty.qty ?? 0})`,
+            sub: [latestFaulty.vendor && `Vendor: ${latestFaulty.vendor}`, latestFaulty.status && `Status: ${latestFaulty.status}`].filter(Boolean).join(' • '),
+        },
+        latestInvoice && {
+            key: 'invoice', dot: 'bg-emerald-500', screen: 'sales-invoices', cta: 'View Invoice', ctaClass: 'text-[#1F2E4A]',
+            title: `Invoice ${latestInvoice.invoiceNumber || latestInvoice.id} Generated: ${latestInvoice.customer || '—'} (${formatCurrency(latestInvoice.total || 0)})`,
+            sub: [latestInvoice.linkedSo && `Linked ${latestInvoice.linkedSo}`, latestInvoice.status && `Status: ${latestInvoice.status}`].filter(Boolean).join(' • '),
+        },
+        latestZoneReq && {
+            key: 'zone', dot: 'bg-amber-500', screen: 'zone-requests', cta: 'Review Requisition', ctaClass: 'text-[#0CB1AC]',
+            title: `Requisition ${latestZoneReq.id} Submitted: ${latestZoneReq.product || '—'} (${latestZoneReq.qty ?? 0} units)`,
+            sub: [latestZoneReq.requestedBy && `Requested by ${latestZoneReq.requestedBy}`, latestZoneReq.zone && `for ${latestZoneReq.zone}`].filter(Boolean).join(' '),
+        },
+    ].filter(Boolean);
     return (<div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6 lg:gap-8 bg-[#F8F9FA] font-sans">
       {/* Welcome Banner */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-lg border border-[#CED4DA] shadow-2xs">
         <div>
           <span className="inline-block px-2 py-0.5 bg-[#1F2E4A]/10 text-[#1F2E4A] text-[11px] font-bold uppercase tracking-wider rounded mb-2">
-            Horizon Operations Hub
+            {companyProfile?.name || 'Operations Hub'}
           </span>
           <h2 className="text-2xl font-bold text-[#1F2E4A] tracking-tight">
             Enterprise Inventory & Logistics Dashboard
@@ -150,11 +173,11 @@ export const DashboardView = ({ onSelectScreen, faultyParts, invoices, zoneReque
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-[#5a6062]">Active Zones:</span>
-                <span className="font-semibold text-[#2d3335]">Zone A, B, C, D, F</span>
+                <span className="font-semibold text-[#2d3335]">{activeZones.length ? activeZones.join(', ') : '—'}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-[#5a6062]">Main Warehouse Stock:</span>
-                <span className="font-bold text-emerald-700">Healthy (42-110+ units)</span>
+                <span className="text-[#5a6062]">Total Requisitions:</span>
+                <span className="font-bold text-[#2d3335]">{zoneRequests.length}</span>
               </div>
             </div>
           </div>
@@ -173,50 +196,18 @@ export const DashboardView = ({ onSelectScreen, faultyParts, invoices, zoneReque
           System Operational Audit Stream
         </h3>
         <div className="divide-y divide-[#CED4DA] text-xs">
-          <div className="py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-blue-500"/>
-              <div>
-                <p className="font-semibold text-[#1F2E4A]">
-                  RMA-2023-1094 Registered: Cisco Catalyst 9300 Switch (Qty: 2)
-                </p>
-                <p className="text-[#5a6062]">Vendor: Cisco Direct • Port 12-24 PoE failure logged</p>
+          {activity.length === 0 ? (<div className="py-8 text-center text-[#767c7e]">No recent activity yet.</div>) : activity.map((a) => (<div key={a.key} className="py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
+              <div className="flex items-center gap-3">
+                <span className={`w-2 h-2 rounded-full ${a.dot}`}/>
+                <div>
+                  <p className="font-semibold text-[#1F2E4A]">{a.title}</p>
+                  {a.sub && <p className="text-[#5a6062]">{a.sub}</p>}
+                </div>
               </div>
-            </div>
-            <button onClick={() => onSelectScreen('faulty-parts')} className="text-xs text-[#1F2E4A] font-semibold hover:underline flex items-center gap-1">
-              Inspect RMA <ArrowUpRight className="w-3 h-3"/>
-            </button>
-          </div>
-
-          <div className="py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-emerald-500"/>
-              <div>
-                <p className="font-semibold text-[#1F2E4A]">
-                  Invoice INV-2026-003 Generated: Stark Industries ($45,000.00)
-                </p>
-                <p className="text-[#5a6062]">Linked SO-2026-0050 • Status: Paid</p>
-              </div>
-            </div>
-            <button onClick={() => onSelectScreen('sales-invoices')} className="text-xs text-[#1F2E4A] font-semibold hover:underline flex items-center gap-1">
-              View Invoice <ArrowUpRight className="w-3 h-3"/>
-            </button>
-          </div>
-
-          <div className="py-3 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-amber-500"/>
-              <div>
-                <p className="font-semibold text-[#1F2E4A]">
-                  Requisition #REQ-8042 Submitted: 12V Battery Pack (5 units)
-                </p>
-                <p className="text-[#5a6062]">Requested by Sarah Jenkins for Zone A (Sector 4)</p>
-              </div>
-            </div>
-            <button onClick={() => onSelectScreen('zone-requests')} className="text-xs text-[#0CB1AC] font-semibold hover:underline flex items-center gap-1">
-              Review Requisition <ArrowUpRight className="w-3 h-3"/>
-            </button>
-          </div>
+              <button onClick={() => onSelectScreen(a.screen)} className={`text-xs ${a.ctaClass} font-semibold hover:underline flex items-center gap-1`}>
+                {a.cta} <ArrowUpRight className="w-3 h-3"/>
+              </button>
+            </div>))}
         </div>
       </div>
     </div>);

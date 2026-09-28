@@ -66,17 +66,25 @@ export const PurchaseBillsPage = () => {
         const po = purchaseOrders.find((p) => p.id === selectedPoId);
         const vend = vendors.find((v) => v.id === selectedVendorId) || vendors[0];
         const totalAmt = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
+        if (!vend) {
+            alert('Please select a vendor for this bill.');
+            return;
+        }
+        if (!(totalAmt > 0)) {
+            alert('Please add at least one line item with an amount greater than zero.');
+            return;
+        }
         addPurchaseBill({
             purchaseOrderId: po?.id,
             poRef: po?.poNumber || 'PO-DIRECT',
             linkedPo: po?.poNumber || 'PO-DIRECT',
             vendorId: vend?.id,
-            vendor: vend?.name || 'Cisco Systems Direct',
+            vendor: vend?.name || '',
             billDate: getCurrentDateFormatted(),
             date: getCurrentDateFormatted(),
             dueDate: dueDate || addDaysISO(getCurrentISODate(), 30),
-            amount: totalAmt > 0 ? totalAmt : 5000,
-            total: totalAmt > 0 ? totalAmt : 5000,
+            amount: totalAmt,
+            total: totalAmt,
             paidAmount: 0,
             status: 'Unpaid',
             items: lineItems,
@@ -387,7 +395,7 @@ export const PurchaseBillsPage = () => {
                   <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                     {vendors.map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.name} ({v.code})
+                        {v.name}{v.code ? ` (${v.code})` : ''}
                       </option>
                     ))}
                   </select>
@@ -403,9 +411,9 @@ export const PurchaseBillsPage = () => {
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                          <span>POC: <strong>{vend.contactPerson || 'Vendor Rep'}</strong></span>
-                          <span>Email: {vend.email}</span>
-                          <span>Phone: {vend.phone}</span>
+                          <span>POC: <strong>{vend.contactPerson || '—'}</strong></span>
+                          <span>Email: {vend.email || '—'}</span>
+                          <span>Phone: {vend.phone || '—'}</span>
                         </div>
                       </div>
                     );
@@ -467,8 +475,8 @@ export const PurchaseBillsPage = () => {
                     <div className="text-slate-600 mt-1 flex items-start gap-1">
                       <MapPin size={12} className="text-slate-400 shrink-0 mt-0.5" />
                       <span>
-                        {selectedBill.billingAddress?.line1 || 'Corporate Headquarters'}<br />
-                        {selectedBill.billingAddress?.city || 'Mumbai'}, {selectedBill.billingAddress?.state || 'Maharashtra'} - {selectedBill.billingAddress?.pincode || '400001'}
+                        {selectedBill.billingAddress?.line1 && (<>{selectedBill.billingAddress.line1}<br /></>)}
+                        {[selectedBill.billingAddress?.city, selectedBill.billingAddress?.state, selectedBill.billingAddress?.pincode].filter(Boolean).join(', ') || (!selectedBill.billingAddress?.line1 && '—')}
                       </span>
                     </div>
                   </div>
@@ -527,7 +535,7 @@ export const PurchaseBillsPage = () => {
 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
               <div className="font-mono text-xs">
-                Total: <strong className="text-slate-900">${(selectedBill.total || selectedBill.amount).toFixed(2)}</strong> | Due: <strong className="text-amber-700">${getBillOutstanding(selectedBill.id).balanceDue.toFixed(2)}</strong>
+                Total: <strong className="text-slate-900">{formatCurrency(Number(selectedBill.total || selectedBill.amount) || 0)}</strong> | Due: <strong className="text-amber-700">{formatCurrency(getBillOutstanding(selectedBill.id).balanceDue || 0)}</strong>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 {selectedBill.status === 'Cancelled' ? (

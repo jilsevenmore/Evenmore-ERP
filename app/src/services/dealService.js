@@ -36,11 +36,11 @@ export const EMPTY_DEAL_FORM = {
   price: '',
   client: '',
   phone: '',
-  product: 'Diamond Jewelry',
+  product: '',
   stage: 'Draft',
   source: 'Website',
-  assignedUser: 'Priya Patel',
-  date: '15 Sep 2025',
+  assignedUser: '',
+  date: '',
   tag: '',
 };
 

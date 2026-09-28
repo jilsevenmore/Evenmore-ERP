@@ -263,31 +263,33 @@ export const CRM_RESOURCES = {
     }),
   },
 
-  taskAllocations: {
-    path: '/crm/task-allocations/',
-    toApi: (a) => compact({
-      taskId: a.taskId || undefined,
-      masterTaskId: a.masterTaskId || undefined,
-      assigneeId: a.assigneeId || undefined,
-      role: a.role || undefined,
-      department: a.department || undefined,
-      status: a.status || undefined,
-      dueDate: isoOut(a.dueDate),
-    }),
-    fromApi: (row) => ({ ...row, dueDate: displayIn(row.dueDate), _synced: true }),
-  },
+  // Hidden: Task Allocation duplicates CRM Tasks; backend route commented out -- restore by uncommenting this entry.
+  // taskAllocations: {
+  //   path: '/crm/task-allocations/',
+  //   toApi: (a) => compact({
+  //     taskId: a.taskId || undefined,
+  //     masterTaskId: a.masterTaskId || undefined,
+  //     assigneeId: a.assigneeId || undefined,
+  //     role: a.role || undefined,
+  //     department: a.department || undefined,
+  //     status: a.status || undefined,
+  //     dueDate: isoOut(a.dueDate),
+  //   }),
+  //   fromApi: (row) => ({ ...row, dueDate: displayIn(row.dueDate), _synced: true }),
+  // },
 
-  userAllocations: {
-    path: '/crm/user-allocations/',
-    toApi: (a) => compact({
-      userId: a.userId || a.assigneeId,
-      role: a.role || undefined,
-      department: a.department || undefined,
-      stageId: a.stageId || undefined,
-      isActive: a.isActive ?? undefined,
-    }),
-    fromApi: (row) => ({ ...row, _synced: true }),
-  },
+  // Hidden: User Tracking out of scope; backend route commented out -- restore by uncommenting this entry.
+  // userAllocations: {
+  //   path: '/crm/user-allocations/',
+  //   toApi: (a) => compact({
+  //     userId: a.userId || a.assigneeId,
+  //     role: a.role || undefined,
+  //     department: a.department || undefined,
+  //     stageId: a.stageId || undefined,
+  //     isActive: a.isActive ?? undefined,
+  //   }),
+  //   fromApi: (row) => ({ ...row, _synced: true }),
+  // },
 
   forms: {
     path: '/crm/forms/',
@@ -351,7 +353,7 @@ export const crmSync = createSync(CRM_RESOURCES, { label: 'crmSync' });
 export const CRM_PULL_ORDER = [
   'stages', 'dealStages', 'sources', 'industries', 'lostReasons',
   'leads', 'deals', 'tasks', 'masterTasks', 'stageTasks',
-  'taskAllocations', 'userAllocations', 'forms', 'projects', 'contracts',
+  /* 'taskAllocations', 'userAllocations', -- hidden: out of scope */ 'forms', 'projects', 'contracts',
 ];
 
 // ── endpoints that are not plain collections ────────────────────────────────

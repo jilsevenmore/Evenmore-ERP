@@ -19,7 +19,7 @@ export const AutoPOModal = ({
   const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
   const [selectedItemId, setSelectedItemId] = useState('');
   const [orderQty, setOrderQty] = useState(initialQty);
-  const [unitCost, setUnitCost] = useState(100);
+  const [unitCost, setUnitCost] = useState(0);
   const [expectedDate, setExpectedDate] = useState('In 7 business days');
   const [notes, setNotes] = useState('');
 
@@ -34,13 +34,13 @@ export const AutoPOModal = ({
       );
       if (matched) {
         setSelectedItemId(matched.id);
-        setUnitCost(matched.costPrice || matched.unitCost || 100);
+        setUnitCost(matched.costPrice || matched.unitCost || 0);
       }
       setOrderQty(Math.max(1, initialQty));
       setNotes(`Auto-requisition for ${activeSource} deficit replenishment`);
     } else if (masterItems.length > 0 && !selectedItemId) {
       setSelectedItemId(masterItems[0].id);
-      setUnitCost(masterItems[0].costPrice || masterItems[0].unitCost || 100);
+      setUnitCost(masterItems[0].costPrice || masterItems[0].unitCost || 0);
     }
   }, [activeItem, initialQty, activeSource, masterItems, selectedItemId]);
 
@@ -61,6 +61,10 @@ export const AutoPOModal = ({
   const handleCreatePO = (e) => {
     e.preventDefault();
     if (!targetMasterItem || orderQty <= 0) return;
+    if (!selectedVendor) {
+      showToast?.('Add a vendor in the Parties directory before raising a purchase order.');
+      return;
+    }
     const lineItem = {
       id: `li-po-${Date.now()}`,
       itemId: targetMasterItem.id,
@@ -73,8 +77,8 @@ export const AutoPOModal = ({
       amount: totalPOAmount,
     };
     const newPO = addPurchaseOrder?.({
-      vendorId: selectedVendor?.id,
-      vendor: selectedVendor?.name || 'Arrow Electronics Supply',
+      vendorId: selectedVendor.id,
+      vendor: selectedVendor.name || '',
       date: getCurrentDateFormatted(),
       expectedDate: expectedDate || 'In 7 business days',
       amount: totalPOAmount,
@@ -161,9 +165,10 @@ export const AutoPOModal = ({
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800 font-medium"
                 required
               >
+                {(vendors || []).length === 0 && <option value="">No vendors yet — add one in Parties</option>}
                 {(vendors || []).map((v) => (
                   <option key={v.id} value={v.id}>
-                    {v.name} ({v.paymentTerms})
+                    {v.name}{v.paymentTerms ? ` (${v.paymentTerms})` : ''}
                   </option>
                 ))}
               </select>

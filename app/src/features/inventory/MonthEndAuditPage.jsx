@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
+import { useAppStore } from '../../stores/appStore';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { CheckCircle2, AlertTriangle, UserCheck, ShieldCheck } from 'lucide-react';
 export const MonthEndAuditPage = () => {
     const { items, calculateItemStock, formatCurrency } = useERP();
+    const currentUser = useAppStore((s) => s.currentUser);
+    const auditCycleLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     // Point-in-time audit snapshot seeded from live book quantities
     // (was hardcoded demo rows). physicalCount starts at book qty; the
     // auditor adjusts via Post Adjustment / recount flows below.
@@ -152,8 +155,8 @@ export const MonthEndAuditPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA]">
           <span className="text-xs text-slate-500 font-semibold uppercase">Audit Cycle</span>
-          <p className="text-lg font-bold text-[#1F2E4A] mt-1">October 2026 Close</p>
-          <span className="text-[11px] text-slate-400">Auditor: Sarah Jenkins (Lead CPA)</span>
+          <p className="text-lg font-bold text-[#1F2E4A] mt-1">{auditCycleLabel} Close</p>
+          <span className="text-[11px] text-slate-400">Auditor: {currentUser?.name || '—'}</span>
         </div>
         <div className="bg-white p-4 rounded-lg border border-[#CED4DA]">
           <span className="text-xs text-slate-500 font-semibold uppercase">Reconciled Accuracy</span>

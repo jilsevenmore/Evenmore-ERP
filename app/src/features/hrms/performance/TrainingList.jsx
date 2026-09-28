@@ -16,6 +16,14 @@ export default function TrainingList({ embedded = false, onBack }) {
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const { trainings, addTraining, updateTraining, deleteTraining, trainers } = useTrainingStore();
+  const employees = useAppStore((s) => s.employees || []);
+  const departmentsList = [
+    ...new Set([
+      "General",
+      ...employees.map((e) => e.department).filter(Boolean),
+      ...trainings.map((t) => t.department).filter(Boolean),
+    ]),
+  ];
 
   const [search, setSearch] = useState("");
   const [dept, setDept] = useState("All");
@@ -28,14 +36,14 @@ export default function TrainingList({ embedded = false, onBack }) {
 
   const [form, setForm] = useState({
     name: "",
-    trainer: "Sarah Mitchell",
-    department: "HR",
-    type: "Leadership",
-    participants: 10,
-    cost: 30000,
-    start: "18 Oct 2024",
-    end: "19 Oct 2024",
-    status: "Scheduled",
+    trainer: "Unassigned",
+    department: "General",
+    type: "Technical",
+    participants: 1,
+    cost: 0,
+    start: "",
+    end: "",
+    status: "Requested",
   });
 
   const filtered = useMemo(() => trainings.filter((r) => {
@@ -110,7 +118,7 @@ export default function TrainingList({ embedded = false, onBack }) {
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-muted">Department</span>
           <select value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="h-9 px-3 bg-white border border-bdr rounded-xl text-[13px]">
-            <option>Engineering</option><option>HR</option><option>Design</option><option>Finance</option><option>Marketing</option><option>Operations</option><option>Product</option>
+            {departmentsList.map((d) => <option key={d}>{d}</option>)}
           </select>
         </label>
         <label className="flex flex-col gap-1">
@@ -178,7 +186,7 @@ export default function TrainingList({ embedded = false, onBack }) {
             View Funnel &rarr;
           </button>
           <Button onClick={() => {
-            setForm({ name: "", trainer: "Unassigned", department: "Engineering", type: "Technical", participants: 10, cost: 25000, start: "18 Oct 2024", end: "19 Oct 2024", status: "Requested" });
+            setForm({ name: "", trainer: "Unassigned", department: "General", type: "Technical", participants: 1, cost: 0, start: "", end: "", status: "Requested" });
             setAddOpen(true);
           }}>+ Add Training</Button>
         </div>
@@ -188,7 +196,7 @@ export default function TrainingList({ embedded = false, onBack }) {
         search={search}
         onSearch={setSearch}
         selects={[
-          { label: "Department", value: dept, onChange: setDept, options: [{ value: "All", label: "All Departments" }, { value: "HR", label: "HR" }, { value: "Engineering", label: "Engineering" }, { value: "Design", label: "Design" }, { value: "Finance", label: "Finance" }, { value: "Marketing", label: "Marketing" }] },
+          { label: "Department", value: dept, onChange: setDept, options: [{ value: "All", label: "All Departments" }, ...departmentsList.map((d) => ({ value: d, label: d }))] },
           { label: "Type", value: type, onChange: setType, options: [{ value: "All", label: "All Types" }, { value: "Leadership", label: "Leadership" }, { value: "Technical", label: "Technical" }, { value: "Design", label: "Design" }, { value: "Workshop", label: "Workshop" }] },
           { label: "Status", value: status, onChange: setStatus, options: [{ value: "All", label: "All Stages" }, ...TRAINING_FUNNEL_STAGES.map(s => ({ value: s.key, label: s.label }))] }
         ]}

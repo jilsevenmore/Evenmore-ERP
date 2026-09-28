@@ -6,32 +6,28 @@ import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
 import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 import { Plus, Award, Search, Edit2, Trash2 } from 'lucide-react';
 
-const INITIAL_DESIGNATIONS = [
-  { id: 'DSG-01', title: 'Chief Executive Officer', level: 'L7', department: 'Executive', count: 1 },
-  { id: 'DSG-02', title: 'Chief Technology Officer', level: 'L6', department: 'Engineering', count: 1 },
-  { id: 'DSG-03', title: 'Head of People & HRMS', level: 'L6', department: 'Human Resources', count: 1 },
-  { id: 'DSG-04', title: 'Chief Financial Officer', level: 'L6', department: 'Finance', count: 1 },
-  { id: 'DSG-05', title: 'Staff Backend Architect', level: 'L5', department: 'Engineering', count: 4 },
-  { id: 'DSG-06', title: 'Senior Software Engineer', level: 'L4', department: 'Engineering', count: 32 },
-  { id: 'DSG-07', title: 'Product Manager', level: 'L5', department: 'Product', count: 14 },
-  { id: 'DSG-08', title: 'HR Operations Lead', level: 'L4', department: 'Human Resources', count: 6 },
-  { id: 'DSG-09', title: 'DevOps & Cloud Lead', level: 'L5', department: 'Engineering', count: 5 },
-];
-
 export function DesignationsPage() {
   const showToast = useAppStore((s) => s.showToast);
-  const [designations, setDesignations] = useState(INITIAL_DESIGNATIONS);
+  const employees = useAppStore((s) => s.employees || []);
+  const [designations, setDesignations] = useState([]);
+  const [departmentNames, setDepartmentNames] = useState([]);
   const [q, setQ] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newDesig, setNewDesig] = useState({ title: '', level: 'L4', department: 'Engineering' });
+  const [newDesig, setNewDesig] = useState({ title: '', level: 'L4', department: '' });
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const rows = await hrmsSync.pull('designations');
-        if (active && Array.isArray(rows) && rows.length > 0) {
+        const [rows, depts] = await Promise.all([
+          hrmsSync.pull('designations'),
+          hrmsSync.pull('departments'),
+        ]);
+        if (active && Array.isArray(rows)) {
           setDesignations(rows);
+        }
+        if (active && Array.isArray(depts)) {
+          setDepartmentNames(depts.map((d) => d.name).filter(Boolean));
         }
       } catch (err) {
         console.warn('[DesignationsPage] Failed to pull designations:', err);
@@ -39,6 +35,8 @@ export function DesignationsPage() {
     })();
     return () => { active = false; };
   }, []);
+
+  const departmentOptions = [...new Set([...departmentNames, ...employees.map((e) => e.department).filter(Boolean)])];
 
   const filtered = designations.filter(
     (d) =>
@@ -64,7 +62,7 @@ export function DesignationsPage() {
     }
     showToast(`Designation "${newDesig.title}" created successfully`);
     setIsModalOpen(false);
-    setNewDesig({ title: '', level: 'L4', department: 'Engineering' });
+    setNewDesig({ title: '', level: 'L4', department: '' });
   }
 
   async function handleDelete(id, title) {
@@ -128,6 +126,13 @@ export function DesignationsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-bdr/40 text-[13px]">
+              {filtered.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="py-10 px-5 text-center text-muted text-[13px]">
+                    {designations.length === 0 ? 'No designations yet. Add your first designation.' : 'No designations match your search.'}
+                  </td>
+                </tr>
+              )}
               {filtered.map((r) => (
                 <tr key={r.id} className="hover:bg-off/60 transition-colors">
                   <td className="py-4 px-5 font-semibold text-slate-900 flex items-center gap-2">
@@ -148,7 +153,7 @@ export function DesignationsPage() {
                     </span>
                   </td>
                   <td className="py-4 px-5 text-slate-700">{r.department}</td>
-                  <td className="py-4 px-5 font-medium text-slate-700">{r.count} members</td>
+                  <td className="py-4 px-5 font-medium text-slate-700">{r.count ?? 0} members</td>
                   <td className="py-4 px-5 text-right">
                     <div className="flex justify-end gap-1">
                       <button
@@ -215,18 +220,19 @@ export function DesignationsPage() {
               <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
                 Department
               </label>
-              <select
+              <input
+                type="text"
+                list="desig-dept-options"
+                placeholder="Enter department"
                 value={newDesig.department}
                 onChange={(e) => setNewDesig({ ...newDesig, department: e.target.value })}
                 className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
-              >
-                <option>Engineering</option>
-                <option>Human Resources</option>
-                <option>Finance</option>
-                <option>Product</option>
-                <option>Sales & CRM</option>
-                <option>Marketing</option>
-              </select>
+              />
+              <datalist id="desig-dept-options">
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-bdr">

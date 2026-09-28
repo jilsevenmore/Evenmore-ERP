@@ -29,7 +29,7 @@ const challanGuide = {
     workflow: ['Sales Order Confirmed', 'Delivery Challan Generated', 'Carrier In-Transit', 'Consignee Receives Goods', 'POD Verified & Invoice Issued'],
 };
 export const DeliveryChallansPage = () => {
-    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId } = useERP();
+    const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId, companyProfile } = useERP();
     const location = useLocation();
     React.useEffect(() => {
         if (location.state?.challanId) setSelectedChallan(deliveryChallans.find(dc => dc.id === location.state.challanId) || null);
@@ -171,9 +171,9 @@ export const DeliveryChallansPage = () => {
             challanNumber: draftChallan?.challanNumber || `DC-2026-${String(deliveryChallans.length + 45).padStart(3, '0')}`,
             salesOrderId: draftChallan ? undefined : order?.id,
             sourceSalesOrderId: draftChallan ? undefined : order?.id,
-            salesOrderNumber: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
-            sourceSalesOrderNumber: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
-            linkedSo: order?.orderNumber || (draftChallan ? '' : 'SO-2026-0102'),
+            salesOrderNumber: order?.orderNumber || '',
+            sourceSalesOrderNumber: order?.orderNumber || '',
+            linkedSo: order?.orderNumber || '',
             customerId: order?.customerId,
             customer: order?.customer || 'Walk-in Customer',
             dispatchDate: new Date().toISOString().split('T')[0],
@@ -256,9 +256,11 @@ export const DeliveryChallansPage = () => {
             render: (c) => (
               <div>
                 <span className="font-bold text-text block">{c.customer}</span>
-                <span className="text-[10px] text-muted flex items-center gap-0.5">
-                  <MapPin size={10}/> Dock Receiving Bay
-                </span>
+                {(c.shippingAddress?.city || c.shippingAddress?.state) && (
+                  <span className="text-[10px] text-muted flex items-center gap-0.5">
+                    <MapPin size={10}/> {[c.shippingAddress?.city, c.shippingAddress?.state].filter(Boolean).join(', ')}
+                  </span>
+                )}
               </div>
             ),
         },
@@ -276,7 +278,7 @@ export const DeliveryChallansPage = () => {
               <div>
                 <p className="font-semibold text-text">{c.transporter}</p>
                 <span className="font-mono text-[10px] text-muted">
-                  {c.vehicleNo || c.trackingNumber || 'TRK-DIRECT'}
+                  {c.vehicleNo || c.trackingNumber || '—'}
                 </span>
               </div>
             ),
@@ -302,78 +304,79 @@ export const DeliveryChallansPage = () => {
             width: '10%',
             render: (c) => <StatusBadge status={c.status}/>,
         },
-        {
-            key: 'warranty',
-            header: 'Customer Warranty',
-            align: 'center',
-            width: '15%',
-            render: (c) => {
-                const wc = (getWarrantyByChallanId && getWarrantyByChallanId(c.id)) || warranties.find((w) => w.deliveryChallanId === c.id || w.challanNumber === c.challanNumber);
-                if (!wc) {
-                    if (c.status === 'Cancelled') {
-                        return <span className="text-[11px] text-slate-400 italic">No Warranty (Cancelled)</span>;
-                    }
-                    return (
-                        <button
-                            onClick={() => setCreateWarrantyChallan(c)}
-                            className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
-                        >
-                            <Plus size={11} /> Attach Warranty
-                        </button>
-                    );
-                }
+        // Hidden: Warranty Cards out of scope; backend route commented out
+        // {
+        //     key: 'warranty',
+        //     header: 'Customer Warranty',
+        //     align: 'center',
+        //     width: '15%',
+        //     render: (c) => {
+        //         const wc = (getWarrantyByChallanId && getWarrantyByChallanId(c.id)) || warranties.find((w) => w.deliveryChallanId === c.id || w.challanNumber === c.challanNumber);
+        //         if (!wc) {
+        //             if (c.status === 'Cancelled') {
+        //                 return <span className="text-[11px] text-slate-400 italic">No Warranty (Cancelled)</span>;
+        //             }
+        //             return (
+        //                 <button
+        //                     onClick={() => setCreateWarrantyChallan(c)}
+        //                     className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-200 transition-colors cursor-pointer shadow-2xs"
+        //                 >
+        //                     <Plus size={11} /> Attach Warranty
+        //                 </button>
+        //             );
+        //         }
 
-                if (wc.documentStatus === 'Cancelled') {
-                    return (
-                        <div className="inline-flex items-center gap-1">
-                            <button
-                                onClick={() => setSelectedWarrantyCard(wc)}
-                                className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200 cursor-pointer"
-                                title="View Cancelled Certificate"
-                            >
-                                Void ({wc.cardNumber})
-                            </button>
-                            {c.status !== 'Cancelled' && (
-                                <button
-                                    onClick={() => setCreateWarrantyChallan(c)}
-                                    className="text-[10px] font-semibold text-emerald-700 hover:underline cursor-pointer"
-                                    title="Create Corrected Warranty"
-                                >
-                                    + Correct
-                                </button>
-                            )}
-                        </div>
-                    );
-                }
+        //         if (wc.documentStatus === 'Cancelled') {
+        //             return (
+        //                 <div className="inline-flex items-center gap-1">
+        //                     <button
+        //                         onClick={() => setSelectedWarrantyCard(wc)}
+        //                         className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500 hover:text-slate-800 border border-slate-200 cursor-pointer"
+        //                         title="View Cancelled Certificate"
+        //                     >
+        //                         Void ({wc.cardNumber})
+        //                     </button>
+        //                     {c.status !== 'Cancelled' && (
+        //                         <button
+        //                             onClick={() => setCreateWarrantyChallan(c)}
+        //                             className="text-[10px] font-semibold text-emerald-700 hover:underline cursor-pointer"
+        //                             title="Create Corrected Warranty"
+        //                         >
+        //                             + Correct
+        //                         </button>
+        //                     )}
+        //                 </div>
+        //             );
+        //         }
 
-                const isDraft = wc.documentStatus === 'Draft';
-                return (
-                    <div className="inline-flex items-center gap-1.5">
-                        <button
-                            onClick={() => setSelectedWarrantyCard(wc)}
-                            className={`font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 cursor-pointer hover:shadow-2xs transition-all ${
-                                isDraft
-                                    ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100/70'
-                                    : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70'
-                            }`}
-                            title={isDraft ? 'Draft Certificate — Click to Preview' : 'Issued Warranty — Click to View Preview'}
-                        >
-                            <Award size={12} className={isDraft ? 'text-amber-600' : 'text-emerald-600'} />
-                            <span>{wc.cardNumber}</span>
-                        </button>
-                        {isDraft && (
-                            <button
-                                onClick={() => setCreateWarrantyChallan(c)}
-                                className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-100/70 px-1.5 py-0.5 rounded cursor-pointer"
-                                title="Edit Draft"
-                            >
-                                Edit
-                            </button>
-                        )}
-                    </div>
-                );
-            },
-        },
+        //         const isDraft = wc.documentStatus === 'Draft';
+        //         return (
+        //             <div className="inline-flex items-center gap-1.5">
+        //                 <button
+        //                     onClick={() => setSelectedWarrantyCard(wc)}
+        //                     className={`font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-lg border flex items-center gap-1.5 cursor-pointer hover:shadow-2xs transition-all ${
+        //                         isDraft
+        //                             ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100/70'
+        //                             : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100/70'
+        //                     }`}
+        //                     title={isDraft ? 'Draft Certificate — Click to Preview' : 'Issued Warranty — Click to View Preview'}
+        //                 >
+        //                     <Award size={12} className={isDraft ? 'text-amber-600' : 'text-emerald-600'} />
+        //                     <span>{wc.cardNumber}</span>
+        //                 </button>
+        //                 {isDraft && (
+        //                     <button
+        //                         onClick={() => setCreateWarrantyChallan(c)}
+        //                         className="text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-100/70 px-1.5 py-0.5 rounded cursor-pointer"
+        //                         title="Edit Draft"
+        //                     >
+        //                         Edit
+        //                     </button>
+        //                 )}
+        //             </div>
+        //         );
+        //     },
+        // },
         {
             key: 'actions',
             header: 'Actions / POD',
@@ -399,7 +402,7 @@ export const DeliveryChallansPage = () => {
                   <button
                     onClick={() => setSendModalChallan(c)}
                     className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded text-xs flex items-center gap-1 cursor-pointer"
-                    title="Send Waybill & Warranty Card"
+                    title="Send Waybill"
                   >
                     <Send size={13}/>
                   </button>
@@ -550,7 +553,7 @@ export const DeliveryChallansPage = () => {
                           <tr key={item.id || idx} className={`hover:bg-slate-50/70 ${isOverLimit ? 'bg-rose-50/50' : isShort ? 'bg-amber-50/30' : ''}`}>
                             <td className="p-2.5">
                               <p className="font-semibold text-slate-800">{item.description || item.name}</p>
-                              <span className="font-mono text-[10px] text-slate-400">SKU: {item.itemSku || mi?.sku || 'GEN-SKU'}</span>
+                              <span className="font-mono text-[10px] text-slate-400">SKU: {item.itemSku || mi?.sku || '—'}</span>
                             </td>
                             <td className="p-2.5 text-center">
                               <div className="font-mono text-[11px] text-slate-700">
@@ -689,9 +692,11 @@ export const DeliveryChallansPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div className="space-y-1">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Shipper / Dispatch From</span>
-                  <p className="font-bold text-slate-900">Horizon Global Logistics & Warehousing Hub</p>
-                  <p className="text-slate-600">452 Industrial Parkway, Dock 14B</p>
-                  <p className="text-slate-600">Seattle, WA 98101 • United States</p>
+                  <p className="font-bold text-slate-900">{companyProfile?.name || '—'}</p>
+                  {companyProfile?.address && <p className="text-slate-600">{companyProfile.address}</p>}
+                  {(selectedChallan.dispatchLocation || selectedChallan.location) && (
+                    <p className="text-slate-600">Dispatch Location: {selectedChallan.dispatchLocation || selectedChallan.location}</p>
+                  )}
                 </div>
                 <div className="space-y-1 sm:border-l sm:border-slate-200 sm:pl-4">
                   <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Consignee / Deliver To (Shipping Address)</span>
@@ -700,12 +705,12 @@ export const DeliveryChallansPage = () => {
                     <div className="text-slate-600 text-[11px] leading-tight mt-1">
                       <p>{selectedChallan.shippingAddress.line1}</p>
                       {selectedChallan.shippingAddress.line2 && <p>{selectedChallan.shippingAddress.line2}</p>}
-                      <p>{selectedChallan.shippingAddress.city}, {selectedChallan.shippingAddress.state} {selectedChallan.shippingAddress.pincode}</p>
+                      <p>{[selectedChallan.shippingAddress.city, selectedChallan.shippingAddress.state, selectedChallan.shippingAddress.pincode].filter(Boolean).join(', ')}</p>
                     </div>
                   ) : (
-                    <p className="text-slate-600">Customer Receiving Facility / Inbound Dock</p>
+                    <p className="text-slate-600">No shipping address on record</p>
                   )}
-                  <p className="text-slate-600 mt-1">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo || selectedChallan.sourceQuotationNumber}</strong></p>
+                  <p className="text-slate-600 mt-1">Linked Order: <strong className="font-mono text-slate-800">{selectedChallan.salesOrderNumber || selectedChallan.linkedSo || selectedChallan.sourceQuotationNumber || '—'}</strong></p>
                 </div>
               </div>
 
@@ -853,6 +858,7 @@ export const DeliveryChallansPage = () => {
               <RelatedDocumentsCard documents={getChallanRelatedDocs(selectedChallan)}/>
 
               {/* Customer Warranty & Asset Guarantee Section */}
+              {/* Hidden: Warranty Cards out of scope; backend route commented out
               {(() => {
                 const wc = (getWarrantyByChallanId && getWarrantyByChallanId(selectedChallan.id)) || warranties.find((w) => w.deliveryChallanId === selectedChallan.id || w.challanNumber === selectedChallan.challanNumber);
                 return (
@@ -936,6 +942,7 @@ export const DeliveryChallansPage = () => {
                   </div>
                 );
               })()}
+              */}
 
               {/* Clean Manifest Table (No Commercial Prices/Taxes) */}
               <div className="space-y-2">
@@ -963,7 +970,7 @@ export const DeliveryChallansPage = () => {
                         <tr key={it.id || idx} className="hover:bg-slate-50/60">
                           <td className="p-2.5 text-center font-mono text-slate-400">{idx + 1}</td>
                           <td className="p-2.5 font-semibold text-slate-800">{it.description || it.name}</td>
-                          <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || 'SKU-LOG-01'}</td>
+                          <td className="p-2.5 font-mono text-slate-500 text-[11px]">{it.itemSku || it.sku || '—'}</td>
                           <td className="p-2.5 text-center font-bold text-slate-900">{it.qty}</td>
                           <td className="p-2.5">
                             {it.selectedSerials && it.selectedSerials.length > 0 ? (
@@ -1082,6 +1089,7 @@ export const DeliveryChallansPage = () => {
       )}
 
       {/* Create / Edit Warranty Card Modal */}
+      {/* Hidden: Warranty Cards out of scope; backend route commented out
       {createWarrantyChallan && (
         <CreateWarrantyCardModal
           isOpen={Boolean(createWarrantyChallan)}
@@ -1095,8 +1103,10 @@ export const DeliveryChallansPage = () => {
           }}
         />
       )}
+      */}
 
       {/* Customer-facing Warranty Card Document Modal */}
+      {/* Hidden: Warranty Cards out of scope; backend route commented out
       {selectedWarrantyCard && (
         <WarrantyCardModal
           isOpen={Boolean(selectedWarrantyCard)}
@@ -1111,6 +1121,7 @@ export const DeliveryChallansPage = () => {
           }}
         />
       )}
+      */}
 
       {/* Send Delivery Challan Modal */}
       {sendModalChallan && (
@@ -1118,7 +1129,7 @@ export const DeliveryChallansPage = () => {
           isOpen={Boolean(sendModalChallan)}
           onClose={() => setSendModalChallan(null)}
           challan={sendModalChallan}
-          warrantyCard={(getWarrantyByChallanId && getWarrantyByChallanId(sendModalChallan.id)) || warranties.find((w) => w.deliveryChallanId === sendModalChallan.id || w.challanNumber === sendModalChallan.challanNumber)}
+          warrantyCard={null} // Hidden: Warranty Cards out of scope; backend route commented out
           onPreviewChallan={() => {
             setSelectedChallan(sendModalChallan);
           }}

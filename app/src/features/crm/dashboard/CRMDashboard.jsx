@@ -1,18 +1,16 @@
 import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, UserPlus, Clock, TrendingUp, TrendingDown, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
+import { Users, UserPlus, Clock, TrendingUp, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
 import { useCrmStore } from "../../../stores/crmStore";
 import { initials, describeError } from "../../../services/crmSync";
 import { useERP } from "../../../context/ERPContext";
 import { useAppStore } from "../../../stores/appStore";
-import { CRM_TEAM_MEMBERS } from "../../../services/leadStageAutomation";
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from "../../../services/taskCompletionService";
 import CompleteTaskModal from "../tasks/CompleteTaskModal";
 import CreateLeadModal from "../leads/CreateLeadModal";
 import { runLeadStageAutomation } from "../../../services/leadStageAutomation";
-const DEAL_STORAGE_KEY = "crm-deals-v1";
-const TASK_STORAGE_KEY = "crm-tasks-v1";
+import { toISODate } from "../../../utils/dateUtils";
 const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
 const SOURCE_COLORS = ["#2f6fed", "#7c3aed", "#f59e0b", "#10b981", "#ec4899", "#06b6d4", "#64748b"];
 const AVATAR_COLORS = ["#2f6fed", "#7c3aed", "#059669", "#ea580c", "#db2777", "#0891b2", "#4f46e5"];
@@ -131,25 +129,27 @@ export default function DashboardView() {
   const totalLeads = leads.length;
   const activeLeads = leads.filter((l) => l.status !== "Lost Lead").length;
   const newLeads = leads.filter((l) => l.status === "New").length;
+  const weekAgoISO = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const leadsThisWeek = leads.filter((l) => toISODate(l.createdOn) >= weekAgoISO).length;
   const pendingTasks = tasks.filter((t) => t.status !== "Completed").length;
+  const overdueTasks = tasks.filter((t) => t.status !== "Completed" && toISODate(t.dueDate) && toISODate(t.dueDate) < todayISO).length;
   const activeDeals = deals.filter((d) => d.stage !== "Declined");
   const pipelineDeals = activeDeals.length;
   const dealsTotal = deals.reduce((a, d) => a + (Number(d.price) || 0), 0);
   const invoicesTotal = invoices.reduce((a, i) => a + (i.total || 0), 0);
   const quotationsTotal = quotations.reduce((a, q) => a + (q.amount || q.total || 0), 0);
   const ordersTotal = salesOrders.reduce((a, o) => a + (o.total || o.amount || 0), 0);
-  const collectedTotal = paymentIns.reduce((a, p) => a + (p.amount || 0), 0);
   const outstandingTotal = invoices.reduce((a, i) => {
     const r = getInvoiceOutstanding(i.id || i.invoiceNumber);
     return a + (r.balanceDue || 0);
   }, 0);
   const revenueExpected = dealsTotal + invoicesTotal + quotationsTotal;
   const kpis = [
-    { label: "Total Active Leads", value: String(activeLeads), icon: Users, bg: "#eef4ff", fg: "#2f6fed", trend: "12%", up: true, note: "vs last week" },
-    { label: "New Leads", value: String(newLeads), icon: UserPlus, bg: "#ecfdf5", fg: "#10b981", trend: "2%", up: true, note: "vs last week" },
-    { label: "Pending Tasks", value: String(pendingTasks), icon: Clock, bg: "#fff7e8", fg: "#f59e0b", trend: "4%", up: false, note: "vs last week" },
-    { label: "Deals in Pipeline", value: String(pipelineDeals), icon: TrendingUp, bg: "#f5efff", fg: "#8b5cf6", trend: "15%", up: true, note: formatShortINR(dealsTotal) },
-    { label: "Total Revenue Expected", value: formatCurrency(revenueExpected), icon: DollarSign, bg: "#ffeef4", fg: "#f43f5e", trend: "22%", up: true, note: formatCurrency(outstandingTotal) + " due" }
+    { label: "Total Active Leads", value: String(activeLeads), icon: Users, bg: "#eef4ff", fg: "#2f6fed", note: totalLeads + " total leads" },
+    { label: "New Leads", value: String(newLeads), icon: UserPlus, bg: "#ecfdf5", fg: "#10b981", note: leadsThisWeek + " added this week" },
+    { label: "Pending Tasks", value: String(pendingTasks), icon: Clock, bg: "#fff7e8", fg: "#f59e0b", note: overdueTasks + " overdue" },
+    { label: "Deals in Pipeline", value: String(pipelineDeals), icon: TrendingUp, bg: "#f5efff", fg: "#8b5cf6", note: formatShortINR(dealsTotal) },
+    { label: "Total Revenue Expected", value: formatCurrency(revenueExpected), icon: DollarSign, bg: "#ffeef4", fg: "#f43f5e", note: formatCurrency(outstandingTotal) + " due" }
   ];
   const pipeline = DEAL_STAGES.map((stage, i) => ({
     label: stage,
@@ -170,7 +170,7 @@ export default function DashboardView() {
       pct: Math.round((count / (totalLeads || 1)) * 100),
       color: SOURCE_COLORS[i % SOURCE_COLORS.length]
     }));
-  }, [totalLeads]);
+  }, [leads, totalLeads]);
   let acc = 0;
   const donut = sourceGroups.map((s) => {
     const a0 = (acc / (totalLeads || 1)) * 360;
@@ -180,8 +180,10 @@ export default function DashboardView() {
   });
   const bucket = (t) => {
     if (t.status === "Completed") return "Upcoming";
-    if (t.dueDate < todayISO) return "Overdue";
-    if (t.dueDate === todayISO) return "Today";
+    const due = toISODate(t.dueDate);
+    if (!due) return "Upcoming";
+    if (due < todayISO) return "Overdue";
+    if (due === todayISO) return "Today";
     return "Upcoming";
   };
   const counts = {
@@ -208,15 +210,16 @@ export default function DashboardView() {
   }
   const handleCompleteSuccess = () => setCompleteTarget(null);
   const recent = leads.slice(0, 5);
-  const todayTasks = tasks.filter((t) => t.dueDate === todayISO).slice(0, 2);
-  const nextOrder = salesOrders[0];
-  const nextQuote = quotations[0];
-  const calendar = [
-    ...todayTasks.map((t) => ({ time: "10:00 AM", title: t.title + " - " + t.lead, sub: t.company || t.owner, color: "#2f6fed" })),
-    { time: "11:00 AM", title: "Team Meeting", sub: "Sales review " + collectedTotal.toLocaleString("en-IN") + " collected", color: "#8b5cf6" },
-    { time: "02:00 PM", title: "Demo - " + (leads[2]?.name || "Lead"), sub: (leads[2]?.company || "") + (nextOrder ? " | " + nextOrder.orderNumber : ""), color: "#10b981" },
-    { time: "05:00 PM", title: "Send Quotations", sub: (nextQuote ? nextQuote.quoteNumber + " " + formatCurrency(nextQuote.amount || 0) : quotationsTotal + " pipeline"), color: "#f59e0b" }
-  ].slice(0, 4);
+  const calendar = tasks
+    .filter((t) => t.status !== "Completed" && toISODate(t.dueDate) === todayISO)
+    .slice(0, 4)
+    .map((t) => ({
+      id: t.id,
+      time: t.dueTime || "Today",
+      title: t.title + (t.lead ? " - " + t.lead : ""),
+      sub: [t.company, t.owner].filter(Boolean).join(" | "),
+      color: t.priority === "High" || t.priority === "Urgent" ? "#ef4444" : t.priority === "Medium" ? "#f59e0b" : "#2f6fed"
+    }));
   return (
     <div className="grid-cols-1 lg:grid-cols-none" style={{ display: "grid", gap: 14, background: "#f6f9ff", minHeight: "100%" }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
@@ -232,11 +235,10 @@ export default function DashboardView() {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 12 }}>
         {kpis.map((k, index) => {
-          const Trend = k.up ? TrendingUp : TrendingDown;
           return (
             <CrmKpiCard key={k.label} label={k.label} value={k.value} icon={k.icon} tone={['blue', 'emerald', 'amber', 'purple', 'rose'][index]}>
-              <span className="flex flex-wrap items-center gap-1 text-[11px] font-semibold" style={{ color: k.up ? '#10b981' : '#ef4444' }}>
-                <Trend size={13} /> {k.trend} <em className="font-normal not-italic text-slate-400">{k.note}</em>
+              <span className="flex flex-wrap items-center gap-1 text-[11px] font-semibold">
+                <em className="font-normal not-italic text-slate-400">{k.note}</em>
               </span>
             </CrmKpiCard>
           );
@@ -322,6 +324,9 @@ export default function DashboardView() {
               </tr>
             </thead>
             <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} style={{ padding: "18px 8px", textAlign: "center", color: "#94a3b8" }}>No tasks to show.</td></tr>
+              )}
               {filtered.map((t) => {
                 const b = bucket(t);
                 const overdue = b === "Overdue";
@@ -379,6 +384,9 @@ export default function DashboardView() {
             <Link to="/crm/leads" style={{ fontSize: 12, fontWeight: 700, color: "#2f6fed" }}>View All</Link>
           </div>
           <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            {recent.length === 0 && (
+              <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>No leads yet.</p>
+            )}
             {recent.map((l) => {
               const pill = statusPill(l.status);
               return (
@@ -404,8 +412,11 @@ export default function DashboardView() {
             <Link to="/crm/tasks" style={{ fontSize: 12, fontWeight: 700, color: "#2f6fed" }}>View Calendar</Link>
           </div>
           <div style={{ display: "grid", gap: 12, marginTop: 12 }}>
+            {calendar.length === 0 && (
+              <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>Nothing scheduled for today.</p>
+            )}
             {calendar.map((c) => (
-              <div key={c.title} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <div key={c.id} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                 <span style={{ fontSize: 11, fontWeight: 800, color: "#475569", width: 64, flexShrink: 0, paddingTop: 2 }}>{c.time}</span>
                 <span style={{ width: 3, borderRadius: 99, background: c.color, alignSelf: "stretch" }} />
                 <span>

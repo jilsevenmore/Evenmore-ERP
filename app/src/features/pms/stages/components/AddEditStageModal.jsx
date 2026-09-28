@@ -20,7 +20,7 @@ const labelClass = 'block text-[11px] font-semibold text-slate-600 mb-1.5';
 const BLANK = {
   name: '',
   description: '',
-  department: 'Design',
+  department: '',
   defaultDuration: 1,
   durationUnit: 'Days',
   assignedRole: '',
@@ -70,9 +70,9 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
   // Reload the form whenever the dialog opens or switches target.
   useEffect(() => {
     if (!isOpen) return;
-    setDraft(stage ? { ...BLANK, ...stage } : BLANK);
+    setDraft(stage ? { ...BLANK, ...stage } : { ...BLANK, department: departmentNames[0] ?? '' });
     setErrors({});
-  }, [isOpen, stage]);
+  }, [isOpen, stage, departmentNames]);
 
   const set = (patch) => setDraft((d) => ({ ...d, ...patch }));
 
@@ -166,6 +166,9 @@ export function AddEditStageModal({ isOpen, onClose, stage = null }) {
               value={draft.department}
               onChange={(e) => set({ department: e.target.value })}
             >
+              <option value="" disabled>
+                {departmentNames.length === 0 ? 'No departments yet' : 'Select a department…'}
+              </option>
               {departmentNames.map((d) => (
                 <option key={d} value={d}>{d}</option>
               ))}

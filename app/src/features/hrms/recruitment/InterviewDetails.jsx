@@ -35,7 +35,7 @@ export default function InterviewDetails() {
   const navigate = useNavigate();
 
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [evalForm, setEvalForm] = useState({ score: "88", feedback: "Strong technical fundamentals, great problem solving skills." });
+  const [evalForm, setEvalForm] = useState({ score: "", feedback: "" });
 
   const it = interviews.find((i) => i.id === id);
   const cand = candidates.find((c) => c.id === it?.candidateId);
@@ -60,10 +60,20 @@ export default function InterviewDetails() {
   const isVideo = it.mode?.toLowerCase().includes("video") || it.mode?.toLowerCase().includes("meet");
   const isPhone = it.mode?.toLowerCase().includes("phone");
 
+  const technicalScore = Number.isFinite(Number(it.score)) && it.score !== null && it.score !== "" ? Number(it.score) : null;
+  const cultureScore = Number.isFinite(Number(it.cultureScore)) && it.cultureScore !== null && it.cultureScore !== undefined && it.cultureScore !== "" ? Number(it.cultureScore) : null;
+  const scoredParts = [technicalScore, cultureScore].filter((v) => v !== null);
+  const overallScore = scoredParts.length ? Math.round(scoredParts.reduce((a, b) => a + b, 0) / scoredParts.length) : null;
+
   function handleSaveEvaluation() {
+    const score = parseInt(evalForm.score, 10);
+    if (!Number.isFinite(score) || score < 0 || score > 100) {
+      showToast("Enter an overall score between 0 and 100.");
+      return;
+    }
     updateInterview(it.id, {
       status: "Completed",
-      score: parseInt(evalForm.score, 10) || 85,
+      score,
       feedback: evalForm.feedback,
     });
     setFeedbackModalOpen(false);
@@ -231,9 +241,17 @@ export default function InterviewDetails() {
                     <p className="text-[12px] text-muted">Assessment logged by {it.interviewer}</p>
                   </div>
                 </div>
-                <span className="px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full text-emerald-700 text-[11.5px] font-bold">
-                  Recommended for Next Round
-                </span>
+                {overallScore !== null && (
+                  <span
+                    className={`px-3 py-1 rounded-full text-[11.5px] font-bold border ${
+                      overallScore >= 70
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        : "bg-amber-50 border-amber-200 text-amber-700"
+                    }`}
+                  >
+                    {overallScore >= 70 ? "Recommended for Next Round" : "Needs Review"}
+                  </span>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
@@ -242,21 +260,23 @@ export default function InterviewDetails() {
                     Technical Score
                   </div>
                   <div className="text-2xl font-bold text-slate-800 dark:text-white mt-1">
-                    {it.score ?? 88}%
+                    {technicalScore !== null ? `${technicalScore}%` : "—"}
                   </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700 rounded-xl p-4 text-center">
                   <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                     Culture & HR
                   </div>
-                  <div className="text-2xl font-bold text-slate-800 dark:text-white mt-1">91%</div>
+                  <div className="text-2xl font-bold text-slate-800 dark:text-white mt-1">
+                    {cultureScore !== null ? `${cultureScore}%` : "—"}
+                  </div>
                 </div>
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl p-4 text-center">
                   <div className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
                     Overall Rating
                   </div>
                   <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300 mt-1">
-                    {Math.round(((it.score ?? 88) + 91) / 2)}%
+                    {overallScore !== null ? `${overallScore}%` : "—"}
                   </div>
                 </div>
               </div>
@@ -267,7 +287,7 @@ export default function InterviewDetails() {
                   <span>Interviewer Feedback & Recommendation</span>
                 </div>
                 <p className="text-[13px] text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {it.feedback || "Candidate demonstrated exceptional domain problem-solving abilities and clear architectural thought process. Culture fit is high."}
+                  {it.feedback || "No feedback recorded."}
                 </p>
               </div>
             </div>
@@ -321,7 +341,7 @@ export default function InterviewDetails() {
                   </a>
                 ) : (
                   <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {it.location || "Company HQ Conference Room"}
+                    {it.location || "—"}
                   </span>
                 )}
               </div>

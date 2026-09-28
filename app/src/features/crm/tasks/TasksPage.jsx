@@ -8,20 +8,14 @@ import StatCard from '../../../components/ui/StatCard';
 import {
   CRM_EVENT,
   TASK_SOURCE_AUTOMATION,
-  CRM_TEAM_MEMBERS,
 } from '../../../services/leadStageAutomation';
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from '../../../services/taskCompletionService';
 import CompleteTaskModal from './CompleteTaskModal';
 import { useAppStore } from '../../../stores/appStore';
 import { useCrmStore } from '../../../stores/crmStore';
 import { describeError } from '../../../services/crmSync';
+import { formatCurrency } from '../../../utils/currencyUtils';
 
-const ASSIGNEE_OPTIONS = [
-  'Unassigned',
-  ...CRM_TEAM_MEMBERS.map((m) => m.name),
-  'Elena Rostova',
-  'Jayesh Nair',
-];
 
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'];
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Waiting', 'Completed'];
@@ -29,6 +23,30 @@ const STATUS_OPTIONS = ['Open', 'In Progress', 'Waiting', 'Completed'];
 export default function TasksPage() {
   const currentUser = useAppStore((s) => s.currentUser);
   const tasks = useCrmStore((s) => s.tasks);
+  const leads = useCrmStore((s) => s.leads);
+  const deals = useCrmStore((s) => s.deals);
+  const teamMembers = useCrmStore((s) => s.teamMembers);
+  const ASSIGNEE_OPTIONS = useMemo(() => [
+    'Unassigned',
+    ...new Set(
+      [...(teamMembers || []).map((m) => m?.name), currentUser?.name, ...tasks.map((t) => t.owner)]
+        .map((name) => String(name || '').trim())
+        .filter((name) => name && name !== 'Unassigned'),
+    ),
+  ], [teamMembers, currentUser?.name, tasks]);
+  const kpis = useMemo(() => {
+    const currency = localStorage.getItem('evenmore_currency') || 'USD ($)';
+    const openDeals = deals.filter((d) => d.stage !== 'Won' && d.stage !== 'Lost' && d.stage !== 'Declined');
+    return {
+      activeLeads: leads.filter((l) => !/lost/i.test(String(l.status || ''))).length,
+      totalLeads: leads.length,
+      newLeads: leads.filter((l) => l.status === 'New' || l.status === 'New Lead').length,
+      pipelineDeals: openDeals.length,
+      pipelineValue: formatCurrency(openDeals.reduce((sum, d) => sum + (Number(d.price) || 0), 0), currency, { noDecimals: true }),
+      expected: formatCurrency(leads.reduce((sum, l) => sum + (Number(l.amount) || 0), 0), currency),
+      symbol: (currency.match(/\(([^)]+)\)/) || [])[1] || '$',
+    };
+  }, [leads, deals]);
   const updateTask = useCrmStore((s) => s.updateTask);
   const [activeStatus, setActiveStatus] = useState('All');
   const [search, setSearch] = useState('');
@@ -324,39 +342,24 @@ export default function TasksPage() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 my-5">
-        <CrmKpiCard label="Total Active Leads" value="6" icon={Users} tone="blue">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 12%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+        <CrmKpiCard label="Total Active Leads" value={kpis.activeLeads} icon={Users} tone="blue">
+          <div className="text-[11px] mt-0.5 text-slate-400">{kpis.totalLeads} total leads</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="New Leads" value="1" icon={UserPlus} tone="emerald">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 2%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+        <CrmKpiCard label="New Leads" value={kpis.newLeads} icon={UserPlus} tone="emerald">
+          <div className="text-[11px] mt-0.5 text-slate-400">in the New stage</div>
         </CrmKpiCard>
 
         <CrmKpiCard label="Pending Tasks" value={tasks.filter((t) => t.status !== 'Completed').length} icon={Clock} tone="amber">
-            <div className="text-[11px] font-semibold text-rose-500 mt-0.5 flex items-center gap-1">
-              <span>↓ 4%</span>
-              <span className="text-slate-400 font-normal">vs last week</span>
-          </div>
+          <div className="text-[11px] mt-0.5 text-slate-400">{tasks.length} total tasks</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="Deals in Pipeline" value="6" icon={TrendingUp} tone="purple">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 15%</span>
-              <span className="text-slate-400 font-normal">Rs 1.72 Cr</span>
-          </div>
+        <CrmKpiCard label="Deals in Pipeline" value={kpis.pipelineDeals} icon={TrendingUp} tone="purple">
+          <div className="text-[11px] mt-0.5 text-slate-400">{kpis.pipelineValue}</div>
         </CrmKpiCard>
 
-        <CrmKpiCard label="Total Revenue Expected" value="$17,355,083.00" symbol="$" tone="rose">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-0.5 flex items-center gap-1">
-              <span>↑ 22%</span>
-              <span className="text-slate-400 font-normal">$5,884.00 due</span>
-          </div>
+        <CrmKpiCard label="Total Revenue Expected" value={kpis.expected} symbol={kpis.symbol} tone="rose">
+          <div className="text-[11px] mt-0.5 text-slate-400">from lead amounts</div>
         </CrmKpiCard>
       </div>
 

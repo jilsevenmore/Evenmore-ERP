@@ -7,6 +7,20 @@
 const API_BASE_URL = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/+$/, '');
 const DEFAULT_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 15000;
 
+/**
+ * A signed file URL (`…/api/v1/files/{id}/download/?token=…`) as this app
+ * should load it. The server builds it absolute from its own host — behind the
+ * Vite proxy that is 127.0.0.1:8000, a different origin from the page, so a
+ * fetch of it is a CORS request and an <iframe> of it is refused. Re-basing it
+ * on the app's API base sends it the way every other API call goes: through
+ * the proxy in dev, to the configured API origin in production.
+ */
+export function resolveFileUrl(url) {
+  if (!url || typeof url !== 'string' || url.startsWith('data:') || url.startsWith('blob:')) return url;
+  const match = url.match(/^(?:https?:\/\/[^/]+)?\/api\/v\d+(\/files\/.+)$/);
+  return match ? `${API_BASE_URL}${match[1]}` : url;
+}
+
 export class ApiError extends Error {
   constructor(message, { status = 0, endpoint = '', payload = null } = {}) {
     super(message);

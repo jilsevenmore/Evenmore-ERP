@@ -69,7 +69,7 @@ export const PurchaseOrdersPage = () => {
         const totalAmt = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
         addPurchaseOrder({
             vendorId: vend?.id,
-            vendor: vend?.name || 'Direct Vendor',
+            vendor: vend?.name || '',
             amount: totalAmt > 0 ? totalAmt : 0,
             date: getCurrentDateFormatted(),
             expectedDate: expectedDate || addDaysISO(getCurrentISODate(), 10),
@@ -307,7 +307,7 @@ export const PurchaseOrdersPage = () => {
                   <select value={selectedVendorId} onChange={(e) => setSelectedVendorId(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium">
                     {vendors.map((v) => (
                       <option key={v.id} value={v.id}>
-                        {v.name} ({v.code}) - Terms: {v.paymentTerms}
+                        {v.name}{v.code ? ` (${v.code})` : ''}{v.paymentTerms ? ` - Terms: ${v.paymentTerms}` : ''}
                       </option>
                     ))}
                   </select>
@@ -323,9 +323,9 @@ export const PurchaseOrdersPage = () => {
                           </span>
                         </div>
                         <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                          <span>POC: <strong>{vend.contactPerson || 'Vendor Rep'}</strong></span>
-                          <span>Email: {vend.email}</span>
-                          <span>Phone: {vend.phone}</span>
+                          <span>POC: <strong>{vend.contactPerson || '—'}</strong></span>
+                          <span>Email: {vend.email || '—'}</span>
+                          <span>Phone: {vend.phone || '—'}</span>
                         </div>
                       </div>
                     );
@@ -391,8 +391,8 @@ export const PurchaseOrdersPage = () => {
                     <div className="text-slate-600 mt-1 flex items-start gap-1">
                       <MapPin size={12} className="text-slate-400 shrink-0 mt-0.5" />
                       <span>
-                        {selectedPo.billingAddress?.line1 || 'Corporate Headquarters'}<br />
-                        {selectedPo.billingAddress?.city || 'Mumbai'}, {selectedPo.billingAddress?.state || 'Maharashtra'} - {selectedPo.billingAddress?.pincode || '400001'}
+                        {selectedPo.billingAddress?.line1 && (<>{selectedPo.billingAddress.line1}<br /></>)}
+                        {[selectedPo.billingAddress?.city, selectedPo.billingAddress?.state, selectedPo.billingAddress?.pincode].filter(Boolean).join(', ') || (!selectedPo.billingAddress?.line1 && '—')}
                       </span>
                     </div>
                   </div>

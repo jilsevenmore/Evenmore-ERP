@@ -114,9 +114,12 @@ export default function Interviews() {
   const [typeFilter, setTypeFilter] = useState("All");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
-  const [activeYear, setActiveYear] = useState(2026);
-  const [activeMonth, setActiveMonth] = useState(8); // 8 = September
-  const [selectedDate, setSelectedDate] = useState("2026-09-09");
+  const [activeYear, setActiveYear] = useState(() => new Date().getFullYear());
+  const [activeMonth, setActiveMonth] = useState(() => new Date().getMonth());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
   const [hoveredCellDate, setHoveredCellDate] = useState(null);
 
   useEffect(() => {
@@ -126,15 +129,15 @@ export default function Interviews() {
   }, [location.state]);
 
   const [form, setForm] = useState({
-    candidateId: "CAND-001",
-    job: "Senior Backend Developer",
+    candidateId: "",
+    job: "",
     type: "Technical Interview",
-    interviewer: "Rahul Mehta",
-    date: "10 Sep 2026",
+    interviewer: "",
+    date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
     start: "10:30 AM",
     end: "11:30 AM",
     mode: "Video Call",
-    meetingLink: "https://meet.google.com/abc",
+    meetingLink: "",
     notes: "",
   });
 
@@ -158,10 +161,11 @@ export default function Interviews() {
   const cancelledCount = interviews.filter((i) => i.status === "Cancelled").length;
 
   const handleToday = () => {
-    setActiveYear(2026);
-    setActiveMonth(8); // September 2026
-    setSelectedDate("2026-09-09");
-    showToast("Jumped to September 2026");
+    const d = new Date();
+    setActiveYear(d.getFullYear());
+    setActiveMonth(d.getMonth());
+    setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    showToast(`Jumped to ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`);
   };
 
   const monthCells = useMemo(() => {
@@ -543,7 +547,7 @@ export default function Interviews() {
                       onChange={(e) => setActiveYear(Number(e.target.value))}
                       className="font-bold text-[18px] text-text bg-transparent hover:bg-soft rounded-lg px-2 py-0.5 border border-transparent hover:border-border focus:outline-none focus:border-primary cursor-pointer transition"
                     >
-                      {[2024, 2025, 2026, 2027].map((y) => (
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
                         <option key={y} value={y}>
                           {y}
                         </option>

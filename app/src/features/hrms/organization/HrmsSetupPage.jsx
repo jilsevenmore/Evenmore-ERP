@@ -93,13 +93,7 @@ const INITIAL_ROLES = [
   },
 ];
 
-const INITIAL_AUDIT = [
-  { id: "LOG-1092", user: "Sarah Mitchell", action: "Salary Reclassification", target: "EMP1024 (Priya Patel)", timestamp: "Oct 11, 09:42 AM", ip: "192.168.1.104" },
-  { id: "LOG-1091", user: "Ayesha Khan", action: "Approved Leave Request", target: "LV-2041 (Marcus Chen)", timestamp: "Oct 11, 08:20 AM", ip: "192.168.1.118" },
-  { id: "LOG-1090", user: "David Park", action: "Created New Team", target: "Core Infrastructure", timestamp: "Oct 10, 04:15 PM", ip: "192.168.1.88" },
-  { id: "LOG-1089", user: "James Wilson", action: "Verified Payroll Batch", target: "October 2024 Cycle", timestamp: "Oct 10, 02:00 PM", ip: "192.168.1.14" },
-  { id: "LOG-1088", user: "Adarsh Gupta", action: "Updated Flexibility Rules", target: "Grace Period 5m -> 10m", timestamp: "Oct 09, 11:30 AM", ip: "192.168.1.5" },
-];
+const INITIAL_AUDIT = [];
 
 function HrmsSetupPageOriginal() {
   const showToast = useAppStore((s) => s.showToast);

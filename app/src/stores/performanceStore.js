@@ -61,15 +61,16 @@ const usePerformanceStoreBase = create((set, get) => ({
   clear: () => set({ cycles: [], appraisals: [], indicators: [], kpis: [] }),
 
   cycles: [],
-  activeCycleId: "CYC-2024-Q4",
+  activeCycleId: null,
   appraisals: [],
   indicators: [],
   kpis: [],
 
-  // Role Simulation ('HR' | 'Manager' | 'Employee')
+  // Role Simulation ('HR' | 'Manager' | 'Employee'). Empty names mean
+  // "the signed-in user" — screens fall back to the session's own name.
   role: "HR",
-  simulatedEmployeeName: "Priya Patel",
-  simulatedManagerName: "David Park",
+  simulatedEmployeeName: "",
+  simulatedManagerName: "",
 
   setRole: (role) => {
     set({ role });
@@ -211,21 +212,31 @@ const usePerformanceStoreBase = create((set, get) => ({
     const id = appraisal.id || `APR-${String(get().appraisals.length + 1).padStart(3, "0")}`;
     const initialRating = Number(appraisal.rating) || 4.0;
     const tier = getRatingScaleTier(initialRating);
+    const activeCycle = get().cycles.find((c) => c.id === get().activeCycleId) || get().cycles.find((c) => c.status === "Active");
+    const defaultKpis = get().indicators
+      .filter((i) => i.status === "Active")
+      .map((i) => ({
+        name: i.name || i.title || "Indicator",
+        target: i.target || "",
+        actual: "",
+        weight: Number(i.weight) || 0,
+        score: initialRating,
+      }));
     const newAppr = {
       id,
-      avatar: appraisal.avatar || "https://i.pravatar.cc/100?img=15",
+      avatar: appraisal.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(appraisal.employee || id)}`,
       employee: appraisal.employee,
-      cycle: appraisal.cycle || "Q4 2024",
-      cycleId: appraisal.cycleId || "CYC-2024-Q4",
+      cycle: appraisal.cycle || activeCycle?.name || "",
+      cycleId: appraisal.cycleId || activeCycle?.id || "",
       reviewer: appraisal.reviewer,
-      department: appraisal.department || "Engineering",
-      designation: appraisal.designation || "Senior Specialist",
+      department: appraisal.department || "",
+      designation: appraisal.designation || "",
       rating: initialRating,
       ratingScaleLabel: tier.label,
       weightedScore: Math.round((initialRating / 5) * 100),
       stage: appraisal.stage || "Self Review",
       status: appraisal.status || "Pending",
-      due: appraisal.due || "15 Nov 2024",
+      due: appraisal.due || "",
       selfReview: appraisal.selfReview || {
         rating: initialRating,
         comments: "",
@@ -255,13 +266,10 @@ const usePerformanceStoreBase = create((set, get) => ({
           action: "Appraisal Created",
           actor: "HR Admin",
           date: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
-          note: "Appraisal initiated for " + (appraisal.cycle || "Q4 2024"),
+          note: "Appraisal initiated" + (appraisal.cycle || activeCycle?.name ? ` for ${appraisal.cycle || activeCycle?.name}` : ""),
         },
       ],
-      kpiResults: appraisal.kpiResults || [
-        { name: "Technical / Execution Quality", target: "≥ 95%", actual: "96%", weight: 50, score: initialRating },
-        { name: "Team Leadership & SLA Adherence", target: "100%", actual: "98%", weight: 50, score: initialRating },
-      ],
+      kpiResults: appraisal.kpiResults || defaultKpis,
     };
 
     set((s) => ({ appraisals: [newAppr, ...s.appraisals] }));
@@ -521,24 +529,23 @@ const usePerformanceStoreBase = create((set, get) => ({
     const cycles = get().cycles;
     const indicators = get().indicators;
 
-    const activeCycle = cycles.find((c) => c.status === "Active") || cycles[0] || { name: "Q4 2024", reviewPeriod: "Oct - Dec" };
+    const activeCycle = cycles.find((c) => c.status === "Active") || cycles[0] || { name: "—", reviewPeriod: "No active cycle" };
     const pendingReviews = appraisals.filter((a) => a.status === "Pending" || a.status === "In Progress" || a.status === "Submitted" || a.status === "Returned").length;
     const completedReviews = appraisals.filter((a) => a.status === "Completed").length;
     const overdueReviews = appraisals.filter((a) => a.status === "Overdue").length;
 
     const ratedAppraisals = appraisals.filter((a) => Number(a.rating) > 0);
-    const avgRatingNum = ratedAppraisals.length
-      ? ratedAppraisals.reduce((sum, a) => sum + Number(a.rating), 0) / ratedAppraisals.length
-      : 4.2;
-    const avgRating = `${avgRatingNum.toFixed(1)} / 5`;
+    const avgRating = ratedAppraisals.length
+      ? `${(ratedAppraisals.reduce((sum, a) => sum + Number(a.rating), 0) / ratedAppraisals.length).toFixed(1)} / 5`
+      : "—";
 
     const activeIndicators = indicators.filter((i) => i.status === "Active");
     const indicatorCompletion = activeIndicators.length
       ? `${Math.round((activeIndicators.filter((i) => (Number(i.rating) || 0) >= 3.5).length / activeIndicators.length) * 100)}%`
-      : "86%";
+      : "—";
 
     return [
-      { label: "Active Cycle", value: activeCycle.name.replace("Performance Cycle", "").replace("Appraisal Cycle", "").trim(), sub: activeCycle.reviewPeriod || "Oct – Dec 2024" },
+      { label: "Active Cycle", value: String(activeCycle.name || "—").replace("Performance Cycle", "").replace("Appraisal Cycle", "").trim(), sub: activeCycle.reviewPeriod || "—" },
       { label: "Pending Reviews", value: String(pendingReviews), sub: "Awaiting stage action" },
       { label: "Completed", value: String(completedReviews), sub: "This cycle" },
       { label: "Avg Rating", value: avgRating, sub: "Across all departments" },

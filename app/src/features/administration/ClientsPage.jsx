@@ -1101,9 +1101,9 @@ function CreateEditClientModal({ client, onClose, onSave }) {
     onSave({
       name: name.trim(),
       email: email.trim(),
-      phone: fullPhone || '+91 98765 43210',
+      phone: fullPhone,
       company: company.trim(),
-      location: location.trim() || 'Surat, India',
+      location: location.trim(),
       tags: formattedTags.length > 0 ? formattedTags : ['Regular'],
       avatar,
       loginEnabled,

@@ -77,13 +77,13 @@ export default function Candidates() {
     name: "",
     email: "",
     phone: "",
-    location: "New York",
-    position: "Senior Backend Developer",
-    experience: "5 years",
-    skills: "Node.js",
-    jobId: "JOB-001",
+    location: "",
+    position: "",
+    experience: "",
+    skills: "",
+    jobId: "",
     stage: "Applied",
-    recruiter: "Ayesha Khan",
+    recruiter: "",
   });
 
   useEffect(() => {
@@ -124,13 +124,13 @@ export default function Candidates() {
       name: "",
       email: "",
       phone: "",
-      location: "New York",
-      position: "Senior Backend Developer",
-      experience: "5 years",
-      skills: "Node.js",
-      jobId: "JOB-001",
+      location: "",
+      position: "",
+      experience: "",
+      skills: "",
+      jobId: "",
       stage: "Applied",
-      recruiter: "Ayesha Khan",
+      recruiter: "",
     });
     setDrawerOpen(true);
   }
@@ -190,13 +190,13 @@ export default function Candidates() {
         email: cand.email,
         position: cand.position,
         jobType: "Full-time",
-        dept: cand.position?.includes("Design") ? "Design" : cand.position?.includes("HR") ? "HR" : "Engineering",
-        salary: "$95,000 / annum",
-        location: cand.location || "New York HQ",
+        dept: jobs.find((j) => j.id === cand.jobId || j.title === cand.position)?.department || "",
+        salary: "",
+        location: cand.location || "",
         workMode: "Hybrid",
         sentDate: new Date().toISOString().split("T")[0],
         joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
-        reportingManager: "David Park (CTO)",
+        reportingManager: jobs.find((j) => j.id === cand.jobId || j.title === cand.position)?.hiringManager || "",
         probationPeriod: "3 Months",
         status: cand.stage === "Offer" || cand.stage === "Hired" ? "Confirmed" : "Draft",
       });
@@ -568,6 +568,7 @@ export default function Candidates() {
                   }}
                   className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
                 >
+                  <option value="">Select position</option>
                   {jobs.map((j) => (
                     <option key={j.id} value={j.title}>
                       {j.title} ({j.department})

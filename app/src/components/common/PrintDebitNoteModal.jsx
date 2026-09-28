@@ -1,11 +1,20 @@
 import React, { useEffect } from 'react';
 import { X, Printer, RotateCcw, Building2, Calendar, FileText } from 'lucide-react';
+import { useERP } from '../../context/ERPContext';
+import { companyInitial, joinNonEmpty } from './printLetterhead';
 
 export const PrintDebitNoteModal = ({
   isOpen,
   onClose,
   debitNote,
 }) => {
+  const { companyProfile } = useERP();
+  const companyName = companyProfile?.name || '';
+  const companyAddress = companyProfile?.address || '';
+  const gstin = companyProfile?.gstin || '';
+  const taxLine = joinNonEmpty([gstin && `GSTIN: ${gstin}`, companyProfile?.pan && `PAN: ${companyProfile.pan}`]);
+  const contactLine = joinNonEmpty([companyProfile?.email, companyProfile?.phone], ' | ');
+
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -58,22 +67,21 @@ export const PrintDebitNoteModal = ({
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                  E
-                </div>
+                {companyName && (
+                  <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
+                    {companyInitial(companyName)}
+                  </div>
+                )}
                 <div>
                   <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
-                    EVENMORE ERP MEDICAL & SYSTEMS
+                    {companyName}
                   </h1>
-                  <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                    Enterprise Healthcare & Surgical Equipment Division
-                  </p>
                 </div>
               </div>
               <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                <p>Corporate Towers, Sector 62, Electronic City • Bengaluru, Karnataka 560100</p>
-                <p>Tax Registration / GSTIN: <strong className="text-slate-700">29AABCU8912E1ZB</strong> • PAN: <strong className="text-slate-700">AABCU8912E</strong></p>
-                <p>Accounts Payable Desk: ap-reconciliation@evenmore.internal | +91 80 4920 1100</p>
+                {companyAddress && <p>{companyAddress}</p>}
+                {taxLine && <p>{taxLine}</p>}
+                {contactLine && <p>Accounts Payable: {contactLine}</p>}
               </div>
             </div>
 
@@ -113,10 +121,9 @@ export const PrintDebitNoteModal = ({
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 ISSUED BY (BUYER / PURCHASER)
               </span>
-              <p className="font-bold text-sm text-slate-900">EVENMORE SYSTEMS PRIVATE LIMITED</p>
-              <p className="text-slate-600">Central Warehouse & Receiving Dock 4</p>
-              <p className="text-slate-600">Electronic City, Phase 1, Bengaluru, KA 560100</p>
-              <p className="text-slate-600">GSTIN: 29AABCU8912E1ZB</p>
+              <p className="font-bold text-sm text-slate-900">{companyName || '—'}</p>
+              {companyAddress && <p className="text-slate-600">{companyAddress}</p>}
+              {gstin && <p className="text-slate-600">GSTIN: {gstin}</p>}
             </div>
 
             <div className="space-y-1 sm:border-l sm:border-slate-200 sm:pl-6">
@@ -124,9 +131,8 @@ export const PrintDebitNoteModal = ({
                 SUPPLIER / VENDOR (BENEFICIARY)
               </span>
               <p className="font-bold text-sm text-blue-900">{debitNote.vendor}</p>
-              <p className="text-slate-600">Vendor Code / Accounts Payable Profile</p>
-              <p className="text-slate-600">Original Tax Bill Reference: <strong>{debitNote.billRef}</strong></p>
-              <p className="text-slate-600">Reason for Reversal: <span className="italic text-rose-800 font-medium">{debitNote.reason}</span></p>
+              {debitNote.billRef && <p className="text-slate-600">Original Tax Bill Reference: <strong>{debitNote.billRef}</strong></p>}
+              {debitNote.reason && <p className="text-slate-600">Reason for Reversal: <span className="italic text-rose-800 font-medium">{debitNote.reason}</span></p>}
             </div>
           </div>
 
@@ -235,7 +241,7 @@ export const PrintDebitNoteModal = ({
             <div className="space-y-10">
               <p className="text-slate-400 uppercase text-[10px] font-bold">Commercial Accounts & Authorized Signatory</p>
               <div className="border-b border-slate-300 w-3/4 mx-auto" />
-              <p className="font-semibold text-slate-700 text-[11px]">Evenmore Systems Private Limited</p>
+              <p className="font-semibold text-slate-700 text-[11px]">{companyName}</p>
             </div>
           </div>
 

@@ -41,127 +41,40 @@ import { useNavigate, Link } from "react-router-dom";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useAssetStore } from "../../../stores/assetStore";
+import { useRecruitmentStore } from "../../../stores/recruitmentStore";
+import { useAttendanceStore } from "../../../stores/attendanceStore";
+import { useCalendarStore } from "../../../stores/calendarStore";
+import { toISODate, getCurrentISODate } from "../../../utils/dateUtils";
 import AnalyticsVolumeChart from "./AnalyticsVolumeChart";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 
-const TOP_STATS = [
-  {
-    label: "Total Employees",
-    value: "1,248",
-    badge: "+4.2%",
-    badgeTone: "green",
-    sub: "32 joined this quarter",
-    Icon: Users,
-  },
-  {
-    label: "Present Today",
-    value: "1,102",
-    badge: "94.2%",
-    badgeTone: "green",
-    sub: "Active on-site & remote",
-    Icon: CheckCircle2,
-  },
-  {
-    label: "On Leave",
-    value: "34",
-    badge: "4 pending",
-    badgeTone: "amber",
-    sub: "Across teams",
-    Icon: Plane,
-  },
-  {
-    label: "Open Positions",
-    value: "24",
-    badge: "4 closing soon",
-    badgeTone: "blue",
-    sub: "142 active candidates",
-    Icon: Briefcase,
-  },
-];
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-const BOTTOM_STATS = [
-  { label: "Active Employees", value: "1,102", sub: "94% active", Icon: ShieldCheck },
-  { label: "New Joiners", value: "32", sub: "This month", Icon: UserPlus },
-  { label: "Pending Approvals", value: "12", sub: "Awaiting action", Icon: ClipboardCheck },
-  { label: "Upcoming Events", value: "6", sub: "This week", Icon: CalendarDays },
-];
+function isoToday() {
+  return getCurrentISODate();
+}
 
-const INITIAL_SCHEDULE = [
-  {
-    time: "09:30 AM",
-    name: "Marcus Chen",
-    dept: "Core Infrastructure",
-    event: "Technical Interview",
-    category: "Interviews",
-    status: "Confirmed",
-    img: "https://randomuser.me/api/portraits/men/32.jpg",
-  },
-  {
-    time: "11:00 AM",
-    name: "Elena Rostova",
-    dept: "Global Marketing",
-    event: "First Day Onboarding",
-    category: "Onboarding",
-    status: "In Progress",
-    img: "https://randomuser.me/api/portraits/women/44.jpg",
-  },
-  {
-    time: "01:15 PM",
-    name: "Devansh Sharma",
-    dept: "Engineering",
-    event: "System Architecture Review",
-    category: "Reviews",
-    status: "Confirmed",
-    img: "https://randomuser.me/api/portraits/men/46.jpg",
-  },
-  {
-    time: "02:15 PM",
-    name: "Tariq Al-Mansoor",
-    dept: "People Ops",
-    event: "Quarterly Performance",
-    category: "Reviews",
-    status: "Scheduled",
-    img: "https://randomuser.me/api/portraits/men/54.jpg",
-  },
-  {
-    time: "03:30 PM",
-    name: "Aisha Patel",
-    dept: "People Ops",
-    event: "HR Policy Orientation",
-    category: "Onboarding",
-    status: "In Progress",
-    img: "https://randomuser.me/api/portraits/women/65.jpg",
-  },
-  {
-    time: "04:00 PM",
-    name: "Sophia Lindqvist",
-    dept: "Design System",
-    event: "Role Realignment",
-    category: "Reviews",
-    status: "Confirmed",
-    img: "https://randomuser.me/api/portraits/women/68.jpg",
-  },
-  {
-    time: "04:45 PM",
-    name: "Michael Chang",
-    dept: "Core Infrastructure",
-    event: "Senior DevOps Interview",
-    category: "Interviews",
-    status: "Scheduled",
-    img: "https://randomuser.me/api/portraits/men/72.jpg",
-  },
-  {
-    time: "05:30 PM",
-    name: "Priya Nair",
-    dept: "Global Marketing",
-    event: "Design & Copy Final Round",
-    category: "Interviews",
-    status: "Confirmed",
-    img: "https://randomuser.me/api/portraits/women/29.jpg",
-  },
-];
+function monthBounds(offset = 0) {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const last = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  return { first, last };
+}
 
+function monthRangeLabel(offset = 0) {
+  const { first, last } = monthBounds(offset);
+  const m = MONTH_SHORT[first.getMonth()];
+  return `${m} 1 – ${m} ${last.getDate()}, ${first.getFullYear()}`;
+}
+
+function inRange(dayISO, from, to) {
+  const a = toISODate(from);
+  const b = toISODate(to) || a;
+  return Boolean(a) && dayISO >= a && dayISO <= b;
+}
+
+const fmt = (n) => Number(n || 0).toLocaleString("en-IN");
 
 const MODULE_META = {
   "Leave Management": { Icon: Plane, bg: "#fef3c7", fg: "#b45309" },
@@ -284,19 +197,19 @@ export default function HRMSDashboard() {
 
   const [filter, setFilter] = useState("All");
   const [showNotice, setShowNotice] = useState(true);
-  const [scheduleItems, setScheduleItems] = useState(INITIAL_SCHEDULE);
+  const [addedSchedule, setAddedSchedule] = useState([]);
 
   // Date range filter state
-  const [dateRangeLabel, setDateRangeLabel] = useState("Oct 1 – Oct 31, 2024");
+  const [dateRangeLabel, setDateRangeLabel] = useState(() => monthRangeLabel(0));
   const [showDateModal, setShowDateModal] = useState(false);
-  const [customStart, setCustomStart] = useState("2024-10-01");
-  const [customEnd, setCustomEnd] = useState("2024-10-31");
+  const [customStart, setCustomStart] = useState(() => toISODate(monthBounds(0).first));
+  const [customEnd, setCustomEnd] = useState(() => toISODate(monthBounds(0).last));
 
   // Add record state
   const [showAddModal, setShowAddModal] = useState(false);
   const [newRecord, setNewRecord] = useState({
     name: "",
-    dept: "Core Infrastructure",
+    dept: "",
     event: "",
     category: "Interviews",
     time: "05:00 PM",
@@ -314,7 +227,7 @@ export default function HRMSDashboard() {
     const list = loadRequestTypes();
     return list[0] || "Casual Leave";
   });
-  const [leaveDate, setLeaveDate] = useState("2024-10-15");
+  const [leaveDate, setLeaveDate] = useState(isoToday);
   const [leaveNote, setLeaveNote] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [requestDropdownOpen, setRequestDropdownOpen] = useState(false);
@@ -368,10 +281,9 @@ export default function HRMSDashboard() {
   const [activityQuery, setActivityQuery] = useState("");
   const [tick, setTick] = useState(0);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadAuditActivities = (isCancelled = () => false) =>
     pullAuditTrail({ limit: 50 }).then((rows) => {
-      if (cancelled || !rows) return;
+      if (isCancelled() || !rows) return;
       setActivities(rows.map((row) => ({
         id: row.id,
         actor: row.actorName || row.actor || 'System',
@@ -381,6 +293,10 @@ export default function HRMSDashboard() {
         read: false,
       })));
     });
+
+  useEffect(() => {
+    let cancelled = false;
+    loadAuditActivities(() => cancelled);
     return () => { cancelled = true; };
   }, []);
 
@@ -419,10 +335,9 @@ export default function HRMSDashboard() {
   const removeActivity = (id) => setActivities((prev) => prev.filter((a) => a.id !== id));
   const clearActivities = () => setActivities([]);
   const resetActivities = () => {
-    const seed = [];
-    setActivities(seed);
     setActivityTab("All");
     setActivityQuery("");
+    loadAuditActivities();
   };
 
   const handleAddRequestType = (e) => {
@@ -471,6 +386,102 @@ export default function HRMSDashboard() {
   const currentUser = useAppStore((s) => s.currentUser);
   const [lastSubmittedAssetReqId, setLastSubmittedAssetReqId] = useState(null);
 
+  const employees = useAppStore((s) => s.employees || []);
+  const leaves = useAppStore((s) => s.leaves || []);
+  const attendanceRecords = useAttendanceStore((s) => s.records || []);
+  const jobs = useRecruitmentStore((s) => s.jobs || []);
+  const candidates = useRecruitmentStore((s) => s.candidates || []);
+  const interviews = useRecruitmentStore((s) => s.interviews || []);
+  const calendarEvents = useCalendarStore((s) => s.events || []);
+
+  const todayISO = isoToday();
+  const todayLabel = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  const currentUserName = currentUser?.name || currentUser?.fullName || "";
+  const currentEmployee = employees.find(
+    (e) => (currentUser?.employeeId && e.id === currentUser.employeeId) || (currentUserName && e.name === currentUserName)
+  );
+
+  const departmentOptions = useMemo(
+    () => [...new Set(employees.map((e) => e.department || e.dept).filter(Boolean))].sort(),
+    [employees]
+  );
+
+  const { TOP_STATS, BOTTOM_STATS } = useMemo(() => {
+    const total = employees.length;
+    const now = new Date();
+    const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const joinedSince = (since) =>
+      employees.filter((e) => {
+        const iso = toISODate(e.joiningDate || e.doj);
+        return iso && new Date(`${iso}T00:00:00`) >= since;
+      }).length;
+
+    const todays = attendanceRecords.filter((r) => toISODate(r.date) === todayISO);
+    const present = todays.filter((r) => ["Present", "Late", "WFH", "Half Day"].includes(r.status)).length;
+    const presentPct = total > 0 ? ((present / total) * 100).toFixed(1) : "0.0";
+
+    const onLeave = leaves.filter((l) => l.status === "Approved" && inRange(todayISO, l.fromDate || l.from, l.toDate || l.to)).length;
+    const pendingLeaves = leaves.filter((l) => /pending/i.test(l.status || "")).length;
+
+    const openJobs = jobs.filter((j) => /open|active|published/i.test(j.status || "")).length;
+    const activeCandidates = candidates.filter((c) => !/hired|rejected|withdrawn/i.test(c.stage || c.status || "")).length;
+
+    const active = employees.filter((e) => !e.status || /active/i.test(e.status)).length;
+    const activePct = total > 0 ? Math.round((active / total) * 100) : 0;
+
+    const weekEnd = new Date();
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    const weekEndISO = toISODate(weekEnd);
+    const upcomingEvents = calendarEvents.filter((ev) => {
+      const start = toISODate(ev.startDate || ev.date);
+      return start && start >= todayISO && start <= weekEndISO;
+    }).length;
+
+    return {
+      TOP_STATS: [
+        { label: "Total Employees", value: fmt(total), sub: `${joinedSince(quarterStart)} joined this quarter`, Icon: Users },
+        { label: "Present Today", value: fmt(present), badge: `${presentPct}%`, badgeTone: "green", sub: "Active on-site & remote", Icon: CheckCircle2 },
+        { label: "On Leave", value: fmt(onLeave), badge: `${pendingLeaves} pending`, badgeTone: "amber", sub: "Across teams", Icon: Plane },
+        { label: "Open Positions", value: fmt(openJobs), sub: `${activeCandidates} active candidates`, Icon: Briefcase },
+      ],
+      BOTTOM_STATS: [
+        { label: "Active Employees", value: fmt(active), sub: `${activePct}% active`, Icon: ShieldCheck },
+        { label: "New Joiners", value: fmt(joinedSince(monthStart)), sub: "This month", Icon: UserPlus },
+        { label: "Pending Approvals", value: fmt(pendingLeaves), sub: "Awaiting action", Icon: ClipboardCheck },
+        { label: "Upcoming Events", value: fmt(upcomingEvents), sub: "This week", Icon: CalendarDays },
+      ],
+    };
+  }, [employees, attendanceRecords, leaves, jobs, candidates, calendarEvents, todayISO]);
+
+  const scheduleItems = useMemo(() => {
+    const fromInterviews = interviews
+      .filter((iv) => toISODate(iv.date) === todayISO && iv.status !== "Cancelled")
+      .map((iv) => ({
+        id: iv.id,
+        time: iv.start || iv.time || "",
+        name: iv.candidateName || "Candidate",
+        dept: iv.job || "",
+        event: `${iv.type || "Interview"}`,
+        category: "Interviews",
+        status: iv.status === "Completed" ? "Confirmed" : "Scheduled",
+        img: iv.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(iv.candidateName || iv.id)}`,
+      }));
+    return [...addedSchedule, ...fromInterviews];
+  }, [interviews, addedSchedule, todayISO]);
+
+  const activeDelegation = useMemo(() => {
+    if (!currentUserName) return null;
+    return (
+      leaves.find(
+        (l) =>
+          String(l.delegate || "").toLowerCase() === currentUserName.toLowerCase() &&
+          l.status === "Approved" &&
+          inRange(todayISO, l.fromDate || l.from, l.toDate || l.to)
+      ) || null
+    );
+  }, [leaves, currentUserName, todayISO]);
+
   const handleQuickRequest = () => {
     if (!leaveDate) return setToast("Please pick a date for your request.", "error");
     if (!leaveType) return setToast("Please select a request type.", "error");
@@ -505,9 +516,9 @@ export default function HRMSDashboard() {
         : "Workstation";
 
       const newReq = useAssetStore.getState().addRequest({
-        employeeName: currentUser?.name || "Adarsh Gupta",
-        employeeId: "EMP-USR",
-        dept: "Operations",
+        employeeName: currentUserName || "Staff Member",
+        employeeId: currentUser?.employeeId || currentEmployee?.id || "",
+        dept: currentEmployee?.department || currentEmployee?.dept || "General",
         category,
         assetName: leaveType,
         reason: leaveNote.trim() || `Submitted via HRMS Dashboard Quick Request for ${leaveDate}.`,
@@ -559,15 +570,16 @@ export default function HRMSDashboard() {
       event: newRecord.event,
       category: newRecord.category,
       status: newRecord.status,
-      img: `https://randomuser.me/api/portraits/${scheduleItems.length % 2 === 0 ? "women" : "men"}/${(scheduleItems.length * 9) % 80}.jpg`,
+      img: `https://i.pravatar.cc/100?u=${encodeURIComponent(newRecord.name)}`,
+      id: `SCH-${Date.now()}`,
     };
-    setScheduleItems((prev) => [created, ...prev]);
+    setAddedSchedule((prev) => [created, ...prev]);
     pushActivity("You", `scheduled "${created.event}" with ${created.name}.`, "Schedule");
     setToast(`Record for ${newRecord.name} added to schedule!`);
     setShowAddModal(false);
     setNewRecord({
       name: "",
-      dept: "Core Infrastructure",
+      dept: "",
       event: "",
       category: "Interviews",
       time: "05:00 PM",
@@ -617,12 +629,12 @@ export default function HRMSDashboard() {
       </div>
 
       {/* Delegation notice */}
-      {showNotice && (
+      {showNotice && activeDelegation && (
         <div className="hrms-notice">
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <UserCheck size={17} style={{ color: "#475569" }} />
             <span>
-              <strong>Delegation Notice:</strong> You&apos;re covering for Ayesha Khan until Oct 14 —{" "}
+              <strong>Delegation Notice:</strong> You&apos;re covering for {activeDelegation.employee} until {activeDelegation.toDate || activeDelegation.to} —{" "}
               <u
                 style={{ cursor: "pointer", fontWeight: 600 }}
                 onClick={() => setShowHandoverModal(true)}
@@ -664,7 +676,7 @@ export default function HRMSDashboard() {
           <div className="hrms-card-head">
             <div>
               <h3 className="hrms-h3">Today&apos;s Schedule &amp; Meetings</h3>
-              <p className="hrms-sub">8 sessions scheduled for Wednesday, Oct 11</p>
+              <p className="hrms-sub">{scheduleItems.length} session{scheduleItems.length === 1 ? "" : "s"} scheduled for {todayLabel}</p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <div className="hrms-tabs">
@@ -695,8 +707,15 @@ export default function HRMSDashboard() {
                 </tr>
               </thead>
               <tbody>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={5} style={{ textAlign: "center", color: "#6b7a90", padding: "28px 16px", fontSize: 13 }}>
+                      No sessions scheduled for today.
+                    </td>
+                  </tr>
+                )}
                 {filtered.map((row) => (
-                  <tr key={row.name}>
+                  <tr key={row.id || `${row.name}-${row.time}`}>
                     <td className="hrms-time">{row.time}</td>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -727,7 +746,7 @@ export default function HRMSDashboard() {
           </div>
           <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0 px-5 py-3 border-t border-border bg-soft/30 text-[12px] text-muted font-medium mt-auto">
             <span>Showing {filtered.length} of {scheduleItems.length} scheduled sessions</span>
-            <span className="text-[11.5px] text-text-secondary">Updated live · Wednesday, Oct 11</span>
+            <span className="text-[11.5px] text-text-secondary">Updated live · {todayLabel}</span>
           </div>
         </div>
 
@@ -760,7 +779,7 @@ export default function HRMSDashboard() {
                     <Bell size={18} style={{ color: "#94a3b8" }} />
                     <p>No activity yet. New leave requests, schedules and updates will appear here.</p>
                     <button type="button" className="hrms-export" onClick={resetActivities}>
-                      <RefreshCw size={13} /> Restore sample
+                      <RefreshCw size={13} /> Refresh
                     </button>
                   </div>
                 )}
@@ -1021,33 +1040,40 @@ export default function HRMSDashboard() {
               type="button"
               className="btn-outline"
               style={{ fontSize: 13, textAlign: "left", justifyContent: "flex-start" }}
-              onClick={() => handleApplyDateRange("Oct 1 – Oct 31, 2024")}
+              onClick={() => handleApplyDateRange(monthRangeLabel(0))}
             >
-              Oct 1 – Oct 31, 2024 (This Month)
+              {monthRangeLabel(0)} (This Month)
             </button>
             <button
               type="button"
               className="btn-outline"
               style={{ fontSize: 13, textAlign: "left", justifyContent: "flex-start" }}
-              onClick={() => handleApplyDateRange("Sep 1 – Sep 30, 2024")}
+              onClick={() => handleApplyDateRange(monthRangeLabel(-1))}
             >
-              Sep 1 – Sep 30, 2024 (Last Month)
+              {monthRangeLabel(-1)} (Last Month)
             </button>
+            {(() => {
+              const now = new Date();
+              const q = Math.floor(now.getMonth() / 3);
+              const label = `Q${q + 1} ${now.getFullYear()} (${MONTH_SHORT[q * 3]} – ${MONTH_SHORT[q * 3 + 2]})`;
+              return (
+                <button
+                  type="button"
+                  className="btn-outline"
+                  style={{ fontSize: 13, textAlign: "left", justifyContent: "flex-start" }}
+                  onClick={() => handleApplyDateRange(label)}
+                >
+                  {label}
+                </button>
+              );
+            })()}
             <button
               type="button"
               className="btn-outline"
               style={{ fontSize: 13, textAlign: "left", justifyContent: "flex-start" }}
-              onClick={() => handleApplyDateRange("Q4 2024 (Oct – Dec)")}
+              onClick={() => handleApplyDateRange(`Year ${new Date().getFullYear()}`)}
             >
-              Q4 2024 (Oct – Dec)
-            </button>
-            <button
-              type="button"
-              className="btn-outline"
-              style={{ fontSize: 13, textAlign: "left", justifyContent: "flex-start" }}
-              onClick={() => handleApplyDateRange("Year 2024")}
-            >
-              Year 2024
+              Year {new Date().getFullYear()}
             </button>
           </div>
 
@@ -1113,13 +1139,10 @@ export default function HRMSDashboard() {
                 value={newRecord.dept}
                 onChange={(e) => setNewRecord({ ...newRecord, dept: e.target.value })}
               >
-                <option>Core Infrastructure</option>
-                <option>Global Marketing</option>
-                <option>People Ops</option>
-                <option>Design System</option>
-                <option>Engineering</option>
-                <option>Finance</option>
-                <option>HR</option>
+                <option value="">Select department</option>
+                {departmentOptions.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
               </select>
             </div>
           </div>
@@ -1180,41 +1203,35 @@ export default function HRMSDashboard() {
       <Modal
         isOpen={showHandoverModal}
         onClose={() => setShowHandoverModal(false)}
-        title="Delegation Handover Notes — Ayesha Khan"
+        title={`Delegation Handover Notes — ${activeDelegation?.employee || ""}`}
         footer={
           <button type="button" className="btn-primary" onClick={() => setShowHandoverModal(false)}>
             Acknowledge &amp; Close
           </button>
         }
       >
-        <div style={{ display: "grid", gap: 14, fontSize: "13.5px", color: "#334155" }}>
-          <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 12 }}>
-            <strong style={{ color: "#1e40af" }}>Delegation Period:</strong> Oct 1, 2024 – Oct 14, 2024
-            <br />
-            <span style={{ fontSize: 12.5, color: "#3b82f6" }}>
-              Covering Manager: Current User (HR Ops Lead)
-            </span>
-          </div>
+        {activeDelegation && (
+          <div style={{ display: "grid", gap: 14, fontSize: "13.5px", color: "#334155" }}>
+            <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, padding: 12 }}>
+              <strong style={{ color: "#1e40af" }}>Delegation Period:</strong>{" "}
+              {activeDelegation.fromDate || activeDelegation.from} – {activeDelegation.toDate || activeDelegation.to}
+              <br />
+              <span style={{ fontSize: 12.5, color: "#3b82f6" }}>
+                Covering: {currentUserName}
+                {activeDelegation.type ? ` · ${activeDelegation.type}` : ""}
+              </span>
+            </div>
 
-          <div>
-            <h4 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, color: "#111827" }}>
-              Key Responsibilities Delegated:
-            </h4>
-            <ul style={{ margin: 0, paddingLeft: 20, display: "grid", gap: 6 }}>
-              <li>Approve pending annual &amp; casual leave requests for People Ops team.</li>
-              <li>Conduct final round onboarding reviews for Q4 new joiners.</li>
-              <li>Verify attendance regularization requests prior to payroll cutoff (Oct 12).</li>
-              <li>Escalate critical grievances directly to Head of HR.</li>
-            </ul>
+            <div>
+              <h4 style={{ margin: "0 0 6px", fontSize: 14, fontWeight: 700, color: "#111827" }}>
+                Handover Notes:
+              </h4>
+              <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+                {activeDelegation.handover || activeDelegation.reason || "No handover notes were added."}
+              </p>
+            </div>
           </div>
-
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: 12 }}>
-            <strong style={{ color: "#111827" }}>Emergency Contact:</strong>
-            <p style={{ margin: "4px 0 0", fontSize: 13, color: "#64748b" }}>
-              Email: ayesha.k@evenmore.in | Slack: @ayesha_hr (Urgent escalations only)
-            </p>
-          </div>
-        </div>
+        )}
       </Modal>
 
       {/* Recent Activity — View All */}

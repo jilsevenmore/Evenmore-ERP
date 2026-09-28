@@ -14,6 +14,7 @@ import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 export default function Indicators() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees) || [];
+  const currentUser = useAppStore((s) => s.currentUser);
 
   const { indicators, addIndicator, updateIndicator, deleteIndicator } = usePerformanceStore();
 
@@ -31,11 +32,11 @@ export default function Indicators() {
 
   const [form, setForm] = useState({
     name: "",
-    branch: "New York",
-    department: "Engineering",
-    designation: "Senior Engineer",
-    assignedEmployee: "All Engineers",
-    target: "≥ 95%",
+    branch: "",
+    department: "",
+    designation: "",
+    assignedEmployee: "All in Designation",
+    target: "",
     measurementType: "Percentage",
     weight: 15,
     description: "",
@@ -75,11 +76,11 @@ export default function Indicators() {
   function openAdd() {
     setForm({
       name: "",
-      branch: "New York",
-      department: "Engineering",
-      designation: "Senior Engineer",
-      assignedEmployee: "All Engineers",
-      target: "≥ 95%",
+      branch: "",
+      department: "",
+      designation: "",
+      assignedEmployee: "All in Designation",
+      target: "",
       measurementType: "Percentage",
       weight: 15,
       description: "",
@@ -124,7 +125,7 @@ export default function Indicators() {
         ...form,
         weight: Number(form.weight),
         rating: 4.0,
-        addedBy: "Ayesha Khan",
+        addedBy: currentUser?.name || "",
       });
       showToast("Indicator created successfully.");
       setAddOpen(false);
@@ -224,27 +225,15 @@ export default function Indicators() {
 
   const branchOpts = [
     { value: "All", label: "All Branches" },
-    { value: "New York", label: "New York" },
-    { value: "London", label: "London" },
-    { value: "Dubai", label: "Dubai" },
+    ...[...new Set([...employees.map((e) => e.location), ...indicators.map((r) => r.branch)].filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
   ];
   const deptOpts = [
     { value: "All", label: "All Departments" },
-    { value: "Engineering", label: "Engineering" },
-    { value: "Design", label: "Design" },
-    { value: "Marketing", label: "Marketing" },
-    { value: "HR", label: "HR" },
-    { value: "Finance", label: "Finance" },
-    { value: "Operations", label: "Operations" },
+    ...[...new Set([...employees.map((e) => e.department), ...indicators.map((r) => r.department)].filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
   ];
   const desigOpts = [
     { value: "All", label: "All Designations" },
-    { value: "Senior Engineer", label: "Senior Engineer" },
-    { value: "Tech Lead", label: "Tech Lead" },
-    { value: "Product Designer", label: "Product Designer" },
-    { value: "DevOps Engineer", label: "DevOps Engineer" },
-    { value: "Analyst", label: "Analyst" },
-    { value: "HR Manager", label: "HR Manager" },
+    ...[...new Set([...employees.map((e) => e.designation || e.role), ...indicators.map((r) => r.designation)].filter(Boolean))].sort().map((v) => ({ value: v, label: v })),
   ];
   const ratingOpts = [
     { value: "All", label: "All Ratings" },
@@ -276,47 +265,50 @@ export default function Indicators() {
 
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-slate-500">Branch *</span>
-          <select
+          <input
+            list="ind-branch-options"
             value={form.branch}
             onChange={(e) => setForm({ ...form, branch: e.target.value })}
+            placeholder="Enter branch"
             className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
+          />
+          <datalist id="ind-branch-options">
             {branchOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value} />
             ))}
-          </select>
+          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-slate-500">Department *</span>
-          <select
+          <input
+            list="ind-dept-options"
             value={form.department}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
+            placeholder="Enter department"
             className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
+          />
+          <datalist id="ind-dept-options">
             {deptOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value} />
             ))}
-          </select>
+          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium text-slate-500">Designation *</span>
-          <select
+          <input
+            list="ind-desig-options"
             value={form.designation}
             onChange={(e) => setForm({ ...form, designation: e.target.value })}
+            placeholder="Enter designation"
             className="h-9 px-3 bg-white border border-[#e2e8f0] rounded-xl text-[13px]"
-          >
+          />
+          <datalist id="ind-desig-options">
             {desigOpts.slice(1).map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
+              <option key={o.value} value={o.value} />
             ))}
-          </select>
+          </datalist>
         </label>
 
         <label className="flex flex-col gap-1">
@@ -464,7 +456,7 @@ export default function Indicators() {
           </>
         }
       >
-        <FormFields />
+        {FormFields()}
       </Modal>
 
       {/* Edit Modal */}
@@ -481,7 +473,7 @@ export default function Indicators() {
           </>
         }
       >
-        <FormFields />
+        {FormFields()}
       </Modal>
 
       {/* View Drawer */}
@@ -539,7 +531,7 @@ export default function Indicators() {
             </div>
 
             <div className="text-[11px] text-slate-400 pt-2 border-t border-[#e2e8f0]">
-              <span>Added by: {viewRow.addedBy || "Ayesha Khan"} • Created: {viewRow.createdAt}</span>
+              <span>Added by: {viewRow.addedBy || "—"} • Created: {viewRow.createdAt}</span>
             </div>
           </div>
         )}

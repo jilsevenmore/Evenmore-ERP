@@ -10,7 +10,7 @@ export default function PMSSettingsPage() {
       scope={[
         'At-risk threshold percentage driving the delay engine',
         'Required sign-off policies for design and QA',
-        'Mock toast and alert preferences',
+        'Toast and alert preferences',
       ]}
     />
   );

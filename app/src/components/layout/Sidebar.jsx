@@ -53,13 +53,16 @@ import {
   Check,
   LogOut,
   Lock,
+  KeyRound,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useERP } from '../../context/ERPContext';
 import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
+import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import { clearStoredAuth } from '../../utils/authUtils';
+import { filterNavByPermission } from '../../utils/navAccess';
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -77,7 +80,14 @@ const NAV = [
   },
 
   {
+    label: 'Track Orders',
+    icon: Package,
+    to: '/customer/projects',
+  },
+
+  {
     label: 'CRM',
+    menu: 'menu_crm',
     icon: LayoutGrid,
     defaultOpen: false,
     children: [
@@ -101,10 +111,10 @@ const NAV = [
         defaultOpen: true,
         children: [
           { label: 'Tasks List', to: '/crm/tasks' },
-          { label: 'Task Allocation', to: '/crm/tasks/allocation' },
+          // { label: 'Task Allocation', to: '/crm/tasks/allocation' }, // Hidden: duplicate of Tasks List
         ],
       },
-      { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' },
+      // { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' }, // Hidden: User Tracking & field GPS map out of scope
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
       { label: 'Projects', icon: Briefcase, to: '/crm/projects' },
       { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
@@ -114,11 +124,13 @@ const NAV = [
 
   {
     label: 'PMS (Projects)',
+    menu: 'menu_pms',
     icon: Briefcase,
     badgeKey: 'pmsActiveCount',
     children: [
       { label: 'PMS Dashboard', icon: Home, to: '/pms' },
       { label: 'All Projects', icon: Layers, to: '/pms/projects' },
+      { label: 'Customer Tracking', icon: Package, to: '/customer/projects' },
       { label: 'My Projects', icon: UserCheck, to: '/pms/my-projects' },
       { label: 'My Tasks', icon: ListChecks, to: '/pms/my-tasks', badgeKey: 'pmsMyTasksPending' },
       { label: 'Dynamic Stages', icon: Sliders, to: '/pms/stages' },
@@ -131,6 +143,7 @@ const NAV = [
 
   {
     label: 'Sales',
+    menu: 'menu_sales',
     icon: BarChart3,
     children: [
       { label: 'Estimates', icon: FileText, to: '/sales/estimates' },
@@ -139,7 +152,7 @@ const NAV = [
       { label: 'Proforma Invoices', icon: FileSpreadsheet, to: '/sales/proforma' },
       { label: 'Sales Invoices', icon: Receipt, to: '/sales/invoices' },
       { label: 'Delivery Challans', icon: Send, to: '/sales/delivery' },
-      { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' },
+      // { label: 'Warranty Cards', icon: ShieldCheck, to: '/sales/warranty' }, // Hidden: Warranty Cards out of scope
       { label: 'Sales Returns', icon: RotateCcw, to: '/sales/returns' },
       { label: 'Payment In', icon: ArrowDownLeft, to: '/sales/payments' },
     ],
@@ -147,6 +160,7 @@ const NAV = [
 
   {
     label: 'Purchase',
+    menu: 'menu_purchase',
     icon: Truck,
     children: [
       { label: 'Purchase Orders', icon: ClipboardList, to: '/purchase/orders' },
@@ -167,6 +181,7 @@ const NAV = [
 
   {
     label: 'Inventory',
+    menu: 'menu_inventory',
     icon: Package,
     children: [
       {
@@ -193,15 +208,16 @@ const NAV = [
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
       { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' },
-      { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' },
-      { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests', badgeKey: 'zone' },
-      { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' },
+      // { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' }, // Hidden: Service Usage out of scope
+      // { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests', badgeKey: 'zone' }, // Hidden: Zone Requests out of scope
+      // { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' }, // Hidden: Valuation & Ageing out of scope
       { label: 'Month-End Audit', icon: CalendarCheck, to: '/inventory/audit' },
     ],
   },
 
   {
     label: 'Accounts',
+    menu: 'menu_accounts',
     icon: Landmark,
     children: [
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
@@ -212,6 +228,7 @@ const NAV = [
 
   {
     label: 'HRMS',
+    menu: 'menu_hrms',
     icon: UserCheck,
     children: [
       { label: 'Dashboard', icon: Home, to: '/hrms/dashboard' },
@@ -243,8 +260,8 @@ const NAV = [
           { label: 'Applications', to: '/hrms/recruitment/applications' },
           { label: 'Offers', to: '/hrms/recruitment/offers' },
           { label: 'Onboarding', to: '/hrms/recruitment/onboarding' },
-          { label: 'Career', to: '/hrms/recruitment/career' },
-          { label: 'Custom Questions', to: '/hrms/recruitment/questions' },
+          // { label: 'Career', to: '/hrms/recruitment/career' }, // Hidden: Career Portal out of scope
+          // { label: 'Custom Questions', to: '/hrms/recruitment/questions' }, // Hidden: Screening Questions out of scope
           // { label: 'Funnel', to: '/hrms/recruitment/funnel' }, // Hidden: Recruitment Funnel feature commented out
         ],
       },
@@ -291,6 +308,7 @@ const NAV = [
 
   {
     label: 'Administration',
+    menu: 'menu_admin',
     icon: Shield,
     children: [
       { label: 'Users', to: '/administration/users' },
@@ -546,11 +564,35 @@ export default function Sidebar() {
   const setTheme = useAppStore((s) => s.setTheme);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const profileRef = useRef(null);
   const dragRef = useRef({ dragging: false, startX: 0, startWidth: sidebarWidth });
 
-  const filteredNav = useMemo(() => filterNavTree(NAV, searchQuery), [searchQuery]);
+  // Hide what the server would refuse (UX only -- the API is the real gate).
+  const permissions = useAppStore((s) => s.permissions);
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
+
+  const permittedNav = useMemo(() => {
+    let list = filterNavByPermission(NAV, permissions || []);
+    if (isCustomer) {
+      // Customer role should only see customer-facing navigation
+      list = list.filter((item) => item.to === '/customer/projects' || item.to === '/dashboard');
+    } else {
+      // Internal staff (Admin, PM, Employee) already have Customer Tracking under PMS (Projects).
+      // Hide the top-level "Track Orders" to avoid duplicate highlighted menu items.
+      list = list.filter((item) => item.to !== '/customer/projects');
+    }
+    return list;
+  }, [permissions, isCustomer]);
+  const filteredNav = useMemo(
+    () => filterNavTree(permittedNav, searchQuery),
+    [permittedNav, searchQuery],
+  );
 
   // PMS live nav counters. Subscribe to stable slices and derive, so the
   // selector never hands useSyncExternalStore a fresh object each render.
@@ -581,7 +623,7 @@ export default function Sidebar() {
     const erp = useERP();
     // Reading these is what loads them, so they wait for the same idle moment.
     if (erp && shellReady) {
-      badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0;
+      // badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0; // Hidden: Zone Requests out of scope
       badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
     }
   } catch { }
@@ -834,6 +876,24 @@ export default function Sidebar() {
                 <span className="text-[11px] font-medium">Interactive User Guides</span>
               </button>
 
+              {/* Change / Reset Password Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  setIsChangePasswordOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition text-left cursor-pointer group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <KeyRound size={13} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-medium">Change / Reset Password</span>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-medium">
+                  Reset
+                </span>
+              </button>
+
               {/* Sign Out / Switch User Button in Person Profile */}
               <button
                 type="button"
@@ -890,6 +950,13 @@ export default function Sidebar() {
     <UserGuideModal
       isOpen={isGuideOpen}
       onClose={() => setIsGuideOpen(false)}
+    />
+
+    {/* Change / Reset Password Modal */}
+    <ChangePasswordModal
+      isOpen={isChangePasswordOpen}
+      onClose={() => setIsChangePasswordOpen(false)}
+      userEmail={currentUser?.email}
     />
     </>
   );

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
 import {
@@ -21,145 +21,89 @@ import {
 import Modal from '../../../components/ui/Modal';
 import PageInfoButton from '../../../components/common/PageInfoButton';
 import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
+import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
 
-const INITIAL_TREE = {
-  id: 'EMP1031',
-  name: 'Sarah Mitchell',
-  role: 'CEO',
-  fullRole: 'Chief Executive Officer',
-  department: 'Executive',
-  avatar: 'https://i.pravatar.cc/100?img=8',
-  email: 'sarah.mitchell@evenmore.com',
-  phone: '+1 (555) 019-2831',
-  location: 'New York, USA',
-  status: 'Active',
-  manager: 'Board of Directors',
-  reports: [
-    {
-      id: 'EMP1030',
-      name: 'David Park',
-      role: 'CTO',
-      fullRole: 'Chief Technology Officer',
-      department: 'Engineering',
-      avatar: 'https://i.pravatar.cc/100?img=11',
-      email: 'david.park@evenmore.com',
-      phone: '+1 (555) 014-9923',
-      location: 'London, UK',
-      status: 'Active',
-      manager: 'Sarah Mitchell',
-      reports: [
-        {
-          id: 'EMP1024',
-          name: 'Priya Patel',
-          role: 'Staff Architect',
-          fullRole: 'Staff Backend Architect',
-          department: 'Engineering',
-          avatar: 'https://i.pravatar.cc/100?img=15',
-          email: 'priya.p@evenmore.com',
-          phone: '+1 (555) 018-4412',
-          location: 'Bangalore, IND',
-          status: 'Active',
-          manager: 'David Park',
-        },
-        {
-          id: 'EMP1026',
-          name: 'Liam Cooper',
-          role: 'DevOps Lead',
-          fullRole: 'DevOps & Cloud Lead',
-          department: 'Engineering',
-          avatar: 'https://i.pravatar.cc/100?img=20',
-          email: 'liam.c@evenmore.com',
-          phone: '+1 (555) 012-7741',
-          location: 'London, UK',
-          status: 'Active',
-          manager: 'David Park',
-        },
-      ],
-    },
-    {
-      id: 'EMP1029',
-      name: 'Ayesha Khan',
-      role: 'HR Director',
-      fullRole: 'Head of People & HRMS',
-      department: 'Human Resources',
-      avatar: 'https://i.pravatar.cc/100?img=5',
-      email: 'ayesha.khan@evenmore.com',
-      phone: '+1 (555) 017-8832',
-      location: 'New York, USA',
-      status: 'Active',
-      manager: 'Sarah Mitchell',
-      reports: [
-        {
-          id: 'EMP1032',
-          name: 'Tariq Al-Mansoor',
-          role: 'Talent Lead',
-          fullRole: 'Talent Acquisition Manager',
-          department: 'Human Resources',
-          avatar: 'https://i.pravatar.cc/100?img=17',
-          email: 'tariq.m@evenmore.com',
-          phone: '+1 (555) 015-3390',
-          location: 'Dubai, UAE',
-          status: 'Active',
-          manager: 'Ayesha Khan',
-        },
-      ],
-    },
-    {
-      id: 'EMP1028',
-      name: 'James Wilson',
-      role: 'CFO',
-      fullRole: 'Chief Financial Officer',
-      department: 'Finance',
-      avatar: 'https://i.pravatar.cc/100?img=12',
-      email: 'james.wilson@evenmore.com',
-      phone: '+1 (555) 013-6629',
-      location: 'New York, USA',
-      status: 'Active',
-      manager: 'Sarah Mitchell',
-      reports: [
-        {
-          id: 'EMP1033',
-          name: 'Sofia Reyes',
-          role: 'Finance Analyst',
-          fullRole: 'Senior Financial Analyst',
-          department: 'Finance',
-          avatar: 'https://i.pravatar.cc/100?img=26',
-          email: 'sofia.r@evenmore.com',
-          phone: '+1 (555) 016-1188',
-          location: 'Madrid, ES',
-          status: 'Active',
-          manager: 'James Wilson',
-        },
-      ],
-    },
-  ],
-};
+/**
+ * Build the reporting tree from the employee directory. When the directory has
+ * exactly one person without a manager they are the root; otherwise the
+ * organisation itself heads the chart.
+ */
+function buildOrgTree(employees) {
+  const nodes = employees.map((e) => ({
+    id: e.empId || e.id,
+    key: String(e.id ?? e.name),
+    name: e.name || '—',
+    role: e.designation || e.role || '',
+    fullRole: e.designation || e.role || '',
+    department: e.department || e.dept || '',
+    avatar: e.avatar || e.img || `https://i.pravatar.cc/100?u=${encodeURIComponent(e.id || e.name)}`,
+    email: e.email || '',
+    phone: e.phone || '',
+    location: e.location || '',
+    status: e.status || 'Active',
+    managerId: e.reportingManagerId != null ? String(e.reportingManagerId) : '',
+    managerName: e.reportingManager || e.manager || '',
+    reports: [],
+  }));
+  const byKey = new Map(nodes.map((n) => [n.key, n]));
+  const byName = new Map(nodes.map((n) => [n.name, n]));
+  const roots = [];
+  nodes.forEach((n) => {
+    const parent = (n.managerId && byKey.get(n.managerId)) || (n.managerName && byName.get(n.managerName));
+    if (parent && parent !== n) {
+      n.manager = parent.name;
+      parent.reports.push(n);
+    } else {
+      n.manager = n.managerName || '';
+      roots.push(n);
+    }
+  });
+  if (roots.length === 1) return roots[0];
+  return {
+    id: '',
+    key: '__org__',
+    name: 'Organization',
+    role: `${nodes.length} employee${nodes.length === 1 ? '' : 's'}`,
+    virtual: true,
+    reports: roots,
+  };
+}
 
 export function OrgChartPage() {
   const navigate = useNavigate();
   const showToast = useAppStore((s) => s.showToast);
+  const employees = useAppStore((s) => s.employees || []);
+  const INITIAL_TREE = useMemo(() => buildOrgTree(employees), [employees]);
+  const locationOptions = useMemo(
+    () => [...new Set(employees.map((e) => e.location).filter(Boolean))],
+    [employees]
+  );
 
   // View Controls
   const [zoom, setZoom] = useState(100);
   const [q, setQ] = useState('');
   const [expandedAll, setExpandedAll] = useState(true);
-  const [expandedBranches, setExpandedBranches] = useState({
-    'David Park': false,
-    'Ayesha Khan': false,
-    'James Wilson': false,
-  });
+  const [expandedBranches, setExpandedBranches] = useState({});
 
   // Feature Integrations
-  const [departmentCount, setDepartmentCount] = useState(12);
+  const [departmentCount, setDepartmentCount] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    hrmsSync.pull('departments').then((rows) => {
+      if (active && Array.isArray(rows)) setDepartmentCount(rows.length);
+    });
+    return () => { active = false; };
+  }, []);
   const [isAddDeptOpen, setIsAddDeptOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
   const [newDept, setNewDept] = useState({
     name: '',
-    head: 'David Park',
+    head: '',
     budget: '',
-    location: 'New York',
+    location: '',
   });
 
   // Toggle single branch
@@ -173,21 +117,11 @@ export function OrgChartPage() {
 
   // Toggle Collapse All / Expand All
   function handleToggleAll() {
-    if (expandedAll) {
-      setExpandedAll(false);
-      setExpandedBranches({
-        'David Park': false,
-        'Ayesha Khan': false,
-        'James Wilson': false,
-      });
-    } else {
-      setExpandedAll(true);
-      setExpandedBranches({
-        'David Park': true,
-        'Ayesha Khan': true,
-        'James Wilson': true,
-      });
-    }
+    const next = !expandedAll;
+    setExpandedAll(next);
+    setExpandedBranches(
+      Object.fromEntries((INITIAL_TREE.reports || []).map((child) => [child.name, next]))
+    );
   }
 
   // Check if a person or their children match query
@@ -211,14 +145,27 @@ export function OrgChartPage() {
   }, [matchesQuery]);
 
   // Handle Add Department submission
-  function handleAddDepartment(e) {
+  async function handleAddDepartment(e) {
     e.preventDefault();
     if (!newDept.name.trim()) return;
 
     setDepartmentCount((c) => c + 1);
     setIsAddDeptOpen(false);
+    try {
+      if (isBackendEnabled()) {
+        await hrmsSync.create('departments', {
+          name: newDept.name,
+          head: newDept.head,
+          budget: newDept.budget,
+          location: newDept.location,
+          status: 'Active',
+        });
+      }
+    } catch (err) {
+      console.warn('[OrgChartPage] Failed to create department on server:', err);
+    }
     showToast(`Department "${newDept.name}" created successfully`);
-    setNewDept({ name: '', head: 'David Park', budget: '', location: 'New York' });
+    setNewDept({ name: '', head: '', budget: '', location: '' });
   }
 
   // Handle CSV Export
@@ -229,6 +176,10 @@ export function OrgChartPage() {
     ];
 
     function flatten(node) {
+      if (node.virtual) {
+        node.reports.forEach(flatten);
+        return;
+      }
       rows.push([
         node.id,
         `"${node.name}"`,
@@ -270,9 +221,9 @@ export function OrgChartPage() {
   // Filtered children of root
   const filteredLevel1 = useMemo(() => {
     return INITIAL_TREE.reports.filter((person) => branchHasMatch(person));
-  }, [branchHasMatch]);
+  }, [branchHasMatch, INITIAL_TREE]);
 
-  const rootMatches = matchesQuery(INITIAL_TREE);
+  const rootMatches = !INITIAL_TREE.virtual && matchesQuery(INITIAL_TREE);
 
   return (
     <div className="flex flex-col gap-6 p-2 sm:p-6 max-w-[1600px] mx-auto w-full printable-document">
@@ -284,7 +235,8 @@ export function OrgChartPage() {
             <PageInfoButton guide={hrmsGuides.orgChart} />
           </div>
           <p className="text-[13px] text-muted mt-1">
-            {departmentCount} Departments • 1,248 Employees • Last updated Oct 11, 2024
+            {departmentCount} Departments • {employees.length.toLocaleString()} Employees • Last updated{' '}
+            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
 
@@ -405,18 +357,24 @@ export function OrgChartPage() {
           style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
           className="min-w-[880px] flex flex-col items-center transition-transform duration-150"
         >
-          {/* ROOT NODE: Sarah Mitchell (CEO) */}
+          {/* ROOT NODE */}
           <div
-            onClick={() => setSelectedEmployee(INITIAL_TREE)}
+            onClick={() => !INITIAL_TREE.virtual && setSelectedEmployee(INITIAL_TREE)}
             className={`w-[160px] bg-white border-2 border-navy rounded-xl p-3 flex flex-col items-center shadow-xs cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group ${
               rootMatches && q ? 'ring-2 ring-blue-500/40' : ''
             }`}
           >
-            <img
-              src={INITIAL_TREE.avatar}
-              alt={INITIAL_TREE.name}
-              className="w-8 h-8 rounded-full ring-2 ring-navy object-cover"
-            />
+            {INITIAL_TREE.virtual ? (
+              <div className="w-8 h-8 rounded-full ring-2 ring-navy grid place-items-center text-navy">
+                <Building size={16} />
+              </div>
+            ) : (
+              <img
+                src={INITIAL_TREE.avatar}
+                alt={INITIAL_TREE.name}
+                className="w-8 h-8 rounded-full ring-2 ring-navy object-cover"
+              />
+            )}
             <div className="text-[13px] font-semibold text-slate-900 mt-2 group-hover:text-navy transition-colors text-center">
               {INITIAL_TREE.name}
             </div>
@@ -445,7 +403,7 @@ export function OrgChartPage() {
                   const hasReports = child.reports && child.reports.length > 0;
 
                   return (
-                    <div key={child.name} className="flex flex-col items-center">
+                    <div key={child.key || child.name} className="flex flex-col items-center">
                       {/* Level 1 Node Card */}
                       <div
                         onClick={() => setSelectedEmployee(child)}
@@ -498,7 +456,7 @@ export function OrgChartPage() {
                             {child.reports.map((sub) => {
                               const isSubMatch = matchesQuery(sub);
                               return (
-                                <div key={sub.name} className="flex flex-col items-center">
+                                <div key={sub.key || sub.name} className="flex flex-col items-center">
                                   {child.reports.length > 1 && <div className="w-px h-5 bg-bdr" />}
                                   <div
                                     onClick={() => setSelectedEmployee(sub)}
@@ -531,8 +489,14 @@ export function OrgChartPage() {
             </>
           )}
 
+          {employees.length === 0 && (
+            <div className="text-center py-16 text-muted text-[13px]">
+              No employees yet. Add employees to build the org chart.
+            </div>
+          )}
+
           {/* Empty search state */}
-          {expandedAll && filteredLevel1.length === 0 && !rootMatches && (
+          {employees.length > 0 && q && expandedAll && filteredLevel1.length === 0 && !rootMatches && (
             <div className="text-center py-16 text-muted text-[13px]">
               No employees found matching &quot;{q}&quot;
             </div>
@@ -576,11 +540,12 @@ export function OrgChartPage() {
                 onChange={(e) => setNewDept({ ...newDept, head: e.target.value })}
                 className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] text-slate-800 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 cursor-pointer"
               >
-                <option value="David Park">David Park (CTO)</option>
-                <option value="Ayesha Khan">Ayesha Khan (HR Director)</option>
-                <option value="James Wilson">James Wilson (CFO)</option>
-                <option value="Priya Patel">Priya Patel (Staff Architect)</option>
-                <option value="Marcus Chen">Marcus Chen (Design Lead)</option>
+                <option value="">Not assigned</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.name}>
+                    {emp.name}{emp.designation ? ` (${emp.designation})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -602,16 +567,19 @@ export function OrgChartPage() {
             <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
               Primary Office Location
             </label>
-            <select
+            <input
+              type="text"
+              list="org-dept-locations"
               value={newDept.location}
               onChange={(e) => setNewDept({ ...newDept, location: e.target.value })}
-              className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] text-slate-800 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 cursor-pointer"
-            >
-              <option value="New York">New York Headquarters</option>
-              <option value="London">London Regional Office</option>
-              <option value="Bangalore">Bangalore Tech Hub</option>
-              <option value="Dubai">Dubai Operations</option>
-            </select>
+              placeholder="Enter office location"
+              className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] text-slate-800 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
+            />
+            <datalist id="org-dept-locations">
+              {locationOptions.map((loc) => (
+                <option key={loc} value={loc} />
+              ))}
+            </datalist>
           </div>
 
           <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-3 border-t border-bdr mt-2">
@@ -689,7 +657,7 @@ export function OrgChartPage() {
                     href={`mailto:${selectedEmployee.email}`}
                     className="text-navy hover:underline truncate block font-medium"
                   >
-                    {selectedEmployee.email}
+                    {selectedEmployee.email || '—'}
                   </a>
                 </div>
               </div>
@@ -702,7 +670,7 @@ export function OrgChartPage() {
                     href={`tel:${selectedEmployee.phone}`}
                     className="text-slate-800 hover:underline truncate block font-medium"
                   >
-                    {selectedEmployee.phone}
+                    {selectedEmployee.phone || '—'}
                   </a>
                 </div>
               </div>
@@ -711,7 +679,7 @@ export function OrgChartPage() {
                 <MapPin size={16} className="text-muted shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] text-muted font-medium">Location</div>
-                  <div className="text-slate-800 font-medium">{selectedEmployee.location}</div>
+                  <div className="text-slate-800 font-medium">{selectedEmployee.location || '—'}</div>
                 </div>
               </div>
 
@@ -733,7 +701,7 @@ export function OrgChartPage() {
                 <div className="flex flex-wrap gap-2">
                   {selectedEmployee.reports.map((rep) => (
                     <div
-                      key={rep.name}
+                      key={rep.key || rep.name}
                       onClick={() => setSelectedEmployee(rep)}
                       className="px-2.5 py-1 bg-white border border-bdr rounded-lg text-[12px] flex items-center gap-2 hover:border-navy cursor-pointer transition-colors"
                     >

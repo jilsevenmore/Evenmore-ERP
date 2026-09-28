@@ -39,9 +39,9 @@ export const PaymentOutPage = () => {
     const [paymentType, setPaymentType] = useState('Final'); // [PHASE-2D] 'Advance' | 'Final'
     const [selectedPoId, setSelectedPoId] = useState(purchaseOrders[0]?.id || '');
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
-    const [amount, setAmount] = useState(1000);
+    const [amount, setAmount] = useState(0);
     const [mode, setMode] = useState('ACH');
-    const [reference, setReference] = useState('ACH-994821');
+    const [reference, setReference] = useState('');
     // [PHASE-2D] advance-adjustment widget state
     const [advanceBillId, setAdvanceBillId] = useState('');
     const [advanceApplyAmt, setAdvanceApplyAmt] = useState(0);
@@ -66,6 +66,10 @@ export const PaymentOutPage = () => {
 
     const handleCreate = (e) => {
         e.preventDefault();
+        if (!(Number(amount) > 0)) {
+            alert('Please enter a valid payment amount greater than zero.');
+            return;
+        }
         if (paymentType === 'Advance') {
             // ── [PHASE-2D] Advance released against a PO (no bill yet for steel on credit) ──
             const po = purchaseOrders.find((p) => p.id === selectedPoId) || purchaseOrders[0];
@@ -74,30 +78,34 @@ export const PaymentOutPage = () => {
                 : vendors.find((v) => v.id === selectedVendorId);
             const res = addPaymentOut({
                 vendorId: vend?.id || po?.vendorId,
-                vendor: vend?.name || po?.vendor || 'Arrow Electronics Supply',
+                vendor: vend?.name || po?.vendor || '',
                 poId: po?.id,
                 poNumber: po?.poNumber,
                 paymentType: 'Advance',
                 date: getCurrentDateFormatted(),
                 mode,
-                amount: Number(amount) || 1000,
+                amount: Number(amount),
                 reference: reference || `ADV-${Date.now()}`,
             });
             if (res) setShowAddModal(false);
             return;
         }
         const bill = purchaseBills.find((b) => b.id === selectedBillId) || purchaseBills[0];
+        if (!bill) {
+            alert('Please select a purchase bill to pay.');
+            return;
+        }
         const vend = vendors.find((v) => v.name === bill?.vendor || v.id === bill?.vendorId);
         
         const res = addPaymentOut({
             vendorId: vend?.id || bill?.vendorId,
-            vendor: bill?.vendor || vend?.name || 'Arrow Electronics Supply',
+            vendor: bill?.vendor || vend?.name || '',
             billId: bill?.id,
-            billNumber: bill?.billNumber || 'PB-2026-015',
+            billNumber: bill?.billNumber || '',
             paymentType: 'Final',
             date: getCurrentDateFormatted(),
             mode,
-            amount: Number(amount) || 1000,
+            amount: Number(amount),
             reference: reference || `ACH-${Date.now()}`,
         });
 

@@ -23,9 +23,10 @@ export const Customer360Drawer = ({ customer, onClose }) => {
     const customerInvoices = invoices.filter((i) => i.customerId === customer.id || i.customer === customer.name);
     const customerPayments = paymentIns.filter((p) => p.customer === customer.name);
     const totalLifetimeSpent = customerInvoices.reduce((sum, i) => sum + (i.total || 0), 0);
-    const creditLimit = customer.creditLimit || 50000;
-    const balance = customer.balance || 0;
-    const creditUsedPct = Math.min(100, Math.round((balance / creditLimit) * 100));
+    const creditLimit = Number(customer.creditLimit) || 0;
+    const balance = Number(customer.balance) || 0;
+    const creditUsedPct = creditLimit > 0 ? Math.max(0, Math.min(100, Math.round((balance / creditLimit) * 100))) : 0;
+    const location = [customer.city || customer.billingAddress?.city, customer.state || customer.billingAddress?.state].filter(Boolean).join(', ') || '—';
     return (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex justify-end animate-in fade-in duration-150" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${customer.name || 'Customer'} 360 view`}>
       <div className="bg-white w-full max-w-xl h-full shadow-2xl border-l border-slate-200 flex flex-col text-xs overflow-hidden printable-document" onClick={(e) => e.stopPropagation()}>
         {/* Top Header */}
@@ -38,7 +39,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
             <div className="flex flex-wrap gap-3 text-slate-500 text-[11px] mt-1.5">
               <span className="flex items-center gap-1"><Mail size={11}/> {customer.email || '—'}</span>
               <span className="flex items-center gap-1"><Phone size={11}/> {customer.phone || '—'}</span>
-              <span className="flex items-center gap-1"><MapPin size={11}/> {customer.city || customer.billingAddress?.city || 'Mumbai'}, {customer.state || customer.billingAddress?.state || 'MH'}</span>
+              <span className="flex items-center gap-1"><MapPin size={11}/> {location}</span>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer">
@@ -67,7 +68,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
               <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
                 <span className="text-[10px] text-slate-400 font-semibold uppercase block">Credit Limit</span>
                 <p className="font-mono font-semibold text-sm text-slate-700 mt-0.5">
-                  {formatCurrency(creditLimit, { noDecimals: true })}
+                  {creditLimit > 0 ? formatCurrency(creditLimit, { noDecimals: true }) : '—'}
                 </p>
               </div>
               <div className="p-2.5 bg-emerald-50 rounded-lg border border-emerald-200">
@@ -82,7 +83,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
             <div className="space-y-1 pt-1">
               <div className="flex justify-between text-[11px] text-slate-600 font-medium">
                 <span>Credit Utilization ({creditUsedPct}%)</span>
-                <span>{formatCurrency(creditLimit - balance, { noDecimals: true })} available</span>
+                <span>{creditLimit > 0 ? `${formatCurrency(creditLimit - balance, { noDecimals: true })} available` : 'No credit limit set'}</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2">
                 <div className={`h-2 rounded-full ${creditUsedPct > 85 ? 'bg-rose-500' : creditUsedPct > 60 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${creditUsedPct}%` }}/>
@@ -133,7 +134,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
 
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
-          <span className="text-slate-500 font-medium">Customer Status: <strong className="text-emerald-700">Active Account</strong></span>
+          <span className="text-slate-500 font-medium">Customer Status: <strong className="text-emerald-700">{customer.status || 'Active'}</strong></span>
           <button onClick={onClose} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-semibold cursor-pointer shadow-xs">
             Close Drawer
           </button>

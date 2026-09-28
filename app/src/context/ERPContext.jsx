@@ -11,9 +11,13 @@ import {
     pushCreate,
     pushUpdate,
     pushDelete,
+    pushAction,
+    pushConvert,
     pullCompanyProfile,
+    resetTenantData,
     isServerId,
     describeError,
+    CHALLAN_TRACK_STATUSES,
 } from '../services/backendSync';
 // ── [PHASE-2E.1] steel-category → HSN default map (Sweven fabrication master) ──
 //   Falls back to 7216 (angles/shapes/sections) unless the category matches a known steel family.
@@ -103,6 +107,7 @@ export const ERPProvider = ({ children, }) => {
     const [salesOrders, setSalesOrders] = useState([]);
     const [deliveryChallans, setDeliveryChallans] = useState([]);
     const [paymentIns, setPaymentIns] = useState([]);
+    const [cashPaymentReceipts, setCashPaymentReceipts] = useState([]);
     const [salesReturns, setSalesReturns] = useState([]);
     const [purchaseOrders, setPurchaseOrders] = useState([]);
     const [purchaseBills, setPurchaseBills] = useState([]);
@@ -117,28 +122,24 @@ export const ERPProvider = ({ children, }) => {
     const [bankAccounts, setBankAccounts] = useState([]);
     const [journalEntries, setJournalEntries] = useState([]);
     // ── [PHASE-2C] QC quality standards master (steel: dimensional + weight + surface checks)
-    //   Seed rows model Sweven's metal-intake checks; used to guide GRN QC review.
-    const defaultQualityStandards = [
-        { id: 'qs-ms-angle', name: 'MS Angle – Structural', category: 'Structural Steel', checks: ['Dimension tolerance ±2 mm', 'Weight variance within tolerance %', 'Surface: no scale / spalling', 'Check length, leg, thickness, mass'], tolerancePct: 2, active: true },
-        { id: 'qs-chequered', name: 'Chequered Plate – MS', category: 'Flat Steel', checks: ['Thickness per IS 2062', 'Chequer height 1.0–1.4 mm', 'Flatness ≤ 4 mm bow per 1 m', 'Mass per theoretical kg'], tolerancePct: 3, active: true },
-        { id: 'qs-hr-sheet', name: 'HR Sheet / Coil', category: 'Flat Steel', checks: ['Gauge per IS 1079', 'Edges trimmed, no oil stains', 'Width tolerance ±2 mm', 'Weighed on receipt'], tolerancePct: 2, active: true },
-        { id: 'qs-sq-pipe', name: 'Square Pipe – Structural', category: 'Structural Steel', checks: ['Section size per IS 4923', 'Wall thickness ±5%', 'Bend/straightness check', 'Weight variance within tolerance %'], tolerancePct: 2.5, active: true },
-    ];
-    const [qualityStandards, setQualityStandards] = useState(defaultQualityStandards);
+    const [qualityStandards, setQualityStandards] = useState([]);
     const [inventoryMovements, setInventoryMovements] = useState([]);
     const [warranties, setWarranties] = useState([]);
     const [currency, setCurrencyState] = useState(() => {
         return localStorage.getItem('evenmore_currency') || 'INR (₹)';
     });
+    // Filled from /settings/company-profile/ once signed in; empty until then.
     const [companyProfile, setCompanyProfileState] = useState({
-        // [PHASE-2E.1] Sweven demo company default — Maharashtra GSTIN so intra-state
-        //   prints show CGST+SGST split and the letterhead carries GSTIN/PAN/address.
-        //   Editable from Settings → Company Profile. Keep `name` aligned with app branding.
-        name: 'Sweven Fabricators Pvt Ltd',
-        gstin: '27AABCU9912E1Z8',
-        pan: 'AABCU9912E',
-        address: 'Plot 14, MIDC Industrial Area, Waluj, Aurangabad, Maharashtra 431136',
-        phone: '+91 80 4920 1100',
+        name: '',
+        legalName: '',
+        gstin: '',
+        pan: '',
+        address: '',
+        addressParts: {},
+        state: '',
+        stateCode: '',
+        phone: '',
+        email: '',
     });
     const [liveRates, setLiveRates] = useState(DEFAULT_RATES);
     const [toastMessage, setToastMessage] = useState(null);
@@ -178,6 +179,7 @@ export const ERPProvider = ({ children, }) => {
         deliveryChallans: setDeliveryChallans,
         invoices: setInvoices,
         paymentIns: setPaymentIns,
+        cashPaymentReceipts: setCashPaymentReceipts,
         salesReturns: setSalesReturns,
         purchaseOrders: setPurchaseOrders,
         purchaseBills: setPurchaseBills,
@@ -452,13 +454,82 @@ export const ERPProvider = ({ children, }) => {
     };
 
     /**
-     * Discard anything held locally and re-read every collection. What used to
-     * restore a shipped demo set now asks the server, which is the only place
-     * this data exists.
+     * Persist a state change that the server models as an action rather than a
+     * field edit (`/cancel/`, `/track/`, …) — posted documents are read-only
+     * there, so a PATCH would be refused.
      */
-    const resetDemoData = async () => {
-        await refreshFromBackend();
-        showToast('Reloaded from the server.');
+    const persistAction = (key, id, action, data, setter, what) => {
+        if (!isBackendEnabled() || !isServerId(id)) return;
+        pushAction(key, id, action, data)
+            .then((serverRecord) => {
+                if (serverRecord && setter) reconcile(setter, id, serverRecord);
+            })
+            .catch((err) => {
+                console.warn(`[ERP] ${key} ${action} failed:`, err);
+                showToast(`${what} not saved to server — ${describeError(err)}`);
+            });
+    };
+
+    /**
+     * Persist a record through a server workflow instead of a plain create — a
+     * pipeline conversion, or create-then-dispatch. `run` makes the calls and
+     * resolves to the server's copy of the row held locally under `localId`.
+     */
+    const persistVia = (setter, localId, what, run) => {
+        if (!isBackendEnabled()) return;
+        run()
+            .then((serverRecord) => {
+                if (serverRecord) reconcile(setter, localId, serverRecord);
+            })
+            .catch((err) => {
+                console.warn(`[ERP] could not save ${what}:`, err);
+                markSyncFailure(setter, localId, err);
+                showToast(`${what} saved locally only — ${describeError(err)}`);
+            });
+    };
+
+    /**
+     * Order lines to hand to `/sales/orders/{id}/convert-to-*`, or `null` when
+     * the order or any line exists only locally — the server can then only be
+     * given a plain create, without the line-level link that tracks fulfilment.
+     */
+    const orderConversionLines = (order, lines, basis = 'dispatch') => {
+        if (!order || !isServerId(order.id)) return null;
+        const orderLines = new Map((order.items || order.lineItems || []).map((l) => [String(l.id), l]));
+        if (!(lines || []).every((l) => isServerId(l.id) && orderLines.has(String(l.id)))) return null;
+        const picked = (lines || []).map((l) => {
+            // Never ask for more than the order still has open — the server
+            // refuses over-dispatch / over-invoicing and would reject the lot.
+            const src = orderLines.get(String(l.id));
+            const ordered = Number(src.orderedQty ?? src.qty) || 0;
+            const done = Number(basis === 'invoice' ? src.invoicedQty : src.deliveredQty) || 0;
+            const qty = Math.min(Number(l.qty) || 0, Math.max(0, ordered - done));
+            const serials = l.selectedSerials || l.serialNumbers || (l.serialNumber ? [l.serialNumber] : []);
+            return { lineId: l.id, qty, ...(serials.length ? { serials: serials.slice(0, qty) } : {}) };
+        }).filter((l) => l.qty > 0);
+        return picked.length ? picked : null;
+    };
+
+    /**
+     * Erase this tenant's business data on the server and start the app over
+     * on the empty database. A full reload is what guarantees no screen or
+     * module store is still holding rows that no longer exist.
+     */
+    const resetBusinessData = async () => {
+        if (!isBackendEnabled()) {
+            showToast('Sign in to reset data.');
+            return false;
+        }
+        try {
+            await resetTenantData();
+        } catch (err) {
+            console.error('Failed to reset data:', err);
+            showToast(`Could not reset data — ${describeError(err)}`);
+            return false;
+        }
+        showToast('All business data erased. Reloading…');
+        setTimeout(() => window.location.reload(), 800);
+        return true;
     };
 
     // ---------------- DOMAIN QUERIES ----------------
@@ -527,15 +598,38 @@ export const ERPProvider = ({ children, }) => {
         });
         // 2. Payments (Credit - decreases AR)
         paymentIns.forEach((p) => {
+            if (p.status === 'Cancelled' || p.status === 'Voided') return;
             if (p.customer?.toLowerCase() === custName.toLowerCase() || (cust && p.customerId === cust.id)) {
+                const isWithoutBill = p.paymentType === 'WITHOUT_BILL';
                 entries.push({
                     id: `led-pay-${p.id}`,
                     date: p.date,
-                    type: 'Payment Received',
-                    reference: p.receiptNumber,
-                    description: `Settlement via ${p.mode || 'Bank'} (${p.reference || 'Ref'})`,
+                    type: isWithoutBill ? 'Cash Receipt' : 'With-Bill Pay',
+                    reference: isWithoutBill
+                        ? (p.cashReceipt?.receiptNumber || p.receiptNumber || '')
+                        : (p.paymentNumber || p.receiptNumber || ''),
+                    description: isWithoutBill
+                        ? `Cash Receipt (Without Bill) - ${p.description || p.reference || 'Cash Settlement'}`
+                        : `Settlement against ${p.invoiceNumber || 'Invoice'} via ${p.mode || 'Bank'} (${p.reference || 'Ref'})`,
                     debit: 0,
-                    credit: p.amount,
+                    credit: Number(p.amount) || 0,
+                    balance: 0,
+                });
+            }
+        });
+        // Also capture any cashPaymentReceipts not already represented in paymentIns
+        cashPaymentReceipts.forEach((r) => {
+            if (r.status === 'CANCELLED' || r.status === 'VOIDED') return;
+            const alreadyIn = paymentIns.some((p) => p.receiptNumber === r.receiptNumber || p.id === r.paymentId);
+            if (!alreadyIn && (r.customer?.toLowerCase() === custName.toLowerCase() || (cust && r.customerId === cust.id))) {
+                entries.push({
+                    id: `led-cpr-${r.id}`,
+                    date: r.date,
+                    type: 'Cash Receipt',
+                    reference: r.receiptNumber || '',
+                    description: `Cash Receipt (Without Bill) - ${r.description || r.referenceNumber || 'Cash Settlement'}`,
+                    debit: 0,
+                    credit: Number(r.amount) || 0,
                     balance: 0,
                 });
             }
@@ -629,27 +723,82 @@ export const ERPProvider = ({ children, }) => {
         });
     };
     const getInvoiceOutstanding = (invoiceIdOrNum) => {
-        if (!invoiceIdOrNum) return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
+        if (!invoiceIdOrNum) return { total: 0, taxableAmount: 0, gst: 0, paid: 0, paidAgainstInvoice: 0, withoutBillCash: 0, totalReceived: 0, balanceDue: 0, outstanding: 0, status: 'Unpaid' };
         const query = String(invoiceIdOrNum).toLowerCase();
         const inv = invoices.find((i) => i?.id === invoiceIdOrNum || (i?.invoiceNumber && String(i.invoiceNumber ?? '').toLowerCase() === query));
         if (!inv)
-            return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
-        // Sum all payments received for this invoice
-        const relatedPayments = paymentIns.filter((p) => p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()));
-        const paid = relatedPayments.reduce((acc, p) => acc + (p.amount || 0), 0) + (inv.paidAmount && relatedPayments.length === 0 ? inv.paidAmount : 0);
-        const total = inv.total || 0;
-        const balanceDue = Math.max(0, total - paid);
+            return { total: 0, taxableAmount: 0, gst: 0, paid: 0, paidAgainstInvoice: 0, withoutBillCash: 0, totalReceived: 0, balanceDue: 0, outstanding: 0, status: 'Unpaid' };
+        
+        // Sum all valid with-bill payments received for this invoice (exclude cancelled/voided and without-bill cash)
+        const relatedWithBillPayments = paymentIns.filter((p) => 
+            p.status !== 'Cancelled' && 
+            p.status !== 'Voided' && 
+            p.paymentType !== 'WITHOUT_BILL' &&
+            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()))
+        );
+        const paidAgainstInvoice = relatedWithBillPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0) + 
+            (inv.paidAmount && relatedWithBillPayments.length === 0 ? Number(inv.paidAmount) : 0);
+
+        // Without-Bill cash received for this invoice
+        const relatedCashReceipts = cashPaymentReceipts.filter((r) => 
+            r.status !== 'CANCELLED' && 
+            r.status !== 'VOIDED' &&
+            (r.invoiceId === inv.id || (r.invoiceNumber && inv.invoiceNumber && String(r.invoiceNumber).toLowerCase() === String(inv.invoiceNumber).toLowerCase()))
+        );
+        const relatedWithoutBillPayments = paymentIns.filter((p) => 
+            p.status !== 'Cancelled' && 
+            p.status !== 'Voided' && 
+            p.paymentType === 'WITHOUT_BILL' &&
+            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()))
+        );
+        const withoutBillCash = relatedCashReceipts.length > 0 
+            ? relatedCashReceipts.reduce((acc, r) => acc + (Number(r.amount) || 0), 0)
+            : relatedWithoutBillPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
+
+        const total = Number(inv.total || inv.grandTotal || 0);
+        const taxableAmount = Number(inv.taxableValue || inv.taxable_value || inv.subtotal || 0);
+        const gst = Number(inv.totalTax || inv.total_tax || ((inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0)) || Math.max(0, total - taxableAmount));
+        
+        // Important: Invoice Outstanding = Invoice Total - Valid With-Bill Payments
+        // Without-Bill Cash does NOT reduce invoice outstanding!
+        const balanceDue = Math.max(0, total - paidAgainstInvoice);
+        const outstanding = balanceDue;
+        const totalReceived = paidAgainstInvoice + withoutBillCash;
+
         let status = 'Unpaid';
         if (balanceDue <= 0.01) {
             status = 'Paid';
         }
-        else if (paid > 0) {
+        else if (paidAgainstInvoice > 0) {
             status = 'Partially Paid';
         }
         else {
             status = inv.status === 'Overdue' ? 'Overdue' : 'Unpaid';
         }
-        return { total, paid, balanceDue, status };
+
+        const cashAmt = inv.cashAmount !== undefined ? Number(inv.cashAmount) : withoutBillCash;
+        const formalAmt = inv.formalInvoiceAmount !== undefined ? Number(inv.formalInvoiceAmount) : total;
+        const totalSales = inv.totalSalesValue !== undefined ? Number(inv.totalSalesValue) : (formalAmt + cashAmt);
+        const totalAlloc = formalAmt + cashAmt;
+        const remaining = Math.max(0, totalSales - totalAlloc);
+
+        return { 
+            total, 
+            taxableAmount, 
+            gst, 
+            paid: paidAgainstInvoice, 
+            paidAgainstInvoice, 
+            withoutBillCash, 
+            totalReceived, 
+            balanceDue, 
+            outstanding, 
+            status,
+            totalSalesValue: totalSales,
+            formalInvoiceAmount: formalAmt,
+            cashAmount: cashAmt,
+            totalAllocated: totalAlloc,
+            remaining,
+        };
     };
     const getBillOutstanding = (billIdOrNum) => {
         if (!billIdOrNum) return { total: 0, paid: 0, balanceDue: 0, status: 'Unpaid' };
@@ -682,7 +831,7 @@ export const ERPProvider = ({ children, }) => {
             itemSku: mov.itemSku,
             itemName: mov.itemName,
             locationId: mov.locationId || 'loc-1',
-            locationName: mov.locationName || 'Main Central Hub',
+            locationName: mov.locationName || '',
             type: mov.type,
             quantity: mov.quantity,
             unitCost: mov.unitCost || 0,
@@ -731,19 +880,19 @@ export const ERPProvider = ({ children, }) => {
                 `RMA-2026-${Math.floor(1000 + Math.random() * 9000)}`,
             date: newPart.date || getCurrentDateFormatted(),
             product: newPart.product || 'Unknown Hardware Item',
-            sku: newPart.sku || 'SKU-GEN-01',
-            serialNumber: newPart.serialNumber || 'SN-UNKNOWN',
+            sku: newPart.sku || '',
+            serialNumber: newPart.serialNumber || '',
             qty: newPart.qty || 1,
-            vendor: newPart.vendor || 'Direct Vendor',
+            vendor: newPart.vendor || '',
             status: 'Reported',
-            notes: newPart.notes || 'Defect reported.',
-            initiatedBy: newPart.initiatedBy || 'System Admin',
+            notes: newPart.notes || '',
+            initiatedBy: newPart.initiatedBy || '',
             timeline: [
                 {
                     id: 'tl-1',
                     title: 'Fault Reported',
                     timestamp: `${newPart.date || getCurrentDateFormatted()} • Just now`,
-                    description: newPart.notes || 'Diagnostic logs attached.',
+                    description: newPart.notes || '',
                     status: 'completed',
                 },
                 {
@@ -849,7 +998,12 @@ export const ERPProvider = ({ children, }) => {
         }));
     };
 
-    const createInvoice = (newInvoice) => {
+    /**
+     * @param opts.persist  false when the caller persists through a server
+     *                      conversion instead (convert-to-invoice), so the
+     *                      invoice is not also created a second time.
+     */
+    const createInvoice = (newInvoice, { persist = true } = {}) => {
         const invItems = newInvoice.items && newInvoice.items.length > 0
             ? newInvoice.items
             : [
@@ -857,8 +1011,8 @@ export const ERPProvider = ({ children, }) => {
                     id: `item-${Date.now()}`,
                     description: 'Standard Order Merchandise',
                     qty: 1,
-                    rate: newInvoice.subtotal || newInvoice.total || 1000,
-                    amount: newInvoice.subtotal || newInvoice.total || 1000,
+                    rate: newInvoice.subtotal || newInvoice.total || 0,
+                    amount: newInvoice.subtotal || newInvoice.total || 0,
                 },
             ];
 
@@ -923,7 +1077,7 @@ export const ERPProvider = ({ children, }) => {
             id: newInvoice.id || `inv-${Date.now()}`,
             invoiceNumber: newInvoice.invoiceNumber || `INV-2026-${String(invoices.length + 101).padStart(3, '0')}`,
             customerId: newInvoice.customerId || cust?.id,
-            customer: newInvoice.customer || cust?.name || 'Acme Corp',
+            customer: newInvoice.customer || cust?.name || '',
             billingAddress,
             shippingAddress,
             linkedSo: newInvoice.linkedSo || newInvoice.salesOrderId,
@@ -955,6 +1109,13 @@ export const ERPProvider = ({ children, }) => {
             paidAmount: isPaid ? total : (newInvoice.paidAmount || 0),
             amountPaid: isPaid ? total : (newInvoice.paidAmount || 0),
             balanceDue: isPaid ? 0 : Math.max(0, total - (newInvoice.paidAmount || 0)),
+            totalSalesValue: newInvoice.totalSalesValue !== undefined ? Number(newInvoice.totalSalesValue) : (newInvoice.formalInvoiceAmount !== undefined ? (Number(newInvoice.formalInvoiceAmount) + (Number(newInvoice.cashAmount) || 0)) : total),
+            formalInvoiceAmount: newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total,
+            cashAmount: Number(newInvoice.cashAmount) || 0,
+            totalAllocated: (newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total) + (Number(newInvoice.cashAmount) || 0),
+            remainingAmount: Math.max(0, (newInvoice.totalSalesValue !== undefined ? Number(newInvoice.totalSalesValue) : total) - ((newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total) + (Number(newInvoice.cashAmount) || 0))),
+            revisions: newInvoice.revisions || [],
+            cashReceipt: newInvoice.cashReceipt || null,
             notes: newInvoice.notes || 'Sales Invoice',
             dispatchedViaChallan: Boolean(newInvoice.dispatchedViaChallan),
         };
@@ -1021,7 +1182,7 @@ export const ERPProvider = ({ children, }) => {
         // the same work authoritatively — allocates INV-…, recomputes the
         // totals, posts the SALE movements and the Dr Debtors / Cr Sales entry —
         // and its reply replaces the optimistic row.
-        persistCreate('invoices', invoice, setInvoices);
+        if (persist) persistCreate('invoices', invoice, setInvoices);
 
         return invoice;
     };
@@ -1108,12 +1269,18 @@ export const ERPProvider = ({ children, }) => {
                 grandTotal: total,
                 amount: total,
                 balanceDue: total,
+                totalSalesValue: updates.totalSalesValue !== undefined ? Number(updates.totalSalesValue) : inv.totalSalesValue,
+                formalInvoiceAmount: updates.formalInvoiceAmount !== undefined ? Number(updates.formalInvoiceAmount) : (updates.total !== undefined ? Number(updates.total) : inv.formalInvoiceAmount),
+                cashAmount: updates.cashAmount !== undefined ? Number(updates.cashAmount) : inv.cashAmount,
                 billingAddress: updates.billingAddress ? createAddressSnapshot(updates.billingAddress) : inv.billingAddress,
                 shippingAddress: updates.shippingAddress ? createAddressSnapshot(updates.shippingAddress) : inv.shippingAddress,
             };
             return updatedInv;
         }));
-        if (updatedInv) showToast(`Draft Invoice ${updatedInv.invoiceNumber} updated.`);
+        if (updatedInv) {
+            showToast(`Draft Invoice ${updatedInv.invoiceNumber} updated.`);
+            persistUpdate('invoices', invoiceId, updates, setInvoices);
+        }
         return updatedInv;
     };
 
@@ -1194,11 +1361,23 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [je, ...prev]);
+
+        if (isBackendEnabled() && isServerId(invoiceId)) {
+            pushAction('invoices', invoiceId, 'finalize')
+                .then((serverRecord) => {
+                    if (serverRecord) reconcile(setInvoices, invoiceId, serverRecord);
+                })
+                .catch((err) => {
+                    console.warn('[ERP] could not finalize invoice on server:', err);
+                    showToast(`Finalized locally only — ${describeError(err)}`);
+                });
+        }
+
         showToast(`Invoice ${finalized.invoiceNumber} finalized and posted to General Ledger.`);
         return finalized;
     };
 
-    const cancelSalesInvoice = (invoiceId) => {
+    const cancelSalesInvoice = (invoiceId, reason = 'Cancelled by user') => {
         const inv = invoices.find((i) => i.id === invoiceId);
         if (!inv) return { success: false, reason: 'not_found', message: 'Invoice not found.' };
         if (inv.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
@@ -1265,8 +1444,67 @@ export const ERPProvider = ({ children, }) => {
         }
 
         setInvoices((prev) => prev.map((i) => i.id === invoiceId ? { ...i, status: 'Cancelled' } : i));
+
+        if (isBackendEnabled() && isServerId(invoiceId)) {
+            pushAction('invoices', invoiceId, 'cancel', { reason })
+                .then((serverRecord) => {
+                    if (serverRecord) reconcile(setInvoices, invoiceId, serverRecord);
+                })
+                .catch((err) => {
+                    console.warn('[ERP] could not cancel invoice on server:', err);
+                    showToast(`Cancelled locally only — ${describeError(err)}`);
+                });
+        }
+
         showToast(`Invoice ${inv.invoiceNumber} cancelled.`);
         return { success: true, message: `Invoice ${inv.invoiceNumber} cancelled.` };
+    };
+
+    const updateSalesAllocation = async (invoiceId, { formalInvoiceAmount, cashAmount, totalSalesValue, reason } = {}) => {
+        const inv = invoices.find((i) => i.id === invoiceId);
+        if (!inv) return null;
+
+        if (isBackendEnabled() && isServerId(invoiceId)) {
+            try {
+                const serverRecord = await pushAction('invoices', invoiceId, 'allocate-split', {
+                    formalInvoiceAmount,
+                    cashAmount,
+                    totalSalesValue,
+                    reason,
+                });
+                if (serverRecord) {
+                    reconcile(setInvoices, invoiceId, serverRecord);
+                    refreshFromBackend();
+                    showToast('Sales allocation split updated successfully.');
+                    return serverRecord;
+                }
+            } catch (err) {
+                console.error('[ERP] allocate-split failed:', err);
+                showToast(`Failed to update allocation: ${describeError(err)}`);
+                throw err;
+            }
+        }
+
+        const formal = formalInvoiceAmount !== undefined ? Number(formalInvoiceAmount) : (Number(inv.formalInvoiceAmount) || Number(inv.total) || 0);
+        const cash = cashAmount !== undefined ? Number(cashAmount) : (Number(inv.cashAmount) || 0);
+        const total = totalSalesValue !== undefined ? Number(totalSalesValue) : (formal + cash);
+
+        let updated = null;
+        setInvoices((prev) => prev.map((item) => {
+            if (item.id !== invoiceId) return item;
+            updated = {
+                ...item,
+                totalSalesValue: total,
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+                total: formal,
+                grandTotal: formal,
+                balanceDue: Math.max(0, formal - (item.paidAmount || 0)),
+            };
+            return updated;
+        }));
+        showToast('Sales allocation split updated locally.');
+        return updated;
     };
 
     const updateInvoiceStatus = (id, newStatus) => {
@@ -1276,7 +1514,7 @@ export const ERPProvider = ({ children, }) => {
 
     // ── PROFORMA INVOICES ACTIONS ──────────────────────────────────────────────
     const addProformaInvoice = (pi) => {
-        const subtotal = Number(pi.subtotal) || (pi.items ? pi.items.reduce((sum, it) => sum + (Number(it.rate || 0) * Number(it.qty || 1)), 0) : 0) || 5000;
+        const subtotal = Number(pi.subtotal) || (pi.items ? pi.items.reduce((sum, it) => sum + (Number(it.rate || 0) * Number(it.qty || 1)), 0) : 0) || 0;
         const discountTotal = Number(pi.discountTotal) || 0;
         const taxableAmount = Math.max(0, subtotal - discountTotal);
         const cgst = pi.cgst !== undefined ? Number(pi.cgst) : Math.round(taxableAmount * 0.09 * 100) / 100;
@@ -1286,12 +1524,16 @@ export const ERPProvider = ({ children, }) => {
         const roundOff = Number(pi.roundOff) || 0;
         const grandTotal = Number(pi.grandTotal || pi.total) || Math.round((taxableAmount + cgst + sgst + igst + otherCharges + roundOff) * 100) / 100;
 
+        const totalSalesVal = Number(pi.totalSalesValue !== undefined ? pi.totalSalesValue : grandTotal);
+        const formalInvoiceAmt = Number(pi.formalInvoiceAmount !== undefined ? pi.formalInvoiceAmount : (pi.cashAmount !== undefined ? Math.max(0, totalSalesVal - Number(pi.cashAmount)) : totalSalesVal));
+        const cashAmt = Number(pi.cashAmount !== undefined ? pi.cashAmount : Math.max(0, totalSalesVal - formalInvoiceAmt));
+
         const nextNumber = pi.proformaNumber || `PI-2026-${String(proformaInvoices.length + 5).padStart(3, '0')}`;
         const newPI = {
             id: pi.id || `pi-${Date.now()}`,
             proformaNumber: nextNumber,
             customerId: pi.customerId,
-            customer: pi.customer || 'Acme Corp',
+            customer: pi.customer || '',
             customerContact: pi.customerContact || '',
             billingAddress: pi.billingAddress || null,
             shippingAddress: pi.shippingAddress || null,
@@ -1335,12 +1577,81 @@ export const ERPProvider = ({ children, }) => {
             roundOff,
             grandTotal,
             total: grandTotal,
+            totalSalesValue: totalSalesVal,
+            formalInvoiceAmount: formalInvoiceAmt,
+            cashAmount: cashAmt,
             notes: pi.notes || 'Commercial Proforma Invoice.',
             termsAndConditions: pi.termsAndConditions || '',
         };
+
+        // If formal invoice creation requested, spawn linked Sales Invoice
+        if (pi.createInvoiceNow && formalInvoiceAmt > 0) {
+            const invoiceItems = (newPI.items && newPI.items.length > 0 ? newPI.items : [
+                {
+                    id: `li-inv-${Date.now()}`,
+                    description: `Formal Invoice for PI ${newPI.proformaNumber}`,
+                    qty: 1,
+                    unit: 'Unit',
+                    rate: formalInvoiceAmt,
+                    amount: formalInvoiceAmt,
+                }
+            ]).map(it => ({
+                ...it,
+                rate: (it.rate || it.amount) ? (Number(it.rate || it.amount) * (formalInvoiceAmt / (totalSalesVal || 1))) : formalInvoiceAmt,
+                amount: it.amount ? (Number(it.amount) * (formalInvoiceAmt / (totalSalesVal || 1))) : formalInvoiceAmt,
+            }));
+
+            const invoicePayload = {
+                customerId: pi.customerId,
+                customer: pi.customer || '',
+                billingAddress: newPI.billingAddress,
+                shippingAddress: newPI.shippingAddress,
+                proformaInvoiceId: newPI.id,
+                linkedPi: newPI.proformaNumber,
+                date: newPI.date,
+                dueDate: pi.invoiceDueDate || addDaysISO(getCurrentISODate(), 30),
+                status: pi.invoiceStatus || 'Draft',
+                finalized: pi.invoiceStatus === 'Finalized',
+                items: invoiceItems,
+                lineItems: invoiceItems,
+                total: formalInvoiceAmt,
+                grandTotal: formalInvoiceAmt,
+                amount: formalInvoiceAmt,
+                totalSalesValue: totalSalesVal,
+                formalInvoiceAmount: formalInvoiceAmt,
+                cashAmount: cashAmt,
+                notes: `Formal Tax Invoice generated directly with Proforma Invoice ${newPI.proformaNumber}.`,
+            };
+
+            const createdInv = createInvoice(invoicePayload);
+            if (createdInv) {
+                newPI.invoiceId = createdInv.id;
+                newPI.invoiceNumber = createdInv.invoiceNumber;
+            }
+        }
+
+        // If cash amount > 0, generate the linked Cash Receipt (Without-Bill PaymentIn)
+        if ((pi.createCashReceiptNow || cashAmt > 0) && cashAmt > 0) {
+            const createdCash = addPaymentIn({
+                customerId: pi.customerId,
+                customer: pi.customer || '',
+                amount: cashAmt,
+                mode: pi.cashMode || 'Cash',
+                paymentType: 'WITHOUT_BILL',
+                proformaInvoiceId: newPI.id,
+                proformaInvoiceNumber: newPI.proformaNumber,
+                reference: pi.cashRef || `CASH-${newPI.proformaNumber}`,
+                notes: `Cash receipt allocated with Proforma Invoice ${newPI.proformaNumber}`,
+            });
+            if (createdCash) {
+                newPI.cashReceiptId = createdCash.id;
+                newPI.cashReceiptNumber = createdCash.receiptNumber || createdCash.paymentNumber;
+            }
+        }
+
         const normalizedPI = normalizeProformaInvoices([newPI])[0];
         setProformaInvoices((prev) => [normalizedPI, ...prev]);
-        showToast(`Proforma Invoice ${normalizedPI.proformaNumber} created.`);
+        showToast(`Proforma Invoice ${normalizedPI.proformaNumber} created with split allocation.`);
         persistCreate('proformaInvoices', normalizedPI, setProformaInvoices);
         return normalizedPI;
     };
@@ -1355,8 +1666,51 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Proforma Invoice updated.`);
     };
 
+    const updateProformaInvoiceAllocation = async (proformaId, { formalInvoiceAmount, cashAmount, totalSalesValue, reason } = {}) => {
+        const pi = proformaInvoices.find((p) => p.id === proformaId);
+        if (!pi) return null;
+
+        const formal = formalInvoiceAmount !== undefined ? Number(formalInvoiceAmount) : (Number(pi.formalInvoiceAmount) || 0);
+        const cash = cashAmount !== undefined ? Number(cashAmount) : (Number(pi.cashAmount) || 0);
+        const total = totalSalesValue !== undefined ? Number(totalSalesValue) : (Number(pi.totalSalesValue) || Number(pi.grandTotal || pi.total) || (formal + cash));
+
+        if (isBackendEnabled() && isServerId(proformaId)) {
+            try {
+                const serverRecord = await pushAction('proformaInvoices', proformaId, 'allocate-split', {
+                    formalInvoiceAmount: formal,
+                    cashAmount: cash,
+                    totalSalesValue: total,
+                    reason,
+                });
+                if (serverRecord) {
+                    reconcile(setProformaInvoices, proformaId, serverRecord);
+                    refreshFromBackend();
+                    showToast('Proforma invoice split updated successfully.');
+                    return serverRecord;
+                }
+            } catch (err) {
+                console.error('[ERP] proformaInvoices allocate-split failed:', err);
+            }
+        }
+
+        let updated = null;
+        setProformaInvoices((prev) => prev.map((item) => {
+            if (item.id !== proformaId) return item;
+            updated = {
+                ...item,
+                totalSalesValue: total,
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+            };
+            return updated;
+        }));
+        showToast('Proforma invoice split updated locally.');
+        return updated;
+    };
+
     const updateProformaInvoiceStatus = (id, status) => {
         setProformaInvoices((prev) => prev.map((pi) => (pi.id === id ? { ...pi, status } : pi)));
+        persistUpdate('proformaInvoices', id, { status }, setProformaInvoices);
         showToast(`Proforma status updated to ${status}.`);
     };
 
@@ -1384,7 +1738,7 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: createAddressSnapshot(pi.billingAddress),
             shippingAddress: createAddressSnapshot(pi.shippingAddress),
             salesOrderId: pi.salesOrderId,
-            linkedSo: pi.linkedSo || (pi.salesOrderId ? `SO-2026-${String(invoices.length + 101).padStart(4, '0')}` : 'Direct Proforma'),
+            linkedSo: pi.linkedSo || (pi.salesOrderId ? (salesOrders.find((so) => so.id === pi.salesOrderId)?.orderNumber || '') : 'Direct Proforma'),
             proformaInvoiceId: pi.id,
             linkedPi: pi.proformaNumber,
             date: getCurrentDateFormatted(),
@@ -1402,7 +1756,19 @@ export const ERPProvider = ({ children, }) => {
             paymentTerms: pi.paymentTerms || 'Net 30',
         };
 
-        createInvoice(newInvoice);
+        const localInvoice = createInvoice(newInvoice, { persist: false });
+        if (isServerId(pi.id)) {
+            // The server clones the proforma into a linked Draft invoice and
+            // marks the proforma Converted; lines edited on the way in replace
+            // the cloned ones while the invoice is still a draft.
+            persistVia(setInvoices, newInvoice.id, `Invoice from ${pi.proformaNumber}`, async () => {
+                const created = await pushConvert('proformaInvoices', pi.id, 'convert-to-invoice', 'invoices');
+                if (!created || !invoiceOverrides.items) return created;
+                return (await pushUpdate('invoices', created.id, { lineItems: targetItems })) || created;
+            });
+        } else {
+            persistCreate('invoices', localInvoice, setInvoices);
+        }
 
         // Update Proforma status to Converted
         setProformaInvoices((prev) => prev.map((p) => (p.id === proformaId ? {
@@ -1420,18 +1786,18 @@ export const ERPProvider = ({ children, }) => {
             id: `req-${Date.now()}`,
             requestNumber: newReq.requestNumber ||
                 `#REQ-${Math.floor(8000 + Math.random() * 900)}`,
-            requestedBy: newReq.requestedBy || 'Sarah Jenkins',
-            avatarInitials: newReq.avatarInitials || 'SJ',
-            product: newReq.product || 'Standard Spare Component',
-            sku: newReq.sku || 'SKU-STD-01',
+            requestedBy: newReq.requestedBy || '',
+            avatarInitials: newReq.avatarInitials || String(newReq.requestedBy || '').split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase(),
+            product: newReq.product || '',
+            sku: newReq.sku || '',
             qty: newReq.qty || 1,
             zone: newReq.zone || 'Zone A',
             targetSector: newReq.targetSector || 'Zone A (Main)',
             date: newReq.date || getCurrentDateFormatted(),
             submittedAt: newReq.submittedAt || 'Submitted just now',
             status: 'Requested',
-            notes: newReq.notes || 'Emergency requisition.',
-            warehouseStock: newReq.warehouseStock || 50,
+            notes: newReq.notes || '',
+            warehouseStock: newReq.warehouseStock ?? 0,
             managerSignoffNeeded: true,
         };
         setZoneRequests((prev) => [req, ...prev]);
@@ -1515,7 +1881,7 @@ export const ERPProvider = ({ children, }) => {
             reorderLevel: item.reorderLevel ?? 5,
             costPrice: item.costPrice ?? 50,
             sellingPrice: item.sellingPrice ?? 90,
-            location: item.location || 'Main Central Warehouse',
+            location: item.location || '',
             status: isService ? 'Optimal' : (calculatedQty <= (item.reorderLevel ?? 5) / 2 ? 'Critical' : calculatedQty <= (item.reorderLevel ?? 5) ? 'Low Stock' : 'Optimal'),
             customFieldValues: item.customFieldValues || {},
         };
@@ -1634,8 +2000,8 @@ export const ERPProvider = ({ children, }) => {
             code: p.code || `PARTY-${String(parties.length + 1).padStart(3, '0')}`,
             type: p.type || 'Customer',
             name: p.name || 'New Enterprise Partner',
-            phone: p.phone || '+1 (555) 000-0000',
-            email: p.email || 'billing@partner.com',
+            phone: p.phone || '',
+            email: p.email || '',
             gstTreatment: p.gstTreatment || 'Registered Business',
             gstin: p.gstin || '',
             placeOfSupply: p.placeOfSupply || 'Maharashtra (27)',
@@ -1654,20 +2020,8 @@ export const ERPProvider = ({ children, }) => {
             accountHolderName: p.accountHolderName || '',
             openingBalance: p.openingBalance ?? 0,
             balance: p.balance ?? (p.openingBalance ?? 0),
-            billingAddress: p.billingAddress || {
-                line1: 'Corporate Headquarters',
-                line2: '',
-                city: 'Mumbai',
-                state: 'Maharashtra',
-                pincode: '400001',
-            },
-            shippingAddress: p.shippingAddress || {
-                line1: 'Corporate Headquarters',
-                line2: '',
-                city: 'Mumbai',
-                state: 'Maharashtra',
-                pincode: '400001',
-            },
+            billingAddress: p.billingAddress || { line1: '', line2: '', city: '', state: '', pincode: '' },
+            shippingAddress: p.shippingAddress || { line1: '', line2: '', city: '', state: '', pincode: '' },
             contacts: p.contacts && p.contacts.length > 0 ? p.contacts : [
                 { id: `cnt-${Date.now()}`, name: p.name || 'Primary POC', role: 'Business Executive', phone: p.phone || '', email: p.email || '' },
             ],
@@ -1821,9 +2175,9 @@ export const ERPProvider = ({ children, }) => {
             id: cust.id || `cust-${Date.now()}`,
             code: cust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
             name: cust.name || 'New Client Account',
-            contactPerson: cust.contactPerson || 'Account Executive',
-            email: cust.email || 'billing@client.com',
-            phone: cust.phone || '+1 (555) 000-0000',
+            contactPerson: cust.contactPerson || '',
+            email: cust.email || '',
+            phone: cust.phone || '',
             balance: cust.balance ?? 0,
             creditLimit: cust.creditLimit ?? 25000,
             status: cust.status || 'Active',
@@ -1858,8 +2212,8 @@ export const ERPProvider = ({ children, }) => {
                 balance: newCust.balance ?? 0,
                 creditLimit: newCust.creditLimit ?? 25000,
                 status: newCust.status || 'Active',
-                billingAddress: { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
-                shippingAddress: { line1: 'Corporate Headquarters', city: 'Mumbai', state: 'Maharashtra', pincode: '400001' },
+                billingAddress: { line1: '', city: '', state: '', pincode: '' },
+                shippingAddress: { line1: '', city: '', state: '', pincode: '' },
                 contacts: [{ id: `cnt-${Date.now()}`, name: newCust.contactPerson || newCust.name, role: 'Primary Contact', phone: newCust.phone, email: newCust.email }],
             };
             return [newParty, ...prev];
@@ -1885,9 +2239,9 @@ export const ERPProvider = ({ children, }) => {
             code: ven.code || `VEND-${String(vendors.length + 1).padStart(3, '0')}`,
             name: ven.name || 'New Supplier Entity',
             category: ven.category || 'Direct Hardware',
-            contactPerson: ven.contactPerson || 'Vendor Rep',
-            email: ven.email || 'sales@vendor.com',
-            phone: ven.phone || '+1 (555) 000-0000',
+            contactPerson: ven.contactPerson || '',
+            email: ven.email || '',
+            phone: ven.phone || '',
             balance: ven.balance ?? 0,
             paymentTerms: ven.paymentTerms || 'Net 30',
             status: ven.status || 'Active',
@@ -1923,8 +2277,8 @@ export const ERPProvider = ({ children, }) => {
                 balance: newVendor.balance ?? 0,
                 paymentTerms: newVendor.paymentTerms || 'Net 30',
                 status: newVendor.status || 'Active',
-                billingAddress: { line1: 'Supplier Facility', city: 'Delhi', state: 'Delhi', pincode: '110001' },
-                shippingAddress: { line1: 'Supplier Facility', city: 'Delhi', state: 'Delhi', pincode: '110001' },
+                billingAddress: { line1: '', city: '', state: '', pincode: '' },
+                shippingAddress: { line1: '', city: '', state: '', pincode: '' },
                 contacts: [{ id: `cnt-${Date.now()}`, name: newVendor.contactPerson || newVendor.name, role: 'Sales Contact', phone: newVendor.phone, email: newVendor.email }],
             };
             return [newParty, ...prev];
@@ -1973,13 +2327,13 @@ export const ERPProvider = ({ children, }) => {
 
     const addEstimate = (est) => {
         const estAmount = est.amount ||
-            (est.items ? est.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+            (est.items ? est.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
         const defaultAddresses = resolvePartyAddresses(est.customerId, est.customer);
         const newEst = {
             id: est.id || `est-${Date.now()}`,
             estimateNumber: est.estimateNumber || `EST-2026-${String(estimates.length + 1).padStart(3, '0')}`,
             customerId: est.customerId,
-            customer: est.customer || 'Acme Corp',
+            customer: est.customer || '',
             billingAddress: createAddressSnapshot(est.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(est.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(est.date || 'Today'),
@@ -2001,7 +2355,11 @@ export const ERPProvider = ({ children, }) => {
             billingAddress: updates.billingAddress ? createAddressSnapshot(updates.billingAddress) : e.billingAddress,
             shippingAddress: updates.shippingAddress ? createAddressSnapshot(updates.shippingAddress) : e.shippingAddress,
         } : e)));
-        persistUpdate('estimates', id, updates, setEstimates);
+        // 'Converted' is set by the server's convert-to-quotation (see
+        // addQuotation); sending it here too would race that conversion.
+        const { status, ...rest } = updates || {};
+        const toPersist = status === 'Converted' ? rest : updates;
+        if (Object.keys(toPersist || {}).length) persistUpdate('estimates', id, toPersist, setEstimates);
         showToast(`Estimate updated.`);
     };
     const deleteEstimate = (id) => {
@@ -2051,7 +2409,7 @@ export const ERPProvider = ({ children, }) => {
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
-            customer: quote.customer || 'Acme Corp',
+            customer: quote.customer || '',
             billingAddress: createAddressSnapshot(quote.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(quote.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(quote.date || 'Today'),
@@ -2065,7 +2423,14 @@ export const ERPProvider = ({ children, }) => {
         };
         setQuotations((prev) => [newQ, ...prev]);
         showToast(`Quotation ${newQ.quoteNumber} issued.`);
-        persistCreate('quotations', newQ, setQuotations);
+        if (isServerId(newQ.sourceEstimateId)) {
+            // From an estimate: the server's conversion clones it, links the two
+            // and marks the estimate Converted (api.md §5.2) in one step.
+            persistVia(setQuotations, newQ.id, `Quotation from ${newQ.sourceEstimateNumber || 'estimate'}`,
+                () => pushConvert('estimates', newQ.sourceEstimateId, 'convert-to-quotation', 'quotations'));
+        } else {
+            persistCreate('quotations', newQ, setQuotations);
+        }
         return newQ;
     };
     const recordQuotationActivity = (id, type) => {
@@ -2120,11 +2485,19 @@ export const ERPProvider = ({ children, }) => {
         });
         setQuotations(prev => prev.map(q => q.id === id ? { ...q, deliveryChallanId: challan.id,
             activity: [...(q.activity || []), { id: crypto.randomUUID(), type: `Delivery challan ${challan.challanNumber} created`, quotationId: id, timestamp: new Date().toISOString() }] } : q));
+        // addDeliveryChallan keeps drafts local; this one is a real document.
+        if (isServerId(quote.id)) {
+            persistVia(setDeliveryChallans, challan.id, `Challan from ${quote.quoteNumber}`,
+                () => pushConvert('quotations', quote.id, 'convert-to-challan', 'deliveryChallans'));
+        } else {
+            persistCreate('deliveryChallans', challan, setDeliveryChallans);
+        }
         return challan;
     };
     const updateQuotationStatus = (id, status) => {
         const target = quotations.find((q) => String(q.id) === String(id));
         setQuotations((prev) => prev.map((q) => (q.id === id ? { ...q, status } : q)));
+        persistUpdate('quotations', id, { status }, setQuotations);
         if (target && target.status !== 'Sent' && status === 'Sent') {
             emitCrmEvent({
                 type: CRM_EVENT_TYPES.QUOTATION_SENT,
@@ -2143,7 +2516,10 @@ export const ERPProvider = ({ children, }) => {
         const quote = quotations.find((q) => q.id === quoteId);
         if (!quote)
             return undefined;
-        updateQuotationStatus(quoteId, 'Confirmed');
+        // Local only: the server's convert-to-order below moves the quotation on
+        // itself (to Converted, which reads back as 'Confirmed'); a PATCH racing
+        // it would be refused once the quotation is no longer a draft.
+        setQuotations((prev) => prev.map((q) => (q.id === quoteId ? { ...q, status: 'Confirmed' } : q)));
         const orderItems = quote.items && quote.items.length > 0 ? quote.items.map((line, idx) => ({
             id: line.id || `item-${Date.now()}-${idx}`,
             itemId: line.itemId || '',
@@ -2201,12 +2577,25 @@ export const ERPProvider = ({ children, }) => {
             lineItems: orderItems,
         };
         setSalesOrders((prev) => [newOrder, ...prev]);
+        if (isServerId(quote.id)) {
+            persistVia(setSalesOrders, newOrder.id, `Sales order from ${quote.quoteNumber}`, async () => {
+                const created = await pushConvert('quotations', quote.id, 'convert-to-order', 'salesOrders');
+                // The server opens it as a Draft; the UI confirms on conversion.
+                return created && ((await pushUpdate('salesOrders', created.id, { stage: 'Confirmed' })) || created);
+            });
+        } else {
+            persistCreate('salesOrders', newOrder, setSalesOrders);
+        }
         showToast(`Quote ${quote.quoteNumber} converted to Sales Order ${newOrder.orderNumber}!`);
         return newOrder;
     };
     const addSalesOrder = (order) => {
         const orderAmt = order.amount ||
-            (order.items ? order.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+            (order.items ? order.items.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
+        const totalSalesVal = order.totalSalesValue !== undefined ? Number(order.totalSalesValue) : orderAmt;
+        const formalInvoiceAmt = order.formalInvoiceAmount !== undefined ? Number(order.formalInvoiceAmount) : 0;
+        const cashAmt = order.cashAmount !== undefined ? Number(order.cashAmount) : 0;
+
         const defaultAddresses = resolvePartyAddresses(order.customerId, order.customer);
         const formattedItems = (order.items || []).map((line, idx) => ({
             ...line,
@@ -2230,34 +2619,149 @@ export const ERPProvider = ({ children, }) => {
             sourceEstimateId: order.sourceEstimateId,
             sourceEstimateNumber: order.sourceEstimateNumber,
             customerId: order.customerId,
-            customer: order.customer || 'Acme Corp',
+            customer: order.customer || '',
             billingAddress: createAddressSnapshot(order.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(order.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(order.date || 'Today'),
             deliveryDate: order.deliveryDate || addDaysISO(getCurrentISODate(), 10),
             amount: orderAmt,
+            totalSalesValue: totalSalesVal,
+            formalInvoiceAmount: formalInvoiceAmt,
+            cashAmount: cashAmt,
             stage: order.stage || 'Draft',
             status: order.stage || 'Draft',
-            paymentStatus: order.paymentStatus || 'Unpaid',
+            paymentStatus: (formalInvoiceAmt > 0 || cashAmt > 0) ? (cashAmt >= orderAmt ? 'Paid' : 'Partial') : (order.paymentStatus || 'Unpaid'),
             items: formattedItems,
             lineItems: formattedItems,
             notes: order.notes || '',
         };
+
+        // If formal invoice amount > 0, generate the linked Sales Invoice
+        if ((order.createInvoiceNow || formalInvoiceAmt > 0) && formalInvoiceAmt > 0) {
+            const scaleRatio = (orderAmt > 0 && Math.abs(formalInvoiceAmt - orderAmt) > 0.01)
+                ? (formalInvoiceAmt / orderAmt)
+                : 1;
+
+            const invoiceItems = formattedItems.map((line) => {
+                const originalRate = Number(line.rate || 0);
+                const scaledRate = Math.round(originalRate * scaleRatio * 100) / 100;
+                const qty = Number(line.qty || line.orderedQty || 1);
+                return {
+                    ...line,
+                    rate: scaledRate,
+                    originalRate,
+                    amount: Math.round(scaledRate * qty * 100) / 100,
+                };
+            });
+
+            const invoicePayload = {
+                customerId: order.customerId,
+                customer: order.customer || '',
+                billingAddress: newOrder.billingAddress,
+                shippingAddress: newOrder.shippingAddress,
+                salesOrderId: newOrder.id,
+                linkedSo: newOrder.orderNumber,
+                date: newOrder.date,
+                dueDate: order.invoiceDueDate || addDaysISO(getCurrentISODate(), 30),
+                status: order.invoiceStatus || 'Draft',
+                finalized: order.invoiceStatus === 'Finalized',
+                items: invoiceItems,
+                lineItems: invoiceItems,
+                total: formalInvoiceAmt,
+                grandTotal: formalInvoiceAmt,
+                amount: formalInvoiceAmt,
+                totalSalesValue: totalSalesVal,
+                formalInvoiceAmount: formalInvoiceAmt,
+                cashAmount: cashAmt,
+                notes: `Formal Tax Invoice generated directly with Sales Order ${newOrder.orderNumber}.`,
+            };
+
+            const createdInv = createInvoice(invoicePayload);
+            if (createdInv) {
+                newOrder.invoiceId = createdInv.id;
+                newOrder.invoiceNumber = createdInv.invoiceNumber;
+            }
+        }
+
+        // If cash amount > 0, generate the linked Cash Receipt (Without-Bill PaymentIn)
+        if ((order.createCashReceiptNow || cashAmt > 0) && cashAmt > 0) {
+            const createdCash = addPaymentIn({
+                customerId: order.customerId,
+                customer: order.customer || '',
+                amount: cashAmt,
+                mode: order.cashMode || 'Cash',
+                paymentType: 'WITHOUT_BILL',
+                salesOrderId: newOrder.id,
+                salesOrderNumber: newOrder.orderNumber,
+                reference: order.cashRef || `CASH-${newOrder.orderNumber}`,
+                notes: `Cash receipt allocated with Sales Order ${newOrder.orderNumber}`,
+            });
+            if (createdCash) {
+                newOrder.cashReceiptId = createdCash.id;
+                newOrder.cashReceiptNumber = createdCash.receiptNumber || createdCash.paymentNumber;
+            }
+        }
+
         setSalesOrders((prev) => [newOrder, ...prev]);
-        showToast(`Sales Order ${newOrder.orderNumber} created.`);
+        showToast(`Sales Order ${newOrder.orderNumber} created with split allocation.`);
         persistCreate('salesOrders', newOrder, setSalesOrders);
         return newOrder;
     };
+
+    const updateSalesOrderAllocation = async (orderId, { formalInvoiceAmount, cashAmount, totalSalesValue, reason } = {}) => {
+        const order = salesOrders.find((o) => o.id === orderId);
+        if (!order) return null;
+
+        const formal = formalInvoiceAmount !== undefined ? Number(formalInvoiceAmount) : (Number(order.formalInvoiceAmount) || 0);
+        const cash = cashAmount !== undefined ? Number(cashAmount) : (Number(order.cashAmount) || 0);
+        const total = totalSalesValue !== undefined ? Number(totalSalesValue) : (Number(order.totalSalesValue) || Number(order.amount) || (formal + cash));
+
+        if (isBackendEnabled() && isServerId(orderId)) {
+            try {
+                const serverRecord = await pushAction('salesOrders', orderId, 'allocate-split', {
+                    formalInvoiceAmount: formal,
+                    cashAmount: cash,
+                    totalSalesValue: total,
+                    reason,
+                });
+                if (serverRecord) {
+                    reconcile(setSalesOrders, orderId, serverRecord);
+                    refreshFromBackend();
+                    showToast('Sales order split updated successfully.');
+                    return serverRecord;
+                }
+            } catch (err) {
+                console.error('[ERP] salesOrders allocate-split failed:', err);
+            }
+        }
+
+        let updated = null;
+        setSalesOrders((prev) => prev.map((item) => {
+            if (item.id !== orderId) return item;
+            updated = {
+                ...item,
+                totalSalesValue: total,
+                formalInvoiceAmount: formal,
+                cashAmount: cash,
+            };
+            return updated;
+        }));
+        showToast('Sales order split updated locally.');
+        return updated;
+    };
     const updateSalesOrderStage = (id, stage) => {
         setSalesOrders((prev) => prev.map((o) => (o.id === id ? { ...o, stage, status: stage } : o)));
+        // Draft → Confirmed is where the server enforces the credit limit.
+        persistUpdate('salesOrders', id, { stage }, setSalesOrders);
     };
-    const cancelSalesOrder = (orderId) => {
+    const cancelSalesOrder = (orderId, reason = 'Cancelled by user') => {
         const order = salesOrders.find((o) => o.id === orderId);
         if (!order) return { success: false, message: 'Order not found.' };
         if (order.stage === 'Cancelled' || order.status === 'Cancelled') {
             return { success: true, message: 'Already cancelled.' };
         }
         setSalesOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, stage: 'Cancelled', status: 'Cancelled' } : o)));
+        persistAction('salesOrders', orderId, 'cancel', { reason }, setSalesOrders, `Cancellation of ${order.orderNumber}`);
         showToast(`Sales Order ${order.orderNumber} cancelled.`);
         return { success: true, message: `Sales Order ${order.orderNumber} cancelled.` };
     };
@@ -2376,10 +2880,10 @@ export const ERPProvider = ({ children, }) => {
                     description: `Fulfillment of ${order.orderNumber}`,
                     name: `Fulfillment of ${order.orderNumber}`,
                     qty: 1,
-                    rate: order.amount ?? 1000,
+                    rate: order.amount ?? 0,
                     discount: 0,
                     tax: 18,
-                    amount: order.amount ?? 1000,
+                    amount: order.amount ?? 0,
                 },
             ];
 
@@ -2405,7 +2909,18 @@ export const ERPProvider = ({ children, }) => {
             dispatchedViaChallan: hasChallan,
         };
 
-        const createdInvoice = createInvoice(newInvoice);
+        const createdInvoice = createInvoice(newInvoice, { persist: false });
+        const conversionLines = orderConversionLines(order, itemsList, 'invoice');
+        if (conversionLines) {
+            // Line-linked on the server, so finalizing bumps the order's
+            // invoicedQty and skips stock a challan already moved.
+            persistVia(setInvoices, createdInvoice.id, `Invoice for ${order.orderNumber}`, async () => {
+                const draft = await pushConvert('salesOrders', order.id, 'convert-to-invoice', 'invoices', { lines: conversionLines });
+                return draft && ((await pushAction('invoices', draft.id, 'finalize')) || draft);
+            });
+        } else {
+            persistCreate('invoices', createdInvoice, setInvoices);
+        }
 
         // Update SO line items invoicedQty and stage
         setSalesOrders((prev) => prev.map((o) => {
@@ -2448,10 +2963,10 @@ export const ERPProvider = ({ children, }) => {
             sourceQuotationNumber: challan.sourceQuotationNumber,
             leadId: challan.leadId,
             dealId: challan.dealId,
-            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
-            linkedSo: challan.salesOrderNumber || challan.linkedSo || (challan.sourceQuotationId ? '' : 'SO-2026-0102'),
+            salesOrderNumber: challan.salesOrderNumber || challan.linkedSo || '',
+            linkedSo: challan.salesOrderNumber || challan.linkedSo || '',
             customerId: challan.customerId,
-            customer: challan.customer || 'Acme Corp',
+            customer: challan.customer || '',
             billingAddress: createAddressSnapshot(challan.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(challan.shippingAddress) || defaultAddresses.shipping,
             date: challan.date || getCurrentISODate(),
@@ -2545,7 +3060,35 @@ export const ERPProvider = ({ children, }) => {
         }
 
         showToast(`Delivery Challan ${newChallan.challanNumber} issued.`);
-        persistCreate('deliveryChallans', newChallan, setDeliveryChallans);
+        // Server side a challan is created as a Draft and only `/dispatch/`
+        // posts its stock (and bumps the order's dispatchedQty); a create alone
+        // would leave it a Draft that reads back over the local 'In Transit'.
+        persistVia(setDeliveryChallans, newChallan.id, `Challan ${newChallan.challanNumber}`, async () => {
+            const transport = {
+                transporter: newChallan.transporter,
+                vehicleNo: newChallan.vehicleNo,
+                dispatchDate: newChallan.dispatchDate,
+            };
+            let serverId;
+            const order = salesOrders.find((o) => o.id === newChallan.salesOrderId);
+            const conversionLines = !previous && orderConversionLines(order, newChallan.items);
+            if (previous && isServerId(previous.id)) {
+                // A server draft (e.g. from a quotation): bring it up to date first.
+                await pushUpdate('deliveryChallans', previous.id, { ...transport, lineItems: newChallan.items });
+                serverId = previous.id;
+            } else if (conversionLines) {
+                // Line-linked to the order, so its fulfilment is tracked server side.
+                const draft = await pushConvert('salesOrders', order.id, 'convert-to-challan', 'deliveryChallans', { lines: conversionLines });
+                serverId = draft?.id;
+                if (serverId) await pushUpdate('deliveryChallans', serverId, transport);
+            } else {
+                serverId = (await pushCreate('deliveryChallans', newChallan))?.id;
+            }
+            if (!serverId) return null;
+            const dispatched = await pushAction('deliveryChallans', serverId, 'dispatch');
+            const onward = CHALLAN_TRACK_STATUSES.includes(newChallan.status) && newChallan.status !== 'Dispatched';
+            return (onward && (await pushAction('deliveryChallans', serverId, 'track', { status: newChallan.status }))) || dispatched;
+        });
         return newChallan;
     };
     const updateDeliveryChallanStatus = (id, status) => {
@@ -2566,12 +3109,19 @@ export const ERPProvider = ({ children, }) => {
             }
             return { ...c, status };
         }));
+        if (CHALLAN_TRACK_STATUSES.includes(status)) {
+            persistAction('deliveryChallans', id, 'track', { status }, setDeliveryChallans, `Challan status ${status}`);
+        }
         showToast(`Challan updated to ${status}.`);
     };
-    const cancelDeliveryChallan = (challanId) => {
+    const cancelDeliveryChallan = (challanId, reason = 'Cancelled by user') => {
         const challan = deliveryChallans.find((c) => c.id === challanId);
         if (!challan) return { success: false, message: 'Challan not found.' };
         if (challan.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
+
+        // Server side this reverses the SALE movements, returns the serials and
+        // releases the order's dispatchedQty — the same work done locally below.
+        persistAction('deliveryChallans', challanId, 'cancel', { reason }, setDeliveryChallans, `Cancellation of ${challan.challanNumber}`);
 
         if (challan.status === 'Draft') {
             setDeliveryChallans(prev => prev.map(c => c.id === challanId ? { ...c, status: 'Cancelled' } : c));
@@ -2674,10 +3224,12 @@ export const ERPProvider = ({ children, }) => {
             return null;
         }
 
+        const isWithoutBill = pay.paymentType === 'WITHOUT_BILL';
+
         let targetInv = null;
         if (pay.invoiceId || pay.invoiceNumber) {
             targetInv = invoices.find((i) => i.id === pay.invoiceId || i.invoiceNumber === pay.invoiceNumber);
-            if (targetInv) {
+            if (targetInv && !isWithoutBill) {
                 if (targetInv.status === 'Cancelled') {
                     showToast('Cannot record payment against a cancelled invoice.');
                     return null;
@@ -2698,21 +3250,113 @@ export const ERPProvider = ({ children, }) => {
             }
         }
 
+        const custName = pay.customer || targetInv?.customer || 'Walk-in Customer';
+        const custId = pay.customerId || targetInv?.customerId;
+
+        if (isWithoutBill) {
+            // WITHOUT BILL / CASH RECEIPT FLOW
+            const cprNum = pay.receiptNumber || `CPR-2026-${String(cashPaymentReceipts.length + paymentIns.length + 1).padStart(4, '0')}`;
+            const payNum = pay.paymentNumber || `PAY-IN-2026-${String(paymentIns.length + 90).padStart(3, '0')}`;
+
+            const newCashReceipt = {
+                id: pay.id || `cpr-${Date.now()}`,
+                receiptNumber: cprNum,
+                customerId: custId,
+                customer: custName,
+                invoiceId: targetInv?.id || pay.invoiceId || null,
+                invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || null,
+                date: pay.date || getCurrentDateFormatted(),
+                amount: payAmt,
+                paymentMode: pay.mode || 'Cash',
+                referenceNumber: pay.reference || cprNum,
+                description: pay.description || 'Without-Bill Cash Payment',
+                notes: pay.notes || '',
+                status: 'RECEIVED',
+                createdBy: 'Admin',
+                createdAt: new Date().toISOString(),
+            };
+
+            const newPay = {
+                id: pay.id || `pay-${Date.now()}`,
+                paymentNumber: payNum,
+                receiptNumber: cprNum,
+                paymentType: 'WITHOUT_BILL',
+                customerId: custId,
+                customer: custName,
+                invoiceId: targetInv?.id || pay.invoiceId || null,
+                invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || null,
+                date: pay.date || getCurrentDateFormatted(),
+                mode: pay.mode || 'Cash',
+                amount: payAmt,
+                reference: pay.reference || cprNum,
+                description: pay.description || 'Without-Bill Cash Payment',
+                notes: pay.notes || '',
+                status: 'Paid',
+                cashReceipt: newCashReceipt,
+            };
+
+            setCashPaymentReceipts((prev) => [newCashReceipt, ...prev]);
+            setPaymentIns((prev) => [newPay, ...prev]);
+
+            // Adjust customer balance
+            if (custName) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === custName.toLowerCase() || (custId && c.id === custId)
+                        ? { ...c, balance: Math.max(0, (c.balance || 0) - payAmt) }
+                        : c
+                ));
+            }
+
+            // Adjust cash/bank
+            setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: (acc.balance || 0) + payAmt } : acc));
+
+            // Auto-create Journal Entry
+            const newJe = {
+                id: `je-${Date.now()}`,
+                entryNumber: `JE-2026-${String(journalEntries.length + 85).padStart(3, '0')}`,
+                date: newPay.date,
+                description: `Cash Receipt (Without Bill) from ${custName}: ${pay.description || 'Direct Settlement'}`,
+                reference: cprNum,
+                debitAccount: '1010 - Cash & Bank',
+                creditAccount: '1210 - Accounts Receivable',
+                amount: payAmt,
+                status: 'Posted',
+            };
+            setJournalEntries((prev) => [newJe, ...prev]);
+            showToast(`Recorded Without-Bill Cash Receipt ${cprNum} of ${formatCurrency(payAmt)}`);
+
+            // Persisting paymentIns with paymentType="WITHOUT_BILL" creates the cash receipt atomically on the server
+            persistCreate('paymentIns', newPay, setPaymentIns, {
+                onServer: (serverRecord) => {
+                    if (serverRecord?.cashReceipt) {
+                        reconcile(setCashPaymentReceipts, newCashReceipt.id, serverRecord.cashReceipt);
+                    }
+                },
+            });
+            return newPay;
+        }
+
+        // WITH-BILL FLOW
+        const payNum = pay.paymentNumber || `PAY-IN-2026-${String(paymentIns.length + 90).padStart(3, '0')}`;
         const newPay = {
             id: pay.id || `pay-${Date.now()}`,
-            receiptNumber: pay.receiptNumber ||
-                `RCP-2026-${String(paymentIns.length + 90).padStart(3, '0')}`,
-            customerId: pay.customerId || targetInv?.customerId,
-            customer: pay.customer || targetInv?.customer || 'Acme Corp',
-            invoiceId: pay.invoiceId || targetInv?.id,
-            invoiceNumber: pay.invoiceNumber || targetInv?.invoiceNumber || 'INV-2026-001',
+            receiptNumber: pay.receiptNumber || payNum,
+            paymentNumber: payNum,
+            paymentType: 'WITH_BILL',
+            customerId: custId,
+            customer: custName,
+            invoiceId: targetInv?.id || pay.invoiceId,
+            invoiceNumber: targetInv?.invoiceNumber || pay.invoiceNumber || '',
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'Bank Transfer',
             amount: payAmt,
-            reference: pay.reference || 'WIRE-49821',
+            reference: pay.reference || '',
+            description: pay.description || '',
+            notes: pay.notes || '',
             status: 'Paid',
         };
         setPaymentIns((prev) => [newPay, ...prev]);
+
         // Update invoice payment tracking and dynamic status
         if (newPay.invoiceNumber || newPay.invoiceId) {
             setInvoices((prev) => prev.map((inv) => {
@@ -2733,20 +3377,25 @@ export const ERPProvider = ({ children, }) => {
                 return inv;
             }));
         }
+
         // Adjust customer balance
-        if (newPay.customer) {
-            setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === newPay.customer?.toLowerCase() || (newPay.customerId && c.id === newPay.customerId)
-                ? { ...c, balance: Math.max(0, c.balance - payAmt) }
-                : c));
+        if (custName) {
+            setCustomers((prev) => prev.map((c) =>
+                String(c.name ?? '').toLowerCase() === custName.toLowerCase() || (custId && c.id === custId)
+                    ? { ...c, balance: Math.max(0, (c.balance || 0) - payAmt) }
+                    : c
+            ));
         }
+
         // Add to Operating Bank Account
-        setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: acc.balance + payAmt } : acc));
+        setBankAccounts((prev) => prev.map((acc, idx) => idx === 0 ? { ...acc, balance: (acc.balance || 0) + payAmt } : acc));
+
         // Auto-create Journal Entry
         const newJe = {
             id: `je-${Date.now()}`,
             entryNumber: `JE-2026-${String(journalEntries.length + 85).padStart(3, '0')}`,
             date: newPay.date,
-            description: `Payment Received from ${newPay.customer} against ${newPay.invoiceNumber || 'Account'}`,
+            description: `Payment Received from ${custName} against ${newPay.invoiceNumber || 'Account'}`,
             reference: newPay.receiptNumber,
             debitAccount: '1010 - Cash & Bank',
             creditAccount: '1210 - Accounts Receivable',
@@ -2754,9 +3403,195 @@ export const ERPProvider = ({ children, }) => {
             status: 'Posted',
         };
         setJournalEntries((prev) => [newJe, ...prev]);
-        showToast(`Recorded receipt of ${formatCurrency(payAmt)} from ${newPay.customer}`);
+        showToast(`Recorded receipt of ${formatCurrency(payAmt)} from ${custName}`);
         persistCreate('paymentIns', newPay, setPaymentIns);
         return newPay;
+    };
+
+    const cancelPaymentIn = (payId, reason = 'Cancelled by user') => {
+        let targetPay = null;
+        setPaymentIns((prev) => prev.map((p) => {
+            if (p.id === payId || p.paymentNumber === payId || p.receiptNumber === payId) {
+                targetPay = {
+                    ...p,
+                    status: 'Cancelled',
+                    cancelledAt: new Date().toISOString(),
+                    cancelledBy: 'Admin',
+                    cancellationReason: reason,
+                };
+                return targetPay;
+            }
+            return p;
+        }));
+
+        if (targetPay) {
+            const payAmt = Number(targetPay.amount) || 0;
+            // Restore customer balance
+            if (targetPay.customer || targetPay.customerId) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === String(targetPay.customer ?? '').toLowerCase() ||
+                    (targetPay.customerId && c.id === targetPay.customerId)
+                        ? { ...c, balance: (c.balance || 0) + payAmt }
+                        : c
+                ));
+            }
+            // If With-Bill, restore invoice outstanding
+            if (targetPay.paymentType !== 'WITHOUT_BILL' && (targetPay.invoiceId || targetPay.invoiceNumber)) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetPay.invoiceId || inv.invoiceNumber === targetPay.invoiceNumber) {
+                        const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
+                        const updatedPaid = Math.max(0, currentPaid - payAmt);
+                        const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
+                        const isFull = updatedPaid >= (totalInvoice - 0.01);
+                        const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
+                        return {
+                            ...inv,
+                            paidAmount: updatedPaid,
+                            amountPaid: updatedPaid,
+                            balanceDue: Math.max(0, totalInvoice - updatedPaid),
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
+            // If linked cash receipt, cancel it too
+            if (targetPay.cashReceipt || targetPay.paymentType === 'WITHOUT_BILL') {
+                setCashPaymentReceipts((prev) => prev.map((r) =>
+                    r.receiptNumber === targetPay.receiptNumber || r.paymentId === targetPay.id
+                        ? { ...r, status: 'CANCELLED', cancellationReason: reason, cancelledAt: new Date().toISOString() }
+                        : r
+                ));
+            }
+            showToast(`Payment ${targetPay.receiptNumber || targetPay.paymentNumber} cancelled.`);
+            if (isBackendEnabled() && isServerId(targetPay.id)) {
+                pushAction('paymentIns', targetPay.id, 'cancel', { reason })
+                    .then((serverRecord) => {
+                        if (serverRecord) reconcile(setPaymentIns, targetPay.id, serverRecord);
+                    })
+                    .catch((err) => {
+                        console.warn('[ERP] cancel payment failed on server:', err);
+                        persistUpdate('paymentIns', targetPay.id, targetPay, setPaymentIns);
+                    });
+            } else {
+                persistUpdate('paymentIns', targetPay.id, targetPay, setPaymentIns);
+            }
+        }
+        return targetPay;
+    };
+
+    const cancelCashPaymentReceipt = (receiptId, reason = 'Cancelled by user') => {
+        let targetReceipt = null;
+        setCashPaymentReceipts((prev) => prev.map((r) => {
+            if (r.id === receiptId || r.receiptNumber === receiptId) {
+                targetReceipt = {
+                    ...r,
+                    status: 'CANCELLED',
+                    cancelledAt: new Date().toISOString(),
+                    cancelledBy: 'Admin',
+                    cancellationReason: reason,
+                };
+                return targetReceipt;
+            }
+            return r;
+        }));
+
+        if (targetReceipt) {
+            const amt = Number(targetReceipt.amount) || 0;
+            // Restore customer balance
+            if (targetReceipt.customer || targetReceipt.customerId) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === String(targetReceipt.customer ?? '').toLowerCase() ||
+                    (targetReceipt.customerId && c.id === targetReceipt.customerId)
+                        ? { ...c, balance: (c.balance || 0) + amt }
+                        : c
+                ));
+            }
+            // Cancel linked paymentIn
+            setPaymentIns((prev) => prev.map((p) =>
+                p.receiptNumber === targetReceipt.receiptNumber || p.id === targetReceipt.paymentId
+                    ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
+                    : p
+            ));
+            showToast(`Cash Receipt ${targetReceipt.receiptNumber} cancelled.`);
+            if (isBackendEnabled() && isServerId(targetReceipt.id)) {
+                pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason })
+                    .then((serverRecord) => {
+                        if (serverRecord) reconcile(setCashPaymentReceipts, targetReceipt.id, serverRecord);
+                    })
+                    .catch((err) => {
+                        console.warn('[ERP] cancel cash receipt failed on server:', err);
+                        persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+                    });
+            } else {
+                persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+            }
+        }
+        return targetReceipt;
+    };
+
+    const voidCashPaymentReceipt = (receiptId, reason = 'Voided by user') => {
+        let targetReceipt = null;
+        setCashPaymentReceipts((prev) => prev.map((r) => {
+            if (r.id === receiptId || r.receiptNumber === receiptId) {
+                targetReceipt = {
+                    ...r,
+                    status: 'VOIDED',
+                    cancelledAt: new Date().toISOString(),
+                    cancelledBy: 'Admin',
+                    cancellationReason: reason,
+                };
+                return targetReceipt;
+            }
+            return r;
+        }));
+
+        if (targetReceipt) {
+            const amt = Number(targetReceipt.amount) || 0;
+            if (targetReceipt.customer || targetReceipt.customerId) {
+                setCustomers((prev) => prev.map((c) =>
+                    String(c.name ?? '').toLowerCase() === String(targetReceipt.customer ?? '').toLowerCase() ||
+                    (targetReceipt.customerId && c.id === targetReceipt.customerId)
+                        ? { ...c, balance: (c.balance || 0) + amt }
+                        : c
+                ));
+            }
+            setPaymentIns((prev) => prev.map((p) =>
+                p.receiptNumber === targetReceipt.receiptNumber || p.id === targetReceipt.paymentId
+                    ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
+                    : p
+            ));
+            showToast(`Cash Receipt ${targetReceipt.receiptNumber} voided.`);
+            if (isBackendEnabled() && isServerId(targetReceipt.id)) {
+                pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason, void: true })
+                    .then((serverRecord) => {
+                        if (serverRecord) reconcile(setCashPaymentReceipts, targetReceipt.id, serverRecord);
+                    })
+                    .catch((err) => {
+                        console.warn('[ERP] void cash receipt failed on server:', err);
+                        persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+                    });
+            } else {
+                persistUpdate('cashPaymentReceipts', targetReceipt.id, targetReceipt, setCashPaymentReceipts);
+            }
+        }
+        return targetReceipt;
+    };
+
+    const updateCashPaymentReceipt = (receiptId, updates) => {
+        let updated = null;
+        setCashPaymentReceipts((prev) => prev.map((r) => {
+            if (r.id === receiptId || r.receiptNumber === receiptId) {
+                updated = { ...r, ...updates, updatedAt: new Date().toISOString() };
+                return updated;
+            }
+            return r;
+        }));
+        if (updated) {
+            showToast(`Cash Receipt ${updated.receiptNumber} updated.`);
+            persistUpdate('cashPaymentReceipts', updated.id, updated, setCashPaymentReceipts);
+        }
+        return updated;
     };
     const addSalesReturn = (ret) => {
         const inv = invoices.find((i) => i.id === ret.invoiceId || i.invoiceNumber === ret.invoiceRef);
@@ -2825,11 +3660,11 @@ export const ERPProvider = ({ children, }) => {
             id: ret.id || `sr-${Date.now()}`,
             returnNumber: ret.returnNumber || `SR-2026-${String(salesReturns.length + 13).padStart(3, '0')}`,
             customerId: ret.customerId || inv?.customerId,
-            customer: ret.customer || inv?.customer || 'Cyberdyne Systems',
+            customer: ret.customer || inv?.customer || '',
             billingAddress: createAddressSnapshot(ret.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(ret.shippingAddress) || defaultAddresses.shipping,
             invoiceId: ret.invoiceId || inv?.id,
-            invoiceRef: ret.invoiceRef || inv?.invoiceNumber || 'INV-2026-002',
+            invoiceRef: ret.invoiceRef || inv?.invoiceNumber || '',
             date: ret.date || getCurrentDateFormatted(),
             amount: totalAmount,
             reason: ret.reason || 'Customer Return',
@@ -2909,10 +3744,11 @@ export const ERPProvider = ({ children, }) => {
         return newRet;
     };
 
-    const cancelSalesReturn = (returnId) => {
+    const cancelSalesReturn = (returnId, reason = 'Cancelled by user') => {
         const sr = salesReturns.find((r) => r.id === returnId);
         if (!sr) return { success: false, message: 'Return not found.' };
         if (sr.status === 'Cancelled') return { success: true, message: 'Already cancelled.' };
+        persistAction('salesReturns', returnId, 'cancel', { reason }, setSalesReturns, `Cancellation of ${sr.returnNumber}`);
 
         // 1. Reverse inventory movements for Good/restocked items
         (sr.items || []).forEach((line) => {
@@ -2967,14 +3803,14 @@ export const ERPProvider = ({ children, }) => {
     const addPurchaseOrder = (po) => {
         const poLines = po.items || po.lineItems || [];
         const poAmt = po.amount ||
-            (poLines.length > 0 ? poLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 2500;
+            (poLines.length > 0 ? poLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
         const defaultAddresses = resolveVendorPartyAddresses(po.vendorId, po.vendor);
         const newPo = {
             id: po.id || `po-${Date.now()}`,
             poNumber: po.poNumber ||
                 `PO-2026-${String(purchaseOrders.length + 201).padStart(4, '0')}`,
             vendorId: po.vendorId,
-            vendor: po.vendor || 'Arrow Electronics Supply',
+            vendor: po.vendor || '',
             billingAddress: createAddressSnapshot(po.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(po.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(po.date || 'Today'),
@@ -3098,7 +3934,7 @@ export const ERPProvider = ({ children, }) => {
                 amount: Math.round(l.remainingQty * (l.rate || 0) * 100) / 100,
             }));
 
-        const billAmt = billLines.reduce((sum, it) => sum + (it.amount || it.qty * (it.rate || 0)), 0) || (po.amount ?? 5000);
+        const billAmt = billLines.reduce((sum, it) => sum + (it.amount || it.qty * (it.rate || 0)), 0) || (po.amount ?? 0);
         const defaultAddresses = resolveVendorPartyAddresses(po.vendorId, po.vendor);
         const newBill = {
             id: `pb-${Date.now()}`,
@@ -3207,17 +4043,17 @@ export const ERPProvider = ({ children, }) => {
     const addPurchaseBill = (bill) => {
         const billLines = bill.items || bill.lineItems || [];
         const billAmt = bill.total || bill.amount ||
-            (billLines.length > 0 ? billLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 5000;
+            (billLines.length > 0 ? billLines.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0) : 0) || 0;
         const defaultAddresses = resolveVendorPartyAddresses(bill.vendorId, bill.vendor);
         const newBill = {
             id: bill.id || `pb-${Date.now()}`,
             billNumber: bill.billNumber ||
                 `PB-2026-${String(purchaseBills.length + 16).padStart(3, '0')}`,
             purchaseOrderId: bill.purchaseOrderId,
-            poRef: bill.poRef || 'PO-2026-0210',
-            linkedPo: bill.linkedPo || bill.poRef || 'PO-2026-0210',
+            poRef: bill.poRef || '',
+            linkedPo: bill.linkedPo || bill.poRef || '',
             vendorId: bill.vendorId,
-            vendor: bill.vendor || 'Cisco Systems Direct',
+            vendor: bill.vendor || '',
             billingAddress: createAddressSnapshot(bill.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(bill.shippingAddress) || defaultAddresses.shipping,
             billDate: bill.billDate || getCurrentDateFormatted(),
@@ -3554,7 +4390,7 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Vendor bill marked as ${status}.`);
     };
     const addPaymentOut = (pay) => {
-        const payAmt = Number(pay.amount) || 1000;
+        const payAmt = Number(pay.amount) || 0;
         // ── [PHASE-2D] Payment classification: Advance (against PO, no bill yet) vs Final/Bill ──
         // Old code always treated the disbursement as a bill settlement. Sweven releases
         //   advances to suppliers (steel on credit) which later adjust against the bill.
@@ -3587,9 +4423,9 @@ export const ERPProvider = ({ children, }) => {
             voucherNumber: pay.voucherNumber ||
                 `VOU-2026-${String(paymentOuts.length + 93).padStart(3, '0')}`,
             vendorId: pay.vendorId || targetBill?.vendorId,
-            vendor: pay.vendor || targetBill?.vendor || 'Arrow Electronics Supply',
+            vendor: pay.vendor || targetBill?.vendor || '',
             billId: isAdvance ? undefined : (pay.billId || targetBill?.id),
-            billNumber: isAdvance ? undefined : (pay.billNumber || targetBill?.billNumber || 'PB-2026-015'),
+            billNumber: isAdvance ? undefined : (pay.billNumber || targetBill?.billNumber || ''),
             // [PHASE-2D] link advances to the purchase order they fund
             poId: pay.poId || targetPo?.id,
             poNumber: pay.poNumber || targetPo?.poNumber,
@@ -3598,7 +4434,7 @@ export const ERPProvider = ({ children, }) => {
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'ACH',
             amount: payAmt,
-            reference: pay.reference || 'ACH-994821',
+            reference: pay.reference || '',
             status: 'Paid',
         };
         setPaymentOuts((prev) => [newPay, ...prev]);
@@ -3831,15 +4667,7 @@ export const ERPProvider = ({ children, }) => {
         return newTr;
     };
     // ── [PHASE-2E] Budgets master: planned amounts by account/category ──
-    const defaultBudgets = [
-        { id: 'bud-rent', name: 'Office & Warehouse Rent', category: 'Facility', annualAmount: 360000, account: '5020 - Rent', active: true },
-        { id: 'bud-salary', name: 'Staff Salaries', category: 'Payroll', annualAmount: 2400000, account: '5010 - Salaries', active: true },
-        { id: 'bud-raw', name: 'Raw Material (MS Steel)', category: 'COGS', annualAmount: 5000000, account: '5030 - Raw Material', active: true },
-        { id: 'bud-utilities', name: 'Electricity & Power', category: 'Utilities', annualAmount: 480000, account: '5040 - Utilities', active: true },
-        { id: 'bud-freight', name: 'Freight & Logistics', category: 'Logistics', annualAmount: 720000, account: '5050 - Freight', active: true },
-        { id: 'bud-office', name: 'Office & Admin Supplies', category: 'Admin', annualAmount: 120000, account: '5060 - Office Supplies', active: true },
-    ];
-    const [budgets, setBudgets] = useState(defaultBudgets);
+    const [budgets, setBudgets] = useState([]);
     const addBudget = (b) => {
         const newB = { id: b.id || `bud-${Date.now()}`, name: b.name || 'New Budget', category: b.category || 'General', annualAmount: Number(b.annualAmount) || 0, account: b.account || '5xxx - Expense', active: b.active !== false };
         setBudgets((prev) => [newB, ...prev]);
@@ -3889,7 +4717,7 @@ export const ERPProvider = ({ children, }) => {
         }
 
         const calculatedTotal = returnLines.reduce((sum, it) => sum + it.amount, 0);
-        const retAmt = calculatedTotal > 0 ? calculatedTotal : (ret.amount ?? 500);
+        const retAmt = calculatedTotal > 0 ? calculatedTotal : (ret.amount ?? 0);
         const defaultAddresses = resolveVendorPartyAddresses(ret.vendorId || bill?.vendorId, ret.vendor || bill?.vendor);
 
         const newDebit = {
@@ -3897,11 +4725,11 @@ export const ERPProvider = ({ children, }) => {
             debitNoteNumber: ret.debitNoteNumber ||
                 `DN-2026-${String(purchaseReturns.length + 10).padStart(3, '0')}`,
             vendorId: ret.vendorId || bill?.vendorId,
-            vendor: ret.vendor || bill?.vendor || 'Delta Controls & Hydraulics',
+            vendor: ret.vendor || bill?.vendor || '',
             billingAddress: createAddressSnapshot(ret.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(ret.shippingAddress) || defaultAddresses.shipping,
             billId: ret.billId || bill?.id,
-            billRef: ret.billRef || bill?.billNumber || 'PB-2026-015',
+            billRef: ret.billRef || bill?.billNumber || '',
             date: ret.date || getCurrentDateFormatted(),
             amount: retAmt,
             reason: ret.reason || 'Damaged goods on intake inspection',
@@ -4039,8 +4867,8 @@ export const ERPProvider = ({ children, }) => {
                 `EXP-2026-${String(expenses.length + 119).padStart(3, '0')}`,
             category: exp.category || 'Logistics',
             date: exp.date || getCurrentDateFormatted(),
-            payee: exp.payee || 'Freight Logistics Inc',
-            amount: exp.amount ?? 150,
+            payee: exp.payee || '',
+            amount: exp.amount ?? 0,
             paidVia: exp.paidVia || 'Corporate Card',
             taxDeductible: exp.taxDeductible ?? true,
         };
@@ -4074,7 +4902,7 @@ export const ERPProvider = ({ children, }) => {
             type: loc.type || 'Assembly Bay',
             capacityPct: loc.capacityPct ?? 15,
             totalSkus: 0,
-            manager: loc.manager || 'Operations Lead',
+            manager: loc.manager || '',
         };
         setLocations((prev) => [...prev, newLoc]);
         showToast(`Location ${newLoc.name} established.`);
@@ -4086,13 +4914,13 @@ export const ERPProvider = ({ children, }) => {
             id: tr.id || `tr-${Date.now()}`,
             transferNumber: tr.transferNumber || `TR-${Math.floor(9900 + Math.random() * 90)}`,
             sourceLocationId: tr.sourceLocationId,
-            sourceLocation: tr.sourceLocation || 'Main Central Warehouse',
+            sourceLocation: tr.sourceLocation || '',
             destLocationId: tr.destLocationId,
-            destLocation: tr.destLocation || 'Assembly Bay Zone A',
+            destLocation: tr.destLocation || '',
             date: tr.date || getCurrentDateFormatted(),
             itemsCount: tr.itemsCount ?? 1,
             status: tr.status || 'In Transit',
-            shippedBy: tr.shippedBy || 'Logistics Clerk',
+            shippedBy: tr.shippedBy || '',
             items: tr.items || [],
         };
         setTransfers((prev) => [newTr, ...prev]);
@@ -4143,12 +4971,12 @@ export const ERPProvider = ({ children, }) => {
         const newUsage = {
             id: usage.id || `su-${Date.now()}`,
             ticketNumber: usage.ticketNumber || `TKT-${Math.floor(9000 + Math.random() * 900)}`,
-            technician: usage.technician || 'Liam Vance',
+            technician: usage.technician || '',
             itemId: usage.itemId,
-            sku: usage.sku || 'CAB-6-01',
+            sku: usage.sku || '',
             qtyUsed: usage.qtyUsed ?? 1,
             date: usage.date || getCurrentDateFormatted(),
-            purpose: usage.purpose || 'Rack cabling replacement',
+            purpose: usage.purpose || '',
         };
         setServiceUsages((prev) => [newUsage, ...prev]);
         // Record SERVICE_USAGE movement
@@ -4175,8 +5003,8 @@ export const ERPProvider = ({ children, }) => {
             id: acc.id || `ba-${Date.now()}`,
             accountName: acc.accountName || 'Operating Account',
             bankName: acc.bankName || 'Commercial Bank',
-            accountNumber: acc.accountNumber || `•••• ${Math.floor(1000 + Math.random() * 9000)}`,
-            balance: acc.balance ?? 10000,
+            accountNumber: acc.accountNumber || '',
+            balance: acc.balance ?? 0,
             currency: acc.currency || 'USD',
         };
         setBankAccounts((prev) => [...prev, newAcc]);
@@ -4192,7 +5020,7 @@ export const ERPProvider = ({ children, }) => {
             reference: entry.reference || 'MANUAL-ADJ',
             debitAccount: entry.debitAccount || '1010 - Cash & Bank',
             creditAccount: entry.creditAccount || '4010 - Sales Revenue',
-            amount: entry.amount ?? 1000,
+            amount: entry.amount ?? 0,
             status: 'Posted',
         };
         setJournalEntries((prev) => [newEntry, ...prev]);
@@ -4498,11 +5326,13 @@ export const ERPProvider = ({ children, }) => {
             proformaInvoices,
             addProformaInvoice,
             updateProformaInvoice,
+            updateProformaInvoiceAllocation,
             updateProformaInvoiceStatus,
             convertProformaToInvoice,
             deleteProformaInvoice,
             deliveryChallans,
             paymentIns,
+            cashPaymentReceipts,
             salesReturns,
             purchaseOrders,
             purchaseBills,
@@ -4547,6 +5377,7 @@ export const ERPProvider = ({ children, }) => {
             updateDraftInvoice,
             finalizeInvoice,
             cancelSalesInvoice,
+            updateSalesAllocation,
             updateInvoiceStatus,
             addZoneRequest,
             updateZoneRequest,
@@ -4567,6 +5398,7 @@ export const ERPProvider = ({ children, }) => {
             convertQuotationToDeliveryChallan,
             convertQuotationToSalesOrder,
             addSalesOrder,
+            updateSalesOrderAllocation,
             updateSalesOrderStage,
             cancelSalesOrder,
             convertSalesOrderToInvoice,
@@ -4575,6 +5407,10 @@ export const ERPProvider = ({ children, }) => {
             updateDeliveryChallanStatus,
             cancelDeliveryChallan,
             addPaymentIn,
+            cancelPaymentIn,
+            cancelCashPaymentReceipt,
+            voidCashPaymentReceipt,
+            updateCashPaymentReceipt,
             addSalesReturn,
             cancelSalesReturn,
             addPurchaseOrder,
@@ -4613,7 +5449,7 @@ export const ERPProvider = ({ children, }) => {
             addServiceUsage,
             addBankAccount,
             addJournalEntry,
-            resetDemoData: resetDatabaseToDefaults,
+            resetBusinessData,
             exportDatabaseSnapshot,
             importDatabaseSnapshot,
             resetDatabaseToDefaults,

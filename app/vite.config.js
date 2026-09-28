@@ -15,6 +15,13 @@ export default defineConfig({
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
       },
+      // Socket.IO (Backend/apps/core/realtime.py) — HTTP long-polling and the
+      // WebSocket upgrade both go to the same Django (ASGI) server.
+      '/socket.io': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
   resolve: {

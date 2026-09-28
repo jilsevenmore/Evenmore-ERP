@@ -80,7 +80,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((c) => ({
         label: c.name,
-        sub: `Code: ${c.code} • Outstanding: $${c.balance.toFixed(2)}`,
+        sub: `Code: ${c.code} • Outstanding: $${(Number(c.balance) || 0).toFixed(2)}`,
         path: '/parties',
         icon: Users,
         category: 'Customers',
@@ -91,7 +91,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((v) => ({
         label: v.name,
-        sub: `Vendor Code: ${v.code} • Outstanding Payable: $${v.balance.toFixed(2)}`,
+        sub: `Vendor Code: ${v.code} • Outstanding Payable: $${(Number(v.balance) || 0).toFixed(2)}`,
         path: '/parties',
         icon: Building2,
         category: 'Suppliers & Vendors',
@@ -102,7 +102,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((o) => ({
         label: `${o.orderNumber} - ${o.customer}`,
-        sub: `Value: $${o.amount.toFixed(2)} • Stage: ${o.stage}`,
+        sub: `Value: $${(Number(o.amount) || 0).toFixed(2)} • Stage: ${o.stage}`,
         path: '/sales/orders',
         icon: ShoppingCart,
         category: 'Sales Orders',
@@ -114,7 +114,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((pi) => ({
         label: `${pi.piNumber} - ${pi.customer}`,
-        sub: `Total: $${(pi.grandTotal || pi.total || 0).toFixed(2)} • Status: ${pi.status}`,
+        sub: `Total: $${(Number(pi.grandTotal || pi.total) || 0).toFixed(2)} • Status: ${pi.status}`,
         path: '/sales/proforma',
         icon: FileSpreadsheet,
         category: 'Proforma Invoices',
@@ -125,7 +125,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         .slice(0, 3)
         .map((inv) => ({
         label: `${inv.invoiceNumber} - ${inv.customer}`,
-        sub: `Total: $${inv.total.toFixed(2)} • Status: ${inv.status}`,
+        sub: `Total: $${(Number(inv.total) || 0).toFixed(2)} • Status: ${inv.status}`,
         path: '/sales/invoices',
         icon: Receipt,
         category: 'Invoices',
@@ -183,7 +183,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
           {allResults.length === 0 ? (<div className="py-12 text-center text-slate-400 space-y-2">
               <Sparkles className="w-8 h-8 mx-auto text-slate-300"/>
               <p className="font-semibold text-slate-600">No matching records found</p>
-              <p className="text-[11px] text-slate-400">Try searching for an SKU (e.g. &quot;SRV-001&quot;), Customer (e.g. &quot;Acme&quot;), or Page name.</p>
+              <p className="text-[11px] text-slate-400">Try searching for an SKU, customer name, document number, or page name.</p>
             </div>) : (allResults.map((res, index) => {
             const Icon = res.icon || Layers;
             const isSelected = index === selectedIndex;
@@ -223,7 +223,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
               Open
             </span>
           </div>
-          <span className="font-semibold text-blue-600">Horizon Global Search</span>
+          <span className="font-semibold text-blue-600">Global Search</span>
         </div>
       </div>
     </div>);

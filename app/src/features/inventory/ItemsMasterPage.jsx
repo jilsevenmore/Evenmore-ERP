@@ -38,15 +38,15 @@ export const ItemsMasterPage = () => {
             addInventoryItem({
                 sku: r['SKU'] || r['Sku'] || r['Part Number'] || `SKU-IMP-${Date.now().toString().slice(-4)}-${idx + 1}`,
                 name: r['NAME'] || r['Name'] || r['Product Name'] || `Imported Item ${idx + 1}`,
-                category: r['CATEGORY'] || r['Category'] || 'Passive Components',
+                category: r['CATEGORY'] || r['Category'] || '',
                 itemKind: isMachineView ? 'Machine' : (r['KIND'] || 'Part'),
                 uom: r['UOM'] || r['Unit'] || 'Pcs',
-                unitCost: parseFloat(r['COST'] || r['Cost Price'] || r['costPrice'] || '25') || 25,
-                costPrice: parseFloat(r['COST'] || r['Cost Price'] || r['costPrice'] || '25') || 25,
-                sellingPrice: parseFloat(r['PRICE'] || r['Selling Price'] || r['sellingPrice'] || '45') || 45,
-                availableQty: parseInt(r['QTY'] || r['Stock'] || r['stock'] || '50', 10) || 50,
+                unitCost: parseFloat(r['COST'] || r['Cost Price'] || r['costPrice'] || '0') || 0,
+                costPrice: parseFloat(r['COST'] || r['Cost Price'] || r['costPrice'] || '0') || 0,
+                sellingPrice: parseFloat(r['PRICE'] || r['Selling Price'] || r['sellingPrice'] || '0') || 0,
+                availableQty: parseInt(r['QTY'] || r['Stock'] || r['stock'] || '0', 10) || 0,
                 reorderLevel: parseInt(r['REORDER'] || r['Reorder Level'] || '10', 10) || 10,
-                location: r['LOCATION'] || r['Location'] || 'Main Central Warehouse',
+                location: r['LOCATION'] || r['Location'] || '',
             });
         });
     };
@@ -57,10 +57,14 @@ export const ItemsMasterPage = () => {
     const handleBulkSmartRestock = () => {
         if (lowStockItems.length === 0) return;
         const defaultVendor = vendors[0];
+        if (!defaultVendor) {
+            alert('Add a vendor before generating a restock purchase order.');
+            return;
+        }
         
         const restockItems = lowStockItems.map((it) => {
             const deficit = Math.max(10, (it.reorderLevel || 10) * 2 - (it.availableQty ?? it.stock ?? 0));
-            const unitRate = it.costPrice ?? it.unitCost ?? 50;
+            const unitRate = Number(it.costPrice ?? it.unitCost) || 0;
             return {
                 id: `li-restock-${Date.now()}-${it.id}`,
                 itemId: it.id,
@@ -78,7 +82,7 @@ export const ItemsMasterPage = () => {
         addPurchaseOrder({
             poNumber: `PO-AUTO-${Date.now().toString().slice(-4)}`,
             vendorId: defaultVendor?.id,
-            vendor: defaultVendor?.name || 'Cisco Systems Direct',
+            vendor: defaultVendor?.name || '',
             date: new Date().toISOString().split('T')[0],
             expectedDate: 'In 5 days (Auto-Restock)',
             amount: totalAmt,
@@ -127,7 +131,7 @@ export const ItemsMasterPage = () => {
                     <span className="font-medium text-text-secondary">{i.category}</span>
                     <span>•</span>
                     <span className="flex items-center gap-0.5">
-                      <MapPin size={10} className="text-muted"/> {i.location || 'Central Bay'}
+                      <MapPin size={10} className="text-muted"/> {i.location || '—'}
                     </span>
                     {machinePartsCount > 0 && (
                       <>

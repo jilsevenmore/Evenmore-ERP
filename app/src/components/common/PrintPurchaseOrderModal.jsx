@@ -1,16 +1,17 @@
 import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, ClipboardList, MapPin } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
+import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
 
 export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
-    // [PHASE-2E.1] profile-driven letterhead (was hardcoded EVENMORE / US strings)
-    const { companyProfile } = useERP();
-    const companyName = companyProfile?.name || 'EVENMORE ENTERPRISES';
-    const companyShort = (companyName || 'E').trim().charAt(0).toUpperCase() || 'E';
+    const { companyProfile, resolveVendorPartyAddresses } = useERP();
+    const companyName = companyProfile?.name || '';
+    const companyShort = companyInitial(companyName);
     const gstin = companyProfile?.gstin || '';
     const pan = companyProfile?.pan || '';
-    const companyAddress = companyProfile?.address || '742 Industrial Technology Way, Bldg 4 • San Jose, CA 95134';
-    const phone = companyProfile?.phone || '+1 (800) 555-0199';
+    const companyAddress = companyProfile?.address || '';
+    const taxLine = joinNonEmpty([gstin && `GSTIN: ${gstin}`, pan && `PAN: ${pan}`]);
+    const contactLine = joinNonEmpty([companyProfile?.email, companyProfile?.phone], ' | ');
     useEffect(() => {
         if (!isOpen) return;
         const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
@@ -25,6 +26,9 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
     };
 
     const items = po.items || [];
+    const expectedDate = po.expectedDate || po.deliveryDate || '';
+    const vendorAddress = addressLines(po.billingAddress
+        || resolveVendorPartyAddresses?.(po.vendorId, po.vendor)?.billing);
     const totalAmount = po.amount || po.total || items.reduce((sum, it) => sum + (it.amount || (it.qty || 1) * (it.rate || it.cost || 0)), 0);
     const subtotal = items.reduce((sum, it) => {
         const rate = it.rate || it.cost || 0;
@@ -80,23 +84,21 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
-                                    {companyShort}
-                                </div>
+                                {companyShort && (
+                                    <div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
+                                        {companyShort}
+                                    </div>
+                                )}
                                 <div>
                                     <h1 className="text-xl font-extrabold text-[#1F2E4A] tracking-tight uppercase">
                                         {companyName}
                                     </h1>
-                                    <p className="text-[10px] text-slate-500 font-semibold tracking-wider uppercase">
-                                        Steel Fabrication Procurement
-                                    </p>
                                 </div>
                             </div>
-                            {/* [PHASE-2E.1] GSTIN now flows from companyProfile (was US-8849201-CORP) */}
                             <div className="text-[11px] text-slate-500 space-y-0.5 pt-2">
-                                <p>{companyAddress}</p>
-                                <p>GSTIN: {gstin || '—'}{pan ? ` • PAN: ${pan}` : ''}</p>
-                                <p>Procurement Desk: procurement@sweven.in | Phone: {phone}</p>
+                                {companyAddress && <p>{companyAddress}</p>}
+                                {taxLine && <p>{taxLine}</p>}
+                                {contactLine && <p>Procurement Desk: {contactLine}</p>}
                             </div>
                         </div>
 
@@ -110,12 +112,16 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                                 <p className="text-xs text-slate-600">
                                     PO Date: <strong className="text-slate-900">{po.date || new Date().toLocaleDateString('en-GB')}</strong>
                                 </p>
-                                <p className="text-xs text-slate-600">
-                                    Delivery Expected: <strong className="text-slate-900">{po.expectedDate || po.deliveryDate || 'Within 7 Days'}</strong>
-                                </p>
-                                <p className="text-xs text-blue-700 font-semibold">
-                                    Requisition Ref: {po.requisitionRef || 'Auto-PO Requisition'}
-                                </p>
+                                {expectedDate && (
+                                    <p className="text-xs text-slate-600">
+                                        Delivery Expected: <strong className="text-slate-900">{expectedDate}</strong>
+                                    </p>
+                                )}
+                                {po.requisitionRef && (
+                                    <p className="text-xs text-blue-700 font-semibold">
+                                        Requisition Ref: {po.requisitionRef}
+                                    </p>
+                                )}
                             </div>
 
                             {/* Status Badge */}
@@ -134,10 +140,11 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                                 SUPPLIER / VENDOR (ORDERED FROM)
                             </span>
-                            <p className="text-sm font-bold text-slate-900">{po.vendor || 'Authorized Supplier'}</p>
-                            <p className="text-slate-600 text-[11px]">Authorized Component & Hardware Vendor</p>
-                            <p className="text-slate-500 text-[11px]">Vendor Code: VEND-{String(po.vendor || 'SUP').slice(0, 3).toUpperCase()}-101</p>
-                            <p className="text-slate-500 text-[11px]">Payment Terms: {po.paymentTerms || 'Net 30 Days'}</p>
+                            <p className="text-sm font-bold text-slate-900">{po.vendor || '—'}</p>
+                            {vendorAddress.map((line, i) => (
+                                <p key={i} className="text-slate-600 text-[11px]">{line}</p>
+                            ))}
+                            {po.paymentTerms && <p className="text-slate-500 text-[11px]">Payment Terms: {po.paymentTerms}</p>}
                         </div>
 
                         {/* Ship To / Receiving Dock */}
@@ -145,10 +152,8 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                                 SHIP TO / RECEIVING WAREHOUSE
                             </span>
-                            <p className="text-sm font-bold text-slate-900">Evenmore Logistics Central Intake Hub</p>
-                            <p className="text-slate-600 text-[11px]">452 Industrial Parkway, Dock 14B</p>
-                            <p className="text-slate-500 text-[11px]">Seattle, WA 98101 • United States</p>
-                            <p className="text-slate-500 text-[11px]">Receiving Hours: 08:00 - 18:00 Mon-Fri</p>
+                            <p className="text-sm font-bold text-slate-900">{companyName || '—'}</p>
+                            {companyAddress && <p className="text-slate-600 text-[11px]">{companyAddress}</p>}
                         </div>
                     </div>
 
@@ -169,25 +174,15 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                             <tbody className="divide-y divide-slate-200">
                                 {items.length === 0 ? (
                                     <tr>
-                                        <td className="py-2.5 px-3 text-center font-mono">1</td>
-                                        <td className="py-2.5 px-3">
-                                            <p className="font-bold text-slate-900">Industrial Hardware Intake Batch</p>
-                                        </td>
-                                        <td className="py-2.5 px-3 text-center font-mono">1</td>
-                                        <td className="py-2.5 px-3 text-right font-mono">${(totalAmount || 0).toFixed(2)}</td>
-                                        <td className="py-2.5 px-3 text-center text-slate-500">0%</td>
-                                        <td className="py-2.5 px-3 text-center text-slate-500">18%</td>
-                                        <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                                            ${(totalAmount || 0).toFixed(2)}
-                                        </td>
+                                        <td colSpan={7} className="py-4 px-3 text-center text-slate-400 italic">No line items.</td>
                                     </tr>
                                 ) : (
                                     items.map((it, idx) => {
-                                        const qty = it.qty || 1;
-                                        const rate = it.rate || it.cost || 0;
-                                        const disc = it.discount || 0;
-                                        const tax = it.tax || 0;
-                                        const lineTotal = it.amount || (qty * rate * (1 - disc / 100) * (1 + tax / 100));
+                                        const qty = Number(it.qty) || 1;
+                                        const rate = Number(it.rate || it.cost) || 0;
+                                        const disc = Number(it.discount) || 0;
+                                        const tax = Number(it.tax) || 0;
+                                        const lineTotal = Number(it.amount) || (qty * rate * (1 - disc / 100) * (1 + tax / 100));
                                         return (
                                             <tr key={idx} className="hover:bg-slate-50/50">
                                                 <td className="py-2.5 px-3 text-center font-mono text-slate-500">{idx + 1}</td>
@@ -221,7 +216,7 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
                             </span>
                             <p className="text-[10px] text-slate-600">1. Packing slip must reference PO #{po.poNumber}.</p>
                             <p className="text-[10px] text-slate-600">2. All items subject to 100% QA / GRN physical intake verification.</p>
-                            <p className="text-[10px] text-slate-600">3. Invoices must be submitted to ap@evenmore-erp.com.</p>
+                            <p className="text-[10px] text-slate-600">3. Invoices must quote PO #{po.poNumber}{companyProfile?.email ? ` and be submitted to ${companyProfile.email}` : ''}.</p>
                         </div>
 
                         {/* Totals */}
@@ -255,18 +250,18 @@ export const PrintPurchaseOrderModal = ({ isOpen, onClose, po }) => {
 
                         <div className="space-y-8">
                             <div className="border-b border-slate-400 pb-1 h-12 flex items-end justify-center">
-                                <span className="font-mono text-slate-400 text-[10px] italic">Evenmore Corporate Seal & Auth</span>
+                                <span className="font-mono text-slate-400 text-[10px] italic">Company Seal & Authorization</span>
                             </div>
                             <div>
                                 <p className="font-bold text-slate-900">Head of Procurement & Materials</p>
-                                <p className="text-[10px] text-slate-500">Evenmore Enterprise Logistics LLC</p>
+                                {companyName && <p className="text-[10px] text-slate-500">{companyName}</p>}
                             </div>
                         </div>
                     </div>
 
                     {/* Footer Notice */}
                     <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">
-                        Official Enterprise Procurement Record. Standard Evenmore Purchase Contract Terms apply to all supplied materials.
+                        Official Enterprise Procurement Record. Standard purchase contract terms apply to all supplied materials.
                     </div>
                 </div>
                 </div>

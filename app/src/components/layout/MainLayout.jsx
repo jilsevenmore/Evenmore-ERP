@@ -7,6 +7,7 @@ import { FloatingSupportModal } from '../common/FloatingSupportModal';
 import { useAppStore } from '../../stores/appStore';
 import { useProofApprovalSync } from '../../features/pms/approval/useProofApprovalSync';
 import { useModuleHydration } from '../../hooks/useModuleHydration';
+import { useRealtimeBridge } from '../../hooks/useRealtimeBridge';
 
 // ERP-only UI scope: graph.json global-shell guidance applied purely as a
 // CSS class. CRM/HRMS routes never receive `erp-scope`, so their UI is
@@ -29,6 +30,9 @@ export default function MainLayout() {
 
   // Pick up design approvals taken in a client's approval-link tab.
   useProofApprovalSync();
+
+  // Socket.IO: live bell, live PMS projects (see services/realtime.js).
+  useRealtimeBridge();
 
   // Global keydown for Ctrl+K / Cmd+K
   useEffect(() => {

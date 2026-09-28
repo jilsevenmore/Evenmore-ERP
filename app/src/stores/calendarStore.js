@@ -84,12 +84,8 @@ const useCalendarStoreBase = create((set, get) => ({
     });
   },
 
-  resetToDefaults: () => {
-    try {
-      
-    } catch {}
-    set({ events: [] });
-  },
+  /** Discard local edits and re-read the calendar from the server. */
+  resetToDefaults: () => get().hydrate(),
 
   // Helper selectors
   getEventsForDate: (dateStr) => {

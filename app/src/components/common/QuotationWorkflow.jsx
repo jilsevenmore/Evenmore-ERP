@@ -9,7 +9,8 @@ import { emitCrmEvent, CRM_EVENT_TYPES } from '../../services/crmEventNotificati
 import { publicQuotation } from '../../utils/quotationDocument';
 
 export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMode = '' }) {
-  const { customers, showToast, recordQuotationActivity, syncQuotationShare } = useERP();
+  const { customers, showToast, recordQuotationActivity, syncQuotationShare, companyProfile } = useERP();
+  const senderName = companyProfile?.name || '';
   const [mode, setMode] = useState(initialMode);
   const [share, setShare] = useState(quotation.share || null);
   const [days, setDays] = useState(30);
@@ -19,8 +20,8 @@ export function QuotationWorkflow({ quotation, onDownload, onChallan, initialMod
   const [qr, setQr] = useState('');
   const customer = customers.find(item => item.id === quotation.customerId);
   const [email, setEmail] = useState(customer?.email || '');
-  const [subject, setSubject] = useState(`Quotation ${quotation.quoteNumber} from Evenmore ERP`);
-  const [message, setMessage] = useState(`Dear ${quotation.customer},\n\nPlease find our quotation ${quotation.quoteNumber} for your review.\n\nYou can view the quotation using the preview link below.\n\nRegards,\nEvenmore ERP`);
+  const [subject, setSubject] = useState(`Quotation ${quotation.quoteNumber}${senderName ? ` from ${senderName}` : ''}`);
+  const [message, setMessage] = useState(`Dear ${quotation.customer || 'Customer'},\n\nPlease find our quotation ${quotation.quoteNumber} for your review.\n\nYou can view the quotation using the preview link below.\n\nRegards,${senderName ? `\n${senderName}` : ''}`);
   const run = async callback => { setBusy(true); setError(''); try { await callback(); } catch (err) { setError(err.status === 404 ? 'No active share link. Please generate a link below.' : 'The share link could not be updated. Please try again.'); } finally { setBusy(false); } };
   useEffect(() => {
     let active = true;

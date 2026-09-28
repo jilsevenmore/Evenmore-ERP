@@ -16,29 +16,21 @@ import {
   DollarSign,
 } from 'lucide-react';
 
-const INITIAL_DEPTS = [
-  { id: 'DEP-01', name: 'Engineering', head: 'David Park', avatar: 'https://i.pravatar.cc/100?img=11', teams: 8, employees: 142, openRoles: 5, budget: '$450,000', status: 'Active' },
-  { id: 'DEP-02', name: 'Sales & CRM', head: 'Alex Rivera', avatar: 'https://i.pravatar.cc/100?img=14', teams: 5, employees: 48, openRoles: 3, budget: '$320,000', status: 'Active' },
-  { id: 'DEP-03', name: 'Human Resources', head: 'Ayesha Khan', avatar: 'https://i.pravatar.cc/100?img=5', teams: 3, employees: 24, openRoles: 1, budget: '$110,000', status: 'Active' },
-  { id: 'DEP-04', name: 'Finance & Accounts', head: 'James Wilson', avatar: 'https://i.pravatar.cc/100?img=12', teams: 4, employees: 38, openRoles: 2, budget: '$180,000', status: 'Restructuring' },
-  { id: 'DEP-05', name: 'Warehouse & Inventory', head: 'Chen Li', avatar: 'https://i.pravatar.cc/100?img=34', teams: 3, employees: 28, openRoles: 4, budget: '$210,000', status: 'Active' },
-  { id: 'DEP-06', name: 'Marketing & Design', head: 'Elena Rostova', avatar: 'https://i.pravatar.cc/100?img=9', teams: 4, employees: 56, openRoles: 1, budget: '$160,000', status: 'Active' },
-];
-
 export function DepartmentsPage() {
   const showToast = useAppStore((s) => s.showToast);
-  const [departments, setDepartments] = useState(INITIAL_DEPTS);
+  const employees = useAppStore((s) => s.employees || []);
+  const [departments, setDepartments] = useState([]);
   const [q, setQ] = useState('');
   const [view, setView] = useState('table');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [newDept, setNewDept] = useState({ name: '', head: 'David Park', budget: '$250,000' });
+  const [newDept, setNewDept] = useState({ name: '', head: '', budget: '' });
 
   useEffect(() => {
     let active = true;
     (async () => {
       try {
         const rows = await hrmsSync.pull('departments');
-        if (active && Array.isArray(rows) && rows.length > 0) {
+        if (active && Array.isArray(rows)) {
           setDepartments(rows);
         }
       } catch (err) {
@@ -56,15 +48,16 @@ export function DepartmentsPage() {
   async function handleCreate(e) {
     e.preventDefault();
     if (!newDept.name.trim()) return;
+    const headEmp = employees.find((emp) => emp.name === newDept.head);
     const created = {
       id: `DEP-0${departments.length + 1}`,
       name: newDept.name,
       head: newDept.head,
-      avatar: 'https://i.pravatar.cc/100?img=11',
-      teams: 1,
-      employees: 1,
+      avatar: headEmp?.avatar || (newDept.head ? `https://i.pravatar.cc/100?u=${encodeURIComponent(newDept.head)}` : ''),
+      teams: 0,
+      employees: employees.filter((emp) => emp.department === newDept.name).length,
       openRoles: 0,
-      budget: newDept.budget || '$150,000',
+      budget: newDept.budget || '',
       status: 'Active',
     };
     setDepartments([created, ...departments]);
@@ -80,7 +73,7 @@ export function DepartmentsPage() {
     }
     showToast(`Department "${newDept.name}" created successfully`);
     setIsModalOpen(false);
-    setNewDept({ name: '', head: 'David Park', budget: '$250,000' });
+    setNewDept({ name: '', head: '', budget: '' });
   }
 
   return (
@@ -156,6 +149,13 @@ export function DepartmentsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-10 px-5 text-center text-muted text-[13px]">
+                      {departments.length === 0 ? 'No departments yet. Add your first department.' : 'No departments match your search.'}
+                    </td>
+                  </tr>
+                )}
                 {filtered.map((d) => (
                   <tr key={d.id} className="hover:bg-off/60 transition-colors">
                     <td className="py-4 px-5 font-semibold text-slate-900 flex items-center gap-2">
@@ -164,18 +164,18 @@ export function DepartmentsPage() {
                     </td>
                     <td className="py-4 px-5">
                       <div className="flex items-center gap-2">
-                        <img src={d.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />
-                        <span className="font-medium text-slate-800">{d.head}</span>
+                        {d.avatar && <img src={d.avatar} alt="" className="w-7 h-7 rounded-full object-cover" />}
+                        <span className="font-medium text-slate-800">{d.head || '—'}</span>
                       </div>
                     </td>
-                    <td className="py-4 px-5 text-slate-700">{d.teams} teams</td>
-                    <td className="py-4 px-5 text-slate-700">{d.employees} members</td>
+                    <td className="py-4 px-5 text-slate-700">{d.teams ?? 0} teams</td>
+                    <td className="py-4 px-5 text-slate-700">{d.employees ?? 0} members</td>
                     <td className="py-4 px-5">
                       <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-medium">
-                        {d.openRoles} open
+                        {d.openRoles ?? 0} open
                       </span>
                     </td>
-                    <td className="py-4 px-5 font-medium text-slate-700">{d.budget}</td>
+                    <td className="py-4 px-5 font-medium text-slate-700">{d.budget || '—'}</td>
                     <td className="py-4 px-5">
                       <Badge tone={d.status === 'Active' ? 'success' : 'warning'}>
                         {d.status}
@@ -189,6 +189,11 @@ export function DepartmentsPage() {
         </div>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filtered.length === 0 && (
+            <div className="col-span-full bg-white border border-bdr rounded-xl p-8 text-center text-muted text-[13px]">
+              {departments.length === 0 ? 'No departments yet. Add your first department.' : 'No departments match your search.'}
+            </div>
+          )}
           {filtered.map((d) => (
             <div key={d.id} className="bg-white border border-bdr rounded-xl p-5 shadow-xs hover:border-slate-400 transition-all flex flex-col justify-between">
               <div>
@@ -197,20 +202,20 @@ export function DepartmentsPage() {
                   <Badge tone={d.status === 'Active' ? 'success' : 'warning'}>{d.status}</Badge>
                 </div>
                 <div className="text-[12.5px] text-muted flex items-center gap-2 mt-2.5">
-                  <img src={d.avatar} alt="" className="w-6 h-6 rounded-full object-cover" />
-                  <span>Head: <b className="text-slate-800 font-medium">{d.head}</b></span>
+                  {d.avatar && <img src={d.avatar} alt="" className="w-6 h-6 rounded-full object-cover" />}
+                  <span>Head: <b className="text-slate-800 font-medium">{d.head || '—'}</b></span>
                 </div>
               </div>
 
               <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-bdr/60 text-[11px]">
                 <span className="px-2.5 py-1 bg-off border border-bdr rounded-full text-slate-700 font-medium">
-                  {d.teams} teams
+                  {d.teams ?? 0} teams
                 </span>
                 <span className="px-2.5 py-1 bg-off border border-bdr rounded-full text-slate-700 font-medium">
-                  {d.employees} employees
+                  {d.employees ?? 0} employees
                 </span>
                 <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full font-medium">
-                  {d.openRoles} open roles
+                  {d.openRoles ?? 0} open roles
                 </span>
               </div>
             </div>
@@ -243,10 +248,12 @@ export function DepartmentsPage() {
               onChange={(e) => setNewDept({ ...newDept, head: e.target.value })}
               className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
             >
-              <option value="David Park">David Park (CTO)</option>
-              <option value="Ayesha Khan">Ayesha Khan (HR Director)</option>
-              <option value="James Wilson">James Wilson (CFO)</option>
-              <option value="Elena Rostova">Elena Rostova (Marketing Lead)</option>
+              <option value="">Not assigned</option>
+              {employees.map((emp) => (
+                <option key={emp.id} value={emp.name}>
+                  {emp.name}{emp.designation ? ` (${emp.designation})` : ''}
+                </option>
+              ))}
             </select>
           </div>
           <div>

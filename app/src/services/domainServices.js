@@ -156,10 +156,10 @@ export const inventoryService = {
   createTransfer: (data) => api.post('/inventory/transfers/', data),
   reportFaultyPart: (data) => api.post('/inventory/faulty-parts/', data),
   updateFaultyPartStatus: (id, status) => api.patch(`/inventory/faulty-parts/${id}/`, { status }),
-  recordServiceUsage: (data) => api.post('/inventory/service-usage/', data),
-  getValuation: (query) => api.get('/inventory/valuation/', { query }),
-  createZoneRequest: (data) => api.post('/inventory/zone-requests/', data),
-  updateZoneRequest: (id, status) => api.patch(`/inventory/zone-requests/${id}/`, { status }),
+  // recordServiceUsage: (data) => api.post('/inventory/service-usage/', data),
+  // getValuation: (query) => api.get('/inventory/valuation/', { query }),
+  // createZoneRequest: (data) => api.post('/inventory/zone-requests/', data),
+  // updateZoneRequest: (id, status) => api.patch(`/inventory/zone-requests/${id}/`, { status }),  // Hidden: Service Usage / Valuation / Zone Requests out of scope
   createMonthEndAudit: (data) => api.post('/inventory/audits/', data),
 };
 

@@ -8,11 +8,11 @@ import { useERP } from '../../context/ERPContext';
 import { Button } from '../../components/ui/Button';
 import { Building2, Sliders, FileCheck, CheckCircle2, Save, } from 'lucide-react';
 export const SettingsPage = () => {
-    const { currency: globalCurrency, setCurrency: setGlobalCurrency } = useERP();
+    const { currency: globalCurrency, setCurrency: setGlobalCurrency, companyProfile } = useERP();
     const [savedToast, setSavedToast] = useState(false);
     // Settings State
-    const [companyName, setCompanyName] = useState('Horizon Industrial & Hardware Solutions');
-    const [taxId, setTaxId] = useState('US-EIN-94-2039481');
+    const [companyName, setCompanyName] = useState(companyProfile?.name || '');
+    const [taxId, setTaxId] = useState(companyProfile?.gstin || '');
     const [currency, setCurrency] = useState(globalCurrency || 'USD ($)');
     const [fiscalYear, setFiscalYear] = useState('January - December (Calendar)');
     const [invoicePrefix, setInvoicePrefix] = useState('INV-2026-');

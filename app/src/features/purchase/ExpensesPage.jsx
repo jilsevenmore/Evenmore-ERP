@@ -30,11 +30,15 @@ export const ExpensesPage = () => {
     const [paidVia, setPaidVia] = useState('Corporate Card');
     const handleCreate = (e) => {
         e.preventDefault();
+        if (!(parseFloat(amount) > 0)) {
+            alert('Please enter a valid expense amount greater than zero.');
+            return;
+        }
         addExpense({
             category,
             date: getCurrentDateFormatted(),
-            payee: payee || 'Service Vendor',
-            amount: parseFloat(amount) || 150,
+            payee: payee || '',
+            amount: parseFloat(amount),
             paidVia,
             taxDeductible: true,
         });
@@ -105,7 +109,7 @@ export const ExpensesPage = () => {
             ),
         },
     ];
-    const totalSpent = expenses.reduce((acc, curr) => acc + curr.amount, 0);
+    const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
     const avgExpense = expenses.length > 0 ? (totalSpent / expenses.length) : 0;
     const categoriesCount = new Set(expenses.map(e => e.category)).size;
 
@@ -119,7 +123,7 @@ export const ExpensesPage = () => {
         <StatCard label="Total Operating Expenses" value={formatCurrency(totalSpent)} icon={DollarSign} highlight />
         <StatCard label="Expense Vouchers" value={`${expenses.length} Vouchers`} icon={Receipt} trend={{ positive: true, text: 'Logged to P&L' }} />
         <StatCard label="Avg Expense Cost" value={formatCurrency(avgExpense)} icon={TrendingDown} />
-        <StatCard label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} subtext="Logistics, Facilities, Admin" />
+        <StatCard label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} subtext={[...new Set(expenses.map((e) => e.category).filter(Boolean))].slice(0, 3).join(', ') || 'No expenses yet'} />
       </div>
 
       <DataTable title="Operational Overheads & Disbursed Vouchers" columns={columns} data={expenses} keyExtractor={(e) => e.id} searchPlaceholder="Search payee, voucher #, or category..." searchFilter={(e, term) => String(e.expenseNumber ?? '').toLowerCase().includes(term) ||

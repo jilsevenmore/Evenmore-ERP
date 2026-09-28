@@ -80,8 +80,9 @@ export const CategoriesPage = () => {
 
     const handleAdd = (e) => {
         e.preventDefault();
+        if (!name.trim()) return;
         addCategory({
-            name: name || 'Hardware Sub-Category',
+            name: name.trim(),
             code: (code || 'GEN').toUpperCase(),
             leadTimeDays: parseInt(leadTime, 10) || 7,
             hasSubParts: Boolean(hasSubParts),

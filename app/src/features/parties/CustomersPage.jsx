@@ -32,11 +32,11 @@ export const CustomersPage = () => {
         contactPerson: '',
         email: '',
         phone: '',
-        creditLimit: 50000,
+        creditLimit: 0,
         balance: 0,
         status: 'Active',
     });
-    const totalOutstanding = customers.reduce((sum, c) => sum + c.balance, 0);
+    const totalOutstanding = customers.reduce((sum, c) => sum + (Number(c.balance) || 0), 0);
     const columns = [
         {
             header: 'Code',
@@ -133,15 +133,15 @@ export const CustomersPage = () => {
         addCustomer({
             code: newCust.code || `CUST-${String(customers.length + 1).padStart(3, '0')}`,
             name: newCust.name,
-            contactPerson: newCust.contactPerson || 'General Contact',
-            email: newCust.email || 'billing@client.com',
-            phone: newCust.phone || '+1 (555) 000-0000',
+            contactPerson: newCust.contactPerson || '',
+            email: newCust.email || '',
+            phone: newCust.phone || '',
             balance: 0,
-            creditLimit: Number(newCust.creditLimit) || 50000,
+            creditLimit: Number(newCust.creditLimit) || 0,
             status: 'Active',
         });
         setIsModalOpen(false);
-        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '', creditLimit: 50000 });
+        setNewCust({ name: '', code: '', contactPerson: '', email: '', phone: '', creditLimit: 0 });
     };
     return (<div className="space-y-6">
       <PageHeader title="Customer Master & Statements" subtitle="Corporate client accounts, active credit thresholds, multi-year invoice billing history, and real-time running statements." guide={customerGuide} actions={<Button icon={Plus} onClick={() => setIsModalOpen(true)}>

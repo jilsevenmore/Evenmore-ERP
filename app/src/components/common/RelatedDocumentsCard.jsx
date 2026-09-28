@@ -44,9 +44,9 @@ export const RelatedDocumentsCard = ({ documents, title = 'Connected Transaction
               </div>
 
               <div className="text-right flex items-center gap-3">
-                {doc.amount !== undefined && (<div>
+                {doc.amount != null && (<div>
                     <span className="text-xs font-mono font-bold text-slate-900">
-                      ${doc.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ${(Number(doc.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                     {doc.status && (<p className="text-[10px] font-medium text-slate-500 flex items-center justify-end gap-1">
                         {String(doc.status ?? '').toLowerCase() === 'paid' || String(doc.status ?? '').toLowerCase() === 'delivered' ? (<CheckCircle className="w-3 h-3 text-emerald-500 inline"/>) : (<Clock className="w-3 h-3 text-amber-500 inline"/>)}
