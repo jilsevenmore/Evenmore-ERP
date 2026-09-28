@@ -141,6 +141,15 @@ export const HRMS_RESOURCES = {
       ...asText(row, ['status', 'workLocation', 'notes', 'checkIn', 'checkOut', 'employeeName']),
       date: displayIn(row.date),
       employee: row.employeeName || row.employee || '',
+      firstPunch: row.firstPunch || row.checkIn,
+      lastPunch: row.lastPunch || row.checkOut,
+      workingHours: row.workingHours || row.hours || 0,
+      lateMinutes: row.lateMinutes || 0,
+      overtimeHours: row.overtimeHours || 0,
+      formattedWorkingHours: row.formattedWorkingHours,
+      lateDisplay: row.lateDisplay,
+      overtimeDisplay: row.overtimeDisplay,
+      punches: row.punches || [],
       _synced: true,
     }),
   },
@@ -374,6 +383,39 @@ export async function pullPayrollFor(employeeId) {
 export async function processPayroll(payload) {
   if (!isBackendEnabled()) return null;
   return api.post('/hrms/payroll/process/', payload);
+}
+
+/** Get current user / employee punch state today. */
+export async function pullTodayPunch(employeeId = null) {
+  if (!isBackendEnabled()) return null;
+  const params = employeeId ? { employeeId } : {};
+  return api.get('/hrms/attendance/today/', params);
+}
+
+/** Record a Punch In or Punch Out event. */
+export async function recordPunch({ punchType, remark, notes, employeeId, source = 'web' }) {
+  if (!isBackendEnabled()) return null;
+  return api.post('/hrms/attendance/punch/', {
+    punchType,
+    remark: remark || notes,
+    source,
+    employeeId: employeeId || undefined,
+  });
+}
+
+/** Get punch timeline for a given employee and date. */
+export async function pullPunchTimeline(employeeId, date) {
+  if (!isBackendEnabled()) return [];
+  return api.get('/hrms/attendance/punch-timeline/', {
+    employeeId,
+    date: isoOut(date) || date,
+  });
+}
+
+/** HR / Admin punch correction. */
+export async function submitPunchCorrection(payload) {
+  if (!isBackendEnabled()) return null;
+  return api.post('/hrms/attendance/correct-punch/', payload);
 }
 
 export default hrmsSync;
