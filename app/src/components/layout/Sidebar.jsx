@@ -53,12 +53,14 @@ import {
   Check,
   LogOut,
   Lock,
+  KeyRound,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
 import { useERP } from '../../context/ERPContext';
 import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
+import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import { clearStoredAuth } from '../../utils/authUtils';
 import { filterNavByPermission } from '../../utils/navAccess';
 
@@ -555,6 +557,7 @@ export default function Sidebar() {
   const setTheme = useAppStore((s) => s.setTheme);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const profileRef = useRef(null);
   const dragRef = useRef({ dragging: false, startX: 0, startWidth: sidebarWidth });
@@ -849,6 +852,24 @@ export default function Sidebar() {
                 <span className="text-[11px] font-medium">Interactive User Guides</span>
               </button>
 
+              {/* Change / Reset Password Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsProfileOpen(false);
+                  setIsChangePasswordOpen(true);
+                }}
+                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition text-left cursor-pointer group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <KeyRound size={13} className="text-cyan-400 group-hover:scale-110 transition-transform" />
+                  <span className="text-[11px] font-medium">Change / Reset Password</span>
+                </div>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-500/20 text-cyan-300 font-medium">
+                  Reset
+                </span>
+              </button>
+
               {/* Sign Out / Switch User Button in Person Profile */}
               <button
                 type="button"
@@ -905,6 +926,13 @@ export default function Sidebar() {
     <UserGuideModal
       isOpen={isGuideOpen}
       onClose={() => setIsGuideOpen(false)}
+    />
+
+    {/* Change / Reset Password Modal */}
+    <ChangePasswordModal
+      isOpen={isChangePasswordOpen}
+      onClose={() => setIsChangePasswordOpen(false)}
+      userEmail={currentUser?.email}
     />
     </>
   );

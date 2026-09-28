@@ -199,6 +199,14 @@ const router = createBrowserRouter([
     element: <Page component={LoginPage} />,
     errorElement: <RootErrorBoundary />,
   },
+  {
+    path: '/forgot-password',
+    element: <Navigate to="/login?action=forgot-password" replace />,
+  },
+  {
+    path: '/reset-password',
+    element: <Navigate to="/login?action=reset-password" replace />,
+  },
   // ── Client-facing design approval link ────────────────────
   // Deliberately outside MainLayout: the recipient is a customer, not a user of
   // the ERP, so the page carries no sidebar, topbar or internal navigation.

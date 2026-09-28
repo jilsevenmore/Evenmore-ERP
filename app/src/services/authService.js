@@ -116,6 +116,23 @@ export async function forgotPassword(email) {
   });
 }
 
+export async function verifyOtp({ email, otp }) {
+  return api.post('/auth/verify-otp/', {
+    email: String(email || '').trim().toLowerCase(),
+    otp: String(otp || '').trim(),
+  });
+}
+
+export async function resetPassword({ email, otp, resetToken, token, newPassword }) {
+  return api.post('/auth/reset-password/', {
+    email: email ? String(email).trim().toLowerCase() : undefined,
+    otp: otp ? String(otp).trim() : undefined,
+    resetToken: resetToken || token || undefined,
+    newPassword,
+  });
+}
+
+
 export async function updateProfile(updates) {
   const row = await api.patch('/auth/me/', updates);
   return normalizeUser(row?.user || row);
