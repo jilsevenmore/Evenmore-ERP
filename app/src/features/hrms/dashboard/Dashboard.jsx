@@ -389,6 +389,51 @@ export default function HRMSDashboard() {
   const employees = useAppStore((s) => s.employees || []);
   const leaves = useAppStore((s) => s.leaves || []);
   const attendanceRecords = useAttendanceStore((s) => s.records || []);
+  const todayPunch = useAttendanceStore((s) => s.todayPunch);
+  const fetchTodayPunch = useAttendanceStore((s) => s.fetchTodayPunch);
+  const punchIn = useAttendanceStore((s) => s.punchIn);
+  const punchOut = useAttendanceStore((s) => s.punchOut);
+  const tickPunch = useAttendanceStore((s) => s.tickPunch);
+  const [submittingPunch, setSubmittingPunch] = useState(false);
+
+  useEffect(() => {
+    fetchTodayPunch();
+  }, [fetchTodayPunch]);
+
+  useEffect(() => {
+    if (!todayPunch?.isPunchedIn) return;
+    const interval = setInterval(() => {
+      tickPunch();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [todayPunch?.isPunchedIn, tickPunch]);
+
+  const handlePunchIn = async () => {
+    try {
+      setSubmittingPunch(true);
+      await punchIn();
+      setToast("Punched In successfully!");
+    } catch (err) {
+      const msg = err?.payload?.message || err?.message || "Failed to punch in";
+      setToast(msg);
+    } finally {
+      setSubmittingPunch(false);
+    }
+  };
+
+  const handlePunchOut = async () => {
+    try {
+      setSubmittingPunch(true);
+      await punchOut();
+      setToast("Punched Out successfully!");
+    } catch (err) {
+      const msg = err?.payload?.message || err?.message || "Failed to punch out";
+      setToast(msg);
+    } finally {
+      setSubmittingPunch(false);
+    }
+  };
+
   const jobs = useRecruitmentStore((s) => s.jobs || []);
   const candidates = useRecruitmentStore((s) => s.candidates || []);
   const interviews = useRecruitmentStore((s) => s.interviews || []);
@@ -653,6 +698,99 @@ export default function HRMSDashboard() {
           </button>
         </div>
       )}
+
+      {/* Today's Attendance Employee Card */}
+      <div className="bg-card border border-border rounded-2xl p-4 sm:p-5 shadow-2xs mb-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs ${
+              todayPunch?.isPunchedIn
+                ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/25'
+                : todayPunch?.punches?.length > 0
+                ? 'bg-blue-500/10 text-blue-600 border border-blue-500/25'
+                : 'bg-primary/10 text-primary border border-primary/25'
+            }`}
+          >
+            <Clock size={22} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-bold text-text">Today&apos;s Attendance</h2>
+              <span
+                className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${
+                  todayPunch?.isPunchedIn
+                    ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/25'
+                    : todayPunch?.punches?.length > 0
+                    ? 'bg-blue-500/10 text-blue-600 border border-blue-500/25'
+                    : 'bg-muted/10 text-muted border border-border'
+                }`}
+              >
+                {todayPunch?.status || 'Not Punched In'}
+              </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted mt-1">
+              <span>
+                Status: <strong className="text-text font-semibold">{todayPunch?.status || 'Not Punched In'}</strong>
+              </span>
+              {todayPunch?.firstPunch && (
+                <span>
+                  Punch In: <strong className="text-text font-semibold">{todayPunch.firstPunch}</strong>
+                </span>
+              )}
+              {todayPunch?.lastPunch && (
+                <span>
+                  Last Punch: <strong className="text-text font-semibold">{todayPunch.lastPunch}</strong>
+                </span>
+              )}
+              <span>
+                Working Time: <strong className="text-primary font-mono font-bold">{todayPunch?.formattedWorkingTime || '00h 00m'}</strong>
+              </span>
+              {todayPunch?.lateMinutes > 0 && (
+                <span className="text-amber-600 font-semibold">
+                  {todayPunch.lateMinutes} min late
+                </span>
+              )}
+              {todayPunch?.overtimeHours > 0 && (
+                <span className="text-emerald-600 font-semibold">
+                  +{todayPunch.overtimeHours}h overtime
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
+          {todayPunch?.isPunchedIn ? (
+            <button
+              type="button"
+              onClick={handlePunchOut}
+              disabled={submittingPunch}
+              className="py-2.5 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              {submittingPunch ? <RefreshCw size={13} className="animate-spin" /> : null}
+              <span>Punch Out</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handlePunchIn}
+              disabled={submittingPunch}
+              className="py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              {submittingPunch ? <RefreshCw size={13} className="animate-spin" /> : <Clock size={14} />}
+              <span>{todayPunch?.punches?.length > 0 ? 'Punch In Again' : 'Punch In'}</span>
+            </button>
+          )}
+
+          <Link
+            to="/hrms/attendance"
+            className="py-2.5 px-3.5 rounded-xl border border-border bg-card hover:bg-soft text-text font-semibold text-xs transition flex items-center gap-1 shadow-2xs"
+          >
+            <span>View Attendance</span>
+            <ChevronRight size={13} />
+          </Link>
+        </div>
+      </div>
 
       {/* Stat grids */}
       <div className="hrms-stat-grid">

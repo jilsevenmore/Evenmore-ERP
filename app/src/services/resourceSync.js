@@ -42,6 +42,12 @@ export function newIdempotencyKey() {
 /** A human-readable reason for a failed request, for the toast. */
 export function describeError(err) {
   if (err instanceof ApiError) {
+    if (err.status === 429) {
+      if (err.retryAfter) {
+        return `Too many requests. Please try again in ${err.retryAfter} second${err.retryAfter === 1 ? '' : 's'}.`;
+      }
+      return err.message || 'Too many requests. Please try again later.';
+    }
     const fieldErrors = err.payload?.field_errors;
     if (fieldErrors && typeof fieldErrors === 'object') {
       const [field, messages] = Object.entries(fieldErrors)[0] || [];

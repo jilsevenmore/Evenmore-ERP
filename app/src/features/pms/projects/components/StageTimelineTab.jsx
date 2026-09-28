@@ -74,7 +74,7 @@ function GateBadge({ required, satisfied, label, icon: Icon }) {
   );
 }
 
-function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, onSubmit, onHandoff, onChat, chatUnread = 0, readOnly }) {
+function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, onAddTask, onSubmit, onHandoff, onChat, chatUnread = 0, readOnly }) {
   const timing = getStageTiming(stage);
   const tone = DEPARTMENT_TONES[stage.department] ?? { bg: '#f1f5f9', fg: '#475569' };
 
@@ -230,6 +230,13 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
             </button>
             <button
               type="button"
+              onClick={() => onAddTask?.(stage)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+            >
+              <Plus size={12} /> Add Task
+            </button>
+            <button
+              type="button"
               onClick={() => onSubmit?.(stage)}
               disabled={isDone || notStarted}
               className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-slate-600 disabled:hover:border-[#dce5f4] disabled:cursor-not-allowed"
@@ -272,7 +279,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
   );
 }
 
-export function StageTimelineTab({ project, stageConfigs = [], onStart, onManageTasks, onSubmit, onHandoff, onChat, chatUnread = {} }) {
+export function StageTimelineTab({ project, stageConfigs = [], onStart, onManageTasks, onAddTask, onSubmit, onHandoff, onChat, chatUnread = {} }) {
   const [isPercentagesOpen, setPercentagesOpen] = useState(false);
   const [isAddDynamicOpen, setAddDynamicOpen] = useState(false);
 
@@ -355,6 +362,7 @@ export function StageTimelineTab({ project, stageConfigs = [], onStart, onManage
               readOnly={project.status === 'Completed'}
               onStart={onStart}
               onManageTasks={onManageTasks}
+              onAddTask={onAddTask}
               onSubmit={onSubmit}
               onHandoff={onHandoff}
               onChat={onChat}

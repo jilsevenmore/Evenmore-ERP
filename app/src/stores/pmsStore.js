@@ -95,10 +95,23 @@ export function computeElapsedPct(stage, now = Date.now()) {
   return ((now - start.getTime()) / total) * 100;
 }
 
-/** Stage completion: mean of its task percentages, else its own value. */
+/** Stage completion: weighted sum of task completion percentages using task weights (totaling 100%),
+ *  falling back to simple mean for tasks without configured weights. */
 export function computeStageCompletionPct(stage) {
   const tasks = stage?.tasks ?? [];
   if (tasks.length === 0) return clampPct(stage?.completionPct ?? 0);
+
+  const totalTaskWeight = tasks.reduce(
+    (acc, t) => acc + (Number(t.weightPct ?? t.weight ?? t.percentage) || 0),
+    0
+  );
+  if (totalTaskWeight > 0) {
+    const weightedSum = tasks.reduce((acc, t) => {
+      const w = Number(t.weightPct ?? t.weight ?? t.percentage) || 0;
+      return acc + clampPct(t.completionPct ?? 0) * w;
+    }, 0);
+    return clampPct(weightedSum / totalTaskWeight);
+  }
   const sum = tasks.reduce((acc, t) => acc + clampPct(t.completionPct ?? 0), 0);
   return clampPct(sum / tasks.length);
 }
@@ -2640,12 +2653,13 @@ const usePmsStoreBase = create((set, get) => ({
             : {
                 ...stage,
                 tasks: [
-                  ...stage.tasks,
+                  ...(stage.tasks ?? []),
                   {
                     id: uid("TSK"),
                     stageId,
                     projectId,
                     completionPct: 0,
+                    weightPct: Number(task.weightPct ?? task.weight) || 0,
                     priority: "Medium",
                     status: "Not Started",
                     department: stage.department,
@@ -2709,7 +2723,7 @@ const usePmsStoreBase = create((set, get) => ({
                   if (patch.status === "Completed") {
                     next.completionPct = 100;
                   } else if (patch.status !== undefined && next.completionPct === 100) {
-                    next.completionPct = 99;
+                    next.completionPct = patch.completionPct !== undefined ? clampPct(patch.completionPct) : 0;
                   }
                   return next;
                 }),

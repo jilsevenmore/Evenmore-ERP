@@ -21,8 +21,12 @@ import {
   Layers,
   Inbox,
   Menu,
+  Clock,
+  ArrowRight,
+  Loader2,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { useAttendanceStore } from '../../stores/attendanceStore';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { useIdleReady } from '../../hooks/useIdleReady';
@@ -58,10 +62,35 @@ export default function Topbar() {
   const [isThemeOpen, setIsThemeOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isPunchOpen, setIsPunchOpen] = useState(false);
+  const [punchSubmitting, setPunchSubmitting] = useState(false);
+  const [punchError, setPunchError] = useState(null);
 
   const themeRef = useRef(null);
   const quickAddRef = useRef(null);
   const notifRef = useRef(null);
+  const punchRef = useRef(null);
+
+  const currentUser = useAppStore((s) => s.currentUser);
+  const todayPunch = useAttendanceStore((s) => s.todayPunch);
+  const fetchTodayPunch = useAttendanceStore((s) => s.fetchTodayPunch);
+  const punchIn = useAttendanceStore((s) => s.punchIn);
+  const punchOut = useAttendanceStore((s) => s.punchOut);
+  const tickPunch = useAttendanceStore((s) => s.tickPunch);
+
+  // Poll / load today's punch status on mount
+  useEffect(() => {
+    fetchTodayPunch();
+  }, [fetchTodayPunch]);
+
+  // Live timer for active punch session
+  useEffect(() => {
+    if (!todayPunch?.isPunchedIn) return;
+    const interval = setInterval(() => {
+      tickPunch();
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [todayPunch?.isPunchedIn, tickPunch]);
 
   // Live ERP data for notifications.
   //
@@ -178,11 +207,44 @@ export default function Topbar() {
     setOpenSections({ erp: false, crm: false, workflow: false });
   };
 
+  const showToast = erp?.showToast || useAppStore((s) => s.showToast || s.setToast);
+
+  const handlePunchIn = async () => {
+    try {
+      setPunchSubmitting(true);
+      setPunchError(null);
+      await punchIn();
+      if (showToast) showToast('Punched In successfully!');
+    } catch (err) {
+      const msg = err?.payload?.message || err?.message || 'Failed to punch in';
+      setPunchError(msg);
+      if (showToast) showToast(msg, 'error');
+    } finally {
+      setPunchSubmitting(false);
+    }
+  };
+
+  const handlePunchOut = async () => {
+    try {
+      setPunchSubmitting(true);
+      setPunchError(null);
+      await punchOut();
+      if (showToast) showToast('Punched Out successfully!');
+    } catch (err) {
+      const msg = err?.payload?.message || err?.message || 'Failed to punch out';
+      setPunchError(msg);
+      if (showToast) showToast(msg, 'error');
+    } finally {
+      setPunchSubmitting(false);
+    }
+  };
+
   // Close popovers on click outside
   useEffect(() => {
     function handleClickOutside(event) {
       if (themeRef.current && !themeRef.current.contains(event.target)) setIsThemeOpen(false);
       if (quickAddRef.current && !quickAddRef.current.contains(event.target)) setIsQuickAddOpen(false);
+      if (punchRef.current && !punchRef.current.contains(event.target)) setIsPunchOpen(false);
       if (notifRef.current && !notifRef.current.contains(event.target)) {
         setIsNotifOpen(false);
         setIsSectionMenuOpen(false);
@@ -662,6 +724,211 @@ export default function Topbar() {
                       All caught up! No active notifications or pending reminders.
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Punch In / Out Primary Control & Popover */}
+          <div className="relative" ref={punchRef}>
+            {todayPunch?.isPunchedIn ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsPunchOpen(!isPunchOpen)}
+                  className="h-9 px-2.5 sm:px-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 flex items-center gap-2 text-xs font-semibold shadow-2xs transition cursor-pointer"
+                  title="View Today's Punches"
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="whitespace-nowrap">
+                    Punched In • {todayPunch.firstPunch || todayPunch.punches?.[todayPunch.punches.length - 1]?.timeDisplay || 'Active'}
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    className={`transition-transform duration-150 opacity-70 ${isPunchOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePunchOut}
+                  disabled={punchSubmitting}
+                  className="h-9 px-2.5 sm:px-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white flex items-center gap-1.5 text-xs font-bold shadow-xs transition cursor-pointer"
+                  title="Punch Out"
+                >
+                  {punchSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
+                  <span className="whitespace-nowrap">Punch Out</span>
+                </button>
+              </div>
+            ) : todayPunch?.punches?.length > 0 ? (
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsPunchOpen(!isPunchOpen)}
+                  className="h-9 px-2.5 sm:px-3 rounded-xl border border-border bg-card hover:bg-soft text-text flex items-center gap-1.5 text-xs font-semibold shadow-2xs transition cursor-pointer"
+                  title="View Today's Punches"
+                >
+                  <Check size={14} className="text-emerald-600 font-bold shrink-0" />
+                  <span className="whitespace-nowrap">
+                    Punched Out • {todayPunch.lastPunch || todayPunch.punches?.[todayPunch.punches.length - 1]?.timeDisplay}
+                  </span>
+                  <ChevronDown
+                    size={12}
+                    className={`text-muted transition-transform duration-150 ${isPunchOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePunchIn}
+                  disabled={punchSubmitting}
+                  className="h-9 px-2 sm:px-2.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary flex items-center gap-1 text-xs font-semibold shadow-2xs transition cursor-pointer"
+                  title="Punch In Again"
+                >
+                  {punchSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Clock size={12} />}
+                  <span className="hidden md:inline whitespace-nowrap">Punch In</span>
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handlePunchIn}
+                disabled={punchSubmitting}
+                className="h-9 px-3 rounded-xl border border-primary/40 bg-card hover:bg-primary/5 text-primary flex items-center gap-1.5 text-xs font-bold shadow-2xs transition cursor-pointer"
+                title="Punch In Today"
+              >
+                {punchSubmitting ? <Loader2 size={14} className="animate-spin text-primary" /> : <Clock size={15} className="text-primary" />}
+                <span className="whitespace-nowrap">Punch In</span>
+              </button>
+            )}
+
+            {/* Attendance Popover Dropdown */}
+            {isPunchOpen && (
+              <div className="top-dropdown-menu w-72 sm:w-80 p-3.5 animate-in fade-in zoom-in-95 duration-150 shadow-xl border border-border bg-card rounded-2xl z-50">
+                <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
+                  <div>
+                    <h4 className="text-xs font-bold text-text">Today's Attendance</h4>
+                    <p className="text-[10px] text-muted">Realtime HRMS attendance tracking</p>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      todayPunch?.isPunchedIn
+                        ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20'
+                        : todayPunch?.punches?.length > 0
+                        ? 'bg-blue-500/10 text-blue-600 border border-blue-500/20'
+                        : 'bg-muted/10 text-muted border border-border'
+                    }`}
+                  >
+                    {todayPunch?.status || 'Not Punched In'}
+                  </span>
+                </div>
+
+                {punchError && (
+                  <div className="mb-2.5 p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[11px] leading-tight flex items-start gap-1.5">
+                    <span>⚠️</span>
+                    <span>{punchError}</span>
+                  </div>
+                )}
+
+                {/* Metrics Summary */}
+                <div className="space-y-1.5 text-xs mb-3 bg-soft/50 p-2.5 rounded-xl border border-border/50">
+                  <div className="flex justify-between items-center py-0.5">
+                    <span className="text-muted text-[11px]">Status</span>
+                    <span className="font-semibold text-text">{todayPunch?.status}</span>
+                  </div>
+                  {todayPunch?.firstPunch && (
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-muted text-[11px]">First Punch In</span>
+                      <span className="font-semibold text-text">{todayPunch.firstPunch}</span>
+                    </div>
+                  )}
+                  {todayPunch?.lastPunch && (
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-muted text-[11px]">Last Punch</span>
+                      <span className="font-semibold text-text">{todayPunch.lastPunch}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-0.5">
+                    <span className="text-muted text-[11px]">Working Time</span>
+                    <span className="font-mono font-bold text-primary">{todayPunch?.formattedWorkingTime || '00h 00m'}</span>
+                  </div>
+                  {todayPunch?.lateMinutes > 0 && (
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-muted text-[11px]">Late</span>
+                      <span className="font-semibold text-amber-600">{todayPunch.lateMinutes} min late</span>
+                    </div>
+                  )}
+                  {todayPunch?.overtimeHours > 0 && (
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-muted text-[11px]">Overtime</span>
+                      <span className="font-semibold text-emerald-600">+{todayPunch.overtimeHours}h</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Multiple Punches Timeline */}
+                {todayPunch?.punches?.length > 0 && (
+                  <div className="mb-3">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted mb-1.5 flex items-center justify-between">
+                      <span>Today's Punches</span>
+                      <span className="font-normal font-mono text-[10px] text-muted">
+                        {todayPunch.punches.length} {todayPunch.punches.length === 1 ? 'event' : 'events'}
+                      </span>
+                    </div>
+                    <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+                      {todayPunch.punches.map((p, idx) => (
+                        <div key={p.id || idx} className="flex items-center justify-between text-[11px] p-1.5 rounded-lg bg-card border border-border/40">
+                          <span className="font-mono text-muted text-[11px]">{p.timeDisplay || p.punchTime?.slice(11, 16)}</span>
+                          <span className="text-muted/40">→</span>
+                          <span className={`font-semibold ${p.punchType === 'IN' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                            {p.punchType === 'IN' ? 'Punch In' : 'Punch Out'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center pt-2 mt-1.5 border-t border-border text-[11px] font-semibold text-text">
+                      <span>Total Working Time:</span>
+                      <span className="font-mono font-bold text-primary">{todayPunch?.formattedWorkingTime || '00h 00m'}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Primary Action in Popover */}
+                <div className="pt-1">
+                  {todayPunch?.isPunchedIn ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handlePunchOut();
+                      }}
+                      disabled={punchSubmitting}
+                      className="w-full py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {punchSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
+                      <span>Punch Out</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handlePunchIn();
+                      }}
+                      disabled={punchSubmitting}
+                      className="w-full py-2 px-3 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      {punchSubmitting ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}
+                      <span>{todayPunch?.punches?.length > 0 ? 'Punch In Again' : 'Punch In'}</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Link to Attendance Overview */}
+                <div className="mt-2.5 pt-2 border-t border-border flex justify-end">
+                  <Link
+                    to="/hrms/attendance"
+                    onClick={() => setIsPunchOpen(false)}
+                    className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                  >
+                    <span>View Attendance →</span>
+                  </Link>
                 </div>
               </div>
             )}
