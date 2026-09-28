@@ -115,6 +115,12 @@ export default function AttendanceOverview() {
             : r.workHours || "—");
         const lateMins =
           r.lateMinutes !== undefined && r.lateMinutes !== null ? Number(r.lateMinutes) : 0;
+        const earlyMins =
+          r.earlyLeavingMinutes !== undefined && r.earlyLeavingMinutes !== null
+            ? Number(r.earlyLeavingMinutes)
+            : r.early_leaving_minutes
+            ? Number(r.early_leaving_minutes)
+            : 0;
         const overtimeHrs =
           r.overtimeHours !== undefined && r.overtimeHours !== null ? Number(r.overtimeHours) : 0;
 
@@ -131,6 +137,7 @@ export default function AttendanceOverview() {
           workingHoursVal,
           workingHoursDisplay,
           lateMins,
+          earlyMins,
           overtimeHrs,
           img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.employeeId || r.name}`,
           workHours: workingHoursDisplay,
@@ -490,6 +497,7 @@ export default function AttendanceOverview() {
                 <th>LAST PUNCH</th>
                 <th>WORKING HOURS</th>
                 <th>LATE</th>
+                <th>EARLY OUT</th>
                 <th>OVERTIME</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
@@ -523,6 +531,22 @@ export default function AttendanceOverview() {
                   <td>
                     {row.lateMins > 0 ? (
                       <span className="att-late-pill">{row.lateMins} min late</span>
+                    ) : (
+                      <span style={{ color: "#94a3b8" }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    {row.earlyMins > 0 ? (
+                      <span
+                        className="att-late-pill"
+                        style={{
+                          background: "rgba(244, 63, 94, 0.1)",
+                          color: "#e11d48",
+                          border: "1px solid rgba(244, 63, 94, 0.2)",
+                        }}
+                      >
+                        {row.earlyMins} min early
+                      </span>
                     ) : (
                       <span style={{ color: "#94a3b8" }}>—</span>
                     )}
@@ -563,7 +587,7 @@ export default function AttendanceOverview() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                  <td colSpan={10} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
                     No attendance records found matching filters.
                   </td>
                 </tr>

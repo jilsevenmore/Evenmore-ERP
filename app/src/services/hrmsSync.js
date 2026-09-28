@@ -418,13 +418,23 @@ export async function pullTodayPunch(employeeId = null) {
 }
 
 /** Record a Punch In or Punch Out event. */
-export async function recordPunch({ punchType, remark, notes, employeeId, source = 'web' }) {
+export async function recordPunch({
+  punchType,
+  remark,
+  notes,
+  employeeId,
+  source = 'web',
+  earlyReason,
+  requestRegularization,
+}) {
   if (!isBackendEnabled()) return null;
   return api.post('/hrms/attendance/punch/', {
     punchType,
     remark: remark || notes,
     source,
     employeeId: employeeId || undefined,
+    earlyReason: earlyReason || undefined,
+    requestRegularization: Boolean(requestRegularization),
   });
 }
 

@@ -45,6 +45,7 @@ import { useRecruitmentStore } from "../../../stores/recruitmentStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { useCalendarStore } from "../../../stores/calendarStore";
 import { toISODate, getCurrentISODate } from "../../../utils/dateUtils";
+import { EarlyPunchOutModal } from "../attendance/components/EarlyPunchOutModal";
 import AnalyticsVolumeChart from "./AnalyticsVolumeChart";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
@@ -395,6 +396,7 @@ export default function HRMSDashboard() {
   const punchOut = useAttendanceStore((s) => s.punchOut);
   const tickPunch = useAttendanceStore((s) => s.tickPunch);
   const [submittingPunch, setSubmittingPunch] = useState(false);
+  const [isEarlyPunchModalOpen, setIsEarlyPunchModalOpen] = useState(false);
 
   useEffect(() => {
     fetchTodayPunch();
@@ -407,6 +409,16 @@ export default function HRMSDashboard() {
     }, 1000);
     return () => clearInterval(interval);
   }, [todayPunch?.isPunchedIn, tickPunch]);
+
+  const isEarlyDeparture = () => {
+    const shiftEndStr = todayPunch?.shiftEnd || "18:30";
+    const [endH, endM] = shiftEndStr.split(":").map((v) => parseInt(v, 10) || 0);
+    const now = new Date();
+    const shiftEndDt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0);
+    const earlyMins = Math.floor((shiftEndDt.getTime() - now.getTime()) / 60000);
+    const workingHours = Number(todayPunch?.workingHours || 0);
+    return earlyMins > 0 || (workingHours > 0 && workingHours < 8);
+  };
 
   const handlePunchIn = async () => {
     try {
@@ -422,10 +434,23 @@ export default function HRMSDashboard() {
   };
 
   const handlePunchOut = async () => {
+    if (isEarlyDeparture()) {
+      setIsEarlyPunchModalOpen(true);
+      return;
+    }
+    await executePunchOut();
+  };
+
+  const executePunchOut = async (earlyPayload = null) => {
     try {
       setSubmittingPunch(true);
-      await punchOut();
-      setToast("Punched Out successfully!");
+      await punchOut(earlyPayload || {});
+      if (earlyPayload?.requestRegularization) {
+        setToast("Early Punch Out recorded & Regularization submitted!");
+      } else {
+        setToast("Punched Out successfully!");
+      }
+      setIsEarlyPunchModalOpen(false);
     } catch (err) {
       const msg = err?.payload?.message || err?.message || "Failed to punch out";
       setToast(msg);
@@ -720,17 +745,17 @@ export default function HRMSDashboard() {
                 className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${
                   todayPunch?.isPunchedIn
                     ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/25'
-                    : todayPunch?.punches?.length > 0
-                    ? 'bg-blue-500/10 text-blue-600 border border-blue-500/25'
+                    : (todayPunch?.dayCompleted || todayPunch?.punches?.length > 0)
+                    ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/25'
                     : 'bg-muted/10 text-muted border border-border'
                 }`}
               >
-                {todayPunch?.status || 'Not Punched In'}
+                {todayPunch?.dayCompleted ? 'Day Completed' : (todayPunch?.status || 'Not Punched In')}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted mt-1">
               <span>
-                Status: <strong className="text-text font-semibold">{todayPunch?.status || 'Not Punched In'}</strong>
+                Status: <strong className="text-text font-semibold">{todayPunch?.dayCompleted ? 'Day Completed' : (todayPunch?.status || 'Not Punched In')}</strong>
               </span>
               {todayPunch?.firstPunch && (
                 <span>
@@ -748,6 +773,16 @@ export default function HRMSDashboard() {
               {todayPunch?.lateMinutes > 0 && (
                 <span className="text-amber-600 font-semibold">
                   {todayPunch.lateMinutes} min late
+                </span>
+              )}
+              {todayPunch?.earlyLeavingMinutes > 0 && (
+                <span className="text-rose-500 font-semibold">
+                  {todayPunch.earlyLeavingMinutes} min early
+                </span>
+              )}
+              {todayPunch?.hasPendingRegularization && (
+                <span className="text-primary font-semibold">
+                  Regularization Pending
                 </span>
               )}
               {todayPunch?.overtimeHours > 0 && (
@@ -770,6 +805,11 @@ export default function HRMSDashboard() {
               {submittingPunch ? <RefreshCw size={13} className="animate-spin" /> : null}
               <span>Punch Out</span>
             </button>
+          ) : (todayPunch?.dayCompleted || todayPunch?.punches?.length > 0) ? (
+            <div className="py-2 px-3 rounded-xl bg-soft border border-border/80 text-muted font-semibold text-xs flex items-center gap-1.5 text-center cursor-not-allowed">
+              <CheckCircle2 size={14} className="text-emerald-500" />
+              <span>Day Completed</span>
+            </div>
           ) : (
             <button
               type="button"
@@ -778,7 +818,7 @@ export default function HRMSDashboard() {
               className="py-2.5 px-4 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-white font-bold text-xs shadow-xs transition flex items-center gap-1.5 cursor-pointer"
             >
               {submittingPunch ? <RefreshCw size={13} className="animate-spin" /> : <Clock size={14} />}
-              <span>{todayPunch?.punches?.length > 0 ? 'Punch In Again' : 'Punch In'}</span>
+              <span>Punch In</span>
             </button>
           )}
 
@@ -791,6 +831,15 @@ export default function HRMSDashboard() {
           </Link>
         </div>
       </div>
+
+      {/* Early Punch Out Confirmation Modal */}
+      <EarlyPunchOutModal
+        isOpen={isEarlyPunchModalOpen}
+        onClose={() => setIsEarlyPunchModalOpen(false)}
+        onConfirm={executePunchOut}
+        todayPunch={todayPunch}
+        isSubmitting={submittingPunch}
+      />
 
       {/* Stat grids */}
       <div className="hrms-stat-grid">
