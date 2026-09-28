@@ -7,7 +7,10 @@ import {
   pushFlexibility,
   pullTodayPunch,
   recordPunch,
+  isBackendEnabled,
+  isServerId,
 } from "../services/hrmsSync";
+import { api } from "../services/api";
 
 function formatSeconds(secs) {
   if (!secs || secs < 0) return "00h 00m";
@@ -239,34 +242,56 @@ const useAttendanceStoreBase = create((set, get) => ({
     return { requests: reqs };
   }),
 
-  setRequestStatus: (id, status, extra = {}) => set((s) => {
-    const targetReq = s.requests.find((r) => r.id === id);
-    const reqs = s.requests.map((r) => r.id === id ? { ...r, status, ...extra } : r);
+  setRequestStatus: async (id, status, extra = {}) => {
+    const targetReq = get().requests.find((r) => r.id === id);
+    const approved = status === "Approved";
 
-    let updatedRecords = s.records;
-    // If approved and was a regularization or early clock-out, write directly to matching record
-    if (status === "Approved" && targetReq) {
-      updatedRecords = s.records.map((rec) => {
-        const matches =
-          (targetReq.employeeId && rec.id === targetReq.employeeId) ||
-          (rec.name && targetReq.employee && String(rec.name ?? '').toLowerCase() === String(targetReq.employee ?? '').toLowerCase());
-
-        if (matches) {
-          return {
-            ...rec,
-            checkIn: targetReq.requestedIn || rec.checkIn,
-            checkOut: targetReq.requestedOut || rec.checkOut,
-            status: targetReq.type === "Regularization" ? "Present" : rec.status,
-            workHours: "08:30",
-          };
-        }
-        return rec;
-      });
+    if (isBackendEnabled() && isServerId(id)) {
+      try {
+        await api.patch(`/hrms/attendance/regularizations/${id}/`, {
+          approved,
+          remark: extra?.rejectReason || extra?.remark || (approved ? "Approved" : "Rejected"),
+        });
+      } catch (err) {
+        console.warn("[HRMS] Failed to update regularization status on backend:", err);
+      }
     }
 
-    writeThrough("attendance", updatedRecords);
-    return { requests: reqs, records: updatedRecords };
-  }),
+    set((s) => {
+      const reqs = s.requests.map((r) => (r.id === id ? { ...r, status, ...extra } : r));
+
+      let updatedRecords = s.records;
+      // If approved and was a regularization or early clock-out, write directly to matching record
+      if (status === "Approved" && targetReq) {
+        updatedRecords = s.records.map((rec) => {
+          const matches =
+            (targetReq.employeeId && rec.id === targetReq.employeeId) ||
+            (rec.name &&
+              targetReq.employee &&
+              String(rec.name ?? "").toLowerCase() === String(targetReq.employee ?? "").toLowerCase());
+
+          if (matches) {
+            return {
+              ...rec,
+              checkIn: targetReq.requestedIn || rec.checkIn,
+              checkOut: targetReq.requestedOut || rec.checkOut,
+              status: targetReq.type === "Regularization" ? "Present" : rec.status,
+              earlyLeavingMinutes: 0,
+              earlyMins: 0,
+              workHours: "08:30",
+            };
+          }
+          return rec;
+        });
+      }
+
+      writeThrough("attendanceRegularizations", reqs);
+      writeThrough("attendance", updatedRecords);
+      return { requests: reqs, records: updatedRecords };
+    });
+
+    get().fetchTodayPunch();
+  },
 
   saveFlexibility: (flexibility) => {
     set({ flexibility });
