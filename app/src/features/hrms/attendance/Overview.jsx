@@ -6,6 +6,7 @@ import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { pullPunchTimeline, submitPunchCorrection, pullTracked } from "../../../services/hrmsSync";
+import { toISODate } from "../../../utils/dateUtils";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -94,8 +95,11 @@ export default function AttendanceOverview() {
   const combinedAttendance = useMemo(() => {
     if (storeRecords && storeRecords.length > 0) {
       return storeRecords.map((r) => {
+        const empName = r.name || r.employeeName || r.employee || "Employee";
+        const empCode = r.employeeCode || r.empId || (r.id && !String(r.id).includes("-") ? r.id : "—");
+        const dept = r.dept || r.department || "General";
         const firstPunchVal = r.firstPunch || r.first_punch || r.checkIn;
-        const lastPunchVal = r.lastPunch || r.last_punch || r.checkOut;
+        const lastPunchVal = r.lastPunch || r.last_punch || (r.status !== "Absent" ? r.checkOut : null);
         const firstPunchDisplay = formatPunchTime(firstPunchVal);
         const lastPunchDisplay = formatPunchTime(lastPunchVal);
         const workingHoursVal =
@@ -116,6 +120,11 @@ export default function AttendanceOverview() {
 
         return {
           ...r,
+          id: r.id,
+          name: empName,
+          dept: dept,
+          employeeCode: empCode,
+          empId: empCode,
           employeeId: r.employeeId || r.empId || r.id,
           firstPunchDisplay,
           lastPunchDisplay,
@@ -123,7 +132,7 @@ export default function AttendanceOverview() {
           workingHoursDisplay,
           lateMins,
           overtimeHrs,
-          img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+          img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.employeeId || r.name}`,
           workHours: workingHoursDisplay,
           shift: r.shift || "General",
           location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
@@ -143,22 +152,25 @@ export default function AttendanceOverview() {
     if (storeEmployees.length > 0) {
       return storeEmployees.map((e) => ({ id: e.empId || e.id, name: e.name }));
     }
-    return combinedAttendance.map((r) => ({ id: r.id, name: r.name }));
+    return combinedAttendance.map((r) => ({ id: r.empId || r.id, name: r.name }));
   }, [storeEmployees, combinedAttendance]);
 
   const filtered = useMemo(() => {
     return combinedAttendance.filter((item) => {
+      const itemIso = toISODate(item.rawDate || item.date);
+      const matchDate = !dateVal || itemIso === dateVal || item.date === dateVal;
       const matchSearch =
         String(item.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        String(item.employeeCode ?? "").toLowerCase().includes(search.toLowerCase()) ||
         (item.id && String(item.id ?? "").toLowerCase().includes(search.toLowerCase()));
       const matchDept = deptFilter === "All" || item.dept === deptFilter;
       const matchStatus = statusFilter === "All" || item.status === statusFilter;
       const matchShift = shiftFilter === "All" || item.shift === shiftFilter;
       const matchLoc = locFilter === "All" || item.location === locFilter;
       const matchRole = roleFilter === "All" || item.role === roleFilter;
-      return matchSearch && matchDept && matchStatus && matchShift && matchLoc && matchRole;
+      return matchDate && matchSearch && matchDept && matchStatus && matchShift && matchLoc && matchRole;
     });
-  }, [combinedAttendance, search, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
+  }, [combinedAttendance, search, dateVal, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
 
   // Dynamic live STATS
   const statsData = useMemo(() => {
@@ -250,7 +262,9 @@ export default function AttendanceOverview() {
     setCorrReason("");
     setLoadingTimeline(true);
     try {
-      const data = await pullPunchTimeline(row.employeeId || row.id, row.date || dateVal);
+      const targetEmp = row.employeeId || row.empId || row.id;
+      const targetDate = toISODate(row.rawDate || row.date) || dateVal;
+      const data = await pullPunchTimeline(targetEmp, targetDate);
       const list = Array.isArray(data) ? data : data?.results || data?.data || [];
       setTimelinePunches(list);
     } catch {
@@ -265,9 +279,11 @@ export default function AttendanceOverview() {
     if (!corrReason.trim()) return setToast("Please provide a reason for punch correction.", "error");
     setSubmittingCorr(true);
     try {
+      const targetEmp = selectedTimelineRow.employeeId || selectedTimelineRow.empId || selectedTimelineRow.id;
+      const targetDate = toISODate(selectedTimelineRow.rawDate || selectedTimelineRow.date) || dateVal;
       await submitPunchCorrection({
-        employeeId: selectedTimelineRow.employeeId || selectedTimelineRow.id,
-        date: selectedTimelineRow.date || dateVal,
+        employeeId: targetEmp,
+        date: targetDate,
         punchType: corrType,
         punchTime: corrTime,
         reason: corrReason,
@@ -276,17 +292,11 @@ export default function AttendanceOverview() {
       setShowCorrectionForm(false);
       setCorrReason("");
       // Refresh timeline
-      const freshData = await pullPunchTimeline(
-        selectedTimelineRow.employeeId || selectedTimelineRow.id,
-        selectedTimelineRow.date || dateVal
-      );
+      const freshData = await pullPunchTimeline(targetEmp, targetDate);
       const list = Array.isArray(freshData) ? freshData : freshData?.results || freshData?.data || [];
       setTimelinePunches(list);
       // Refresh attendance records
-      const freshRecords = await pullTracked("attendance");
-      if (freshRecords) {
-        useAttendanceStore.setState({ records: freshRecords });
-      }
+      await useAttendanceStore.getState().refreshAttendance();
     } catch (err) {
       setToast(err?.message || "Failed to submit punch correction.", "error");
     } finally {
@@ -496,7 +506,7 @@ export default function AttendanceOverview() {
                           {row.name}
                         </span>
                         <span style={{ fontSize: 11.5, color: "#6b7280" }}>
-                          {row.id} • {row.dept || "General"}
+                          {row.employeeCode || row.empId || (row.id && !String(row.id).includes("-") ? row.id : "—")} • {row.dept || "General"}
                         </span>
                       </div>
                     </div>

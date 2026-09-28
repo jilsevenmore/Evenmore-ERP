@@ -17,6 +17,8 @@ function formatSeconds(secs) {
 }
 
 const DEFAULT_TODAY_PUNCH = {
+  hasEmployee: true,
+  employee: null,
   status: "Not Punched In",
   isPunchedIn: false,
   attendanceStatus: null,
@@ -50,6 +52,8 @@ const useAttendanceStoreBase = create((set, get) => ({
       flexibility: flex || s.flexibility,
       todayPunch: punchStatus
         ? {
+            hasEmployee: punchStatus.has_employee !== false,
+            employee: punchStatus.employee || null,
             status: punchStatus.status || "Not Punched In",
             isPunchedIn: Boolean(punchStatus.is_punched_in),
             attendanceStatus: punchStatus.attendance_status || null,
@@ -86,6 +90,8 @@ const useAttendanceStoreBase = create((set, get) => ({
       if (punchStatus) {
         set({
           todayPunch: {
+            hasEmployee: punchStatus.has_employee !== false,
+            employee: punchStatus.employee || null,
             status: punchStatus.status || "Not Punched In",
             isPunchedIn: Boolean(punchStatus.is_punched_in),
             attendanceStatus: punchStatus.attendance_status || null,
@@ -127,6 +133,8 @@ const useAttendanceStoreBase = create((set, get) => ({
       if (res) {
         set({
           todayPunch: {
+            hasEmployee: res.has_employee !== false,
+            employee: res.employee || null,
             status: res.status || "Punched In",
             isPunchedIn: true,
             attendanceStatus: res.attendance_status || "Present",
@@ -146,13 +154,11 @@ const useAttendanceStoreBase = create((set, get) => ({
           },
         });
         // Sync attendance records in background
-        pullTracked("attendance").then((recs) => {
-          if (recs) set({ records: recs });
-        });
+        get().refreshAttendance();
       }
       return res;
     } catch (err) {
-      const msg = err?.message || err?.payload?.message || "Failed to punch in";
+      const msg = err?.payload?.message || err?.message || "Failed to punch in";
       set((s) => ({ todayPunch: { ...s.todayPunch, loading: false, error: msg } }));
       throw err;
     }
@@ -165,6 +171,8 @@ const useAttendanceStoreBase = create((set, get) => ({
       if (res) {
         set({
           todayPunch: {
+            hasEmployee: res.has_employee !== false,
+            employee: res.employee || null,
             status: res.status || "Punched Out",
             isPunchedIn: false,
             attendanceStatus: res.attendance_status || null,
@@ -183,13 +191,11 @@ const useAttendanceStoreBase = create((set, get) => ({
             error: null,
           },
         });
-        pullTracked("attendance").then((recs) => {
-          if (recs) set({ records: recs });
-        });
+        get().refreshAttendance();
       }
       return res;
     } catch (err) {
-      const msg = err?.message || err?.payload?.message || "Failed to punch out";
+      const msg = err?.payload?.message || err?.message || "Failed to punch out";
       set((s) => ({ todayPunch: { ...s.todayPunch, loading: false, error: msg } }));
       throw err;
     }
@@ -199,10 +205,12 @@ const useAttendanceStoreBase = create((set, get) => ({
     const { todayPunch } = get();
     if (todayPunch.isPunchedIn) {
       const nextSeconds = (todayPunch.workingSeconds || 0) + 1;
+      const nextHours = Number((nextSeconds / 3600).toFixed(2));
       set({
         todayPunch: {
           ...todayPunch,
           workingSeconds: nextSeconds,
+          workingHours: nextHours,
           formattedWorkingTime: formatSeconds(nextSeconds),
         },
       });

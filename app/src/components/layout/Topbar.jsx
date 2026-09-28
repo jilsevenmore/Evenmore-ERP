@@ -805,8 +805,14 @@ export default function Topbar() {
               <div className="top-dropdown-menu w-72 sm:w-80 p-3.5 animate-in fade-in zoom-in-95 duration-150 shadow-xl border border-border bg-card rounded-2xl z-50">
                 <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
                   <div>
-                    <h4 className="text-xs font-bold text-text">Today's Attendance</h4>
-                    <p className="text-[10px] text-muted">Realtime HRMS attendance tracking</p>
+                    <h4 className="text-xs font-bold text-text">
+                      {todayPunch?.employee?.name || "Today's Attendance"}
+                    </h4>
+                    <p className="text-[10px] text-muted">
+                      {todayPunch?.employee?.employeeCode
+                        ? `${todayPunch.employee.employeeCode} • ${todayPunch.employee.department || 'General'}`
+                        : 'Realtime HRMS attendance tracking'}
+                    </p>
                   </div>
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -820,6 +826,13 @@ export default function Topbar() {
                     {todayPunch?.status || 'Not Punched In'}
                   </span>
                 </div>
+
+                {todayPunch?.hasEmployee === false && (
+                  <div className="mb-2.5 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] leading-tight flex items-start gap-1.5">
+                    <span>ℹ️</span>
+                    <span>No employee profile linked to this user account. Link your profile in HRMS Employees.</span>
+                  </div>
+                )}
 
                 {punchError && (
                   <div className="mb-2.5 p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[11px] leading-tight flex items-start gap-1.5">
