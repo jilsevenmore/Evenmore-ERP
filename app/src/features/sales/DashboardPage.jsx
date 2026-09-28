@@ -1,8 +1,9 @@
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PageHeader } from '../../components/common/PageHeader';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
+import { useAppStore } from '../../stores/appStore';
 // ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
 // Before (kept for reference if the CRM dashboard panel is ever re-added):
 // Reason: the ERP dashboard should compute from live ERP state (invoices, paymentIns,
@@ -51,6 +52,12 @@ const CARD_STYLES = {
 };
 
 export const DashboardPage = () => {
+  const currentUser = useAppStore((s) => s.currentUser);
+  const isCustomer = currentUser?.isCustomer || currentUser?.role?.code === 'CU' || String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer';
+  if (isCustomer) {
+    return <Navigate to="/customer/projects" replace />;
+  }
+
   const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock, cashPaymentReceipts, getInvoiceOutstanding } = useERP();
   // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──
   // Before (kept for reference): dashboardData.leadsOverview, dashboardData.taskStatus drove

@@ -40,6 +40,7 @@ const ROUTE_PERMISSIONS = [
   ['/administration/users', 'view_staff'],
   ['/administration/roles', 'manage_roles'],
   ['/administration/clients', 'menu_admin'],
+  ['/customer/projects', ['view_projects', 'view_pms']],
 ];
 
 const SELF_SERVICE_ROUTES = new Set([
@@ -49,6 +50,7 @@ const SELF_SERVICE_ROUTES = new Set([
   '/hrms/attendance/mark',
   '/pms/my-projects',
   '/pms/my-tasks',
+  '/customer/projects',
 ]);
 
 export function routePermission(path) {

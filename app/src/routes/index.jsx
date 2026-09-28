@@ -5,6 +5,12 @@ import RequireAuth from './RequireAuth';
 import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { PageLoadingSkeleton } from '../components/common/PageLoadingSkeleton';
 
+import { useAppStore } from '../stores/appStore';
+
+// ── Customer Project Tracking (Lazy Loaded) ───────────────────
+const CustomerTrackingPage = lazy(() => import('../features/pms/customer/CustomerTrackingPage'));
+const CustomerProjectsListPage = lazy(() => import('../features/pms/customer/CustomerProjectsListPage'));
+
 // ── CRM (Lazy Loaded) ───────────────────────────────────────
 const LeadsPage = lazy(() => import('../features/crm/leads/LeadsPage'));
 const LeadDetailPage = lazy(() => import('../features/crm/leads/LeadDetailPage'));
@@ -192,6 +198,16 @@ function RootErrorBoundary() {
 const PublicQuotationPage = lazy(() => import('../features/sales/PublicQuotationPage'));
 const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 
+function RootRedirect() {
+  const currentUser = useAppStore((s) => s.currentUser);
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
+  return <Navigate to={isCustomer ? '/customer/projects' : '/dashboard'} replace />;
+}
+
 const router = createBrowserRouter([
   // ── Authentication ────────────────────────────────────────
   {
@@ -225,10 +241,15 @@ const router = createBrowserRouter([
         element: <MainLayout />,
         children: [
           // Root redirect
-          { index: true, element: <Navigate to="/dashboard" replace /> },
+          { index: true, element: <RootRedirect /> },
 
       // ── Main Dashboard ─────────────────────────────────────
       { path: 'dashboard', element: <Page component={DashboardPage} /> },
+
+      // ── Customer Project & Product Tracking ───────────────
+      { path: 'customer/projects', element: <Page component={CustomerProjectsListPage} /> },
+      { path: 'customer/projects/:id', element: <Page component={CustomerTrackingPage} /> },
+      { path: 'pms/tracking/:id', element: <Page component={CustomerTrackingPage} /> },
 
       // ── CRM ───────────────────────────────────────────────
       { path: 'crm', element: <Navigate to="/crm/leads" replace /> },

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart } from 'lucide-react';
+import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { formatCurrency } from '../../../../utils/currencyUtils';
@@ -141,6 +141,16 @@ export function ProjectHeader({
           <Button size="sm" icon={CheckCircle2} onClick={onCompleteProject} disabled={isClosed}>
             {isClosed ? 'Completed' : 'Complete Project'}
           </Button>
+
+          <Link
+            to={`/customer/projects/${project.id || project.code}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg shadow-xs transition-colors"
+            title="Preview Customer Tracking View for this project"
+          >
+            <Eye size={13} /> Customer Tracking View
+          </Link>
 
           {isClosed && (
             <>

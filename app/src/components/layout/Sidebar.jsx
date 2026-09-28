@@ -80,6 +80,12 @@ const NAV = [
   },
 
   {
+    label: 'Track Orders',
+    icon: Package,
+    to: '/customer/projects',
+  },
+
+  {
     label: 'CRM',
     menu: 'menu_crm',
     icon: LayoutGrid,
@@ -124,6 +130,7 @@ const NAV = [
     children: [
       { label: 'PMS Dashboard', icon: Home, to: '/pms' },
       { label: 'All Projects', icon: Layers, to: '/pms/projects' },
+      { label: 'Customer Tracking', icon: Package, to: '/customer/projects' },
       { label: 'My Projects', icon: UserCheck, to: '/pms/my-projects' },
       { label: 'My Tasks', icon: ListChecks, to: '/pms/my-tasks', badgeKey: 'pmsMyTasksPending' },
       { label: 'Dynamic Stages', icon: Sliders, to: '/pms/stages' },
@@ -564,7 +571,24 @@ export default function Sidebar() {
 
   // Hide what the server would refuse (UX only -- the API is the real gate).
   const permissions = useAppStore((s) => s.permissions);
-  const permittedNav = useMemo(() => filterNavByPermission(NAV, permissions || []), [permissions]);
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
+
+  const permittedNav = useMemo(() => {
+    let list = filterNavByPermission(NAV, permissions || []);
+    if (isCustomer) {
+      // Customer role should only see customer-facing navigation
+      list = list.filter((item) => item.to === '/customer/projects' || item.to === '/dashboard');
+    } else {
+      // Internal staff (Admin, PM, Employee) already have Customer Tracking under PMS (Projects).
+      // Hide the top-level "Track Orders" to avoid duplicate highlighted menu items.
+      list = list.filter((item) => item.to !== '/customer/projects');
+    }
+    return list;
+  }, [permissions, isCustomer]);
   const filteredNav = useMemo(
     () => filterNavTree(permittedNav, searchQuery),
     [permittedNav, searchQuery],
