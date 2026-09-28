@@ -59,37 +59,51 @@ export const HRMS_RESOURCES = {
   // ── people ────────────────────────────────────────────────────────────────
   employees: {
     path: '/hrms/employees/',
-    toApi: (e) => compact({
-      name: e.name,
-      email: e.email || undefined,
-      phone: e.phone || undefined,
-      employeeCode: e.employeeCode || e.empId || undefined,
-      departmentId: e.departmentId || undefined,
-      department: e.department || undefined,
-      designationId: e.designationId || undefined,
-      designation: e.designation || e.role || undefined,
-      reportingManagerId: e.reportingManagerId || undefined,
-      locationId: e.locationId || undefined,
-      joiningDate: isoOut(e.joiningDate || e.doj),
-      dateOfBirth: isoOut(e.dateOfBirth || e.dob),
-      gender: e.gender || undefined,
-      employmentType: e.employmentType || undefined,
-      status: e.status || undefined,
-      avatar: e.avatar || undefined,
-    }),
-    fromApi: (row) => ({
-      ...asText(row, [
-        'name', 'email', 'phone', 'department', 'designation',
-        'employmentType', 'gender', 'location', 'status',
-      ]),
-      // Tables read `empId` and `role`; the API calls them `employeeCode` and
-      // `designation`.
-      empId: row.employeeCode || row.empId || '',
-      role: row.designation || row.role || '',
-      doj: displayIn(row.joiningDate),
-      joiningDate: displayIn(row.joiningDate),
-      _synced: true,
-    }),
+    toApi: (e) => {
+      const joinIso = isoOut(e.joining || e.joiningDate || e.doj) || toISODate(new Date()) || undefined;
+      return compact({
+        name: e.name,
+        email: e.email || undefined,
+        phone: e.phone || undefined,
+        employeeCode: e.employeeCode || e.empId || undefined,
+        departmentId: e.departmentId || undefined,
+        department: e.department || undefined,
+        designationId: e.designationId || undefined,
+        designation: e.designation || e.role || undefined,
+        reportingManagerId: e.reportingManagerId || undefined,
+        locationId: e.locationId || undefined,
+        location: e.location || undefined,
+        joining: joinIso,
+        joiningDate: joinIso,
+        dateOfBirth: isoOut(e.dateOfBirth || e.dob),
+        gender: e.gender || undefined,
+        employmentType: e.employmentType || undefined,
+        status: e.status || undefined,
+        avatar: e.avatar || undefined,
+        createUserAccount: e.createUserAccount !== undefined ? e.createUserAccount : true,
+        password: e.password || undefined,
+        userPassword: e.userPassword || e.password || undefined,
+        roleId: e.roleId || undefined,
+      });
+    },
+    fromApi: (row) => {
+      const joinDisplay = displayIn(row.joining || row.joiningDate);
+      return {
+        ...asText(row, [
+          'name', 'email', 'phone', 'department', 'designation',
+          'employmentType', 'gender', 'location', 'status',
+        ]),
+        // Tables read `empId` and `role`; the API calls them `employeeCode` and
+        // `designation`.
+        empId: row.employeeCode || row.empId || '',
+        employeeCode: row.employeeCode || row.empId || '',
+        role: row.designation || row.role || '',
+        joining: joinDisplay,
+        doj: joinDisplay,
+        joiningDate: joinDisplay,
+        _synced: true,
+      };
+    },
   },
 
   departments: plain('/hrms/departments/'),

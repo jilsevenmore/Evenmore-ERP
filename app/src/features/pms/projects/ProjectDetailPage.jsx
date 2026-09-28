@@ -12,6 +12,7 @@ import { DocumentsProofTab } from './components/DocumentsProofTab';
 import { ApprovalsTab } from './components/ApprovalsTab';
 import { ActivityAuditTab } from './components/ActivityAuditTab';
 import { AssignStageModal } from './components/AssignStageModal';
+import { CreateTaskModal } from './components/CreateTaskModal';
 import { StageHandoffModal } from '../components/StageHandoffModal';
 import { CompleteProjectModal } from './components/CompleteProjectModal';
 import { PmsToast } from '../components/PmsToast';
@@ -57,6 +58,7 @@ export default function ProjectDetailPage() {
   const [focusStageId, setFocusStageId] = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [assignStageId, setAssignStageId] = useState(null); // null = closed
+  const [createTaskStageId, setCreateTaskStageId] = useState(null); // null = closed
   const [handoffStageId, setHandoffStageId] = useState(null);
 
   const project = useMemo(() => projects.find((p) => p.id === id) ?? null, [projects, id]);
@@ -137,6 +139,11 @@ export default function ProjectDetailPage() {
     setTab('tasks');
   }
 
+  function handleOpenAddTask(stageOrStageId) {
+    const sId = typeof stageOrStageId === 'object' ? stageOrStageId?.id : stageOrStageId;
+    setCreateTaskStageId(sId || currentStage?.id || project?.stages?.[0]?.id || '');
+  }
+
   function handleOpenStageChat(stage) {
     setChatStageId(stage.id);
     setHighlightMessageId(null);
@@ -210,6 +217,7 @@ export default function ProjectDetailPage() {
             stageConfigs={stageConfigs}
             onStart={(stage) => startStage(project.id, stage.id, project.projectManager)}
             onManageTasks={handleManageTasks}
+            onAddTask={handleOpenAddTask}
             onSubmit={handleSubmitStage}
             onHandoff={(stage) => setHandoffStageId(stage.id)}
             onChat={chatStatus === 'offline' ? undefined : handleOpenStageChat}
@@ -221,11 +229,14 @@ export default function ProjectDetailPage() {
           <StageTasksTab
             project={project}
             focusStageId={focusStageId}
-            onToggleTask={(stageId, task) =>
+            onAddTask={handleOpenAddTask}
+            onToggleTask={(stageId, task) => {
+              const willBeCompleted = task.status !== 'Completed';
               updateTask(project.id, stageId, task.id, {
-                status: task.status === 'Completed' ? 'In Progress' : 'Completed',
-              })
-            }
+                status: willBeCompleted ? 'Completed' : 'Not Started',
+                completionPct: willBeCompleted ? 100 : 0,
+              });
+            }}
             onTaskProgress={(stageId, task, pct) =>
               updateTask(project.id, stageId, task.id, { completionPct: pct })
             }
@@ -253,6 +264,13 @@ export default function ProjectDetailPage() {
         initialStageId={assignStageId || null}
         project={project}
         onClose={() => setAssignStageId(null)}
+      />
+
+      <CreateTaskModal
+        isOpen={createTaskStageId !== null}
+        initialStageId={createTaskStageId || null}
+        project={project}
+        onClose={() => setCreateTaskStageId(null)}
       />
 
       <StageHandoffModal

@@ -6,7 +6,7 @@ import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { hrmsSync } from "../../../services/hrmsSync";
 
-const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "" };
+const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
 const STATUSES = ["All", "Active", "On Leave", "Probation"];
 
@@ -20,6 +20,7 @@ export default function Employees() {
   const storeEmployees = useAppStore((s) => s.employees || []);
   const addStoreEmployee = useAppStore((s) => s.addEmployee);
   const deleteStoreEmployee = useAppStore((s) => s.deleteEmployee);
+  const refreshHrms = useAppStore((s) => s.refreshHrms);
   const setToast = useAppStore((s) => s.setToast || s.showToast);
   const [dept, setDept] = useState("All");
   const [status, setStatus] = useState("All");
@@ -38,18 +39,29 @@ export default function Employees() {
 
   const [form, setForm] = useState(EMPTY_FORM);
 
-  const [orgDepartments, setOrgDepartments] = useState([]);
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [designationsList, setDesignationsList] = useState([]);
+  const [locationsList, setLocationsList] = useState([]);
+
   useEffect(() => {
     let cancelled = false;
-    hrmsSync.pull("departments").then((rows) => {
-      if (!cancelled && rows) setOrgDepartments(rows.map((d) => d.name).filter(Boolean));
+    refreshHrms?.("employees");
+    Promise.all([
+      hrmsSync.pull("departments"),
+      hrmsSync.pull("designations"),
+      hrmsSync.pull("locations"),
+    ]).then(([deps, desigs, locs]) => {
+      if (cancelled) return;
+      if (deps) setDepartmentsList(deps);
+      if (desigs) setDesignationsList(desigs);
+      if (locs) setLocationsList(locs);
     });
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshHrms]);
 
   const DEPARTMENTS = useMemo(
-    () => ["All", ...new Set([...orgDepartments, ...employees.map((e) => e.department).filter(Boolean)])],
-    [orgDepartments, employees]
+    () => ["All", ...new Set([...departmentsList.map((d) => d.name).filter(Boolean), ...employees.map((e) => e.department).filter(Boolean)])],
+    [departmentsList, employees]
   );
 
   const filtered = useMemo(
@@ -66,22 +78,37 @@ export default function Employees() {
     return filtered.slice(start, start + pageSize);
   }, [filtered, currentPage, pageSize]);
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!form.name || !form.email) return setToast("Name and email are required.", "error");
+
+    const matchedDept = departmentsList.find((d) => d.name?.toLowerCase() === form.dept?.trim().toLowerCase());
+    const matchedDesig = designationsList.find((d) => d.name?.toLowerCase() === form.designation?.trim().toLowerCase());
+    const matchedLoc = locationsList.find((l) => l.name?.toLowerCase() === form.location?.trim().toLowerCase());
+
     const next = {
-      id: `EMP${1000 + employees.length + 1}`,
-      name: form.name,
-      email: form.email,
-      designation: form.designation,
-      department: form.dept,
-      location: form.location,
-      joining: new Date().toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" }),
+      name: form.name.trim(),
+      email: form.email.trim(),
+      designation: form.designation?.trim() || "",
+      designationId: matchedDesig?.id || undefined,
+      department: form.dept?.trim() || "",
+      departmentId: matchedDept?.id || undefined,
+      location: form.location?.trim() || "",
+      locationId: matchedLoc?.id || undefined,
+      joining: new Date().toISOString().split("T")[0],
+      joiningDate: new Date().toISOString().split("T")[0],
       status: "Active",
+      createUserAccount: form.createUserAccount !== false,
+      password: form.password?.trim() || undefined,
     };
-    addStoreEmployee(next);
-    setToast("Employee added successfully.");
-    setShowForm(false);
-    setForm(EMPTY_FORM);
+
+    try {
+      await addStoreEmployee(next);
+      setToast("Employee added successfully.");
+      setShowForm(false);
+      setForm(EMPTY_FORM);
+    } catch {
+      // toast is displayed by store
+    }
   }
 
   function handleDelete(id, name) {
@@ -91,7 +118,7 @@ export default function Employees() {
 
   const handleExport = () => {
     const header = "ID,Name,Email,Designation,Department,Status";
-    const rows = filtered.map((e) => `"${e.id}","${e.name}","${e.email}","${e.designation}","${e.department}","${e.status}"`);
+    const rows = filtered.map((e) => `"${e.employeeCode || e.empId || e.id}","${e.name}","${e.email}","${e.designation}","${e.department}","${e.status}"`);
     const blob = new Blob([[header, ...rows].join("\n")], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -118,7 +145,7 @@ export default function Employees() {
             <PageInfoButton guide={hrmsGuides.employees} />
           </div>
           <p className="emp-sub">
-            {filtered.length} employees • 12 departments
+            {filtered.length} employee{filtered.length === 1 ? "" : "s"} • {Math.max(DEPARTMENTS.length - 1, 0)} department{DEPARTMENTS.length - 1 === 1 ? "" : "s"}
           </p>
         </div>
         <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -241,7 +268,7 @@ export default function Employees() {
                         </div>
                       </div>
                     </td>
-                    <td className="emp-id">{row.id}</td>
+                    <td className="emp-id">{row.employeeCode || row.empId || row.id}</td>
                     <td style={{ color: "#374151" }}>{row.designation}</td>
                     <td style={{ color: "#374151" }}>{row.department}</td>
                     <td>
@@ -294,7 +321,7 @@ export default function Employees() {
                   <strong>{row.designation}</strong> • {row.department}
                 </div>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
-                  <span className="emp-id">{row.id}</span>
+                  <span className="emp-id">{row.employeeCode || row.empId || row.id}</span>
                   <span className="emp-status" style={{ ...statusStyles[row.status] }}>
                     {row.status}
                   </span>
@@ -395,20 +422,61 @@ export default function Employees() {
               <label className="form-label">Designation</label>
               <input
                 className="form-input"
+                list="emp-desig-options"
                 placeholder="Enter designation"
                 value={form.designation}
                 onChange={(e) => setForm({ ...form, designation: e.target.value })}
               />
+              <datalist id="emp-desig-options">
+                {designationsList.map((d) => (
+                  <option key={d.id || d.name} value={d.name} />
+                ))}
+              </datalist>
             </div>
           </div>
           <div className="form-group">
             <label className="form-label">Location</label>
             <input
               className="form-input"
+              list="emp-loc-options"
               placeholder="Enter location"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
             />
+            <datalist id="emp-loc-options">
+              {locationsList.map((l) => (
+                <option key={l.id || l.name} value={l.name} />
+              ))}
+            </datalist>
+          </div>
+          <div style={{ padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #e2e8f0" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 9, fontSize: "13.5px", fontWeight: 600, color: "#1e293b", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={form.createUserAccount !== false}
+                onChange={(e) => setForm({ ...form, createUserAccount: e.target.checked })}
+                style={{ width: 16, height: 16, cursor: "pointer" }}
+              />
+              Create Administration Login Account for this Employee
+            </label>
+            <p style={{ margin: "4px 0 0 25px", fontSize: "12px", color: "#64748b" }}>
+              Connects with Administration Users so this employee can log into the ERP.
+            </p>
+            {form.createUserAccount !== false && (
+              <div style={{ marginTop: 10, marginLeft: 25 }}>
+                <label className="form-label" style={{ fontSize: "12px", marginBottom: 4 }}>
+                  Initial Password <span style={{ color: "#94a3b8", fontWeight: 400 }}>(defaults to Password@123)</span>
+                </label>
+                <input
+                  className="form-input"
+                  type="password"
+                  placeholder="Enter login password or leave empty for default"
+                  value={form.password || ""}
+                  onChange={(e) => setForm({ ...form, password: e.target.value })}
+                  style={{ maxWidth: 320, fontSize: "13px" }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </Modal>
