@@ -231,6 +231,7 @@ export function UsersPage() {
       employeeId: `EMP00${nextEmpNum < 10 ? '0' + nextEmpNum : nextEmpNum}`,
       location: '',
       reportingManager: '',
+      password: '',
       permissions: ['View Leads', 'Manage Deals', 'Create Tasks', 'View Reports'],
     });
     setIsCreateModalOpen(true);
@@ -248,10 +249,11 @@ export function UsersPage() {
         phone: userForm.phone,
         roleId: userForm.roleId,
         department: userForm.department,
-        status: userForm.status,
+        status: userForm.status || 'Active',
         employeeId: userForm.employeeId,
         location: userForm.location,
         reportingManager: userForm.reportingManager,
+        password: userForm.password || 'Password@123',
       });
     } catch (err) {
       showNotification(`User not created — ${describeError(err)}`);
@@ -351,14 +353,20 @@ export function UsersPage() {
     setIsResetPasswordModalOpen(true);
   };
 
-  const handlePasswordResetSubmit = (e) => {
+  const handlePasswordResetSubmit = async (e) => {
     e.preventDefault();
-    setPasswordSuccess(true);
-    setTimeout(() => {
-      setIsResetPasswordModalOpen(false);
-      setPasswordSuccess(false);
-      showNotification(`Password has been reset for "${userToModify?.name}".`);
-    }, 1200);
+    if (!userToModify || !newPassword) return;
+    try {
+      await adminSync.update('users', userToModify.id, { password: newPassword });
+      setPasswordSuccess(true);
+      setTimeout(() => {
+        setIsResetPasswordModalOpen(false);
+        setPasswordSuccess(false);
+        showNotification(`Password has been reset for "${userToModify?.name}".`);
+      }, 1200);
+    } catch (err) {
+      showNotification(`Failed to reset password — ${describeError(err)}`);
+    }
   };
 
   const openPermissionsModal = (user) => {
@@ -984,6 +992,34 @@ export function UsersPage() {
                     onChange={(e) => setUserForm({ ...userForm, reportingManager: e.target.value })}
                     className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Password * <span className="font-normal text-slate-400">(Saved in PBKDF2 format for login)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter password"
+                    value={userForm.password || ''}
+                    onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
+                    className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setUserForm({
+                        ...userForm,
+                        password: 'Password@' + Math.floor(100 + Math.random() * 900),
+                      })
+                    }
+                    className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
+                  >
+                    Generate
+                  </button>
                 </div>
               </div>
 
