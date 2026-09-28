@@ -22,12 +22,13 @@ export function resolveFileUrl(url) {
 }
 
 export class ApiError extends Error {
-  constructor(message, { status = 0, endpoint = '', payload = null } = {}) {
+  constructor(message, { status = 0, endpoint = '', payload = null, retryAfter = null } = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.endpoint = endpoint;
     this.payload = payload;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -154,6 +155,27 @@ export async function apiClient(
         return result;
       }
 
+      if (response.status === 429) {
+        const retryAfterHeader = response.headers.get('Retry-After');
+        const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+        const msg =
+          (result && (result.detail || result.message || result.error)) ||
+          'Too many requests. Please try again later.';
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('evenmore:throttled', { detail: { retryAfter, message: msg } })
+          );
+        }
+
+        throw new ApiError(msg, {
+          status: 429,
+          endpoint: normalizedEp,
+          payload: result,
+          retryAfter,
+        });
+      }
+
       const message =
         (result && (result.message || result.detail || result.error)) ||
         (result && typeof result === 'object' && Object.values(result)[0]?.[0]) ||
@@ -163,7 +185,7 @@ export async function apiClient(
     } catch (err) {
       const retryable =
         err?.name === 'AbortError' ||
-        (err instanceof ApiError && (err.status >= 500 || err.status === 429)) ||
+        (err instanceof ApiError && err.status >= 500 && err.status !== 429) ||
         err instanceof TypeError;
 
       if (retryable && attempt < retries) {
