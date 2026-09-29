@@ -157,13 +157,13 @@ export default function DynamicLeadFormPage({
           <button
             type="button"
             onClick={handleEdit}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             Edit Page Layout
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition cursor-pointer"
+            className="btn-primary inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             <Save size={15} />
             Save Lead

@@ -351,10 +351,10 @@ export default function LeadStageTasks({ leadForms = [] }) {
             <button
               type="button"
               onClick={() => setIsGuideOpen(true)}
-              className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2 text-[13px] font-semibold text-[#1d6bff]"
+              className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2"
               aria-label="How to create lead stage tasks"
             >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1f6bff] text-[11px] font-bold text-white">?</span>
               <span>How to create lead stage tasks?</span>
             </button>
             <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
@@ -362,7 +362,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
               <select
                 value={pipeline}
                 onChange={(e) => setPipeline(e.target.value)}
-                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+                className="bg-white border border-slate-200 rounded-xl px-3 h-9 text-xs text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
               >
                 <option>Sales</option>
                 <option>Support</option>
@@ -371,7 +371,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
             <button
               type="button"
               onClick={() => addTask(stages[0].id)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Plus size={15} />
               Add Stage Task
@@ -414,7 +414,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
               e.stopPropagation();
               addTask(stages[0].id);
             }}
-            className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer shrink-0"
+            className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shrink-0"
           >
             <Plus size={14} />
             Add Task
@@ -481,7 +481,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                         <button
                           type="button"
                           onClick={() => triggerSaveToast()}
-                          className="px-4 py-1.5 bg-[#17487d] hover:bg-[#12365e] text-white text-xs font-semibold rounded-lg shadow-2xs transition cursor-pointer"
+                          className="btn-primary btn-sm"
                         >
                           Save
                         </button>
@@ -564,7 +564,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                       e.stopPropagation();
                       addTask(stage.id);
                     }}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
+                    className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
                   >
                     <Plus size={13} />
                     Add Task
@@ -672,14 +672,14 @@ export default function LeadStageTasks({ leadForms = [] }) {
                                   <button
                                     type="button"
                                     onClick={() => triggerSaveToast()}
-                                    className="px-3.5 py-1.5 bg-[#0f4c81] hover:bg-[#0c3c66] text-white text-xs font-semibold rounded-md shadow-2xs transition cursor-pointer"
+                                    className="btn-primary btn-sm"
                                   >
                                     Save
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => deleteTask(stage.id, task.id)}
-                                    className="px-3 py-1.5 bg-white border border-[#f43f5e] text-[#f43f5e] hover:bg-rose-50 text-xs font-semibold rounded-md shadow-2xs transition cursor-pointer"
+                                    className="btn-danger btn-sm"
                                   >
                                     Remove
                                   </button>
@@ -758,7 +758,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                             <button
                               type="button"
                               onClick={() => addDraftTask(stage.id)}
-                              className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-[#50667a] hover:bg-[#415363] text-white text-xs font-semibold rounded-md shadow-2xs transition cursor-pointer"
+                              className="btn-primary btn-sm inline-flex items-center gap-1"
                             >
                               <Plus size={13} /> Add
                             </button>
@@ -921,13 +921,13 @@ export default function LeadStageTasks({ leadForms = [] }) {
               <button
                 type="button"
                 onClick={closeTaskModal}
-                className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer text-xs"
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition cursor-pointer text-xs"
+                className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
               >
                 Create
               </button>

@@ -149,10 +149,10 @@ export const ImportModal = ({ isOpen, onClose, title, templateHeaders, sampleRow
 
         {/* Modal Footer */}
         <div className="pt-3 border-t border-slate-200 mt-4 flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-          <button type="button" onClick={onClose} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium">
+          <button type="button" onClick={onClose} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
             Cancel
           </button>
-          <button type="button" disabled={parsedRows.length === 0} onClick={handleCommitImport} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold flex items-center gap-1.5 shadow-xs">
+          <button type="button" disabled={parsedRows.length === 0} onClick={handleCommitImport} className="px-4 py-2 bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-xs shadow-2xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer">
             <Database size={13}/>
             Commit Import ({parsedRows.length} Items)
           </button>

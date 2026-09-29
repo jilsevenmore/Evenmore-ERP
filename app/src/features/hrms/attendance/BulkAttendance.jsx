@@ -333,12 +333,13 @@ export default function BulkAttendance() {
         .bulk-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: #16233a; cursor: pointer; }
 
         .bulk-pills-group { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .bulk-pill { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 14px; font-size: 12.5px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
-        .bulk-pill:hover { background: #f8fafc; color: #111827; }
-        .bulk-pill.active { background: #16233a; color: #fff; border-color: #16233a; font-weight: 600; }
+        .bulk-pill { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 10px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .bulk-pill:hover { background: var(--card-hover); color: var(--text); }
+        .bulk-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 600; }
 
-        .bulk-btn-save { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .bulk-btn-save:hover { background: #0f172a; }
+        .bulk-btn-save { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--primary); color: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(31,107,255,0.25); }
+        .bulk-btn-save:hover { background: var(--primary-dark); }
+        .bulk-btn-save:active, .bulk-pill:active { transform: scale(0.99); }
 
         .bulk-main-card { overflow: hidden; }
         .bulk-table { width: 100%; border-collapse: collapse; min-width: 700px; font-size: 13.5px; }

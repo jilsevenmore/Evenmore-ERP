@@ -243,7 +243,7 @@ export default function Dashboard() {
       render: (r) => (
         <button
           onClick={() => navigate('/hrms/performance/appraisal')}
-          className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#e2e8f0] text-slate-700 rounded-lg text-[11.5px] font-medium transition flex items-center gap-1 shadow-2xs"
+          className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#e2e8f0] text-slate-700 rounded-xl text-[11.5px] font-medium transition flex items-center gap-1 shadow-2xs"
         >
           Manage <ChevronRight size={13} />
         </button>
@@ -267,7 +267,7 @@ export default function Dashboard() {
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           <button
             onClick={handleOpenNewCycle}
-            className="bg-[#16233a] text-white px-4 py-2 rounded-xl text-[13px] font-medium hover:bg-[#0f172a] transition shadow-2xs flex items-center gap-1.5"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
           >
             <Plus size={15} />
             New Review Cycle
@@ -292,7 +292,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-1 bg-[#f8fafc] p-1 rounded-xl border border-[#e2e8f0]">
           <button
             onClick={() => setRole("HR")}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition flex items-center gap-1.5 ${
+            className={`h-8 px-3 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
               role === "HR"
                 ? "bg-white text-slate-900 shadow-2xs border border-[#e2e8f0]"
                 : "text-slate-600 hover:text-slate-900"
@@ -303,7 +303,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setRole("Manager")}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition flex items-center gap-1.5 ${
+            className={`h-8 px-3 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
               role === "Manager"
                 ? "bg-white text-slate-900 shadow-2xs border border-[#e2e8f0]"
                 : "text-slate-600 hover:text-slate-900"
@@ -314,7 +314,7 @@ export default function Dashboard() {
           </button>
           <button
             onClick={() => setRole("Employee")}
-            className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition flex items-center gap-1.5 ${
+            className={`h-8 px-3 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
               role === "Employee"
                 ? "bg-white text-slate-900 shadow-2xs border border-[#e2e8f0]"
                 : "text-slate-600 hover:text-slate-900"
@@ -343,7 +343,7 @@ export default function Dashboard() {
       <div className="bg-white border border-[#e2e8f0] rounded-2xl p-5 shadow-2xs flex flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f1f5f9] pb-3.5">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
               <Calendar size={16} />
             </div>
             <div>

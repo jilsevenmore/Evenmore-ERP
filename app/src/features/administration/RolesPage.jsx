@@ -552,9 +552,9 @@ export function RolesPage() {
           <AdministrationGuideButton entity="role" />
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 bg-[#1f6bff] hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all duration-150 active:scale-95"
+          className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs hover:shadow transition-all duration-150 active:scale-[0.99] cursor-pointer"
         >
-          <Plus size={18} strokeWidth={2.4} />
+          <Plus size={16} strokeWidth={2.4} />
           <span>Create New Role</span>
         </button>
         </div>
@@ -951,13 +951,13 @@ export function RolesPage() {
           <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               onClick={handleCancelChanges}
-              className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+              className="px-4 h-9 border border-border bg-card hover:bg-card-hover text-text rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleUpdateRole}
-              className="px-6 py-2.5 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-sm hover:shadow transition-all"
+              className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs hover:shadow transition-all active:scale-[0.99] cursor-pointer"
             >
               Update Role
             </button>

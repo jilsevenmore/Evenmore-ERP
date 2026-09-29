@@ -473,9 +473,9 @@ export function DocumentsPage() {
                 activeTab === "employee" ? selectedEmpName : activeTab === "my" ? myDocUser : "All Staff"
               )
             }
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-semibold hover:bg-navy/90 transition cursor-pointer shadow-sm"
+            className="inline-flex items-center gap-2 px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition cursor-pointer"
           >
-            <UploadCloud size={17} />
+            <UploadCloud size={16} />
             <span>Select PDF from Device</span>
           </button>
         </div>
@@ -732,7 +732,7 @@ export function DocumentsPage() {
                       <tr key={d.id} className="hover:bg-slate-50/60 transition">
                         <td className="py-3.5 px-5">
                           <div className="flex items-start gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center shrink-0 mt-0.5 font-bold text-[10px]">
+                            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 flex items-center justify-center shrink-0 mt-0.5 font-bold text-[10px]">
                               PDF
                             </div>
                             <div>
@@ -825,7 +825,7 @@ export function DocumentsPage() {
                             <button
                               type="button"
                               onClick={() => setPreviewDoc(d)}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-navy transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-navy transition cursor-pointer"
                               title="Preview PDF"
                             >
                               <Eye size={16} />
@@ -836,7 +836,7 @@ export function DocumentsPage() {
                                 downloadPdfDocument(d);
                                 showToast(`Downloading ${d.title}.pdf`);
                               }}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-emerald-700 transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-emerald-700 transition cursor-pointer"
                               title="Download PDF"
                             >
                               <Download size={16} />
@@ -844,7 +844,7 @@ export function DocumentsPage() {
                             <button
                               type="button"
                               onClick={() => setEditDoc(d)}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-900 transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-slate-900 transition cursor-pointer"
                               title="Edit / Replace File"
                             >
                               <Edit3 size={16} />
@@ -852,7 +852,7 @@ export function DocumentsPage() {
                             <button
                               type="button"
                               onClick={() => setDeleteDocConfirm(d)}
-                              className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                              className="p-1.5 hover:bg-rose-50 rounded-xl text-slate-400 hover:text-rose-600 transition cursor-pointer"
                               title="Delete"
                             >
                               <Trash2 size={16} />
@@ -1122,7 +1122,7 @@ export function DocumentsPage() {
                           <button
                             type="button"
                             onClick={() => handleQuickVerify(doc)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-lg text-[11.5px] font-semibold transition cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer"
                             title="Verify Document"
                           >
                             <Check size={13} />
@@ -1132,7 +1132,7 @@ export function DocumentsPage() {
                         <button
                           type="button"
                           onClick={() => setPreviewDoc(doc)}
-                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-navy transition cursor-pointer"
+                          className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-600 hover:text-navy transition cursor-pointer"
                           title="Preview PDF"
                         >
                           <Eye size={16} />
@@ -1143,7 +1143,7 @@ export function DocumentsPage() {
                             downloadPdfDocument(doc);
                             showToast(`Downloading ${doc.title}.pdf`);
                           }}
-                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-emerald-700 transition cursor-pointer"
+                          className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-600 hover:text-emerald-700 transition cursor-pointer"
                           title="Download PDF"
                         >
                           <Download size={16} />
@@ -1151,7 +1151,7 @@ export function DocumentsPage() {
                         <button
                           type="button"
                           onClick={() => setEditDoc(doc)}
-                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                          className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-600 hover:text-slate-900 transition cursor-pointer"
                           title="Edit"
                         >
                           <Edit3 size={16} />
@@ -1159,7 +1159,7 @@ export function DocumentsPage() {
                         <button
                           type="button"
                           onClick={() => setDeleteDocConfirm(doc)}
-                          className="p-1.5 hover:bg-rose-50 rounded-lg text-slate-400 hover:text-rose-600 transition cursor-pointer"
+                          className="p-1.5 hover:bg-rose-50 rounded-xl text-slate-400 hover:text-rose-600 transition cursor-pointer"
                           title="Delete"
                         >
                           <Trash2 size={16} />
@@ -1213,7 +1213,7 @@ export function DocumentsPage() {
                 <select
                   value={myDocUser}
                   onChange={(e) => setMyDocUser(e.target.value)}
-                  className="bg-navy/80 text-white border-none rounded-lg px-2.5 py-1 text-[12px] font-semibold focus:outline-none cursor-pointer"
+                  className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold focus:outline-none cursor-pointer"
                 >
                   <option value={currentUser?.name}>{currentUser?.name} (You)</option>
                   {employees

@@ -795,7 +795,7 @@ export default function Payroll() {
           <button
             type="button"
             onClick={() => setShowGenerateSlipModal(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white border border-slate-300 text-slate-800 rounded-xl text-[13px] font-semibold shadow-xs hover:bg-slate-50 transition-colors cursor-pointer"
+            className="btn-outline inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
             title="Generate and download employee PDF salary slip"
           >
             <FileText size={15} className="text-emerald-700" />
@@ -994,7 +994,7 @@ export default function Payroll() {
               <button
                 type="button"
                 onClick={() => setShowGenerateSlipModal(true)}
-                className="ml-1 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl text-[12px] font-semibold transition cursor-pointer shadow-xs flex items-center gap-1.5"
+                className="ml-1 px-3.5 h-9 bg-card border border-border text-text hover:bg-card-hover rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs flex items-center gap-1.5"
                 title="Generate employee payslip PDF"
               >
                 <Download size={13} className="text-emerald-600" />
@@ -1005,7 +1005,7 @@ export default function Payroll() {
                 <button
                   type="button"
                   onClick={handleAdvanceStage}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[12px] font-semibold transition cursor-pointer shadow-xs flex items-center gap-1"
+                  className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs active:scale-[0.99] flex items-center gap-1"
                 >
                   <span>Advance Stage</span>
                   <ChevronRight size={14} />
@@ -1015,7 +1015,7 @@ export default function Payroll() {
                   <button
                     type="button"
                     onClick={handleBatchDownloadSlips}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[12px] font-semibold transition cursor-pointer shadow-xs flex items-center gap-1"
+                    className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs active:scale-[0.99] flex items-center gap-1"
                     title="Download payslips for all staff"
                   >
                     <Download size={13} />
@@ -1024,7 +1024,7 @@ export default function Payroll() {
                   <button
                     type="button"
                     onClick={() => handleStageClick("In Progress")}
-                    className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-[12px] font-medium transition cursor-pointer"
+                    className="px-3.5 h-9 bg-card border border-border hover:bg-card-hover text-text rounded-xl text-xs font-semibold transition cursor-pointer"
                     title="Reopen cycle for adjustments"
                   >
                     Reopen Cycle
@@ -1457,7 +1457,7 @@ export default function Payroll() {
                             <button
                               type="button"
                               onClick={() => openEditModal(p)}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-navy transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-navy transition cursor-pointer"
                               title="Adjust Advance / Earnings"
                             >
                               <Edit3 size={14} />
@@ -1465,7 +1465,7 @@ export default function Payroll() {
                             <button
                               type="button"
                               onClick={() => setSelectedPayslip(p)}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-navy transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-navy transition cursor-pointer"
                               title="View Payslip"
                             >
                               <Eye size={15} />
@@ -1476,7 +1476,7 @@ export default function Payroll() {
                                 downloadPayslipPdf(p);
                                 showToast(`Downloading PDF Payslip for ${p.name}`);
                               }}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-emerald-700 transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-emerald-700 transition cursor-pointer"
                               title="Download PDF"
                             >
                               <Download size={15} />
@@ -1488,7 +1488,7 @@ export default function Payroll() {
                                   markEmployeePaid(p.id, p.remainingPayable);
                                   showToast(`Disbursed & marked ${p.name} as Paid`);
                                 }}
-                                className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-lg text-[11px] font-semibold transition cursor-pointer ml-1"
+                                className="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-xl text-[11px] font-semibold transition cursor-pointer ml-1"
                               >
                                 Pay
                               </button>
@@ -1588,7 +1588,7 @@ export default function Payroll() {
               <select
                 value={activeOwnUser}
                 onChange={(e) => setActiveOwnUser(e.target.value)}
-                className="h-8 px-2.5 bg-off border border-bdr rounded-lg font-medium text-slate-900 focus:outline-none focus:border-navy cursor-pointer"
+                className="h-8 px-2.5 bg-off border border-bdr rounded-xl font-medium text-slate-900 focus:outline-none focus:border-navy cursor-pointer"
               >
                 <option value={currentUser?.name}>{currentUser?.name} (You)</option>
                 {payrollEmployees
@@ -1839,7 +1839,7 @@ export default function Payroll() {
                                 status: "Paid",
                               });
                             }}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-navy transition cursor-pointer"
+                            className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-navy transition cursor-pointer"
                             title="View Slip"
                           >
                             <Eye size={15} />
@@ -1861,7 +1861,7 @@ export default function Payroll() {
                               });
                               showToast(`Downloaded PDF Payslip for ${h.month}`);
                             }}
-                            className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-emerald-700 transition cursor-pointer"
+                            className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-500 hover:text-emerald-700 transition cursor-pointer"
                             title="Download PDF"
                           >
                             <Download size={15} />
@@ -2090,14 +2090,14 @@ export default function Payroll() {
                   <button
                     type="button"
                     onClick={handleRunPayroll}
-                    className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition cursor-pointer shadow-xs"
+                    className="flex-1 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs transition cursor-pointer shadow-2xs active:scale-[0.99]"
                   >
                     Confirm &amp; Disburse
                   </button>
                   <button
                     type="button"
                     onClick={() => setShowRunModal(false)}
-                    className="px-4 bg-off border border-bdr text-slate-700 hover:bg-slate-100 rounded-xl py-2.5 font-medium text-[13px] transition cursor-pointer"
+                    className="px-4 h-9 bg-card border border-border text-text hover:bg-card-hover rounded-xl font-semibold text-xs transition cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -2152,7 +2152,7 @@ export default function Payroll() {
                         setEditAttendedDays(newT);
                       }
                     }}
-                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-lg text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
+                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-xl text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
                   >
                     {[20, 21, 22, 23, 24, 25, 26, 27, 28, 30, 31].map((d) => (
                       <option key={d} value={d}>
@@ -2168,7 +2168,7 @@ export default function Payroll() {
                   <select
                     value={Number(editDailyHours)}
                     onChange={(e) => setEditDailyHours(Number(e.target.value))}
-                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-lg text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
+                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-xl text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
                   >
                     {[7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0].map((h) => (
                       <option key={h} value={h}>
@@ -2184,7 +2184,7 @@ export default function Payroll() {
                   <select
                     value={Number(editAttendedDays)}
                     onChange={(e) => setEditAttendedDays(Number(e.target.value))}
-                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-lg text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
+                    className="w-full h-9 px-2.5 bg-white border border-bdr rounded-xl text-[13px] font-medium focus:outline-none focus:border-navy cursor-pointer"
                   >
                     {Array.from({ length: Number(editTotalDays) + 1 }, (_, i) => i).map((num) => (
                       <option key={num} value={num}>
@@ -2307,14 +2307,14 @@ export default function Payroll() {
             <div className="flex gap-2 mt-2">
               <button
                 type="submit"
-                className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition cursor-pointer shadow-xs"
+                className="flex-1 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs transition cursor-pointer shadow-2xs active:scale-[0.99]"
               >
                 Apply Changes
               </button>
               <button
                 type="button"
                 onClick={() => setEditingEmployee(null)}
-                className="px-4 bg-off border border-bdr text-slate-700 hover:bg-slate-100 rounded-xl py-2.5 font-medium text-[13px] transition cursor-pointer"
+                className="px-4 h-9 bg-card border border-border text-text hover:bg-card-hover rounded-xl font-semibold text-xs transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2395,14 +2395,14 @@ export default function Payroll() {
             <div className="flex gap-2 mt-2">
               <button
                 type="submit"
-                className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition cursor-pointer shadow-xs"
+                className="flex-1 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs transition cursor-pointer shadow-2xs active:scale-[0.99]"
               >
                 Save Structure
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddStructureModal(false)}
-                className="px-4 bg-off border border-bdr text-slate-700 hover:bg-slate-100 rounded-xl py-2.5 font-medium text-[13px] transition cursor-pointer"
+                className="px-4 h-9 bg-card border border-border text-text hover:bg-card-hover rounded-xl font-semibold text-xs transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2484,7 +2484,7 @@ export default function Payroll() {
               <button
                 type="button"
                 onClick={() => executeStageTransition(targetStage)}
-                className="flex-1 bg-navy hover:bg-navy/90 text-white rounded-xl py-2.5 font-semibold text-[13px] transition cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                className="flex-1 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs transition cursor-pointer shadow-2xs active:scale-[0.99] flex items-center justify-center gap-1.5"
               >
                 <span>{STAGE_SCENARIOS[targetStage]?.actionLabel || `Confirm ${targetStage}`}</span>
                 <ChevronRight size={14} />
@@ -2492,7 +2492,7 @@ export default function Payroll() {
               <button
                 type="button"
                 onClick={() => setShowLifecycleModal(false)}
-                className="px-4 bg-off border border-bdr text-slate-700 hover:bg-slate-100 rounded-xl py-2.5 font-medium text-[13px] transition cursor-pointer"
+                className="px-4 h-9 bg-card border border-border text-text hover:bg-card-hover rounded-xl font-semibold text-xs transition cursor-pointer"
               >
                 Cancel
               </button>
@@ -2568,7 +2568,7 @@ export default function Payroll() {
                     <span className="text-[11.5px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-200">
                       {formatINR(slipSelectedEmp?.remainingPayable)}
                     </span>
-                    <div className="flex items-center gap-1 text-[11.5px] text-navy font-semibold bg-white border border-slate-200 rounded-md px-2 py-1 shadow-2xs hover:bg-slate-50">
+                    <div className="flex items-center gap-1 text-[11.5px] text-navy font-semibold bg-white border border-slate-200 rounded-xl px-2 py-1 shadow-2xs hover:bg-slate-50">
                       <span>{slipPickerOpen ? "Close" : "Switch"}</span>
                       <ChevronDown
                         size={13}

@@ -126,7 +126,7 @@ export function LegacyCompanyPolicyPage() {
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+          className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition cursor-pointer flex items-center gap-2"
         >
           <Upload size={16} />
           Publish Policy
@@ -187,10 +187,10 @@ export function LegacyCompanyPolicyPage() {
               <button
                 type="button"
                 onClick={() => selectedPolicy.id && handleAcknowledge(selectedPolicy.id)}
-                className={`px-5 py-2 rounded-xl text-[13px] font-semibold transition ${
+                className={`btn-primary h-9 px-4 rounded-xl text-xs font-semibold transition ${
                   currentAcked
-                    ? "bg-emerald-600 text-white cursor-default"
-                    : "bg-navy text-white hover:bg-navy/90"
+                    ? "bg-emerald-600 border-emerald-600 text-white cursor-default"
+                    : ""
                 }`}
               >
                 {currentAcked ? "Acknowledged ✓" : "Read & Acknowledge"}
@@ -282,7 +282,7 @@ export function LegacyCompanyPolicyPage() {
                           e.stopPropagation();
                           setSelectedPolicy(p);
                         }}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900"
+                        className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900"
                         title="View Policy"
                       >
                         <Eye size={16} />
@@ -305,7 +305,7 @@ export function LegacyCompanyPolicyPage() {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800"
               >
                 ✕
               </button>
@@ -373,13 +373,13 @@ export function LegacyCompanyPolicyPage() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                  className="px-4 h-9 bg-card border border-border rounded-xl text-xs font-semibold text-text hover:bg-card-hover transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90"
+                  className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition cursor-pointer"
                 >
                   Publish Policy
                 </button>

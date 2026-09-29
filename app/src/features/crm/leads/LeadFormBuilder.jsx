@@ -353,17 +353,17 @@ export default function LeadFormBuilder({
               <button
                 type="button"
                 onClick={onPreview}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
               >
-                <Eye size={16} className="text-slate-500" />
+                <Eye size={15} className="text-slate-500" />
                 Preview
               </button>
               <button
                 type="button"
                 onClick={onSaveAndOpen}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-xs transition cursor-pointer"
+                className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs cursor-pointer"
               >
-                <Save size={16} />
+                <Save size={15} />
                 Save Changes
               </button>
             </div>
@@ -429,7 +429,7 @@ export default function LeadFormBuilder({
               <button
                 type="button"
                 onClick={onAddSection}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+                className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus size={14} />
                 Add Section
@@ -437,7 +437,7 @@ export default function LeadFormBuilder({
               <button
                 type="button"
                 onClick={() => onAddField(effectiveSectionId, "Single Line")}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition cursor-pointer"
+                className="btn-primary h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <Plus size={14} />
                 Add Field
@@ -705,7 +705,7 @@ export default function LeadFormBuilder({
                       <button
                         type="button"
                         onClick={addOptionToField}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition"
+                        className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition"
                       >
                         Add
                       </button>
@@ -774,14 +774,14 @@ export default function LeadFormBuilder({
                     onRemoveField(selectedField.id);
                     setIsPropertiesOpen(false);
                   }}
-                  className="px-3.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition cursor-pointer"
+                  className="btn-danger h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Remove Field
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsPropertiesOpen(false)}
-                  className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition cursor-pointer"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Save Field
                 </button>

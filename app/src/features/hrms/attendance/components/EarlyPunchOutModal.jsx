@@ -78,7 +78,7 @@ export function EarlyPunchOutModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-text hover:bg-soft transition disabled:opacity-50 cursor-pointer"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-muted hover:text-text hover:bg-soft transition disabled:opacity-50 cursor-pointer"
           >
             <X size={16} />
           </button>

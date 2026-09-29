@@ -84,7 +84,7 @@ export function LocationsPage() {
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+          className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
         >
           <Plus size={16} /> Add Location
         </button>
@@ -133,7 +133,7 @@ export function LocationsPage() {
                   <button
                     type="button"
                     onClick={() => showToast(`Edit ${l.name}`)}
-                    className="w-8 h-8 rounded-lg border border-bdr hover:bg-off grid place-items-center text-muted transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-xl border border-bdr hover:bg-off grid place-items-center text-muted transition-colors cursor-pointer"
                     title="Edit"
                   >
                     <Edit2 size={14} />
@@ -141,7 +141,7 @@ export function LocationsPage() {
                   <button
                     type="button"
                     onClick={() => handleDelete(l.id, l.name)}
-                    className="w-8 h-8 rounded-lg border border-bdr hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
+                    className="w-8 h-8 rounded-xl border border-bdr hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
                     title="Delete"
                   >
                     <Trash2 size={14} />
@@ -180,7 +180,7 @@ export function LocationsPage() {
               placeholder="e.g. Singapore Innovation Hub"
               value={newLoc.name}
               onChange={(e) => setNewLoc({ ...newLoc, name: e.target.value })}
-              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              className="w-full h-9 px-3.5 bg-off border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
             />
           </div>
           <div>
@@ -192,7 +192,7 @@ export function LocationsPage() {
               placeholder="e.g. 1 Marina Boulevard, Singapore"
               value={newLoc.address}
               onChange={(e) => setNewLoc({ ...newLoc, address: e.target.value })}
-              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              className="w-full h-9 px-3.5 bg-off border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -203,7 +203,7 @@ export function LocationsPage() {
               <select
                 value={newLoc.type}
                 onChange={(e) => setNewLoc({ ...newLoc, type: e.target.value })}
-                className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 bg-white border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
               >
                 <option>Headquarters</option>
                 <option>Branch</option>
@@ -220,7 +220,7 @@ export function LocationsPage() {
                 placeholder="e.g. SGT • UTC+8"
                 value={newLoc.timezone}
                 onChange={(e) => setNewLoc({ ...newLoc, timezone: e.target.value })}
-                className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 bg-off border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
               />
             </div>
           </div>
@@ -228,13 +228,13 @@ export function LocationsPage() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+              className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Save Location
             </button>

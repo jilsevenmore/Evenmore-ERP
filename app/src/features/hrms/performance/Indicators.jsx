@@ -200,21 +200,21 @@ export default function Indicators() {
           <button
             aria-label={`View ${r.name}`}
             onClick={() => setViewRow(r)}
-            className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+            className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
           >
             <Eye size={14} />
           </button>
           <button
             aria-label={`Edit ${r.name}`}
             onClick={() => openEdit(r)}
-            className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+            className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
           >
             <Pencil size={14} />
           </button>
           <button
             aria-label={`Delete ${r.name}`}
             onClick={() => setDeleteRow(r)}
-            className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center transition"
+            className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center transition"
           >
             <Trash2 size={14} />
           </button>

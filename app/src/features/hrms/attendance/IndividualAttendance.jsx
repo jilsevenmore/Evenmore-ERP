@@ -483,14 +483,14 @@ export default function IndividualAttendance() {
         .ind-select-emp { min-width: 210px; }
 
         .ind-tabs { display: inline-flex; align-items: center; gap: 3px; background: #f4f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 3px 4px; }
-        .ind-tab { border: 1.5px solid transparent; border-radius: 999px; padding: 4px 16px; font-size: 13px; font-weight: 500; color: #8e9baa; background: transparent; cursor: pointer; transition: all 0.15s ease; }
-        .ind-tab.active { font-weight: 600; color: #000000; background: #ffffff; border-color: #000000; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .ind-tab { border: 1px solid transparent; border-radius: 999px; padding: 6px 16px; font-size: 12px; font-weight: 600; color: var(--muted); background: transparent; cursor: pointer; transition: all 0.15s ease; }
+        .ind-tab.active { font-weight: 700; color: var(--primary); background: var(--card); border-color: var(--primary); box-shadow: 0 1px 2px rgba(31,107,255,0.15); }
 
         .ind-hero-card { padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .ind-hero-avatar { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; }
         .ind-status-pill { display: inline-block; font-size: 11px; font-weight: 600; color: #15803d; background: #e6f4ea; border: 1px solid #a7f3d0; border-radius: 999px; padding: 2px 9px; }
-        .ind-btn-view-emp { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 7px 16px; font-size: 13px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; }
-        .ind-btn-view-emp:hover { background: #f9fafb; }
+        .ind-btn-view-emp { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .ind-btn-view-emp:hover { background: var(--card-hover); color: var(--text); }
 
         .ind-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
         .ind-stat-card { background: #fff; border: 1px solid #e8edf3; border-radius: 14px; padding: 16px 14px; text-align: center; box-shadow: 0 1px 2px rgba(16,24,40,0.03); }
@@ -509,8 +509,9 @@ export default function IndividualAttendance() {
         .ind-time { font-family: inherit; font-size: 13px; color: #374151; white-space: nowrap; }
         .ind-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 12px; border: 1px solid; white-space: nowrap; }
 
-        .ind-btn-edit { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
-        .ind-btn-edit:hover { background: #f8fafc; color: #111827; border-color: #cbd5e1; }
+        .ind-btn-edit { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 10px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .ind-btn-edit:hover { background: var(--card-hover); color: var(--text); }
+        .ind-btn-view-emp:active, .ind-btn-edit:active { transform: scale(0.99); }
 
         .ind-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
         .ind-cal-header { text-align: center; font-size: 12px; font-weight: 700; color: #6b7280; padding: 8px 0; }

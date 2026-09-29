@@ -761,8 +761,8 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 px-5 py-4 border-t border-slate-100">
-                    <button type="button" onClick={closeEmailModal} className="h-10 px-6 rounded-lg bg-slate-500 hover:bg-slate-600 text-white text-sm font-semibold">Cancel</button>
-                    <button type="submit" className="h-10 px-6 rounded-lg bg-[#1f6bff] hover:bg-blue-700 text-white text-sm font-semibold">Create</button>
+                    <button type="button" onClick={closeEmailModal} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold">Cancel</button>
+                    <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs">Create</button>
                   </div>
                 </form>
               </div>
@@ -1085,10 +1085,10 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
           <button type="button" onClick={() => setIsLogOpen(true)} className="btn-outline btn-sm">
             Log Call
           </button>
-          <button type="button" onClick={callNow} className="btn-primary btn-sm flex items-center gap-1.5 !bg-emerald-600 hover:!bg-emerald-700">
+          <button type="button" onClick={callNow} className="btn-primary btn-sm flex items-center gap-1.5">
             <Phone size={13} /> Call Lead
           </button>
-          <button type="button" onClick={() => { setSubject(''); setCallType('Outbound'); setAssignee(lead?.owner || assigneeOptions[0] || currentUserName()); setDescription(''); setIsAddOpen(true); }} title="Add Call" aria-label="Add Call" className="w-8 h-8 grid place-items-center rounded-md bg-[#1d3f6e] hover:bg-[#16325a] text-white transition">
+          <button type="button" onClick={() => { setSubject(''); setCallType('Outbound'); setAssignee(lead?.owner || assigneeOptions[0] || currentUserName()); setDescription(''); setIsAddOpen(true); }} title="Add Call" aria-label="Add Call" className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors">
             <Plus size={16} />
           </button>
         </div>
@@ -1235,8 +1235,8 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
                 <textarea rows={7} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter Description" className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 resize-y focus:outline-none focus:border-blue-500" />
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsAddOpen(false)} className="h-10 px-5 rounded-lg bg-slate-500 hover:bg-slate-600 text-white text-[13px] font-semibold transition">Cancel</button>
-                <button type="submit" disabled={!String(subject || '').trim() || !assignee} className="h-10 px-6 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] disabled:opacity-50 text-white text-[13px] font-semibold transition">Add</button>
+                <button type="button" onClick={() => setIsAddOpen(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold">Cancel</button>
+                <button type="submit" disabled={!String(subject || '').trim() || !assignee} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50">Add</button>
               </div>
             </form>
           </div>
@@ -1694,14 +1694,14 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {!done && showNote && (
-            <button type="button" onClick={() => setCompleteId(task.id)} title="Fill Task Form" className="w-8 h-8 grid place-items-center rounded-md bg-lime-500 hover:bg-lime-600 text-white transition">
+            <button type="button" onClick={() => setCompleteId(task.id)} title="Fill Task Form" className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors">
               <ClipboardList size={14} />
             </button>
           )}
-          <button type="button" onClick={() => openEdit(task)} title="Edit" className="w-8 h-8 grid place-items-center rounded-md bg-[#3a9ab5] hover:bg-[#2f8299] text-white transition">
+          <button type="button" onClick={() => openEdit(task)} title="Edit" className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors">
             <Pencil size={14} />
           </button>
-          <button type="button" onClick={() => setDeleteId(task.id)} title="Delete" className="w-8 h-8 grid place-items-center rounded-md bg-rose-600 hover:bg-rose-700 text-white transition">
+          <button type="button" onClick={() => setDeleteId(task.id)} title="Delete" className="p-1.5 text-muted hover:text-danger hover:bg-card-hover rounded-lg cursor-pointer transition-colors">
             <Trash2 size={14} />
           </button>
         </div>
@@ -1718,7 +1718,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
           onClick={openCreate}
           title="Add Lead Task"
           aria-label="Add Lead Task"
-          className="w-8 h-8 grid place-items-center rounded-md bg-[#1d3f6e] hover:bg-[#16325a] text-white transition"
+          className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
         >
           <Plus size={16} />
         </button>
@@ -1863,16 +1863,16 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
                     </div>
                     {taskFormDraftError && <p className="text-[11px] font-semibold text-rose-600 mt-2">{taskFormDraftError}</p>}
                     <div className="flex flex-wrap items-center gap-2 mt-3">
-                      <button type="button" onClick={saveTaskFormDraft} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-[#1d4a79] hover:bg-[#163a61] text-white text-[12px] font-semibold transition">Save Form</button>
-                      <button type="button" onClick={() => { setShowFormEditor(false); setTaskFormDraftError(''); }} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md bg-slate-500 hover:bg-slate-600 text-white text-[12px] font-semibold transition"><X size={13} /> Cancel</button>
+                      <button type="button" onClick={saveTaskFormDraft} className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1">Save Form</button>
+                      <button type="button" onClick={() => { setShowFormEditor(false); setTaskFormDraftError(''); }} className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1"><X size={13} /> Cancel</button>
                     </div>
                   </div>
                 )}
                 {formError && <p className="text-xs font-semibold text-rose-600">{formError}</p>}
               </div>
               <div className="flex items-center justify-end gap-2.5 mt-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="h-10 px-5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 text-[13px] font-semibold border border-slate-200 transition">Cancel</button>
-                <button type="submit" className="h-10 px-6 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] text-white text-[13px] font-semibold transition">{editingId ? 'Update' : 'Create'}</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold">Cancel</button>
+                <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">{editingId ? 'Update' : 'Create'}</button>
               </div>
               <p className="text-[11px] text-slate-400 mt-4">© 2026 IMT Endoscopy</p>
             </form>
@@ -1886,8 +1886,8 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
             <h2 className="text-sm font-bold text-slate-900">Delete this task?</h2>
             <p className="text-xs text-slate-500 mt-1">This action cannot be undone.</p>
             <div className="flex items-center justify-end gap-2 mt-4">
-              <button type="button" onClick={() => setDeleteId(null)} className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200">Cancel</button>
-              <button type="button" onClick={confirmDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg">Delete</button>
+              <button type="button" onClick={() => setDeleteId(null)} className="btn-outline">Cancel</button>
+              <button type="button" onClick={confirmDelete} className="btn-danger">Delete</button>
             </div>
           </div>
         </div>
@@ -2068,10 +2068,10 @@ function EstimatesTab({ lead, onCountsChange }) {
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
-                <button type="button" onClick={() => setIsCreateOpen(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-medium cursor-pointer">
+                <button type="button" onClick={() => setIsCreateOpen(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer">
                   Cancel
                 </button>
-                <button type="submit" className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 cursor-pointer">
+                <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer">
                   Generate Estimate
                 </button>
               </div>
@@ -2279,10 +2279,10 @@ function QuotationsTab({ lead, onActivity }) {
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
-                <button type="button" onClick={() => setIsCreateOpen(false)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 font-medium cursor-pointer">
+                <button type="button" onClick={() => setIsCreateOpen(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer">
                   Cancel
                 </button>
-                <button type="submit" className="px-3.5 py-1.5 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 cursor-pointer">
+                <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer">
                   Generate Quotation
                 </button>
               </div>
@@ -2803,7 +2803,7 @@ function GeneralTab({ lead, activities = [] }) {
             <div className="w-10 h-10 rounded-full bg-rose-500/15 -mt-6 mb-3" />
             <button
               type="button"
-              className="px-3.5 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-md border border-slate-200 shadow-xs transition cursor-pointer"
+              className="btn-outline btn-sm"
             >
               View on Map
             </button>
@@ -2816,7 +2816,7 @@ function GeneralTab({ lead, activities = [] }) {
           <h3 className="font-bold text-sm text-slate-900">Recent Activity</h3>
           <button
             type="button"
-            className="inline-flex items-center gap-1 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            className="btn-outline btn-sm inline-flex items-center gap-1"
           >
             <Plus size={13} /> Add
           </button>
@@ -2986,7 +2986,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
               setSelectedEmployeeId(availableEmployees[0]?.id || '');
               setIsAddUserOpen(true);
             }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus size={14} /> Add User
           </button>
@@ -3007,7 +3007,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                 <select
                   value={selectedEmployeeId}
                   onChange={(event) => setSelectedEmployeeId(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
+                  className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 h-9 text-xs text-slate-700 focus:outline-none focus:border-blue-500"
                 >
                   {availableEmployees.length === 0 ? (
                     <option value="">All employees are already added</option>
@@ -3021,10 +3021,10 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                 </select>
               </label>
               <div className="flex justify-end gap-2 mt-5">
-                <button type="button" className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsAddUserOpen(false)}>
+                <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" onClick={() => setIsAddUserOpen(false)}>
                   Cancel
                 </button>
-                <button type="button" className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50" onClick={addUser} disabled={!selectedEmployeeId}>
+                <button type="button" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50" onClick={addUser} disabled={!selectedEmployeeId}>
                   Add User
                 </button>
               </div>
@@ -3129,7 +3129,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
           <button
             type="button"
             onClick={() => setIsAddProductOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus size={14} /> Add Product
           </button>
@@ -3211,12 +3211,12 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                 </label>
               </div>
               <div className="flex justify-end gap-2 mt-6">
-                <button type="button" className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setIsAddProductOpen(false)}>
+                <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" onClick={() => setIsAddProductOpen(false)}>
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50"
                   onClick={addProduct}
                   disabled={!productDraft.name.trim() || !productDraft.sku.trim() || !productDraft.price || Number(productDraft.qty) < 1}
                 >
@@ -3303,12 +3303,12 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                 </label>
               </div>
               <div className="flex justify-end gap-2 mt-6">
-                <button type="button" className="px-3 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100" onClick={() => setEditingProduct(null)}>
+                <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" onClick={() => setEditingProduct(null)}>
                   Cancel
                 </button>
                 <button
                   type="button"
-                  className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 disabled:opacity-50"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50"
                   onClick={saveEditProduct}
                   disabled={!editingProduct.name.trim() || !editingProduct.sku.trim() || !editingProduct.price || Number(editingProduct.qty) < 1}
                 >
@@ -3641,31 +3641,31 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
           <button
             type="button"
             onClick={onBackToLeads}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
           >
             <ArrowLeft size={13} className="text-slate-500" /> Back
           </button>
           <button
             type="button"
             onClick={openEditLead}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
           >
             <Pencil size={13} className="text-slate-500" /> Edit
           </button>
           <button
             type="button"
             onClick={handleConvert}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer ${
+            className={`h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs transition cursor-pointer ${
               isConverted
-                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                : 'bg-white hover:bg-blue-50 text-blue-600 border border-blue-200'
+                ? 'btn-primary !bg-emerald-600 hover:!bg-emerald-700 text-white'
+                : 'btn-outline text-[#1f6bff] border-[#1f6bff]/30 hover:bg-[#1f6bff]/5'
             }`}
           >
             <CheckCircle size={13} /> {isConverted ? 'Converted' : 'Convert'}
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
             onClick={() => setIsExportOpen(true)}
           >
             <Printer size={13} className="text-slate-500" /> Print
@@ -3758,9 +3758,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3.5 py-2 whitespace-nowrap rounded-lg text-xs font-semibold transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3.5 h-9 whitespace-nowrap rounded-xl text-xs font-semibold transition cursor-pointer focus:outline-none ${
                 isActive
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'btn-primary text-white shadow-xs'
                   : 'text-slate-500 hover:text-slate-900 hover:bg-white hover:shadow-xs'
               }`}
             >
@@ -3884,10 +3884,10 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               </label>
             </div>
             <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100 sticky bottom-0 bg-white rounded-b-xl">
-              <button type="button" className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 border border-slate-200" onClick={() => { setIsEditOpen(false); setEditForm(null); }}>
+              <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" onClick={() => { setIsEditOpen(false); setEditForm(null); }}>
                 Cancel
               </button>
-              <button type="button" className="px-4 py-2 rounded-lg text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700" onClick={saveEditedLead}>
+              <button type="button" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold" onClick={saveEditedLead}>
                 Save Changes
               </button>
             </div>

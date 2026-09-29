@@ -447,7 +447,7 @@ export function CompanyPolicyModule({ forcedSection }) {
           <button
             type="button"
             onClick={() => setIsEmployeeView(!isEmployeeView)}
-            className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-semibold border transition cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-xs font-semibold border transition cursor-pointer ${
               isEmployeeView
                 ? "bg-amber-50 text-amber-800 border-amber-300 shadow-xs"
                 : "bg-white text-slate-700 border-bdr hover:bg-off"
@@ -462,7 +462,7 @@ export function CompanyPolicyModule({ forcedSection }) {
             <button
               type="button"
               onClick={openCreateModal}
-              className="inline-flex items-center gap-1.5 px-4.5 py-2 bg-navy text-white rounded-xl text-[13px] font-bold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              className="btn-primary inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
             >
               <Plus size={16} />
               <span>Create Policy</span>
@@ -704,7 +704,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                     return (
                       <div key={p.id} className="py-3 flex items-center justify-between gap-3 hover:bg-off/50 px-2 rounded-xl transition">
                         <div className="flex items-start gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-lg bg-off border border-bdr grid place-items-center shrink-0 mt-0.5">
+                          <div className="w-8 h-8 rounded-xl bg-off border border-bdr grid place-items-center shrink-0 mt-0.5">
                             {getCategoryIcon(p.category)}
                           </div>
                           <div className="min-w-0">
@@ -742,7 +742,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                           <button
                             type="button"
                             onClick={() => setViewPolicy(p)}
-                            className="p-1.5 rounded-lg border border-bdr hover:bg-off text-muted hover:text-navy transition cursor-pointer"
+                            className="p-1.5 rounded-xl border border-bdr hover:bg-off text-muted hover:text-navy transition cursor-pointer"
                             title="View Policy Details"
                           >
                             <Eye size={14} />
@@ -1048,7 +1048,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                           {/* Policy Name & icon */}
                           <td className="py-3.5 px-5 font-semibold text-slate-900 max-w-xs">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-7 h-7 rounded-lg bg-off border border-bdr grid place-items-center shrink-0">
+                              <div className="w-7 h-7 rounded-xl bg-off border border-bdr grid place-items-center shrink-0">
                                 {getCategoryIcon(p.category)}
                               </div>
                               <div className="min-w-0">
@@ -1117,7 +1117,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                 <button
                                   type="button"
                                   onClick={() => setAckModalPolicy(p)}
-                                  className="px-2.5 py-1 rounded-lg bg-navy text-white text-[11px] font-bold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+                                  className="px-2.5 py-1 rounded-xl bg-navy text-white text-[11px] font-bold hover:bg-navy/90 transition shadow-xs cursor-pointer"
                                 >
                                   Acknowledge
                                 </button>
@@ -1146,7 +1146,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                               <button
                                 type="button"
                                 onClick={() => setViewPolicy(p)}
-                                className="w-7 h-7 rounded-lg border border-bdr hover:bg-off grid place-items-center text-muted hover:text-navy transition cursor-pointer"
+                                className="w-7 h-7 rounded-xl border border-bdr hover:bg-off grid place-items-center text-muted hover:text-navy transition cursor-pointer"
                                 title="View Full Policy & Versions"
                               >
                                 <Eye size={14} />
@@ -1158,7 +1158,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                   <button
                                     type="button"
                                     onClick={() => setAckModalPolicy(p)}
-                                    className="px-2 py-1 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-100 transition cursor-pointer flex items-center gap-1"
+                                    className="px-2 py-1 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-100 transition cursor-pointer flex items-center gap-1"
                                     title="Acknowledge Policy"
                                   >
                                     <Check size={12} /> Ack
@@ -1170,7 +1170,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                   <button
                                     type="button"
                                     onClick={() => openEditModal(p)}
-                                    className="w-7 h-7 rounded-lg border border-bdr hover:bg-off grid place-items-center text-muted hover:text-slate-900 transition cursor-pointer"
+                                    className="w-7 h-7 rounded-xl border border-bdr hover:bg-off grid place-items-center text-muted hover:text-slate-900 transition cursor-pointer"
                                     title="Edit Policy"
                                   >
                                     <Edit size={13} />
@@ -1180,7 +1180,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                   <button
                                     type="button"
                                     onClick={() => openNewVersionModal(p)}
-                                    className="w-7 h-7 rounded-lg border border-bdr hover:bg-off grid place-items-center text-muted hover:text-blue-600 transition cursor-pointer"
+                                    className="w-7 h-7 rounded-xl border border-bdr hover:bg-off grid place-items-center text-muted hover:text-blue-600 transition cursor-pointer"
                                     title="Create New Version"
                                   >
                                     <History size={13} />
@@ -1195,7 +1195,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                           approvePolicy(p.id, currentUser?.name);
                                           showToast?.(`Approved and published policy ${p.name}`);
                                         }}
-                                        className="w-7 h-7 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 grid place-items-center transition cursor-pointer"
+                                        className="w-7 h-7 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 grid place-items-center transition cursor-pointer"
                                         title="Approve & Publish"
                                       >
                                         <Check size={14} />
@@ -1206,7 +1206,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                           setRejectModalPolicy(p);
                                           setRejectReason("");
                                         }}
-                                        className="w-7 h-7 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 grid place-items-center transition cursor-pointer"
+                                        className="w-7 h-7 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 grid place-items-center transition cursor-pointer"
                                         title="Reject / Return to Draft"
                                       >
                                         <X size={14} />
@@ -1222,7 +1222,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                         restorePolicy(p.id, currentUser?.name);
                                         showToast?.(`Restored ${p.name} to Active status`);
                                       }}
-                                      className="w-7 h-7 rounded-lg border border-bdr hover:bg-blue-50 text-muted hover:text-blue-600 grid place-items-center transition cursor-pointer"
+                                      className="w-7 h-7 rounded-xl border border-bdr hover:bg-blue-50 text-muted hover:text-blue-600 grid place-items-center transition cursor-pointer"
                                       title="Restore to Active"
                                     >
                                       <RotateCcw size={13} />
@@ -1234,7 +1234,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                         archivePolicy(p.id, currentUser?.name);
                                         showToast?.(`Archived policy ${p.name}`);
                                       }}
-                                      className="w-7 h-7 rounded-lg border border-bdr hover:bg-slate-100 text-muted hover:text-slate-700 grid place-items-center transition cursor-pointer"
+                                      className="w-7 h-7 rounded-xl border border-bdr hover:bg-slate-100 text-muted hover:text-slate-700 grid place-items-center transition cursor-pointer"
                                       title="Archive Policy"
                                     >
                                       <Archive size={13} />
@@ -1245,7 +1245,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                   <button
                                     type="button"
                                     onClick={() => setDeleteConfirmTarget(p)}
-                                    className="w-7 h-7 rounded-lg border border-bdr hover:bg-rose-50 text-muted hover:text-rose-600 grid place-items-center transition cursor-pointer"
+                                    className="w-7 h-7 rounded-xl border border-bdr hover:bg-rose-50 text-muted hover:text-rose-600 grid place-items-center transition cursor-pointer"
                                     title="Delete Policy"
                                   >
                                     <Trash2 size={13} />
@@ -1272,7 +1272,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                   type="button"
                   disabled={currentPage <= 1}
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  className="px-3 py-1.5 border border-bdr rounded-lg hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
+                  className="px-3 py-1.5 border border-bdr rounded-xl hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
                 >
                   Previous
                 </button>
@@ -1283,7 +1283,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                   type="button"
                   disabled={currentPage >= totalPages}
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  className="px-3 py-1.5 border border-bdr rounded-lg hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
+                  className="px-3 py-1.5 border border-bdr rounded-xl hover:bg-off disabled:opacity-40 disabled:hover:bg-transparent font-medium cursor-pointer"
                 >
                   Next
                 </button>
@@ -1346,7 +1346,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                               });
                               setIsCategoryModalOpen(true);
                             }}
-                            className="p-1.5 rounded-lg border border-bdr hover:bg-off text-muted hover:text-slate-900 transition cursor-pointer"
+                            className="p-1.5 rounded-xl border border-bdr hover:bg-off text-muted hover:text-slate-900 transition cursor-pointer"
                             title="Edit Category"
                           >
                             <Edit size={13} />
@@ -1359,7 +1359,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                 showToast?.(`Deleted category ${cat.name}`);
                               }
                             }}
-                            className="p-1.5 rounded-lg border border-bdr hover:bg-rose-50 text-muted hover:text-rose-600 transition cursor-pointer"
+                            className="p-1.5 rounded-xl border border-bdr hover:bg-rose-50 text-muted hover:text-rose-600 transition cursor-pointer"
                             title="Delete Category"
                           >
                             <Trash2 size={13} />
@@ -1479,7 +1479,7 @@ export function CompanyPolicyModule({ forcedSection }) {
                                 acknowledgePolicy(ack.policyId, currentUser?.name, myEmployeeId, myDept);
                                 showToast?.(`Acknowledged ${ack.policyName}`);
                               }}
-                              className="px-3 py-1 rounded-lg bg-navy text-white text-[11.5px] font-bold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+                              className="px-3 py-1 rounded-xl bg-navy text-white text-[11.5px] font-bold hover:bg-navy/90 transition shadow-xs cursor-pointer"
                             >
                               Acknowledge Policy
                             </button>

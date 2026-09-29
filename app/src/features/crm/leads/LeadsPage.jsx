@@ -497,7 +497,7 @@ export default function LeadsPage() {
                 </div>
               </div>
             )}
-            <button type="button" className="btn-primary btn-sm" onClick={openCreateLeadModal}>
+            <button type="button" className="btn-primary" onClick={openCreateLeadModal}>
               + Create Lead
             </button>
           </div>
@@ -568,7 +568,7 @@ export default function LeadsPage() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {['CSV', 'Excel', 'PDF'].map((format) => (
-                <button key={format} type="button" className="border border-slate-200 rounded-lg px-3 py-3 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50" onClick={() => exportLeads(format)}>
+                <button key={format} type="button" className="btn-outline h-9 text-xs font-semibold" onClick={() => exportLeads(format)}>
                   {format}
                 </button>
               ))}

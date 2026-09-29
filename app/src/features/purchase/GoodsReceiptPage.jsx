@@ -396,7 +396,7 @@ export const GoodsReceiptPage = () => {
                                             <td className="p-2.5 text-center">
                                                 <button
                                                     onClick={() => openReceiveModal(b)}
-                                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#1F2E4A] text-white rounded-md text-[11px] font-semibold hover:bg-[#152033] transition cursor-pointer"
+                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-dark transition shadow-2xs cursor-pointer"
                                                 >
                                                     <PackageCheck size={13} /> Receive Goods
                                                 </button>
@@ -411,14 +411,14 @@ export const GoodsReceiptPage = () => {
             </div>
 
             {selectedBill && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-2 sm:p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-                        <div className="px-4 sm:px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2 lg:gap-0 sticky top-0 bg-white">
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-150">
+                    <div className="bg-card rounded-2xl border border-border shadow-2xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+                        <div className="px-4 sm:px-5 py-4 border-b border-border flex items-center justify-between gap-2 lg:gap-0 sticky top-0 bg-card z-10">
                             <div>
-                                <h3 className="font-bold text-[#1F2E4A]">Goods Receipt — {selectedBill.billNumber}</h3>
-                                <p className="text-xs text-slate-500 mt-0.5">{selectedBill.vendor} • {selectedBill.linkedPo || 'Direct Bill'}</p>
+                                <h3 className="font-bold text-text text-base">Goods Receipt — {selectedBill.billNumber}</h3>
+                                <p className="text-xs text-muted mt-0.5">{selectedBill.vendor} • {selectedBill.linkedPo || 'Direct Bill'}</p>
                             </div>
-                            <button onClick={() => setSelectedBill(null)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 cursor-pointer"><X size={18} /></button>
+                            <button onClick={() => setSelectedBill(null)} className="p-1.5 rounded-xl hover:bg-card-hover text-muted hover:text-text cursor-pointer transition"><X size={18} /></button>
                         </div>
 
                         <div className="p-4 sm:p-5 space-y-5">
@@ -538,9 +538,9 @@ export const GoodsReceiptPage = () => {
                                 </div>
                             </div>
 
-                            <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-100">
-                                <button onClick={() => setSelectedBill(null)} className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium text-xs cursor-pointer">Cancel</button>
-                                <button onClick={confirmReceipt} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold text-xs flex items-center gap-1.5 cursor-pointer">
+                            <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-border">
+                                <button onClick={() => setSelectedBill(null)} className="px-4 py-2 border border-border text-text rounded-xl hover:bg-card-hover font-semibold text-xs cursor-pointer transition">Cancel</button>
+                                <button onClick={confirmReceipt} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer transition">
                                     <CheckCircle2 size={14} /> Confirm GRN & Add to Stock
                                 </button>
                             </div>

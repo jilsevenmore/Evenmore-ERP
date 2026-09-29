@@ -287,7 +287,7 @@ export default function Candidates() {
             type="button"
             title="View Profile"
             onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)}
-            className="p-1.5 rounded-lg hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-500 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-500 transition cursor-pointer"
           >
             <Eye size={15} />
           </button>
@@ -295,7 +295,7 @@ export default function Candidates() {
             type="button"
             title="Generate / View Offer Letter"
             onClick={() => handleOpenOffer(r)}
-            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border font-semibold transition cursor-pointer ${
+            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl border font-semibold transition cursor-pointer ${
               r.stage === "Offer" || r.stage === "Hired" || offers.some((o) => o.candidateId === r.id)
                 ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
                 : "bg-soft text-text border-border hover:bg-card-hover"
@@ -323,7 +323,7 @@ export default function Candidates() {
               setEditing(r.id);
               setDrawerOpen(true);
             }}
-            className="p-1.5 rounded-lg hover:text-slate-800 hover:bg-slate-100 text-slate-500 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-slate-800 hover:bg-slate-100 text-slate-500 transition cursor-pointer"
           >
             <Pencil size={15} />
           </button>
@@ -331,7 +331,7 @@ export default function Candidates() {
             type="button"
             title="Delete Candidate"
             onClick={() => setDeleteId(r.id)}
-            className="p-1.5 rounded-lg hover:text-rose-700 hover:bg-rose-50 text-rose-500 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-rose-700 hover:bg-rose-50 text-rose-500 transition cursor-pointer"
           >
             <Trash2 size={15} />
           </button>
@@ -369,7 +369,7 @@ export default function Candidates() {
               <button
                 type="button"
                 onClick={() => setViewMode("table")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
                   viewMode === "table"
                     ? "bg-card text-primary shadow-2xs border border-border"
                     : "text-muted hover:text-text"
@@ -381,7 +381,7 @@ export default function Candidates() {
               <button
                 type="button"
                 onClick={() => setViewMode("kanban")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
                   viewMode === "kanban"
                     ? "bg-card text-primary shadow-2xs border border-border"
                     : "text-muted hover:text-text"

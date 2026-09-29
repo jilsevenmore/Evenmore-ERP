@@ -148,7 +148,7 @@ export function DelayResolutionTable({ rows = [], onUpdatePlan, onResolve, onLog
                 title="Update recovery plan"
                 aria-label={`Update recovery plan for ${row.stageName}`}
                 onClick={() => onUpdatePlan?.(row)}
-                className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-card-hover"
               >
                 <CalendarClock size={14} />
               </button>
@@ -157,7 +157,7 @@ export function DelayResolutionTable({ rows = [], onUpdatePlan, onResolve, onLog
                 title="Resolve delay"
                 aria-label={`Resolve delay on ${row.stageName}`}
                 onClick={() => onResolve?.(row)}
-                className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+                className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-card-hover"
               >
                 <CheckCircle2 size={14} />
               </button>

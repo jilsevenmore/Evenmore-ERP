@@ -116,7 +116,7 @@ export default function Applications() {
             changeStage(r.id, e.target.value);
             showToast(`Moved ${r.name} to ${e.target.value}`);
           }}
-          className={`h-7 px-2 text-[11.5px] font-medium rounded-lg border outline-none cursor-pointer transition ${
+          className={`h-9 px-2 text-xs font-semibold rounded-xl border outline-none cursor-pointer transition ${
             r.stage === "Hired"
               ? "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
               : r.stage === "Offer"
@@ -151,7 +151,7 @@ export default function Applications() {
       render: (r) => (
         <button
           onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 dark:text-slate-200 hover:text-navy dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition"
+          className="inline-flex items-center gap-1 h-8 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:text-navy dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition"
         >
           <Eye size={12} />
           <span>Profile</span>
@@ -176,7 +176,7 @@ export default function Applications() {
             <button
               type="button"
               onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-card text-muted hover:text-text hover:bg-soft text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-xl border border-border bg-card text-muted hover:text-text hover:bg-soft text-xs font-semibold transition cursor-pointer shadow-2xs whitespace-nowrap"
             >
               <HelpCircle size={14} />
               <span>Guide</span>

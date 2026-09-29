@@ -217,21 +217,21 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
               type="button"
               onClick={() => onStart?.(stage)}
               disabled={!notStarted && stage.status !== 'Assigned'}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-blue-700 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-slate-600 disabled:hover:border-[#dce5f4] disabled:cursor-not-allowed"
+              className="btn-outline btn-sm inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Play size={12} /> Start Stage
             </button>
             <button
               type="button"
               onClick={() => onManageTasks?.(stage)}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-indigo-700 hover:border-indigo-300 hover:bg-indigo-50"
+              className="btn-outline btn-sm inline-flex items-center gap-1.5"
             >
               <ListChecks size={12} /> Manage Tasks
             </button>
             <button
               type="button"
               onClick={() => onAddTask?.(stage)}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+              className="btn-outline btn-sm inline-flex items-center gap-1.5"
             >
               <Plus size={12} /> Add Task
             </button>
@@ -239,7 +239,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
               type="button"
               onClick={() => onSubmit?.(stage)}
               disabled={isDone || notStarted}
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-slate-600 disabled:hover:border-[#dce5f4] disabled:cursor-not-allowed"
+              className="btn-outline btn-sm inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Send size={12} /> Submit Stage
             </button>
@@ -248,7 +248,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
               onClick={() => onHandoff?.(stage)}
               disabled={isDone || notStarted}
               title="Hand off to the next department"
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-violet-700 hover:border-violet-300 hover:bg-violet-50 disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-slate-600 disabled:hover:border-[#dce5f4] disabled:cursor-not-allowed"
+              className="btn-outline btn-sm inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ArrowRightLeft size={12} /> Hand Off
             </button>
@@ -257,7 +257,7 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
                 type="button"
                 onClick={() => onChat(stage)}
                 title={`Open the ${stage.department} team chat`}
-                className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-blue-700 hover:border-blue-300 hover:bg-blue-50"
+                className="btn-outline btn-sm inline-flex items-center gap-1.5"
               >
                 <MessageSquare size={12} /> Chat
                 {chatUnread > 0 && (
@@ -313,7 +313,7 @@ export function StageTimelineTab({ project, stageConfigs = [], onStart, onManage
               <button
                 type="button"
                 onClick={() => setPercentagesOpen(true)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] bg-white text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors"
+                className="btn-outline inline-flex items-center gap-1.5"
                 title="Configure stage percentage weights"
               >
                 <Percent size={13} /> Stage Weights

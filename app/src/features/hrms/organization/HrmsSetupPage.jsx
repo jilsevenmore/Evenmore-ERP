@@ -141,7 +141,7 @@ function HrmsSetupPageOriginal() {
           <button
             type="button"
             onClick={() => setIsRoleModalOpen(true)}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs"
+            className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs"
           >
             <Plus size={16} />
             Define Role
@@ -249,7 +249,7 @@ function HrmsSetupPageOriginal() {
               <button
                 type="button"
                 onClick={() => setIsRoleModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800"
               >
                 ✕
               </button>

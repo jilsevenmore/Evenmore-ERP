@@ -130,13 +130,13 @@ export default function LeadFormsPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer text-xs"
+                  className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition cursor-pointer text-xs"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
                 >
                   Create Form
                 </button>

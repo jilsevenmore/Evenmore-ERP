@@ -257,7 +257,7 @@ export default function TaskFormBuilderPage() {
               <button
                 type="button"
                 onClick={() => setPreviewOpen(false)}
-                className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition"
+                className="btn-outline"
               >
                 Close
               </button>

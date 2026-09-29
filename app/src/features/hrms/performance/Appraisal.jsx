@@ -346,7 +346,7 @@ export default function Appraisal() {
             {r.stage === "Self Review" && (isEmployee || isHR) && (
               <button
                 onClick={() => handleOpenSelfReview(r)}
-                className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-[11px] font-medium border border-blue-200 transition flex items-center gap-1"
+                className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-[11px] font-medium border border-blue-200 transition flex items-center gap-1"
                 title="Fill & Submit Self Review"
               >
                 <Send size={11} /> Self Review
@@ -357,14 +357,14 @@ export default function Appraisal() {
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => handleOpenManagerReview(r)}
-                  className="px-2 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-lg text-[11px] font-medium border border-amber-200 transition flex items-center gap-1"
+                  className="px-2 py-1 bg-amber-50 text-amber-800 hover:bg-amber-100 rounded-xl text-[11px] font-medium border border-amber-200 transition flex items-center gap-1"
                   title="Manager Evaluation"
                 >
                   <Award size={11} /> Review
                 </button>
                 <button
                   onClick={() => handleOpenReturn(r)}
-                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-[11px] font-medium border border-slate-200 transition flex items-center"
+                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl text-[11px] font-medium border border-slate-200 transition flex items-center"
                   title="Return to Employee for Revision"
                 >
                   <RotateCcw size={11} />
@@ -379,14 +379,14 @@ export default function Appraisal() {
                     setHrApproveRow(r);
                     setHrComments("Calibrated across department benchmarks and approved.");
                   }}
-                  className="px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-[11px] font-medium border border-purple-200 transition flex items-center gap-1"
+                  className="px-2 py-1 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-xl text-[11px] font-medium border border-purple-200 transition flex items-center gap-1"
                   title="Calibrate & Approve Appraisal"
                 >
                   <CheckCircle size={11} /> Calibrate
                 </button>
                 <button
                   onClick={() => handleOpenReturn(r)}
-                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-lg text-[11px] font-medium border border-slate-200 transition flex items-center"
+                  className="px-1.5 py-1 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl text-[11px] font-medium border border-slate-200 transition flex items-center"
                   title="Return to Manager"
                 >
                   <RotateCcw size={11} />
@@ -397,7 +397,7 @@ export default function Appraisal() {
             {r.stage === "Finalization" && isHR && r.status !== "Completed" && (
               <button
                 onClick={() => handleFinalize(r)}
-                className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-[11px] font-medium border border-emerald-200 transition flex items-center gap-1"
+                className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-[11px] font-medium border border-emerald-200 transition flex items-center gap-1"
                 title="Finalize and lock rating"
               >
                 <CheckCircle size={11} /> Finalize
@@ -408,7 +408,7 @@ export default function Appraisal() {
             {r.status === "Completed" && isHR && (
               <button
                 onClick={() => handleSyncToProfile(r)}
-                className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-lg text-[11px] font-medium border border-[#e2e8f0] transition shadow-2xs"
+                className="px-2 py-1 bg-slate-50 text-slate-700 hover:bg-slate-100 rounded-xl text-[11px] font-medium border border-[#e2e8f0] transition shadow-2xs"
                 title="Sync Rating to Employee Profile & Bonus Record"
               >
                 Sync
@@ -418,7 +418,7 @@ export default function Appraisal() {
             {/* View Details Drawer */}
             <button
               onClick={() => setViewRow(r)}
-              className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+              className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
               title="View full appraisal details"
             >
               <Eye size={14} />
@@ -442,7 +442,7 @@ export default function Appraisal() {
                   setFormErrors({});
                   setEditRow(r);
                 }}
-                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-600 grid place-items-center transition"
+                className="w-7 h-7 rounded-xl hover:bg-slate-100 text-slate-600 grid place-items-center transition"
                 title="Edit appraisal"
               >
                 <Pencil size={14} />
@@ -453,7 +453,7 @@ export default function Appraisal() {
             {isHR && (
               <button
                 onClick={() => setDeleteRow(r)}
-                className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center transition"
+                className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center transition"
                 title="Delete appraisal"
               >
                 <Trash2 size={14} />

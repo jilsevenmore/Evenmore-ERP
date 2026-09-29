@@ -1,7 +1,8 @@
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { PageHeader } from '../../components/common/PageHeader';
-import { Link, Navigate } from 'react-router-dom';
+import { Button } from '../../components/ui/Button';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { useAppStore } from '../../stores/appStore';
 // ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
@@ -10,7 +11,7 @@ import { useAppStore } from '../../stores/appStore';
 //   purchaseBills, items, calculateItemStock), not from static CRM fixture data.
 // import { toISODate, getCurrentISODate } from '../../utils/dateUtils';
 import { toISODate } from '../../utils/dateUtils';
-import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown } from 'lucide-react';
+import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown, Plus } from 'lucide-react';
 function buildChart(values, width, height, padding) {
   const max = Math.max(...values);
   const min = 0;
@@ -52,6 +53,7 @@ const CARD_STYLES = {
 };
 
 export const DashboardPage = () => {
+  const navigate = useNavigate();
   const currentUser = useAppStore((s) => s.currentUser);
   const isCustomer = currentUser?.isCustomer || currentUser?.role?.code === 'CU' || String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer';
   if (isCustomer) {
@@ -198,18 +200,20 @@ export const DashboardPage = () => {
         subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration"
         actions={
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
-            <Link
-              to="/crm/dashboard"
-              className="flex-1 sm:flex-initial text-center justify-center px-3.5 py-2 bg-card border border-border hover:bg-soft text-text rounded-xl text-xs font-semibold shadow-2xs transition"
+            <Button
+              variant="outline"
+              className="flex-1 sm:flex-initial"
+              onClick={() => navigate('/crm/dashboard')}
             >
               CRM Dashboard
-            </Link>
-            <Link
-              to="/crm/leads"
-              className="flex-1 sm:flex-initial text-center justify-center px-3.5 py-2 bg-primary hover:bg-primary/90 text-white rounded-xl text-xs font-bold shadow-xs transition flex items-center gap-1.5"
+            </Button>
+            <Button
+              icon={Plus}
+              className="flex-1 sm:flex-initial"
+              onClick={() => navigate('/crm/leads')}
             >
-              + New Lead
-            </Link>
+              New Lead
+            </Button>
           </div>
         }
       />
@@ -480,10 +484,10 @@ export const DashboardPage = () => {
             </div>
             <p className="chart-note">{overview.summary}</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-[11px] sm:text-xs font-semibold">
-              <Link to="/sales/quotes" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition truncate">Quotes: {fmt(quotations.length)}</Link>
-              <Link to="/sales/invoices" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition truncate">Invoices: {fmt(invoices.length)}</Link>
-              <Link to="/sales/challans" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition truncate">Challans: {fmt(deliveryChallans.length)}</Link>
-              <Link to="/sales/orders" className="text-center px-2.5 py-2 rounded-xl border border-border bg-soft hover:bg-card text-text shadow-2xs transition flex items-center justify-center gap-1.5 truncate">
+              <Link to="/sales/quotes" className="btn-outline h-9 flex items-center justify-center text-center px-2.5 rounded-xl shadow-2xs transition truncate">Quotes: {fmt(quotations.length)}</Link>
+              <Link to="/sales/invoices" className="btn-outline h-9 flex items-center justify-center text-center px-2.5 rounded-xl shadow-2xs transition truncate">Invoices: {fmt(invoices.length)}</Link>
+              <Link to="/sales/challans" className="btn-outline h-9 flex items-center justify-center text-center px-2.5 rounded-xl shadow-2xs transition truncate">Challans: {fmt(deliveryChallans.length)}</Link>
+              <Link to="/sales/orders" className="btn-outline h-9 flex items-center justify-center text-center px-2.5 rounded-xl shadow-2xs transition gap-1.5 truncate">
                 <Settings size={12} className="text-primary shrink-0" />
                 <span className="truncate">Orders: {fmt(salesOrders.length)}</span>
               </Link>
@@ -608,16 +612,16 @@ export const DashboardPage = () => {
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-xs font-semibold">
-            <Link to="/inventory/items" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition truncate">
+            <Link to="/inventory/items" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Items: {fmt(items.length)}
             </Link>
-            <Link to="/inventory/transfers" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition truncate">
+            <Link to="/inventory/transfers" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Transfers: {fmt(transfers.length)}
             </Link>
-            <Link to="/inventory/faulty-parts" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition truncate">
+            <Link to="/inventory/faulty-parts" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Faulty: {fmt(openFaulty)}
             </Link>
-            <Link to="/inventory/locations" className="px-2.5 py-2 rounded-xl bg-card hover:bg-soft border border-border text-text text-center shadow-2xs transition flex items-center justify-center gap-1 truncate">
+            <Link to="/inventory/locations" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition gap-1 truncate">
               <MapPin size={12} className="shrink-0" />
               <span className="truncate">Locations</span>
             </Link>
@@ -679,19 +683,19 @@ export const DashboardPage = () => {
           </div>
 
           <div className="pt-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2 text-xs font-semibold">
-            <Link to="/sales/invoices" className="px-2.5 py-2 rounded-xl bg-primary text-white text-center shadow-2xs hover:bg-primary/90 transition truncate">
+            <Link to="/sales/invoices" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Invoices ₹{fmt(Math.round(invoiceTotal))}
             </Link>
-            <Link to="/purchase/bills" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/purchase/bills" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Bills ₹{fmt(Math.round(billTotal))}
             </Link>
-            <Link to="/sales/payments" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/sales/payments" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               PayIn ₹{fmt(Math.round(paymentInTotal))}
             </Link>
-            <Link to="/purchase/payments" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/purchase/payments" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               PayOut ₹{fmt(Math.round(paymentOutTotal))}
             </Link>
-            <Link to="/purchase/expenses" className="px-2.5 py-2 rounded-xl bg-soft hover:bg-card border border-border text-text text-center col-span-2 sm:col-span-4 xl:col-span-2 transition text-[11px] sm:text-xs">
+            <Link to="/purchase/expenses" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center col-span-2 sm:col-span-4 xl:col-span-2 transition text-[11px] sm:text-xs shadow-2xs truncate">
               Expenses ₹{fmt(Math.round(expenseTotal))} • Challans {fmt(deliveryChallans.length)} • Returns {fmt(salesReturns.length)}
             </Link>
           </div>
@@ -781,22 +785,22 @@ export const DashboardPage = () => {
             </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 gap-2 text-xs font-semibold">
-            <Link to="/hrms/employees" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/hrms/employees" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
               Employees
             </Link>
-            <Link to="/hrms/attendance" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/hrms/attendance" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
               Attendance
             </Link>
-            <Link to="/hrms/leave" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/hrms/leave" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
               Leave
             </Link>
-            <Link to="/hrms/payroll" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/hrms/payroll" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
               Payroll
             </Link>
-            <Link to="/administration/users" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/administration/users" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
               Users
             </Link>
-            <Link to="/administration/settings" className="p-2 sm:p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text text-center transition truncate">
+            <Link to="/administration/settings" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
               Settings
             </Link>
           </div>
@@ -810,7 +814,7 @@ export const DashboardPage = () => {
               <span className="truncate">Zone Requests ({pendingZoneReqs})</span>
             </Link>
             */}
-            <Link to="/inventory/transfers" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
+            <Link to="/inventory/transfers" className="btn-outline h-9 px-3 rounded-xl text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <ArrowLeftRight size={13} className="text-primary shrink-0" />
               <span className="truncate">Transfers ({pendingTransfers})</span>
             </Link>

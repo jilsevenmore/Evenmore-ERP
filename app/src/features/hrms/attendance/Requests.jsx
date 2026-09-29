@@ -708,14 +708,14 @@ export default function Requests() {
         .req-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
         .req-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
 
-        .req-btn-outline { background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 18px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-        .req-btn-outline:hover { background: #f9fafb; }
-        .req-btn-primary { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .req-btn-primary:hover { background: #0f172a; }
+        .req-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .req-btn-outline:hover { background: var(--card-hover); color: var(--text); }
+        .req-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--primary); color: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(31,107,255,0.25); }
+        .req-btn-primary:hover { background: var(--primary-dark); }
 
         .req-tabs { display: inline-flex; align-items: center; gap: 3px; background: #f4f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 3px 4px; margin-bottom: 16px; }
-        .req-tab { border: 1.5px solid transparent; border-radius: 999px; padding: 5px 16px; font-size: 13px; font-weight: 500; color: #8e9baa; background: transparent; cursor: pointer; transition: all 0.15s ease; }
-        .req-tab.active { font-weight: 600; color: #000000; background: #ffffff; border-color: #000000; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .req-tab { border: 1px solid transparent; border-radius: 999px; padding: 6px 16px; font-size: 12px; font-weight: 600; color: var(--muted); background: transparent; cursor: pointer; transition: all 0.15s ease; }
+        .req-tab.active { font-weight: 700; color: var(--primary); background: var(--card); border-color: var(--primary); box-shadow: 0 1px 2px rgba(31,107,255,0.15); }
 
         .req-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
         .req-filter-card { border: none; padding: 14px 18px; margin-bottom: 16px; }
@@ -739,8 +739,8 @@ export default function Requests() {
         .req-filter-dropdown.active .req-filter-arrow { color: #2563eb; }
         .req-filter-native-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
-        .req-btn-clear { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
-        .req-btn-clear:hover { background: #f8fafc; color: #111827; }
+        .req-btn-clear { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .req-btn-clear:hover { background: var(--card-hover); color: var(--text); }
 
         .req-main-card { overflow: hidden; }
         .req-table { width: 100%; border-collapse: collapse; min-width: 1000px; font-size: 13.5px; }
@@ -758,12 +758,13 @@ export default function Requests() {
         .req-reason { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #374151; }
         .req-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 12px; border: 1px solid; white-space: nowrap; }
 
-        .req-btn-approve { background: #059669; color: #fff; border: none; border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer; transition: background 0.15s ease; }
-        .req-btn-approve:hover { background: #047857; }
-        .req-btn-reject { background: #fff; border: 1px solid #d1d5db; border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: background 0.15s ease; }
-        .req-btn-reject:hover { background: #fee2e2; color: #dc2626; border-color: #fca5a5; }
-        .req-btn-view { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 12px; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
-        .req-btn-view:hover { background: #f8fafc; color: #111827; }
+        .req-btn-approve { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 10px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--primary); color: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(31,107,255,0.25); }
+        .req-btn-approve:hover { background: var(--primary-dark); }
+        .req-btn-reject { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 10px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .req-btn-reject:hover { background: var(--card-hover); color: var(--danger); border-color: var(--danger); }
+        .req-btn-view { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 10px; font-size: 12px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .req-btn-view:hover { background: var(--card-hover); color: var(--text); }
+        .req-btn-outline:active, .req-btn-primary:active, .req-btn-clear:active, .req-btn-approve:active, .req-btn-reject:active, .req-btn-view:active { transform: scale(0.99); }
         @media (max-width: 1023px) {
           .req-page { margin: -16px -20px -24px; }
         }

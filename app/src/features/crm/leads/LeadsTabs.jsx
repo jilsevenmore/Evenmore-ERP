@@ -74,10 +74,10 @@ export default function LeadsTabs({
           <button
             type="button"
             onClick={onOpenGuide}
-            className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2.5 text-[13px] font-semibold text-[#1d6bff]"
+            className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
             aria-label="How to create a lead"
           >
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1f6bff] text-[11px] font-bold text-white">?</span>
             <span>How to create a lead?</span>
           </button>
         </div>

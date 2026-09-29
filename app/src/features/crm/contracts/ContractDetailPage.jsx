@@ -391,7 +391,7 @@ export default function ContractDetailPage() {
         <div className="flex overflow-x-auto scrollbar-none gap-1 px-4 border-b border-slate-100" role="tablist" aria-label="Contract sections">
           {tabs.map(({ name, count }) => (
             <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}
-              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3 py-3 text-xs whitespace-nowrap border-b-2 ${tab === name ? 'text-blue-600 border-blue-600 font-semibold' : 'text-slate-500 border-transparent'}`}>
+              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3 py-3 text-xs whitespace-nowrap border-b-2 ${tab === name ? 'text-primary border-primary font-semibold' : 'text-slate-500 border-transparent'}`}>
               {name}{count != null && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{count}</span>}
             </button>
           ))}
@@ -553,7 +553,7 @@ export default function ContractDetailPage() {
           </fieldset>)}
           <button type="button" className="btn-outline btn-sm" onClick={() => setTermsForm([...termsForm, { heading: '', body: '' }])}><Plus size={14} />Add Clause</button>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
-          <div className="contract-terms-footer"><button type="button" className="btn-outline btn-sm" onClick={() => setTermsOpen(false)}>Cancel</button><button type="submit" className="btn-primary btn-sm">Save Terms</button></div>
+          <div className="contract-terms-footer"><button type="button" className="btn-outline" onClick={() => setTermsOpen(false)}>Cancel</button><button type="submit" className="btn-primary">Save Terms</button></div>
         </form>
       </Modal>
 
@@ -616,8 +616,8 @@ export default function ContractDetailPage() {
           </label>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setEditOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button>
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setEditOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button>
           </div>
         </form>
       </Modal>
@@ -643,21 +643,21 @@ export default function ContractDetailPage() {
           </label>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setRenewOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Renewing…' : 'Renew Contract'}</button>
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setRenewOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Renewing…' : 'Renew Contract'}</button>
           </div>
         </form>
       </Modal>
 
       <Modal isOpen={closeOpen} onClose={() => setCloseOpen(false)} title="Close Contract"
-        footer={<><button type="button" className="btn-outline btn-sm" onClick={() => setCloseOpen(false)}>Cancel</button>
-          <button type="button" className="btn-primary btn-sm" onClick={handleClose}>Close Contract</button></>}>
+        footer={<><button type="button" className="btn-outline" onClick={() => setCloseOpen(false)}>Cancel</button>
+          <button type="button" className="btn-primary" onClick={handleClose}>Close Contract</button></>}>
         <p className="text-xs leading-6 text-slate-600">Close <strong>{contract.contractNumber}</strong>? Closed contracts remain in the list for reference.</p>
       </Modal>
 
       <Modal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Contract"
-        footer={<><button type="button" className="btn-outline btn-sm" onClick={() => setDeleteOpen(false)}>Cancel</button>
-          <button type="button" className="btn-sm rounded-lg bg-rose-600 px-4 py-2 font-semibold text-white hover:bg-rose-700" onClick={handleDelete}>Delete</button></>}>
+        footer={<><button type="button" className="btn-outline" onClick={() => setDeleteOpen(false)}>Cancel</button>
+          <button type="button" className="btn-danger" onClick={handleDelete}>Delete</button></>}>
         <p className="text-xs leading-6 text-slate-600">Delete <strong>{contract.contractNumber}</strong>? This cannot be undone.</p>
       </Modal>
 
@@ -682,8 +682,8 @@ export default function ContractDetailPage() {
           </label>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setActivityOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Saving…' : 'Add Activity'}</button>
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setActivityOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Add Activity'}</button>
           </div>
         </form>
       </Modal>

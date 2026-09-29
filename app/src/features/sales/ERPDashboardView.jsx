@@ -96,7 +96,7 @@ export const DashboardView = ({ onSelectScreen, faultyParts = [], invoices = [],
             </div>
           </div>
 
-          <button onClick={() => onSelectScreen('faulty-parts')} className="mt-6 w-full py-2 bg-[#1F2E4A] hover:bg-[#152036] text-white rounded text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-2xs">
+          <button onClick={() => onSelectScreen('faulty-parts')} className="mt-6 w-full py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-[0.99] cursor-pointer">
             Open Faulty Parts Screen
             <ArrowRight className="w-3.5 h-3.5"/>
           </button>
@@ -141,7 +141,7 @@ export const DashboardView = ({ onSelectScreen, faultyParts = [], invoices = [],
             </div>
           </div>
 
-          <button onClick={() => onSelectScreen('sales-invoices')} className="mt-6 w-full py-2 bg-[#1F2E4A] hover:bg-[#152036] text-white rounded text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-2xs">
+          <button onClick={() => onSelectScreen('sales-invoices')} className="mt-6 w-full py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-[0.99] cursor-pointer">
             Open Sales Invoices Screen
             <ArrowRight className="w-3.5 h-3.5"/>
           </button>
@@ -182,7 +182,7 @@ export const DashboardView = ({ onSelectScreen, faultyParts = [], invoices = [],
             </div>
           </div>
 
-          <button onClick={() => onSelectScreen('zone-requests')} className="mt-6 w-full py-2 bg-[#0CB1AC] hover:bg-[#0aa09c] text-white rounded text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-2xs">
+          <button onClick={() => onSelectScreen('zone-requests')} className="mt-6 w-full py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all shadow-2xs active:scale-[0.99] cursor-pointer">
             Open Zone Requests Screen
             <ArrowRight className="w-3.5 h-3.5"/>
           </button>

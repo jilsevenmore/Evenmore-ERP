@@ -246,7 +246,7 @@ export function OrgChartPage() {
             <button
               type="button"
               onClick={() => setIsExportOpen(!isExportOpen)}
-              className="px-4 py-2.5 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+              className="px-4 h-9 border border-border bg-card hover:bg-card-hover text-text rounded-xl text-xs font-semibold flex items-center gap-2 shadow-2xs transition-colors cursor-pointer"
             >
               <Download size={16} />
               <span>Export</span>
@@ -258,7 +258,7 @@ export function OrgChartPage() {
                 <button
                   type="button"
                   onClick={exportCSV}
-                  className="w-full px-3.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                 >
                   <FileSpreadsheet size={16} className="text-emerald-600" />
                   <span>Export as CSV</span>
@@ -266,7 +266,7 @@ export function OrgChartPage() {
                 <button
                   type="button"
                   onClick={exportPrint}
-                  className="w-full px-3.5 py-2 text-left text-[13px] text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
+                  className="w-full px-3.5 py-2 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer"
                 >
                   <Printer size={16} className="text-blue-600" />
                   <span>Print / Save as PDF</span>
@@ -279,7 +279,7 @@ export function OrgChartPage() {
           <button
             type="button"
             onClick={() => setIsAddDeptOpen(true)}
-            className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium shadow-xs transition-colors cursor-pointer"
+            className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition-colors cursor-pointer"
           >
             Add Department
           </button>
@@ -313,7 +313,7 @@ export function OrgChartPage() {
           <button
             type="button"
             onClick={handleToggleAll}
-            className="px-3 py-1 text-navy hover:bg-slate-100 rounded-lg text-[13px] font-medium transition-colors cursor-pointer"
+            className="px-3 py-1 text-navy hover:bg-slate-100 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
           >
             {expandedAll ? 'Collapse all' : 'Expand all'}
           </button>
@@ -326,7 +326,7 @@ export function OrgChartPage() {
             type="button"
             onClick={() => setZoom((z) => Math.max(60, z - 10))}
             disabled={zoom <= 60}
-            className="w-8 h-8 border border-bdr rounded-lg grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
+            className="w-8 h-8 border border-bdr rounded-xl grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
             title="Zoom out"
           >
             <Minus size={15} />
@@ -343,7 +343,7 @@ export function OrgChartPage() {
             type="button"
             onClick={() => setZoom((z) => Math.min(140, z + 10))}
             disabled={zoom >= 140}
-            className="w-8 h-8 border border-bdr rounded-lg grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
+            className="w-8 h-8 border border-bdr rounded-xl grid place-items-center bg-white hover:bg-slate-50 text-slate-700 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
             title="Zoom in"
           >
             <Plus size={15} />
@@ -598,13 +598,13 @@ export function OrgChartPage() {
               <button
                 type="button"
                 onClick={() => setIsAddDeptOpen(false)}
-                className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+                className="px-4 h-9 bg-card border border-border text-text hover:bg-card-hover rounded-xl text-xs font-semibold transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+                className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition cursor-pointer"
               >
                 Create Department
               </button>
@@ -703,7 +703,7 @@ export function OrgChartPage() {
                     <div
                       key={rep.key || rep.name}
                       onClick={() => setSelectedEmployee(rep)}
-                      className="px-2.5 py-1 bg-white border border-bdr rounded-lg text-[12px] flex items-center gap-2 hover:border-navy cursor-pointer transition-colors"
+                      className="px-2.5 h-8 bg-white border border-bdr rounded-xl text-xs flex items-center gap-2 hover:border-navy cursor-pointer transition-colors"
                     >
                       <img src={rep.avatar} alt={rep.name} className="w-4 h-4 rounded-full" />
                       <span className="font-medium text-slate-800">{rep.name}</span>

@@ -75,7 +75,7 @@ export default function GenerateOfferModal({
       <div className="bg-white rounded-2xl border border-slate-300 shadow-2xl w-full max-w-lg p-4 sm:p-6 my-auto">
         <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-navy/10 text-navy grid place-items-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-navy/10 text-navy grid place-items-center font-bold">
               <Briefcase size={16} />
             </div>
             <div>
@@ -90,7 +90,7 @@ export default function GenerateOfferModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-100 grid place-items-center text-slate-400 hover:text-slate-700 transition"
+            className="w-8 h-8 rounded-xl hover:bg-slate-100 grid place-items-center text-slate-400 hover:text-slate-700 transition"
           >
             <X size={18} />
           </button>
@@ -112,7 +112,7 @@ export default function GenerateOfferModal({
             <select
               value={selectedCandidateId}
               onChange={handleSelectCandidate}
-              className="w-full px-3 py-1.5 rounded-lg border border-emerald-300 text-xs bg-white text-slate-800 focus:outline-none focus:border-emerald-600 font-medium"
+              className="w-full h-9 px-3.5 rounded-xl border border-emerald-300 text-xs bg-white text-slate-800 focus:outline-none focus:border-emerald-600 font-medium"
             >
               <option value="">-- Choose candidate to auto-fill (or enter manually) --</option>
               <optgroup label="Hired Candidates (Ready for Offer)">
@@ -147,7 +147,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, candidateName: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               />
             </div>
             <div>
@@ -161,7 +161,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               />
             </div>
           </div>
@@ -179,7 +179,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, position: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               />
             </div>
             <div>
@@ -191,7 +191,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, jobType: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy font-medium"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy font-medium"
               >
                 <option>Full-time</option>
                 <option>Part-time</option>
@@ -214,7 +214,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, salary: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy font-bold text-emerald-800"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy font-bold text-emerald-800"
               />
             </div>
             <div>
@@ -228,7 +228,7 @@ export default function GenerateOfferModal({
                   setFormData({ ...formData, dept: e.target.value })
                 }
                 placeholder="Enter department"
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               />
               <datalist id="gen-offer-depts">
                 {departmentOptions.map((d) => (
@@ -250,7 +250,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, location: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               />
             </div>
             <div>
@@ -262,7 +262,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, workMode: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               >
                 <option>Hybrid</option>
                 <option>On-site</option>
@@ -283,7 +283,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, joiningDate: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               />
             </div>
             <div>
@@ -297,7 +297,7 @@ export default function GenerateOfferModal({
                 onChange={(e) =>
                   setFormData({ ...formData, reportingManager: e.target.value })
                 }
-                className="w-full px-3 py-1.5 rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:border-navy"
               />
             </div>
           </div>
@@ -306,13 +306,13 @@ export default function GenerateOfferModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-slate-200 rounded-xl text-[13px] hover:bg-slate-50 font-medium"
+              className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 flex items-center gap-1.5 shadow-xs"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs"
             >
               <Briefcase size={15} />
               <span>Generate &amp; Preview</span>

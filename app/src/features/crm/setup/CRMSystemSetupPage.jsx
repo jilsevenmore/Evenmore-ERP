@@ -322,7 +322,7 @@ export default function CRMSystemSetupPage() {
                 <p className="text-xs text-slate-500 truncate">Manage stages for your lead follow-up process.</p>
               </div>
             </div>
-            <button type="button" onClick={openAddLead} className="bg-[#1f6bff] hover:bg-blue-700 text-white rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 shrink-0">
+            <button type="button" onClick={openAddLead} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-2xs active:scale-[0.99] cursor-pointer">
               <Plus size={14} /> Add Lead Stage
             </button>
           </div>
@@ -406,7 +406,7 @@ export default function CRMSystemSetupPage() {
                 <p className="text-xs text-slate-500 truncate">Manage stages for your sales pipeline process.</p>
               </div>
             </div>
-            <button type="button" onClick={openAddDeal} className="bg-[#1f6bff] hover:bg-blue-700 text-white rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1.5 shrink-0">
+            <button type="button" onClick={openAddDeal} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-2xs active:scale-[0.99] cursor-pointer">
               <Plus size={14} /> Add Deal Stage
             </button>
           </div>
@@ -523,7 +523,7 @@ export default function CRMSystemSetupPage() {
             </div>
 
             <div className="mt-5 flex justify-end">
-              <button type="button" onClick={() => setShowDifferenceModal(false)} className="h-9 px-4 rounded-lg bg-[#1f6bff] text-white text-xs font-semibold hover:bg-blue-700">
+              <button type="button" onClick={() => setShowDifferenceModal(false)} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold shadow-2xs active:scale-[0.99] cursor-pointer">
                 Close
               </button>
             </div>
@@ -552,8 +552,8 @@ export default function CRMSystemSetupPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button type="button" onClick={() => setLeadModal(null)} className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={saveLeadModal} className="h-9 px-4 rounded-lg bg-[#1f6bff] text-white text-xs font-semibold hover:bg-blue-700">Save Stage</button>
+              <button type="button" onClick={() => setLeadModal(null)} className="btn-outline">Cancel</button>
+              <button type="button" onClick={saveLeadModal} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold shadow-2xs active:scale-[0.99] cursor-pointer transition-colors">Save Stage</button>
             </div>
           </div>
         </div>
@@ -586,8 +586,8 @@ export default function CRMSystemSetupPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button type="button" onClick={() => setDealModal(null)} className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={saveDealModal} className="h-9 px-4 rounded-lg bg-[#1f6bff] text-white text-xs font-semibold hover:bg-blue-700">Save Stage</button>
+              <button type="button" onClick={() => setDealModal(null)} className="btn-outline">Cancel</button>
+              <button type="button" onClick={saveDealModal} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold shadow-2xs active:scale-[0.99] cursor-pointer transition-colors">Save Stage</button>
             </div>
           </div>
         </div>
@@ -600,8 +600,8 @@ export default function CRMSystemSetupPage() {
             <h2 className="text-sm font-bold text-slate-800 mt-3">Delete {deleteModal.type === 'lead' ? 'Lead' : 'Deal'} Stage?</h2>
             <p className="text-xs text-slate-500 mt-1">Are you sure you want to delete <strong className="text-slate-700">{deleteModal.name}</strong>? This action is permanent.</p>
             <div className="flex justify-end gap-2 mt-5">
-              <button type="button" onClick={() => setDeleteModal(null)} className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-              <button type="button" onClick={confirmDelete} className="h-9 px-4 rounded-lg bg-red-600 text-white text-xs font-semibold hover:bg-red-700">Delete</button>
+              <button type="button" onClick={() => setDeleteModal(null)} className="btn-outline">Cancel</button>
+              <button type="button" onClick={confirmDelete} className="btn-danger">Delete</button>
             </div>
           </div>
         </div>

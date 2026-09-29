@@ -264,7 +264,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
               <button
                 type="button"
                 onClick={() => setViewMode("kanban")}
-                className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
+                className={`p-2 rounded-xl text-slate-700 transition cursor-pointer ${
                   viewMode === "kanban" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
                 }`}
                 title="Kanban Funnel View"
@@ -274,7 +274,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
               <button
                 type="button"
                 onClick={() => setViewMode("list")}
-                className={`p-2 rounded-lg text-slate-700 transition cursor-pointer ${
+                className={`p-2 rounded-xl text-slate-700 transition cursor-pointer ${
                   viewMode === "list" ? "bg-slate-800 text-white shadow-xs" : "hover:bg-off"
                 }`}
                 title="Table / List View"
@@ -287,7 +287,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
             <button
               type="button"
               onClick={() => handleOpenAdd("Requested")}
-              className="w-9 h-9 rounded-xl bg-[#1e3a8a] text-white hover:bg-[#1e40af] transition grid place-items-center shadow-xs cursor-pointer"
+              className="w-9 h-9 rounded-xl bg-primary hover:bg-primary-dark text-white transition grid place-items-center shadow-2xs active:scale-[0.99] cursor-pointer"
               title="Add / Request Training"
             >
               <Plus size={18} />
@@ -344,14 +344,14 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
           <button
             type="button"
             onClick={() => navigate("/hrms/training/list")}
-            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-lg hover:bg-off font-medium transition"
+            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-xl hover:bg-off font-medium transition"
           >
             Programs List &rarr;
           </button>
           <button
             type="button"
             onClick={() => navigate("/hrms/training/trainers")}
-            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-lg hover:bg-off font-medium transition"
+            className="text-[12px] text-slate-600 hover:text-navy px-2.5 py-1 rounded-xl hover:bg-off font-medium transition"
           >
             Trainers &rarr;
           </button>
@@ -595,7 +595,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                           <button
                             type="button"
                             onClick={() => handleOpenEdit(t)}
-                            className="p-1 text-slate-500 hover:text-navy rounded-lg hover:bg-off transition"
+                            className="p-1 text-slate-500 hover:text-navy rounded-xl hover:bg-off transition"
                             title="Edit"
                           >
                             <Pencil size={14} />
@@ -608,7 +608,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                                 showToast(`Deleted "${t.name}"`);
                               }
                             }}
-                            className="p-1 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-rose-50 transition"
+                            className="p-1 text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition"
                             title="Delete"
                           >
                             <Trash2 size={14} />
@@ -662,7 +662,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-200/60 grid place-items-center text-muted hover:text-slate-800 transition"
+                className="w-8 h-8 rounded-xl hover:bg-slate-200/60 grid place-items-center text-muted hover:text-slate-800 transition"
               >
                 ✕
               </button>
@@ -870,13 +870,13 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                   <button
                     type="button"
                     onClick={() => setModalOpen(false)}
-                    className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium transition"
+                    className="px-4 h-9 bg-card border border-border rounded-xl text-xs font-semibold text-text hover:bg-card-hover transition cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 transition shadow-xs"
+                    className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition cursor-pointer"
                   >
                     {editingItem ? "Update Training" : "Save to Funnel"}
                   </button>

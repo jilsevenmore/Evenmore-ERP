@@ -226,10 +226,10 @@ export const VendorsPage = () => {
               </div>
 
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded hover:bg-slate-100 font-medium">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded font-bold shadow-sm">
+                <button type="submit" className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs cursor-pointer transition active:scale-[0.99]">
                   Register Vendor
                 </button>
               </div>

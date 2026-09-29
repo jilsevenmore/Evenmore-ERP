@@ -138,7 +138,7 @@ export default function OfferLetterModal({
         {/* Top Control Bar (Hidden during Print) */}
         <div className="bg-[#1F2E4A] text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 no-print shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 flex items-center justify-center font-bold">
               <FileCheck size={16} />
             </div>
             <div>
@@ -161,7 +161,7 @@ export default function OfferLetterModal({
             <button
               type="button"
               onClick={() => setIsEditing(!isEditing)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              className={`h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
                 isEditing
                   ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
                   : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
@@ -176,7 +176,7 @@ export default function OfferLetterModal({
               <button
                 type="button"
                 onClick={handleConfirm}
-                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                className="btn-primary h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer border-transparent"
                 title="Confirm & Generate Offer Letter"
               >
                 <CheckCircle2 size={14} />
@@ -186,7 +186,7 @@ export default function OfferLetterModal({
               <button
                 type="button"
                 onClick={handleSave}
-                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                className="btn-primary h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer border-transparent"
                 title="Save Changes"
               >
                 <Save size={14} />
@@ -198,7 +198,7 @@ export default function OfferLetterModal({
             <button
               type="button"
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+              className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
               title="Print or Export as PDF"
             >
               <Printer size={14} />
@@ -209,7 +209,7 @@ export default function OfferLetterModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition ml-1"
+              className="p-1.5 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition ml-1 cursor-pointer"
               title="Close Preview"
             >
               <X size={18} />
@@ -254,7 +254,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, candidateName: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -267,7 +267,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, email: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -283,7 +283,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, position: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -295,7 +295,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, jobType: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600 font-medium"
                   >
                     <option>Full-time</option>
                     <option>Part-time</option>
@@ -313,7 +313,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, dept: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -330,7 +330,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, salary: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600 font-bold text-emerald-800"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600 font-bold text-emerald-800"
                   />
                 </div>
                 <div>
@@ -344,7 +344,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, location: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -356,7 +356,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, workMode: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   >
                     <option>On-site</option>
                     <option>Hybrid</option>
@@ -376,7 +376,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, joiningDate: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -389,7 +389,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, reportingManager: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -403,7 +403,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, probationPeriod: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -420,7 +420,7 @@ export default function OfferLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, acceptanceDeadline: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -435,7 +435,7 @@ export default function OfferLetterModal({
                       onChange={(e) =>
                         setFormData({ ...formData, signatoryName: e.target.value })
                       }
-                      className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                      className="w-1/2 h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                     />
                     <input
                       type="text"
@@ -444,7 +444,7 @@ export default function OfferLetterModal({
                       onChange={(e) =>
                         setFormData({ ...formData, signatoryTitle: e.target.value })
                       }
-                      className="w-1/2 px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                      className="w-1/2 h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                     />
                   </div>
                 </div>
@@ -454,7 +454,7 @@ export default function OfferLetterModal({
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-1.5 bg-slate-200 text-slate-800 rounded-lg text-xs font-semibold hover:bg-slate-300"
+                  className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold hover:bg-slate-100"
                 >
                   Done Editing &amp; Preview
                 </button>
@@ -462,7 +462,7 @@ export default function OfferLetterModal({
                   <button
                     type="button"
                     onClick={handleConfirm}
-                    className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-500 flex items-center gap-1.5"
+                    className="btn-primary h-9 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 border-transparent"
                   >
                     <CheckCircle2 size={14} />
                     <span>Confirm &amp; Generate Offer</span>
@@ -480,7 +480,7 @@ export default function OfferLetterModal({
             <div className="flex items-start justify-between border-b border-slate-200 pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-base font-mono">
+                  <div className="w-8 h-8 rounded-xl bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-base font-mono">
                     E
                   </div>
                   <div>

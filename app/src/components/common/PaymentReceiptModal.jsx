@@ -143,10 +143,10 @@ export const PaymentReceiptModal = ({ receipt, onClose }) => {
                         {isWithoutBill ? 'Internal Cash Voucher Clear' : 'Ledger GL Posted & Invoice Settled'}
                     </span>
                     <div className="flex items-center gap-2">
-                        <button onClick={() => window.print()} className="px-3.5 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs">
+                        <button onClick={() => window.print()} className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs">
                             <Printer size={13}/> Print Receipt
                         </button>
-                        <button onClick={onClose} className="px-3 py-1.5 border border-slate-200 hover:bg-slate-100 rounded-lg text-slate-700 font-medium cursor-pointer">
+                        <button onClick={onClose} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
                             Done
                         </button>
                     </div>

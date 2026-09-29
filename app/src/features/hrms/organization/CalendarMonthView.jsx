@@ -79,7 +79,7 @@ export function CalendarMonthView({
                         e.stopPropagation();
                         onQuickAddDate(cell.dateStr);
                       }}
-                      className="w-5 h-5 rounded-md bg-navy text-white hover:bg-navy/90 grid place-items-center shadow-2xs transition"
+                      className="w-5 h-5 rounded-xl bg-navy text-white hover:bg-navy/90 grid place-items-center shadow-2xs transition"
                     >
                       <Plus size={12} />
                     </button>
@@ -99,7 +99,7 @@ export function CalendarMonthView({
                       e.stopPropagation();
                       onEventClick(ev);
                     }}
-                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium truncate transition hover:opacity-85 ${getEventBadgeClasses(
+                    className={`text-[10px] px-1.5 py-0.5 rounded-xl font-medium truncate transition hover:opacity-85 ${getEventBadgeClasses(
                       ev.type
                     )}`}
                     title={`${ev.title} (${ev.time || "All Day"})`}

@@ -393,7 +393,7 @@ export function ClientsPage() {
           <div className="relative export-menu-container">
             <button
               onClick={() => setIsExportOpen(!isExportOpen)}
-              className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-colors"
+              className="inline-flex items-center gap-2 bg-card hover:bg-card-hover text-text border border-border font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs transition-colors cursor-pointer"
             >
               <Download size={16} />
               <span>Export</span>
@@ -425,9 +425,9 @@ export function ClientsPage() {
               setEditingClient(null);
               setIsCreateModalOpen(true);
             }}
-            className="inline-flex items-center justify-center gap-2 bg-[#1f6bff] hover:bg-blue-700 text-white font-semibold text-xs md:text-sm px-4 md:px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all duration-150 active:scale-95"
+            className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs hover:shadow transition-all duration-150 active:scale-[0.99] cursor-pointer"
           >
-            <Plus size={18} strokeWidth={2.4} />
+            <Plus size={16} strokeWidth={2.4} />
             <span>Create New Client</span>
           </button>
         </div>

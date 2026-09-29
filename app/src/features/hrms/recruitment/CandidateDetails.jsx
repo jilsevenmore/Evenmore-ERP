@@ -206,7 +206,7 @@ export default function CandidateDetails() {
                     openOfferLetter();
                   }
                 }}
-                className="h-7 px-2 bg-transparent text-xs font-bold text-text focus:outline-none cursor-pointer"
+                className="h-9 px-2 bg-transparent text-xs font-semibold text-text focus:outline-none cursor-pointer"
               >
                 <option>Applied</option>
                 <option>Screening</option>

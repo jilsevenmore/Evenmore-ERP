@@ -254,7 +254,7 @@ export default function ProjectsPage() {
       <PageHeader
         title="Projects"
         subtitle="Every created project appears here — create from a Won deal or manually."
-        actions={<button type="button" className="btn-primary btn-sm" onClick={() => openCreate()}><Plus size={14} /> New Project</button>}
+        actions={<button type="button" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5" onClick={() => openCreate()}><Plus size={14} /> New Project</button>}
       />
 
       {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
@@ -273,7 +273,7 @@ export default function ProjectsPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             {wonDeals.slice(0, 8).map((d) => (
               <button key={d.id} type="button" onClick={() => openCreate(d.id)}
-                className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100">
+                className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100">
                 <Plus size={12} /> {d.name} • {d.client}
               </button>
             ))}
@@ -291,7 +291,7 @@ export default function ProjectsPage() {
           <div className="flex gap-2 flex-wrap">
             {STATUSES.map((s) => (
               <button key={s} type="button" onClick={() => setStatusFilter(s)}
-                className={`rounded-full px-3 py-1.5 text-xs font-semibold border ${statusFilter === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-300'}`}>
+                className={`h-9 px-3.5 rounded-xl text-xs font-semibold transition ${statusFilter === s ? 'btn-primary' : 'btn-outline'}`}>
                 {s}
               </button>
             ))}
@@ -303,7 +303,7 @@ export default function ProjectsPage() {
             <Briefcase size={28} className="mx-auto text-slate-300" />
             <p className="mt-3 text-sm font-bold text-slate-700">No projects yet</p>
             <p className="mt-1 text-xs text-slate-500">Create your first project — it will show up here instantly.</p>
-            <button type="button" className="btn-primary btn-sm mt-4" onClick={() => openCreate()}><Plus size={14} /> Create Project</button>
+            <button type="button" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold mt-4 inline-flex items-center gap-1.5" onClick={() => openCreate()}><Plus size={14} /> Create Project</button>
           </div>
         ) : (
           <div className="mt-4 overflow-x-auto rounded-xl border border-slate-100">
@@ -337,11 +337,11 @@ export default function ProjectsPage() {
                     <td className="px-4 py-3 text-slate-600">{p.sourceDealId || 'Manual'}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1.5">
-                        <Link className="p-2 rounded-lg border border-slate-200 text-blue-600 hover:bg-blue-50" title="View"
+                        <Link className="p-2 rounded-xl border border-slate-200 text-blue-600 hover:bg-blue-50" title="View"
                           to={`/crm/projects/${encodeURIComponent(p.id)}`}><Eye size={14} /></Link>
-                        <button type="button" className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100" title="Edit"
+                        <button type="button" className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-100" title="Edit"
                           onClick={() => openEdit(p)}><Pencil size={14} /></button>
-                        <button type="button" className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50" title="Delete"
+                        <button type="button" className="p-2 rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50" title="Delete"
                           onClick={() => setDeleting(p)}><Trash2 size={14} /></button>
                       </div>
                     </td>
@@ -358,8 +358,8 @@ export default function ProjectsPage() {
           <ProjectForm form={form} setForm={setForm} wonDeals={wonDeals} dealLocked={false} />
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setCreateOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Creating…' : 'Create Project'}</button>
+            <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" disabled={busy} onClick={() => setCreateOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold" disabled={busy}>{busy ? 'Creating…' : 'Create Project'}</button>
           </div>
         </form>
       </Modal>
@@ -370,27 +370,27 @@ export default function ProjectsPage() {
             <ProjectForm form={form} setForm={setForm} wonDeals={wonDeals} dealLocked />
             {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-              <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
-              <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button>
+              <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" disabled={busy} onClick={() => setEditing(null)}>Cancel</button>
+              <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button>
             </div>
           </form>
         )}
       </Modal>
 
       <Modal isOpen={Boolean(deleting)} onClose={() => setDeleting(null)} title="Delete Project"
-        footer={<><button type="button" className="btn-outline btn-sm" onClick={() => setDeleting(null)}>Cancel</button>
-          <button type="button" className="btn-sm rounded-lg bg-rose-600 px-4 py-2 font-semibold text-white hover:bg-rose-700" onClick={confirmDelete}>Delete</button></>}>
+        footer={<><button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" onClick={() => setDeleting(null)}>Cancel</button>
+          <button type="button" className="btn-danger h-9 px-4 rounded-xl text-xs font-semibold" onClick={confirmDelete}>Delete</button></>}>
         {deleting && <p className="text-xs leading-6 text-slate-600">Delete <strong>{deleting.projectNumber}</strong> — {deleting.name}? The linked deal will be unlinked. This cannot be undone.</p>}
       </Modal>
 
       <Modal isOpen={Boolean(created)} onClose={() => setCreated(null)}
         footer={created && (
           <div className="flex justify-center gap-2 w-full">
-            <Link className="btn-primary btn-sm" to={`/crm/projects/${encodeURIComponent(created.id)}`}>View Project</Link>
+            <Link className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center justify-center" to={`/crm/projects/${encodeURIComponent(created.id)}`}>View Project</Link>
             {created.sourceDealId ? (
-              <Link className="btn-outline btn-sm" to={`/crm/deals?deal=${encodeURIComponent(created.sourceDealId)}`}>Back to Deal</Link>
+              <Link className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center justify-center" to={`/crm/deals?deal=${encodeURIComponent(created.sourceDealId)}`}>Back to Deal</Link>
             ) : (
-              <button type="button" className="btn-outline btn-sm" onClick={() => setCreated(null)}>Back to Projects</button>
+              <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" onClick={() => setCreated(null)}>Back to Projects</button>
             )}
           </div>
         )}>

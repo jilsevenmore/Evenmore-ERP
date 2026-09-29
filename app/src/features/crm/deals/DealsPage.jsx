@@ -638,7 +638,7 @@ export default function DealsPage() {
           <button
             type="button"
             onClick={handlePrintDeals}
-            className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-colors cursor-pointer"
+            className="btn-outline inline-flex items-center gap-2"
           >
             <Printer size={16} />
             <span>Print</span>
@@ -646,7 +646,7 @@ export default function DealsPage() {
 
           <button
             onClick={() => handleOpenCreateModal()}
-            className="inline-flex items-center gap-2 bg-[#1d4a79] hover:bg-[#163a61] text-white font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs transition-colors cursor-pointer active:scale-[0.99]"
           >
             <Plus size={16} strokeWidth={2.5} />
             <span>Add Deal</span>
@@ -754,7 +754,7 @@ export default function DealsPage() {
                 onClick={() => setViewMode('kanban')}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'kanban'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'btn-primary text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -767,7 +767,7 @@ export default function DealsPage() {
                 onClick={() => setViewMode('list')}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'btn-primary text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -1247,7 +1247,7 @@ export default function DealsPage() {
         title="Lead Stages vs Deal Stages"
         size="lg"
         footer={
-          <button type="button" onClick={() => setIsLearnMoreOpen(false)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+          <button type="button" onClick={() => setIsLearnMoreOpen(false)} className="rounded-xl bg-primary hover:bg-primary-dark h-9 px-4 text-xs font-semibold text-white shadow-2xs active:scale-[0.99] cursor-pointer">
             Got it
           </button>
         }
@@ -1418,13 +1418,13 @@ export default function DealsPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
+                  className="btn-outline"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-all"
+                  className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs active:scale-[0.99] transition-all cursor-pointer"
                 >
                   {editingDeal ? 'Save Changes' : 'Create Deal'}
                 </button>
@@ -1452,14 +1452,14 @@ export default function DealsPage() {
               <button
                 type="button"
                 onClick={() => setDealToDelete(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
+                className="btn-outline"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDeleteDeal}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold shadow-xs"
+                className="btn-danger"
               >
                 Yes, Delete Deal
               </button>

@@ -92,7 +92,7 @@ export function DepartmentsPage() {
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+          className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
         >
           <Plus size={16} /> Add Department
         </button>
@@ -114,8 +114,8 @@ export function DepartmentsPage() {
           <button
             type="button"
             onClick={() => setView('table')}
-            className={`px-3 py-1.5 rounded-lg text-[12px] flex items-center gap-1.5 transition-colors cursor-pointer ${
-              view === 'table' ? 'bg-white border border-bdr shadow-xs font-medium text-slate-900' : 'text-muted hover:text-slate-700'
+            className={`h-8 px-3 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+              view === 'table' ? 'bg-white border border-bdr shadow-xs font-semibold text-slate-900' : 'text-muted hover:text-slate-700'
             }`}
           >
             <LayoutList size={14} /> List
@@ -123,8 +123,8 @@ export function DepartmentsPage() {
           <button
             type="button"
             onClick={() => setView('grid')}
-            className={`px-3 py-1.5 rounded-lg text-[12px] flex items-center gap-1.5 transition-colors cursor-pointer ${
-              view === 'grid' ? 'bg-white border border-bdr shadow-xs font-medium text-slate-900' : 'text-muted hover:text-slate-700'
+            className={`h-8 px-3 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer ${
+              view === 'grid' ? 'bg-white border border-bdr shadow-xs font-semibold text-slate-900' : 'text-muted hover:text-slate-700'
             }`}
           >
             <LayoutGrid size={14} /> Grid
@@ -236,7 +236,7 @@ export function DepartmentsPage() {
               placeholder="e.g. Artificial Intelligence"
               value={newDept.name}
               onChange={(e) => setNewDept({ ...newDept, name: e.target.value })}
-              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              className="w-full h-9 px-3.5 bg-off border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
             />
           </div>
           <div>
@@ -246,7 +246,7 @@ export function DepartmentsPage() {
             <select
               value={newDept.head}
               onChange={(e) => setNewDept({ ...newDept, head: e.target.value })}
-              className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              className="w-full h-9 px-3.5 bg-white border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
             >
               <option value="">Not assigned</option>
               {employees.map((emp) => (
@@ -265,20 +265,20 @@ export function DepartmentsPage() {
               placeholder="e.g. $300,000"
               value={newDept.budget}
               onChange={(e) => setNewDept({ ...newDept, budget: e.target.value })}
-              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              className="w-full h-9 px-3.5 bg-off border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
             />
           </div>
           <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-bdr">
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+              className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Save Department
             </button>

@@ -45,7 +45,7 @@ export const PrintDebitNoteModal = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
             >
               <Printer size={14} />
               Print / Save as PDF

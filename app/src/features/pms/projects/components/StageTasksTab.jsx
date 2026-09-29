@@ -161,7 +161,7 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
             <button
               type="button"
               onClick={() => setShowAllStages(!showAllStages)}
-              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:bg-slate-50"
+              className="btn-outline btn-sm inline-flex items-center gap-1"
             >
               <Filter size={12} />
               {showAllStages ? 'Stages with tasks only' : 'Show all stages'}
@@ -233,7 +233,7 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
                     <button
                       type="button"
                       onClick={() => onAddTask?.(stage.id)}
-                      className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded-md border border-blue-200 transition-colors"
+                      className="btn-outline btn-sm inline-flex items-center gap-1"
                       title={`Add a task to ${stage.name}`}
                     >
                       <Plus size={12} /> Add Task

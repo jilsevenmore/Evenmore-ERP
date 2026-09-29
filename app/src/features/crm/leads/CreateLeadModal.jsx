@@ -411,13 +411,13 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
               </svg>
             </div>
             )}
-            <button type="button" className="btn-outline" onClick={onEditLayout}>
+            <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer" onClick={onEditLayout}>
               <Plus size={15} />
               Edit Page Layout
             </button>
           </div>
           <div className="lead-create-action-right">
-            <button type="button" className="btn-outline" onClick={handleClose}>Cancel</button>
+            <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer" onClick={handleClose}>Cancel</button>
             <div className="relative inline-block">
               {showTour && isFormComplete && (
               <div className="pointer-events-none absolute bottom-[calc(100%+6px)] right-0 z-30 flex flex-col items-end">
@@ -431,7 +431,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
                 </svg>
               </div>
               )}
-              <button type="button" className="btn-primary" onClick={handleCreate} disabled={!isFormComplete} style={!isFormComplete ? { opacity: 0.5, cursor: "not-allowed" } : undefined}>Create</button>
+              <button type="button" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer" onClick={handleCreate} disabled={!isFormComplete} style={!isFormComplete ? { opacity: 0.5, cursor: "not-allowed" } : undefined}>Create</button>
             </div>
           </div>
         </div>

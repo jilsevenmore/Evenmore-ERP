@@ -431,9 +431,9 @@ export function UsersPage() {
           <AdministrationGuideButton entity="user" />
         <button
           onClick={openCreateModal}
-          className="inline-flex items-center justify-center gap-2 bg-[#1f6bff] hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm hover:shadow transition-all duration-150 active:scale-95"
+          className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs hover:shadow transition-all duration-150 active:scale-[0.99] cursor-pointer"
         >
-          <Plus size={18} strokeWidth={2.4} />
+          <Plus size={16} strokeWidth={2.4} />
           <span>Create User</span>
         </button>
         </div>

@@ -61,26 +61,26 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 lg:justify-end">
+        <div className="flex flex-wrap items-center gap-2.5 lg:justify-end">
           {onOpenGuide && (
             <button
               type="button"
               onClick={onOpenGuide}
               aria-haspopup="dialog"
-              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 transition-colors hover:border-blue-300 hover:bg-blue-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 cursor-pointer"
+              className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
             >
-              <span aria-hidden="true" className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white">?</span>
+              <span aria-hidden="true" className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#1f6bff] text-[11px] font-bold text-white">?</span>
               <span>How to create a form?</span>
             </button>
           )}
 
           <button
             type="button"
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] bg-[#2f6fed] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] cursor-pointer"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
             onClick={onCreateForm}
             aria-label="Create new lead form"
           >
-            <Plus size={18} />
+            <Plus size={15} />
             <span>Create Form</span>
           </button>
         </div>
@@ -97,7 +97,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
       <div className="mt-5 rounded-[24px] border border-slate-200 bg-white p-4 sm:p-5 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-            <div className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1.5 text-sm font-semibold text-blue-700">
+            <div className="inline-flex items-center rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
               {filteredForms.length} {filteredForms.length === 1 ? "Form" : "Forms"}
             </div>
 
@@ -105,45 +105,45 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-11 min-w-[150px] appearance-none rounded-[14px] border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2f6fed]"
+                className="h-9 min-w-[140px] appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-medium text-slate-700 outline-none transition focus:border-primary cursor-pointer"
               >
                 <option>All Status</option>
                 <option>Active</option>
               </select>
-              <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
 
             <div className="relative shrink-0">
               <select
                 value={sortOrder}
                 onChange={(e) => setSortOrder(e.target.value)}
-                className="h-11 min-w-[160px] appearance-none rounded-[14px] border border-slate-200 bg-white px-4 pr-10 text-sm font-medium text-slate-700 outline-none transition focus:border-[#2f6fed]"
+                className="h-9 min-w-[150px] appearance-none rounded-xl border border-slate-200 bg-white px-3 pr-8 text-xs font-medium text-slate-700 outline-none transition focus:border-primary cursor-pointer"
               >
                 <option>Newest First</option>
                 <option>Oldest First</option>
               </select>
-              <ChevronDown size={16} className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
+              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
 
-            <div className="inline-flex shrink-0 rounded-[16px] border border-slate-200 bg-slate-50 p-1">
+            <div className="inline-flex shrink-0 rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
               <button
                 type="button"
                 onClick={() => setViewMode("grid")}
-                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
-                  viewMode === "grid" ? "bg-[#2f6fed] text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition cursor-pointer ${
+                  viewMode === "grid" ? "btn-primary text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                <Rows3 size={15} />
+                <Rows3 size={14} />
                 <span>Grid View</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode("tile")}
-                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
-                  viewMode === "tile" ? "bg-[#2f6fed] text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+                className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition cursor-pointer ${
+                  viewMode === "tile" ? "btn-primary text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                <LayoutGrid size={15} />
+                <LayoutGrid size={14} />
                 <span>Tile View</span>
               </button>
             </div>
@@ -200,7 +200,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
                           <button
                             type="button"
                             onClick={() => onEditForm(form.id)}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+                            className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                           >
                             <Pencil size={13} />
                             <span>Edit</span>
@@ -209,7 +209,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
                             <button
                               type="button"
                               onClick={() => onDeleteForm(form.id)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
+                              className="h-8 w-8 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
                               aria-label={`Delete ${form.name}`}
                             >
                               <Trash2 size={14} />
@@ -276,7 +276,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
                 <div className="mt-4 flex items-center justify-between gap-2.5">
                   <button
                     type="button"
-                    className="inline-flex h-9 items-center gap-1.5 rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] cursor-pointer"
+                    className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
                     onClick={() => onEditForm(form.id)}
                   >
                     <Pencil size={13} />
@@ -285,7 +285,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
                   {onDeleteForm && (
                     <button
                       type="button"
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-[12px] border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 cursor-pointer"
+                      className="h-8 w-8 inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600 transition hover:bg-rose-100 cursor-pointer"
                       onClick={() => onDeleteForm(form.id)}
                       aria-label={`Delete ${form.name}`}
                     >
@@ -298,33 +298,33 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
           </div>
         )}
 
-        <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-5 flex flex-col gap-4 border-t border-slate-100 pt-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
           <div>
             Showing {filteredForms.length === 0 ? 0 : 1} to {filteredForms.length} of {filteredForms.length} forms
           </div>
 
-          <div className="flex items-center gap-2 self-start sm:self-auto">
+          <div className="flex items-center gap-1.5 self-start sm:self-auto">
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400"
               disabled
               aria-label="Previous page"
             >
-              <ChevronDown size={16} className="rotate-90" />
+              <ChevronDown size={14} className="rotate-90" />
             </button>
             <button
               type="button"
-              className="inline-flex h-10 min-w-10 items-center justify-center rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white"
+              className="inline-flex h-8 min-w-8 items-center justify-center rounded-lg bg-primary px-3 text-xs font-semibold text-white"
             >
               1
             </button>
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] border border-slate-200 bg-white text-slate-400"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400"
               disabled
               aria-label="Next page"
             >
-              <ChevronDown size={16} className="-rotate-90" />
+              <ChevronDown size={14} className="-rotate-90" />
             </button>
           </div>
         </div>

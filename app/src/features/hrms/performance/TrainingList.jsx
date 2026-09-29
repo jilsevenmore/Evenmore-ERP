@@ -89,12 +89,12 @@ export default function TrainingList({ embedded = false, onBack }) {
     { key: "start", header: "Dates", sortable: true, render: (r) => `${r.start}${r.end && r.end !== r.start ? ` – ${r.end}` : ""}` },
     { key: "status", header: "Stage / Status", render: (r) => <StatusBadge status={r.status || r.stage} /> },
     { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
-        <button onClick={() => setViewRow(r)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center text-slate-600"><Eye size={14} /></button>
+        <button onClick={() => setViewRow(r)} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center text-slate-600"><Eye size={14} /></button>
         <button onClick={() => {
           setForm({ name: r.name, trainer: r.trainer, department: r.department, type: r.type, participants: r.participants, cost: r.cost || 0, start: r.start, end: r.end, status: r.status || r.stage });
           setEditRow(r);
-        }} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center text-slate-600"><Pencil size={14} /></button>
-        <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
+        }} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center text-slate-600"><Pencil size={14} /></button>
+        <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
       </div> }
   ];
 

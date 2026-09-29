@@ -276,16 +276,16 @@ export default function MasterTasksPage() {
           <button
             type="button"
             onClick={() => setIsGuideOpen(true)}
-            className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2 text-[13px] font-semibold text-[#1d6bff]"
+            className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2"
             aria-label="How to create lead tasks master"
           >
-            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1f6bff] text-[11px] font-bold text-white">?</span>
             <span>How to create lead tasks master?</span>
           </button>
           <button
             type="button"
             onClick={openCreate}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs"
           >
             <Plus size={15} /> Create Master Task
           </button>
@@ -331,7 +331,7 @@ export default function MasterTasksPage() {
             <button
               type="button"
               onClick={resetFilters}
-              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold rounded-lg border border-slate-200 transition"
+              className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5"
             >
               <RotateCcw size={13} /> Reset
             </button>
@@ -341,7 +341,7 @@ export default function MasterTasksPage() {
         {selected.length > 0 && (
           <div className="flex items-center justify-between px-4 py-2 bg-blue-50/60 border-b border-blue-100 text-xs">
             <span className="font-semibold text-blue-700">{selected.length} selected</span>
-            <button type="button" onClick={() => setBulkDelete(true)} className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-lg transition">
+            <button type="button" onClick={() => setBulkDelete(true)} className="btn-danger h-8 px-3 rounded-xl inline-flex items-center gap-1.5 text-xs font-semibold">
               <Trash2 size={13} /> Delete selected
             </button>
           </div>
@@ -468,7 +468,7 @@ export default function MasterTasksPage() {
                 key={p}
                 type="button"
                 onClick={() => setPage(p)}
-                className={`min-w-7 h-7 px-2 rounded-lg border text-xs font-bold transition cursor-pointer ${p === safePage ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                className={`min-w-7 h-7 px-2 rounded-lg border text-xs font-bold transition cursor-pointer ${p === safePage ? 'bg-primary border-primary text-white' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
                 {p}
               </button>
@@ -582,10 +582,10 @@ export default function MasterTasksPage() {
               {formError && <p className="text-[11px] font-semibold text-rose-600">{formError}</p>}
             </div>
             <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-slate-50/70 border-t border-slate-100">
-              <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition">
+              <button type="button" onClick={() => setModalOpen(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold">
                 Cancel
               </button>
-              <button type="submit" className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition">
+              <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">
                 {editingId ? 'Save Changes' : 'Create Task'}
               </button>
             </div>
@@ -599,10 +599,10 @@ export default function MasterTasksPage() {
             <h2 className="text-sm font-bold text-slate-900">Delete this task?</h2>
             <p className="text-xs text-slate-500 mt-1">This action cannot be undone. The master task will be removed permanently.</p>
             <div className="flex items-center justify-end gap-2.5 mt-4">
-              <button type="button" onClick={() => setDeleteId(null)} className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition">
+              <button type="button" onClick={() => setDeleteId(null)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold">
                 Cancel
               </button>
-              <button type="button" onClick={confirmDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition">
+              <button type="button" onClick={confirmDelete} className="btn-danger h-9 px-4 rounded-xl text-xs font-semibold">
                 Delete
               </button>
             </div>
@@ -616,10 +616,10 @@ export default function MasterTasksPage() {
             <h2 className="text-sm font-bold text-slate-900">Delete {selected.length} tasks?</h2>
             <p className="text-xs text-slate-500 mt-1">Selected master tasks will be removed permanently.</p>
             <div className="flex items-center justify-end gap-2.5 mt-4">
-              <button type="button" onClick={() => setBulkDelete(false)} className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition">
+              <button type="button" onClick={() => setBulkDelete(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold">
                 Cancel
               </button>
-              <button type="button" onClick={confirmBulkDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition">
+              <button type="button" onClick={confirmBulkDelete} className="btn-danger h-9 px-4 rounded-xl text-xs font-semibold">
                 Delete All
               </button>
             </div>

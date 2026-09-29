@@ -93,7 +93,7 @@ export function DesignationsPage() {
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="px-5 py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-medium flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
+          className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold flex items-center gap-2 shadow-xs transition-colors cursor-pointer"
         >
           <Plus size={16} /> Add Designation
         </button>
@@ -159,7 +159,7 @@ export function DesignationsPage() {
                       <button
                         type="button"
                         onClick={() => showToast(`Edit ${r.title}`)}
-                        className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted transition-colors cursor-pointer"
+                        className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted transition-colors cursor-pointer"
                         title="Edit"
                       >
                         <Edit2 size={14} />
@@ -167,7 +167,7 @@ export function DesignationsPage() {
                       <button
                         type="button"
                         onClick={() => handleDelete(r.id, r.title)}
-                        className="w-8 h-8 rounded-lg hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
+                        className="w-8 h-8 rounded-xl hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
                         title="Delete"
                       >
                         <Trash2 size={14} />
@@ -194,7 +194,7 @@ export function DesignationsPage() {
               placeholder="e.g. Lead Product Designer"
               value={newDesig.title}
               onChange={(e) => setNewDesig({ ...newDesig, title: e.target.value })}
-              className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+              className="w-full h-9 px-3.5 bg-off border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -205,7 +205,7 @@ export function DesignationsPage() {
               <select
                 value={newDesig.level}
                 onChange={(e) => setNewDesig({ ...newDesig, level: e.target.value })}
-                className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 bg-white border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
               >
                 <option value="L1">L1 — Associate</option>
                 <option value="L2">L2 — Junior</option>
@@ -226,7 +226,7 @@ export function DesignationsPage() {
                 placeholder="Enter department"
                 value={newDesig.department}
                 onChange={(e) => setNewDesig({ ...newDesig, department: e.target.value })}
-                className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+                className="w-full h-9 px-3.5 bg-white border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy"
               />
               <datalist id="desig-dept-options">
                 {departmentOptions.map((d) => (
@@ -239,13 +239,13 @@ export function DesignationsPage() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-4 py-2 border border-bdr bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+              className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Save Designation
             </button>

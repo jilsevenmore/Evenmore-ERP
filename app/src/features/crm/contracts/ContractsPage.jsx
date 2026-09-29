@@ -210,7 +210,7 @@ export default function ContractsPage() {
       <PageHeader
         title="Contracts"
         subtitle="Manage contracts, agreements and renewals."
-        actions={<button type="button" className="btn-primary btn-sm" onClick={() => { setFormError(''); setForm(EMPTY_FORM); setCreateOpen(true); }}><Plus size={14} /> Create Contract</button>}
+        actions={<button type="button" className="btn-primary" onClick={() => { setFormError(''); setForm(EMPTY_FORM); setCreateOpen(true); }}><Plus size={14} /> Create Contract</button>}
       />
 
       {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">{error}</p>}
@@ -252,7 +252,7 @@ export default function ContractsPage() {
             <input type="date" aria-label="To date" value={toDate} onChange={(e) => setToDate(e.target.value)}
               className="border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 text-slate-600" />
           </div>
-          <button type="button" onClick={resetFilters} className="btn-outline btn-sm shrink-0">Reset</button>
+          <button type="button" onClick={resetFilters} className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold shrink-0">Reset</button>
         </div>
 
         {pageRows.length === 0 ? (
@@ -298,11 +298,11 @@ export default function ContractsPage() {
                     <td className="px-3 py-3 text-slate-600 whitespace-nowrap">{formatContractDate(contract.createdAt)}</td>
                     <td className="px-3 py-3">
                       <div className="flex justify-end gap-1.5">
-                        <Link className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100" title="View"
+                        <Link className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100" title="View"
                           to={`/crm/contracts/${encodeURIComponent(contract.id)}`}><Eye size={14} /></Link>
-                        <Link className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100" title="Edit"
+                        <Link className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100" title="Edit"
                           to={`/crm/contracts/${encodeURIComponent(contract.id)}`}><Pencil size={14} /></Link>
-                        <button type="button" className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100" title="Download"
+                        <button type="button" className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-100" title="Download"
                           onClick={() => {
                             const text = `${contract.title || contract.contractNumber}\nContract: ${contract.contractNumber}\nCustomer: ${contract.customer}\nDeal: ${contract.dealNumber || contract.dealId}\nStatus: ${getContractDisplayStatus(contract)}\n\n${contract.terms || ''}`;
                             const link = document.createElement('a');
@@ -310,7 +310,7 @@ export default function ContractsPage() {
                             link.download = `${contract.contractNumber}.txt`;
                             link.click();
                           }}><Download size={14} /></button>
-                        <span className="p-2 rounded-lg border border-slate-200 text-slate-300"><Clock size={14} /></span>
+                        <span className="p-2 rounded-xl border border-slate-200 text-slate-300"><Clock size={14} /></span>
                       </div>
                     </td>
                   </tr>
@@ -328,7 +328,7 @@ export default function ContractsPage() {
                 className="p-1.5 rounded-lg border border-slate-200 disabled:opacity-40 hover:bg-slate-100" aria-label="Previous page"><ChevronLeft size={14} /></button>
               {Array.from({ length: totalPages }, (_, i) => i + 1).slice(0, 7).map((number) => (
                 <button key={number} type="button" onClick={() => setPage(number)}
-                  className={`min-w-[28px] h-7 rounded-lg border text-xs font-semibold ${number === safePage ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
+                  className={`min-w-[32px] h-8 rounded-lg border text-xs font-semibold ${number === safePage ? 'bg-primary text-white border-primary' : 'border-slate-200 text-slate-600 hover:bg-slate-100'}`}>
                   {number}
                 </button>
               ))}
@@ -345,8 +345,8 @@ export default function ContractsPage() {
           <ContractForm form={form} setForm={setForm} deals={deals} />
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setCreateOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Creating…' : 'Create Contract'}</button>
+            <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" disabled={busy} onClick={() => setCreateOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold" disabled={busy}>{busy ? 'Creating…' : 'Create Contract'}</button>
           </div>
         </form>
       </Modal>
@@ -354,11 +354,11 @@ export default function ContractsPage() {
       <Modal isOpen={Boolean(created)} onClose={() => setCreated(null)}
         footer={created && (
           <div className="flex justify-center gap-2 w-full">
-            <Link className="btn-primary btn-sm" to={`/crm/contracts/${encodeURIComponent(created.id)}`}>View Contract</Link>
+            <Link className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center justify-center" to={`/crm/contracts/${encodeURIComponent(created.id)}`}>View Contract</Link>
             {created.dealId ? (
-              <Link className="btn-outline btn-sm" to={`/crm/deals?deal=${encodeURIComponent(created.dealId)}`}>Back to Deal</Link>
+              <Link className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center justify-center" to={`/crm/deals?deal=${encodeURIComponent(created.dealId)}`}>Back to Deal</Link>
             ) : (
-              <button type="button" className="btn-outline btn-sm" onClick={() => setCreated(null)}>Back to Contracts</button>
+              <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold" onClick={() => setCreated(null)}>Back to Contracts</button>
             )}
           </div>
         )}>

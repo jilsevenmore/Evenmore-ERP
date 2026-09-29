@@ -61,7 +61,7 @@ export default function PMSReportsPage() {
                   onClick={() => setView(opt.id)}
                   aria-pressed={active}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold transition-colors"
-                  style={active ? { background: '#1f6bff', color: '#fff' } : { background: '#fff', color: '#475569' }}
+                  style={active ? { background: 'var(--primary)', color: '#fff' } : { background: '#fff', color: '#475569' }}
                 >
                   <Icon size={13} /> {opt.label}
                 </button>

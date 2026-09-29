@@ -247,7 +247,7 @@ export function ProjectsTable({
               type="button"
               title="View details"
               onClick={() => navigate(`/pms/projects/${row.id}`)}
-              className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+              className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-card-hover"
             >
               <Eye size={14} />
             </button>
@@ -256,7 +256,7 @@ export function ProjectsTable({
               title="Quick assign current stage"
               disabled={!onQuickAssign || !row._meta.currentStage}
               onClick={() => onQuickAssign?.(row)}
-              className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-card-hover disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <UserPlus size={14} />
             </button>
@@ -271,7 +271,7 @@ export function ProjectsTable({
               }
               disabled={!onConfigurePercentages || !isCreator || row.status === 'Completed'}
               onClick={() => onConfigurePercentages?.(row)}
-              className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-card-hover disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <Percent size={14} />
             </button>
@@ -280,7 +280,7 @@ export function ProjectsTable({
               title="Log delay"
               disabled={!onLogDelay || !row._meta.currentStage}
               onClick={() => onLogDelay?.(row)}
-              className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-30 disabled:hover:bg-transparent"
+              className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-card-hover disabled:opacity-30 disabled:hover:bg-transparent"
             >
               <AlertTriangle size={14} />
             </button>

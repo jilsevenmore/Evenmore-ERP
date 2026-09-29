@@ -208,19 +208,19 @@ export default function CompleteTaskModal({ open, task, lead, onCancel, onComple
               )}
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/50 px-5 py-4">
+            <div className="flex items-center justify-end gap-2.5 border-t border-slate-100 bg-slate-50/50 px-5 py-3.5">
               <button
                 type="button"
                 onClick={onCancel}
                 disabled={submitting}
-                className="h-10 rounded-lg bg-slate-500 px-5 text-[13px] font-semibold text-white transition hover:bg-slate-600 disabled:opacity-50"
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={!valid || submitting}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1d4a79] px-5 text-[13px] font-semibold text-white transition hover:bg-[#163a61] disabled:cursor-not-allowed disabled:opacity-50"
+                className="btn-primary inline-flex h-9 items-center gap-2 px-4 rounded-xl text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? (
                   <>

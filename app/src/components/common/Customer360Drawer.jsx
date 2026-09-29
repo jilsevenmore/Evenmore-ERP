@@ -135,7 +135,7 @@ export const Customer360Drawer = ({ customer, onClose }) => {
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
           <span className="text-slate-500 font-medium">Customer Status: <strong className="text-emerald-700">{customer.status || 'Active'}</strong></span>
-          <button onClick={onClose} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-semibold cursor-pointer shadow-xs">
+          <button onClick={onClose} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
             Close Drawer
           </button>
         </div>

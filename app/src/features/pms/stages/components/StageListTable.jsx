@@ -167,7 +167,7 @@ export function StageListTable({ stages = [], onMove, onEdit, onDelete, onToggle
                         onClick={() => onEdit?.(stage)}
                         title="Edit stage"
                         aria-label={`Edit ${stage.name}`}
-                        className="p-1.5 rounded-md text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                        className="p-1.5 rounded-lg text-muted hover:text-primary hover:bg-card-hover"
                       >
                         <Pencil size={14} />
                       </button>
@@ -176,7 +176,7 @@ export function StageListTable({ stages = [], onMove, onEdit, onDelete, onToggle
                         onClick={() => onDelete?.(stage)}
                         title="Delete stage"
                         aria-label={`Delete ${stage.name}`}
-                        className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-card-hover"
                       >
                         <Trash2 size={14} />
                       </button>

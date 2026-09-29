@@ -1111,7 +1111,7 @@ export default function HRMSDashboard() {
                               setRequestDropdownOpen(false);
                               setRequestSearch("");
                             }}
-                            className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12.5px] rounded-lg transition-colors cursor-pointer ${
+                            className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-xs rounded-xl transition-colors cursor-pointer ${
                               isSelected
                                 ? "bg-primary/10 text-primary font-semibold"
                                 : "text-text hover:bg-soft"
@@ -1139,7 +1139,7 @@ export default function HRMSDashboard() {
                         setRequestDropdownOpen(false);
                         setShowManageTypesModal(true);
                       }}
-                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-[11.5px] font-semibold text-primary hover:bg-primary/10 rounded-lg transition-colors cursor-pointer"
+                      className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-xs font-semibold text-primary hover:bg-primary/10 rounded-xl transition-colors cursor-pointer"
                     >
                       <Settings size={13} className="shrink-0" />
                       <span>Manage Request Types (HR)</span>

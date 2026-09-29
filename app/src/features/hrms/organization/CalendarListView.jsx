@@ -29,7 +29,7 @@ export function CalendarListView({
           <button
             type="button"
             onClick={onAddNewEvent}
-            className="px-4 py-2 bg-navy text-white text-[13px] font-medium rounded-xl hover:bg-navy/90 transition shadow-xs"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs transition"
           >
             Schedule New Event
           </button>
@@ -118,7 +118,7 @@ export function CalendarListView({
                   target="_blank"
                   rel="noreferrer"
                   onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-[12px] font-medium transition"
+                  className="inline-flex items-center gap-1 h-8 px-3 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-semibold transition"
                 >
                   <ExternalLink size={13} />
                   Join Link
