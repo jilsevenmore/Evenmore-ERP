@@ -429,20 +429,32 @@ export const CRM_RESOURCES = {
     }),
   },
 
-  // Hidden: Task Allocation duplicates CRM Tasks; backend route commented out -- restore by uncommenting this entry.
-  // taskAllocations: {
-  //   path: '/crm/task-allocations/',
-  //   toApi: (a) => compact({
-  //     taskId: a.taskId || undefined,
-  //     masterTaskId: a.masterTaskId || undefined,
-  //     assigneeId: a.assigneeId || undefined,
-  //     role: a.role || undefined,
-  //     department: a.department || undefined,
-  //     status: a.status || undefined,
-  //     dueDate: isoOut(a.dueDate),
-  //   }),
-  //   fromApi: (row) => ({ ...row, dueDate: displayIn(row.dueDate), _synced: true }),
-  // },
+  // Internal work handed to a team member (api.md §9.3) — not a lead task.
+  // The server writes the audit trail; `note` only annotates the next line.
+  // Every key is optional so a PATCH carries just what changed: an assignee
+  // may only send `status` and `note`.
+  taskAllocations: {
+    path: '/crm/task-allocations/',
+    toApi: (a) => compact({
+      title: a.title ?? undefined,
+      description: a.description ?? undefined,
+      department: a.department ?? undefined,
+      assigneeId: a.assigneeId !== undefined ? (a.assigneeId || null) : undefined,
+      priority: a.priority ?? undefined,
+      deadline: a.deadline !== undefined ? (a.deadline || null) : undefined,
+      status: a.status ?? undefined,
+      fileName: a.fileName ?? undefined,
+      note: a.note || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      assignee: row.assignee || 'Unassigned',
+      assignedBy: row.assignedBy || '',
+      // The detail page lists the newest activity first.
+      audit: [...(row.audit || [])].reverse(),
+      _synced: true,
+    }),
+  },
 
   // Hidden: User Tracking out of scope; backend route commented out -- restore by uncommenting this entry.
   // userAllocations: {
@@ -474,7 +486,7 @@ export const crmSync = createSync(CRM_RESOURCES, { label: 'crmSync' });
 export const CRM_PULL_ORDER = [
   'stages', 'dealStages', 'sources', 'industries', 'lostReasons',
   'leads', 'deals', 'tasks', 'masterTasks', 'stageTasks',
-  /* 'taskAllocations', 'userAllocations', -- hidden: out of scope */ 'forms', 'projects', 'contracts',
+  'taskAllocations', /* 'userAllocations', -- hidden: out of scope */ 'forms', 'projects', 'contracts',
 ];
 
 // ── endpoints that are not plain collections ────────────────────────────────

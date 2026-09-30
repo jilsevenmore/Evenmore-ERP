@@ -18,9 +18,8 @@ const LeadFormBuilderPage = lazy(() => import('../features/crm/leads/LeadFormBui
 const LeadFormsPage = lazy(() => import('../features/crm/leads/LeadFormsPage'));
 const DynamicLeadFormPage = lazy(() => import('../features/crm/leads/DynamicLeadFormPage'));
 const TasksPage = lazy(() => import('../features/crm/tasks/TasksPage'));
-// Hidden: Task Allocation duplicates Tasks List
-// const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationPage'));
-// const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
+const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationPage'));
+const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
 const MasterTasksPage = lazy(() => import('../features/crm/tasks/MasterTasksPage'));
 const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage'));
 const TaskFormPage = lazy(() => import('../features/crm/tasks/TaskFormPage'));
@@ -265,9 +264,8 @@ const router = createBrowserRouter([
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
-      // Hidden: Task Allocation duplicates Tasks List (crm/tasks)
-      // { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
-      // { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
+      { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
+      { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
       // { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> }, // Hidden: duplicate of crm/leads/stage-tasks
       { path: 'crm/projects', element: <Page component={ProjectsPage} /> },
       { path: 'crm/contracts', element: <Page component={ContractsPage} /> },

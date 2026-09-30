@@ -111,7 +111,7 @@ const NAV = [
         defaultOpen: true,
         children: [
           { label: 'Tasks List', to: '/crm/tasks' },
-          // { label: 'Task Allocation', to: '/crm/tasks/allocation' }, // Hidden: duplicate of Tasks List
+          { label: 'Task Allocation', to: '/crm/tasks/allocation' },
         ],
       },
       // { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' }, // Hidden: User Tracking & field GPS map out of scope

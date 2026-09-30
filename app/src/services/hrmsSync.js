@@ -59,8 +59,11 @@ export const HRMS_RESOURCES = {
   // ── people ────────────────────────────────────────────────────────────────
   employees: {
     path: '/hrms/employees/',
+    // Also the PATCH body, so a key is sent only when the caller set it: a
+    // status change must not reset the joining date or re-offer a login.
+    // (The server defaults the joining date to today on create.)
     toApi: (e) => {
-      const joinIso = isoOut(e.joining || e.joiningDate || e.doj) || toISODate(new Date()) || undefined;
+      const joinIso = isoOut(e.joining || e.joiningDate || e.doj);
       return compact({
         name: e.name,
         email: e.email || undefined,
@@ -70,7 +73,7 @@ export const HRMS_RESOURCES = {
         department: e.department || undefined,
         designationId: e.designationId || undefined,
         designation: e.designation || e.role || undefined,
-        reportingManagerId: e.reportingManagerId || undefined,
+        managerId: e.managerId || e.reportingManagerId || undefined,
         locationId: e.locationId || undefined,
         location: e.location || undefined,
         joining: joinIso,
@@ -80,7 +83,7 @@ export const HRMS_RESOURCES = {
         employmentType: e.employmentType || undefined,
         status: e.status || undefined,
         avatar: e.avatar || undefined,
-        createUserAccount: e.createUserAccount !== undefined ? e.createUserAccount : true,
+        createUserAccount: e.createUserAccount,
         password: e.password || undefined,
         userPassword: e.userPassword || e.password || undefined,
         roleId: e.roleId || undefined,

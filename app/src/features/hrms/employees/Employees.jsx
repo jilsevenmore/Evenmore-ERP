@@ -10,6 +10,17 @@ const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "
 
 const STATUSES = ["All", "Active", "On Leave", "Probation"];
 
+/** The employee's Administration login, kept in step with this record. */
+function LoginBadge({ login }) {
+  if (!login) return <span className="emp-login emp-login-none">No login</span>;
+  const inactive = login.status !== "Active";
+  return (
+    <span className={`emp-login ${inactive ? "emp-login-off" : ""}`} title={login.role ? `${login.email} • ${login.role}` : login.email}>
+      {login.role || "User"}{inactive ? ` • ${login.status}` : ""}
+    </span>
+  );
+}
+
 const statusStyles = {
   Active: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
   "On Leave": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
@@ -251,6 +262,7 @@ export default function Employees() {
                   <th>DESIGNATION</th>
                   <th>DEPARTMENT</th>
                   <th>STATUS</th>
+                  <th>LOGIN</th>
                   <th style={{ width: 40 }}></th>
                 </tr>
               </thead>
@@ -277,6 +289,9 @@ export default function Employees() {
                       </span>
                     </td>
                     <td>
+                      <LoginBadge login={row.login} />
+                    </td>
+                    <td>
                       <button
                         type="button"
                         onClick={() => handleDelete(row.id, row.name)}
@@ -290,7 +305,7 @@ export default function Employees() {
                 ))}
                 {paginatedEmployees.length === 0 && (
                   <tr>
-                    <td colSpan={6} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                    <td colSpan={7} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
                       No employees match the selected filters.
                     </td>
                   </tr>
@@ -320,6 +335,7 @@ export default function Employees() {
                 <div style={{ margin: "12px 0 10px", fontSize: "13px", color: "#374151" }}>
                   <strong>{row.designation}</strong> • {row.department}
                 </div>
+                <LoginBadge login={row.login} />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
                   <span className="emp-id">{row.employeeCode || row.empId || row.id}</span>
                   <span className="emp-status" style={{ ...statusStyles[row.status] }}>
@@ -460,7 +476,7 @@ export default function Employees() {
               Create Administration Login Account for this Employee
             </label>
             <p style={{ margin: "4px 0 0 25px", fontSize: "12px", color: "#64748b" }}>
-              Connects with Administration Users so this employee can log into the ERP.
+              Connects with Administration Users so this employee can log into the ERP. Name, email, phone, department, location and manager stay in step between the two.
             </p>
             {form.createUserAccount !== false && (
               <div style={{ marginTop: 10, marginLeft: 25 }}>
@@ -525,6 +541,9 @@ export default function Employees() {
         .emp-avatar-large { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; }
         .emp-id { font-family: inherit; font-size: 12.5px; color: #6b7280; white-space: nowrap; }
         .emp-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 13px; border: 1px solid; white-space: nowrap; }
+        .emp-login { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 3px 11px; background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; white-space: nowrap; }
+        .emp-login-off { background: #f1f5f9; color: #64748b; border-color: #cbd5e1; }
+        .emp-login-none { background: transparent; color: #94a3b8; border-color: transparent; padding-left: 0; font-weight: 500; }
         .emp-trash-btn { border: none; background: transparent; color: #9ca3af; cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center; transition: color 0.15s ease; }
         .emp-trash-btn:hover { color: #ef4444; background: #fee2e2; }
         

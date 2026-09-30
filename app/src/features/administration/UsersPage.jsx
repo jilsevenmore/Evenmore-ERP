@@ -11,6 +11,7 @@ import {
   pullPermissionCatalogue,
   describeError,
 } from '../../services/adminSync';
+import { hrmsSync } from '../../services/hrmsSync';
 import {
   Users,
   UserCheck,
@@ -76,6 +77,36 @@ function getRoleBadgeStyle(role) {
   return ROLE_BADGE_STYLES[Math.abs(hash) % ROLE_BADGE_STYLES.length];
 }
 
+/**
+ * Which HRMS employee a login belongs to. Linked, the two records keep their
+ * name, email, phone, department, location and manager in step (the server
+ * copies each save across). `value` is an employee id, '' for none, or 'new'
+ * (create only) for a fresh employee record made from this user.
+ */
+function EmployeeLinkSelect({ value, onChange, employees, userId, allowNew }) {
+  // An employee can back one login: offer the free ones and this user's own.
+  const options = employees.filter((e) => !e.login || (userId && String(e.login.id) === String(userId)));
+  return (
+    <div>
+      <label className="block font-semibold text-slate-700 mb-1">Linked HRMS Employee</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+        {allowNew && <option value="new">Create a new employee record</option>}
+        <option value="">Not linked</option>
+        {options.map((e) => (
+          <option key={e.id} value={e.id}>
+            {[e.employeeCode, e.name, e.email].filter(Boolean).join(' · ')}
+          </option>
+        ))}
+      </select>
+      <p className="text-[11px] text-slate-400 mt-1">
+        {value === 'new'
+          ? 'An employee with the same email is linked instead, if HRMS already has one.'
+          : 'Name, email, phone, department, location and manager stay in step with HRMS.'}
+      </p>
+    </div>
+  );
+}
+
 export function UsersPage() {
   // ── Users, from /admin/users/ ────────────────────────────────
   const [users, setUsers] = useState([]);
@@ -88,6 +119,15 @@ export function UsersPage() {
       if (!cancelled && modules) setPermissionModules(modules);
     });
     return () => { cancelled = true; };
+  }, []);
+
+  // HRMS employees, for the "Linked HRMS Employee" picker.
+  const [hrEmployees, setHrEmployees] = useState([]);
+  const reloadHrEmployees = () => hrmsSync.pull('employees').then((rows) => {
+    if (rows) setHrEmployees(rows);
+  });
+  useEffect(() => {
+    reloadHrEmployees();
   }, []);
 
   useEffect(() => {
@@ -128,7 +168,7 @@ export function UsersPage() {
     role: 'Tele Caller Executive',
     department: 'Sales',
     status: 'Active',
-    employeeId: '',
+    employeeLink: '',
     location: '',
     reportingManager: '',
     permissions: ['View Leads', 'Create Tasks', 'Manage Deals'],
@@ -220,7 +260,6 @@ export function UsersPage() {
   };
 
   const openCreateModal = () => {
-    const nextEmpNum = users.length + 1;
     setUserForm({
       name: '',
       email: '',
@@ -228,7 +267,7 @@ export function UsersPage() {
       role: 'Sales support execut.',
       department: 'Sales',
       status: 'Active',
-      employeeId: `EMP00${nextEmpNum < 10 ? '0' + nextEmpNum : nextEmpNum}`,
+      employeeLink: 'new',
       location: '',
       reportingManager: '',
       password: '',
@@ -250,7 +289,9 @@ export function UsersPage() {
         roleId: userForm.roleId,
         department: userForm.department,
         status: userForm.status || 'Active',
-        employeeId: userForm.employeeId,
+        // 'new' lets the server match by email or make the employee record.
+        employeeId: userForm.employeeLink === 'new' ? undefined : userForm.employeeLink,
+        createEmployee: userForm.employeeLink === 'new',
         location: userForm.location,
         reportingManager: userForm.reportingManager,
         password: userForm.password || 'Password@123',
@@ -262,6 +303,7 @@ export function UsersPage() {
     if (!newUser) return;
 
     setUsers((prev) => [newUser, ...prev]);
+    reloadHrEmployees();
     setSelectedUserId(newUser.id);
     setIsCreateModalOpen(false);
     showNotification(`User "${newUser.name}" successfully created!`);
@@ -278,7 +320,7 @@ export function UsersPage() {
       role: target.role,
       department: target.department,
       status: target.status,
-      employeeId: target.employeeId,
+      employeeLink: target.employeeRecordId || '',
       location: target.location,
       reportingManager: target.reportingManager,
       permissions: target.permissions || [],
@@ -297,14 +339,16 @@ export function UsersPage() {
       roleId: userForm.roleId,
       department: userForm.department,
       status: userForm.status,
-      employeeId: userForm.employeeId,
       location: userForm.location,
       reportingManager: userForm.reportingManager,
     };
     setUsers((prev) => prev.map((u) => (u.id === userToModify.id ? { ...u, ...updates } : u)));
-    adminSync.update('users', userToModify.id, updates)
+    // The server answers with the linked employee's code and name, and may
+    // take HR's values on a fresh link, so its row replaces the optimistic one.
+    adminSync.update('users', userToModify.id, { ...updates, employeeId: userForm.employeeLink })
       .then((saved) => {
         if (saved) setUsers((prev) => prev.map((u) => (u.id === saved.id ? saved : u)));
+        reloadHrEmployees();
       })
       .catch((err) => showNotification(`Change not saved — ${describeError(err)}`));
     setIsEditModalOpen(false);
@@ -806,8 +850,10 @@ export function UsersPage() {
               </h4>
               <div className="space-y-2 text-xs divide-y divide-slate-100">
                 <div className="flex items-center justify-between py-1">
-                  <span className="text-slate-500">Employee ID</span>
-                  <span className="font-semibold text-slate-800">{activeUser.employeeId}</span>
+                  <span className="text-slate-500">HRMS Employee</span>
+                  <span className="font-semibold text-slate-800">
+                    {activeUser.employeeId ? `${activeUser.employeeId} · ${activeUser.employeeName || ''}` : 'Not linked'}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between py-1">
                   <span className="text-slate-500">Location</span>
@@ -923,16 +969,12 @@ export function UsersPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Employee ID</label>
-                  <input
-                    type="text"
-                    placeholder="EMP0027"
-                    value={userForm.employeeId}
-                    onChange={(e) => setUserForm({ ...userForm, employeeId: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                <EmployeeLinkSelect
+                  value={userForm.employeeLink}
+                  onChange={(employeeLink) => setUserForm({ ...userForm, employeeLink })}
+                  employees={hrEmployees}
+                  allowNew
+                />
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Role</label>
@@ -1124,15 +1166,12 @@ export function UsersPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Employee ID</label>
-                  <input
-                    type="text"
-                    value={userForm.employeeId}
-                    onChange={(e) => setUserForm({ ...userForm, employeeId: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+                <EmployeeLinkSelect
+                  value={userForm.employeeLink}
+                  onChange={(employeeLink) => setUserForm({ ...userForm, employeeLink })}
+                  employees={hrEmployees}
+                  userId={userToModify?.id}
+                />
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Role</label>
