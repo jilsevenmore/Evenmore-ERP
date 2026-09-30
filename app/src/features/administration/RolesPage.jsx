@@ -203,6 +203,7 @@ const DEFAULT_MODULE_PERMISSIONS = {
         { id: 'menu_inventory', label: 'Show Inventory Menu' },
         { id: 'menu_accounts', label: 'Show Accounts Menu' },
         { id: 'menu_hrms', label: 'Show HRMS Menu' },
+        { id: 'menu_organization', label: 'Show Organization Menu' },
         { id: 'menu_admin', label: 'Show Administration Menu' },
       ],
     },

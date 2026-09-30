@@ -37,6 +37,7 @@ const ROUTE_PERMISSIONS = [
   ['/hrms/leave', ['apply_leave', 'approve_leave']],
   ['/hrms/payroll', ['view_own_payslip', 'generate_payroll', 'approve_payroll']],
   ['/hrms', 'view_staff'],
+  ['/organization', 'view_staff'],
   ['/administration/users', 'view_staff'],
   ['/administration/roles', 'manage_roles'],
   ['/administration/clients', 'menu_admin'],

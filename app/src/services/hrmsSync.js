@@ -73,7 +73,8 @@ export const HRMS_RESOURCES = {
         department: e.department || undefined,
         designationId: e.designationId || undefined,
         designation: e.designation || e.role || undefined,
-        managerId: e.managerId || e.reportingManagerId || undefined,
+        // null clears the reporting manager; absent leaves it alone.
+        managerId: e.managerId !== undefined ? (e.managerId || null) : (e.reportingManagerId || undefined),
         locationId: e.locationId || undefined,
         location: e.location || undefined,
         joining: joinIso,
@@ -109,9 +110,67 @@ export const HRMS_RESOURCES = {
     },
   },
 
-  departments: plain('/hrms/departments/'),
-  designations: plain('/hrms/designations/'),
-  locations: plain('/hrms/locations/'),
+  // ── organization ──────────────────────────────────────────────────────────
+  // The Organization section's units. Each body carries only the keys the
+  // caller set (so it doubles as a partial PATCH); counts, head name and
+  // department name are read-only and never sent.
+  departments: {
+    path: '/hrms/departments/',
+    toApi: (d) => compact({
+      name: d.name?.trim() || undefined,
+      code: d.code ?? undefined,
+      headEmployeeId: d.headEmployeeId !== undefined ? (d.headEmployeeId || null) : undefined,
+      parentId: d.parentId !== undefined ? (d.parentId || null) : undefined,
+      budget: d.budget !== undefined ? (d.budget === '' || d.budget === null ? null : num(d.budget)) : undefined,
+      status: d.status || undefined,
+      description: d.description ?? undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      name: row.name || '',
+      head: row.head || '',
+      employees: row.employees ?? 0,
+      teams: row.teams ?? 0,
+      openRoles: row.openRoles ?? 0,
+      _synced: true,
+    }),
+  },
+  // The screens say "title" and "L4"; the API stores `name` and 4.
+  designations: {
+    path: '/hrms/designations/',
+    toApi: (d) => {
+      const level = d.level === undefined ? undefined : Number(String(d.level).replace(/^L/i, ''));
+      return compact({
+        name: (d.name ?? d.title)?.trim() || undefined,
+        level: level === undefined ? undefined : (Number.isFinite(level) ? level : null),
+        departmentId: d.departmentId !== undefined ? (d.departmentId || null) : undefined,
+      });
+    },
+    fromApi: (row) => ({
+      ...row,
+      title: row.name || '',
+      level: row.level ? `L${row.level}` : '',
+      department: row.department || '',
+      employees: row.employees ?? 0,
+      _synced: true,
+    }),
+  },
+  locations: {
+    path: '/hrms/locations/',
+    toApi: (l) => compact({
+      name: l.name?.trim() || undefined,
+      type: l.type || undefined,
+      address: l.address ?? undefined,
+      timezone: l.timezone ?? undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      name: row.name || '',
+      address: row.address || '',
+      employees: row.employees ?? 0,
+      _synced: true,
+    }),
+  },
   teams: plain('/hrms/teams/'),
   holidays: dated('/hrms/holidays/', ['date']),
 

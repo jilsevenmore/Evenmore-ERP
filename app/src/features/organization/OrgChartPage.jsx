@@ -1,13 +1,12 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppStore } from '../../../stores/appStore';
+import { useAppStore } from '../../stores/appStore';
 import {
   Download,
   Search,
   Minus,
   Plus,
   ChevronDown,
-  ChevronUp,
   Building,
   Mail,
   Phone,
@@ -17,194 +16,163 @@ import {
   X,
   FileSpreadsheet,
   Printer,
+  AlertTriangle,
 } from 'lucide-react';
-import Modal from '../../../components/ui/Modal';
-import PageInfoButton from '../../../components/common/PageInfoButton';
-import { hrmsGuides } from '../../../data/hrms/hrmsGuides';
-import { hrmsSync, isBackendEnabled } from '../../../services/hrmsSync';
+import Modal from '../../components/ui/Modal';
+import PageInfoButton from '../../components/common/PageInfoButton';
+import { hrmsGuides } from '../../data/hrms/hrmsGuides';
+import { hrmsSync, pullOrgChart, describeError } from '../../services/hrmsSync';
+import { useEmployeeOptions } from './useOrgCollection';
+import OrgTreeView from './OrgTreeView';
+import {
+  buildTree,
+  indexTree,
+  branchKeys,
+  defaultExpanded,
+  searchTree,
+  exportRows,
+  ORG_KEY,
+} from './orgTree';
 
-/**
- * Build the reporting tree from the employee directory. When the directory has
- * exactly one person without a manager they are the root; otherwise the
- * organisation itself heads the chart.
- */
-function buildOrgTree(employees) {
-  const nodes = employees.map((e) => ({
-    id: e.empId || e.id,
-    key: String(e.id ?? e.name),
-    name: e.name || '—',
-    role: e.designation || e.role || '',
-    fullRole: e.designation || e.role || '',
-    department: e.department || e.dept || '',
-    avatar: e.avatar || e.img || `https://i.pravatar.cc/100?u=${encodeURIComponent(e.id || e.name)}`,
-    email: e.email || '',
-    phone: e.phone || '',
-    location: e.location || '',
-    status: e.status || 'Active',
-    managerId: e.reportingManagerId != null ? String(e.reportingManagerId) : '',
-    managerName: e.reportingManager || e.manager || '',
-    reports: [],
-  }));
-  const byKey = new Map(nodes.map((n) => [n.key, n]));
-  const byName = new Map(nodes.map((n) => [n.name, n]));
-  const roots = [];
-  nodes.forEach((n) => {
-    const parent = (n.managerId && byKey.get(n.managerId)) || (n.managerName && byName.get(n.managerName));
-    if (parent && parent !== n) {
-      n.manager = parent.name;
-      parent.reports.push(n);
-    } else {
-      n.manager = n.managerName || '';
-      roots.push(n);
-    }
-  });
-  if (roots.length === 1) return roots[0];
-  return {
-    id: '',
-    key: '__org__',
-    name: 'Organization',
-    role: `${nodes.length} employee${nodes.length === 1 ? '' : 's'}`,
-    virtual: true,
-    reports: roots,
-  };
+function avatarFor(item) {
+  return item.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(item.id || item.name)}`;
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
 }
 
 export function OrgChartPage() {
   const navigate = useNavigate();
   const showToast = useAppStore((s) => s.showToast);
-  const employees = useAppStore((s) => s.employees || []);
-  const INITIAL_TREE = useMemo(() => buildOrgTree(employees), [employees]);
-  const locationOptions = useMemo(
-    () => [...new Set(employees.map((e) => e.location).filter(Boolean))],
-    [employees]
-  );
+  const refreshHrms = useAppStore((s) => s.refreshHrms);
+  const employees = useEmployeeOptions();
+
+  // Organization -> Department -> Head -> reporting lines, from the server.
+  const [chart, setChart] = useState(null);
+  const [chartLoaded, setChartLoaded] = useState(false);
+  const [chartFailed, setChartFailed] = useState(false);
+  const tree = useMemo(() => buildTree(chart), [chart]);
+  const byKey = useMemo(() => indexTree(tree), [tree]);
+  const allBranches = useMemo(() => branchKeys(tree), [tree]);
+  const headcount = tree.employeeCount;
+  const issues = chart?.issues || [];
+
+  const [expanded, setExpanded] = useState(() => new Set([ORG_KEY]));
+  // Bumped by view-wide changes so the canvas re-centres on the organisation.
+  const [centerSignal, setCenterSignal] = useState(0);
+
+  const reloadChart = useCallback(() => pullOrgChart().then((body) => {
+    if (body?.departments) setChart(body);
+    setChartFailed(!body?.departments);
+    setChartLoaded(true);
+    return body;
+  }), []);
+
+  useEffect(() => {
+    reloadChart().then((body) => {
+      if (body?.departments) setExpanded(defaultExpanded(buildTree(body)));
+      setCenterSignal((n) => n + 1);
+    });
+  }, [reloadChart]);
 
   // View Controls
   const [zoom, setZoom] = useState(100);
   const [q, setQ] = useState('');
-  const [expandedAll, setExpandedAll] = useState(true);
-  const [expandedBranches, setExpandedBranches] = useState({});
 
   // Feature Integrations
-  const [departmentCount, setDepartmentCount] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    hrmsSync.pull('departments').then((rows) => {
-      if (active && Array.isArray(rows)) setDepartmentCount(rows.length);
-    });
-    return () => { active = false; };
-  }, []);
+  const departmentCount = tree.departmentCount;
   const [isAddDeptOpen, setIsAddDeptOpen] = useState(false);
   const [isExportOpen, setIsExportOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [selectedKey, setSelectedKey] = useState(null);
+  const selectedEmployee = selectedKey ? byKey.get(selectedKey) || null : null;
+  const [managerDraft, setManagerDraft] = useState('');
+  const [savingManager, setSavingManager] = useState(false);
 
-  const [newDept, setNewDept] = useState({
-    name: '',
-    head: '',
-    budget: '',
-    location: '',
-  });
+  const [newDept, setNewDept] = useState({ name: '', headEmployeeId: '', budget: '' });
 
-  // Toggle single branch
-  function toggleBranch(name, e) {
-    e?.stopPropagation();
-    setExpandedBranches((prev) => ({
-      ...prev,
-      [name]: !prev[name],
-    }));
+  // Search keeps the path to every match open; otherwise the user's choice.
+  const search = useMemo(() => searchTree(tree, q), [tree, q]);
+  const visibleExpanded = search.expand || expanded;
+  const allOpen = allBranches.size > 0 && [...allBranches].every((key) => expanded.has(key));
+
+  const toggleBranch = useCallback((key) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  function handleExpandAll() {
+    setQ('');
+    setExpanded(new Set(allBranches));
+    setCenterSignal((n) => n + 1);
   }
 
-  // Toggle Collapse All / Expand All
-  function handleToggleAll() {
-    const next = !expandedAll;
-    setExpandedAll(next);
-    setExpandedBranches(
-      Object.fromEntries((INITIAL_TREE.reports || []).map((child) => [child.name, next]))
-    );
+  function handleCollapseAll() {
+    setQ('');
+    setExpanded(new Set([ORG_KEY]));
+    setCenterSignal((n) => n + 1);
   }
 
-  // Check if a person or their children match query
-  const matchesQuery = useCallback((person) => {
-    if (!q.trim()) return true;
-    const term = q.toLowerCase();
-    return (
-      String(person.name ?? '').toLowerCase().includes(term) ||
-      String(person.role ?? '').toLowerCase().includes(term) ||
-      String(person.department ?? '').toLowerCase().includes(term)
-    );
+  useEffect(() => {
+    setCenterSignal((n) => n + 1);
   }, [q]);
 
-  // Check if any report matches query to keep branch visible
-  const branchHasMatch = useCallback((node) => {
-    if (matchesQuery(node)) return true;
-    if (node.reports) {
-      return node.reports.some((r) => branchHasMatch(r));
-    }
-    return false;
-  }, [matchesQuery]);
+  const selectEmployee = useCallback((item) => {
+    setSelectedKey(item.key);
+    setManagerDraft(item.managerId || '');
+  }, []);
 
   // Handle Add Department submission
   async function handleAddDepartment(e) {
     e.preventDefault();
     if (!newDept.name.trim()) return;
 
-    setDepartmentCount((c) => c + 1);
-    setIsAddDeptOpen(false);
     try {
-      if (isBackendEnabled()) {
-        await hrmsSync.create('departments', {
-          name: newDept.name,
-          head: newDept.head,
-          budget: newDept.budget,
-          location: newDept.location,
-          status: 'Active',
-        });
-      }
+      await hrmsSync.create('departments', { ...newDept, status: 'Active' });
     } catch (err) {
-      console.warn('[OrgChartPage] Failed to create department on server:', err);
+      showToast(`Department not saved — ${describeError(err)}`);
+      return;
     }
-    showToast(`Department "${newDept.name}" created successfully`);
-    setNewDept({ name: '', head: '', budget: '', location: '' });
+    setIsAddDeptOpen(false);
+    reloadChart();
+    showToast(`Department "${newDept.name.trim()}" created successfully`);
+    setNewDept({ name: '', headEmployeeId: '', budget: '' });
+  }
+
+  // The reporting line is the employee record's manager; the server refuses
+  // self-reporting, loops and people who have left.
+  async function handleSaveManager() {
+    if (!selectedEmployee || savingManager) return;
+    setSavingManager(true);
+    try {
+      await hrmsSync.update('employees', selectedEmployee.id, { managerId: managerDraft || null });
+      await reloadChart();
+      refreshHrms?.('employees');
+      showToast(`Reporting manager updated for ${selectedEmployee.name}`);
+    } catch (err) {
+      showToast(`Reporting manager not saved — ${describeError(err)}`);
+    } finally {
+      setSavingManager(false);
+    }
   }
 
   // Handle CSV Export
   function exportCSV() {
     setIsExportOpen(false);
-    const rows = [
-      ['ID', 'Name', 'Role', 'Department', 'Manager', 'Email', 'Location', 'Status'],
-    ];
-
-    function flatten(node) {
-      if (node.virtual) {
-        node.reports.forEach(flatten);
-        return;
-      }
-      rows.push([
-        node.id,
-        `"${node.name}"`,
-        `"${node.fullRole || node.role}"`,
-        `"${node.department}"`,
-        `"${node.manager || '—'}"`,
-        `"${node.email}"`,
-        `"${node.location}"`,
-        `"${node.status}"`,
-      ]);
-      if (node.reports) {
-        node.reports.forEach(flatten);
-      }
-    }
-
-    flatten(INITIAL_TREE);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + rows.map((e) => e.join(',')).join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvContent = exportRows(tree).map((row) => row.map(csvCell).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', 'Evenmore_Org_Chart.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 
     showToast('Org Chart exported as CSV');
   }
@@ -218,12 +186,8 @@ export function OrgChartPage() {
     }, 250);
   }
 
-  // Filtered children of root
-  const filteredLevel1 = useMemo(() => {
-    return INITIAL_TREE.reports.filter((person) => branchHasMatch(person));
-  }, [branchHasMatch, INITIAL_TREE]);
-
-  const rootMatches = !INITIAL_TREE.virtual && matchesQuery(INITIAL_TREE);
+  const noMatches = Boolean(q.trim()) && search.root.children.length === 0;
+  const managerOptions = employees.filter((emp) => String(emp.id) !== String(selectedEmployee?.id));
 
   return (
     <div className="flex flex-col gap-6 p-2 sm:p-6 max-w-[1600px] mx-auto w-full printable-document">
@@ -235,7 +199,7 @@ export function OrgChartPage() {
             <PageInfoButton guide={hrmsGuides.orgChart} />
           </div>
           <p className="text-[13px] text-muted mt-1">
-            {departmentCount} Departments • {employees.length.toLocaleString()} Employees • Last updated{' '}
+            {departmentCount} Departments • {headcount.toLocaleString()} Employees • Last updated{' '}
             {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
           </p>
         </div>
@@ -295,8 +259,8 @@ export function OrgChartPage() {
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Search by name or role"
-              className="pl-10 pr-4 h-9 w-full sm:w-64 bg-off border border-bdr rounded-xl text-[13px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
+              placeholder="Search name, employee ID, designation, department"
+              className="pl-10 pr-4 h-9 w-full sm:w-80 bg-off border border-bdr rounded-xl text-[13px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 transition-all"
             />
             {q && (
               <button
@@ -312,10 +276,18 @@ export function OrgChartPage() {
           {/* Collapse / Expand all */}
           <button
             type="button"
-            onClick={handleToggleAll}
+            onClick={handleExpandAll}
+            disabled={allOpen && !q}
+            className="px-3 py-1 text-navy hover:bg-slate-100 rounded-xl text-[13px] font-medium transition-colors cursor-pointer disabled:opacity-40"
+          >
+            Expand all
+          </button>
+          <button
+            type="button"
+            onClick={handleCollapseAll}
             className="px-3 py-1 text-navy hover:bg-slate-100 rounded-xl text-[13px] font-medium transition-colors cursor-pointer"
           >
-            {expandedAll ? 'Collapse all' : 'Expand all'}
+            Collapse all
           </button>
         </div>
 
@@ -351,157 +323,45 @@ export function OrgChartPage() {
         </div>
       </div>
 
-      {/* ── Main Org Chart Canvas ───────────────────────────────── */}
-      <div className="bg-white border border-bdr rounded-xl shadow-xs p-4 sm:p-8 overflow-x-auto min-h-[520px] flex justify-center-safe items-start">
-        <div
-          style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'top center' }}
-          className="min-w-[880px] flex flex-col items-center transition-transform duration-150"
-        >
-          {/* ROOT NODE */}
-          <div
-            onClick={() => !INITIAL_TREE.virtual && setSelectedEmployee(INITIAL_TREE)}
-            className={`w-[160px] bg-white border-2 border-navy rounded-xl p-3 flex flex-col items-center shadow-xs cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group ${
-              rootMatches && q ? 'ring-2 ring-blue-500/40' : ''
-            }`}
-          >
-            {INITIAL_TREE.virtual ? (
-              <div className="w-8 h-8 rounded-full ring-2 ring-navy grid place-items-center text-navy">
-                <Building size={16} />
-              </div>
-            ) : (
-              <img
-                src={INITIAL_TREE.avatar}
-                alt={INITIAL_TREE.name}
-                className="w-8 h-8 rounded-full ring-2 ring-navy object-cover"
-              />
-            )}
-            <div className="text-[13px] font-semibold text-slate-900 mt-2 group-hover:text-navy transition-colors text-center">
-              {INITIAL_TREE.name}
-            </div>
-            <div className="text-[11px] text-muted text-center">{INITIAL_TREE.role}</div>
+      {/* ── Data checks ─────────────────────────────────────────── */}
+      {issues.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-[12.5px] text-amber-800 no-print">
+          <div className="font-semibold flex items-center gap-1.5">
+            <AlertTriangle size={14} /> {issues.length} record{issues.length === 1 ? '' : 's'} to fix in HR data
           </div>
-
-          {/* Connectors from Root to Level 1 */}
-          {expandedAll && filteredLevel1.length > 0 && (
-            <>
-              {/* Vertical line from root card */}
-              <div className="w-px h-8 bg-bdr" />
-
-              {/* Horizontal bar across Level 1 children */}
-              <div
-                className="h-px bg-bdr"
-                style={{
-                  width: `${Math.max(160, (filteredLevel1.length - 1) * 220 + 160)}px`,
-                }}
-              />
-
-              {/* LEVEL 1 CARDS */}
-              <div className="flex gap-6 mt-6 relative">
-                {filteredLevel1.map((child) => {
-                  const isMatch = matchesQuery(child);
-                  const isBranchExpanded = expandedBranches[child.name];
-                  const hasReports = child.reports && child.reports.length > 0;
-
-                  return (
-                    <div key={child.key || child.name} className="flex flex-col items-center">
-                      {/* Level 1 Node Card */}
-                      <div
-                        onClick={() => setSelectedEmployee(child)}
-                        className={`w-[160px] bg-white border border-bdr rounded-xl p-3 flex flex-col items-center shadow-xs cursor-pointer hover:border-slate-400 hover:shadow-md hover:-translate-y-0.5 transition-all group relative ${
-                          isMatch && q ? 'ring-2 ring-blue-500/40 border-blue-400' : ''
-                        }`}
-                      >
-                        <img
-                          src={child.avatar}
-                          alt={child.name}
-                          className="w-8 h-8 rounded-full object-cover"
-                        />
-                        <div className="text-[13px] font-semibold text-slate-900 mt-2 group-hover:text-navy transition-colors text-center">
-                          {child.name}
-                        </div>
-                        <div className="text-[11px] text-muted text-center">{child.role}</div>
-
-                        {/* Subordinate Toggle indicator if reports exist */}
-                        {hasReports && (
-                          <button
-                            type="button"
-                            onClick={(e) => toggleBranch(child.name, e)}
-                            title={isBranchExpanded ? 'Hide reports' : `View ${child.reports.length} reports`}
-                            className="mt-2.5 px-2 py-0.5 text-[10.5px] font-medium text-slate-600 bg-off hover:bg-slate-200 border border-bdr rounded-full flex items-center gap-1 transition-colors cursor-pointer"
-                          >
-                            <span>{child.reports.length} reports</span>
-                            {isBranchExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* LEVEL 2 SUBORDINATES (Expandable under each Level 1 Leader) */}
-                      {hasReports && isBranchExpanded && (
-                        <div className="flex flex-col items-center mt-0">
-                          {/* Vertical connector down from Level 1 card */}
-                          <div className="w-px h-6 bg-bdr" />
-
-                          {/* Horizontal connector bar for Level 2 children if > 1 */}
-                          {child.reports.length > 1 && (
-                            <div
-                              className="h-px bg-bdr"
-                              style={{
-                                width: `${(child.reports.length - 1) * 168}px`,
-                              }}
-                            />
-                          )}
-
-                          {/* Level 2 Subordinate Cards */}
-                          <div className="flex gap-4">
-                            {child.reports.map((sub) => {
-                              const isSubMatch = matchesQuery(sub);
-                              return (
-                                <div key={sub.key || sub.name} className="flex flex-col items-center">
-                                  {child.reports.length > 1 && <div className="w-px h-5 bg-bdr" />}
-                                  <div
-                                    onClick={() => setSelectedEmployee(sub)}
-                                    className={`w-[148px] bg-white border border-bdr rounded-xl p-2.5 flex flex-col items-center shadow-xs cursor-pointer hover:border-slate-400 hover:shadow-md hover:-translate-y-0.5 transition-all group ${
-                                      isSubMatch && q ? 'ring-2 ring-blue-500/40 border-blue-400' : ''
-                                    }`}
-                                  >
-                                    <img
-                                      src={sub.avatar}
-                                      alt={sub.name}
-                                      className="w-7 h-7 rounded-full object-cover"
-                                    />
-                                    <div className="text-[12px] font-semibold text-slate-900 mt-1.5 group-hover:text-navy transition-colors text-center truncate w-full">
-                                      {sub.name}
-                                    </div>
-                                    <div className="text-[10.5px] text-muted text-center truncate w-full">
-                                      {sub.role}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {employees.length === 0 && (
-            <div className="text-center py-16 text-muted text-[13px]">
-              No employees yet. Add employees to build the org chart.
-            </div>
-          )}
-
-          {/* Empty search state */}
-          {employees.length > 0 && q && expandedAll && filteredLevel1.length === 0 && !rootMatches && (
-            <div className="text-center py-16 text-muted text-[13px]">
-              No employees found matching &quot;{q}&quot;
-            </div>
-          )}
+          <ul className="mt-1 list-disc pl-5 space-y-0.5">
+            {issues.slice(0, 5).map((issue, i) => <li key={i}>{issue.message}</li>)}
+          </ul>
         </div>
+      )}
+
+      {/* ── Main Org Chart Canvas ───────────────────────────────── */}
+      <div className="bg-white border border-bdr rounded-xl shadow-xs">
+        {!chartLoaded ? (
+          <div className="text-center py-24 text-muted text-[13px]">Loading org chart…</div>
+        ) : chartFailed && !chart ? (
+          <div className="text-center py-24 text-muted text-[13px]">
+            Couldn’t load the org chart. Refresh the page to try again.
+          </div>
+        ) : headcount === 0 && tree.children.length === 0 ? (
+          <div className="text-center py-24 text-muted text-[13px]">
+            No departments or employees yet. Add them to build the org chart.
+          </div>
+        ) : noMatches ? (
+          <div className="text-center py-24 text-muted text-[13px]">
+            No employees found matching &quot;{q}&quot;
+          </div>
+        ) : (
+          <OrgTreeView
+            root={search.root}
+            expanded={visibleExpanded}
+            matched={search.matched}
+            zoom={zoom}
+            onToggle={toggleBranch}
+            onSelect={selectEmployee}
+            centerSignal={centerSignal}
+          />
+        )}
       </div>
 
       {/* ── ADD DEPARTMENT MODAL ─────────────────────────────────── */}
@@ -536,13 +396,13 @@ export function OrgChartPage() {
                 Department Head
               </label>
               <select
-                value={newDept.head}
-                onChange={(e) => setNewDept({ ...newDept, head: e.target.value })}
+                value={newDept.headEmployeeId}
+                onChange={(e) => setNewDept({ ...newDept, headEmployeeId: e.target.value })}
                 className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] text-slate-800 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10 cursor-pointer"
               >
                 <option value="">Not assigned</option>
                 {employees.map((emp) => (
-                  <option key={emp.id} value={emp.name}>
+                  <option key={emp.id} value={emp.id}>
                     {emp.name}{emp.designation ? ` (${emp.designation})` : ''}
                   </option>
                 ))}
@@ -554,32 +414,14 @@ export function OrgChartPage() {
                 Annual Budget
               </label>
               <input
-                type="text"
+                type="number"
+                min="0"
                 value={newDept.budget}
                 onChange={(e) => setNewDept({ ...newDept, budget: e.target.value })}
-                placeholder="e.g. $350,000"
+                placeholder="e.g. 3500000"
                 className="w-full px-3.5 py-2 bg-off border border-bdr rounded-xl text-[13.5px] text-slate-800 placeholder:text-muted focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-[12.5px] font-semibold text-slate-700 mb-1.5">
-              Primary Office Location
-            </label>
-            <input
-              type="text"
-              list="org-dept-locations"
-              value={newDept.location}
-              onChange={(e) => setNewDept({ ...newDept, location: e.target.value })}
-              placeholder="Enter office location"
-              className="w-full px-3.5 py-2 bg-white border border-bdr rounded-xl text-[13.5px] text-slate-800 focus:outline-none focus:border-navy focus:ring-2 focus:ring-navy/10"
-            />
-            <datalist id="org-dept-locations">
-              {locationOptions.map((loc) => (
-                <option key={loc} value={loc} />
-              ))}
-            </datalist>
           </div>
 
           <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-3 border-t border-bdr mt-2">
@@ -587,7 +429,7 @@ export function OrgChartPage() {
               type="button"
               onClick={() => {
                 setIsAddDeptOpen(false);
-                navigate('/hrms/departments');
+                navigate('/organization/departments');
               }}
               className="text-navy text-[13px] font-medium hover:underline flex items-center gap-1 cursor-pointer"
             >
@@ -616,7 +458,7 @@ export function OrgChartPage() {
       {/* ── EMPLOYEE QUICK VIEW MODAL / DRAWER ─────────────────────── */}
       <Modal
         isOpen={Boolean(selectedEmployee)}
-        onClose={() => setSelectedEmployee(null)}
+        onClose={() => setSelectedKey(null)}
         title="Employee Profile"
         size="md"
       >
@@ -625,7 +467,7 @@ export function OrgChartPage() {
             {/* Top Employee Card */}
             <div className="flex items-center gap-4 p-4 bg-off border border-bdr rounded-xl">
               <img
-                src={selectedEmployee.avatar}
+                src={avatarFor(selectedEmployee)}
                 alt={selectedEmployee.name}
                 className="w-14 h-14 rounded-full ring-2 ring-navy/20 object-cover"
               />
@@ -639,10 +481,11 @@ export function OrgChartPage() {
                   </span>
                 </div>
                 <div className="text-[13px] text-slate-600 font-medium">
-                  {selectedEmployee.fullRole || selectedEmployee.role}
+                  {selectedEmployee.designation || '—'}
+                  {selectedEmployee.code && <span className="text-muted font-normal"> • {selectedEmployee.code}</span>}
                 </div>
                 <div className="text-[12px] text-muted flex items-center gap-1.5 mt-0.5">
-                  <Building size={13} /> {selectedEmployee.department}
+                  <Building size={13} /> {selectedEmployee.department || 'No department'}
                 </div>
               </div>
             </div>
@@ -687,27 +530,57 @@ export function OrgChartPage() {
                 <Users size={16} className="text-muted shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] text-muted font-medium">Reports To</div>
-                  <div className="text-slate-800 font-medium">{selectedEmployee.manager || '—'}</div>
+                  <div className="text-slate-800 font-medium">
+                    {selectedEmployee.manager
+                      || (selectedEmployee.relation === 'department' ? 'Department head (no manager set)' : '—')}
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Reporting manager (the employee record's manager) */}
+            <div className="p-3.5 border border-bdr rounded-xl no-print">
+              <div className="text-[12px] font-semibold text-slate-700 mb-2">Change Reporting Manager</div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={managerDraft}
+                  onChange={(e) => setManagerDraft(e.target.value)}
+                  className="flex-1 min-w-0 h-9 px-3 bg-white border border-bdr rounded-xl text-[13px] text-slate-800 focus:outline-none focus:border-navy"
+                >
+                  <option value="">No reporting manager</option>
+                  {managerOptions.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name}{emp.designation ? ` (${emp.designation})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={handleSaveManager}
+                  disabled={savingManager || managerDraft === (selectedEmployee.managerId || '')}
+                  className="px-4 h-9 bg-navy hover:bg-navy/90 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {savingManager ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+
             {/* Direct Reports Count if any */}
-            {selectedEmployee.reports && selectedEmployee.reports.length > 0 && (
+            {selectedEmployee.children && selectedEmployee.children.length > 0 && (
               <div className="p-3.5 bg-slate-50 border border-bdr rounded-xl">
                 <div className="text-[12px] font-semibold text-slate-700 mb-2 flex items-center gap-1.5">
-                  <Users size={14} className="text-navy" /> Direct Reports ({selectedEmployee.reports.length})
+                  <Users size={14} className="text-navy" /> Direct Reports ({selectedEmployee.children.length})
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {selectedEmployee.reports.map((rep) => (
+                  {selectedEmployee.children.map((rep) => (
                     <div
-                      key={rep.key || rep.name}
-                      onClick={() => setSelectedEmployee(rep)}
+                      key={rep.key}
+                      onClick={() => selectEmployee(rep)}
                       className="px-2.5 h-8 bg-white border border-bdr rounded-xl text-xs flex items-center gap-2 hover:border-navy cursor-pointer transition-colors"
                     >
-                      <img src={rep.avatar} alt={rep.name} className="w-4 h-4 rounded-full" />
+                      <img src={avatarFor(rep)} alt={rep.name} className="w-4 h-4 rounded-full" />
                       <span className="font-medium text-slate-800">{rep.name}</span>
-                      <span className="text-[11px] text-muted">({rep.role})</span>
+                      {rep.designation && <span className="text-[11px] text-muted">({rep.designation})</span>}
                     </div>
                   ))}
                 </div>
@@ -719,7 +592,7 @@ export function OrgChartPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedEmployee(null);
+                  setSelectedKey(null);
                   navigate('/hrms/employees');
                 }}
                 className="px-4 py-2 bg-white border border-bdr hover:bg-slate-50 text-slate-700 rounded-xl text-[13px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -746,7 +619,5 @@ export function OrgChartPage() {
   );
 }
 
-// Named alias for flexibility across legacy and unified imports
-export const OrgChart = OrgChartPage;
 export default OrgChartPage;
 
