@@ -2,6 +2,12 @@ import React, { useEffect } from 'react';
 import { X, Printer, FileSpreadsheet, Clock, Info } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { addressLines, companyInitial, joinNonEmpty, pickPrintBankAccount } from './printLetterhead';
+import { LetterpadBrand, LetterpadFooter } from './SalesLetterpad';
+import { lineSpecText } from '../../utils/salesLineMetal';
+
+// Letterpad (documents/sewen letter pad.pdf). The previous letterhead block is
+// kept below, switched off -- flip this to restore it.
+const USE_LEGACY_LETTERHEAD = false;
 
 export const PrintProformaInvoiceModal = ({
   isOpen,
@@ -80,6 +86,7 @@ export const PrintProformaInvoiceModal = ({
         <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
           {/* Header / Corporate Letterhead */}
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
+            {USE_LEGACY_LETTERHEAD ? (
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
                 {companyShort && (
@@ -105,6 +112,7 @@ export const PrintProformaInvoiceModal = ({
                 {contactLine && <p>Commercial Billing Desk: {contactLine}</p>}
               </div>
             </div>
+            ) : <LetterpadBrand company={companyProfile} contactLabel="Billing Desk" />}
 
             {/* Proforma Meta Block */}
             <div className="text-right space-y-1">
@@ -191,7 +199,9 @@ export const PrintProformaInvoiceModal = ({
                   {items.map((item, idx) => {
                     const rate = Number(item.rate || 0);
                     const qty = Number(item.qty || 1);
-                    const taxRate = Number(item.tax || 18);
+                    // Replaced: `item.tax || 18` printed a 0% GST service line at 18%.
+                    // const taxRate = Number(item.tax || 18);
+                    const taxRate = item.tax !== undefined && item.tax !== null && item.tax !== '' ? Number(item.tax) || 0 : 18;
                     const taxAmt = (rate * qty * taxRate) / 100;
                     const total = rate * qty + taxAmt;
 
@@ -201,8 +211,10 @@ export const PrintProformaInvoiceModal = ({
                         <td className="py-2.5 px-3">
                           <p className="font-bold text-slate-800">{item.name || item.description}</p>
                           {(item.sku || item.itemSku) && <p className="text-[10px] font-mono text-slate-400">SKU: {item.sku || item.itemSku}</p>}
+                          {lineSpecText(item) && <p className="text-[10px] text-slate-500">{lineSpecText(item)}</p>}
                         </td>
-                        <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-900">{qty} {item.unit || 'Unit'}</td>
+                        {/* Replaced: {qty} {item.unit || 'Unit'} -- the server's field is `uom`. */}
+                        <td className="py-2.5 px-2 text-center font-mono font-bold text-slate-900">{qty} {item.uom || item.unit || 'Unit'}</td>
                         <td className="py-2.5 px-3 text-right font-mono text-slate-600">₹{rate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         <td className="py-2.5 px-2 text-center font-mono text-slate-600">{taxRate}%</td>
                         <td className="py-2.5 px-3 text-right font-mono text-slate-600">₹{taxAmt.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
@@ -325,10 +337,12 @@ export const PrintProformaInvoiceModal = ({
             </div>
           </div>
 
-          {/* Footer */}
+          {/* Footer -- Replaced: the software vendor's name does not belong on the
+              customer's document. Was:
           <div className="text-center text-[10px] text-slate-400 border-t border-slate-100 pt-3">
             Commercial document • Created via Evenmore ERP Unified Platform
-          </div>
+          </div> */}
+          <LetterpadFooter company={companyProfile} note="Proforma invoice · not a tax invoice" />
         </div>
         </div>
       </div>

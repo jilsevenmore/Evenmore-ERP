@@ -10,6 +10,7 @@ import { PrintInvoiceModal } from '../../components/common/PrintInvoiceModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
 import { Pagination } from '../../components/ui/Pagination';
 
 const invoiceGuide = {
@@ -820,6 +821,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                         </div>
 
                         <div className="p-2 space-y-4 overflow-y-auto flex-1 my-2 pr-1">
+                            <FormSection number="01" title="Customer & billing" />
                             {/* Top Form Row */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
                                 <div className="flex flex-col gap-1">
@@ -985,10 +987,12 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 </div>
                             </div>
 
+                            <FormSection number="02" title="Sheet, plate, sections & fabrication" hint="Bill steel at dispatched weight (₹/kg) or per piece; HSN is suggested from material and form." />
                             {/* Line Items Editor */}
                             <div>
                                 <label className="text-xs font-semibold text-slate-800 block mb-2">Invoice Line Items</label>
-                                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales"/>
+                                {/* Metal-industry sales lines: custom / fabrication rows, unit, material, spec, weight (was: no allowCustomLines). */}
+                                <LineItemEditor allowCustomLines items={lineItems} onChange={setLineItems} type="sales"/>
                             </div>
 
                             {/* Sales Value & Cash Allocation Split */}
@@ -1199,7 +1203,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         </span>
                                     )}
                                 </div>
-                                <LineItemEditor items={selectedInvoice.items || []} onChange={() => { }} readOnly={true}/>
+                                {/* Metal-industry sales lines: custom / fabrication rows, unit, material, spec, weight (was: no allowCustomLines). */}
+                                <LineItemEditor allowCustomLines items={selectedInvoice.items || []} onChange={() => { }} readOnly={true}/>
                             </div>
 
                             {/* BILL PAYMENT & ALLOCATION SUMMARY CARD */}

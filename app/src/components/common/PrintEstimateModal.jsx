@@ -2,9 +2,17 @@ import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, FileText, Clock } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
+import { LetterpadBrand, LetterpadFooter } from './SalesLetterpad';
+import { lineSpecText, lineTotalWeight, formatKg } from '../../utils/salesLineMetal';
+
+// Letterpad (documents/sewen letter pad.pdf). The previous letterhead block is
+// kept below, switched off -- flip this to restore it.
+const USE_LEGACY_LETTERHEAD = false;
 
 export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
-    const { companyProfile, resolvePartyAddresses } = useERP();
+    const { companyProfile, resolvePartyAddresses, formatCurrency } = useERP();
+    // Replaced: amounts printed with a hardcoded "$" on an INR workspace.
+    const money = (value) => (formatCurrency ? formatCurrency(Number(value) || 0) : (Number(value) || 0).toFixed(2));
     const companyName = companyProfile?.name || '';
     const companyShort = companyInitial(companyName);
     const gstin = companyProfile?.gstin || '';
@@ -82,6 +90,7 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                 <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
                     {/* Header / Letterhead */}
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
+                        {USE_LEGACY_LETTERHEAD ? (
                         <div className="space-y-1">
                             <div className="flex items-center gap-2.5">
                                 {companyShort && (
@@ -101,6 +110,7 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                                 {contactLine && <p>Sales Desk: {contactLine}</p>}
                             </div>
                         </div>
+                        ) : <LetterpadBrand company={companyProfile} contactLabel="Sales Desk" />}
 
                         {/* Estimate Meta Block */}
                         <div className="text-right space-y-1">
@@ -197,13 +207,16 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                                                     {it.itemSku && (
                                                         <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku}</p>
                                                     )}
+                                                    {lineSpecText(it) && <p className="text-[10px] text-slate-500">{lineSpecText(it)}</p>}
                                                 </td>
-                                                <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{qty}</td>
-                                                <td className="py-2.5 px-3 text-right font-mono">${rate.toFixed(2)}</td>
+                                                <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{qty}{it.uom ? ` ${it.uom}` : ''}</td>
+                                                {/* Replaced: <td ...>${rate.toFixed(2)}</td> */}
+                                                <td className="py-2.5 px-3 text-right font-mono">{money(rate)}</td>
                                                 <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{disc}%</td>
                                                 <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{tax}%</td>
                                                 <td className="py-2.5 px-3 text-right font-mono font-bold text-slate-900">
-                                                    ${lineTotal.toFixed(2)}
+                                                    {/* Replaced: ${lineTotal.toFixed(2)} */}
+                                                    {money(lineTotal)}
                                                 </td>
                                             </tr>
                                         );
@@ -211,6 +224,11 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                                 )}
                             </tbody>
                         </table>
+                        {items.some((it) => Number(it.unitWeight) > 0) && (
+                            <p className="text-[10px] text-slate-500 text-right font-mono">
+                                Total weight: {formatKg(items.reduce((acc, it) => acc + lineTotalWeight(it), 0))} (theoretical)
+                            </p>
+                        )}
                     </div>
 
                     {/* Subtotals & Terms */}
@@ -229,15 +247,18 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                         <div className="w-72 space-y-1.5 font-mono text-xs text-right">
                             <div className="flex justify-between text-slate-600">
                                 <span>Net Subtotal:</span>
-                                <span>${subtotal.toFixed(2)}</span>
+                                {/* Replaced: ${subtotal.toFixed(2)} */}
+                                <span>{money(subtotal)}</span>
                             </div>
                             <div className="flex justify-between text-slate-600">
                                 <span>Estimated GST / Tax:</span>
-                                <span>${taxAmount.toFixed(2)}</span>
+                                {/* Replaced: ${taxAmount.toFixed(2)} */}
+                                <span>{money(taxAmount)}</span>
                             </div>
                             <div className="flex justify-between text-sm font-black text-slate-900 pt-2 border-t-2 border-slate-900 bg-slate-50 p-1.5 rounded">
                                 <span>Grand Estimated Total:</span>
-                                <span className="text-blue-900">${grandTotal.toFixed(2)}</span>
+                                {/* Replaced: ${grandTotal.toFixed(2)} */}
+                                <span className="text-blue-900">{money(grandTotal)}</span>
                             </div>
                         </div>
                     </div>
@@ -269,6 +290,7 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                     <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">
                         Thank you for your interest!{contactLine ? ` For any questions regarding this estimate, please contact ${contactLine}.` : ''}
                     </div>
+                    <LetterpadFooter company={companyProfile} />
                 </div>
                 </div>
 

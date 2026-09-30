@@ -12,6 +12,8 @@ import { CreateWarrantyCardModal } from '../../components/common/CreateWarrantyC
 import { WarrantyCardModal } from '../../components/common/WarrantyCardModal';
 import { SendChallanModal } from '../../components/common/SendChallanModal';
 import { PrintDeliveryChallanModal } from '../../components/common/PrintDeliveryChallanModal';
+import { FormSection } from '../../components/common/FormSection';
+import { lineSpecText, lineTotalWeight, formatKg } from '../../utils/salesLineMetal';
 const challanGuide = {
     title: 'Delivery Challans & Waybills',
     subtitle: 'Warehouse logistics dispatch, non-commercial shipping waybills, and proof of delivery (POD).',
@@ -48,6 +50,10 @@ export const DeliveryChallansPage = () => {
     const [driverContact, setDriverContact] = useState('');
     const [totalPackages, setTotalPackages] = useState(1);
     const [dispatchNote, setDispatchNote] = useState('');
+    // Weighbridge (sheet metal leaves the gate on a weighed truck).
+    const [weighbridgeSlip, setWeighbridgeSlip] = useState('');
+    const [grossWeight, setGrossWeight] = useState('');
+    const [tareWeight, setTareWeight] = useState('');
     const [lineItems, setLineItems] = useState([]);
     const [validationError, setValidationError] = useState('');
 
@@ -88,6 +94,7 @@ export const DeliveryChallansPage = () => {
             setSelectedSoId(defaultSo.id);
             setLineItems(prepareOrderLines(defaultSo));
         }
+        setWeighbridgeSlip(''); setGrossWeight(''); setTareWeight('');
         setValidationError('');
         setShowAddModal(true);
     };
@@ -99,6 +106,9 @@ export const DeliveryChallansPage = () => {
         setLineItems(prepareOrderLines(challan));
         setTransporter(challan.transporter || '');
         setVehicleNo(challan.vehicleNo || '');
+        setWeighbridgeSlip(challan.weighbridgeSlip || '');
+        setGrossWeight(challan.grossWeight ?? '');
+        setTareWeight(challan.tareWeight ?? '');
         setValidationError('');
         setShowAddModal(true);
     };
@@ -165,6 +175,10 @@ export const DeliveryChallansPage = () => {
             setValidationError('Please specify at least 1 item with dispatch quantity > 0.');
             return;
         }
+        if (grossWeight !== '' && tareWeight !== '' && Number(tareWeight) > Number(grossWeight)) {
+            setValidationError('Weighbridge tare weight cannot be more than the gross weight.');
+            return;
+        }
 
         const created = addDeliveryChallan({
             ...(draftChallan ? { ...draftChallan, id: draftChallan.id } : {}),
@@ -179,6 +193,9 @@ export const DeliveryChallansPage = () => {
             dispatchDate: new Date().toISOString().split('T')[0],
             transporter,
             vehicleNo,
+            weighbridgeSlip,
+            grossWeight: grossWeight === '' ? undefined : Number(grossWeight),
+            tareWeight: tareWeight === '' ? undefined : Number(tareWeight),
             status: 'In Transit',
             items: validLines,
             lineItems: validLines,
@@ -468,6 +485,7 @@ export const DeliveryChallansPage = () => {
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              <FormSection number="01" title="Order, vehicle & transporter" />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Source Sales Order *</label>
@@ -494,7 +512,8 @@ export const DeliveryChallansPage = () => {
                   <input type="text" value={driverContact} onChange={(e) => setDriverContact(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Total Packages / Cartons</label>
+                  {/* Replaced label: <label ...>Total Packages / Cartons</label> */}
+                  <label className="font-semibold text-slate-700 block mb-1">Bundles / Packages</label>
                   <input type="number" min="1" value={totalPackages} onChange={(e) => setTotalPackages(Number(e.target.value))} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
               </div>
@@ -504,7 +523,45 @@ export const DeliveryChallansPage = () => {
                 <input type="text" value={dispatchNote} onChange={(e) => setDispatchNote(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800" placeholder="Special storage, gate pass, or forklift handling instructions..."/>
               </div>
 
+              {/* Weighbridge: gross − tare = net, against the theoretical weight of the manifest. */}
+              <FormSection number="02" title="Weighbridge" hint="Enter the weighbridge slip once the loaded truck is weighed. Net weight is gross minus tare." />
+              {(() => {
+                const theoretical = lineItems.reduce((acc, it) => acc + lineTotalWeight(it), 0);
+                const net = grossWeight !== '' && tareWeight !== '' ? Number(grossWeight) - Number(tareWeight) : null;
+                const variation = net !== null && theoretical > 0 ? ((net - theoretical) / theoretical) * 100 : null;
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 items-end">
+                    <div className="sm:col-span-2">
+                      <label className="font-semibold text-slate-700 block mb-1">Weighbridge Slip #</label>
+                      <input type="text" value={weighbridgeSlip} onChange={(e) => setWeighbridgeSlip(e.target.value)} placeholder="e.g. WB-5521" className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                    </div>
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">Gross (kg)</label>
+                      <input type="number" min="0" step="any" value={grossWeight} onChange={(e) => setGrossWeight(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 text-right font-mono"/>
+                    </div>
+                    <div>
+                      <label className="font-semibold text-slate-700 block mb-1">Tare (kg)</label>
+                      <input type="number" min="0" step="any" value={tareWeight} onChange={(e) => setTareWeight(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 text-right font-mono"/>
+                    </div>
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200">
+                      <span className="block text-[10px] font-semibold uppercase text-slate-500">Net</span>
+                      <strong className="font-mono text-slate-900">{net !== null ? formatKg(net) : '—'}</strong>
+                    </div>
+                    <div className="p-2 rounded bg-slate-50 border border-slate-200">
+                      <span className="block text-[10px] font-semibold uppercase text-slate-500">Theoretical</span>
+                      <strong className="font-mono text-slate-900">{theoretical > 0 ? formatKg(theoretical) : '—'}</strong>
+                      {variation !== null && (
+                        <span className={`block text-[10px] font-bold ${Math.abs(variation) > 2 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {variation > 0 ? '+' : ''}{variation.toFixed(2)}% variation
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Warehouse Dispatch Manifest Item Table (No Commercial Invoicing Fields) */}
+              <FormSection number="03" title="Dispatch manifest" />
               <div className="space-y-2">
                 <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
                   <label className="font-semibold text-slate-700 block">
@@ -545,7 +602,10 @@ export const DeliveryChallansPage = () => {
                             No items found in selected sales order.
                           </td>
                         </tr>) : (lineItems.map((item, idx) => {
-                        const stock = item.itemId ? calculateItemStock(item.itemId) : { available: 10 };
+                        // Replaced: a line with no inventory item (custom sheet / fabrication) has
+                        // no stock to run short of -- the old fallback of 10 flagged a false deficit.
+                        // const stock = item.itemId ? calculateItemStock(item.itemId) : { available: 10 };
+                        const stock = item.itemId ? calculateItemStock(item.itemId) : { available: Infinity, nonStock: true };
                         const mi = masterItems.find((m) => m.id === item.itemId || (item.itemSku && m.sku?.toLowerCase() === String(item.itemSku ?? '').toLowerCase()) || (item.sku && m.sku?.toLowerCase() === String(item.sku ?? '').toLowerCase()));
                         const isShort = stock.available < item.qty;
                         const isOverLimit = item.qty > (item.remainingQty ?? 9999);
@@ -554,6 +614,7 @@ export const DeliveryChallansPage = () => {
                             <td className="p-2.5">
                               <p className="font-semibold text-slate-800">{item.description || item.name}</p>
                               <span className="font-mono text-[10px] text-slate-400">SKU: {item.itemSku || mi?.sku || '—'}</span>
+                              {lineSpecText(item) && <span className="block text-[10px] text-slate-500">{lineSpecText(item)}</span>}
                             </td>
                             <td className="p-2.5 text-center">
                               <div className="font-mono text-[11px] text-slate-700">
@@ -563,6 +624,9 @@ export const DeliveryChallansPage = () => {
                               </div>
                             </td>
                             <td className="p-2.5 text-center">
+                              {stock.nonStock ? (
+                                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Non-stock</span>
+                              ) : (
                               <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${stock.available <= 0
                                   ? 'bg-rose-100 text-rose-800'
                                   : stock.available < item.qty
@@ -570,12 +634,15 @@ export const DeliveryChallansPage = () => {
                                       : 'bg-emerald-50 text-emerald-700'}`}>
                                 {stock.available} in stock
                               </span>
+                              )}
                             </td>
                             <td className="p-2.5 text-center">
                               <div className="flex flex-col items-center gap-1">
+                                {/* step="any": sheet metal dispatches in kg, e.g. 371.72 (was integer-only). */}
                                 <input
                                   type="number"
                                   min="0"
+                                  step="any"
                                   max={item.remainingQty ?? item.orderedQty ?? 100}
                                   value={item.qty}
                                   onChange={(e) => handleItemQtyChange(idx, Number(e.target.value))}
@@ -583,7 +650,8 @@ export const DeliveryChallansPage = () => {
                                     isOverLimit ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:ring-blue-500'
                                   }`}
                                 />
-                                <span className="text-[10px] text-slate-400">Max: {item.remainingQty ?? item.orderedQty}</span>
+                                <span className="text-[10px] text-slate-400">Max: {item.remainingQty ?? item.orderedQty}{item.uom ? ` ${item.uom}` : ''}</span>
+                                {lineTotalWeight(item) > 0 && <span className="text-[10px] font-semibold text-slate-600">{formatKg(lineTotalWeight(item))}</span>}
                               </div>
                             </td>
                             <td className="p-2.5">

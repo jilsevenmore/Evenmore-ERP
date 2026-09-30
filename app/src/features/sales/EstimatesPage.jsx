@@ -8,6 +8,7 @@ import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimi
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
 import { useEstimates, addEstimate, updateEstimate } from '../../services/estimateStore';
 import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 
@@ -323,6 +324,7 @@ export const EstimatesPage = () => {
                             </div>
                         </div>
                         <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+                            <FormSection number="01" title="Customer & validity" />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
@@ -367,9 +369,11 @@ export const EstimatesPage = () => {
                                 </div>
                             </div>
 
+                            <FormSection number="02" title="Sheet, plate, sections & fabrication" />
                             <div>
                                 <label className="font-semibold text-slate-700 block mb-2">Estimate Line Items</label>
-                                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" />
+                                {/* Metal-industry sales lines: custom / fabrication rows, unit, material, spec, weight (was: no allowCustomLines). */}
+                                <LineItemEditor allowCustomLines items={lineItems} onChange={setLineItems} type="sales" />
                             </div>
 
                             <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
@@ -425,7 +429,8 @@ export const EstimatesPage = () => {
                                 <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
                                     Estimated Line Items ({selectedEstimate.items?.length || 0})
                                 </h4>
-                                <LineItemEditor items={selectedEstimate.items || []} onChange={() => {}} readOnly={true} />
+                                {/* Metal-industry sales lines: custom / fabrication rows, unit, material, spec, weight (was: no allowCustomLines). */}
+                                <LineItemEditor allowCustomLines items={selectedEstimate.items || []} onChange={() => {}} readOnly={true} />
                             </div>
                         </div>
 
