@@ -110,10 +110,10 @@ export const ReportFaultyModal = ({ isOpen, onClose, onSubmit, }) => {
 
           {/* Modal Footer */}
           <div className="pt-3 border-t border-[#CED4DA] flex flex-wrap lg:flex-nowrap items-center justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-[#CED4DA] text-[#343A40] rounded text-xs font-medium hover:bg-gray-100 transition-colors">
+            <button type="button" onClick={onClose} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
               Cancel
             </button>
-            <button type="submit" className="px-4 py-2 bg-[#1F2E4A] hover:bg-[#152036] text-white rounded text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm">
+            <button type="submit" className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.99] flex items-center gap-1.5 shadow-2xs cursor-pointer">
               <Check className="w-3.5 h-3.5"/>
               Register Faulty Part
             </button>

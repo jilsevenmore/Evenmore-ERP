@@ -13,6 +13,8 @@ import {
   Sparkles,
   TreePine,
   Check,
+  CheckCircle2,
+  AlertTriangle,
   Building,
   FilePlus,
   ShoppingCart,
@@ -31,6 +33,7 @@ import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { useIdleReady } from '../../hooks/useIdleReady';
 import { markEventNotificationRead } from '../../services/crmEventNotifications';
+import { EarlyPunchOutModal } from '../../features/hrms/attendance/components/EarlyPunchOutModal';
 
 const THEMES = [
   { id: 'light', name: 'Enterprise Light', icon: Sun, desc: 'Clean high-contrast corporate palette', color: '#1f6bff' },
@@ -65,6 +68,7 @@ export default function Topbar() {
   const [isPunchOpen, setIsPunchOpen] = useState(false);
   const [punchSubmitting, setPunchSubmitting] = useState(false);
   const [punchError, setPunchError] = useState(null);
+  const [isEarlyPunchModalOpen, setIsEarlyPunchModalOpen] = useState(false);
 
   const themeRef = useRef(null);
   const quickAddRef = useRef(null);
@@ -224,12 +228,37 @@ export default function Topbar() {
     }
   };
 
+  const isEarlyDeparture = () => {
+    const shiftEndStr = todayPunch?.shiftEnd || '18:30';
+    const [endH, endM] = shiftEndStr.split(':').map((v) => parseInt(v, 10) || 0);
+    const now = new Date();
+    const shiftEndDt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0);
+    const earlyMins = Math.floor((shiftEndDt.getTime() - now.getTime()) / 60000);
+    const workingHours = Number(todayPunch?.workingHours || 0);
+    return earlyMins > 0 || (workingHours > 0 && workingHours < 8);
+  };
+
   const handlePunchOut = async () => {
+    if (isEarlyDeparture()) {
+      setIsEarlyPunchModalOpen(true);
+      return;
+    }
+    await executePunchOut();
+  };
+
+  const executePunchOut = async (earlyPayload = null) => {
     try {
       setPunchSubmitting(true);
       setPunchError(null);
-      await punchOut();
-      if (showToast) showToast('Punched Out successfully!');
+      await punchOut(earlyPayload || {});
+      if (showToast) {
+        if (earlyPayload?.requestRegularization) {
+          showToast('Early Punch Out recorded & Regularization submitted!');
+        } else {
+          showToast('Punched Out successfully!');
+        }
+      }
+      setIsEarlyPunchModalOpen(false);
     } catch (err) {
       const msg = err?.payload?.message || err?.message || 'Failed to punch out';
       setPunchError(msg);
@@ -759,32 +788,22 @@ export default function Topbar() {
                   <span className="whitespace-nowrap">Punch Out</span>
                 </button>
               </div>
-            ) : todayPunch?.punches?.length > 0 ? (
+            ) : (todayPunch?.dayCompleted || todayPunch?.punches?.length > 0) ? (
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setIsPunchOpen(!isPunchOpen)}
-                  className="h-9 px-2.5 sm:px-3 rounded-xl border border-border bg-card hover:bg-soft text-text flex items-center gap-1.5 text-xs font-semibold shadow-2xs transition cursor-pointer"
-                  title="View Today's Punches"
+                  className="h-9 px-2.5 sm:px-3 rounded-xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 text-text flex items-center gap-1.5 text-xs font-semibold shadow-2xs transition cursor-pointer"
+                  title="Today's attendance completed (1 Punch In, 1 Punch Out)"
                 >
-                  <Check size={14} className="text-emerald-600 font-bold shrink-0" />
+                  <CheckCircle2 size={14} className="text-emerald-600 font-bold shrink-0" />
                   <span className="whitespace-nowrap">
-                    Punched Out • {todayPunch.lastPunch || todayPunch.punches?.[todayPunch.punches.length - 1]?.timeDisplay}
+                    Day Completed • {todayPunch.lastPunch || todayPunch.punches?.[todayPunch.punches.length - 1]?.timeDisplay}
                   </span>
                   <ChevronDown
                     size={12}
                     className={`text-muted transition-transform duration-150 ${isPunchOpen ? 'rotate-180' : ''}`}
                   />
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePunchIn}
-                  disabled={punchSubmitting}
-                  className="h-9 px-2 sm:px-2.5 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary/20 text-primary flex items-center gap-1 text-xs font-semibold shadow-2xs transition cursor-pointer"
-                  title="Punch In Again"
-                >
-                  {punchSubmitting ? <Loader2 size={12} className="animate-spin" /> : <Clock size={12} />}
-                  <span className="hidden md:inline whitespace-nowrap">Punch In</span>
                 </button>
               </div>
             ) : (
@@ -805,8 +824,14 @@ export default function Topbar() {
               <div className="top-dropdown-menu w-72 sm:w-80 p-3.5 animate-in fade-in zoom-in-95 duration-150 shadow-xl border border-border bg-card rounded-2xl z-50">
                 <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
                   <div>
-                    <h4 className="text-xs font-bold text-text">Today's Attendance</h4>
-                    <p className="text-[10px] text-muted">Realtime HRMS attendance tracking</p>
+                    <h4 className="text-xs font-bold text-text">
+                      {todayPunch?.employee?.name || "Today's Attendance"}
+                    </h4>
+                    <p className="text-[10px] text-muted">
+                      {todayPunch?.employee?.employeeCode
+                        ? `${todayPunch.employee.employeeCode} • ${todayPunch.employee.department || 'General'}`
+                        : 'Realtime HRMS attendance tracking'}
+                    </p>
                   </div>
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
@@ -820,6 +845,13 @@ export default function Topbar() {
                     {todayPunch?.status || 'Not Punched In'}
                   </span>
                 </div>
+
+                {todayPunch?.hasEmployee === false && (
+                  <div className="mb-2.5 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-[11px] leading-tight flex items-start gap-1.5">
+                    <span>ℹ️</span>
+                    <span>No employee profile linked to this user account. Link your profile in HRMS Employees.</span>
+                  </div>
+                )}
 
                 {punchError && (
                   <div className="mb-2.5 p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 text-[11px] leading-tight flex items-start gap-1.5">
@@ -854,6 +886,18 @@ export default function Topbar() {
                     <div className="flex justify-between items-center py-0.5">
                       <span className="text-muted text-[11px]">Late</span>
                       <span className="font-semibold text-amber-600">{todayPunch.lateMinutes} min late</span>
+                    </div>
+                  )}
+                  {todayPunch?.earlyLeavingMinutes > 0 && (
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-muted text-[11px]">Early Leaving</span>
+                      <span className="font-semibold text-rose-500">{todayPunch.earlyLeavingMinutes} min early</span>
+                    </div>
+                  )}
+                  {todayPunch?.hasPendingRegularization && (
+                    <div className="flex justify-between items-center py-0.5">
+                      <span className="text-muted text-[11px]">Regularization</span>
+                      <span className="font-semibold text-primary">Pending Review</span>
                     </div>
                   )}
                   {todayPunch?.overtimeHours > 0 && (
@@ -905,6 +949,11 @@ export default function Topbar() {
                       {punchSubmitting ? <Loader2 size={13} className="animate-spin" /> : null}
                       <span>Punch Out</span>
                     </button>
+                  ) : (todayPunch?.dayCompleted || todayPunch?.punches?.length > 0) ? (
+                    <div className="w-full py-2 px-3 rounded-xl bg-soft border border-border/70 text-muted font-semibold text-xs flex items-center justify-center gap-1.5 text-center">
+                      <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                      <span>Day Completed (1 Punch In/Out per day)</span>
+                    </div>
                   ) : (
                     <button
                       type="button"
@@ -915,7 +964,7 @@ export default function Topbar() {
                       className="w-full py-2 px-3 rounded-xl bg-primary hover:bg-primary-hover disabled:opacity-50 text-white font-bold text-xs shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       {punchSubmitting ? <Loader2 size={13} className="animate-spin" /> : <Clock size={13} />}
-                      <span>{todayPunch?.punches?.length > 0 ? 'Punch In Again' : 'Punch In'}</span>
+                      <span>Punch In</span>
                     </button>
                   )}
                 </div>
@@ -965,6 +1014,15 @@ export default function Topbar() {
           </Link>
         </div>
       </div>
+
+      {/* Early Punch Out Confirmation Modal */}
+      <EarlyPunchOutModal
+        isOpen={isEarlyPunchModalOpen}
+        onClose={() => setIsEarlyPunchModalOpen(false)}
+        onConfirm={executePunchOut}
+        todayPunch={todayPunch}
+        isSubmitting={punchSubmitting}
+      />
     </header>
   );
 }

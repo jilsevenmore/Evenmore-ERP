@@ -7,7 +7,10 @@ import {
   pushFlexibility,
   pullTodayPunch,
   recordPunch,
+  isBackendEnabled,
+  isServerId,
 } from "../services/hrmsSync";
+import { api } from "../services/api";
 
 function formatSeconds(secs) {
   if (!secs || secs < 0) return "00h 00m";
@@ -17,8 +20,20 @@ function formatSeconds(secs) {
 }
 
 const DEFAULT_TODAY_PUNCH = {
+  hasEmployee: true,
+  employee: null,
   status: "Not Punched In",
   isPunchedIn: false,
+  dayCompleted: false,
+  canPunchIn: true,
+  canPunchOut: false,
+  isEarlyOut: false,
+  earlyLeavingMinutes: 0,
+  shiftStart: "09:30",
+  shiftEnd: "18:30",
+  fullDayHours: 8,
+  halfDayThresholdHours: 4,
+  hasPendingRegularization: false,
   attendanceStatus: null,
   firstPunch: null,
   lastPunch: null,
@@ -35,6 +50,40 @@ const DEFAULT_TODAY_PUNCH = {
   error: null,
 };
 
+function mapPunchPayload(res) {
+  if (!res) return null;
+  return {
+    hasEmployee: res.has_employee !== false,
+    employee: res.employee || null,
+    status: res.status || "Not Punched In",
+    isPunchedIn: Boolean(res.is_punched_in),
+    dayCompleted: Boolean(res.day_completed),
+    canPunchIn: res.can_punch_in !== undefined ? Boolean(res.can_punch_in) : (!res.is_punched_in && !res.day_completed),
+    canPunchOut: res.can_punch_out !== undefined ? Boolean(res.can_punch_out) : Boolean(res.is_punched_in),
+    isEarlyOut: Boolean(res.is_early_out),
+    earlyLeavingMinutes: res.early_leaving_minutes || res.early_minutes || 0,
+    shiftStart: res.shift_start || "09:30",
+    shiftEnd: res.shift_end || "18:30",
+    fullDayHours: res.full_day_hours || 8,
+    halfDayThresholdHours: res.half_day_threshold_hours || 4,
+    hasPendingRegularization: Boolean(res.has_pending_regularization),
+    attendanceStatus: res.attendance_status || null,
+    firstPunch: res.first_punch || null,
+    lastPunch: res.last_punch || null,
+    firstPunchIso: res.first_punch_iso || null,
+    lastPunchIso: res.last_punch_iso || null,
+    workingSeconds: res.working_seconds || 0,
+    formattedWorkingTime: res.formatted_working_time || "00h 00m",
+    workingHours: res.working_hours || 0,
+    lateMinutes: res.late_minutes || 0,
+    overtimeHours: res.overtime_hours || 0,
+    punches: res.punches || [],
+    pairs: res.pairs || [],
+    loading: false,
+    error: null,
+  };
+}
+
 const useAttendanceStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
@@ -48,26 +97,7 @@ const useAttendanceStoreBase = create((set, get) => ({
       records: attRows || s.records,
       requests: reqRows || s.requests,
       flexibility: flex || s.flexibility,
-      todayPunch: punchStatus
-        ? {
-            status: punchStatus.status || "Not Punched In",
-            isPunchedIn: Boolean(punchStatus.is_punched_in),
-            attendanceStatus: punchStatus.attendance_status || null,
-            firstPunch: punchStatus.first_punch || null,
-            lastPunch: punchStatus.last_punch || null,
-            firstPunchIso: punchStatus.first_punch_iso || null,
-            lastPunchIso: punchStatus.last_punch_iso || null,
-            workingSeconds: punchStatus.working_seconds || 0,
-            formattedWorkingTime: punchStatus.formatted_working_time || "00h 00m",
-            workingHours: punchStatus.working_hours || 0,
-            lateMinutes: punchStatus.late_minutes || 0,
-            overtimeHours: punchStatus.overtime_hours || 0,
-            punches: punchStatus.punches || [],
-            pairs: punchStatus.pairs || [],
-            loading: false,
-            error: null,
-          }
-        : s.todayPunch,
+      todayPunch: punchStatus ? mapPunchPayload(punchStatus) : s.todayPunch,
     }));
     return [attRows, reqRows, flex];
   },
@@ -85,24 +115,7 @@ const useAttendanceStoreBase = create((set, get) => ({
       const punchStatus = await pullTodayPunch(employeeId);
       if (punchStatus) {
         set({
-          todayPunch: {
-            status: punchStatus.status || "Not Punched In",
-            isPunchedIn: Boolean(punchStatus.is_punched_in),
-            attendanceStatus: punchStatus.attendance_status || null,
-            firstPunch: punchStatus.first_punch || null,
-            lastPunch: punchStatus.last_punch || null,
-            firstPunchIso: punchStatus.first_punch_iso || null,
-            lastPunchIso: punchStatus.last_punch_iso || null,
-            workingSeconds: punchStatus.working_seconds || 0,
-            formattedWorkingTime: punchStatus.formatted_working_time || "00h 00m",
-            workingHours: punchStatus.working_hours || 0,
-            lateMinutes: punchStatus.late_minutes || 0,
-            overtimeHours: punchStatus.overtime_hours || 0,
-            punches: punchStatus.punches || [],
-            pairs: punchStatus.pairs || [],
-            loading: false,
-            error: null,
-          },
+          todayPunch: mapPunchPayload(punchStatus),
         });
       } else {
         set((s) => ({ todayPunch: { ...s.todayPunch, loading: false } }));
@@ -126,70 +139,41 @@ const useAttendanceStoreBase = create((set, get) => ({
       const res = await recordPunch({ punchType: "IN", notes });
       if (res) {
         set({
-          todayPunch: {
-            status: res.status || "Punched In",
-            isPunchedIn: true,
-            attendanceStatus: res.attendance_status || "Present",
-            firstPunch: res.first_punch,
-            lastPunch: res.last_punch,
-            firstPunchIso: res.first_punch_iso,
-            lastPunchIso: res.last_punch_iso,
-            workingSeconds: res.working_seconds || 0,
-            formattedWorkingTime: res.formatted_working_time || "00h 00m",
-            workingHours: res.working_hours || 0,
-            lateMinutes: res.late_minutes || 0,
-            overtimeHours: res.overtime_hours || 0,
-            punches: res.punches || [],
-            pairs: res.pairs || [],
-            loading: false,
-            error: null,
-          },
+          todayPunch: mapPunchPayload(res),
         });
         // Sync attendance records in background
-        pullTracked("attendance").then((recs) => {
-          if (recs) set({ records: recs });
-        });
+        get().refreshAttendance();
       }
       return res;
     } catch (err) {
-      const msg = err?.message || err?.payload?.message || "Failed to punch in";
+      const msg = err?.payload?.message || err?.message || "Failed to punch in";
       set((s) => ({ todayPunch: { ...s.todayPunch, loading: false, error: msg } }));
       throw err;
     }
   },
 
-  punchOut: async (notes = "") => {
+  punchOut: async (payload = {}) => {
     try {
       set((s) => ({ todayPunch: { ...s.todayPunch, loading: true, error: null } }));
-      const res = await recordPunch({ punchType: "OUT", notes });
+      const notes = typeof payload === "string" ? payload : (payload?.notes || payload?.remark || "");
+      const earlyReason = typeof payload === "object" ? payload?.earlyReason : undefined;
+      const requestRegularization = typeof payload === "object" ? payload?.requestRegularization : undefined;
+
+      const res = await recordPunch({
+        punchType: "OUT",
+        notes,
+        earlyReason,
+        requestRegularization,
+      });
       if (res) {
         set({
-          todayPunch: {
-            status: res.status || "Punched Out",
-            isPunchedIn: false,
-            attendanceStatus: res.attendance_status || null,
-            firstPunch: res.first_punch,
-            lastPunch: res.last_punch,
-            firstPunchIso: res.first_punch_iso,
-            lastPunchIso: res.last_punch_iso,
-            workingSeconds: res.working_seconds || 0,
-            formattedWorkingTime: res.formatted_working_time || "00h 00m",
-            workingHours: res.working_hours || 0,
-            lateMinutes: res.late_minutes || 0,
-            overtimeHours: res.overtime_hours || 0,
-            punches: res.punches || [],
-            pairs: res.pairs || [],
-            loading: false,
-            error: null,
-          },
+          todayPunch: mapPunchPayload(res),
         });
-        pullTracked("attendance").then((recs) => {
-          if (recs) set({ records: recs });
-        });
+        get().refreshAttendance();
       }
       return res;
     } catch (err) {
-      const msg = err?.message || err?.payload?.message || "Failed to punch out";
+      const msg = err?.payload?.message || err?.message || "Failed to punch out";
       set((s) => ({ todayPunch: { ...s.todayPunch, loading: false, error: msg } }));
       throw err;
     }
@@ -199,10 +183,12 @@ const useAttendanceStoreBase = create((set, get) => ({
     const { todayPunch } = get();
     if (todayPunch.isPunchedIn) {
       const nextSeconds = (todayPunch.workingSeconds || 0) + 1;
+      const nextHours = Number((nextSeconds / 3600).toFixed(2));
       set({
         todayPunch: {
           ...todayPunch,
           workingSeconds: nextSeconds,
+          workingHours: nextHours,
           formattedWorkingTime: formatSeconds(nextSeconds),
         },
       });
@@ -256,34 +242,56 @@ const useAttendanceStoreBase = create((set, get) => ({
     return { requests: reqs };
   }),
 
-  setRequestStatus: (id, status, extra = {}) => set((s) => {
-    const targetReq = s.requests.find((r) => r.id === id);
-    const reqs = s.requests.map((r) => r.id === id ? { ...r, status, ...extra } : r);
+  setRequestStatus: async (id, status, extra = {}) => {
+    const targetReq = get().requests.find((r) => r.id === id);
+    const approved = status === "Approved";
 
-    let updatedRecords = s.records;
-    // If approved and was a regularization or early clock-out, write directly to matching record
-    if (status === "Approved" && targetReq) {
-      updatedRecords = s.records.map((rec) => {
-        const matches =
-          (targetReq.employeeId && rec.id === targetReq.employeeId) ||
-          (rec.name && targetReq.employee && String(rec.name ?? '').toLowerCase() === String(targetReq.employee ?? '').toLowerCase());
-
-        if (matches) {
-          return {
-            ...rec,
-            checkIn: targetReq.requestedIn || rec.checkIn,
-            checkOut: targetReq.requestedOut || rec.checkOut,
-            status: targetReq.type === "Regularization" ? "Present" : rec.status,
-            workHours: "08:30",
-          };
-        }
-        return rec;
-      });
+    if (isBackendEnabled() && isServerId(id)) {
+      try {
+        await api.patch(`/hrms/attendance/regularizations/${id}/`, {
+          approved,
+          remark: extra?.rejectReason || extra?.remark || (approved ? "Approved" : "Rejected"),
+        });
+      } catch (err) {
+        console.warn("[HRMS] Failed to update regularization status on backend:", err);
+      }
     }
 
-    writeThrough("attendance", updatedRecords);
-    return { requests: reqs, records: updatedRecords };
-  }),
+    set((s) => {
+      const reqs = s.requests.map((r) => (r.id === id ? { ...r, status, ...extra } : r));
+
+      let updatedRecords = s.records;
+      // If approved and was a regularization or early clock-out, write directly to matching record
+      if (status === "Approved" && targetReq) {
+        updatedRecords = s.records.map((rec) => {
+          const matches =
+            (targetReq.employeeId && rec.id === targetReq.employeeId) ||
+            (rec.name &&
+              targetReq.employee &&
+              String(rec.name ?? "").toLowerCase() === String(targetReq.employee ?? "").toLowerCase());
+
+          if (matches) {
+            return {
+              ...rec,
+              checkIn: targetReq.requestedIn || rec.checkIn,
+              checkOut: targetReq.requestedOut || rec.checkOut,
+              status: targetReq.type === "Regularization" ? "Present" : rec.status,
+              earlyLeavingMinutes: 0,
+              earlyMins: 0,
+              workHours: "08:30",
+            };
+          }
+          return rec;
+        });
+      }
+
+      writeThrough("attendanceRegularizations", reqs);
+      writeThrough("attendance", updatedRecords);
+      return { requests: reqs, records: updatedRecords };
+    });
+
+    get().fetchTodayPunch();
+  },
 
   saveFlexibility: (flexibility) => {
     set({ flexibility });

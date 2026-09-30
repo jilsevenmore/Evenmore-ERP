@@ -183,7 +183,7 @@ export default function ProjectDetailPage() {
                 className="inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap"
                 style={
                   active
-                    ? { borderColor: '#1f6bff', color: '#1f6bff' }
+                    ? { borderColor: 'var(--primary)', color: 'var(--primary)' }
                     : { borderColor: 'transparent', color: '#64748b' }
                 }
               >

@@ -60,12 +60,12 @@ export default function Trainers({ embedded = false, onBack }) {
     } },
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
     { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
-        <button onClick={() => setViewRow(r)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center text-slate-600"><Eye size={14} /></button>
+        <button onClick={() => setViewRow(r)} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center text-slate-600"><Eye size={14} /></button>
         <button onClick={() => {
           setForm({ name: r.name, specialization: r.specialization, email: r.email, phone: r.phone, programs: r.programs, status: r.status });
           setEditRow(r);
-        }} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center text-slate-600"><Pencil size={14} /></button>
-        <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
+        }} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center text-slate-600"><Pencil size={14} /></button>
+        <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
       </div> }
   ];
 

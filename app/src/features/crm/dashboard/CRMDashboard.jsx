@@ -300,7 +300,16 @@ export default function DashboardView() {
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", gap: 6 }}>
               {["All", "Overdue", "Today", "Upcoming"].map((t) => (
-                <button key={t} type="button" onClick={() => setTab(t)} style={{ border: "1px solid", borderColor: tab === t ? "#2f6fed" : "#e2e8f0", background: tab === t ? "#eef4ff" : "#fff", color: tab === t ? "#2f6fed" : "#64748b", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700 }}>
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  className={`h-9 px-3.5 rounded-xl text-xs font-semibold border transition shadow-2xs cursor-pointer ${
+                    tab === t
+                      ? "btn-primary text-white"
+                      : "btn-outline text-text"
+                  }`}
+                >
                   {t} ({counts[t]})
                 </button>
               ))}
@@ -366,7 +375,15 @@ export default function DashboardView() {
                       </span>
                     </td>
                     <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                      <button type="button" onClick={() => completeTask(t)} style={{ border: "1px solid #2f6fed", color: "#2f6fed", background: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 800 }}>
+                      <button
+                        type="button"
+                        onClick={() => completeTask(t)}
+                        className={`h-8 px-3 rounded-xl text-xs font-semibold border transition shadow-2xs active:scale-[0.99] cursor-pointer ${
+                          t.status === "Completed"
+                            ? "btn-outline text-muted"
+                            : "btn-primary text-white"
+                        }`}
+                      >
                         {t.status === "Completed" ? "Done" : "Complete"}
                       </button>
                     </td>
@@ -431,30 +448,30 @@ export default function DashboardView() {
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Quick Actions</h3>
           <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals {invoices.length} invoices</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
-            <button type="button" onClick={() => setIsCreateLeadOpen(true)} style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155", background: "none", cursor: "pointer", width: "100%" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><UserPlus size={17} /></span> Add Lead
+            <button type="button" onClick={() => setIsCreateLeadOpen(true)} className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
+              <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><UserPlus size={16} /></span> Add Lead
             </button>
-            <Link to="/crm/tasks" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#ecfdf5", color: "#10b981", display: "grid", placeItems: "center" }}><ClipboardList size={17} /></span> Add Task
+            <Link to="/crm/tasks" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
+              <span className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardList size={16} /></span> Add Task
             </Link>
-            <Link to="/crm/tasks" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#f5efff", color: "#8b5cf6", display: "grid", placeItems: "center" }}><Video size={17} /></span> Meeting
+            <Link to="/crm/tasks" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
+              <span className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0"><Video size={16} /></span> Meeting
             </Link>
-            <Link to="/crm/leads" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#fff7e8", color: "#d97706", display: "grid", placeItems: "center" }}><Send size={17} /></span> Send Email
+            <Link to="/crm/leads" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
+              <span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><Send size={16} /></span> Send Email
             </Link>
-            <Link to="/crm/leads" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#ffeef4", color: "#f43f5e", display: "grid", placeItems: "center" }}><Phone size={17} /></span> Log Call
+            <Link to="/crm/leads" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
+              <span className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><Phone size={16} /></span> Log Call
             </Link>
-            <Link to="/sales/quotations" style={{ display: "grid", gap: 6, placeItems: "center", border: "1px solid #eef2f7", borderRadius: 12, padding: "12px 6px", fontSize: 11, fontWeight: 700, color: "#334155" }}>
-              <span style={{ width: 34, height: 34, borderRadius: 10, background: "#eef4ff", color: "#2f6fed", display: "grid", placeItems: "center" }}><FileText size={17} /></span> Quotation
+            <Link to="/sales/quotations" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
+              <span className="w-8 h-8 rounded-lg bg-blue-50 text-primary flex items-center justify-center shrink-0"><FileText size={16} /></span> Quotation
             </Link>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-            <Link to="/crm/leads" style={{ flex: 1, textAlign: "center", background: "#0f1f3d", color: "#fff", borderRadius: 9, padding: "9px 0", fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <Link to="/crm/leads" className="btn-primary h-9 flex-1 text-center justify-center px-4 rounded-xl text-xs font-semibold shadow-2xs transition active:scale-[0.99] cursor-pointer flex items-center gap-1.5">
               <Mail size={14} /> Email
             </Link>
-            <Link to="/crm/deals" style={{ flex: 1, textAlign: "center", background: "#fff", border: "1px solid #e2e8f0", color: "#0f1f3d", borderRadius: 9, padding: "9px 0", fontSize: 12, fontWeight: 800 }}>
+            <Link to="/crm/deals" className="btn-outline h-9 flex-1 text-center justify-center px-4 rounded-xl text-xs font-semibold shadow-2xs transition cursor-pointer flex items-center justify-center">
               Deals
             </Link>
           </div>

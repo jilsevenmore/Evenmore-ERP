@@ -151,7 +151,7 @@ export default function NotesDrawer({ lead, isOpen, onClose }) {
                       <button
                         type="button"
                         onClick={() => { setEditId(null); setEditText(""); }}
-                        className="h-8 px-3 rounded-md border border-slate-300 text-xs font-semibold text-slate-600 bg-white"
+                        className="btn-outline btn-sm"
                       >
                         Cancel
                       </button>
@@ -226,7 +226,7 @@ export default function NotesDrawer({ lead, isOpen, onClose }) {
                   <button
                     type="button"
                     onClick={() => { setEditing(false); setDraft(""); }}
-                    className="h-8 px-3 rounded-md border border-slate-300 text-xs font-semibold text-slate-600 bg-white"
+                    className="btn-outline btn-sm"
                   >
                     Cancel
                   </button>

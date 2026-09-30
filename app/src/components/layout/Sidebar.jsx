@@ -18,6 +18,8 @@ import {
   ChevronRight,
   Infinity as InfinityIcon,
   Building2,
+  Network,
+  Award,
   FileText,
   FileSpreadsheet,
   Receipt,
@@ -111,7 +113,7 @@ const NAV = [
         defaultOpen: true,
         children: [
           { label: 'Tasks List', to: '/crm/tasks' },
-          // { label: 'Task Allocation', to: '/crm/tasks/allocation' }, // Hidden: duplicate of Tasks List
+          { label: 'Task Allocation', to: '/crm/tasks/allocation' },
         ],
       },
       // { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' }, // Hidden: User Tracking & field GPS map out of scope
@@ -283,20 +285,21 @@ const NAV = [
       { label: 'HR Admin', icon: ShieldCheck, to: '/hrms/hr-admin' },
       { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },
-      {
-        label: 'Organization',
-        icon: Building2,
-        defaultOpen: false,
-        children: [
-          { label: 'Org Chart', to: '/hrms/org-chart', dot: true },
-          { label: 'Departments', to: '/hrms/departments' },
-          { label: 'Locations', to: '/hrms/locations' },
-          { label: 'Designations', to: '/hrms/designations' },
-        ],
-      },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
       { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
       // { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' }, // Hidden: HRMS Setup commented out
+    ],
+  },
+
+  {
+    label: 'Organization',
+    menu: 'menu_organization',
+    icon: Building2,
+    children: [
+      { label: 'Org Chart', icon: Network, to: '/organization/org-chart' },
+      { label: 'Departments', icon: Building2, to: '/organization/departments' },
+      { label: 'Designations', icon: Award, to: '/organization/designations' },
+      { label: 'Locations', icon: MapPin, to: '/organization/locations' },
     ],
   },
 

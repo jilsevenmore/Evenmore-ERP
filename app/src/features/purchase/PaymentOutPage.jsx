@@ -278,7 +278,7 @@ export const PaymentOutPage = () => {
                 const res = applyVendorAdvanceToBill(advanceBillId, amt);
                 if (res) { setAdvanceBillId(''); setAdvanceApplyAmt(0); }
               }}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer whitespace-nowrap"
+              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs transition-all active:scale-[0.99] cursor-pointer whitespace-nowrap"
             >
               Apply Advance
             </button>
@@ -453,10 +453,10 @@ export const PaymentOutPage = () => {
               </div>
 
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
                   Cancel
                 </button>
-                <button type="submit" disabled={(paymentType === 'Final' && (isCancelled || isSettled)) || amount <= 0 || (paymentType === 'Final' && amount > selectedBillOutstanding.balanceDue + 0.01)} className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-lg font-bold shadow-sm cursor-pointer">
+                <button type="submit" disabled={(paymentType === 'Final' && (isCancelled || isSettled)) || amount <= 0 || (paymentType === 'Final' && amount > selectedBillOutstanding.balanceDue + 0.01)} className="px-4 py-2 bg-primary hover:bg-primary-dark disabled:opacity-50 text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer">
                   {paymentType === 'Advance' ? 'Release Advance Voucher' : 'Post Voucher & Disburse'}
                 </button>
               </div>

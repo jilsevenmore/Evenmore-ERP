@@ -2,31 +2,49 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Pencil } from 'lucide-react';
 import AssignTaskModal from './AssignTaskModal';
-import { loadAllocationTasks, saveAllocationTasks, formatDeadline, formatAuditDate, STATUSES, EMPLOYEES } from './taskAllocationStore';
+import { useAppStore } from '../../../../stores/appStore';
+import { describeError } from '../../../../services/crmSync';
+import {
+  useAllocationTasks,
+  useAllocationsLoaded,
+  useCanManageAllocations,
+  updateAllocation,
+  formatDeadline,
+  formatAuditDate,
+  STATUSES,
+  EMPLOYEES,
+} from './taskAllocationStore';
 
 export default function TaskAllocationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState(loadAllocationTasks);
+  const tasks = useAllocationTasks();
+  const loaded = useAllocationsLoaded();
+  const canManage = useCanManageAllocations();
+  const showToast = useAppStore((s) => s.showToast);
   const [statusDraft, setStatusDraft] = useState('');
   const [statusNote, setStatusNote] = useState('');
   const [reassignTo, setReassignTo] = useState('');
   const [reassignReason, setReassignReason] = useState('');
   const [isEditOpen, setIsEditOpen] = useState(false);
 
-  const task = tasks.find((t) => t.id === id);
-
-  useEffect(() => {
-    saveAllocationTasks(tasks);
-  }, [tasks]);
+  const task = tasks.find((t) => String(t.id) === String(id));
 
   useEffect(() => {
     if (task) {
       setStatusDraft(task.status);
-      setReassignTo(task.assignee);
+      setReassignTo(task.assigneeId || '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.id]);
+  }, [task?.id, task?.status, task?.assigneeId]);
+
+  if (!task && !loaded) {
+    return (
+      <section className="w-full max-w-5xl mx-auto py-8 text-center">
+        <p className="text-sm text-slate-500">Loading task…</p>
+      </section>
+    );
+  }
 
   if (!task) {
     return (
@@ -37,27 +55,31 @@ export default function TaskAllocationDetailPage() {
     );
   }
 
-  function appendAudit(text) {
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, audit: [{ text, at: new Date().toISOString() }, ...(t.audit || [])] } : t)));
+  // The server writes each audit line from the change itself; the note or
+  // reason typed here is appended to that line.
+  async function save(updates, failure) {
+    try {
+      await updateAllocation(task.id, updates);
+      return true;
+    } catch (err) {
+      showToast?.(`${failure} — ${describeError(err)}`);
+      return false;
+    }
   }
 
-  function handleSaveStatus() {
-    if (!statusDraft) return;
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, status: statusDraft } : t)));
-    appendAudit(`${task.assignee} changed status to ${statusDraft}${statusNote.trim() ? ` — ${statusNote.trim()}` : ''}`);
-    setStatusNote('');
+  async function handleSaveStatus() {
+    if (!statusDraft || statusDraft === task.status) return;
+    if (await save({ status: statusDraft, note: statusNote.trim() }, 'Status not saved')) setStatusNote('');
   }
 
-  function handleReassign() {
-    if (!reassignTo || reassignTo === task.assignee) return;
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, assignee: reassignTo } : t)));
-    appendAudit(`${task.assignedBy} reassigned this to ${reassignTo}${reassignReason.trim() ? ` — ${reassignReason.trim()}` : ''}`);
-    setReassignReason('');
+  async function handleReassign() {
+    if (!reassignTo || reassignTo === task.assigneeId) return;
+    if (await save({ assigneeId: reassignTo, note: reassignReason.trim() }, 'Task not reassigned')) setReassignReason('');
   }
 
-  function handleEditSubmit(data) {
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, ...data } : t)));
+  async function handleEditSubmit(data) {
     setIsEditOpen(false);
+    await save(data, 'Task not saved');
   }
 
   return (
@@ -74,13 +96,15 @@ export default function TaskAllocationDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <button
-            type="button"
-            onClick={() => setIsEditOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1d4a79] hover:bg-[#163a61] text-white text-xs font-semibold rounded-md transition"
-          >
-            <Pencil size={13} /> Edit
-          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setIsEditOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-[#1d4a79] hover:bg-[#163a61] text-white text-xs font-semibold rounded-md transition"
+            >
+              <Pencil size={13} /> Edit
+            </button>
+          )}
           <button type="button" onClick={() => navigate('/crm/tasks/allocation')} className="text-[13px] font-medium text-slate-700 hover:text-slate-900">
             Back
           </button>
@@ -134,18 +158,21 @@ export default function TaskAllocationDetailPage() {
             </div>
           </div>
 
+          {canManage && (
           <div className="bg-white rounded-xl border border-slate-200/70 shadow-sm p-6">
             <h3 className="text-[13px] font-bold text-slate-900 mb-3">Reassign</h3>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)} className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-700 focus:outline-none focus:border-blue-400">
+                {!task.assigneeId && <option value="">Select employee</option>}
                 {EMPLOYEES.map((e) => (
-                  <option key={e.name} value={e.name}>{e.name}</option>
+                  <option key={e.id} value={e.id}>{e.name}</option>
                 ))}
               </select>
               <input value={reassignReason} onChange={(e) => setReassignReason(e.target.value)} placeholder="Reason (optional)" className="px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] focus:outline-none focus:border-blue-400" />
               <button type="button" onClick={handleReassign} className="px-5 py-2.5 bg-white hover:bg-slate-50 text-[#1d4a79] text-[13px] font-medium rounded-lg border border-[#1d4a79] transition">Reassign</button>
             </div>
           </div>
+          )}
         </div>
 
         <div className="lg:col-span-1">
@@ -153,7 +180,7 @@ export default function TaskAllocationDetailPage() {
             <h3 className="text-[13px] font-bold text-slate-900 mb-4">Audit Log</h3>
             <div className="relative pl-4 border-l border-slate-200 space-y-5">
               {(task.audit || []).map((a, i) => (
-                <div key={i} className="relative">
+                <div key={a.id || i} className="relative">
                   <span className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-slate-500 border-2 border-white shadow" />
                   <p className="text-[13px] text-slate-700">{a.text}</p>
                   <p className="text-xs text-slate-400 mt-0.5">{formatAuditDate(a.at)}</p>
@@ -165,7 +192,8 @@ export default function TaskAllocationDetailPage() {
         </div>
       </div>
 
-      <AssignTaskModal isOpen={isEditOpen} initial={task} onClose={() => setIsEditOpen(false)} onSubmit={handleEditSubmit} />
+      {/* Keyed so each opening starts from the task as it is now. */}
+      <AssignTaskModal key={isEditOpen ? 'open' : 'closed'} isOpen={isEditOpen} initial={task} onClose={() => setIsEditOpen(false)} onSubmit={handleEditSubmit} />
     </section>
   );
 }

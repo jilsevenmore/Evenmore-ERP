@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, Download, MoreHorizontal, RefreshCw,
@@ -10,6 +10,10 @@ import './ContractDetailPage.css';
 import { printContract } from '../../../utils/contractPrint';
 import { useAppStore } from '../../../stores/appStore';
 import { loadProjects } from '../../../services/dealProjectService';
+import { describeError, pullDealActivities } from '../../../services/crmSync';
+import { uploadFileToBackend } from '../../../services/fileUploadService';
+import { resolveFileUrl } from '../../../services/api';
+import { useCrmStore } from '../../../stores/crmStore';
 import {
   CONTRACT_TYPES,
   CONTRACT_TEMPLATES,
@@ -122,25 +126,34 @@ export default function ContractDetailPage() {
         setProject(linked || null);
       } catch { setProject(null); }
       setError('');
-    } catch (failure) { setRecord({ contract: null, deal: null, loading: false }); setError(failure.message); }
+    } catch (failure) { setRecord({ contract: null, deal: null, loading: false }); setError(describeError(failure)); }
   }
 
+  // Contracts, deals and projects live in the CRM store; re-read whenever they change.
+  const storeContracts = useCrmStore((s) => s.contracts);
+  const storeDeals = useCrmStore((s) => s.deals);
+  const storeProjects = useCrmStore((s) => s.projects);
+  useEffect(() => { refresh(); }, [id, storeContracts, storeDeals, storeProjects]);
+
+  // The deal's activity feed is its own endpoint (`/crm/deals/{id}/activities/`).
+  const [dealActivities, setDealActivities] = useState([]);
+  const activityDealId = record.contract?.dealId;
+  const loadActivities = useCallback(async () => {
+    setDealActivities(activityDealId ? await pullDealActivities(activityDealId) : []);
+  }, [activityDealId]);
   useEffect(() => {
-    refresh();
-    window.addEventListener('storage', refresh);
-    window.addEventListener('crm:data-updated', refresh);
-    return () => {
-      window.removeEventListener('storage', refresh);
-      window.removeEventListener('crm:data-updated', refresh);
-    };
-  }, [id]);
+    loadActivities();
+    window.addEventListener('crm:data-updated', loadActivities);
+    return () => window.removeEventListener('crm:data-updated', loadActivities);
+  }, [loadActivities]);
 
   const { contract, deal } = record;
   const displayStatus = contract ? getContractDisplayStatus(contract) : '';
   const attachments = contract?.attachments || [];
   const activities = useMemo(() => {
-    const list = (deal?.activities || []).filter(item => !item.contractId || String(item.contractId) === String(contract?.id));
-    if (contract?.contractNumber && !list.some((item) => item.activityType === 'Contract Created' && String(item.contractId) === String(contract.id))) {
+    const list = [...dealActivities];
+    const logged = (item) => Boolean(contract?.contractNumber) && String(item.title || '').includes(contract.contractNumber);
+    if (contract?.contractNumber && !list.some(logged)) {
       list.push({
         id: `contract-created-${contract.id}`,
         activityType: 'Contract Created',
@@ -152,7 +165,7 @@ export default function ContractDetailPage() {
       });
     }
     return list;
-  }, [deal, contract]);
+  }, [dealActivities, contract]);
   const relatedCount = Number(Boolean(contract?.customer)) + Number(Boolean(deal)) + Number(deal?.leadId != null) + Number(Boolean(project));
 
   const tabs = useMemo(() => [
@@ -183,28 +196,28 @@ export default function ContractDetailPage() {
     setEditOpen(true);
   }
 
-  function submitEdit(event) {
+  async function submitEdit(event) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
     setFormError('');
     try {
-      updateContract(contract.dealId, contract.id, form);
+      await updateContract(contract.dealId, contract.id, form);
       setEditOpen(false);
       setNotice(`Contract ${contract.contractNumber} updated successfully.`);
       refresh();
-    } catch (failure) { setFormError(failure.message); }
+    } catch (failure) { setFormError(describeError(failure)); }
     finally { setBusy(false); }
   }
 
-  function handleClose() {
+  async function handleClose() {
     try {
-      updateContract(contract.dealId, contract.id, { status: 'Closed' });
-      appendDealActivity(contract.dealId, `Contract ${contract.contractNumber} closed.`);
+      await updateContract(contract.dealId, contract.id, { status: 'Closed' });
+      await appendDealActivity(contract.dealId, `Contract ${contract.contractNumber} closed.`);
       setCloseOpen(false);
       setNotice(`Contract ${contract.contractNumber} closed.`);
       refresh();
-    } catch (failure) { setError(failure.message); }
+    } catch (failure) { setError(describeError(failure)); }
   }
 
   function openRenew() {
@@ -213,32 +226,32 @@ export default function ContractDetailPage() {
     setRenewOpen(true);
   }
 
-  function submitRenew(event) {
+  async function submitRenew(event) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
     setFormError('');
     try {
-      const renewed = createContract({
-        dealId: contract.dealId, customer: contract.customer, contractType: contract.contractType,
+      const renewed = await createContract({
+        dealId: contract.dealId, customerId: contract.customerId, customer: contract.customer, contractType: contract.contractType,
         amount: renew.amount, startDate: renew.startDate, endDate: renew.endDate,
         description: contract.description, terms: contract.terms, template: contract.template,
         status: 'Active',
       });
-      updateContract(contract.dealId, contract.id, { status: 'Closed' });
-      appendDealActivity(contract.dealId, `Contract ${contract.contractNumber} renewed as ${renewed.contractNumber}.`);
+      await updateContract(contract.dealId, contract.id, { status: 'Closed' });
+      await appendDealActivity(contract.dealId, `Contract ${contract.contractNumber} renewed as ${renewed.contractNumber}.`);
       setRenewOpen(false);
       setNotice(`Contract renewed as ${renewed.contractNumber}.`);
       navigate(`/crm/contracts/${encodeURIComponent(renewed.id)}`);
-    } catch (failure) { setFormError(failure.message); }
+    } catch (failure) { setFormError(describeError(failure)); }
     finally { setBusy(false); }
   }
 
-  function handleDelete() {
+  async function handleDelete() {
     try {
-      deleteContract(contract.dealId, contract.id);
+      await deleteContract(contract.dealId, contract.id);
       navigate('/crm/contracts');
-    } catch (failure) { setError(failure.message); }
+    } catch (failure) { setError(describeError(failure)); }
   }
 
   async function uploadFile(event) {
@@ -246,22 +259,19 @@ export default function ContractDetailPage() {
     event.target.value = '';
     if (!file) return;
     try {
-      if (file.size > 2 * 1024 * 1024) throw new Error('Choose a file smaller than 2 MB.');
-      const data = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('The file could not be read.'));
-        reader.readAsDataURL(file);
-      });
-      updateContract(contract.dealId, contract.id, {
-        attachments: [...attachments, { id: `att-${Date.now()}`, name: file.name, size: file.size, mimeType: file.type, data, uploadedBy: actor, createdAt: new Date().toISOString() }],
+      if (file.size > 25 * 1024 * 1024) throw new Error('Choose a file smaller than 25 MB.');
+      // Stored as an uploaded file; the contract keeps only the reference.
+      const fileId = await uploadFileToBackend(file, file.name, 'contract');
+      if (!fileId) throw new Error('Sign in to attach documents.');
+      await updateContract(contract.dealId, contract.id, {
+        attachments: [...attachments, { id: fileId, fileId, name: file.name, size: file.size, mimeType: file.type, uploadedBy: actor, createdAt: new Date().toISOString() }],
       });
       setNotice(`Document ${file.name} attached.`);
       refresh();
-    } catch (failure) { setError(failure.message); }
+    } catch (failure) { setError(describeError(failure)); }
   }
 
-  function submitActivity(event) {
+  async function submitActivity(event) {
     event.preventDefault();
     if (busy) return;
     const title = activityTitle.trim();
@@ -269,7 +279,7 @@ export default function ContractDetailPage() {
     setBusy(true);
     setFormError('');
     try {
-      addDealActivity(contract.dealId, { activityType, title, description: activityDetails.trim(), actor });
+      await addDealActivity(contract.dealId, { activityType, title, description: activityDetails.trim(), actor });
       setActivityOpen(false);
       setActivityTitle('');
       setActivityDetails('');
@@ -277,7 +287,7 @@ export default function ContractDetailPage() {
       setTab('Activities');
       setNotice('Activity added.');
       refresh();
-    } catch (failure) { setFormError(failure.message); }
+    } catch (failure) { setFormError(describeError(failure)); }
     finally { setBusy(false); }
   }
 
@@ -300,27 +310,27 @@ export default function ContractDetailPage() {
     setTermsOpen(true);
   }
 
-  function saveTerms(event) {
+  async function saveTerms(event) {
     event.preventDefault();
     try {
       if (termsForm.some((clause) => !clause.heading.trim() || !clause.body.trim() || /[:\n]/.test(clause.heading))) throw new Error('Enter a heading without colons and the full terms for every row.');
-      updateContract(contract.dealId, contract.id, { terms: termsForm.map((clause) => `${clause.heading.trim()}: ${clause.body.trim().replace(/\n/g, '\n  ')}`).join('\n') });
+      await updateContract(contract.dealId, contract.id, { terms: termsForm.map((clause) => `${clause.heading.trim()}: ${clause.body.trim().replace(/\n/g, '\n  ')}`).join('\n') });
       setTermsOpen(false);
       setOpenClause(-1);
       setNotice('Terms & Conditions updated.');
       refresh();
-    } catch (failure) { setFormError(failure.message); }
+    } catch (failure) { setFormError(describeError(failure)); }
   }
 
   function fileType(file) {
     return (file.name?.split('.').pop() || file.mimeType?.split('/').pop() || 'File').toUpperCase();
   }
 
-  function removeAttachment(attachmentId) {
+  async function removeAttachment(attachmentId) {
     try {
-      updateContract(contract.dealId, contract.id, { attachments: attachments.filter((item) => item.id !== attachmentId) });
+      await updateContract(contract.dealId, contract.id, { attachments: attachments.filter((item) => item.id !== attachmentId) });
       refresh();
-    } catch (failure) { setError(failure.message); }
+    } catch (failure) { setError(describeError(failure)); }
   }
 
   const infoRows = [
@@ -391,7 +401,7 @@ export default function ContractDetailPage() {
         <div className="flex overflow-x-auto scrollbar-none gap-1 px-4 border-b border-slate-100" role="tablist" aria-label="Contract sections">
           {tabs.map(({ name, count }) => (
             <button key={name} type="button" role="tab" aria-selected={tab === name} onClick={() => setTab(name)}
-              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3 py-3 text-xs whitespace-nowrap border-b-2 ${tab === name ? 'text-blue-600 border-blue-600 font-semibold' : 'text-slate-500 border-transparent'}`}>
+              className={`inline-flex shrink-0 lg:shrink items-center gap-1.5 px-3 py-3 text-xs whitespace-nowrap border-b-2 ${tab === name ? 'text-primary border-primary font-semibold' : 'text-slate-500 border-transparent'}`}>
               {name}{count != null && <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded">{count}</span>}
             </button>
           ))}
@@ -455,7 +465,7 @@ export default function ContractDetailPage() {
                           <td className="px-3 py-2.5 text-slate-600 whitespace-nowrap">{formatContractDate(file.createdAt)}</td>
                           <td className="px-3 py-2.5">
                             <div className="flex justify-end gap-1.5">
-                              <a className="p-2 rounded-lg border border-slate-200 text-blue-600 hover:bg-blue-50" href={file.data} download={file.name} title="Download"><Download size={14} /></a>
+                              <a className="p-2 rounded-lg border border-slate-200 text-blue-600 hover:bg-blue-50" href={resolveFileUrl(file.url || file.data)} download={file.name} target="_blank" rel="noreferrer" title="Download"><Download size={14} /></a>
                               <button type="button" className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50" title="Remove" onClick={() => removeAttachment(file.id)}><Trash2 size={14} /></button>
                             </div>
                           </td>
@@ -553,7 +563,7 @@ export default function ContractDetailPage() {
           </fieldset>)}
           <button type="button" className="btn-outline btn-sm" onClick={() => setTermsForm([...termsForm, { heading: '', body: '' }])}><Plus size={14} />Add Clause</button>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
-          <div className="contract-terms-footer"><button type="button" className="btn-outline btn-sm" onClick={() => setTermsOpen(false)}>Cancel</button><button type="submit" className="btn-primary btn-sm">Save Terms</button></div>
+          <div className="contract-terms-footer"><button type="button" className="btn-outline" onClick={() => setTermsOpen(false)}>Cancel</button><button type="submit" className="btn-primary">Save Terms</button></div>
         </form>
       </Modal>
 
@@ -616,8 +626,8 @@ export default function ContractDetailPage() {
           </label>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setEditOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button>
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setEditOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</button>
           </div>
         </form>
       </Modal>
@@ -643,21 +653,21 @@ export default function ContractDetailPage() {
           </label>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setRenewOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Renewing…' : 'Renew Contract'}</button>
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setRenewOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Renewing…' : 'Renew Contract'}</button>
           </div>
         </form>
       </Modal>
 
       <Modal isOpen={closeOpen} onClose={() => setCloseOpen(false)} title="Close Contract"
-        footer={<><button type="button" className="btn-outline btn-sm" onClick={() => setCloseOpen(false)}>Cancel</button>
-          <button type="button" className="btn-primary btn-sm" onClick={handleClose}>Close Contract</button></>}>
+        footer={<><button type="button" className="btn-outline" onClick={() => setCloseOpen(false)}>Cancel</button>
+          <button type="button" className="btn-primary" onClick={handleClose}>Close Contract</button></>}>
         <p className="text-xs leading-6 text-slate-600">Close <strong>{contract.contractNumber}</strong>? Closed contracts remain in the list for reference.</p>
       </Modal>
 
       <Modal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Contract"
-        footer={<><button type="button" className="btn-outline btn-sm" onClick={() => setDeleteOpen(false)}>Cancel</button>
-          <button type="button" className="btn-sm rounded-lg bg-rose-600 px-4 py-2 font-semibold text-white hover:bg-rose-700" onClick={handleDelete}>Delete</button></>}>
+        footer={<><button type="button" className="btn-outline" onClick={() => setDeleteOpen(false)}>Cancel</button>
+          <button type="button" className="btn-danger" onClick={handleDelete}>Delete</button></>}>
         <p className="text-xs leading-6 text-slate-600">Delete <strong>{contract.contractNumber}</strong>? This cannot be undone.</p>
       </Modal>
 
@@ -682,8 +692,8 @@ export default function ContractDetailPage() {
           </label>
           {formError && <p role="alert" className="text-xs text-rose-600">{formError}</p>}
           <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
-            <button type="button" className="btn-outline btn-sm" disabled={busy} onClick={() => setActivityOpen(false)}>Cancel</button>
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>{busy ? 'Saving…' : 'Add Activity'}</button>
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setActivityOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Add Activity'}</button>
           </div>
         </form>
       </Modal>

@@ -255,7 +255,7 @@ export default function Jobs() {
             title="View Details"
             aria-label="View"
             onClick={() => navigate(`/hrms/recruitment/jobs/${r.id}`)}
-            className="p-1.5 rounded-lg hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition cursor-pointer"
           >
             <Eye size={15} />
           </button>
@@ -264,7 +264,7 @@ export default function Jobs() {
             title="Edit Requisition"
             aria-label="Edit"
             onClick={() => openEdit(r)}
-            className="p-1.5 rounded-lg hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer"
           >
             <Pencil size={15} />
           </button>
@@ -273,7 +273,7 @@ export default function Jobs() {
             title="View Applicants"
             aria-label="Applicants"
             onClick={() => navigate(`/hrms/recruitment/applications`)}
-            className="p-1.5 rounded-lg hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition cursor-pointer"
           >
             <Users size={15} />
           </button>
@@ -285,7 +285,7 @@ export default function Jobs() {
               addJob({ ...r, id: `JOB-${Date.now()}`, title: r.title + " Copy" });
               showToast("Job opening duplicated");
             }}
-            className="p-1.5 rounded-lg hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-950/40 transition cursor-pointer"
           >
             <Copy size={15} />
           </button>
@@ -294,7 +294,7 @@ export default function Jobs() {
             title="Delete Job"
             aria-label="Delete"
             onClick={() => setDeleteId(r.id)}
-            className="p-1.5 rounded-lg text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
+            className="p-1.5 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
           >
             <Trash2 size={15} />
           </button>

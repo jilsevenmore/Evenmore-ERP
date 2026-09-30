@@ -193,21 +193,21 @@ export function FinancialReportsPage() {
       <div className="stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, margin: '20px 0 24px' }}>
         {stats.map(s => <StatCard key={s.label} stat={s} />)}
         {/* [PHASE-2E] balance sheet headline KPIs */}
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-1 shadow-xs">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Assets</span>
-          <span className="text-lg font-mono font-bold text-[#1F2E4A]">{formatCurrency(totalAssets)}</span>
-          <span className="text-[11px] text-slate-400 mt-0.5">{bankAccounts.length} bank accts · {formatCurrency(bankTotal)} cash</span>
+        <div className="bg-card rounded-xl border border-border p-4 flex flex-col gap-1 shadow-xs">
+          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Total Assets</span>
+          <span className="text-lg font-mono font-bold text-text">{formatCurrency(totalAssets)}</span>
+          <span className="text-[11px] text-muted mt-0.5">{bankAccounts.length} bank accts · {formatCurrency(bankTotal)} cash</span>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col gap-1 shadow-xs">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Net Worth (A − L)</span>
-          <span className="text-lg font-mono font-bold text-emerald-700">{formatCurrency(totalAssets - totalLiabilities)}</span>
-          <span className="text-[11px] text-slate-400 mt-0.5">Liabilities: {formatCurrency(totalLiabilities)} · Equity: {formatCurrency(totalAssets - totalLiabilities)}</span>
+        <div className="bg-card rounded-xl border border-border p-4 flex flex-col gap-1 shadow-xs">
+          <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">Net Worth (A − L)</span>
+          <span className="text-lg font-mono font-bold text-emerald-600">{formatCurrency(totalAssets - totalLiabilities)}</span>
+          <span className="text-[11px] text-muted mt-0.5">Liabilities: {formatCurrency(totalLiabilities)} · Equity: {formatCurrency(totalAssets - totalLiabilities)}</span>
         </div>
       </div>
 
-      <div className="card" style={{ background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }}>
-        <div className="flex-wrap lg:flex-nowrap gap-3 lg:gap-0" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #e2e8f0', paddingBottom: 12 }}>
-          <div className="no-print" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="card bg-card rounded-xl border border-border p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-wrap lg:flex-nowrap gap-3 lg:gap-0 justify-between items-center mb-5 border-b border-border pb-3">
+          <div className="no-print flex gap-2 flex-wrap">
             {[
               { id: 'pl', label: 'Profit & Loss' },
               { id: 'bs', label: 'Balance Sheet' },
@@ -217,25 +217,18 @@ export function FinancialReportsPage() {
               <button
                 key={tab.id}
                 type="button"
-                className={`tab-btn ${reportType === tab.id ? 'active' : ''}`}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold border transition shadow-2xs cursor-pointer ${
+                  reportType === tab.id
+                    ? 'border-primary bg-primary-subtle text-primary'
+                    : 'border-border bg-card text-muted hover:text-text hover:bg-card-hover'
+                }`}
                 onClick={() => setReportType(tab.id)}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: '1px solid',
-                  borderColor: reportType === tab.id ? '#1f6bff' : '#e2e8f0',
-                  background: reportType === tab.id ? '#f0f6ff' : '#ffffff',
-                  color: reportType === tab.id ? '#1f6bff' : '#64748b',
-                  cursor: 'pointer',
-                }}
               >
                 {tab.label}
               </button>
             ))}
           </div>
-          <span style={{ fontSize: 13, color: '#64748b' }}>Period: Current Fiscal Year ({fyLabel})</span>
+          <span className="text-xs text-muted">Period: Current Fiscal Year ({fyLabel})</span>
         </div>
 
         {reportType === 'pl' && (
@@ -251,42 +244,42 @@ export function FinancialReportsPage() {
         {/* [PHASE-2E] Balance Sheet — computed from live bank + AR + AP + inventory */}
         {reportType === 'bs' && (
           <div>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Balance Sheet (as of today)</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Derived from bank accounts, outstanding invoices/bills, inventory at cost, and journal entry equity.</p>
+            <div className="mb-4">
+              <h3 className="font-bold text-base text-text">Balance Sheet (as of today)</h3>
+              <p className="text-xs text-muted mt-1">Derived from bank accounts, outstanding invoices/bills, inventory at cost, and journal entry equity.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600" style={{ minWidth: 540 }}>
-                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-left text-xs text-text" style={{ minWidth: 540 }}>
+                <thead className="bg-table-head uppercase font-semibold text-text-secondary tracking-wider border-b border-border text-[11px]">
                   <tr>
-                    <th className="py-2 px-3">Section</th>
-                    <th className="py-2 px-3">Account</th>
-                    <th className="py-2 px-3 text-right">Balance</th>
+                    <th className="py-2.5 px-3">Section</th>
+                    <th className="py-2.5 px-3">Account</th>
+                    <th className="py-2.5 px-3 text-right">Balance</th>
                   </tr>
                 </thead>
-                <tbody>
-                  <tr><td colSpan={3} className="py-2 px-3 bg-blue-50 font-bold text-blue-800 text-[11px] uppercase tracking-wider">Assets</td></tr>
+                <tbody className="divide-y divide-border">
+                  <tr><td colSpan={3} className="py-2 px-3 bg-blue-50/70 font-bold text-blue-700 text-[11px] uppercase tracking-wider">Assets</td></tr>
                   {bsAssets.map((r, i) => (
-                    <tr key={`a-${i}`} className={r.isTotal ? 'bg-blue-50/60 font-bold border-t-2 border-blue-200' : 'hover:bg-slate-50'}>
-                      <td className="py-1.5 px-3">{r.section}</td>
-                      <td className="py-1.5 px-3 font-semibold text-slate-800">{r.account}</td>
-                      <td className="py-1.5 px-3 text-right font-mono text-slate-900" style={{ fontWeight: r.isTotal ? 800 : 500 }}>{formatCurrency(r.amount)}</td>
+                    <tr key={`a-${i}`} className={r.isTotal ? 'bg-blue-50/40 font-bold border-t-2 border-blue-200' : 'hover:bg-table-row-hover transition-colors'}>
+                      <td className="py-2 px-3">{r.section}</td>
+                      <td className="py-2 px-3 font-semibold text-text">{r.account}</td>
+                      <td className="py-2 px-3 text-right font-mono text-text font-bold">{formatCurrency(r.amount)}</td>
                     </tr>
                   ))}
-                  <tr><td colSpan={3} className="py-2 px-3 bg-rose-50 font-bold text-rose-800 text-[11px] uppercase tracking-wider">Liabilities</td></tr>
+                  <tr><td colSpan={3} className="py-2 px-3 bg-rose-50/70 font-bold text-rose-700 text-[11px] uppercase tracking-wider">Liabilities</td></tr>
                   {bsLiabilities.map((r, i) => (
-                    <tr key={`l-${i}`} className={r.isTotal ? 'bg-rose-50/60 font-bold border-t-2 border-rose-200' : 'hover:bg-slate-50'}>
-                      <td className="py-1.5 px-3">{r.section}</td>
-                      <td className="py-1.5 px-3 font-semibold text-slate-800">{r.account}</td>
-                      <td className="py-1.5 px-3 text-right font-mono text-slate-900" style={{ fontWeight: r.isTotal ? 800 : 500 }}>{formatCurrency(r.amount)}</td>
+                    <tr key={`l-${i}`} className={r.isTotal ? 'bg-rose-50/40 font-bold border-t-2 border-rose-200' : 'hover:bg-table-row-hover transition-colors'}>
+                      <td className="py-2 px-3">{r.section}</td>
+                      <td className="py-2 px-3 font-semibold text-text">{r.account}</td>
+                      <td className="py-2 px-3 text-right font-mono text-text font-bold">{formatCurrency(r.amount)}</td>
                     </tr>
                   ))}
-                  <tr><td colSpan={3} className="py-2 px-3 bg-emerald-50 font-bold text-emerald-800 text-[11px] uppercase tracking-wider">Owners' Equity</td></tr>
+                  <tr><td colSpan={3} className="py-2 px-3 bg-emerald-50/70 font-bold text-emerald-700 text-[11px] uppercase tracking-wider">Owners' Equity</td></tr>
                   {bsEquity.map((r, i) => (
-                    <tr key={`e-${i}`} className={r.isTotal ? 'bg-emerald-50/60 font-bold border-t-2 border-emerald-200' : 'hover:bg-slate-50'}>
-                      <td className="py-1.5 px-3">{r.section}</td>
-                      <td className="py-1.5 px-3 font-semibold text-slate-800">{r.account}</td>
-                      <td className="py-1.5 px-3 text-right font-mono text-slate-900" style={{ fontWeight: r.isTotal ? 800 : 500 }}>{formatCurrency(r.amount)}</td>
+                    <tr key={`e-${i}`} className={r.isTotal ? 'bg-emerald-50/40 font-bold border-t-2 border-emerald-200' : 'hover:bg-table-row-hover transition-colors'}>
+                      <td className="py-2 px-3">{r.section}</td>
+                      <td className="py-2 px-3 font-semibold text-text">{r.account}</td>
+                      <td className="py-2 px-3 text-right font-mono text-text font-bold">{formatCurrency(r.amount)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -298,37 +291,37 @@ export function FinancialReportsPage() {
         {/* [PHASE-2E] Budget vs Variance — annual budgeted amounts vs actual expense + COGS */}
         {reportType === 'budget' && (
           <div>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Budget vs Actual ({fyLabel})</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Annual budgets compared against actual expenses and COGS derived from live transactions. Over-budget lines are flagged.</p>
+            <div className="mb-4">
+              <h3 className="font-bold text-base text-text">Budget vs Actual ({fyLabel})</h3>
+              <p className="text-xs text-muted mt-1">Annual budgets compared against actual expenses and COGS derived from live transactions. Over-budget lines are flagged.</p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs text-slate-600" style={{ minWidth: 600 }}>
-                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="w-full text-left text-xs text-text" style={{ minWidth: 600 }}>
+                <thead className="bg-table-head uppercase font-semibold text-text-secondary tracking-wider border-b border-border text-[11px]">
                   <tr>
-                    <th className="py-2 px-3">Category</th>
-                    <th className="py-2 px-3 text-right">Budget (Annual)</th>
-                    <th className="py-2 px-3 text-right">Actual YTD</th>
-                    <th className="py-2 px-3 text-right">Variance</th>
-                    <th className="py-2 px-3 text-right">Utilization</th>
-                    <th className="py-2 px-3 text-center">Status</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3 text-right">Budget (Annual)</th>
+                    <th className="py-2.5 px-3 text-right">Actual YTD</th>
+                    <th className="py-2.5 px-3 text-right">Variance</th>
+                    <th className="py-2.5 px-3 text-right">Utilization</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {budgetRows.length === 0 && (
                     <tr><td colSpan={6} className="py-6 px-3 text-center text-slate-500">No budgets configured yet.</td></tr>
                   )}
                   {budgetRows.map((r) => (
-                    <tr key={r.id} className={`hover:bg-slate-50 ${r.isOver ? 'bg-rose-50/50' : ''}`}>
-                      <td className="py-2 px-3 font-semibold text-slate-800">{r.name}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-700">{formatCurrency(r.budget)}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold text-slate-900">{formatCurrency(r.actual)}</td>
-                      <td className={`py-2 px-3 text-right font-mono font-bold ${r.isOver ? 'text-rose-600' : 'text-emerald-700'}`}>
+                    <tr key={r.id} className={`hover:bg-table-row-hover transition-colors ${r.isOver ? 'bg-rose-50/30' : ''}`}>
+                      <td className="py-2.5 px-3 font-semibold text-text">{r.name}</td>
+                      <td className="py-2.5 px-3 text-right font-mono text-text-secondary">{formatCurrency(r.budget)}</td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-text">{formatCurrency(r.actual)}</td>
+                      <td className={`py-2.5 px-3 text-right font-mono font-bold ${r.isOver ? 'text-rose-600' : 'text-emerald-700'}`}>
                         {r.variance < 0 ? '−' : '+'}{formatCurrency(Math.abs(r.variance))}
                       </td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-600">{r.utilization === '—' ? '—' : `${r.utilization}%`}</td>
-                      <td className="py-2 px-3 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${r.isOver ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
+                      <td className="py-2.5 px-3 text-right font-mono text-muted">{r.utilization === '—' ? '—' : `${r.utilization}%`}</td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${r.isOver ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'}`}>
                           {r.isOver ? 'Over Budget' : 'Within Budget'}
                         </span>
                       </td>
@@ -337,15 +330,15 @@ export function FinancialReportsPage() {
                 </tbody>
               </table>
             </div>
-            <p className="mt-3 text-[11px] text-slate-400 italic">Budgets are annual and static; variance is computed against total expenses + COGS recorded so far in {fyLabel}.</p>
+            <p className="mt-3 text-[11px] text-muted italic">Budgets are annual and static; variance is computed against total expenses + COGS recorded so far in {fyLabel}.</p>
           </div>
         )}
 
         {reportType === 'cashflow' && (
           <div>
-            <div style={{ marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: '#0f172a' }}>Sales Invoices Ledger</h3>
-              <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Individual invoice contributions to overall operating revenue.</p>
+            <div className="mb-4">
+              <h3 className="font-bold text-base text-text">Sales Invoices Ledger</h3>
+              <p className="text-xs text-muted mt-1">Individual invoice contributions to overall operating revenue.</p>
             </div>
             <DataTable
               columns={[

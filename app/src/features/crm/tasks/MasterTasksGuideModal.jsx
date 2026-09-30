@@ -117,9 +117,7 @@ export default function MasterTasksGuideModal({ isOpen, onClose }) {
                 type="button"
                 onClick={() => setLang(l.code)}
                 className={
-                  lang === l.code
-                    ? "flex-1 h-10 rounded-lg bg-[#1f6bff] text-white text-sm font-bold"
-                    : "flex-1 h-10 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold hover:border-blue-400 hover:text-blue-600"
+                  lang === l.code ? "btn-primary flex-1" : "btn-outline flex-1"
                 }
               >
                 {l.label}
@@ -156,14 +154,14 @@ export default function MasterTasksGuideModal({ isOpen, onClose }) {
           <button
             type="button"
             onClick={onClose}
-            className="h-10 px-5 rounded-lg border border-slate-300 text-slate-600 text-sm font-semibold hover:bg-slate-50"
+            className="btn-outline"
           >
             Close
           </button>
           <button
             type="button"
             onClick={() => downloadGuidePdf(lang)}
-            className="h-10 px-5 rounded-lg bg-[#1f6bff] hover:bg-blue-700 text-white text-sm font-bold flex items-center gap-1.5"
+            className="btn-primary flex items-center gap-1.5"
           >
             <Download size={15} /> Download PDF
           </button>

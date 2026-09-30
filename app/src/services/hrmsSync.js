@@ -59,8 +59,11 @@ export const HRMS_RESOURCES = {
   // ── people ────────────────────────────────────────────────────────────────
   employees: {
     path: '/hrms/employees/',
+    // Also the PATCH body, so a key is sent only when the caller set it: a
+    // status change must not reset the joining date or re-offer a login.
+    // (The server defaults the joining date to today on create.)
     toApi: (e) => {
-      const joinIso = isoOut(e.joining || e.joiningDate || e.doj) || toISODate(new Date()) || undefined;
+      const joinIso = isoOut(e.joining || e.joiningDate || e.doj);
       return compact({
         name: e.name,
         email: e.email || undefined,
@@ -70,7 +73,8 @@ export const HRMS_RESOURCES = {
         department: e.department || undefined,
         designationId: e.designationId || undefined,
         designation: e.designation || e.role || undefined,
-        reportingManagerId: e.reportingManagerId || undefined,
+        // null clears the reporting manager; absent leaves it alone.
+        managerId: e.managerId !== undefined ? (e.managerId || null) : (e.reportingManagerId || undefined),
         locationId: e.locationId || undefined,
         location: e.location || undefined,
         joining: joinIso,
@@ -80,7 +84,7 @@ export const HRMS_RESOURCES = {
         employmentType: e.employmentType || undefined,
         status: e.status || undefined,
         avatar: e.avatar || undefined,
-        createUserAccount: e.createUserAccount !== undefined ? e.createUserAccount : true,
+        createUserAccount: e.createUserAccount,
         password: e.password || undefined,
         userPassword: e.userPassword || e.password || undefined,
         roleId: e.roleId || undefined,
@@ -106,9 +110,67 @@ export const HRMS_RESOURCES = {
     },
   },
 
-  departments: plain('/hrms/departments/'),
-  designations: plain('/hrms/designations/'),
-  locations: plain('/hrms/locations/'),
+  // ── organization ──────────────────────────────────────────────────────────
+  // The Organization section's units. Each body carries only the keys the
+  // caller set (so it doubles as a partial PATCH); counts, head name and
+  // department name are read-only and never sent.
+  departments: {
+    path: '/hrms/departments/',
+    toApi: (d) => compact({
+      name: d.name?.trim() || undefined,
+      code: d.code ?? undefined,
+      headEmployeeId: d.headEmployeeId !== undefined ? (d.headEmployeeId || null) : undefined,
+      parentId: d.parentId !== undefined ? (d.parentId || null) : undefined,
+      budget: d.budget !== undefined ? (d.budget === '' || d.budget === null ? null : num(d.budget)) : undefined,
+      status: d.status || undefined,
+      description: d.description ?? undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      name: row.name || '',
+      head: row.head || '',
+      employees: row.employees ?? 0,
+      teams: row.teams ?? 0,
+      openRoles: row.openRoles ?? 0,
+      _synced: true,
+    }),
+  },
+  // The screens say "title" and "L4"; the API stores `name` and 4.
+  designations: {
+    path: '/hrms/designations/',
+    toApi: (d) => {
+      const level = d.level === undefined ? undefined : Number(String(d.level).replace(/^L/i, ''));
+      return compact({
+        name: (d.name ?? d.title)?.trim() || undefined,
+        level: level === undefined ? undefined : (Number.isFinite(level) ? level : null),
+        departmentId: d.departmentId !== undefined ? (d.departmentId || null) : undefined,
+      });
+    },
+    fromApi: (row) => ({
+      ...row,
+      title: row.name || '',
+      level: row.level ? `L${row.level}` : '',
+      department: row.department || '',
+      employees: row.employees ?? 0,
+      _synced: true,
+    }),
+  },
+  locations: {
+    path: '/hrms/locations/',
+    toApi: (l) => compact({
+      name: l.name?.trim() || undefined,
+      type: l.type || undefined,
+      address: l.address ?? undefined,
+      timezone: l.timezone ?? undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      name: row.name || '',
+      address: row.address || '',
+      employees: row.employees ?? 0,
+      _synced: true,
+    }),
+  },
   teams: plain('/hrms/teams/'),
   holidays: dated('/hrms/holidays/', ['date']),
 
@@ -153,13 +215,24 @@ export const HRMS_RESOURCES = {
     }),
     fromApi: (row) => ({
       ...asText(row, ['status', 'workLocation', 'notes', 'checkIn', 'checkOut', 'employeeName']),
+      id: row.id,
       date: displayIn(row.date),
-      employee: row.employeeName || row.employee || '',
+      rawDate: row.date,
+      name: row.name || row.employeeName || row.employee || '',
+      employee: row.employeeName || row.name || row.employee || '',
+      employeeName: row.employeeName || row.name || row.employee || '',
+      employeeId: row.employeeId || row.empId || row.employeeCode || row.id,
+      employeeCode: row.employeeCode || row.empId || '',
+      empId: row.employeeCode || row.empId || '',
+      dept: row.dept || row.department || '',
+      department: row.department || row.dept || '',
+      shift: row.shift || 'General',
       firstPunch: row.firstPunch || row.checkIn,
-      lastPunch: row.lastPunch || row.checkOut,
-      workingHours: row.workingHours || row.hours || 0,
-      lateMinutes: row.lateMinutes || 0,
-      overtimeHours: row.overtimeHours || 0,
+      lastPunch: row.lastPunch || (row.status !== 'Absent' ? row.checkOut : null),
+      workingHours: row.workingHours !== undefined && row.workingHours !== null ? Number(row.workingHours) : (Number(row.hours) || 0),
+      hours: row.workingHours !== undefined && row.workingHours !== null ? Number(row.workingHours) : (Number(row.hours) || 0),
+      lateMinutes: Number(row.lateMinutes) || 0,
+      overtimeHours: Number(row.overtimeHours) || 0,
       formattedWorkingHours: row.formattedWorkingHours,
       lateDisplay: row.lateDisplay,
       overtimeDisplay: row.overtimeDisplay,
@@ -407,13 +480,23 @@ export async function pullTodayPunch(employeeId = null) {
 }
 
 /** Record a Punch In or Punch Out event. */
-export async function recordPunch({ punchType, remark, notes, employeeId, source = 'web' }) {
+export async function recordPunch({
+  punchType,
+  remark,
+  notes,
+  employeeId,
+  source = 'web',
+  earlyReason,
+  requestRegularization,
+}) {
   if (!isBackendEnabled()) return null;
   return api.post('/hrms/attendance/punch/', {
     punchType,
     remark: remark || notes,
     source,
     employeeId: employeeId || undefined,
+    earlyReason: earlyReason || undefined,
+    requestRegularization: Boolean(requestRegularization),
   });
 }
 

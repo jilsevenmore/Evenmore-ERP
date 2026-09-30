@@ -12,7 +12,7 @@ import { Search, X, SlidersHorizontal } from 'lucide-react';
 const STATUS_PILLS = ['In Progress', 'Delayed', 'At Risk', 'Completed', 'Draft'];
 
 const selectClass =
-  'text-xs rounded-lg border border-[#dce5f4] bg-white px-2.5 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400';
+  'text-xs h-9 rounded-xl border border-border bg-card px-2.5 text-text focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-2xs';
 
 export function ProjectFilterBar({
   filters,
@@ -33,13 +33,13 @@ export function ProjectFilterBar({
   };
 
   return (
-    <section className="rounded-xl border border-[#dce5f4] bg-white p-4 shadow-2xs space-y-3">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-xs space-y-3">
       {/* Row 1 — search + dropdowns */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative flex-1 min-w-[220px]">
           <Search
             size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"
           />
           <input
             type="search"
@@ -47,7 +47,7 @@ export function ProjectFilterBar({
             onChange={(e) => set({ search: e.target.value })}
             placeholder="Search project ID, customer, order or product…"
             aria-label="Search projects"
-            className="w-full text-xs rounded-lg border border-[#dce5f4] bg-white pl-9 pr-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+            className="w-full text-xs h-9 rounded-xl border border-border bg-card pl-9 pr-3 text-text placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition shadow-2xs"
           />
         </div>
 
@@ -106,12 +106,11 @@ export function ProjectFilterBar({
           <button
             type="button"
             onClick={() => set({ statuses: [] })}
-            className="text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors"
-            style={
+            className={`text-[11px] font-semibold h-8 px-3 rounded-xl border transition-colors shadow-2xs cursor-pointer ${
               filters.statuses.length === 0
-                ? { background: '#1f6bff', color: '#fff', borderColor: '#1f6bff' }
-                : { background: '#fff', color: '#475569', borderColor: '#dce5f4' }
-            }
+                ? 'bg-primary text-white border-primary'
+                : 'bg-card text-muted hover:text-text border-border hover:bg-card-hover'
+            }`}
             aria-pressed={filters.statuses.length === 0}
           >
             All
@@ -124,12 +123,11 @@ export function ProjectFilterBar({
                 type="button"
                 onClick={() => toggleStatus(status)}
                 aria-pressed={active}
-                className="text-[11px] font-semibold px-2.5 py-1 rounded-full border transition-colors"
-                style={
+                className={`text-[11px] font-semibold h-8 px-3 rounded-xl border transition-colors shadow-2xs cursor-pointer ${
                   active
-                    ? { background: '#1f6bff', color: '#fff', borderColor: '#1f6bff' }
-                    : { background: '#fff', color: '#475569', borderColor: '#dce5f4' }
-                }
+                    ? 'bg-primary text-white border-primary'
+                    : 'bg-card text-muted hover:text-text border-border hover:bg-card-hover'
+                }`}
               >
                 {status}
               </button>
@@ -137,12 +135,12 @@ export function ProjectFilterBar({
           })}
         </div>
 
-        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-600 cursor-pointer ml-1">
+        <label className="flex items-center gap-1.5 text-[11px] font-semibold text-text-secondary cursor-pointer ml-1 select-none">
           <input
             type="checkbox"
             checked={filters.delayedOnly}
             onChange={(e) => set({ delayedOnly: e.target.checked })}
-            className="accent-rose-500"
+            className="rounded text-primary focus:ring-primary w-3.5 h-3.5"
           />
           Delayed only
         </label>
@@ -164,7 +162,7 @@ export function ProjectFilterBar({
             aria-label="From date"
             className={selectClass}
           />
-          <span className="text-xs text-slate-400">to</span>
+          <span className="text-xs text-muted">to</span>
           <input
             type="date"
             value={filters.dateTo}
@@ -176,16 +174,16 @@ export function ProjectFilterBar({
       </div>
 
       {/* Row 3 — result summary */}
-      <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-1 border-t border-slate-100">
-        <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-500">
-          <SlidersHorizontal size={12} className="text-slate-300" />
-          Showing <strong className="text-slate-700">{resultCount}</strong> of {totalCount} projects
+      <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-2 border-t border-border">
+        <span className="inline-flex items-center gap-1.5 text-[11px] text-muted">
+          <SlidersHorizontal size={12} className="text-muted" />
+          Showing <strong className="text-text font-bold">{resultCount}</strong> of {totalCount} projects
         </span>
         {isFiltered && (
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 hover:text-rose-600"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted hover:text-rose-600 transition cursor-pointer"
           >
             <X size={12} />
             Clear filters

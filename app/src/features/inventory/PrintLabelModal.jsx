@@ -100,8 +100,8 @@ const PrintLabelModalOriginal = ({ isOpen, onClose, part, }) => {
             <CheckCircle2 className="w-3.5 h-3.5"/> Barcode verified
           </span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-3 py-1.5 border border-[#CED4DA] text-xs font-medium rounded text-[#343A40] hover:bg-gray-100">Close</button>
-            <button onClick={handlePrint} className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152036] text-white text-xs font-medium rounded flex items-center gap-1.5 shadow-sm">
+            <button onClick={onClose} className="px-3 py-1.5 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">Close</button>
+            <button onClick={handlePrint} className="px-4 py-1.5 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold transition-all active:scale-[0.99] flex items-center gap-1.5 shadow-2xs cursor-pointer">
               <Printer className="w-3.5 h-3.5"/> Print Label
             </button>
           </div>

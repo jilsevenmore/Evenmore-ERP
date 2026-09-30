@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import LeadFormsManager from '../leads/LeadFormsManager';
 import LeadGuideModal from '../leads/LeadGuideModal';
-import { defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
+import { withStandardLeadFields } from '../../../data/crm/leadFormSchema';
 import { useCrmStore } from '../../../stores/crmStore';
 import { loadForms, saveForms, setActiveFormId, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
@@ -39,7 +39,8 @@ export default function LeadFormsPage() {
       name: formName.trim(),
       description: formDesc.trim() || 'Custom lead capture form',
       createdOn: new Date().toLocaleDateString('en-GB'),
-      sections: [{ id: 'lead-information', title: 'Lead Information', fields: [] }],
+      // Starts with the standard lead fields the Create Lead modal always shows.
+      sections: withStandardLeadFields([{ id: 'lead-information', title: 'Lead Information', fields: [] }]),
     };
 
     const updated = [...leadForms, newForm];
@@ -130,13 +131,13 @@ export default function LeadFormsPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer text-xs"
+                  className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition cursor-pointer text-xs"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
                 >
                   Create Form
                 </button>

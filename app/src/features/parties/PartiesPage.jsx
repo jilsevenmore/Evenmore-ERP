@@ -528,14 +528,14 @@ export default function PartiesPage() {
                   setViewingParty(null);
                   handleEdit(partyToEdit);
                 }}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-xs transition cursor-pointer shadow-xs"
+                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer"
               >
                 Edit Party Details
               </button>
               <button
                 type="button"
                 onClick={() => setViewingParty(null)}
-                className="px-4 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs transition cursor-pointer"
+                className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
               >
                 Close
               </button>

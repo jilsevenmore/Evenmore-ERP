@@ -11,10 +11,44 @@ import {
   Type,
   UserRound,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { defaultLeadFormSections } from "../../../data/crm/leadFormSchema";
+import { useNavigate, useLocation } from "react-router-dom";
+import { defaultLeadFormSections, withStandardLeadFields } from "../../../data/crm/leadFormSchema";
 import { useCrmStore } from "../../../stores/crmStore";
-import { getActiveFormId, LEAD_FORM } from "../../../services/crmForms";
+import { activeLeadForm } from "../../../services/leadFormFields";
+
+function resolveFieldDraftValue(field, draftData) {
+  if (!draftData || typeof draftData !== 'object') return null;
+  const fid = String(field.id || '').toLowerCase().trim();
+  const flabel = String(field.label || '').toLowerCase().trim();
+
+  if (draftData.customValues && draftData.customValues[field.id] !== undefined) {
+    const cv = draftData.customValues[field.id];
+    if (cv !== null && cv !== undefined && cv !== '') return String(cv);
+  }
+
+  if (fid === 'lead-name' || flabel === 'lead name') return draftData.leadName;
+  if (fid === 'company' || flabel === 'company') return draftData.company;
+  if (fid === 'email' || flabel === 'email') return draftData.email;
+  if (fid === 'phone' || flabel === 'phone') return draftData.phone;
+  if (fid === 'lead-source' || flabel === 'lead source') return draftData.source || draftData.sourceId;
+  if (fid === 'title' || flabel === 'title') return draftData.titleValue || draftData.title;
+  if (fid === 'industry' || flabel === 'industry') return draftData.industry;
+  if (fid === 'lead-owner' || flabel === 'lead owner') return draftData.owner || draftData.ownerId;
+  if (fid === 'created-on' || flabel === 'created on') return draftData.createdOn;
+  if (fid === 'lead-photo' || flabel === 'lead photo' || field.type === 'Lead Image') return draftData.photoPreview;
+  if (fid.includes('product') || flabel.includes('product')) {
+    if (Array.isArray(draftData.products) && draftData.products.length > 0) return draftData.products.join(', ');
+    return draftData.products;
+  }
+  if (fid.includes('user') || flabel.includes('user')) {
+    if (Array.isArray(draftData.leadUsers) && draftData.leadUsers.length > 0) return draftData.leadUsers.join(', ');
+    return draftData.leadUsers;
+  }
+  if (fid.includes('task-date') || flabel.includes('task date')) return draftData.taskDate;
+  if (fid.includes('task-time') || flabel.includes('task time')) return draftData.taskTime;
+
+  return null;
+}
 
 function getFieldIcon(field) {
   if (field.type === "Email") return Mail;
@@ -26,7 +60,10 @@ function getFieldIcon(field) {
   return Type;
 }
 
-function renderInput(field) {
+function renderInput(field, draftData) {
+  const draftVal = resolveFieldDraftValue(field, draftData);
+  const hasDraftVal = draftVal !== null && draftVal !== undefined && String(draftVal).trim() !== '';
+
   if (field.type === "Lead Image") {
     return (
       <div className="rounded-xl border border-slate-200 bg-white p-3.5">
@@ -36,9 +73,15 @@ function renderInput(field) {
             <div className="w-3.5 h-3.5 bg-white rounded-full shadow-xs" />
           </div>
         </div>
-        <div className="w-14 h-14 rounded-xl bg-slate-100/80 border border-slate-200/80 flex items-center justify-center text-slate-400 mt-2.5">
-          <ImagePlus size={24} strokeWidth={1.5} />
-        </div>
+        {hasDraftVal ? (
+          <div className="w-16 h-16 rounded-xl border border-slate-200 overflow-hidden mt-2.5 shadow-2xs">
+            <img src={draftVal} alt="Lead preview" className="w-full h-full object-cover" />
+          </div>
+        ) : (
+          <div className="w-14 h-14 rounded-xl bg-slate-100/80 border border-slate-200/80 flex items-center justify-center text-slate-400 mt-2.5">
+            <ImagePlus size={24} strokeWidth={1.5} />
+          </div>
+        )}
       </div>
     );
   }
@@ -47,6 +90,7 @@ function renderInput(field) {
     return (
       <textarea
         rows={3}
+        defaultValue={hasDraftVal ? draftVal : ""}
         placeholder={field.placeholder}
         className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none"
       />
@@ -57,9 +101,10 @@ function renderInput(field) {
     return (
       <div className="relative flex items-center">
         <select
-          defaultValue=""
+          defaultValue={hasDraftVal ? draftVal : ""}
           className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none pr-8 cursor-pointer"
         >
+          {hasDraftVal && <option value={draftVal}>{draftVal}</option>}
           <option value="" disabled>
             {field.placeholder}
           </option>
@@ -74,7 +119,7 @@ function renderInput(field) {
   if (field.type === "Checkbox") {
     return (
       <label className="flex items-center gap-2 py-1 cursor-pointer">
-        <input type="checkbox" className="w-4 h-4 text-blue-600 rounded border-slate-300" />
+        <input type="checkbox" defaultChecked={Boolean(hasDraftVal && draftVal !== 'false')} className="w-4 h-4 text-blue-600 rounded border-slate-300" />
         <span className="text-xs font-medium text-slate-700">{field.placeholder || field.label}</span>
       </label>
     );
@@ -85,6 +130,7 @@ function renderInput(field) {
       <div className="relative flex items-center">
         <input
           type="text"
+          defaultValue={hasDraftVal ? draftVal : ""}
           placeholder={field.placeholder || "Select date"}
           className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
@@ -107,6 +153,7 @@ function renderInput(field) {
     <div className="relative flex items-center">
       <input
         type={inputType}
+        defaultValue={hasDraftVal ? draftVal : ""}
         placeholder={field.placeholder}
         className="w-full bg-white border border-slate-200 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
       />
@@ -121,8 +168,26 @@ export default function DynamicLeadFormPage({
   onEditLayout,
 }) {
   const navigate = useNavigate();
-  const handleBack = onBackToLeads || (() => navigate("/crm/leads"));
-  const handleEdit = onEditLayout || (() => navigate("/crm/leads/form-builder"));
+  const location = useLocation();
+
+  const draftData = useMemo(() => {
+    if (location.state?.draftData) return location.state.draftData;
+    try {
+      const saved = sessionStorage.getItem('crm_lead_create_draft');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, [location.state]);
+
+  const handleBack = onBackToLeads || (() => {
+    if (draftData) {
+      navigate("/crm/leads?openCreate=true");
+    } else {
+      navigate("/crm/leads");
+    }
+  });
+  const handleEdit = onEditLayout || (() => navigate("/crm/leads/form-builder", { state: { draftData, returnTo: "/crm/leads/create-form" } }));
 
   // The published lead form, from `/crm/forms/` — the same one the builder saves.
   const storeForms = useCrmStore((s) => s.forms);
@@ -131,14 +196,15 @@ export default function DynamicLeadFormPage({
       return sections;
     }
 
-    const activeId = getActiveFormId();
-    const leadForms = (storeForms || []).filter((form) => (form.kind || LEAD_FORM) === LEAD_FORM);
-    const savedForm = (activeId ? leadForms.find((form) => String(form.id) === String(activeId)) : null) || leadForms[0] || null;
+    // The same form the Create Lead modal uses (resolves pre-save ids too).
+    const savedForm = activeLeadForm();
     if (Array.isArray(savedForm?.sections) && savedForm.sections.length > 0) {
-      return savedForm.sections;
+      return withStandardLeadFields(savedForm.sections);
     }
 
     return Array.isArray(sections) && sections.length > 0 ? sections : defaultLeadFormSections;
+  // storeForms: re-read the form when it is saved or arrives.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sections, storeForms]);
 
   return (
@@ -157,19 +223,34 @@ export default function DynamicLeadFormPage({
           <button
             type="button"
             onClick={handleEdit}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+            className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             Edit Page Layout
           </button>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition cursor-pointer"
+            className="btn-primary inline-flex items-center gap-1.5 h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
           >
             <Save size={15} />
             Save Lead
           </button>
         </div>
       </div>
+
+      {draftData && (
+        <div className="mb-5 flex items-center justify-between p-3.5 bg-blue-50/90 border border-blue-200/90 rounded-2xl text-xs text-blue-950 shadow-2xs">
+          <span>
+            Displaying present form data for: <strong>{draftData.leadName || draftData.company || "Current Lead"}</strong>
+          </span>
+          <button
+            type="button"
+            onClick={handleBack}
+            className="btn-primary h-7 px-3 text-[11px] font-semibold rounded-lg cursor-pointer"
+          >
+            Back to Form
+          </button>
+        </div>
+      )}
 
       {/* Sections */}
       <div className="space-y-6">
@@ -197,7 +278,7 @@ export default function DynamicLeadFormPage({
                       {field.required && <span className="text-rose-500 ml-0.5">*</span>}
                     </span>
                   )}
-                  {renderInput(field)}
+                  {renderInput(field, draftData)}
                   {field.helpText && (
                     <small className="text-[11px] text-slate-400">{field.helpText}</small>
                   )}

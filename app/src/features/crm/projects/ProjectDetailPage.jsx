@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Building2, CalendarDays, CheckCircle2, CircleDas
 import { loadProjects } from '../../../services/dealProjectService';
 import { loadDeals } from '../../../services/dealService';
 import { useAppStore } from '../../../stores/appStore';
+import { useCrmStore } from '../../../stores/crmStore';
 
 function formatDate(value) {
   if (!value) return 'Not specified';
@@ -34,6 +35,9 @@ export default function ProjectDetailPage() {
   const navigationOpen = useAppStore((state) => state.mobileSidebarOpen);
   const toggleNavigation = useAppStore((state) => state.toggleMobileSidebar);
   const [record, setRecord] = useState({ project: null, deal: null, error: '', loading: true });
+  // Projects and deals come from the CRM store; it may still be loading on a direct visit.
+  const storeProjects = useCrmStore((s) => s.projects);
+  const storeDeals = useCrmStore((s) => s.deals);
   useEffect(() => {
     function read() {
       try {
@@ -42,14 +46,13 @@ export default function ProjectDetailPage() {
         let warning = '';
         try { deal = loadDeals().find((item) => String(item.id) === String(project?.sourceDealId)); }
         catch { warning = 'Source deal details could not be loaded.'; }
-        setRecord({ project, deal, warning, error: '', loading: false });
+        setRecord({ project, deal, warning, error: '', loading: !project && !useCrmStore.getState().status.loaded });
       } catch (failure) { setRecord({ project: null, deal: null, error: failure.message, loading: false }); }
     }
     read();
-    window.addEventListener('storage', read);
     window.addEventListener('crm:data-updated', read);
-    return () => { window.removeEventListener('storage', read); window.removeEventListener('crm:data-updated', read); };
-  }, [id]);
+    return () => { window.removeEventListener('crm:data-updated', read); };
+  }, [id, storeProjects, storeDeals]);
   const { project, deal } = record;
   if (!project) return <div className="card p-8 space-y-3"><FolderOpen size={28} className="text-blue-600" /><h1 className="font-bold">{record.loading ? 'Loading project...' : record.error || 'Project not found'}</h1><Link className="btn-outline btn-sm" to="/crm/deals">Back to Deals</Link></div>;
   const dealUrl = `/crm/deals?deal=${encodeURIComponent(project.sourceDealId)}`;

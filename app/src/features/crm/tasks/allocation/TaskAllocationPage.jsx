@@ -4,7 +4,18 @@ import { Plus, Search, RotateCcw, Eye, Trash2, ChevronUp, ChevronDown, ChevronsU
 import AssignTaskModal from './AssignTaskModal';
 import InfoBanner from '../../common/InfoBanner';
 import KpiCard from '../../../../components/ui/KpiCard';
-import { loadAllocationTasks, saveAllocationTasks, formatDeadline, EMPLOYEES, DEPARTMENTS, STATUSES } from './taskAllocationStore';
+import { useAppStore } from '../../../../stores/appStore';
+import { describeError } from '../../../../services/crmSync';
+import {
+  useAllocationTasks,
+  useCanManageAllocations,
+  createAllocation,
+  deleteAllocation,
+  formatDeadline,
+  EMPLOYEES,
+  DEPARTMENTS,
+  STATUSES,
+} from './taskAllocationStore';
 
 function initials(name) {
   if (!name) return '?';
@@ -39,7 +50,9 @@ const selectCls = 'w-full h-11 px-3.5 bg-slate-50/60 border border-slate-200 rou
 
 export default function TaskAllocationPage() {
   const navigate = useNavigate();
-  const [tasks, setTasks] = useState(loadAllocationTasks);
+  const tasks = useAllocationTasks();
+  const canManage = useCanManageAllocations();
+  const showToast = useAppStore((s) => s.showToast);
   const [statusFilter, setStatusFilter] = useState('Any');
   const [assigneeFilter, setAssigneeFilter] = useState('Anyone');
   const [deptFilter, setDeptFilter] = useState('Any');
@@ -56,14 +69,10 @@ export default function TaskAllocationPage() {
   const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
-    saveAllocationTasks(tasks);
-  }, [tasks]);
-
-  useEffect(() => {
     setPage(1);
   }, [statusFilter, assigneeFilter, deptFilter, search, perPage]);
 
-  const assigneeOptions = useMemo(() => [...new Set([...EMPLOYEES.map((e) => e.name), ...tasks.map((t) => t.assignee)])], [tasks]);
+  const assigneeOptions = useMemo(() => [...new Set([...EMPLOYEES.map((e) => e.name), ...tasks.map((t) => t.assignee)].filter(Boolean))], [tasks]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -121,27 +130,25 @@ export default function TaskAllocationPage() {
     setSearch('');
   }
 
-  function handleCreate(data) {
-    setTasks((prev) => {
-      const now = new Date().toISOString();
-      return [
-        ...prev,
-        {
-          id: `ta-${Date.now()}`,
-          assignedBy: 'company',
-          status: 'Pending',
-          audit: [{ text: `company assigned this to ${data.assignee}`, at: now }],
-          ...data,
-        },
-      ];
-    });
+  async function handleCreate(data) {
     setIsModalOpen(false);
+    try {
+      // The server records who assigned it and writes the first audit line.
+      await createAllocation({ ...data, status: 'Pending' });
+    } catch (err) {
+      showToast?.(`Task not assigned — ${describeError(err)}`);
+    }
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteId) return;
-    setTasks((prev) => prev.filter((t) => t.id !== deleteId));
+    const id = deleteId;
     setDeleteId(null);
+    try {
+      await deleteAllocation(id);
+    } catch (err) {
+      showToast?.(`Task not deleted — ${describeError(err)}`);
+    }
   }
 
   function openDetail(id) {
@@ -163,14 +170,16 @@ export default function TaskAllocationPage() {
             <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-500">{filtered.length} tasks</span>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="shrink-0 h-10 px-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-[13px] font-semibold rounded-xl shadow-sm shadow-blue-600/25 transition"
-        >
-          <Plus size={16} strokeWidth={2.5} />
-          Assign Task
-        </button>
+        {canManage && (
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="shrink-0 h-10 px-4 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white text-[13px] font-semibold rounded-xl shadow-sm shadow-blue-600/25 transition"
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            Assign Task
+          </button>
+        )}
       </div>
 
       <InfoBanner
@@ -305,7 +314,7 @@ export default function TaskAllocationPage() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {pageItems.map((t) => {
-                const overdue = t.status === 'Pending' && t.deadline;
+                const overdue = t.status !== 'Completed' && t.deadline && new Date(t.deadline) < new Date();
                 return (
                   <tr key={t.id} className="hover:bg-blue-50/40 transition-colors group">
                     <td className="px-5 py-4">
@@ -353,9 +362,11 @@ export default function TaskAllocationPage() {
                         <button type="button" onClick={() => openDetail(t.id)} title="View details" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 border border-slate-200 rounded-lg transition">
                           <Eye size={15} />
                         </button>
-                        <button type="button" onClick={() => setDeleteId(t.id)} title="Delete task" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 border border-slate-200 rounded-lg transition">
-                          <Trash2 size={15} />
-                        </button>
+                        {canManage && (
+                          <button type="button" onClick={() => setDeleteId(t.id)} title="Delete task" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 border border-slate-200 rounded-lg transition">
+                            <Trash2 size={15} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -389,7 +400,8 @@ export default function TaskAllocationPage() {
         </div>
       </div>
 
-      <AssignTaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
+      {/* Keyed so each opening starts from a blank form. */}
+      <AssignTaskModal key={isModalOpen ? 'open' : 'closed'} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSubmit={handleCreate} />
 
       {deleteId && (
         <div className="fixed inset-0 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center z-[70] p-2 sm:p-4" onClick={() => setDeleteId(null)}>

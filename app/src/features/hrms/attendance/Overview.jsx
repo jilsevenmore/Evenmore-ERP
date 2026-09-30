@@ -6,6 +6,7 @@ import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { pullPunchTimeline, submitPunchCorrection, pullTracked } from "../../../services/hrmsSync";
+import { toISODate } from "../../../utils/dateUtils";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -94,8 +95,11 @@ export default function AttendanceOverview() {
   const combinedAttendance = useMemo(() => {
     if (storeRecords && storeRecords.length > 0) {
       return storeRecords.map((r) => {
+        const empName = r.name || r.employeeName || r.employee || "Employee";
+        const empCode = r.employeeCode || r.empId || (r.id && !String(r.id).includes("-") ? r.id : "—");
+        const dept = r.dept || r.department || "General";
         const firstPunchVal = r.firstPunch || r.first_punch || r.checkIn;
-        const lastPunchVal = r.lastPunch || r.last_punch || r.checkOut;
+        const lastPunchVal = r.lastPunch || r.last_punch || (r.status !== "Absent" ? r.checkOut : null);
         const firstPunchDisplay = formatPunchTime(firstPunchVal);
         const lastPunchDisplay = formatPunchTime(lastPunchVal);
         const workingHoursVal =
@@ -111,19 +115,31 @@ export default function AttendanceOverview() {
             : r.workHours || "—");
         const lateMins =
           r.lateMinutes !== undefined && r.lateMinutes !== null ? Number(r.lateMinutes) : 0;
+        const earlyMins =
+          r.earlyLeavingMinutes !== undefined && r.earlyLeavingMinutes !== null
+            ? Number(r.earlyLeavingMinutes)
+            : r.early_leaving_minutes
+            ? Number(r.early_leaving_minutes)
+            : 0;
         const overtimeHrs =
           r.overtimeHours !== undefined && r.overtimeHours !== null ? Number(r.overtimeHours) : 0;
 
         return {
           ...r,
+          id: r.id,
+          name: empName,
+          dept: dept,
+          employeeCode: empCode,
+          empId: empCode,
           employeeId: r.employeeId || r.empId || r.id,
           firstPunchDisplay,
           lastPunchDisplay,
           workingHoursVal,
           workingHoursDisplay,
           lateMins,
+          earlyMins,
           overtimeHrs,
-          img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+          img: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.employeeId || r.name}`,
           workHours: workingHoursDisplay,
           shift: r.shift || "General",
           location: r.location || (r.status === "WFH" ? "Remote" : "On-Site"),
@@ -143,22 +159,25 @@ export default function AttendanceOverview() {
     if (storeEmployees.length > 0) {
       return storeEmployees.map((e) => ({ id: e.empId || e.id, name: e.name }));
     }
-    return combinedAttendance.map((r) => ({ id: r.id, name: r.name }));
+    return combinedAttendance.map((r) => ({ id: r.empId || r.id, name: r.name }));
   }, [storeEmployees, combinedAttendance]);
 
   const filtered = useMemo(() => {
     return combinedAttendance.filter((item) => {
+      const itemIso = toISODate(item.rawDate || item.date);
+      const matchDate = !dateVal || itemIso === dateVal || item.date === dateVal;
       const matchSearch =
         String(item.name ?? "").toLowerCase().includes(search.toLowerCase()) ||
+        String(item.employeeCode ?? "").toLowerCase().includes(search.toLowerCase()) ||
         (item.id && String(item.id ?? "").toLowerCase().includes(search.toLowerCase()));
       const matchDept = deptFilter === "All" || item.dept === deptFilter;
       const matchStatus = statusFilter === "All" || item.status === statusFilter;
       const matchShift = shiftFilter === "All" || item.shift === shiftFilter;
       const matchLoc = locFilter === "All" || item.location === locFilter;
       const matchRole = roleFilter === "All" || item.role === roleFilter;
-      return matchSearch && matchDept && matchStatus && matchShift && matchLoc && matchRole;
+      return matchDate && matchSearch && matchDept && matchStatus && matchShift && matchLoc && matchRole;
     });
-  }, [combinedAttendance, search, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
+  }, [combinedAttendance, search, dateVal, deptFilter, statusFilter, shiftFilter, locFilter, roleFilter]);
 
   // Dynamic live STATS
   const statsData = useMemo(() => {
@@ -250,7 +269,9 @@ export default function AttendanceOverview() {
     setCorrReason("");
     setLoadingTimeline(true);
     try {
-      const data = await pullPunchTimeline(row.employeeId || row.id, row.date || dateVal);
+      const targetEmp = row.employeeId || row.empId || row.id;
+      const targetDate = toISODate(row.rawDate || row.date) || dateVal;
+      const data = await pullPunchTimeline(targetEmp, targetDate);
       const list = Array.isArray(data) ? data : data?.results || data?.data || [];
       setTimelinePunches(list);
     } catch {
@@ -265,9 +286,11 @@ export default function AttendanceOverview() {
     if (!corrReason.trim()) return setToast("Please provide a reason for punch correction.", "error");
     setSubmittingCorr(true);
     try {
+      const targetEmp = selectedTimelineRow.employeeId || selectedTimelineRow.empId || selectedTimelineRow.id;
+      const targetDate = toISODate(selectedTimelineRow.rawDate || selectedTimelineRow.date) || dateVal;
       await submitPunchCorrection({
-        employeeId: selectedTimelineRow.employeeId || selectedTimelineRow.id,
-        date: selectedTimelineRow.date || dateVal,
+        employeeId: targetEmp,
+        date: targetDate,
         punchType: corrType,
         punchTime: corrTime,
         reason: corrReason,
@@ -276,17 +299,11 @@ export default function AttendanceOverview() {
       setShowCorrectionForm(false);
       setCorrReason("");
       // Refresh timeline
-      const freshData = await pullPunchTimeline(
-        selectedTimelineRow.employeeId || selectedTimelineRow.id,
-        selectedTimelineRow.date || dateVal
-      );
+      const freshData = await pullPunchTimeline(targetEmp, targetDate);
       const list = Array.isArray(freshData) ? freshData : freshData?.results || freshData?.data || [];
       setTimelinePunches(list);
       // Refresh attendance records
-      const freshRecords = await pullTracked("attendance");
-      if (freshRecords) {
-        useAttendanceStore.setState({ records: freshRecords });
-      }
+      await useAttendanceStore.getState().refreshAttendance();
     } catch (err) {
       setToast(err?.message || "Failed to submit punch correction.", "error");
     } finally {
@@ -480,6 +497,7 @@ export default function AttendanceOverview() {
                 <th>LAST PUNCH</th>
                 <th>WORKING HOURS</th>
                 <th>LATE</th>
+                <th>EARLY OUT</th>
                 <th>OVERTIME</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
@@ -496,7 +514,7 @@ export default function AttendanceOverview() {
                           {row.name}
                         </span>
                         <span style={{ fontSize: 11.5, color: "#6b7280" }}>
-                          {row.id} • {row.dept || "General"}
+                          {row.employeeCode || row.empId || (row.id && !String(row.id).includes("-") ? row.id : "—")} • {row.dept || "General"}
                         </span>
                       </div>
                     </div>
@@ -513,6 +531,22 @@ export default function AttendanceOverview() {
                   <td>
                     {row.lateMins > 0 ? (
                       <span className="att-late-pill">{row.lateMins} min late</span>
+                    ) : (
+                      <span style={{ color: "#94a3b8" }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    {row.earlyMins > 0 ? (
+                      <span
+                        className="att-late-pill"
+                        style={{
+                          background: "rgba(244, 63, 94, 0.1)",
+                          color: "#e11d48",
+                          border: "1px solid rgba(244, 63, 94, 0.2)",
+                        }}
+                      >
+                        {row.earlyMins} min early
+                      </span>
                     ) : (
                       <span style={{ color: "#94a3b8" }}>—</span>
                     )}
@@ -553,7 +587,7 @@ export default function AttendanceOverview() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                  <td colSpan={10} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
                     No attendance records found matching filters.
                   </td>
                 </tr>
@@ -822,10 +856,10 @@ export default function AttendanceOverview() {
         .att-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .att-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
         .att-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
-        .att-export-btn { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #d1d5db; border-radius: 10px; padding: 8px 16px; font-size: 13.5px; font-weight: 600; color: #374151; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-        .att-export-btn:hover { background: #f9fafb; }
-        .att-reg-btn { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .att-reg-btn:hover { background: #0f172a; }
+        .att-export-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .att-export-btn:hover { background: var(--card-hover); color: var(--text); }
+        .att-reg-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--primary); color: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(31,107,255,0.25); }
+        .att-reg-btn:hover { background: var(--primary-dark); }
 
         .att-stats-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; margin-bottom: 16px; }
         .att-stat-card { background: #fff; border: 1px solid #e8edf3; border-radius: 14px; padding: 14px 16px; box-shadow: 0 1px 2px rgba(16,24,40,0.03); }
@@ -858,8 +892,8 @@ export default function AttendanceOverview() {
         .att-filter-dropdown.active .att-filter-arrow { color: #2563eb; }
         .att-filter-native-select { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
-        .att-btn-outline { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: #475569; cursor: pointer; transition: all 0.15s ease; }
-        .att-btn-outline:hover { background: #f8fafc; color: #111827; }
+        .att-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .att-btn-outline:hover { background: var(--card-hover); color: var(--text); }
 
         .att-main-card { overflow: hidden; }
         .att-table { width: 100%; border-collapse: collapse; min-width: 800px; font-size: 13.5px; }
@@ -877,10 +911,12 @@ export default function AttendanceOverview() {
         .att-status { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 4px 13px; border: 1px solid; white-space: nowrap; }
         .att-late-pill { display: inline-block; font-size: 11.5px; font-weight: 600; color: #b45309; background: #fef3c7; border: 1px solid #fde68a; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
         .att-ot-pill { display: inline-block; font-size: 11.5px; font-weight: 600; color: #047857; background: #d1fae5; border: 1px solid #a7f3d0; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
-        .att-action-btn { border: 1px solid #e2e8f0; background: #fff; color: #475569; cursor: pointer; padding: 5px 7px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
-        .att-action-btn:hover { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
-        .att-dots-btn { border: none; background: transparent; color: #6b7280; cursor: pointer; padding: 4px; border-radius: 6px; display: grid; place-items: center; }
-        .att-dots-btn:hover { color: #111827; background: #f1f5f9; }
+        .att-action-btn { border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 6px; border-radius: var(--radius-lg, 12px); display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+        .att-action-btn:hover { color: var(--primary); background: var(--card-hover); }
+        .att-dots-btn { border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 6px; border-radius: var(--radius-lg, 12px); display: inline-flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
+        .att-dots-btn:hover { color: var(--primary); background: var(--card-hover); }
+        .att-mgmt-page .att-export-btn:hover, .att-mgmt-page .att-btn-outline:hover { background-color: var(--card-hover) !important; border-color: var(--border) !important; color: var(--text) !important; }
+        .att-mgmt-page .att-export-btn:active, .att-mgmt-page .att-btn-outline:active, .att-reg-btn:active { transform: scale(0.99); }
 
         @media (max-width: 1200px) {
           .att-stats-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

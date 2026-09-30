@@ -1,31 +1,27 @@
 const tones = {
-  blue: ['#eff6ff', '#dbeafe', '#dbeafe', '#3b82f6'],
-  emerald: ['#f0fdf4', '#d1fae5', '#d1fae5', '#059669'],
-  rose: ['#fff1f2', '#ffe4e6', '#ffe4e6', '#f43f5e'],
-  purple: ['#faf5ff', '#f3e8ff', '#f3e8ff', '#a855f7'],
-  amber: ['#fffbeb', '#fef3c7', '#fef3c7', '#d97706'],
-  sky: ['#f0f9ff', '#e0f2fe', '#e0f2fe', '#0284c7'],
-  teal: ['#f0fdfa', '#ccfbf1', '#ccfbf1', '#0d9488'],
-  orange: ['#fff7ed', '#ffedd5', '#ffedd5', '#ea580c'],
+  blue: { bg: 'rgba(31, 107, 255, 0.12)', fg: '#1f6bff' },
+  emerald: { bg: 'rgba(27, 184, 120, 0.12)', fg: '#1bb878' },
+  green: { bg: 'rgba(27, 184, 120, 0.12)', fg: '#1bb878' },
+  rose: { bg: 'rgba(255, 79, 143, 0.12)', fg: '#ff4f8f' },
+  pink: { bg: 'rgba(255, 79, 143, 0.12)', fg: '#ff4f8f' },
+  purple: { bg: 'rgba(155, 81, 224, 0.12)', fg: '#9b51e0' },
+  amber: { bg: 'rgba(239, 155, 6, 0.12)', fg: '#ef9b06' },
+  orange: { bg: 'rgba(239, 155, 6, 0.12)', fg: '#ef9b06' },
+  sky: { bg: 'rgba(31, 107, 255, 0.12)', fg: '#1f6bff' },
+  teal: { bg: 'rgba(12, 177, 172, 0.12)', fg: '#0cb1ac' },
 };
 
 export default function KpiCard({ label, value, icon: Icon, symbol, tone = 'blue', children }) {
-  const [background, borderColor, iconBackground, color] = tones[tone] || tones.blue;
+  const toneStyle = tones[tone] || tones.blue;
 
   return (
-    <article
-      className="flex min-w-0 items-center gap-3.5 rounded-2xl border px-3.5 py-3"
-      style={{ background, borderColor, minHeight: 74 }}
-    >
-      <span
-        className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-xl font-bold"
-        style={{ background: iconBackground, color }}
-      >
-        {Icon ? <Icon size={21} strokeWidth={2} aria-hidden="true" /> : symbol}
+    <article className="stat-card">
+      <span className="stat-badge" style={{ background: toneStyle.bg, color: toneStyle.fg }}>
+        {Icon ? <Icon size={20} strokeWidth={2} aria-hidden="true" /> : <span className="font-bold text-base">{symbol}</span>}
       </span>
-      <div className="min-w-0">
-        <span className="block text-[11px] font-medium leading-4 text-slate-500">{label}</span>
-        <strong className="block break-words text-[22px] font-bold leading-7 text-slate-900">{value}</strong>
+      <div className="stat-body">
+        <strong className="stat-num" title={String(value)}>{value}</strong>
+        <span className="stat-label" title={label}>{label}</span>
         {children}
       </div>
     </article>

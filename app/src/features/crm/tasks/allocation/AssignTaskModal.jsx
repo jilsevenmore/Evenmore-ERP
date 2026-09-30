@@ -2,21 +2,11 @@ import { useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { DEPARTMENTS, EMPLOYEES, PRIORITIES } from './taskAllocationStore';
 
-const EMPTY = {
-  title: '',
-  department: 'Any',
-  assignee: '',
-  priority: 'Medium',
-  deadline: '',
-  description: '',
-  fileName: '',
-};
-
 export default function AssignTaskModal({ isOpen, initial, onClose, onSubmit }) {
   const [form, setForm] = useState(() => ({
     title: initial?.title ?? '',
     department: initial?.department ?? 'Any',
-    assignee: initial?.assignee ?? '',
+    assigneeId: initial?.assigneeId ?? '',
     priority: initial?.priority ?? 'Medium',
     deadline: initial?.deadline ? toInputValue(initial.deadline) : '',
     description: initial?.description ?? '',
@@ -48,15 +38,15 @@ export default function AssignTaskModal({ isOpen, initial, onClose, onSubmit }) 
       setError('Task title is required.');
       return;
     }
-    if (!form.assignee) {
+    if (!form.assigneeId) {
       setError('Please select an employee.');
       return;
     }
     setError('');
     onSubmit({
       title: form.title.trim(),
-      department: form.department === 'Any' ? assigneeDept(form.assignee) : form.department,
-      assignee: form.assignee,
+      department: form.department === 'Any' ? assigneeDept(form.assigneeId) : form.department,
+      assigneeId: form.assigneeId,
       priority: form.priority,
       deadline: form.deadline ? new Date(form.deadline).toISOString() : null,
       description: form.description.trim(),
@@ -64,8 +54,8 @@ export default function AssignTaskModal({ isOpen, initial, onClose, onSubmit }) 
     });
   }
 
-  function assigneeDept(name) {
-    return EMPLOYEES.find((e) => e.name === name)?.department ?? 'Sales and Marketing';
+  function assigneeDept(id) {
+    return EMPLOYEES.find((e) => e.id === id)?.department || '';
   }
 
   return (
@@ -114,13 +104,13 @@ export default function AssignTaskModal({ isOpen, initial, onClose, onSubmit }) 
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1.5">Assign To<span className="text-rose-500">*</span></label>
               <select
-                value={form.assignee}
-                onChange={(e) => update('assignee', e.target.value)}
+                value={form.assigneeId}
+                onChange={(e) => update('assigneeId', e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500"
               >
                 <option value="">Select employee</option>
                 {assigneeOptions.map((e) => (
-                  <option key={e.name} value={e.name}>{e.name}</option>
+                  <option key={e.id} value={e.id}>{e.name}</option>
                 ))}
               </select>
             </div>

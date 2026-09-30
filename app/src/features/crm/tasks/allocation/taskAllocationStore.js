@@ -1,9 +1,17 @@
 import { useCrmStore } from '../../../../stores/crmStore';
-import { isServerId } from '../../../../services/resourceSync';
+import { useAppStore } from '../../../../stores/appStore';
 
-/** Who can be allocated work, and the departments they sit in — from the roster. */
+/**
+ * Who can be allocated work, and the departments they sit in — from the roster.
+ * The roster lists a person once per CRM role, so it is de-duplicated by id.
+ */
 export function loadEmployees() {
-  return useCrmStore.getState().teamMembers;
+  const seen = new Set();
+  return (useCrmStore.getState().teamMembers || []).filter((member) => {
+    if (!member?.id || seen.has(member.id)) return false;
+    seen.add(member.id);
+    return true;
+  });
 }
 
 export function loadDepartments() {
@@ -41,41 +49,35 @@ export const PRIORITIES = ['Low', 'Medium', 'High'];
 export const STATUSES = ['Pending', 'In Progress', 'Completed'];
 
 /** The allocations the CRM store is holding, from `/crm/task-allocations/`. */
-export function loadAllocationTasks() {
-  return useCrmStore.getState().taskAllocations;
+export function useAllocationTasks() {
+  return useCrmStore((s) => s.taskAllocations);
+}
+
+/** Whether the store has finished its first load (so "not found" means it). */
+export function useAllocationsLoaded() {
+  return useCrmStore((s) => s.status.loaded);
 }
 
 /**
- * Persist the allocation list a screen just produced. Rows the server has not
- * seen are created, rows that changed are patched, rows that went are deleted.
+ * Managers allocate, edit, reassign and delete; everyone else sees the work
+ * allocated to them and moves its status along. Mirrors the API's rule.
  */
-export function saveAllocationTasks(tasks) {
-  const store = useCrmStore.getState();
-  const previous = store.taskAllocations;
-  const before = new Map(previous.map((t) => [String(t.id), t]));
-  const after = new Set((tasks || []).map((t) => String(t.id)));
-
-  (tasks || []).forEach((task) => {
-    if (!task) return;
-    const existing = before.get(String(task.id));
-    if (!existing) {
-      store.createRecord('taskAllocations', task).catch(reportFailure);
-    } else if (isServerId(task.id) && JSON.stringify(existing) !== JSON.stringify(task)) {
-      store.updateRecord('taskAllocations', task.id, task).catch(reportFailure);
-    }
-  });
-
-  previous.forEach((task) => {
-    if (!after.has(String(task.id)) && isServerId(task.id)) {
-      store.deleteRecord('taskAllocations', task.id).catch(reportFailure);
-    }
-  });
-
-  window.dispatchEvent(new Event('crm:data-updated'));
+export function useCanManageAllocations() {
+  const permissions = useAppStore((s) => s.permissions) || [];
+  return ['manage_task_allocation', 'assign_task', '*'].some((code) => permissions.includes(code));
 }
 
-function reportFailure(err) {
-  console.warn('[CRM] allocation not saved:', err?.message || err);
+export function createAllocation(allocation) {
+  return useCrmStore.getState().createRecord('taskAllocations', allocation);
+}
+
+/** A partial update: send only what changed, plus an optional audit `note`. */
+export function updateAllocation(id, updates) {
+  return useCrmStore.getState().updateRecord('taskAllocations', id, updates);
+}
+
+export function deleteAllocation(id) {
+  return useCrmStore.getState().deleteRecord('taskAllocations', id);
 }
 
 export function formatDeadline(value) {

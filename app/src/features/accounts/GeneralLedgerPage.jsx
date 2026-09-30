@@ -135,28 +135,28 @@ export const GeneralLedgerPage = () => {
           </Button>}/>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
+        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-slate-500 font-semibold uppercase">Total Debits (Dr)</span>
-            <p className="text-lg font-bold text-blue-900 mt-1">
+            <span className="text-xs text-muted font-semibold uppercase">Total Debits (Dr)</span>
+            <p className="text-lg font-bold font-mono text-text mt-1">
               {formatCurrency(totalDebits)}
             </p>
           </div>
           <ArrowDownLeft className="text-blue-600" size={24}/>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
+        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-slate-500 font-semibold uppercase">Total Credits (Cr)</span>
-            <p className="text-lg font-bold text-emerald-900 mt-1">
+            <span className="text-xs text-muted font-semibold uppercase">Total Credits (Cr)</span>
+            <p className="text-lg font-bold font-mono text-emerald-600 mt-1">
               {formatCurrency(totalCredits)}
             </p>
           </div>
           <ArrowUpRight className="text-emerald-600" size={24}/>
         </div>
-        <div className="bg-white p-4 rounded-lg border border-[#CED4DA] flex items-center justify-between">
+        <div className="bg-card p-4 rounded-xl border border-border flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-xs text-slate-500 font-semibold uppercase">Trial Balance Net</span>
-            <p className="text-lg font-bold text-slate-800 mt-1">{formatCurrency(0)} (Balanced)</p>
+            <span className="text-xs text-muted font-semibold uppercase">Trial Balance Net</span>
+            <p className="text-lg font-bold font-mono text-text mt-1">{formatCurrency(0)} (Balanced)</p>
           </div>
           <Scale className="text-emerald-600" size={24}/>
         </div>
@@ -167,25 +167,25 @@ export const GeneralLedgerPage = () => {
             text(e.debitAccount).includes(term) ||
             text(e.creditAccount).includes(term)}/>
 
-      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-2 sm:p-4">
-          <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
-            <h3 className="font-bold text-base text-[#1F2E4A] mb-1">
+      {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-md w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
+            <h3 className="font-bold text-base text-text mb-1">
               Create Journal Voucher Entry
             </h3>
-            <p className="text-xs text-slate-500 mb-4">
+            <p className="text-xs text-muted mb-4">
               Enter balanced debit and credit accounts for general ledger posting.
             </p>
 
             <form onSubmit={handleCreate} className="space-y-3 text-xs">
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Narration / Description</label>
-                <input required value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]" placeholder="e.g. Accrued utility adjustment for Q3"/>
+                <label className="block font-semibold text-text-secondary mb-1">Narration / Description</label>
+                <input required value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition" placeholder="e.g. Accrued utility adjustment for Q3"/>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Debit Account (Dr)</label>
-                  <select value={debitAccount} onChange={(e) => setDebitAccount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]">
+                  <label className="block font-semibold text-text-secondary mb-1">Debit Account (Dr)</label>
+                  <select value={debitAccount} onChange={(e) => setDebitAccount(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
                     <option value="1010 - Cash & Bank">1010 - Cash & Bank</option>
                     <option value="1200 - Accounts Receivable">1200 - Accounts Receivable</option>
                     <option value="1300 - Inventory Asset">1300 - Inventory Asset</option>
@@ -194,8 +194,8 @@ export const GeneralLedgerPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Credit Account (Cr)</label>
-                  <select value={creditAccount} onChange={(e) => setCreditAccount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA]">
+                  <label className="block font-semibold text-text-secondary mb-1">Credit Account (Cr)</label>
+                  <select value={creditAccount} onChange={(e) => setCreditAccount(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
                     <option value="4010 - Sales Revenue">4010 - Sales Revenue</option>
                     <option value="2010 - Accounts Payable">2010 - Accounts Payable</option>
                     <option value="1010 - Cash & Bank">1010 - Cash & Bank</option>
@@ -206,20 +206,20 @@ export const GeneralLedgerPage = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Amount ($)</label>
-                  <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono" placeholder="2500"/>
+                  <label className="block font-semibold text-text-secondary mb-1">Amount ($)</label>
+                  <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text font-mono text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition" placeholder="2500"/>
                 </div>
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Reference Doc #</label>
-                  <input value={reference} onChange={(e) => setReference(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono" placeholder="MEMO-991"/>
+                  <label className="block font-semibold text-text-secondary mb-1">Reference Doc #</label>
+                  <input value={reference} onChange={(e) => setReference(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text font-mono text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition" placeholder="MEMO-991"/>
                 </div>
               </div>
 
-              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-4 border-t border-slate-200">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-3.5 py-1.5 border border-[#CED4DA] rounded text-slate-600 hover:bg-slate-100">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-4 border-t border-border">
+                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 border border-border rounded-xl text-text hover:bg-card-hover font-semibold text-xs cursor-pointer transition">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded font-semibold">
+                <button type="submit" className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs cursor-pointer transition">
                   Post to General Ledger
                 </button>
               </div>

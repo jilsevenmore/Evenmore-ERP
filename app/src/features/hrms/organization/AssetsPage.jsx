@@ -491,7 +491,7 @@ export function AssetsPage() {
             <button
               type="button"
               onClick={handleOpenAdd}
-              className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs flex items-center gap-2 cursor-pointer"
+              className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition flex items-center gap-2 cursor-pointer"
             >
               <Plus size={16} />
               Register Asset
@@ -500,7 +500,7 @@ export function AssetsPage() {
             <button
               type="button"
               onClick={handleOpenAddReq}
-              className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs flex items-center gap-2 cursor-pointer"
+              className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition flex items-center gap-2 cursor-pointer"
             >
               <Plus size={16} />
               New Asset Request
@@ -807,7 +807,7 @@ export function AssetsPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenReturn(r)}
-                            className="px-2.5 py-1 rounded-lg text-[11.5px] font-semibold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1"
+                            className="h-8 px-3 rounded-xl text-xs font-semibold border bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer flex items-center gap-1"
                             title="Return asset to inventory"
                           >
                             <RotateCcw size={13} />
@@ -817,7 +817,7 @@ export function AssetsPage() {
                           <button
                             type="button"
                             onClick={() => handleOpenAssign(r)}
-                            className="px-2.5 py-1 rounded-lg text-[11.5px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1"
+                            className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                             title="Assign asset to employee"
                           >
                             <UserCheck size={13} />
@@ -829,7 +829,7 @@ export function AssetsPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenDetails(r)}
-                          className="w-7 h-7 rounded-lg border border-bdr hover:bg-off grid place-items-center text-muted hover:text-slate-900 transition-colors cursor-pointer"
+                          className="w-7 h-7 rounded-xl border border-bdr hover:bg-off grid place-items-center text-muted hover:text-slate-900 transition-colors cursor-pointer"
                           title="View Specifications & History"
                         >
                           <Eye size={14} />
@@ -839,7 +839,7 @@ export function AssetsPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(r)}
-                          className="w-7 h-7 rounded-lg border border-bdr hover:bg-off grid place-items-center text-muted hover:text-slate-900 transition-colors cursor-pointer"
+                          className="w-7 h-7 rounded-xl border border-bdr hover:bg-off grid place-items-center text-muted hover:text-slate-900 transition-colors cursor-pointer"
                           title="Edit Details"
                         >
                           <Edit2 size={14} />
@@ -849,7 +849,7 @@ export function AssetsPage() {
                         <button
                           type="button"
                           onClick={() => handleOpenDelete(r)}
-                          className="w-7 h-7 rounded-lg border border-bdr hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
+                          className="w-7 h-7 rounded-xl border border-bdr hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
                           title="Decommission / Delete"
                         >
                           <Trash2 size={14} />
@@ -1104,7 +1104,7 @@ export function AssetsPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleApproveRequest(req)}
-                                  className="px-2.5 py-1 rounded-lg text-[11.5px] font-semibold border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer flex items-center gap-1"
+                                  className="h-8 px-3 rounded-xl text-xs font-semibold border bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer flex items-center gap-1"
                                   title="Approve Requisition"
                                 >
                                   <Check size={13} />
@@ -1113,7 +1113,7 @@ export function AssetsPage() {
                                 <button
                                   type="button"
                                   onClick={() => handleRejectRequest(req)}
-                                  className="px-2.5 py-1 rounded-lg text-[11.5px] font-semibold border bg-red-50 text-red-700 border-red-200 hover:bg-red-100 transition-colors cursor-pointer flex items-center gap-1"
+                                  className="btn-danger h-8 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                                   title="Reject Requisition"
                                 >
                                   <X size={13} />
@@ -1127,7 +1127,7 @@ export function AssetsPage() {
                               <button
                                 type="button"
                                 onClick={() => handleOpenFulfill(req)}
-                                className="px-2.5 py-1 rounded-lg text-[11.5px] font-semibold border bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer flex items-center gap-1"
+                                className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1"
                                 title="Allocate and fulfill request from stock inventory"
                               >
                                 <UserCheck size={13} />
@@ -1139,7 +1139,7 @@ export function AssetsPage() {
                             <button
                               type="button"
                               onClick={() => handleDeleteRequest(req)}
-                              className="w-7 h-7 rounded-lg border border-bdr hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
+                              className="w-7 h-7 rounded-xl border border-bdr hover:bg-red-50 text-muted hover:text-red-600 grid place-items-center transition-colors cursor-pointer"
                               title="Delete Requisition Log"
                             >
                               <Trash2 size={13} />
@@ -1544,7 +1544,7 @@ export function AssetsPage() {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-emerald-600 text-white rounded-xl text-[13px] font-medium hover:bg-emerald-700 cursor-pointer shadow-xs flex items-center gap-1.5"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer shadow-xs flex items-center gap-1.5"
             >
               <UserCheck size={15} />
               Confirm Assignment
@@ -1756,7 +1756,7 @@ export function AssetsPage() {
             <button
               type="button"
               onClick={handleConfirmDelete}
-              className="px-5 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[13px] font-medium cursor-pointer shadow-xs"
+              className="btn-danger h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer shadow-xs"
             >
               Delete Asset
             </button>
@@ -1982,7 +1982,7 @@ export function AssetsPage() {
             <button
               type="submit"
               disabled={availableAssets.length === 0 || !fulfillAssetId}
-              className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-xl text-[13px] font-medium cursor-pointer shadow-xs flex items-center gap-1.5"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer shadow-xs flex items-center gap-1.5"
             >
               <CheckCircle2 size={14} />
               Confirm Allocation

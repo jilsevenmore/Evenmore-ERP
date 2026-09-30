@@ -248,7 +248,7 @@ export function MessageComposer({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={disabled || files.length >= MAX_FILES}
-          className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border border-[#dce5f4] text-slate-600 hover:text-blue-700 hover:border-blue-300 hover:bg-blue-50 disabled:opacity-35 disabled:cursor-not-allowed"
+          className="btn-outline inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <Paperclip size={12} /> Attach
         </button>

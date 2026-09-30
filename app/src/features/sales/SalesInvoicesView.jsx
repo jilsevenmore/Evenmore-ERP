@@ -1424,7 +1424,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                     </button>
                                 )}
 
-                                <button onClick={() => setSelectedInvoice(null)} className="px-4 py-1.5 border border-slate-300 hover:bg-slate-100 text-slate-700 rounded-lg font-semibold text-xs cursor-pointer">
+                                <button onClick={() => setSelectedInvoice(null)} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
                                     Close
                                 </button>
                             </div>
@@ -1459,7 +1459,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             <button
                                 type="button"
                                 onClick={handleConfirmFinalize}
-                                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+                                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer"
                             >
                                 Finalize Invoice
                             </button>
@@ -1504,7 +1504,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 <button
                                     type="button"
                                     onClick={handleConfirmCancelInvoice}
-                                    className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-sm cursor-pointer"
+                                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer"
                                 >
                                     Cancel Invoice & Reverse
                                 </button>
@@ -1578,10 +1578,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                             </div>
 
                             <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
-                                <button type="button" onClick={() => setShowPaymentModal(null)} className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded hover:bg-slate-100 font-medium cursor-pointer">
+                                <button type="button" onClick={() => setShowPaymentModal(null)} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">
                                     Cancel
                                 </button>
-                                <button type="submit" className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-bold shadow-sm cursor-pointer">
+                                <button type="submit" className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer">
                                     Post Payment & Settle Invoice
                                 </button>
                             </div>
@@ -1777,7 +1777,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 <button
                                     type="submit"
                                     disabled={allocSubmitting || (allocModalFormal + allocModalCash > allocModalTotal + 0.01) || allocModalFormal <= 0}
-                                    className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-bold shadow-sm cursor-pointer flex items-center gap-1.5"
+                                    className="px-4 py-2 bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer flex items-center gap-1.5"
                                 >
                                     {allocSubmitting ? (
                                         <>Updating Split...</>

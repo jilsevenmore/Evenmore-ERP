@@ -80,7 +80,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
               Manage RMA and replacement lifecycle
             </p>
           </div>
-          <button onClick={() => setIsReportModalOpen(true)} className="bg-[#1F2E4A] hover:bg-[#152036] text-white px-4 py-2 rounded-md font-medium text-sm flex items-center gap-2 shadow-sm transition-all active:scale-[0.99] cursor-pointer">
+          <button onClick={() => setIsReportModalOpen(true)} className="bg-primary hover:bg-primary-dark text-white px-3.5 py-2 rounded-xl font-semibold text-xs flex items-center gap-2 shadow-2xs transition-all active:scale-[0.99] cursor-pointer">
             <Plus className="w-4 h-4"/>
             Report Faulty
           </button>
@@ -206,7 +206,7 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                     Ship to Vendor
                   </div>
                   {selectedPart.status === 'Reported' ? (<div className="mt-2.5">
-                      <button onClick={() => handleMarkAsShipped(selectedPart.id)} className="bg-[#1F2E4A] hover:bg-[#152036] text-white px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-1.5 shadow-2xs">
+                      <button onClick={() => handleMarkAsShipped(selectedPart.id)} className="bg-primary hover:bg-primary-dark text-white px-3 py-1.5 rounded-xl text-xs font-semibold transition-all active:scale-[0.99] flex items-center gap-1.5 shadow-2xs cursor-pointer">
                         <Truck className="w-3.5 h-3.5"/>
                         Mark as Shipped
                       </button>
@@ -342,13 +342,13 @@ export const FaultyPartsView = ({ parts, onAddPart, onUpdatePartStatus, onUpdate
                 <button
                   type="button"
                   onClick={() => setIsEditNotesModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl transition cursor-pointer"
+                  className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-xs font-bold text-white bg-[#1F2E4A] hover:bg-[#152033] rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-sm"
+                  className="px-4 py-2 text-xs font-semibold text-white bg-primary hover:bg-primary-dark rounded-xl transition cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-[0.99]"
                 >
                   <Save size={14} />
                   Save Diagnostics

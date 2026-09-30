@@ -30,9 +30,15 @@ export function saveForms(next = [], kind = LEAD_FORM) {
   syncCollection('forms', [...others, ...stamped], previous);
 }
 
-/** One form by id, across both kinds. */
+/**
+ * One form by id, across both kinds. A builder opened on the id minted before
+ * the server answered still finds the form: that id is kept as `clientId`.
+ */
 export function findForm(formId) {
-  return useCrmStore.getState().forms.find((form) => String(form.id) === String(formId)) || null;
+  const key = String(formId);
+  return useCrmStore.getState().forms.find(
+    (form) => String(form.id) === key || (form.clientId != null && String(form.clientId) === key),
+  ) || null;
 }
 
 /** Which form the builder has open — a per-tab editing position. */

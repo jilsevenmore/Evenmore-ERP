@@ -73,7 +73,7 @@ export default function CustomQuestions() {
       sortable: true,
       render: (r) => (
         <div className="flex items-start gap-2.5 max-w-[420px]">
-          <div className="p-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 mt-0.5 shrink-0">
+          <div className="p-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 mt-0.5 shrink-0">
             <FileQuestion size={14} />
           </div>
           <div>
@@ -140,7 +140,7 @@ export default function CustomQuestions() {
         <div className="flex items-center gap-1">
           <button
             onClick={() => setViewRow(r)}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
             title="View details"
           >
             <Eye size={13} />
@@ -150,14 +150,14 @@ export default function CustomQuestions() {
               setForm({ text: r.text, type: r.type, enabled: r.enabled });
               setEditRow(r);
             }}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
             title="Edit question"
           >
             <Pencil size={13} />
           </button>
           <button
             onClick={() => setDeleteRow(r)}
-            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
+            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition"
             title="Delete question"
           >
             <Trash2 size={13} />
@@ -230,7 +230,7 @@ export default function CustomQuestions() {
             <button
               type="button"
               onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
             >
               <HelpCircle size={14} />
               <span>Guide</span>

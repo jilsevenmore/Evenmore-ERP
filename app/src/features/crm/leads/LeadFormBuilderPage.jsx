@@ -1,14 +1,26 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import LeadFormBuilder from './LeadFormBuilder';
-import { createFieldFromType, defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
+import { createFieldFromType, withStandardLeadFields } from '../../../data/crm/leadFormSchema';
 import { useCrmStore } from '../../../stores/crmStore';
 import { loadForms, saveForms, findForm, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
 export default function LeadFormBuilderPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const formId = searchParams.get('formId') || getActiveFormId() || null;
+
+  const returnTo = location.state?.returnTo || null;
+  const draftData = useMemo(() => {
+    if (location.state?.draftData) return location.state.draftData;
+    try {
+      const saved = sessionStorage.getItem('crm_lead_create_draft');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  }, [location.state]);
 
   // The form being edited, from `/crm/forms/`.
   const storeForms = useCrmStore((s) => s.forms);
@@ -17,13 +29,15 @@ export default function LeadFormBuilderPage() {
     [formId, storeForms],
   );
 
+  // The standard lead fields are always on the Create Lead form, so they are
+  // always in the layout — even for a form created with an empty section.
   const [leadFormSections, setLeadFormSections] = useState(
-    () => currentForm?.sections || defaultLeadFormSections,
+    () => withStandardLeadFields(currentForm?.sections),
   );
 
   // A form loaded after the first render replaces the blank starting point.
   useEffect(() => {
-    if (currentForm?.sections) setLeadFormSections(currentForm.sections);
+    if (currentForm?.sections) setLeadFormSections(withStandardLeadFields(currentForm.sections));
   }, [currentForm]);
 
   const [selectedBuilderFieldId, setSelectedBuilderFieldId] = useState(() => {
@@ -62,6 +76,7 @@ export default function LeadFormBuilderPage() {
 
   function removeLeadFormField(fieldId) {
     const allFields = leadFormSections.flatMap((s) => s.fields);
+    if (allFields.find((f) => f.id === fieldId)?.locked) return;
     const filtered = allFields.filter((f) => f.id !== fieldId);
     setLeadFormSections((current) =>
       current.map((section) => ({
@@ -106,6 +121,9 @@ export default function LeadFormBuilderPage() {
   }
 
   function removeLeadFormSection(sectionId) {
+    const target = leadFormSections.find((section) => section.id === sectionId);
+    // A section holding standard fields stays: those fields are always on the form.
+    if (target?.fields?.some((field) => field.locked)) return;
     const remaining = leadFormSections.filter((section) => section.id !== sectionId);
     if (remaining.length === 0) return;
     setLeadFormSections(remaining);
@@ -127,6 +145,8 @@ export default function LeadFormBuilderPage() {
       const clonedFields = (targetSec.fields || []).map((f, i) => ({
         ...f,
         id: `field-${Date.now()}-${i}`,
+        // A copy is an ordinary custom field, not the standard one it came from.
+        locked: false,
       }));
       const newSec = {
         ...targetSec,
@@ -146,7 +166,7 @@ export default function LeadFormBuilderPage() {
   function openLeadCreateForm() {
     // Save first, so the capture page renders what is on screen here.
     persistSections();
-    navigate('/crm/leads/create-form');
+    navigate('/crm/leads/create-form', { state: { draftData } });
   }
 
   function persistSections() {
@@ -158,12 +178,25 @@ export default function LeadFormBuilderPage() {
     saveForms(updated, LEAD_FORM);
   }
 
+  function handleReturnToForm() {
+    persistSections();
+    if (returnTo) {
+      navigate(returnTo);
+    } else {
+      navigate('/crm/leads?openCreate=true');
+    }
+  }
+
   function saveLeadForm() {
     persistSections();
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
-      navigate('/crm/leads/forms');
+      if (returnTo) {
+        navigate(returnTo);
+      } else {
+        navigate('/crm/leads/forms');
+      }
     }, 600);
   }
 
@@ -185,6 +218,8 @@ export default function LeadFormBuilderPage() {
       onSaveAndOpen={saveLeadForm}
       saveSuccess={saveSuccess}
       formTitle={currentForm?.name}
+      draftData={draftData}
+      onReturnToForm={handleReturnToForm}
     />
   );
 }

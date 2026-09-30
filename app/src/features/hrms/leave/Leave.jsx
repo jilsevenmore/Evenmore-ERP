@@ -363,7 +363,7 @@ export default function Leave() {
           <button
             type="button"
             onClick={() => setCompOffModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 h-9 bg-card border border-border text-text rounded-xl text-xs font-semibold shadow-2xs hover:bg-card-hover transition-colors cursor-pointer"
           >
             <Clock size={15} className="text-amber-600" />
             Claim Comp-Off
@@ -371,7 +371,7 @@ export default function Leave() {
           <button
             type="button"
             onClick={() => setEncashModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-[13px] font-medium shadow-2xs hover:bg-emerald-100 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 h-9 bg-card border border-border text-text rounded-xl text-xs font-semibold shadow-2xs hover:bg-card-hover transition-colors cursor-pointer"
           >
             <Coins size={15} className="text-emerald-700" />
             Encash Leave
@@ -379,7 +379,7 @@ export default function Leave() {
           <button
             type="button"
             onClick={() => setApplyModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4.5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium shadow-xs hover:bg-navy/90 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition-colors cursor-pointer"
           >
             <Plus size={16} />
             Apply Leave
@@ -606,7 +606,7 @@ export default function Leave() {
             <button
               type="button"
               onClick={submitLeave}
-              className="w-full py-2.5 bg-navy hover:bg-navy/90 text-white rounded-xl text-[13.5px] font-semibold transition-colors cursor-pointer shadow-xs"
+              className="w-full h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs active:scale-[0.99] transition-colors cursor-pointer"
             >
               Submit Application
             </button>
@@ -633,7 +633,7 @@ export default function Leave() {
                   key={st}
                   type="button"
                   onClick={() => setStatusFilter(st)}
-                  className={`px-2.5 py-1 text-[11.5px] font-semibold rounded-lg transition cursor-pointer shrink-0 lg:shrink whitespace-nowrap ${
+                  className={`px-2.5 py-1 text-[11.5px] font-semibold rounded-xl transition cursor-pointer shrink-0 lg:shrink whitespace-nowrap ${
                     statusFilter === st ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
@@ -742,7 +742,7 @@ export default function Leave() {
                           onChange={(e) =>
                             setDelegateSelect({ ...delegateSelect, [l.id]: e.target.value })
                           }
-                          className="h-7.5 px-2 bg-white border border-bdr rounded-lg text-[12px] font-medium text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
+                          className="h-7.5 px-2 bg-white border border-bdr rounded-xl text-[12px] font-medium text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
                         >
                           {employees.slice(0, 6).map((emp) => (
                             <option key={emp.id} value={emp.name}>
@@ -773,7 +773,7 @@ export default function Leave() {
                       <button
                         type="button"
                         onClick={() => handleOpenReject(l)}
-                        className="px-3.5 py-1.5 border border-rose-200 hover:bg-rose-50 text-rose-700 rounded-xl text-[12.5px] font-medium transition cursor-pointer"
+                        className="btn-danger h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
                       >
                         Reject
                       </button>
@@ -949,7 +949,7 @@ export default function Leave() {
                       <button
                         type="button"
                         onClick={() => setDetailModalLeave(r)}
-                        className="px-3 py-1 bg-white border border-bdr rounded-lg text-[12px] font-medium text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
+                        className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer shadow-xs"
                       >
                         View Details
                       </button>
@@ -1028,7 +1028,7 @@ export default function Leave() {
                               rejectCompOff(c.id, "Insufficient overtime proof");
                               showToast(`Comp-off claim ${c.id} rejected.`);
                             }}
-                            className="px-2.5 py-1 text-[11.5px] font-medium text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                            className="btn-danger h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer"
                           >
                             Reject
                           </button>
@@ -1038,7 +1038,7 @@ export default function Leave() {
                               approveCompOff(c.id);
                               showToast(`Comp-off claim approved: ${c.creditDays} day credited to ${c.employee}.`);
                             }}
-                            className="px-3 py-1 text-[11.5px] font-semibold text-white bg-navy rounded-lg hover:bg-navy/90 transition shadow-2xs cursor-pointer flex items-center gap-1"
+                            className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer flex items-center gap-1"
                           >
                             <Check size={12} /> Approve
                           </button>
@@ -1125,7 +1125,7 @@ export default function Leave() {
                               rejectEncashment(e.id, "Exceeds annual encashment quota");
                               showToast(`Encashment ${e.id} rejected.`);
                             }}
-                            className="px-2.5 py-1 text-[11.5px] font-medium text-rose-700 border border-rose-200 rounded-lg hover:bg-rose-50 transition cursor-pointer"
+                            className="btn-danger h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer"
                           >
                             Reject
                           </button>
@@ -1135,7 +1135,7 @@ export default function Leave() {
                               approveEncashment(e.id);
                               showToast(`Approved! Added ₹${(e.amount || e.days * 2083).toLocaleString()} to Payroll additional earnings.`);
                             }}
-                            className="px-3 py-1 text-[11.5px] font-semibold text-white bg-navy rounded-lg hover:bg-navy/90 transition shadow-2xs cursor-pointer flex items-center gap-1"
+                            className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition shadow-2xs cursor-pointer flex items-center gap-1"
                           >
                             <Coins size={12} /> Approve Payout
                           </button>

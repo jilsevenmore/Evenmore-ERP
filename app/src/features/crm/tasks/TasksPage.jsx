@@ -312,7 +312,7 @@ export default function TasksPage() {
             type="button"
             onClick={() => toggleComplete(row)}
             title={row.status === 'Completed' ? 'Reopen task' : 'Complete task'}
-            className={`p-1.5 rounded-lg border transition ${
+            className={`p-1.5 rounded-xl border transition ${
               row.status === 'Completed'
                 ? 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
                 : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50 hover:text-emerald-600'
@@ -324,7 +324,7 @@ export default function TasksPage() {
             type="button"
             onClick={() => openEditModal(row)}
             title="Edit / Reassign Task"
-            className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition"
+            className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition"
           >
             <Pencil size={15} />
           </button>
@@ -382,19 +382,10 @@ export default function TasksPage() {
               <button
                 key={status}
                 type="button"
-                className={`tab-btn ${activeStatus === status ? 'active' : ''}`}
+                className={`tab-btn h-9 px-3.5 rounded-xl text-xs font-semibold cursor-pointer transition ${
+                  activeStatus === status ? 'btn-primary' : 'btn-outline'
+                }`}
                 onClick={() => setActiveStatus(status)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  border: '1px solid',
-                  borderColor: activeStatus === status ? '#1f6bff' : '#e2e8f0',
-                  background: activeStatus === status ? '#f0f6ff' : '#ffffff',
-                  color: activeStatus === status ? '#1f6bff' : '#64748b',
-                  cursor: 'pointer',
-                }}
               >
                 {status}
               </button>
@@ -544,13 +535,13 @@ export default function TasksPage() {
                 <button
                   type="button"
                   onClick={closeEditModal}
-                  className="px-3.5 py-1.5 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold"
+                  className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold shadow-xs"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs"
                 >
                   Save Changes
                 </button>

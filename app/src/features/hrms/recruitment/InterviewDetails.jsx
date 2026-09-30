@@ -86,7 +86,7 @@ export default function InterviewDetails() {
       <button
         type="button"
         onClick={() => navigate("/hrms/recruitment/interviews")}
-        className="inline-flex items-center gap-1.5 text-[12.5px] font-medium text-slate-500 hover:text-navy dark:hover:text-white transition w-fit cursor-pointer group"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-navy dark:hover:text-white transition w-fit cursor-pointer group"
       >
         <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
         <span>Back to Interview Schedules</span>
@@ -166,7 +166,7 @@ export default function InterviewDetails() {
               <Button
                 size="sm"
                 onClick={() => window.open(it.meetingLink, "_blank")}
-                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex items-center gap-1.5 btn-primary"
               >
                 <Video size={14} />
                 <span>Join Meeting</span>
@@ -394,7 +394,7 @@ export default function InterviewDetails() {
 
             <button
               onClick={() => navigate(`/hrms/recruitment/candidates/${it.candidateId}`)}
-              className="mt-4 w-full py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-[12px] font-semibold rounded-xl transition cursor-pointer"
+              className="mt-4 w-full h-9 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl transition cursor-pointer"
             >
               Open Candidate Dossier →
             </button>
@@ -457,7 +457,7 @@ export default function InterviewDetails() {
               max="100"
               value={evalForm.score}
               onChange={(e) => setEvalForm({ ...evalForm, score: e.target.value })}
-              className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-[13px]"
+              className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs"
             />
           </label>
 
@@ -469,7 +469,7 @@ export default function InterviewDetails() {
               rows={4}
               value={evalForm.feedback}
               onChange={(e) => setEvalForm({ ...evalForm, feedback: e.target.value })}
-              className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-[13px] resize-none"
+              className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-xs resize-none"
               placeholder="Detail candidate performance across coding, system design, and communication..."
             />
           </label>

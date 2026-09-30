@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  ArrowLeft,
   AtSign,
   CalendarDays,
   Check,
@@ -61,6 +62,58 @@ function readDragPayload(event) {
   }
 }
 
+function resolveFieldDraftValue(field, draftData) {
+  if (!draftData || typeof draftData !== 'object') return null;
+  const fid = String(field.id || '').toLowerCase().trim();
+  const flabel = String(field.label || '').toLowerCase().trim();
+
+  // Custom values map check
+  if (draftData.customValues && draftData.customValues[field.id] !== undefined) {
+    const cv = draftData.customValues[field.id];
+    if (cv !== null && cv !== undefined && cv !== '') return String(cv);
+  }
+
+  // Name
+  if (fid === 'lead-name' || flabel === 'lead name') return draftData.leadName;
+  // Company
+  if (fid === 'company' || flabel === 'company') return draftData.company;
+  // Email
+  if (fid === 'email' || flabel === 'email') return draftData.email;
+  // Phone
+  if (fid === 'phone' || flabel === 'phone') return draftData.phone;
+  // Source
+  if (fid === 'lead-source' || flabel === 'lead source') return draftData.source || draftData.sourceId;
+  // Title
+  if (fid === 'title' || flabel === 'title') return draftData.titleValue || draftData.title;
+  // Industry
+  if (fid === 'industry' || flabel === 'industry') return draftData.industry;
+  // Owner
+  if (fid === 'lead-owner' || flabel === 'lead owner') return draftData.owner || draftData.ownerId;
+  // Created on
+  if (fid === 'created-on' || flabel === 'created on') return draftData.createdOn;
+  // Photo
+  if (fid === 'lead-photo' || flabel === 'lead photo' || field.type === 'Lead Image') return draftData.photoPreview;
+  // Products
+  if (fid.includes('product') || flabel.includes('product')) {
+    if (Array.isArray(draftData.products) && draftData.products.length > 0) {
+      return draftData.products.join(', ');
+    }
+    return draftData.products;
+  }
+  // Users
+  if (fid.includes('user') || flabel.includes('user')) {
+    if (Array.isArray(draftData.leadUsers) && draftData.leadUsers.length > 0) {
+      return draftData.leadUsers.join(', ');
+    }
+    return draftData.leadUsers;
+  }
+  // Task date / time
+  if (fid.includes('task-date') || flabel.includes('task date')) return draftData.taskDate;
+  if (fid.includes('task-time') || flabel.includes('task time')) return draftData.taskTime;
+
+  return null;
+}
+
 function FieldPreview({
   field,
   sectionId,
@@ -70,12 +123,16 @@ function FieldPreview({
   onRemove,
   onDropField,
   onDragStart,
+  draftData,
 }) {
   const Icon = FIELD_ICONS[field.type] ?? Type;
   const isTextArea = field.type === "Multi Line";
   const isDropdown = field.type === "Dropdown";
   const isLeadImage = field.type === "Lead Image";
   const [previewValue, setPreviewValue] = useState("");
+  const draftVal = resolveFieldDraftValue(field, draftData);
+  const hasDraftVal = draftVal !== null && draftVal !== undefined && String(draftVal).trim() !== '';
+
   const previewOptions =
     Array.isArray(field.options) && field.options.length > 0
       ? field.options
@@ -169,16 +226,23 @@ function FieldPreview({
                 <div className="w-3.5 h-3.5 bg-white rounded-full shadow-xs" />
               </div>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-slate-100/80 border border-slate-200/80 flex items-center justify-center text-slate-400 mt-2.5">
-              <ImagePlus size={24} strokeWidth={1.5} />
-            </div>
+            {hasDraftVal ? (
+              <div className="w-16 h-16 rounded-xl border border-slate-200 overflow-hidden mt-2.5 shadow-2xs bg-slate-50">
+                <img src={draftVal} alt="Lead preview" className="w-full h-full object-cover" />
+              </div>
+            ) : (
+              <div className="w-14 h-14 rounded-xl bg-slate-100/80 border border-slate-200/80 flex items-center justify-center text-slate-400 mt-2.5">
+                <ImagePlus size={24} strokeWidth={1.5} />
+              </div>
+            )}
           </div>
         ) : isTextArea ? (
           <textarea
             rows={2}
+            value={hasDraftVal ? draftVal : ''}
             placeholder={field.placeholder}
             readOnly
-            className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-400 resize-none pointer-events-none focus:outline-none"
+            className={`w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs ${hasDraftVal ? 'text-slate-800 font-medium' : 'text-slate-400'} resize-none pointer-events-none focus:outline-none`}
           />
         ) : isDropdown ? (
           <div
@@ -190,12 +254,15 @@ function FieldPreview({
             onMouseDown={(event) => event.stopPropagation()}
           >
             <select
-              value={previewValue}
+              value={hasDraftVal ? draftVal : previewValue}
               onChange={(event) => setPreviewValue(event.target.value)}
               onClick={(event) => event.stopPropagation()}
               onFocus={() => onSelect()}
-              className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-700 appearance-none pr-8 cursor-pointer focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 text-xs text-slate-800 font-medium appearance-none pr-8 cursor-pointer focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
             >
+              {hasDraftVal && !previewOptions.includes(draftVal) && (
+                <option value={draftVal}>{draftVal}</option>
+              )}
               <option value="" disabled>
                 {field.placeholder || `Select ${String(field.label ?? '').toLowerCase()}`}
               </option>
@@ -208,9 +275,13 @@ function FieldPreview({
             <ChevronDown size={14} className="text-slate-400 shrink-0 pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" />
           </div>
         ) : (
-          <div className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 flex items-center justify-between text-xs text-slate-400 shadow-2xs pointer-events-none">
-            <span className="truncate mr-2">{field.placeholder || `Enter ${String(field.label ?? '').toLowerCase()}`}</span>
-            <Icon size={14} className="text-slate-400 shrink-0" />
+          <div className="w-full bg-white border border-slate-200 rounded-lg px-3.5 py-2 flex items-center justify-between text-xs shadow-2xs pointer-events-none">
+            {hasDraftVal ? (
+              <span className="truncate mr-2 text-slate-800 font-medium">{draftVal}</span>
+            ) : (
+              <span className="truncate mr-2 text-slate-400">{field.placeholder || `Enter ${String(field.label ?? '').toLowerCase()}`}</span>
+            )}
+            <Icon size={14} className={hasDraftVal ? "text-blue-500 shrink-0" : "text-slate-400 shrink-0"} />
           </div>
         )}
       </div>
@@ -236,6 +307,8 @@ export default function LeadFormBuilder({
   saveSuccess = false,
   formTitle = "Lead Form Builder",
   hideHeader = false,
+  draftData = null,
+  onReturnToForm = null,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
@@ -350,24 +423,57 @@ export default function LeadFormBuilder({
               </p>
             </div>
             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 shrink-0">
+              {onReturnToForm && (
+                <button
+                  type="button"
+                  onClick={onReturnToForm}
+                  className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900"
+                >
+                  <ArrowLeft size={15} />
+                  Return to Lead Form
+                </button>
+              )}
               <button
                 type="button"
                 onClick={onPreview}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-sm font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
               >
-                <Eye size={16} className="text-slate-500" />
+                <Eye size={15} className="text-slate-500" />
                 Preview
               </button>
               <button
                 type="button"
                 onClick={onSaveAndOpen}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg shadow-xs transition cursor-pointer"
+                className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-2 shadow-xs cursor-pointer"
               >
-                <Save size={16} />
+                <Save size={15} />
                 Save Changes
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {draftData && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 p-3.5 bg-blue-50/90 border border-blue-200/90 rounded-2xl text-xs text-blue-950 shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
+            </span>
+            <span>
+              Previewing layout with your active lead data: <strong>{draftData.leadName || draftData.company || "Current Lead"}</strong>. Your data is preserved and will stay intact when you return.
+            </span>
+          </div>
+          {onReturnToForm && (
+            <button
+              type="button"
+              onClick={onReturnToForm}
+              className="btn-primary h-8 px-3.5 text-xs font-semibold rounded-xl cursor-pointer"
+            >
+              Return to Create Lead Form
+            </button>
+          )}
         </div>
       )}
 
@@ -429,7 +535,7 @@ export default function LeadFormBuilder({
               <button
                 type="button"
                 onClick={onAddSection}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium rounded-lg border border-slate-200 shadow-xs transition cursor-pointer"
+                className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus size={14} />
                 Add Section
@@ -437,7 +543,7 @@ export default function LeadFormBuilder({
               <button
                 type="button"
                 onClick={() => onAddField(effectiveSectionId, "Single Line")}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg shadow-xs transition cursor-pointer"
+                className="btn-primary h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <Plus size={14} />
                 Add Field
@@ -575,6 +681,7 @@ export default function LeadFormBuilder({
                             onDropField={(payload, targetSectionId, position) =>
                               handleDrop(payload, targetSectionId, position, field.id)
                             }
+                            draftData={draftData}
                           />
                         ))}
                         {section.fields.length === 0 && (
@@ -705,7 +812,7 @@ export default function LeadFormBuilder({
                       <button
                         type="button"
                         onClick={addOptionToField}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition"
+                        className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold transition"
                       >
                         Add
                       </button>
@@ -768,20 +875,24 @@ export default function LeadFormBuilder({
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onRemoveField(selectedField.id);
-                    setIsPropertiesOpen(false);
-                  }}
-                  className="px-3.5 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-lg border border-slate-200 transition cursor-pointer"
-                >
-                  Remove Field
-                </button>
+                {selectedField.locked ? (
+                  <span />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRemoveField(selectedField.id);
+                      setIsPropertiesOpen(false);
+                    }}
+                    className="btn-danger h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
+                  >
+                    Remove Field
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsPropertiesOpen(false)}
-                  className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-xs transition cursor-pointer"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold transition cursor-pointer"
                 >
                   Save Field
                 </button>

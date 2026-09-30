@@ -119,7 +119,7 @@ export default function Flexibility() {
             <button
               type="button"
               onClick={reset}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-[#e2e8f0] rounded-xl text-[13px] font-medium text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition shadow-xs"
+              className="btn-outline"
             >
               <RotateCcw size={14} className="text-slate-400" />
               Cancel
@@ -128,7 +128,7 @@ export default function Flexibility() {
               type="button"
               onClick={save}
               disabled={!canEdit}
-              className="inline-flex items-center gap-1.5 px-5 py-2 bg-[#1e3a8a] text-white rounded-xl text-[13px] font-semibold hover:bg-[#1e40af] disabled:opacity-50 transition shadow-xs"
+              className="inline-flex items-center gap-1.5 px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold disabled:opacity-50 transition shadow-2xs active:scale-[0.99] cursor-pointer"
             >
               <Check size={15} />
               Save Changes
@@ -160,10 +160,10 @@ export default function Flexibility() {
               type="button"
               disabled={!canEdit}
               onClick={() => applyPreset(preset)}
-              className={`px-3 py-1.5 rounded-xl text-[12px] font-medium transition border ${
+              className={`h-8 px-3 rounded-xl text-xs font-semibold transition border ${
                 activePreset === preset
-                  ? "bg-[#1e3a8a] text-white border-[#1e3a8a] shadow-xs"
-                  : "bg-[#f8fafc] text-slate-600 border-[#e2e8f0] hover:bg-slate-100"
+                  ? "bg-primary text-white border-primary shadow-xs"
+                  : "bg-card text-slate-600 border-border hover:bg-card-hover"
               }`}
             >
               {preset}
@@ -198,7 +198,7 @@ export default function Flexibility() {
                     disabled={!canEdit}
                     value={form.gracePeriod || "10 minutes"}
                     onChange={(e) => setForm({ ...form, gracePeriod: e.target.value })}
-                    className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a] cursor-pointer"
+                    className="w-full h-9 px-3.5 bg-white border border-border rounded-xl text-xs text-slate-800 disabled:bg-soft focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="0 minutes">None (0 min strict)</option>
                     <option value="5 minutes">5 minutes</option>
@@ -222,7 +222,7 @@ export default function Flexibility() {
                   disabled={!canEdit}
                   value={form.lateAfter || "09:10"}
                   onChange={(e) => setForm({ ...form, lateAfter: e.target.value })}
-                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a]"
+                  className="w-full h-9 px-3.5 bg-white border border-border rounded-xl text-xs text-slate-800 disabled:bg-soft focus:outline-none focus:border-primary"
                 />
                 <span className="block text-[11px] text-slate-400 mt-1">
                   Punches after this trigger &apos;Late&apos; flag.
@@ -239,7 +239,7 @@ export default function Flexibility() {
                     disabled={!canEdit}
                     value={form.halfDayThreshold || "4 hours"}
                     onChange={(e) => setForm({ ...form, halfDayThreshold: e.target.value })}
-                    className="flex-1 h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a] cursor-pointer"
+                    className="flex-1 h-9 px-3.5 bg-white border border-border rounded-xl text-xs text-slate-800 disabled:bg-soft focus:outline-none focus:border-primary cursor-pointer"
                   >
                     <option value="3 hours">3 hours</option>
                     <option value="4 hours">4 hours (Standard half shift)</option>
@@ -323,7 +323,7 @@ export default function Flexibility() {
                   disabled={!canEdit}
                   value={form.minimumWorkingHours || "8 hours"}
                   onChange={(e) => setForm({ ...form, minimumWorkingHours: e.target.value })}
-                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a] cursor-pointer"
+                  className="w-full h-9 px-3.5 bg-white border border-border rounded-xl text-xs text-slate-800 disabled:bg-soft focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="7 hours">7 hours</option>
                   <option value="7.5 hours">7.5 hours</option>
@@ -345,7 +345,7 @@ export default function Flexibility() {
                   value={form.flexibleWorkingHours || "09:00 - 18:00 (Flexible)"}
                   onChange={(e) => setForm({ ...form, flexibleWorkingHours: e.target.value })}
                   placeholder="e.g. 09:00 - 18:00 (Flexible)"
-                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a]"
+                  className="w-full h-9 px-3.5 bg-white border border-border rounded-xl text-xs text-slate-800 disabled:bg-soft focus:outline-none focus:border-primary"
                 />
                 <span className="block text-[11px] text-slate-400 mt-1">
                   Permitted punch window for employees.
@@ -377,7 +377,7 @@ export default function Flexibility() {
                   disabled={!canEdit}
                   value={form.overtimeStartsAfter || "8 hours"}
                   onChange={(e) => setForm({ ...form, overtimeStartsAfter: e.target.value })}
-                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a] cursor-pointer"
+                  className="w-full h-9 px-3.5 bg-white border border-border rounded-xl text-xs text-slate-800 disabled:bg-soft focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="8 hours">After 8 completed hours</option>
                   <option value="8.5 hours">After 8.5 completed hours</option>
@@ -399,7 +399,7 @@ export default function Flexibility() {
                   onChange={(e) =>
                     setForm({ ...form, overtimeRequiresApproval: e.target.value === "Yes" })
                   }
-                  className="w-full h-10 px-3.5 bg-white border border-[#cbd5e1] rounded-xl text-[13px] text-slate-800 disabled:bg-[#f8fafc] focus:outline-none focus:border-[#1e3a8a] cursor-pointer"
+                  className="w-full h-9 px-3.5 bg-white border border-border rounded-xl text-xs text-slate-800 disabled:bg-soft focus:outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="Yes">Yes — requires manager sign-off</option>
                   <option value="No">No — automatic payroll accrual</option>
@@ -432,7 +432,7 @@ export default function Flexibility() {
           <button
             type="button"
             onClick={reset}
-            className="px-4 py-2 text-[12.5px] font-medium text-slate-600 bg-white border border-[#cbd5e1] rounded-xl hover:bg-slate-50"
+            className="btn-outline"
           >
             Reset to Default
           </button>
@@ -440,7 +440,7 @@ export default function Flexibility() {
             type="button"
             onClick={save}
             disabled={!canEdit}
-            className="px-4 py-2 text-[12.5px] font-semibold text-white bg-[#1e3a8a] rounded-xl hover:bg-[#1e40af] disabled:opacity-50"
+            className="px-4 h-9 text-xs font-semibold text-white bg-primary hover:bg-primary-dark rounded-xl disabled:opacity-50 transition-colors cursor-pointer shadow-2xs active:scale-[0.99]"
           >
             Save Changes
           </button>

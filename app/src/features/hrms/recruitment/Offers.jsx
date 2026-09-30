@@ -245,7 +245,7 @@ export default function Offers() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => handleOpenLetterModal(r)}
-            className="inline-flex items-center gap-1 text-[11.5px] bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-lg px-2.5 py-1 font-medium transition cursor-pointer"
+            className="inline-flex items-center gap-1 text-[11.5px] bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-xl px-2.5 py-1 font-medium transition cursor-pointer"
             title="View, edit and print offer letter"
           >
             <FileText size={12} />
@@ -265,7 +265,7 @@ export default function Offers() {
               setEditing(r.id);
               setDrawerOpen(true);
             }}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition"
+            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
             title="Edit Offer"
           >
             <Edit2 size={13} />
@@ -275,7 +275,7 @@ export default function Offers() {
               updateOffer(r.id, { status: "Pending" });
               showToast("Offer re-sent to candidate");
             }}
-            className="inline-flex items-center gap-1 text-[11.5px] bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 rounded-lg px-2 py-1 font-medium transition cursor-pointer"
+            className="inline-flex items-center gap-1 text-[11.5px] bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 rounded-xl px-2 py-1 font-medium transition cursor-pointer"
             title="Send Offer"
           >
             <Send size={11} />
@@ -283,7 +283,7 @@ export default function Offers() {
           </button>
           <button
             onClick={() => setDeleteId(r.id)}
-            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition cursor-pointer"
+            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition cursor-pointer"
             title="Withdraw Offer"
           >
             <Trash2 size={13} />
@@ -309,7 +309,7 @@ export default function Offers() {
             <button
               type="button"
               onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
             >
               <HelpCircle size={14} />
               <span>Guide</span>

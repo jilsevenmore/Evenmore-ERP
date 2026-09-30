@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
 import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X } from "lucide-react";
+import { customLeadFields, missingRequiredField } from '../../../services/leadFormFields';
+import { CustomLeadFieldInput } from './CustomLeadFieldInput';
 
 /** Who a lead can be assigned to, from `/crm/team-roster/` (one row per person). */
 function useUserOptions() {
@@ -155,6 +157,12 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   const [createdOn, setCreatedOn] = useState("");
   const [taskDate, setTaskDate] = useState("");
   const [taskTime, setTaskTime] = useState("");
+  // Fields added in the Lead Create Form builder, saved as lead.customValues.
+  const storeForms = useCrmStore((s) => s.forms);
+  // storeForms: re-read the fields when a form is saved or arrives.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const customFields = useMemo(() => customLeadFields(), [storeForms]);
+  const [customValues, setCustomValues] = useState({});
   const photoInputRef = useRef(null);
   const createdOnRef = useRef(null);
   const taskDateRef = useRef(null);
@@ -168,10 +176,38 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
     sourceId !== "" &&
     titleValue.trim() !== "" &&
     industry.trim() !== "" &&
-    ownerId !== "";
+    ownerId !== "" &&
+    !missingRequiredField(customFields, customValues);
+
+  const isNavigatingToLayoutRef = useRef(false);
 
   useEffect(() => {
-    if (!isOpen) {
+    if (isOpen) {
+      isNavigatingToLayoutRef.current = false;
+      try {
+        const saved = sessionStorage.getItem('crm_lead_create_draft');
+        if (saved) {
+          const draft = JSON.parse(saved);
+          if (draft.leadName !== undefined) setLeadName(draft.leadName);
+          if (draft.company !== undefined) setCompany(draft.company);
+          if (draft.email !== undefined) setEmail(draft.email);
+          if (draft.phone !== undefined) setPhone(draft.phone);
+          if (draft.sourceId !== undefined) setSourceId(draft.sourceId);
+          if (draft.titleValue !== undefined) setTitleValue(draft.titleValue);
+          if (draft.industry !== undefined) setIndustry(draft.industry);
+          if (draft.ownerId !== undefined) setOwnerId(draft.ownerId);
+          if (draft.createdOn !== undefined) setCreatedOn(draft.createdOn);
+          if (Array.isArray(draft.products)) setProducts(draft.products);
+          if (Array.isArray(draft.leadUsers)) setLeadUsers(draft.leadUsers);
+          if (draft.taskDate !== undefined) setTaskDate(draft.taskDate);
+          if (draft.taskTime !== undefined) setTaskTime(draft.taskTime);
+          if (draft.photoPreview !== undefined) setPhotoPreview(draft.photoPreview);
+          if (draft.customValues && typeof draft.customValues === 'object') setCustomValues(draft.customValues);
+        }
+      } catch (err) {
+        console.error("Failed to restore lead draft", err);
+      }
+    } else if (!isNavigatingToLayoutRef.current) {
       setProducts([]);
       setLeadUsers([]);
       setPhotoPreview("");
@@ -186,12 +222,13 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
       setCreatedOn("");
       setTaskDate("");
       setTaskTime("");
+      setCustomValues({});
     }
   }, [isOpen]);
 
   useEffect(() => {
     return () => {
-      if (photoPreview) {
+      if (photoPreview && !isNavigatingToLayoutRef.current) {
         URL.revokeObjectURL(photoPreview);
       }
     };
@@ -211,13 +248,65 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   }
 
   function handleClose() {
+    isNavigatingToLayoutRef.current = false;
+    try {
+      sessionStorage.removeItem('crm_lead_create_draft');
+    } catch {}
     if (photoPreview) {
       URL.revokeObjectURL(photoPreview);
     }
+    setProducts([]);
+    setLeadUsers([]);
+    setPhotoPreview("");
+    setLeadName("");
+    setCompany("");
+    setEmail("");
+    setPhone("");
+    setSourceId("");
+    setTitleValue("");
+    setIndustry("");
+    setOwnerId("");
+    setCreatedOn("");
+    setTaskDate("");
+    setTaskTime("");
+    setCustomValues({});
     onClose();
   }
 
+  function handleEditPageLayout() {
+    isNavigatingToLayoutRef.current = true;
+    const draft = {
+      leadName,
+      company,
+      email,
+      phone,
+      sourceId,
+      source: sources.find((option) => option.id === sourceId)?.name || "",
+      titleValue,
+      industry,
+      ownerId,
+      owner: userOptions.find((member) => member.id === ownerId)?.name || "",
+      createdOn,
+      taskDate,
+      taskTime,
+      products,
+      leadUsers,
+      photoPreview,
+      customValues,
+    };
+    try {
+      sessionStorage.setItem('crm_lead_create_draft', JSON.stringify(draft));
+    } catch (e) {
+      console.error("Failed to save lead draft", e);
+    }
+    onEditLayout?.(draft);
+  }
+
   function handleCreate() {
+    isNavigatingToLayoutRef.current = false;
+    try {
+      sessionStorage.removeItem('crm_lead_create_draft');
+    } catch {}
     onCreate({
       leadName,
       company,
@@ -236,6 +325,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
       products,
       leadUsers,
       photoPreview,
+      customValues,
     });
   }
 
@@ -358,6 +448,19 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
             </div>
           </label>
 
+          {customFields.map((field) => (
+            <label key={field.id} className="lead-create-field" htmlFor={`custom-${field.id}`}>
+              <span>{field.label}{field.required ? ' *' : ''}</span>
+              <CustomLeadFieldInput
+                field={field}
+                value={customValues[field.id]}
+                users={userOptions}
+                onChange={(value) => setCustomValues((current) => ({ ...current, [field.id]: value }))}
+              />
+              {field.helpText && <small>{field.helpText}</small>}
+            </label>
+          ))}
+
           <MultiValueSelect
             label="Products"
             placeholder="Select Products"
@@ -411,13 +514,13 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
               </svg>
             </div>
             )}
-            <button type="button" className="btn-outline" onClick={onEditLayout}>
+            <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer" onClick={handleEditPageLayout}>
               <Plus size={15} />
               Edit Page Layout
             </button>
           </div>
           <div className="lead-create-action-right">
-            <button type="button" className="btn-outline" onClick={handleClose}>Cancel</button>
+            <button type="button" className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer" onClick={handleClose}>Cancel</button>
             <div className="relative inline-block">
               {showTour && isFormComplete && (
               <div className="pointer-events-none absolute bottom-[calc(100%+6px)] right-0 z-30 flex flex-col items-end">
@@ -431,7 +534,7 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
                 </svg>
               </div>
               )}
-              <button type="button" className="btn-primary" onClick={handleCreate} disabled={!isFormComplete} style={!isFormComplete ? { opacity: 0.5, cursor: "not-allowed" } : undefined}>Create</button>
+              <button type="button" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer" onClick={handleCreate} disabled={!isFormComplete} style={!isFormComplete ? { opacity: 0.5, cursor: "not-allowed" } : undefined}>Create</button>
             </div>
           </div>
         </div>

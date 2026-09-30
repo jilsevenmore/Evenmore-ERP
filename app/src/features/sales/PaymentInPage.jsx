@@ -1075,13 +1075,13 @@ export const PaymentInPage = () => {
                                 <button
                                     type="button"
                                     onClick={() => setEditReceipt(null)}
-                                    className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100"
+                                    className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
-                                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold"
+                                    className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer"
                                 >
                                     Save Changes
                                 </button>
@@ -1146,7 +1146,7 @@ export const PaymentInPage = () => {
                             <button
                                 type="button"
                                 onClick={() => setCancelModalTarget(null)}
-                                className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium"
+                                className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
                             >
                                 Dismiss
                             </button>
@@ -1161,7 +1161,7 @@ export const PaymentInPage = () => {
                                     }
                                     setCancelModalTarget(null);
                                 }}
-                                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold disabled:opacity-50"
+                                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
                             >
                                 Confirm {cancelAction === 'VOIDED' ? 'Void' : 'Cancellation'}
                             </button>

@@ -37,7 +37,7 @@ export function CalendarAgendaSidebar({
               <button
                 type="button"
                 onClick={() => onAddEventForDate(selectedDate)}
-                className="w-7 h-7 rounded-lg bg-navy/10 text-navy hover:bg-navy hover:text-white grid place-items-center transition"
+                className="w-7 h-7 rounded-xl bg-navy/10 text-navy hover:bg-navy hover:text-white grid place-items-center transition"
                 title="Add event for this date"
               >
                 <Plus size={14} />

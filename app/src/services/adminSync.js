@@ -21,7 +21,10 @@ export const ADMIN_RESOURCES = {
       phone: u.phone || undefined,
       roleId: u.roleId || undefined,
       department: u.department || undefined,
-      employeeId: u.employeeId || undefined,
+      // The HRMS employee this login belongs to, by id or code; '' / null
+      // unlinks. `createEmployee: false` stops a new login getting a record.
+      employeeId: u.employeeId !== undefined ? (u.employeeId || null) : undefined,
+      createEmployee: u.createEmployee,
       location: u.location || undefined,
       reportingManager: u.reportingManager || undefined,
       status: u.status || undefined,

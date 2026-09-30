@@ -109,7 +109,7 @@ export default function TerminationLetterModal({
         {/* Top Control Bar (Hidden during Print) */}
         <div className="bg-[#1F2E4A] text-white px-5 py-3 flex flex-wrap items-center justify-between gap-3 no-print shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-red-600/30 border border-red-500/40 text-red-300 flex items-center justify-center font-bold">
+            <div className="w-8 h-8 rounded-xl bg-red-600/30 border border-red-500/40 text-red-300 flex items-center justify-center font-bold">
               <FileText size={16} />
             </div>
             <div>
@@ -132,7 +132,7 @@ export default function TerminationLetterModal({
             <button
               type="button"
               onClick={() => setIsEditing(!isEditing)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+              className={`h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ${
                 isEditing
                   ? "bg-amber-500 text-slate-950 hover:bg-amber-400"
                   : "bg-white/10 hover:bg-white/20 text-white border border-white/20"
@@ -146,7 +146,7 @@ export default function TerminationLetterModal({
             <button
               type="button"
               onClick={handleSave}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition shadow-xs"
+              className="btn-primary h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs border-transparent"
               title="Save Changes"
             >
               <Save size={14} />
@@ -157,7 +157,7 @@ export default function TerminationLetterModal({
             <button
               type="button"
               onClick={handlePrint}
-              className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition shadow-xs"
+              className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
               title="Print or Export as PDF"
             >
               <Printer size={14} />
@@ -168,7 +168,7 @@ export default function TerminationLetterModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 text-slate-300 hover:text-white rounded-lg hover:bg-white/10 transition ml-1"
+              className="p-1.5 text-slate-300 hover:text-white rounded-xl hover:bg-white/10 transition ml-1 cursor-pointer"
               title="Close Preview"
             >
               <X size={18} />
@@ -213,7 +213,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, employeeName: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -226,7 +226,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, employeeId: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -242,7 +242,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, role: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -255,7 +255,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, dept: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -271,7 +271,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, noticeDate: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -284,7 +284,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, exitDate: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -297,7 +297,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, severance: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600 font-medium"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600 font-medium"
                   />
                 </div>
               </div>
@@ -312,7 +312,7 @@ export default function TerminationLetterModal({
                   onChange={(e) =>
                     setFormData({ ...formData, reason: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                 />
               </div>
 
@@ -326,7 +326,7 @@ export default function TerminationLetterModal({
                   onChange={(e) =>
                     setFormData({ ...formData, handoverInstruction: e.target.value })
                   }
-                  className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                  className="w-full px-3.5 py-2 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                 />
               </div>
 
@@ -341,7 +341,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, signatoryName: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
                 <div>
@@ -354,7 +354,7 @@ export default function TerminationLetterModal({
                     onChange={(e) =>
                       setFormData({ ...formData, signatoryTitle: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
+                    className="w-full h-9 px-3.5 rounded-xl border border-slate-300 bg-white focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </div>
@@ -363,7 +363,7 @@ export default function TerminationLetterModal({
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-500"
+                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold"
                 >
                   Done Editing &amp; Preview
                 </button>
@@ -379,7 +379,7 @@ export default function TerminationLetterModal({
             <div className="flex items-start justify-between border-b border-slate-200 pb-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-base font-mono">
+                  <div className="w-8 h-8 rounded-xl bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-base font-mono">
                     E
                   </div>
                   <div>

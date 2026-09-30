@@ -39,7 +39,7 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 
-import { loadDeals, saveDeals, buildDeal, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
+import { loadDeals, saveDeals, buildDeal, ownerIdFor, EMPTY_DEAL_FORM, getInitialsFromName, getAvatarColorFromName } from '../../../services/dealService';
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
 import { useAppStore } from '../../../stores/appStore';
@@ -160,10 +160,9 @@ export default function DealsPage() {
 
   useEffect(() => { setDeals(storeDeals); }, [storeDeals]);
 
-  // Anything the board changed is written back to `/crm/deals/`.
-  useEffect(() => {
-    if (deals.length > 0 || storeDeals.length > 0) saveDeals(deals);
-  }, [deals, storeDeals]);
+  // Each handler below writes its own change to `/crm/deals/`. There is no
+  // "save whatever changed" effect: one on [deals, storeDeals] compared a local
+  // copy a render behind the store and wrote again on every server reply.
 
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedDealId = searchParams.get('deal');
@@ -457,6 +456,7 @@ export default function DealsPage() {
         stage: formState.stage,
         source: formState.source,
         assignedUser: formState.assignedUser,
+        ownerId: ownerIdFor(formState.assignedUser),
         date: formState.date || editingDeal.date,
         tag: formState.tag || editingDeal.tag,
       };
@@ -470,7 +470,7 @@ export default function DealsPage() {
       useCrmStore.getState().updateRecord('deals', editingDeal.id, updatedFields).catch(console.warn);
       showNotification(`Deal "${formState.name.trim()}" updated successfully!`);
     } else {
-      const newDeal = buildDeal(formState);
+      const newDeal = { ...buildDeal(formState), ownerId: ownerIdFor(formState.assignedUser) };
       setDeals((prev) => [newDeal, ...prev]);
       useCrmStore.getState().createRecord('deals', newDeal).catch((err) => {
         console.warn('[CRM Deals] Server save error:', err);
@@ -607,11 +607,12 @@ export default function DealsPage() {
       {linkedDealId ? <DealDetailView key={linkedDealId} deal={deals.find((item) => String(item.id) === linkedDealId)} onEdit={handleOpenEditModal} onNotify={showNotification} onDelete={setDealToDelete} onUpdate={(patch) => {
         const updated = loadDeals().map((item) => String(item.id) === linkedDealId ? { ...item, ...patch } : item);
         setDeals(updated);
-        window.dispatchEvent(new Event('crm:data-updated'));
+        saveDeals(updated);
       }} onDuplicate={(deal) => {
         const copy = buildDeal({ name: `${deal.name} (copy)`, client: deal.client, phone: deal.phone, price: deal.price, product: deal.product, products: deal.products, source: deal.source, assignedUser: deal.assignedUser, team: deal.team, description: deal.description, stage: 'Draft', createdAt: new Date().toISOString() }, `dl-${crypto.randomUUID()}`);
         const updated = [copy, ...loadDeals()];
         setDeals(updated);
+        saveDeals(updated);
         setSearchParams({ deal: copy.id });
         showNotification('Deal duplicated as a new draft.');
       }} /> : <>
@@ -638,7 +639,7 @@ export default function DealsPage() {
           <button
             type="button"
             onClick={handlePrintDeals}
-            className="inline-flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-2xs transition-colors cursor-pointer"
+            className="btn-outline inline-flex items-center gap-2"
           >
             <Printer size={16} />
             <span>Print</span>
@@ -646,7 +647,7 @@ export default function DealsPage() {
 
           <button
             onClick={() => handleOpenCreateModal()}
-            className="inline-flex items-center gap-2 bg-[#1d4a79] hover:bg-[#163a61] text-white font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs transition-colors cursor-pointer active:scale-[0.99]"
           >
             <Plus size={16} strokeWidth={2.5} />
             <span>Add Deal</span>
@@ -754,7 +755,7 @@ export default function DealsPage() {
                 onClick={() => setViewMode('kanban')}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'kanban'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'btn-primary text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -767,7 +768,7 @@ export default function DealsPage() {
                 onClick={() => setViewMode('list')}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   viewMode === 'list'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'btn-primary text-white shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
@@ -1247,7 +1248,7 @@ export default function DealsPage() {
         title="Lead Stages vs Deal Stages"
         size="lg"
         footer={
-          <button type="button" onClick={() => setIsLearnMoreOpen(false)} className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
+          <button type="button" onClick={() => setIsLearnMoreOpen(false)} className="rounded-xl bg-primary hover:bg-primary-dark h-9 px-4 text-xs font-semibold text-white shadow-2xs active:scale-[0.99] cursor-pointer">
             Got it
           </button>
         }
@@ -1418,13 +1419,13 @@ export default function DealsPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
+                  className="btn-outline"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-all"
+                  className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs active:scale-[0.99] transition-all cursor-pointer"
                 >
                   {editingDeal ? 'Save Changes' : 'Create Deal'}
                 </button>
@@ -1452,14 +1453,14 @@ export default function DealsPage() {
               <button
                 type="button"
                 onClick={() => setDealToDelete(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
+                className="btn-outline"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleDeleteDeal}
-                className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold shadow-xs"
+                className="btn-danger"
               >
                 Yes, Delete Deal
               </button>

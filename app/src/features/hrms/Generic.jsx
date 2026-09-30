@@ -12,7 +12,7 @@ export function Generic({ title, subtitle, children }) {
           </div>
           <p className="text-[13px] text-muted">{subtitle}</p>
         </div>
-        <button onClick={() => showToast(title + " action")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add New</button>
+        <button onClick={() => showToast(title + " action")} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">Add New</button>
       </div>
       {children}
     </div>;

@@ -13,7 +13,7 @@ import CreateLeadModal from './CreateLeadModal';
 import DeleteLeadModal from './DeleteLeadModal';
 import LeadGuideModal from './LeadGuideModal';
 import InfoBanner from '../common/InfoBanner';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
 import { Users, UserPlus, Clock, TrendingUp } from 'lucide-react';
 import { useCrmStore } from '../../../stores/crmStore';
@@ -148,6 +148,17 @@ export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  useEffect(() => {
+    if (searchParams.get('openCreate') === 'true') {
+      setIsCreateLeadOpen(true);
+      const nextParams = new URLSearchParams(searchParams);
+      nextParams.delete('openCreate');
+      setSearchParams(nextParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const [showCreateArrow, setShowCreateArrow] = useState(false);
   const [showLeadTour, setShowLeadTour] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
@@ -349,8 +360,10 @@ export default function LeadsPage() {
         email: data.email || '',
         ownerId: data.ownerId || undefined,
         sourceId: data.sourceId || undefined,
-        industryId: data.industryId || undefined,
+        industry: data.industry || undefined,
         jobTitle: data.titleValue || '',
+        // Fields from the Lead Create Form builder, keyed by field id.
+        customValues: data.customValues && Object.keys(data.customValues).length ? data.customValues : undefined,
         createdOn: data.createdOn || undefined,
         country: 'India',
       });
@@ -497,7 +510,7 @@ export default function LeadsPage() {
                 </div>
               </div>
             )}
-            <button type="button" className="btn-primary btn-sm" onClick={openCreateLeadModal}>
+            <button type="button" className="btn-primary" onClick={openCreateLeadModal}>
               + Create Lead
             </button>
           </div>
@@ -568,7 +581,7 @@ export default function LeadsPage() {
             </div>
             <div className="grid grid-cols-3 gap-2">
               {['CSV', 'Excel', 'PDF'].map((format) => (
-                <button key={format} type="button" className="border border-slate-200 rounded-lg px-3 py-3 text-xs font-semibold text-slate-700 hover:border-blue-400 hover:bg-blue-50" onClick={() => exportLeads(format)}>
+                <button key={format} type="button" className="btn-outline h-9 text-xs font-semibold" onClick={() => exportLeads(format)}>
                   {format}
                 </button>
               ))}
@@ -691,7 +704,13 @@ export default function LeadsPage() {
         showTour={showLeadTour}
         onClose={() => { setIsCreateLeadOpen(false); setShowLeadTour(false); }}
         onCreate={handleCreateLead}
-        onEditLayout={() => { setIsCreateLeadOpen(false); setShowLeadTour(false); navigate('/crm/leads/form-builder'); }}
+        onEditLayout={(draft) => {
+          setIsCreateLeadOpen(false);
+          setShowLeadTour(false);
+          navigate('/crm/leads/form-builder', {
+            state: { draftData: draft, returnTo: '/crm/leads?openCreate=true' },
+          });
+        }}
       />
       <LeadGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
     </>

@@ -30,11 +30,11 @@ export function Locations() {
           </div>
           <p className="text-[13px] text-muted">{locations.length} offices and workspaces</p>
         </div>
-        <button onClick={() => showToast("Add location")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Location</button>
+        <button onClick={() => showToast("Add location")} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">Add Location</button>
       </div>
       <div className="grid md:grid-cols-2 gap-5">
         {locations.length === 0 && <div className="md:col-span-2 bg-white border border-bdr rounded-xl p-8 text-center text-[13px] text-muted">No locations yet.</div>}
-        {locations.map((l) => ({ name: l.name, addr: l.address || "—", tz: l.timezone || "—", count: l.count ?? 0 })).map((l) => <div key={l.name} className="bg-white border border-bdr rounded-xl p-5 shadow-sm"><div className="flex justify-between"><h3 className="font-semibold">{l.name}</h3><button onClick={() => showToast("Edit " + l.name)} className="w-8 h-8 border border-bdr rounded-lg grid place-items-center hover:bg-off"><span className="material-symbols-outlined text-[16px] text-muted">edit</span></button></div><div className="text-[13px] text-muted flex items-center gap-1 mt-2"><span className="material-symbols-outlined text-[16px]">location_on</span>{l.addr}</div><div className="flex gap-2 mt-3 text-[11px]"><span className="px-2.5 py-1 bg-off border border-bdr rounded-full">{l.tz}</span><span className="px-2.5 py-1 bg-off border border-bdr rounded-full">{l.count} employees</span></div></div>)}
+        {locations.map((l) => ({ name: l.name, addr: l.address || "—", tz: l.timezone || "—", count: l.count ?? 0 })).map((l) => <div key={l.name} className="bg-white border border-bdr rounded-xl p-5 shadow-sm"><div className="flex justify-between"><h3 className="font-semibold">{l.name}</h3><button onClick={() => showToast("Edit " + l.name)} className="w-8 h-8 border border-bdr rounded-xl grid place-items-center hover:bg-off"><span className="material-symbols-outlined text-[16px] text-muted">edit</span></button></div><div className="text-[13px] text-muted flex items-center gap-1 mt-2"><span className="material-symbols-outlined text-[16px]">location_on</span>{l.addr}</div><div className="flex gap-2 mt-3 text-[11px]"><span className="px-2.5 py-1 bg-off border border-bdr rounded-full">{l.tz}</span><span className="px-2.5 py-1 bg-off border border-bdr rounded-full">{l.count} employees</span></div></div>)}
       </div>
     </div>;
 }
@@ -53,12 +53,12 @@ export function Designations() {
         <button onClick={() => {
     const t = prompt("Title");
     if (t) setRows([...rows, { title: t, level: "L3", dept: "General", count: 0 }]);
-  }} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Designation</button></div>
+  }} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">Add Designation</button></div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-x-auto">
         <table className="w-full min-w-[640px] lg:min-w-0 text-left"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Title</th><th className="py-3 px-5">Level</th><th className="py-3 px-5">Department</th><th className="py-3 px-5">Employees</th><th className="py-3 px-5 text-right">Actions</th></tr></thead>
-          <tbody className="divide-y divide-bdr/40 text-[13px]">{rows.map((r) => <tr key={r.title} className="hover:bg-off/60"><td className="py-4 px-5 font-medium">{r.title}</td><td className="py-4 px-5"><span className={`px-2.5 py-1 rounded-full text-[11px] border ${r.level === "L6" ? "bg-navy text-white border-navy" : "bg-off border-bdr"}`}>{r.level}</span></td><td className="py-4 px-5">{r.dept}</td><td className="py-4 px-5">{r.count}</td><td className="py-4 px-5 text-right flex justify-end gap-1"><button onClick={() => showToast("Edit " + r.title)} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">edit</span></button><button onClick={() => {
+          <tbody className="divide-y divide-bdr/40 text-[13px]">{rows.map((r) => <tr key={r.title} className="hover:bg-off/60"><td className="py-4 px-5 font-medium">{r.title}</td><td className="py-4 px-5"><span className={`px-2.5 py-1 rounded-full text-[11px] border ${r.level === "L6" ? "bg-navy text-white border-navy" : "bg-off border-bdr"}`}>{r.level}</span></td><td className="py-4 px-5">{r.dept}</td><td className="py-4 px-5">{r.count}</td><td className="py-4 px-5 text-right flex justify-end gap-1"><button onClick={() => showToast("Edit " + r.title)} className="p-1.5 hover:bg-off rounded-xl"><span className="material-symbols-outlined text-[18px] text-muted">edit</span></button><button onClick={() => {
     if (confirm("Delete " + r.title + "?")) setRows(rows.filter((x) => x.title !== r.title));
-  }} className="p-1.5 hover:bg-off rounded-lg"><span className="material-symbols-outlined text-[18px] text-muted">delete</span></button></td></tr>)}</tbody>
+  }} className="p-1.5 hover:bg-off rounded-xl"><span className="material-symbols-outlined text-[18px] text-muted">delete</span></button></td></tr>)}</tbody>
         </table>
       </div>
     </div>;
@@ -77,7 +77,7 @@ export function Training() {
           </div>
           <p className="text-[13px] text-muted">Programs, sessions, assessments & certificates</p>
         </div>
-        <button onClick={() => showToast("Create program")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Create Program</button>
+        <button onClick={() => showToast("Create program")} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">Create Program</button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">{[{ l: "Active Programs", v: String(activeCount) }, { l: "Enrolled", v: String(trainings.reduce((sum, t) => sum + (Number(t.participants) || 0), 0)) }, { l: "Upcoming", v: String(trainings.filter((t) => ["Scheduled", "Trainer Assigned", "Requested"].includes(t.stage)).length) }, { l: "Completion", v: `${activeCount ? Math.round((doneCount / activeCount) * 100) : 0}%` }, { l: "Certificates", v: String(doneCount) }].map((x) => <div key={x.l} className="bg-white border border-bdr rounded-xl p-4 shadow-sm"><div className="text-[12px] text-muted">{x.l}</div><div className="text-[20px] font-bold mt-1">{x.v}</div></div>)}</div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-x-auto"><table className="w-full min-w-[640px] lg:min-w-0 text-left text-[13px]"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Program</th><th className="py-3 px-5">Trainer</th><th className="py-3 px-5">Date</th><th className="py-3 px-5">Status</th></tr></thead>
@@ -97,7 +97,7 @@ export function Assets() {
           </div>
           <p className="text-[13px] text-muted">Inventory, assignment, return & maintenance</p>
         </div>
-        <button className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Add Asset</button>
+        <button className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">Add Asset</button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">{[{ l: "Total Assets", v: String(assets.length) }, { l: "Assigned", v: String(countOf("Assigned")) }, { l: "Available", v: String(countOf("Available")) }, { l: "Under Maintenance", v: String(countOf("Under Maintenance")) }, { l: "Lost/Damaged", v: String(countOf("Lost") + countOf("Damaged")) }].map((x) => <div key={x.l} className="bg-white border border-bdr rounded-xl p-4 shadow-sm"><div className="text-[12px] text-muted">{x.l}</div><div className="text-[20px] font-bold mt-1">{x.v}</div></div>)}</div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-x-auto"><table className="w-full min-w-[640px] lg:min-w-0 text-left text-[13px]"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Asset</th><th className="py-3 px-5">ID</th><th className="py-3 px-5">Category</th><th className="py-3 px-5">Assigned To</th><th className="py-3 px-5">Status</th></tr></thead>
@@ -116,7 +116,7 @@ export function Documents() {
           </div>
           <p className="text-[13px] text-muted">Versioning & expiry</p>
         </div>
-        <button className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">Upload Document</button>
+        <button className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">Upload Document</button>
       </div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-x-auto"><table className="w-full min-w-[640px] lg:min-w-0 text-left text-[13px]"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Document</th><th className="py-3 px-5">Employee</th><th className="py-3 px-5">Expiry</th><th className="py-3 px-5">Status</th></tr></thead>
         <tbody className="divide-y divide-bdr/40">{documents.length === 0 && <tr><td colSpan={4} className="py-6 px-5 text-center text-muted">No documents uploaded yet.</td></tr>}{documents.map((d) => <tr key={d.id}><td className="py-3 px-5">{d.title || d.name}</td><td className="py-3 px-5">{d.employee || d.employeeName || "—"}</td><td className="py-3 px-5">{d.expiryDate || "—"}</td><td className="py-3 px-5"><Badge tone={d.status === "Expired" ? "danger" : d.status === "Expiring Soon" ? "warning" : "success"}>{d.status || "Valid"}</Badge></td></tr>)}</tbody>

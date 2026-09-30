@@ -11,6 +11,12 @@ import { useAppStore } from '../stores/appStore';
 const CustomerTrackingPage = lazy(() => import('../features/pms/customer/CustomerTrackingPage'));
 const CustomerProjectsListPage = lazy(() => import('../features/pms/customer/CustomerProjectsListPage'));
 
+// ── Organization (Lazy Loaded) ──────────────────────────────
+const OrgChartPage = lazy(() => import('../features/organization/OrgChartPage'));
+const DepartmentsPage = lazy(() => import('../features/organization/DepartmentsPage'));
+const DesignationsPage = lazy(() => import('../features/organization/DesignationsPage'));
+const LocationsPage = lazy(() => import('../features/organization/LocationsPage'));
+
 // ── CRM (Lazy Loaded) ───────────────────────────────────────
 const LeadsPage = lazy(() => import('../features/crm/leads/LeadsPage'));
 const LeadDetailPage = lazy(() => import('../features/crm/leads/LeadDetailPage'));
@@ -18,9 +24,8 @@ const LeadFormBuilderPage = lazy(() => import('../features/crm/leads/LeadFormBui
 const LeadFormsPage = lazy(() => import('../features/crm/leads/LeadFormsPage'));
 const DynamicLeadFormPage = lazy(() => import('../features/crm/leads/DynamicLeadFormPage'));
 const TasksPage = lazy(() => import('../features/crm/tasks/TasksPage'));
-// Hidden: Task Allocation duplicates Tasks List
-// const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationPage'));
-// const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
+const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationPage'));
+const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
 const MasterTasksPage = lazy(() => import('../features/crm/tasks/MasterTasksPage'));
 const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage'));
 const TaskFormPage = lazy(() => import('../features/crm/tasks/TaskFormPage'));
@@ -83,10 +88,6 @@ const TrainingList = lazy(() => import('../features/hrms/performance/TrainingLis
 const TrainingFunnel = lazy(() => import('../features/hrms/performance/TrainingFunnel'));
 const Trainers = lazy(() => import('../features/hrms/performance/Trainers'));
 const TrainingDashboard = lazy(() => import('../features/hrms/performance/TrainingDashboard'));
-const OrgChartPage = lazy(() => import('../features/hrms/organization/OrgChartPage'));
-const DepartmentsPage = lazy(() => import('../features/hrms/organization/DepartmentsPage'));
-const DesignationsPage = lazy(() => import('../features/hrms/organization/DesignationsPage'));
-const LocationsPage = lazy(() => import('../features/hrms/organization/LocationsPage'));
 const AssetsPage = lazy(() => import('../features/hrms/organization/AssetsPage'));
 const DocumentsPage = lazy(() => import('../features/hrms/organization/DocumentsPage'));
 const CompanyPolicy = lazy(() => import('../features/hrms/organization/SimplePages').then(m => ({ default: m.CompanyPolicy })));
@@ -265,9 +266,8 @@ const router = createBrowserRouter([
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },
       { path: 'crm/customers', element: <Page component={CustomersPage} /> },
       { path: 'crm/tasks', element: <Page component={TasksPage} /> },
-      // Hidden: Task Allocation duplicates Tasks List (crm/tasks)
-      // { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
-      // { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
+      { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
+      { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
       // { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> }, // Hidden: duplicate of crm/leads/stage-tasks
       { path: 'crm/projects', element: <Page component={ProjectsPage} /> },
       { path: 'crm/contracts', element: <Page component={ContractsPage} /> },
@@ -401,10 +401,16 @@ const router = createBrowserRouter([
       { path: 'hrms/training/training-funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
       { path: 'hrms/training/trainers', element: <Page component={() => <TrainingDashboard initialTab="trainers" />} /> },
       { path: 'hrms/training/funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
-      { path: 'hrms/org-chart', element: <Page component={OrgChartPage} /> },
-      { path: 'hrms/departments', element: <Page component={DepartmentsPage} /> },
-      { path: 'hrms/designations', element: <Page component={DesignationsPage} /> },
-      { path: 'hrms/locations', element: <Page component={LocationsPage} /> },
+      // Moved to the Organization section; old links still land there.
+      { path: 'hrms/org-chart', element: <Navigate to="/organization/org-chart" replace /> },
+      { path: 'hrms/departments', element: <Navigate to="/organization/departments" replace /> },
+      { path: 'hrms/designations', element: <Navigate to="/organization/designations" replace /> },
+      { path: 'hrms/locations', element: <Navigate to="/organization/locations" replace /> },
+      { path: 'organization', element: <Navigate to="/organization/org-chart" replace /> },
+      { path: 'organization/org-chart', element: <Page component={OrgChartPage} /> },
+      { path: 'organization/departments', element: <Page component={DepartmentsPage} /> },
+      { path: 'organization/designations', element: <Page component={DesignationsPage} /> },
+      { path: 'organization/locations', element: <Page component={LocationsPage} /> },
       { path: 'hrms/assets', element: <Page component={AssetsPage} /> },
       { path: 'hrms/asset', element: <Page component={AssetsPage} /> },
       { path: 'hrms/asset-setup', element: <Page component={AssetsPage} /> },

@@ -141,17 +141,48 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const [stageDrafts, setStageDrafts] = useState({});
   const masterTasks = useCrmStore((s) => s.masterTasks);
   const taskOptions = useMemo(() => getDynamicTaskOptions(masterTasks), [masterTasks]);
+  const storeForms = useCrmStore((s) => s.forms);
+  const taskForms = useMemo(() => storeForms.filter((f) => f.kind === 'task'), [storeForms]);
+
+  /**
+   * A task name picked from the list: when it is a Tasks Master row, the stage
+   * task is linked to it by id and starts from its role, department, priority,
+   * due days and form; a plain name clears the link.
+   */
+  function fieldsForName(name, fallbackRole) {
+    const master = masterTasks.find((m) => (m.name || m.title) === name);
+    if (!master) {
+      return { name, masterTaskId: null, role: TASK_ROLE_MAP[name] || fallbackRole };
+    }
+    return {
+      name,
+      masterTaskId: master.id,
+      role: master.role || TASK_ROLE_MAP[name] || fallbackRole,
+      department: master.department || undefined,
+      priority: master.priority || undefined,
+      dueIn: master.dueIn ?? undefined,
+      formId: master.formId || '',
+    };
+  }
 
 
   // An edit anywhere in the tree is written back as the flat task collection
-  // the API stores, with each task carrying the stage it belongs to.
-  useEffect(() => {
-    if (stages.length === 0) return;
-    const flat = stages.flatMap((stage) =>
-      (stage.tasks || []).map((task, index) => ({ ...task, stageId: stage.id, order: index + 1 }))
+  // the API stores, with each task carrying the stage it belongs to. Only on a
+  // user edit: syncing from an effect on [stages, storeStageTasks] compared a
+  // local copy one render behind the store and wrote again on every reply.
+  function commitStages(update) {
+    const next = typeof update === 'function' ? update(stages) : update;
+    setStages(next);
+    // A typed ORDER wins; rows without one take their list position.
+    const flat = next.flatMap((stage) =>
+      (stage.tasks || []).map((task, index) => ({
+        ...task,
+        stageId: stage.id,
+        order: task.order !== '' && Number.isFinite(Number(task.order)) && Number(task.order) > 0 ? Number(task.order) : index + 1,
+      }))
     );
     syncCollection('stageTasks', flat, storeStageTasks);
-  }, [stages, storeStageTasks]);
+  }
 
   useEffect(() => {
     try {
@@ -192,8 +223,8 @@ export default function LeadStageTasks({ leadForms = [] }) {
 
   function addDraftTask(stageId) {
     const draft = getDraft(stageId);
-    const role = TASK_ROLE_MAP[draft.name] || "Tele Caller Executive";
-    setStages((current) =>
+    const linked = fieldsForName(draft.name, "Tele Caller Executive");
+    commitStages((current) =>
       current.map((stage) => {
         if (stage.id !== stageId) return stage;
         return {
@@ -202,10 +233,9 @@ export default function LeadStageTasks({ leadForms = [] }) {
             ...stage.tasks,
             {
               id: Date.now(),
-              name: draft.name,
               description: `${draft.name} task`,
-              role,
               department: "Any",
+              ...linked,
               order: Number(draft.order) || 0,
               required: draft.required ?? true,
               autoCreate: draft.autoCreate ?? true,
@@ -247,7 +277,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
     event.preventDefault();
     if (!masterTask.name.trim()) return;
 
-    setStages((current) =>
+    commitStages((current) =>
       current.map((stage) => {
         if (stage.id !== taskModalStageId) return stage;
         return {
@@ -262,7 +292,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
               department: masterTask.department || "Any",
               priority: masterTask.priority,
               time: masterTask.time,
-              form: masterTask.form,
+              formId: masterTask.formId || '',
               order: stage.tasks.length,
               required: true,
               autoCreate: true,
@@ -281,7 +311,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
   }
 
   function deleteTask(stageId, taskId) {
-    setStages((current) =>
+    commitStages((current) =>
       current.map((stage) =>
         stage.id === stageId
           ? {
@@ -295,13 +325,18 @@ export default function LeadStageTasks({ leadForms = [] }) {
   }
 
   function updateTask(stageId, taskId, key, value) {
-    setStages((current) =>
+    updateTaskFields(stageId, taskId, { [key]: value });
+  }
+
+  /** Several fields in one save (two separate saves raced and reverted). */
+  function updateTaskFields(stageId, taskId, patch) {
+    commitStages((current) =>
       current.map((stage) =>
         stage.id === stageId
           ? {
               ...stage,
               tasks: stage.tasks.map((task) =>
-                task.id === taskId ? { ...task, [key]: value } : task
+                task.id === taskId ? { ...task, ...patch } : task
               ),
             }
           : stage
@@ -351,10 +386,10 @@ export default function LeadStageTasks({ leadForms = [] }) {
             <button
               type="button"
               onClick={() => setIsGuideOpen(true)}
-              className="inline-flex items-center gap-2 rounded-[12px] border-2 border-[#1d6bff] bg-[#f2f7ff] px-3 py-2 text-[13px] font-semibold text-[#1d6bff]"
+              className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold inline-flex items-center gap-2"
               aria-label="How to create lead stage tasks"
             >
-              <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#1d6bff] text-[12px] font-bold text-white">?</span>
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1f6bff] text-[11px] font-bold text-white">?</span>
               <span>How to create lead stage tasks?</span>
             </button>
             <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
@@ -362,7 +397,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
               <select
                 value={pipeline}
                 onChange={(e) => setPipeline(e.target.value)}
-                className="bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+                className="bg-white border border-slate-200 rounded-xl px-3 h-9 text-xs text-slate-700 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
               >
                 <option>Sales</option>
                 <option>Support</option>
@@ -371,7 +406,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
             <button
               type="button"
               onClick={() => addTask(stages[0].id)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg shadow-xs transition cursor-pointer"
+              className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Plus size={15} />
               Add Stage Task
@@ -414,7 +449,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
               e.stopPropagation();
               addTask(stages[0].id);
             }}
-            className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer shrink-0"
+            className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shrink-0"
           >
             <Plus size={14} />
             Add Task
@@ -481,7 +516,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                         <button
                           type="button"
                           onClick={() => triggerSaveToast()}
-                          className="px-4 py-1.5 bg-[#17487d] hover:bg-[#12365e] text-white text-xs font-semibold rounded-lg shadow-2xs transition cursor-pointer"
+                          className="btn-primary btn-sm"
                         >
                           Save
                         </button>
@@ -564,7 +599,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                       e.stopPropagation();
                       addTask(stage.id);
                     }}
-                    className="inline-flex items-center gap-1 px-3 py-1 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer"
+                    className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer"
                   >
                     <Plus size={13} />
                     Add Task
@@ -597,18 +632,25 @@ export default function LeadStageTasks({ leadForms = [] }) {
                               <td className="px-3 py-2.5">
                                 <select
                                   value={task.name}
-                                  onChange={(e) => {
-                                    const newName = e.target.value;
-                                    const newRole = TASK_ROLE_MAP[newName] || task.role;
-                                    updateTask(stage.id, task.id, "name", newName);
-                                    updateTask(stage.id, task.id, "role", newRole);
-                                  }}
+                                  onChange={(e) => updateTaskFields(stage.id, task.id, fieldsForName(e.target.value, task.role))}
                                   className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                                 >
                                   {taskOptions.map((opt) => (
                                     <option key={opt} value={opt}>
                                       {opt}
                                     </option>
+                                  ))}
+                                </select>
+                                <select
+                                  value={task.formId || ''}
+                                  onChange={(e) => updateTask(stage.id, task.id, "formId", e.target.value)}
+                                  aria-label="Task form"
+                                  title="The Lead Task Form this task opens"
+                                  className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-3 py-1 text-[11px] text-slate-500 focus:outline-none focus:border-blue-500 cursor-pointer"
+                                >
+                                  <option value="">No task form</option>
+                                  {taskForms.map((f) => (
+                                    <option key={f.id} value={f.id}>Form: {f.title || f.name}</option>
                                   ))}
                                 </select>
                               </td>
@@ -672,14 +714,14 @@ export default function LeadStageTasks({ leadForms = [] }) {
                                   <button
                                     type="button"
                                     onClick={() => triggerSaveToast()}
-                                    className="px-3.5 py-1.5 bg-[#0f4c81] hover:bg-[#0c3c66] text-white text-xs font-semibold rounded-md shadow-2xs transition cursor-pointer"
+                                    className="btn-primary btn-sm"
                                   >
                                     Save
                                   </button>
                                   <button
                                     type="button"
                                     onClick={() => deleteTask(stage.id, task.id)}
-                                    className="px-3 py-1.5 bg-white border border-[#f43f5e] text-[#f43f5e] hover:bg-rose-50 text-xs font-semibold rounded-md shadow-2xs transition cursor-pointer"
+                                    className="btn-danger btn-sm"
                                   >
                                     Remove
                                   </button>
@@ -758,7 +800,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
                             <button
                               type="button"
                               onClick={() => addDraftTask(stage.id)}
-                              className="inline-flex items-center gap-1 px-3.5 py-1.5 bg-[#50667a] hover:bg-[#415363] text-white text-xs font-semibold rounded-md shadow-2xs transition cursor-pointer"
+                              className="btn-primary btn-sm inline-flex items-center gap-1"
                             >
                               <Plus size={13} /> Add
                             </button>
@@ -915,19 +957,36 @@ export default function LeadStageTasks({ leadForms = [] }) {
                   className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 resize-none"
                 />
               </div>
+
+              <div>
+                <label htmlFor="stage-task-form" className="block text-xs font-semibold text-slate-700 mb-1">
+                  Task Form
+                </label>
+                <select
+                  id="stage-task-form"
+                  value={masterTask.formId || ''}
+                  onChange={(e) => updateMasterTask("formId", e.target.value)}
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                >
+                  <option value="">No task form</option>
+                  {taskForms.map((f) => (
+                    <option key={f.id} value={f.id}>{f.title || f.name}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-slate-50/70 border-t border-slate-100">
               <button
                 type="button"
                 onClick={closeTaskModal}
-                className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer text-xs"
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-xs transition cursor-pointer text-xs"
+                className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
               >
                 Create
               </button>

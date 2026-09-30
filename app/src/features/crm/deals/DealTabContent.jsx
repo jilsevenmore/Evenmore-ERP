@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, CheckCircle2, Download, Eye, FileText, Flag, FolderOpen, FolderPlus, Pencil, Phone, Printer, Trash2, Users } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
+import { resolveFileUrl } from '../../../services/api';
 
 export const formatDealMoney = (value) => `₹ ${Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 export function formatDealDate(value) {
@@ -64,10 +65,14 @@ export function ActivitiesTimeline({ activities }) {
   })}</ol></section>)}</div>;
 }
 
+/** An uploaded document's signed link (older rows carried the file inline as a data URL). */
+const docUrl = (item) => resolveFileUrl(item?.url || item?.data || '');
+const docMime = (item) => item?.mimeType || /^data:([^;]+);/.exec(item?.data || '')?.[1] || '';
+
 export function DocumentsTable({ documents, onRemove }) {
   const [preview, setPreview] = useState(null);
   const type = (item) => (item.name?.split('.').pop() || item.mimeType?.split('/').pop() || 'File').toUpperCase();
-  return <><Table columns={['#', 'File Name', 'Type', 'Uploaded By', 'Date', 'Actions']} count={documents.length} empty="No documents uploaded yet.">{documents.map((item, index) => <tr key={item.id}><td>{index + 1}</td><td className="deal-cell-primary"><button className="deal-text-action" onClick={() => setPreview(item)}>{item.name}</button></td><td>{type(item)}</td><td>{item.uploadedBy || 'Not recorded'}</td><td>{formatDealDate(item.createdAt)}</td><td><div className="deal-row-actions"><button aria-label={`View ${item.name}`} onClick={() => setPreview(item)}><Eye size={14} /></button><a aria-label={`Download ${item.name}`} href={item.data} download={item.name}><Download size={14} /></a><button className="deal-delete-action" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item)}><Trash2 size={14} /></button></div></td></tr>)}</Table><Modal isOpen={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.name} size="lg">{preview && <><p className="deal-action-hint">{type(preview)} · {Math.ceil((preview.size || 0) / 1024)} KB · {preview.uploadedBy || 'Not recorded'}</p>{/^data:image\/(png|jpeg|gif|webp);/i.test(preview.data || '') ? <img className="deal-document-preview" src={preview.data} alt={preview.name} /> : /^data:application\/pdf;/i.test(preview.data || '') ? <iframe className="deal-document-preview" title={preview.name} sandbox="" src={preview.data} /> : <p className="deal-detail-empty">Download this file to view its contents.</p>}<a className="btn-primary btn-sm" href={preview.data} download={preview.name}><Download size={14} />Download</a></>}</Modal></>;
+  return <><Table columns={['#', 'File Name', 'Type', 'Uploaded By', 'Date', 'Actions']} count={documents.length} empty="No documents uploaded yet.">{documents.map((item, index) => <tr key={item.id}><td>{index + 1}</td><td className="deal-cell-primary"><button className="deal-text-action" onClick={() => setPreview(item)}>{item.name}</button></td><td>{type(item)}</td><td>{item.uploadedBy || 'Not recorded'}</td><td>{formatDealDate(item.createdAt)}</td><td><div className="deal-row-actions"><button aria-label={`View ${item.name}`} onClick={() => setPreview(item)}><Eye size={14} /></button><a aria-label={`Download ${item.name}`} href={docUrl(item)} download={item.name} target="_blank" rel="noreferrer"><Download size={14} /></a><button className="deal-delete-action" aria-label={`Remove ${item.name}`} onClick={() => onRemove(item)}><Trash2 size={14} /></button></div></td></tr>)}</Table><Modal isOpen={Boolean(preview)} onClose={() => setPreview(null)} title={preview?.name} size="lg">{preview && <><p className="deal-action-hint">{type(preview)} · {Math.ceil((preview.size || 0) / 1024)} KB · {preview.uploadedBy || 'Not recorded'}</p>{/^image\/(png|jpeg|gif|webp)$/i.test(docMime(preview)) ? <img className="deal-document-preview" src={docUrl(preview)} alt={preview.name} /> : /^application\/pdf$/i.test(docMime(preview)) ? <iframe className="deal-document-preview" title={preview.name} src={docUrl(preview)} /> : <p className="deal-detail-empty">Download this file to view its contents.</p>}<a className="btn-primary btn-sm" href={docUrl(preview)} download={preview.name} target="_blank" rel="noreferrer"><Download size={14} />Download</a></>}</Modal></>;
 }
 
 export function QuotationsTable({ quotations }) {

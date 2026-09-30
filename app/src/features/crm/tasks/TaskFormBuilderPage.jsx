@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { X } from 'lucide-react';
 import LeadFormBuilder from '../leads/LeadFormBuilder';
@@ -33,6 +33,8 @@ export default function TaskFormBuilderPage() {
   const storeForms = useCrmStore((s) => s.forms);
   const currentForm = useMemo(
     () => (formId ? findForm(formId) : null) || loadForms(TASK_FORM)[0] || null,
+    // storeForms: re-resolve when the forms arrive or change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [formId, storeForms],
   );
 
@@ -41,31 +43,48 @@ export default function TaskFormBuilderPage() {
     return taskFormToSections(currentForm);
   });
 
+  // After a refresh the builder renders before `/crm/forms/` answers, so the
+  // form's sections are loaded when it arrives -- once per form. A form that
+  // just traded its pre-save id for the server's is the same form.
+  const [loadedFormKey, setLoadedFormKey] = useState(currentForm ? String(currentForm.id) : null);
+  const currentKey = currentForm ? String(currentForm.id) : null;
+  if (
+    currentKey
+    && currentKey !== loadedFormKey
+    && !(currentForm.clientId != null && String(currentForm.clientId) === loadedFormKey)
+  ) {
+    setLoadedFormKey(currentKey);
+    setSections(taskFormToSections(currentForm));
+  }
+
   const [selectedFieldId, setSelectedFieldId] = useState(() => sections[0]?.fields?.[0]?.id ?? null);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
   const selectedField = sections.flatMap((s) => s.fields).find((f) => f.id === selectedFieldId) ?? null;
 
-  // Single source of truth: persist every sections change (add/edit/delete/reorder)
-  useEffect(() => {
-    if (!currentForm?.id) return;
-    persistSections();
-  }, [sections, currentForm?.id]);
+  // Every edit (add / change / delete / reorder) is saved as it happens --
+  // from the handlers, not an effect, so opening the builder saves nothing and
+  // a form that loads late is never overwritten with the empty default.
+  function commitSections(update) {
+    const next = typeof update === 'function' ? update(sections) : update;
+    setSections(next);
+    persistSections(next);
+  }
 
-  function persistSections() {
+  function persistSections(nextSections) {
     if (!currentForm?.id) return;
-    const fieldNames = sections.flatMap((sec) => (sec.fields || []).map((f) => f.label));
+    const fieldNames = nextSections.flatMap((sec) => (sec.fields || []).map((f) => f.label));
     const updated = loadForms(TASK_FORM).map((f) =>
       f.id === currentForm.id
-        ? { ...f, sections, fields: fieldNames, lastUpdated: new Date().toLocaleDateString('en-GB') }
+        ? { ...f, sections: nextSections, fields: fieldNames, lastUpdated: new Date().toLocaleDateString('en-GB') }
         : f
     );
     saveForms(updated, TASK_FORM);
   }
 
   function updateField(fieldId, updates) {
-    setSections((cur) =>
+    commitSections((cur) =>
       cur.map((s) => ({
         ...s,
         fields: s.fields.map((f) => (f.id === fieldId ? { ...f, ...updates } : f)),
@@ -76,7 +95,7 @@ export default function TaskFormBuilderPage() {
   function addField(sectionId, type, index) {
     const targetId = sectionId || sections[0]?.id;
     const nextField = createFieldFromType(type, Date.now());
-    setSections((cur) =>
+    commitSections((cur) =>
       cur.map((s) => {
         if (s.id !== targetId) return s;
         const arr = [...s.fields];
@@ -88,7 +107,7 @@ export default function TaskFormBuilderPage() {
   }
 
   function removeField(fieldId) {
-    setSections((cur) => cur.map((s) => ({ ...s, fields: s.fields.filter((f) => f.id !== fieldId) })));
+    commitSections((cur) => cur.map((s) => ({ ...s, fields: s.fields.filter((f) => f.id !== fieldId) })));
     setSelectedFieldId((prev) => {
       if (prev !== fieldId) return prev;
       return sections.flatMap((s) => s.fields).filter((f) => f.id !== fieldId)[0]?.id ?? null;
@@ -96,7 +115,7 @@ export default function TaskFormBuilderPage() {
   }
 
   function moveField(fieldId, targetSectionId, targetIndex) {
-    setSections((cur) => {
+    commitSections((cur) => {
       let moving = null;
       const stripped = cur.map((s) => ({
         ...s,
@@ -118,21 +137,21 @@ export default function TaskFormBuilderPage() {
 
   function addSection() {
     const id = `task-section-${Date.now()}`;
-    setSections((cur) => [...cur, { id, title: `New Section ${cur.length + 1}`, fields: [] }]);
+    commitSections((cur) => [...cur, { id, title: `New Section ${cur.length + 1}`, fields: [] }]);
   }
 
   function removeSection(sectionId) {
-    setSections((cur) => (cur.length <= 1 ? cur : cur.filter((s) => s.id !== sectionId)));
+    commitSections((cur) => (cur.length <= 1 ? cur : cur.filter((s) => s.id !== sectionId)));
   }
 
   function updateSectionTitle(sectionId, newTitle) {
-    setSections((cur) =>
+    commitSections((cur) =>
       cur.map((s) => (s.id === sectionId ? { ...s, title: newTitle } : s))
     );
   }
 
   function duplicateSection(sectionId) {
-    setSections((cur) => {
+    commitSections((cur) => {
       const targetSec = cur.find((s) => s.id === sectionId);
       if (!targetSec) return cur;
       const newSecId = `task-section-${Date.now()}`;
@@ -158,7 +177,7 @@ export default function TaskFormBuilderPage() {
   }
 
   function handleSave() {
-    persistSections();
+    persistSections(sections);
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -257,7 +276,7 @@ export default function TaskFormBuilderPage() {
               <button
                 type="button"
                 onClick={() => setPreviewOpen(false)}
-                className="px-4 py-1.5 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition"
+                className="btn-outline"
               >
                 Close
               </button>

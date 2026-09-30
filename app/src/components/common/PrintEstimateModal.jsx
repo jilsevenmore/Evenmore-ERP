@@ -62,7 +62,7 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={handlePrint}
-                            className="px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
                         >
                             <Printer size={14} />
                             Print / Save as PDF
@@ -280,13 +280,13 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                     <div className="flex items-center gap-2">
                         <button
                             onClick={onClose}
-                            className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-white font-semibold text-xs transition cursor-pointer"
+                            className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
                         >
                             Close
                         </button>
                         <button
                             onClick={handlePrint}
-                            className="px-5 py-2 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm"
+                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-[0.99] cursor-pointer shadow-2xs"
                         >
                             <Printer size={14} />
                             Print Official Estimate

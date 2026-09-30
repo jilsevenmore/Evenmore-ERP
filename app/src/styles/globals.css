@@ -557,12 +557,492 @@ html.dark,
   background-color: var(--card-hover) !important;
   color: var(--text) !important;
   border-color: var(--border) !important;
+}/* =========================================================
+   GLOBAL APPLICATION UI STANDARDIZATION — SALES VISUAL REFERENCE
+   Standardizes all modules (CRM, HRMS, PMS, Inventory, Parties, Accounts,
+   Administration, Reports) using the exact Sales module & sidebar styles.
+   ========================================================= */
+
+/* ── 1. Buttons: Exact Sales Height, Padding, Radius & Colors ── */
+.btn-primary,
+button.btn-primary,
+a.btn-primary,
+.emp-add-btn,
+.bulk-btn-save,
+.mark-btn-primary,
+.indiv-btn-primary,
+.pms-btn-primary,
+.crm-btn-primary,
+.deal-btn-primary,
+.lead-btn-primary,
+.create-lead-btn,
+.hrms-add-btn,
+.hrms-submit,
+button.bg-primary,
+button.bg-blue-600,
+button.bg-indigo-600,
+button.bg-\[\#1d4a79\],
+button.bg-\[\#163a61\],
+button.bg-\[\#1f6bff\],
+button.bg-\[\#1F2E4A\],
+button.bg-\[\#152033\],
+button.bg-\[\#152036\],
+button.bg-\[\#16233a\],
+button.bg-\[\#1e3a8a\],
+button.bg-\[\#0CB1AC\],
+button.bg-navy {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  font-size: 0.8125rem !important; /* 13px (exact Sales text-xs) */
+  font-weight: 600 !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 16px !important;
+  border: 1px solid transparent !important;
+  transition: all 0.15s ease !important;
+  box-shadow: 0 1px 3px rgba(31, 107, 255, 0.22) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
 }
 
+.btn-primary:hover,
+button.btn-primary:hover,
+a.btn-primary:hover,
+.emp-add-btn:hover,
+.bulk-btn-save:hover,
+.mark-btn-primary:hover,
+.indiv-btn-primary:hover,
+.pms-btn-primary:hover,
+.crm-btn-primary:hover,
+.deal-btn-primary:hover,
+.lead-btn-primary:hover,
+.create-lead-btn:hover,
+.hrms-add-btn:hover,
+.hrms-submit:hover,
+button.bg-primary:hover,
+button.bg-blue-600:hover,
+button.bg-indigo-600:hover,
+button.bg-\[\#1d4a79\]:hover,
+button.bg-\[\#163a61\]:hover,
+button.bg-\[\#1f6bff\]:hover,
+button.bg-\[\#1F2E4A\]:hover,
+button.bg-\[\#152033\]:hover,
+button.bg-\[\#152036\]:hover,
+button.bg-\[\#16233a\]:hover,
+button.bg-\[\#1e3a8a\]:hover,
+button.bg-\[\#0CB1AC\]:hover,
+button.bg-navy:hover {
+  background-color: var(--primary-dark) !important;
+  color: #ffffff !important;
+}
 
+.btn-primary:active,
+button.btn-primary:active,
+a.btn-primary:active,
+.emp-add-btn:active,
+.bulk-btn-save:active,
+.mark-btn-primary:active,
+.indiv-btn-primary:active,
+.pms-btn-primary:active,
+.crm-btn-primary:active,
+.create-lead-btn:active,
+button.bg-primary:active,
+button.bg-blue-600:active,
+button.bg-\[\#1d4a79\]:active,
+button.bg-\[\#163a61\]:active,
+button.bg-\[\#1f6bff\]:active,
+button.bg-\[\#1F2E4A\]:active,
+button.bg-navy:active {
+  transform: scale(0.99) !important;
+}
 
+.btn-outline,
+button.btn-outline,
+a.btn-outline,
+.btn-secondary,
+button.btn-secondary,
+a.btn-secondary,
+.emp-export-btn,
+.bulk-btn-export,
+.mark-btn-export,
+.indiv-btn-export,
+.pms-btn-export,
+.att-btn-outline,
+.att-export-btn,
+.hrms-export,
+.hrms-date-btn,
+.pms-btn-outline,
+.crm-btn-outline,
+.deal-btn-outline,
+.lead-btn-outline {
+  background-color: var(--card) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  font-size: 0.8125rem !important; /* 13px (exact Sales text-xs) */
+  font-weight: 600 !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 14px !important;
+  transition: all 0.15s ease !important;
+  box-shadow: var(--shadow-2xs) !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+  line-height: 1 !important;
+}
 
-/* ── Reset ──────────────────────────────────────────────── */
+.btn-outline:hover,
+button.btn-outline:hover,
+a.btn-outline:hover,
+.btn-secondary:hover,
+button.btn-secondary:hover,
+a.btn-secondary:hover,
+.emp-export-btn:hover,
+.bulk-btn-export:hover,
+.mark-btn-export:hover,
+.indiv-btn-export:hover,
+.pms-btn-export:hover,
+.att-btn-outline:hover,
+.att-export-btn:hover,
+.hrms-export:hover,
+.hrms-date-btn:hover,
+.pms-btn-outline:hover,
+.crm-btn-outline:hover,
+.deal-btn-outline:hover,
+.lead-btn-outline:hover {
+  background-color: var(--card-hover) !important;
+  border-color: var(--primary) !important;
+  color: var(--primary) !important;
+}
+
+.btn-outline:active,
+button.btn-outline:active,
+a.btn-outline:active,
+.btn-secondary:active,
+button.btn-secondary:active,
+.emp-export-btn:active,
+.bulk-btn-export:active,
+.mark-btn-export:active,
+.indiv-btn-export:active,
+.pms-btn-export:active,
+.att-btn-outline:active,
+.att-export-btn:active,
+.hrms-export:active,
+.hrms-date-btn:active {
+  transform: scale(0.99) !important;
+}
+
+/* Small buttons (.btn-sm) — standardized to 30px height, 12px font */
+.btn-sm,
+button.btn-sm {
+  height: 30px !important;
+  min-height: 30px !important;
+  font-size: 0.75rem !important; /* 12px */
+  padding: 0 10px !important;
+  border-radius: 10px !important;
+}
+
+/* Modal and form cancel / outline buttons */
+.modal-footer button[type="button"]:not(.btn-danger):not(.icon-ghost),
+.modal-card button[type="button"]:not(.btn-danger):not(.icon-ghost):not(.tab-btn):not(.p-1):not(.p-1\.5):not(.p-2) {
+  border-radius: var(--radius-lg, 12px) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  min-height: 36px !important;
+  padding: 8px 16px !important;
+  transition: all 0.15s ease !important;
+}
+
+/* Modal and form submit buttons */
+.modal-footer button[type="submit"]:not(.btn-danger):not(.btn-outline),
+.modal-card button[type="submit"]:not(.btn-danger):not(.btn-outline) {
+  background-color: var(--primary) !important;
+  color: #ffffff !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  min-height: 36px !important;
+  padding: 8px 16px !important;
+  border: 1px solid transparent !important;
+  box-shadow: 0 1px 3px rgba(31, 107, 255, 0.22) !important;
+  transition: all 0.15s ease !important;
+  cursor: pointer !important;
+}
+.modal-footer button[type="submit"]:not(.btn-danger):not(.btn-outline):hover,
+.modal-card button[type="submit"]:not(.btn-danger):not(.btn-outline):hover {
+  background-color: var(--primary-dark) !important;
+}
+
+/* Table action icon buttons in all modules (matching Sales Eye, Sliders, Edit, Printer, Zap) */
+.emp-trash-btn,
+.row-action-btn,
+.pms-action-icon,
+.crm-action-icon {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.row-action-btn:hover,
+.pms-action-icon:hover,
+.crm-action-icon:hover {
+  background: var(--soft) !important;
+  color: var(--primary) !important;
+}
+
+/* ── 2. Cards: Sales Surface, Border, Radius & Subtle Shadow ── */
+.emp-card,
+.bulk-card,
+.indiv-card,
+.mark-card,
+.req-card,
+.pms-card,
+.crm-card,
+.reg-card {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.emp-card-header,
+.bulk-card-header,
+.pms-card-header {
+  padding: 14px 18px !important;
+  border-bottom: 1px solid var(--border) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+/* ── 3. Tables: Sales Table Header, Dividers, Padding & Row Hover ── */
+.emp-table,
+.bulk-table,
+.indiv-table,
+.mark-table,
+.req-table,
+.pms-table,
+.crm-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  font-size: 0.8125rem !important;
+}
+
+.emp-table thead tr,
+.bulk-table thead tr,
+.indiv-table thead tr,
+.mark-table thead tr,
+.req-table thead tr,
+.pms-table thead tr,
+.crm-table thead tr {
+  background-color: var(--table-head-bg) !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+.emp-table th,
+.bulk-table th,
+.indiv-table th,
+.mark-table th,
+.req-table th,
+.pms-table th,
+.crm-table th {
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  color: var(--text-secondary) !important;
+  padding: 10px 14px !important;
+  text-transform: uppercase !important;
+  border-bottom: 1px solid var(--border) !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+
+.emp-table td,
+.bulk-table td,
+.indiv-table td,
+.mark-table td,
+.req-table td,
+.pms-table td,
+.crm-table td {
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+  color: var(--text) !important;
+  font-size: 0.8125rem !important;
+  vertical-align: middle !important;
+}
+
+.emp-table tbody tr:hover,
+.bulk-table tbody tr:hover,
+.indiv-table tbody tr:hover,
+.mark-table tbody tr:hover,
+.req-table tbody tr:hover,
+.pms-table tbody tr:hover,
+.crm-table tbody tr:hover {
+  background-color: var(--table-row-hover) !important;
+}
+
+/* ── 4. Tabs: Sales Segmented & Underline Tab Styles ── */
+.emp-tabs,
+.bulk-pills-group,
+.pms-tabs-strip,
+.crm-tabs-strip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background-color: var(--soft) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  padding: 3px 4px !important;
+}
+
+.emp-tab,
+.bulk-pill,
+.pms-tab-btn,
+.crm-tab-btn {
+  border-radius: 9px !important;
+  padding: 5px 14px !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  color: var(--muted) !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.emp-tab:hover,
+.bulk-pill:hover,
+.pms-tab-btn:hover,
+.crm-tab-btn:hover {
+  color: var(--text) !important;
+}
+
+.emp-tab.active,
+.bulk-pill.active,
+.pms-tab-btn.active,
+.crm-tab-btn.active {
+  background-color: var(--card) !important;
+  color: var(--primary) !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid var(--border-subtle) !important;
+}
+
+/* ── 5. Dropdowns & Selects: Sales 12px Radius, Border, Font-Medium ── */
+.emp-select,
+.bulk-select,
+.emp-filter-dropdown,
+.bulk-date-wrap,
+.pms-select,
+.crm-select {
+  background-color: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  color: var(--text) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  padding: 6px 12px !important;
+  outline: none !important;
+  transition: all 0.15s ease !important;
+}
+
+.emp-select:focus,
+.bulk-select:focus,
+.pms-select:focus,
+.crm-select:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-subtle) !important;
+}
+
+.emp-filter-dropdown.active {
+  border-color: var(--primary) !important;
+  background-color: var(--primary-subtle) !important;
+}
+
+.emp-filter-dropdown.active .emp-filter-text,
+.emp-filter-dropdown.active .emp-filter-arrow {
+  color: var(--primary) !important;
+}
+
+.emp-filter-text {
+  color: var(--text) !important;
+}
+
+.emp-btn-clear {
+  background: var(--card) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-lg, 12px) !important;
+  padding: 6px 12px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  color: var(--text-secondary) !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+.emp-btn-clear:hover {
+  background: var(--card-hover) !important;
+  color: var(--text) !important;
+  border-color: var(--primary) !important;
+}
+
+/* ── 6. Page Typography & Container Normalization ── */
+.emp-dir-page,
+.bulk-att-page,
+.indiv-att-page,
+.mark-att-page,
+.pms-page-container {
+  background: transparent !important;
+}
+
+.emp-title,
+.bulk-title,
+.pms-page-title {
+  color: var(--text) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.02em !important;
+}
+
+.emp-sub,
+.bulk-sub,
+.pms-page-subtitle {
+  color: var(--muted) !important;
+  font-size: 0.78rem !important;
+}
+
+.emp-page-indicator {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+}
+
+.emp-id,
+.bulk-id {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace) !important;
+  font-size: 0.78rem !important;
+  color: var(--muted) !important;
+}
 *, *::before, *::after { box-sizing: border-box; }
 
 html, body, #root {
@@ -937,10 +1417,11 @@ img { display: block; max-width: 100%; }
   border-radius: 7px;
   background: transparent;
   color: var(--sidebar-text);
-  opacity: 0.85;
-  padding: 5.5px 8px;
+  opacity: 0.92;
+  padding: 6.5px 8px;
   text-align: left;
-  font-size: 0.79rem;
+  font-size: 0.82rem;
+  font-weight: 500;
   line-height: 1.3;
   transition: all 0.15s ease;
   min-width: 0;
@@ -1347,24 +1828,34 @@ img { display: block; max-width: 100%; }
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn-primary, .btn-outline, .btn-ghost, .btn-danger {
   height: 36px;
-  border-radius: var(--radius);
-  padding: 0 16px;
+  border-radius: var(--radius-lg);
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  gap: 7px;
   font-weight: 600;
-  font-size: 0.88rem;
-  border: 0;
+  font-size: 0.8125rem;
+  border: 1px solid transparent;
   transition: all 0.15s ease;
-  box-shadow: var(--shadow-card);
+  box-shadow: var(--shadow-2xs, 0 1px 2px rgba(0, 0, 0, 0.04));
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn-primary:active, .btn-outline:active, .btn-ghost:active, .btn-danger:active {
+  transform: scale(0.99);
 }
 
 .btn-primary {
   background: var(--primary);
   color: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(31, 107, 255, 0.22);
 }
 .btn-primary:hover { background: var(--primary-dark); }
-.btn-primary:disabled { cursor: not-allowed; opacity: 0.55; background: var(--muted); }
+.btn-primary:disabled { cursor: not-allowed; opacity: 0.5; background: var(--muted); }
 
 .btn-outline {
   background: var(--card);
@@ -1372,41 +1863,44 @@ img { display: block; max-width: 100%; }
   border: 1px solid var(--border);
 }
 .btn-outline:hover {
-  background: var(--soft);
+  background: var(--card-hover);
   border-color: var(--primary);
+  color: var(--primary);
 }
 
 .btn-ghost {
   background: transparent;
   color: var(--text);
-  border: 0;
+  border: 1px solid transparent;
   box-shadow: none;
 }
-.btn-ghost:hover { background: var(--soft); }
+.btn-ghost:hover { background: var(--soft); color: var(--text); }
 
 .btn-danger {
   background: var(--danger);
   color: #fff;
+  border-color: transparent;
 }
 .btn-danger:hover { opacity: 0.9; }
 
-.btn-sm { height: 30px; padding: 0 12px; font-size: 0.8rem; }
-.btn-lg { height: 44px; padding: 0 24px; font-size: 0.96rem; }
+.btn-sm { height: 30px; padding: 0 11px; font-size: 0.75rem; border-radius: 9px; gap: 6px; }
+.btn-lg { height: 40px; padding: 0 18px; font-size: 0.875rem; border-radius: var(--radius-lg); gap: 8px; }
 
 /* Icon button */
 .icon-ghost {
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border: 0;
   background: transparent;
-  border-radius: var(--radius);
-  color: var(--text);
+  border-radius: 8px;
+  color: var(--text-secondary);
   display: grid;
   place-items: center;
   transition: all 0.15s ease;
+  cursor: pointer;
 }
 
-.icon-ghost:hover { background: var(--soft); }
+.icon-ghost:hover { background: var(--soft); color: var(--primary); }
 
 /* ── Cards ───────────────────────────────────────────────── */
 .card {
@@ -1586,49 +2080,63 @@ img { display: block; max-width: 100%; }
   background: rgba(148, 163, 184, 0.6);
 }
 
-.data-table, .leads-table {
+.data-table, .leads-table, .emp-table, .bulk-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
-.data-table thead th, .leads-table thead th {
+.data-table thead th, .leads-table thead th, .emp-table thead th, .bulk-table thead th {
   background: var(--table-head-bg);
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   text-align: inherit;
-  padding: 13px 14px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
 .data-table thead th.text-left,
 .leads-table thead th.text-left,
+.emp-table thead th.text-left,
+.bulk-table thead th.text-left,
 .data-table tbody td.text-left,
-.leads-table tbody td.text-left {
+.leads-table tbody td.text-left,
+.emp-table tbody td.text-left,
+.bulk-table tbody td.text-left {
   text-align: left !important;
 }
 
 .data-table thead th.text-center,
 .leads-table thead th.text-center,
+.emp-table thead th.text-center,
+.bulk-table thead th.text-center,
 .data-table tbody td.text-center,
-.leads-table tbody td.text-center {
+.leads-table tbody td.text-center,
+.emp-table tbody td.text-center,
+.bulk-table tbody td.text-center {
   text-align: center !important;
 }
 
 .data-table thead th.text-right,
 .leads-table thead th.text-right,
+.emp-table thead th.text-right,
+.bulk-table thead th.text-right,
 .data-table tbody td.text-right,
-.leads-table tbody td.text-right {
+.leads-table tbody td.text-right,
+.emp-table tbody td.text-right,
+.bulk-table tbody td.text-right {
   text-align: right !important;
 }
 
 .data-table thead th + th,
-.leads-table thead th + th {
+.leads-table thead th + th,
+.emp-table thead th + th,
+.bulk-table thead th + th {
   box-shadow: inset 1px 0 0 var(--border-subtle);
 }
 
@@ -1640,14 +2148,15 @@ img { display: block; max-width: 100%; }
 
 .sort-ico { color: var(--muted); }
 
-.data-table tbody td, .leads-table tbody td {
-  padding: 12px 14px;
+.data-table tbody td, .leads-table tbody td, .emp-table tbody td, .bulk-table tbody td {
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
   vertical-align: middle;
   color: var(--text);
+  font-size: 0.8125rem;
 }
 
-.data-table tbody tr:hover, .leads-table tbody tr:hover { background: var(--table-row-hover); }
+.data-table tbody tr:hover, .leads-table tbody tr:hover, .emp-table tbody tr:hover, .bulk-table tbody tr:hover { background: var(--table-row-hover); }
 
 .col-check, .col-more, .col-delete { width: 44px; }
 
@@ -1678,29 +2187,31 @@ img { display: block; max-width: 100%; }
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 10px;
+  padding: 2.5px 9px;
   border-radius: 999px;
-  font-size: 0.77rem;
+  font-size: 0.72rem;
   font-weight: 600;
+  line-height: 1.3;
+  border: 1px solid transparent;
 }
 
-.badge-blue { background: rgba(59, 130, 246, 0.16); color: var(--primary); }
-.badge-green { background: rgba(16, 185, 129, 0.16); color: var(--success); }
-.badge-yellow { background: rgba(245, 158, 11, 0.16); color: var(--warning); }
-.badge-red { background: rgba(239, 68, 68, 0.16); color: var(--danger); }
-.badge-purple { background: rgba(139, 92, 246, 0.16); color: #a78bfa; }
-.badge-gray { background: var(--soft); color: var(--text-secondary); }
-.badge-orange { background: rgba(249, 115, 22, 0.16); color: #fb923c; }
-.badge-cyan { background: rgba(6, 182, 212, 0.16); color: var(--info); }
+.badge-blue { background: rgba(31, 107, 255, 0.12); color: #1f6bff; border-color: rgba(31, 107, 255, 0.22); }
+.badge-green { background: rgba(27, 184, 120, 0.12); color: #1bb878; border-color: rgba(27, 184, 120, 0.22); }
+.badge-yellow { background: rgba(239, 155, 6, 0.12); color: #ef9b06; border-color: rgba(239, 155, 6, 0.22); }
+.badge-red { background: rgba(239, 68, 68, 0.12); color: #ef4444; border-color: rgba(239, 68, 68, 0.22); }
+.badge-purple { background: rgba(155, 81, 224, 0.12); color: #9b51e0; border-color: rgba(155, 81, 224, 0.22); }
+.badge-gray { background: var(--soft); color: var(--text-secondary); border-color: var(--border); }
+.badge-orange { background: rgba(249, 115, 22, 0.12); color: #ea580c; border-color: rgba(249, 115, 22, 0.22); }
+.badge-cyan { background: rgba(12, 177, 172, 0.12); color: #0cb1ac; border-color: rgba(12, 177, 172, 0.22); }
 
 /* ── Modal ───────────────────────────────────────────────── */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 16px;
   z-index: 100;
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -1723,7 +2234,7 @@ img { display: block; max-width: 100%; }
 .modal-card.modal-xl { max-width: min(1000px, 100%); }
 
 .modal-header {
-  padding: 20px 24px 16px;
+  padding: 16px 20px 14px;
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -1732,7 +2243,7 @@ img { display: block; max-width: 100%; }
   background: var(--card);
 }
 
-.modal-header h2 { margin: 0; font-size: 1.15rem; color: var(--text); font-weight: 700; }
+.modal-header h2 { margin: 0; font-size: 1.05rem; color: var(--text); font-weight: 700; }
 
 .modal-close {
   width: 32px;
@@ -1744,6 +2255,7 @@ img { display: block; max-width: 100%; }
   display: grid;
   place-items: center;
   transition: all 0.15s ease;
+  cursor: pointer;
 }
 
 .modal-close:hover { background: var(--soft); color: var(--text); }
@@ -1990,7 +2502,12 @@ img { display: block; max-width: 100%; }
   border-top: 1px solid var(--border);
 }
 .lead-create-action-right { display: flex; align-items: center; gap: 8px; }
-.lead-create-modal-actions button { min-height: 34px; }
+.lead-create-modal-actions button {
+  height: 36px;
+  border-radius: var(--radius-lg, 12px) !important;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
 
 @media (max-width: 640px) {
   .lead-create-modal-body { grid-template-columns: 1fr; }
@@ -2747,16 +3264,16 @@ img { display: block; max-width: 100%; }
 
 .record-action-button,
 .record-action-close {
-  height: 38px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg, 12px) !important;
   background: #fff;
   padding: 0 14px;
-  font-size: 0.76rem;
+  font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -2765,7 +3282,7 @@ img { display: block; max-width: 100%; }
 .record-action-button.delete { border-color: #fca5a5; color: #dc2626; }
 .record-action-button.delete:hover { background: #fef2f2; border-color: #ef4444; }
 .record-action-close {
-  width: 38px;
+  width: 36px;
   border-color: transparent;
   background: transparent;
   color: var(--muted);
@@ -2798,16 +3315,17 @@ img { display: block; max-width: 100%; }
 }
 
 .toolbar-pill {
-  height: 38px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg, 12px) !important;
   background: transparent;
   color: var(--text);
   padding: 0 14px;
-  font-weight: 500;
+  font-size: 0.8125rem;
+  font-weight: 600;
   transition: all 0.15s ease;
 }
 
@@ -2816,8 +3334,8 @@ img { display: block; max-width: 100%; }
 .toolbar-icon {
   width: 36px;
   height: 36px;
-  border: 0;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg, 12px) !important;
   background: transparent;
   color: var(--text-secondary);
   display: grid;

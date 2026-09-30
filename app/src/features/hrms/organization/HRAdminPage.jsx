@@ -846,7 +846,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={handleOpenAddTeam}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Plus size={16} /> Create Team
             </button>
@@ -878,7 +878,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={handleOpenAddChain}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Plus size={16} /> New Approval Chain
             </button>
@@ -887,7 +887,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={() => setIsGenerateOfferModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Plus size={16} /> Generate Offer Letter
             </button>
@@ -905,7 +905,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={() => setIsResignationModalOpen(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <UserMinus size={16} /> Submit Resignation
             </button>
@@ -923,7 +923,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={handleOpenAddHoliday}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Calendar size={16} /> Add Holiday
             </button>
@@ -932,7 +932,7 @@ export default function HRAdminPage({ defaultTab }) {
             <button
               type="button"
               onClick={handleSaveOrgSettings}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <CheckCircle2 size={16} /> Save Configuration
             </button>
@@ -1017,7 +1017,7 @@ export default function HRAdminPage({ defaultTab }) {
                   placeholder="Search teams by name, ID, lead, approver..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-[12.5px] rounded-lg border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  className="w-full pl-9 pr-3 h-9 text-xs rounded-xl border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
                 />
               </div>
             </div>
@@ -1028,7 +1028,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setTeamDeptFilter("all")}
-                className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
+                className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
                   teamDeptFilter === "all" ? "bg-navy text-white font-semibold" : "bg-off text-muted hover:text-slate-800"
                 }`}
               >
@@ -1039,7 +1039,7 @@ export default function HRAdminPage({ defaultTab }) {
                   key={d}
                   type="button"
                   onClick={() => setTeamDeptFilter(d)}
-                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
+                  className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
                     teamDeptFilter === d ? "bg-navy text-white font-semibold" : "bg-off text-muted hover:text-slate-800"
                   }`}
                 >
@@ -1091,7 +1091,7 @@ export default function HRAdminPage({ defaultTab }) {
                       <tr key={t.id} className="hover:bg-off/60 transition">
                         <td className="py-4 px-5">
                           <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center font-bold text-[12px]">
+                            <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200 text-blue-800 flex items-center justify-center font-bold text-[12px]">
                               {t.name.substring(0, 2).toUpperCase()}
                             </div>
                             <div>
@@ -1124,7 +1124,7 @@ export default function HRAdminPage({ defaultTab }) {
                             <button
                               type="button"
                               onClick={() => handleOpenEditTeam(t)}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-muted hover:text-slate-900 transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-muted hover:text-slate-900 transition cursor-pointer"
                               title="Edit Team Details"
                             >
                               <Edit size={16} />
@@ -1132,7 +1132,7 @@ export default function HRAdminPage({ defaultTab }) {
                             <button
                               type="button"
                               onClick={() => handleDeleteTeam(t.id, t.name)}
-                              className="p-1.5 hover:bg-red-50 rounded-lg text-muted hover:text-red-600 transition cursor-pointer"
+                              className="p-1.5 hover:bg-red-50 rounded-xl text-muted hover:text-red-600 transition cursor-pointer"
                               title="Remove Team"
                             >
                               <Trash2 size={16} />
@@ -1201,7 +1201,7 @@ export default function HRAdminPage({ defaultTab }) {
                   placeholder="Search workflows by module name or approver..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-[12.5px] rounded-lg border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  className="w-full pl-9 pr-3 h-9 text-xs rounded-xl border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
                 />
               </div>
             </div>
@@ -1213,7 +1213,7 @@ export default function HRAdminPage({ defaultTab }) {
                   key={st}
                   type="button"
                   onClick={() => setChainStatusFilter(st)}
-                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
+                  className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
                     chainStatusFilter === st
                       ? "bg-navy text-white font-semibold"
                       : "bg-off text-muted hover:text-slate-800"
@@ -1308,7 +1308,7 @@ export default function HRAdminPage({ defaultTab }) {
                             <button
                               type="button"
                               onClick={() => handleOpenEditChain(c)}
-                              className="p-1.5 hover:bg-slate-100 rounded-lg text-muted hover:text-slate-900 transition cursor-pointer"
+                              className="p-1.5 hover:bg-slate-100 rounded-xl text-muted hover:text-slate-900 transition cursor-pointer"
                               title="Edit Approval Chain"
                             >
                               <Edit size={16} />
@@ -1316,7 +1316,7 @@ export default function HRAdminPage({ defaultTab }) {
                             <button
                               type="button"
                               onClick={() => handleDeleteChain(c.id, c.module)}
-                              className="p-1.5 hover:bg-red-50 rounded-lg text-muted hover:text-red-600 transition cursor-pointer"
+                              className="p-1.5 hover:bg-red-50 rounded-xl text-muted hover:text-red-600 transition cursor-pointer"
                               title="Delete Approval Chain"
                             >
                               <Trash2 size={16} />
@@ -1396,7 +1396,7 @@ export default function HRAdminPage({ defaultTab }) {
                   placeholder="Search offer letters by candidate, position, or ID..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-[12.5px] rounded-lg border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  className="w-full pl-9 pr-3 h-9 text-xs rounded-xl border border-bdr bg-off focus:bg-white focus:outline-none focus:border-navy"
                 />
               </div>
             </div>
@@ -1408,7 +1408,7 @@ export default function HRAdminPage({ defaultTab }) {
                   key={st}
                   type="button"
                   onClick={() => setOfferStatusFilter(st)}
-                  className={`px-3 py-1 rounded-lg text-[12px] font-medium transition cursor-pointer ${
+                  className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
                     offerStatusFilter === st
                       ? "bg-navy text-white font-semibold"
                       : "bg-off text-muted hover:text-slate-800"
@@ -1516,7 +1516,7 @@ export default function HRAdminPage({ defaultTab }) {
                                 setActiveOfferLetter(o);
                                 setIsOfferLetterModalOpen(true);
                               }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition cursor-pointer"
+                              className="inline-flex items-center gap-1 btn-primary h-8 px-3 rounded-xl text-xs font-semibold border border-emerald-200 transition cursor-pointer"
                               title="View / Edit Offer Letter & Print PDF"
                             >
                               <FileCheck2 size={13} />
@@ -1529,7 +1529,7 @@ export default function HRAdminPage({ defaultTab }) {
                                 setIsOfferLetterModalOpen(true);
                                 setTimeout(() => window.print(), 350);
                               }}
-                              className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                              className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
                               title="Direct Print / Save PDF"
                             >
                               <Printer size={15} />
@@ -1631,7 +1631,7 @@ export default function HRAdminPage({ defaultTab }) {
                               setActiveTerminationLetter(t);
                               setIsTerminationLetterModalOpen(true);
                             }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-semibold bg-red-50 text-red-700 hover:bg-red-100 rounded-lg border border-red-200 transition cursor-pointer"
+                            className="inline-flex items-center gap-1 btn-danger h-8 px-3 rounded-xl text-xs font-semibold border border-red-200 transition cursor-pointer"
                             title="View / Edit Termination Letter & Print PDF"
                           >
                             <FileText size={13} />
@@ -1644,7 +1644,7 @@ export default function HRAdminPage({ defaultTab }) {
                               setIsTerminationLetterModalOpen(true);
                               setTimeout(() => window.print(), 350);
                             }}
-                            className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                            className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
                             title="Direct Print / Save PDF"
                           >
                             <Printer size={15} />
@@ -1652,7 +1652,7 @@ export default function HRAdminPage({ defaultTab }) {
                           <button
                             type="button"
                             onClick={() => showToast(`Reason: ${t.reason}`)}
-                            className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                            className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
                             title="View Reason"
                           >
                             <Eye size={16} />
@@ -1734,7 +1734,7 @@ export default function HRAdminPage({ defaultTab }) {
                       <button
                         type="button"
                         onClick={() => showToast(`Resignation Reason: ${r.reason}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                        className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
                         title="View Reason"
                       >
                         <Eye size={16} />
@@ -1824,7 +1824,7 @@ export default function HRAdminPage({ defaultTab }) {
                       <button
                         type="button"
                         onClick={() => showToast(`Grievance: ${c.summary}`)}
-                        className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                        className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
                         title="View Summary"
                       >
                         <Eye size={16} />
@@ -1901,7 +1901,7 @@ export default function HRAdminPage({ defaultTab }) {
                         <button
                           type="button"
                           onClick={() => handleOpenEditHoliday(h)}
-                          className="p-1.5 hover:bg-off rounded-lg text-muted hover:text-slate-900 cursor-pointer"
+                          className="p-1.5 hover:bg-off rounded-xl text-muted hover:text-slate-900 cursor-pointer"
                           title="Edit Holiday"
                         >
                           <Edit size={16} />
@@ -1909,7 +1909,7 @@ export default function HRAdminPage({ defaultTab }) {
                         <button
                           type="button"
                           onClick={() => handleDeleteHoliday(h.id, h.name)}
-                          className="p-1.5 hover:bg-red-50 rounded-lg text-muted hover:text-red-600 cursor-pointer"
+                          className="p-1.5 hover:bg-red-50 rounded-xl text-muted hover:text-red-600 cursor-pointer"
                           title="Remove Holiday"
                         >
                           <Trash2 size={16} />
@@ -2186,7 +2186,7 @@ export default function HRAdminPage({ defaultTab }) {
                       <tr key={dept.name} className="hover:bg-slate-50/60 transition-colors">
                         <td className="py-3.5 px-4 font-semibold text-slate-900">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-[12px] border border-blue-100">
+                            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-[12px] border border-blue-100">
                               <Building2 size={15} />
                             </div>
                             <div>
@@ -2398,7 +2398,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsTeamModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -2489,7 +2489,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsChainModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -2585,7 +2585,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsTerminationModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -2610,7 +2610,7 @@ export default function HRAdminPage({ defaultTab }) {
                       });
                     }
                   }}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
                 >
                   <option value="">-- Choose active staff member (or enter below) --</option>
                   {employees.map((emp) => (
@@ -2755,7 +2755,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsResignationModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -2779,7 +2779,7 @@ export default function HRAdminPage({ defaultTab }) {
                       });
                     }
                   }}
-                  className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-300 text-[12.5px] bg-white text-slate-800 focus:outline-none focus:border-navy cursor-pointer"
                 >
                   <option value="">-- Choose active staff member (or enter below) --</option>
                   {employees.map((emp) => (
@@ -2921,7 +2921,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsComplaintModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>
@@ -3035,7 +3035,7 @@ export default function HRAdminPage({ defaultTab }) {
               <button
                 type="button"
                 onClick={() => setIsHolidayModalOpen(false)}
-                className="w-8 h-8 rounded-lg hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
               >
                 ✕
               </button>

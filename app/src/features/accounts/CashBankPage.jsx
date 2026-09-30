@@ -125,13 +125,13 @@ export const CashBankPage = () => {
       </div>
 
       {/* ── [PHASE-2E] Inter-Bank Transfer (treasury reshuffling, no P&L impact) ── */}
-      <div className="bg-white border border-[#CED4DA] rounded-lg shadow-xs">
-        <div className="px-5 py-4 border-b border-[#CED4DA] flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
+      <div className="bg-card border border-border rounded-xl shadow-xs">
+        <div className="px-5 py-4 border-b border-border flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
           <div>
-            <h3 className="font-bold text-sm text-[#1F2E4A]">Inter-Bank Transfer</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Move cash between company bank accounts. A mirrored journal entry is auto-posted; P&amp;L is unaffected.</p>
+            <h3 className="font-bold text-sm text-text">Inter-Bank Transfer</h3>
+            <p className="text-xs text-muted mt-0.5">Move cash between company bank accounts. A mirrored journal entry is auto-posted; P&amp;L is unaffected.</p>
           </div>
-          <button onClick={() => setShowTransfer(!showTransfer)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg cursor-pointer whitespace-nowrap transition">
+          <button onClick={() => setShowTransfer(!showTransfer)} className="px-3 py-1.5 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-xl cursor-pointer whitespace-nowrap transition shadow-2xs">
             {showTransfer ? 'Close' : 'New Transfer'}
           </button>
         </div>
@@ -139,8 +139,8 @@ export const CashBankPage = () => {
           <div className="p-4 sm:p-5">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_160px_auto] gap-3 items-end">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">From Account *</label>
-                <select value={transferFrom} onChange={(e) => setTransferFrom(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 text-xs">
+                <label className="block text-[11px] font-semibold text-text-secondary mb-1">From Account *</label>
+                <select value={transferFrom} onChange={(e) => setTransferFrom(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
                   <option value="">Select source...</option>
                   {bankAccounts.map((a) => (
                     <option key={a.id} value={a.id}>{a.bankName} — {formatCurrency(a.balance)}</option>
@@ -148,8 +148,8 @@ export const CashBankPage = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">To Account *</label>
-                <select value={transferTo} onChange={(e) => setTransferTo(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 text-xs">
+                <label className="block text-[11px] font-semibold text-text-secondary mb-1">To Account *</label>
+                <select value={transferTo} onChange={(e) => setTransferTo(e.target.value)} className="w-full border border-border rounded-xl p-2 bg-card text-text text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
                   <option value="">Select destination...</option>
                   {bankAccounts.filter((a) => a.id !== transferFrom).map((a) => (
                     <option key={a.id} value={a.id}>{a.bankName} — {formatCurrency(a.balance)}</option>
@@ -157,8 +157,8 @@ export const CashBankPage = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Amount (₹) *</label>
-                <input type="number" min="0.01" step="0.01" value={transferAmt || ''} onChange={(e) => setTransferAmt(Number(e.target.value))} placeholder="0" className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-900 font-mono text-xs" />
+                <label className="block text-[11px] font-semibold text-text-secondary mb-1">Amount (₹) *</label>
+                <input type="number" min="0.01" step="0.01" value={transferAmt || ''} onChange={(e) => setTransferAmt(Number(e.target.value))} placeholder="0" className="w-full border border-border rounded-xl p-2 bg-card text-text font-mono text-xs focus:ring-2 focus:ring-primary/20 focus:border-primary transition" />
               </div>
               <button
                 type="button"
@@ -167,13 +167,13 @@ export const CashBankPage = () => {
                   addInterbankTransfer({ fromAccountId: transferFrom, toAccountId: transferTo, amount: transferAmt, reference: transferRef, date: getCurrentDateFormatted() });
                   setTransferFrom(''); setTransferTo(''); setTransferAmt(0); setTransferRef('');
                 }}
-                className="px-4 py-2 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg text-xs font-bold shadow-sm cursor-pointer disabled:opacity-50 transition"
+                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs cursor-pointer disabled:opacity-50 transition"
               >
                 Execute Transfer
               </button>
             </div>
             <div className="mt-3">
-              <input type="text" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} placeholder="Internal reference (optional)" className="w-full sm:w-80 border border-slate-200 rounded-lg p-1.5 text-xs text-slate-700 bg-slate-50" />
+              <input type="text" value={transferRef} onChange={(e) => setTransferRef(e.target.value)} placeholder="Internal reference (optional)" className="w-full sm:w-80 border border-border rounded-xl p-2 text-xs text-text bg-card focus:ring-2 focus:ring-primary/20 focus:border-primary transition" />
             </div>
           </div>
         )}
@@ -181,31 +181,31 @@ export const CashBankPage = () => {
 
       {/* [PHASE-2E] Recent inter-bank transfers log */}
       {transfers.length > 0 && (
-        <div className="bg-white border border-[#CED4DA] rounded-lg overflow-hidden">
-          <div className="px-5 py-3 border-b border-slate-100">
-            <h3 className="font-bold text-xs text-[#1F2E4A]">Inter-Bank Transfer Ledger</h3>
+        <div className="bg-card border border-border rounded-xl overflow-hidden shadow-xs">
+          <div className="px-5 py-3 border-b border-border">
+            <h3 className="font-bold text-xs text-text">Inter-Bank Transfer Ledger</h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-slate-600">
-              <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+            <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs text-text-secondary">
+              <thead className="bg-table-head uppercase font-semibold text-text-secondary tracking-wider border-b border-border">
                 <tr>
-                  <th className="py-2 px-3">Ref</th>
-                  <th className="py-2 px-3">Date</th>
-                  <th className="py-2 px-3">From</th>
-                  <th className="py-2 px-3">To</th>
-                  <th className="py-2 px-3 text-right">Amount</th>
-                  <th className="py-2 px-3 text-center">Status</th>
+                  <th className="py-2.5 px-3">Ref</th>
+                  <th className="py-2.5 px-3">Date</th>
+                  <th className="py-2.5 px-3">From</th>
+                  <th className="py-2.5 px-3">To</th>
+                  <th className="py-2.5 px-3 text-right">Amount</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {transfers.slice(0, 10).map((tr) => (
-                  <tr key={tr.id} className="hover:bg-slate-50/70">
-                    <td className="p-2 font-mono font-semibold text-slate-800">{tr.transferNumber}</td>
-                    <td className="p-2 font-mono text-slate-500">{formatDateDDMMYYYY(tr.date)}</td>
-                    <td className="p-2">{tr.fromAccount}</td>
-                    <td className="p-2">{tr.toAccount}</td>
-                    <td className="p-2 text-right font-mono font-bold text-rose-600">{formatCurrency(tr.amount)}</td>
-                    <td className="p-2 text-center"><span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">{tr.status}</span></td>
+                  <tr key={tr.id} className="hover:bg-table-row-hover transition-colors">
+                    <td className="p-2.5 font-mono font-semibold text-text">{tr.transferNumber}</td>
+                    <td className="p-2.5 font-mono text-muted">{formatDateDDMMYYYY(tr.date)}</td>
+                    <td className="p-2.5 text-text">{tr.fromAccount}</td>
+                    <td className="p-2.5 text-text">{tr.toAccount}</td>
+                    <td className="p-2.5 text-right font-mono font-bold text-rose-600">{formatCurrency(tr.amount)}</td>
+                    <td className="p-2.5 text-center"><span className="inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">{tr.status}</span></td>
                   </tr>
                 ))}
               </tbody>
@@ -218,38 +218,38 @@ export const CashBankPage = () => {
             String(a.accountNumber ?? '').toLowerCase().includes(term) ||
             (a.accountType || '').toLowerCase().includes(term)}/>
 
-      {isModalOpen && (<div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-lg border border-[#CED4DA] max-w-md w-full p-4 sm:p-6 shadow-xl text-xs max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between pb-3 border-b border-[#CED4DA]">
-              <h3 className="font-bold text-base text-[#1F2E4A]">Link New Bank Account</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+      {isModalOpen && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-card rounded-2xl border border-border max-w-md w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[95vh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="font-bold text-base text-text">Link New Bank Account</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-1 rounded-xl text-muted hover:text-text cursor-pointer transition">
                 <X size={18}/>
               </button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Financial Institution *</label>
-                <input type="text" required placeholder="e.g. Bank of America Commercial" value={newAcc.bankName} onChange={(e) => setNewAcc({ ...newAcc, bankName: e.target.value })} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
+                <label className="font-semibold text-text-secondary block mb-1">Financial Institution *</label>
+                <input type="text" required placeholder="e.g. Bank of America Commercial" value={newAcc.bankName} onChange={(e) => setNewAcc({ ...newAcc, bankName: e.target.value })} className="w-full p-2 border border-border rounded-xl bg-card text-text focus:ring-2 focus:ring-primary/20 focus:border-primary transition"/>
               </div>
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Account Number Mask</label>
-                <input type="text" placeholder="e.g. •••• 9921" value={newAcc.accountNumber} onChange={(e) => setNewAcc({ ...newAcc, accountNumber: e.target.value })} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
+                <label className="font-semibold text-text-secondary block mb-1">Account Number Mask</label>
+                <input type="text" placeholder="e.g. •••• 9921" value={newAcc.accountNumber} onChange={(e) => setNewAcc({ ...newAcc, accountNumber: e.target.value })} className="w-full p-2 border border-border rounded-xl bg-card text-text focus:ring-2 focus:ring-primary/20 focus:border-primary transition"/>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Account Type</label>
-                  <select value={newAcc.accountType} onChange={(e) => setNewAcc({ ...newAcc, accountType: e.target.value })} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]">
+                  <label className="font-semibold text-text-secondary block mb-1">Account Type</label>
+                  <select value={newAcc.accountType} onChange={(e) => setNewAcc({ ...newAcc, accountType: e.target.value })} className="w-full p-2 border border-border rounded-xl bg-card text-text focus:ring-2 focus:ring-primary/20 focus:border-primary transition">
                     <option value="Current Operating">Current Operating</option>
                     <option value="Treasury Reserve">Treasury Reserve</option>
                     <option value="Petty Cash">Petty Cash</option>
                   </select>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Opening Balance ($)</label>
-                  <input type="number" value={newAcc.balance} onChange={(e) => setNewAcc({ ...newAcc, balance: Number(e.target.value) })} className="w-full p-2 border border-[#CED4DA] rounded bg-[#F8F9FA]"/>
+                  <label className="font-semibold text-text-secondary block mb-1">Opening Balance ($)</label>
+                  <input type="number" value={newAcc.balance} onChange={(e) => setNewAcc({ ...newAcc, balance: Number(e.target.value) })} className="w-full p-2 border border-border rounded-xl bg-card text-text font-mono focus:ring-2 focus:ring-primary/20 focus:border-primary transition"/>
                 </div>
               </div>
-              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-3 pt-3 border-t border-[#CED4DA]">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-border">
                 <Button variant="outline" type="button" onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </Button>

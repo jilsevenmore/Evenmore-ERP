@@ -391,7 +391,7 @@ export default function CRMReportsPage() {
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold border border-slate-200 transition cursor-pointer"
+              className="btn-outline inline-flex items-center gap-1.5"
             >
               <Printer size={14} /> Print Report
             </button>
@@ -439,9 +439,7 @@ export default function CRMReportsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 isActive
-                  ? 'bg-[#1F2E4A] text-white shadow-xs'
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
-              }`}
+                  ? 'btn-primary text-white shadow-xs' : 'btn-outline' }`}
             >
               <Icon size={13} /> {tab.label}
             </button>

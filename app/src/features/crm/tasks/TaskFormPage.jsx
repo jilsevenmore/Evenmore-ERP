@@ -22,6 +22,15 @@ export default function TaskFormPage() {
   const storeForms = useCrmStore((s) => s.forms);
   const [forms, setForms] = useState([]);
   useEffect(() => { setForms(loadForms(TASK_FORM)); }, [storeForms]);
+
+  // Save only what the user changed. An effect on [forms, storeForms] compared
+  // a local copy a render behind the store and re-saved on every server reply
+  // -- re-creating each new form and deleting its server copy, endlessly.
+  function commitForms(update) {
+    const next = typeof update === 'function' ? update(forms) : update;
+    setForms(next);
+    saveForms(next, TASK_FORM);
+  }
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formName, setFormName] = useState('');
@@ -30,11 +39,6 @@ export default function TaskFormPage() {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [sortOrder, setSortOrder] = useState('Newest First');
   const [viewMode, setViewMode] = useState('grid');
-
-  // Task forms are the same server collection as lead forms, tagged by kind.
-  useEffect(() => {
-    if (forms.length > 0 || storeForms.length > 0) saveForms(forms, TASK_FORM);
-  }, [forms, storeForms]);
 
   function openCreateModal() {
     setEditingId(null);
@@ -65,7 +69,7 @@ export default function TaskFormPage() {
     const today = new Date().toLocaleDateString('en-GB');
 
     if (editingId) {
-      setForms((prev) => prev.map((f) => (f.id === editingId ? { ...f, title, description: desc, lastUpdated: today } : f)));
+      commitForms((prev) => prev.map((f) => (f.id === editingId ? { ...f, title, description: desc, lastUpdated: today } : f)));
       closeModal();
     } else {
       const newId = `task-form-${Date.now()}`;
@@ -79,7 +83,7 @@ export default function TaskFormPage() {
         status: 'ACTIVE',
         iconName: 'call',
       };
-      setForms((prev) => [...prev, newForm]);
+      commitForms((prev) => [...prev, newForm]);
       closeModal();
       try {
         localStorage.setItem('activeTaskFormId', newId);
@@ -90,7 +94,7 @@ export default function TaskFormPage() {
 
   function confirmDelete() {
     if (!deleteId) return;
-    setForms((prev) => prev.filter((f) => f.id !== deleteId));
+    commitForms((prev) => prev.filter((f) => f.id !== deleteId));
     setDeleteId(null);
   }
 
@@ -135,7 +139,7 @@ export default function TaskFormPage() {
 
         <button
           type="button"
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] bg-[#2f6fed] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1d4ed8] cursor-pointer"
+          className="btn-primary shrink-0 inline-flex items-center gap-2"
           onClick={openCreateModal}
           aria-label="Create new task form"
         >
@@ -187,9 +191,7 @@ export default function TaskFormPage() {
               <button
                 type="button"
                 onClick={() => setViewMode('grid')}
-                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
-                  viewMode === 'grid' ? 'bg-[#2f6fed] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
+                className={`inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-semibold transition cursor-pointer ${ viewMode === 'grid' ? 'btn-primary text-white shadow-xs' : 'text-slate-600 hover:text-slate-900' }`}
               >
                 <Rows3 size={15} />
                 <span>Grid View</span>
@@ -197,9 +199,7 @@ export default function TaskFormPage() {
               <button
                 type="button"
                 onClick={() => setViewMode('tile')}
-                className={`inline-flex h-9 items-center gap-2 rounded-[12px] px-3 text-sm font-semibold transition cursor-pointer ${
-                  viewMode === 'tile' ? 'bg-[#2f6fed] text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'
-                }`}
+                className={`inline-flex h-9 items-center gap-2 rounded-xl px-3 text-xs font-semibold transition cursor-pointer ${ viewMode === 'tile' ? 'btn-primary text-white shadow-xs' : 'text-slate-600 hover:text-slate-900' }`}
               >
                 <LayoutGrid size={15} />
                 <span>Tile View</span>
@@ -219,7 +219,7 @@ export default function TaskFormPage() {
             <button
               type="button"
               onClick={openCreateModal}
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-[12px] bg-[#2f6fed] px-4 text-sm font-semibold text-white transition hover:bg-[#1d4ed8]"
+              className="btn-primary mt-4"
             >
               Create Form
             </button>
@@ -274,7 +274,7 @@ export default function TaskFormPage() {
                             <button
                               type="button"
                               onClick={() => openEditModal(form)}
-                              className="inline-flex h-9 items-center gap-1.5 rounded-[12px] border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 cursor-pointer"
+                              className="btn-outline inline-flex items-center gap-1.5"
                             >
                               <Pencil size={13} />
                               <span>Edit</span>
@@ -350,7 +350,7 @@ export default function TaskFormPage() {
                   <div className="mt-4 flex items-center justify-between gap-2.5">
                     <button
                       type="button"
-                      className="inline-flex h-9 items-center gap-1.5 rounded-[12px] bg-[#2f6fed] px-3 text-sm font-semibold text-white transition hover:bg-[#1d4ed8] cursor-pointer"
+                      className="btn-primary inline-flex items-center gap-1.5"
                       onClick={() => openEditModal(form)}
                     >
                       <Pencil size={13} />
@@ -458,7 +458,7 @@ export default function TaskFormPage() {
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 font-semibold rounded-lg border border-slate-200 shadow-2xs transition cursor-pointer text-xs"
+                  className="btn-outline"
                 >
                   Cancel
                 </button>
@@ -493,14 +493,14 @@ export default function TaskFormPage() {
               <button
                 type="button"
                 onClick={() => setDeleteId(null)}
-                className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg border border-slate-200 transition"
+                className="btn-outline"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={confirmDelete}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg transition"
+                className="btn-danger"
               >
                 Delete
               </button>

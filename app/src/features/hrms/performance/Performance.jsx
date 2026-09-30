@@ -15,17 +15,17 @@ export default function Performance() {
           <h1 className="text-[24px] font-bold">Performance Management</h1>
           <PageInfoButton guide={hrmsGuides.performanceDashboard} />
         </div>
-        <button onClick={() => showToast("New review cycle created")} className="px-5 py-2.5 bg-navy text-white rounded-xl text-[13.5px] font-medium">New Review Cycle</button>
+        <button onClick={() => showToast("New review cycle created")} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">New Review Cycle</button>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         {[{ l: "Total Goals", v: String(goals.length) }, { l: "In Progress", v: String(goals.filter((g) => g.status === "In Progress").length) }, { l: "Completed", v: String(goals.filter((g) => g.status === "Completed").length) }, { l: "Avg Progress", v: `${goals.length ? Math.round(goals.reduce((sum, g) => sum + (Number(g.progress) || 0), 0) / goals.length) : 0}%` }, { l: "Goals Completed", v: `${goals.length ? Math.round((goals.filter((g) => g.status === "Completed").length / goals.length) * 100) : 0}%` }].map((x) => <div key={x.l} className="bg-white border border-bdr rounded-xl p-4 shadow-sm"><div className="text-[12px] text-muted">{x.l}</div><div className="text-[20px] font-bold mt-1">{x.v}</div></div>)}
       </div>
       <div className="bg-white border border-bdr rounded-xl shadow-sm overflow-hidden">
         <div className="p-5 flex flex-wrap justify-between gap-3 border-b border-bdr"><h3 className="font-semibold">Goals & KPIs</h3>
-          <div className="flex gap-2"><select value={filter} onChange={(e) => setFilter(e.target.value)} className="h-8 px-2 bg-off border border-bdr rounded-lg text-[12px]"><option>All</option><option>In Progress</option><option>Completed</option></select><button onClick={() => {
+          <div className="flex gap-2"><select value={filter} onChange={(e) => setFilter(e.target.value)} className="h-9 px-2 bg-off border border-bdr rounded-xl text-xs font-semibold"><option>All</option><option>In Progress</option><option>Completed</option></select><button onClick={() => {
     const t = prompt("Goal title");
     if (t) setGoals([...goals, { id: "G" + Date.now(), emp: currentUser?.name || "—", avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(currentUser?.name || "goal")}`, title: t, target: "1", progress: 0, due: "—", status: "In Progress" }]);
-  }} className="px-3 py-1.5 bg-navy text-white rounded-lg text-[12px]">Add Goal</button></div>
+  }} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold">Add Goal</button></div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] lg:min-w-0 text-left text-[13px]"><thead className="bg-off border-b border-bdr text-[11px] uppercase text-muted"><tr><th className="py-3 px-5">Employee</th><th className="py-3 px-5">Goal</th><th className="py-3 px-5">Target</th><th className="py-3 px-5">Progress</th><th className="py-3 px-5">Status</th></tr></thead>

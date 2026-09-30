@@ -3,6 +3,7 @@ import { useERP } from '../context/ERPContext';
 import { useIdleReady } from './useIdleReady';
 import { loadEventNotifications, NOTIFICATION_EVENT } from '../services/crmEventNotifications';
 import { useCrmStore } from '../stores/crmStore';
+import { useAppStore } from '../stores/appStore';
 
 const CRM_EVENT = 'crm:data-updated';
 const EMPTY_ROWS = [];
@@ -281,10 +282,10 @@ function sortItems(items, now) {
   });
 }
 
-function buildCrmNotificationDigest({ leadRows, leadDetails, crmTasks, quotations, deliveryChallans, eventItems, now }) {
+function buildCrmNotificationDigest({ leadRows, leadDetails, crmTasks, allocationTasks, quotations, deliveryChallans, eventItems, now }) {
   const reminders = sortItems([
     ...buildLeadTaskReminders({ leadRows, leadDetails, now }),
-    // ...buildAllocationReminders({ allocationTasks, now }), // Hidden: Task Allocation duplicates Tasks List
+    ...buildAllocationReminders({ allocationTasks, now }),
   ], now);
   const notifications = [
     ...buildEventNotifications({ eventItems, now }),
@@ -318,6 +319,13 @@ export function useCrmNotificationDigest() {
   const { quotations, deliveryChallans } = digestReady ? erp : {};
   const leadRows = useCrmStore((s) => s.leads) || EMPTY_ROWS;
   const crmTasks = useCrmStore((s) => s.tasks) || EMPTY_ROWS;
+  const allAllocations = useCrmStore((s) => s.taskAllocations) || EMPTY_ROWS;
+  // Remind people of work allocated to them, not of everything a manager can see.
+  const currentUserId = useAppStore((s) => s.currentUser?.id);
+  const allocationTasks = useMemo(
+    () => allAllocations.filter((task) => currentUserId && String(task.assigneeId) === String(currentUserId)),
+    [allAllocations, currentUserId],
+  );
   const [eventItems, setEventItems] = useState(() => loadEventNotifications());
 
   useEffect(() => {
@@ -342,11 +350,12 @@ export function useCrmNotificationDigest() {
       leadRows,
       leadDetails: groupTasksByLead(crmTasks),
       crmTasks,
+      allocationTasks,
       quotations,
       deliveryChallans,
       eventItems,
       now: new Date(),
     }),
-    [deliveryChallans, quotations, leadRows, crmTasks, eventItems]
+    [deliveryChallans, quotations, leadRows, crmTasks, allocationTasks, eventItems]
   );
 }

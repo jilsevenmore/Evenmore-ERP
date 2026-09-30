@@ -239,7 +239,7 @@ export function CalendarPage() {
                 key={v}
                 type="button"
                 onClick={() => setView(v)}
-                className={`px-3.5 py-1.5 rounded-lg text-[12.5px] font-medium transition cursor-pointer ${
+                className={`h-8 px-3 rounded-xl text-xs font-semibold transition cursor-pointer ${
                   view === v ? "bg-navy text-white shadow-xs" : "text-muted hover:text-slate-900"
                 }`}
               >
@@ -252,7 +252,7 @@ export function CalendarPage() {
           <button
             type="button"
             onClick={handleExport}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white border border-bdr text-slate-700 rounded-xl text-[13px] font-medium hover:bg-off transition shadow-xs cursor-pointer"
+            className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold hover:bg-card-hover transition shadow-2xs cursor-pointer inline-flex items-center gap-1.5"
             title="Export calendar to iCal (.ics) for Google/Outlook Calendar"
           >
             <Download size={15} />
@@ -263,7 +263,7 @@ export function CalendarPage() {
           <button
             type="button"
             onClick={() => handleOpenCreateModal()}
-            className="inline-flex items-center gap-2 px-5 py-2 bg-navy text-white rounded-xl text-[13.5px] font-medium hover:bg-navy/90 transition shadow-xs cursor-pointer"
+            className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold transition shadow-2xs active:scale-[0.99] cursor-pointer inline-flex items-center gap-2"
           >
             <Plus size={16} />
             Add Event
@@ -278,7 +278,7 @@ export function CalendarPage() {
           <button
             type="button"
             onClick={() => setCategoryFilter("All")}
-            className={`shrink-0 px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition cursor-pointer ${
+            className={`shrink-0 h-8 px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
               categoryFilter === "All"
                 ? "bg-navy text-white shadow-2xs"
                 : "bg-off text-slate-600 hover:bg-slate-200/70 border border-bdr/60"
@@ -297,7 +297,7 @@ export function CalendarPage() {
                 key={key}
                 type="button"
                 onClick={() => setCategoryFilter(isSelected ? "All" : key)}
-                className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-medium whitespace-nowrap transition cursor-pointer border ${
+                className={`shrink-0 inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer border ${
                   isSelected
                     ? `${cat.badgeClass} ring-1 ring-offset-1`
                     : "bg-white border-bdr/60 text-slate-600 hover:bg-off"
@@ -318,7 +318,7 @@ export function CalendarPage() {
             <button
               type="button"
               onClick={() => setDeptDropdownOpen(!deptDropdownOpen)}
-              className="h-9 px-3 pr-2.5 bg-off border border-bdr rounded-xl text-[12px] text-slate-700 hover:bg-slate-200/60 focus:outline-none focus:border-navy cursor-pointer font-medium inline-flex items-center gap-2 transition"
+              className="h-9 px-3 pr-2.5 bg-off border border-bdr rounded-xl text-xs text-slate-700 hover:bg-slate-200/60 focus:outline-none focus:border-navy cursor-pointer font-semibold inline-flex items-center gap-2 transition"
             >
               <span className="truncate max-w-[130px]">{deptFilter === "All" ? "All Departments" : deptFilter}</span>
               <ChevronDown size={14} className={`text-slate-400 transition-transform ${deptDropdownOpen ? "rotate-180" : ""}`} />
@@ -333,7 +333,7 @@ export function CalendarPage() {
                       setDeptFilter("All");
                       setDeptDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] rounded-lg transition-colors cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] rounded-xl transition-colors cursor-pointer ${
                       deptFilter === "All"
                         ? "bg-navy/10 text-navy font-semibold"
                         : "text-slate-700 hover:bg-off"
@@ -352,7 +352,7 @@ export function CalendarPage() {
                           setDeptFilter(d);
                           setDeptDropdownOpen(false);
                         }}
-                        className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] rounded-lg transition-colors cursor-pointer ${
+                        className={`w-full flex items-center justify-between px-3 py-1.5 text-left text-[12px] rounded-xl transition-colors cursor-pointer ${
                           isSelected
                             ? "bg-navy/10 text-navy font-semibold"
                             : "text-slate-700 hover:bg-off"
@@ -389,7 +389,7 @@ export function CalendarPage() {
                 setSearchQuery("");
               }}
               title="Reset active filters"
-              className="h-9 px-2.5 rounded-xl border border-bdr text-muted hover:text-slate-800 hover:bg-off text-[12px] flex items-center gap-1 transition"
+              className="h-9 px-3 rounded-xl border border-bdr text-muted hover:text-slate-800 hover:bg-off text-xs font-semibold flex items-center gap-1 transition"
             >
               <RotateCcw size={12} />
               Reset
@@ -411,7 +411,7 @@ export function CalendarPage() {
                   <select
                     value={activeMonth}
                     onChange={(e) => setActiveMonth(Number(e.target.value))}
-                    className="font-bold text-[18px] text-slate-900 bg-transparent hover:bg-off rounded-lg px-2 py-0.5 border border-transparent hover:border-bdr focus:outline-none focus:border-navy cursor-pointer transition"
+                    className="font-bold text-[18px] text-slate-900 bg-transparent hover:bg-off rounded-xl px-2 py-0.5 border border-transparent hover:border-bdr focus:outline-none focus:border-navy cursor-pointer transition"
                   >
                     {MONTH_NAMES.map((m, idx) => (
                       <option key={m} value={idx}>
@@ -423,7 +423,7 @@ export function CalendarPage() {
                   <select
                     value={activeYear}
                     onChange={(e) => setActiveYear(Number(e.target.value))}
-                    className="font-bold text-[18px] text-slate-900 bg-transparent hover:bg-off rounded-lg px-2 py-0.5 border border-transparent hover:border-bdr focus:outline-none focus:border-navy cursor-pointer transition"
+                    className="font-bold text-[18px] text-slate-900 bg-transparent hover:bg-off rounded-xl px-2 py-0.5 border border-transparent hover:border-bdr focus:outline-none focus:border-navy cursor-pointer transition"
                   >
                     {Array.from({ length: 7 }, (_, i) => new Date().getFullYear() - 3 + i).map((y) => (
                       <option key={y} value={y}>
@@ -443,7 +443,7 @@ export function CalendarPage() {
                 <button
                   type="button"
                   onClick={handleToday}
-                  className="h-8 px-3.5 rounded-lg border border-bdr text-[12px] font-medium hover:bg-off text-slate-700 transition cursor-pointer shadow-2xs"
+                  className="h-8 px-3 rounded-xl border border-bdr text-xs font-semibold hover:bg-off text-slate-700 transition cursor-pointer shadow-2xs"
                   title="Visit Today"
                 >
                   Today

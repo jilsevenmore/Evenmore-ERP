@@ -232,13 +232,13 @@ export const AutoPOModal = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-3 py-1.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-100 font-medium cursor-pointer"
+                className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 bg-[#1F2E4A] hover:bg-[#152033] text-white rounded-lg font-bold shadow-sm flex items-center gap-1.5 cursor-pointer"
+                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-xl font-semibold text-xs shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-[0.99]"
               >
                 <CheckCircle2 className="w-3.5 h-3.5" /> Issue Purchase Order
               </button>

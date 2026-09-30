@@ -108,7 +108,7 @@ export function AddEditEventModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-slate-200/60 grid place-items-center text-muted hover:text-slate-800 transition"
+            className="w-8 h-8 rounded-xl hover:bg-slate-200/60 grid place-items-center text-muted hover:text-slate-800 transition"
           >
             <X size={18} />
           </button>
@@ -127,7 +127,7 @@ export function AddEditEventModal({
               placeholder="e.g. Annual Hackathon / Sprint Review / Vacation"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+              className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy transition"
             />
           </div>
 
@@ -150,7 +150,7 @@ export function AddEditEventModal({
                     location: isOff ? "All Offices / Out of Office" : formData.location,
                   });
                 }}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition font-medium"
+                className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition font-semibold"
               >
                 {Object.keys(EVENT_CATEGORIES).map((catKey) => (
                   <option key={catKey} value={catKey}>
@@ -168,7 +168,7 @@ export function AddEditEventModal({
               <select
                 value={formData.dept}
                 onChange={(e) => setFormData({ ...formData, dept: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition font-medium"
+                className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy cursor-pointer transition font-semibold"
               >
                 {DEPARTMENTS.map((d) => (
                   <option key={d} value={d}>
@@ -214,7 +214,7 @@ export function AddEditEventModal({
                     endDate: formData.isMultiDay && formData.endDate < newStart ? newStart : formData.endDate,
                   });
                 }}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy transition"
               />
             </div>
 
@@ -227,7 +227,7 @@ export function AddEditEventModal({
                   min={formData.startDate}
                   value={formData.endDate}
                   onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                  className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy transition"
                 />
               </div>
             )}
@@ -256,7 +256,7 @@ export function AddEditEventModal({
                 placeholder="e.g. 10:00 AM - 11:30 AM"
                 value={formData.time}
                 onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy transition"
               />
             ) : (
               <div className="px-3.5 py-2 rounded-xl border border-dashed border-bdr text-[12.5px] bg-off text-muted font-medium">
@@ -277,7 +277,7 @@ export function AddEditEventModal({
                 placeholder="e.g. Meeting Room 2 / Zoom"
                 value={formData.location}
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy transition"
               />
             </div>
 
@@ -291,7 +291,7 @@ export function AddEditEventModal({
                 placeholder="https://zoom.us/... or meet.google.com/..."
                 value={formData.virtualLink}
                 onChange={(e) => setFormData({ ...formData, virtualLink: e.target.value })}
-                className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy transition"
               />
             </div>
           </div>
@@ -306,7 +306,7 @@ export function AddEditEventModal({
               placeholder="e.g. David Park or Sarah Mitchell"
               value={formData.organizer}
               onChange={(e) => setFormData({ ...formData, organizer: e.target.value })}
-              className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+              className="w-full h-9 px-3.5 rounded-xl border border-bdr text-xs bg-off focus:bg-white focus:outline-none focus:border-navy transition"
             />
           </div>
 
@@ -334,7 +334,7 @@ export function AddEditEventModal({
                     onDelete(initialEvent.id);
                   }
                 }}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-medium text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition"
+                className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition"
               >
                 <Trash2 size={15} />
                 Delete
@@ -347,13 +347,13 @@ export function AddEditEventModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium transition"
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold transition"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 transition shadow-xs"
+                className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs transition"
               >
                 {isEditMode ? "Update Event" : "Schedule Event"}
               </button>

@@ -32,7 +32,7 @@ export default function DeleteLeadModal({ lead, leads = [], onClose, onConfirm, 
           </button>
           <button
             type="button"
-            className="delete-confirm-btn"
+            className="btn-danger"
             onClick={() => (isBulk ? onConfirmAll(leads) : onConfirm(lead.id))}
           >
             Delete {isBulk ? "All Records" : "Record"}

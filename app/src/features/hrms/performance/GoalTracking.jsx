@@ -63,12 +63,12 @@ export default function GoalTracking() {
     { key: "due", header: "Due Date", sortable: true },
     { key: "status", header: "Status", render: (r) => <StatusBadge status={r.status} /> },
     { key: "actions", header: "Actions", render: (r) => <div className="flex gap-1">
-        <button onClick={() => setViewRow(r)} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center"><Eye size={14} /></button>
+        <button onClick={() => setViewRow(r)} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center"><Eye size={14} /></button>
         <button onClick={() => {
       setForm({ employee: r.employee, goal: r.goal, target: r.target, current: r.current, progress: r.progress, due: r.due, status: r.status, department: r.department });
       setEditRow(r);
-    }} className="w-7 h-7 rounded-lg hover:bg-off grid place-items-center"><Pencil size={14} /></button>
-        <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-lg hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
+    }} className="w-7 h-7 rounded-xl hover:bg-off grid place-items-center"><Pencil size={14} /></button>
+        <button onClick={() => setDeleteRow(r)} className="w-7 h-7 rounded-xl hover:bg-red-50 text-red-600 grid place-items-center"><Trash2 size={14} /></button>
       </div> }
   ];
   function FormFields() {

@@ -316,7 +316,7 @@ export default function Interviews() {
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => navigate(`/hrms/recruitment/interviews/${r.id}`)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 dark:text-slate-200 hover:text-navy dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-slate-700 dark:text-slate-200 hover:text-navy dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition"
           >
             <Eye size={12} />
             <span>View</span>
@@ -324,7 +324,7 @@ export default function Interviews() {
           {r.meetingLink && (
             <button
               onClick={() => window.open(r.meetingLink || "#", "_blank")}
-              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-lg transition"
+              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11.5px] font-medium text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 border border-blue-200 dark:border-blue-800 rounded-xl transition"
             >
               <ExternalLink size={12} />
               <span>Join</span>
@@ -433,7 +433,7 @@ export default function Interviews() {
           <button
             type="button"
             onClick={() => setView("List")}
-            className={`h-full px-3.5 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer select-none ${
+            className={`h-full px-3.5 inline-flex items-center gap-1.5 rounded-xl text-[13px] font-medium transition cursor-pointer select-none ${
               view === "List"
                 ? "bg-card text-primary font-semibold shadow-xs border border-border/70"
                 : "text-muted hover:text-text hover:bg-card/40"
@@ -445,7 +445,7 @@ export default function Interviews() {
           <button
             type="button"
             onClick={() => setView("Calendar")}
-            className={`h-full px-3.5 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer select-none ${
+            className={`h-full px-3.5 inline-flex items-center gap-1.5 rounded-xl text-[13px] font-medium transition cursor-pointer select-none ${
               view === "Calendar"
                 ? "bg-card text-primary font-semibold shadow-xs border border-border/70"
                 : "text-muted hover:text-text hover:bg-card/40"
@@ -533,7 +533,7 @@ export default function Interviews() {
                     <select
                       value={activeMonth}
                       onChange={(e) => setActiveMonth(Number(e.target.value))}
-                      className="font-bold text-[18px] text-text bg-transparent hover:bg-soft rounded-lg px-2 py-0.5 border border-transparent hover:border-border focus:outline-none focus:border-primary cursor-pointer transition"
+                      className="font-bold text-[18px] text-text bg-transparent hover:bg-soft rounded-xl px-2 py-0.5 border border-transparent hover:border-border focus:outline-none focus:border-primary cursor-pointer transition"
                     >
                       {MONTH_NAMES.map((m, idx) => (
                         <option key={m} value={idx}>
@@ -545,7 +545,7 @@ export default function Interviews() {
                     <select
                       value={activeYear}
                       onChange={(e) => setActiveYear(Number(e.target.value))}
-                      className="font-bold text-[18px] text-text bg-transparent hover:bg-soft rounded-lg px-2 py-0.5 border border-transparent hover:border-border focus:outline-none focus:border-primary cursor-pointer transition"
+                      className="font-bold text-[18px] text-text bg-transparent hover:bg-soft rounded-xl px-2 py-0.5 border border-transparent hover:border-border focus:outline-none focus:border-primary cursor-pointer transition"
                     >
                       {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((y) => (
                         <option key={y} value={y}>
@@ -565,7 +565,7 @@ export default function Interviews() {
                   <button
                     type="button"
                     onClick={handleToday}
-                    className="h-8 px-3.5 rounded-lg border border-border text-[12px] font-medium hover:bg-soft text-text transition cursor-pointer shadow-2xs"
+                    className="h-8 px-3.5 rounded-xl border border-border text-[12px] font-medium hover:bg-soft text-text transition cursor-pointer shadow-2xs"
                     title="Visit Today"
                   >
                     Today
@@ -633,7 +633,7 @@ export default function Interviews() {
                                 setForm((prev) => ({ ...prev, date: toHumanDate(cell.dateStr) }));
                                 setDrawerOpen(true);
                               }}
-                              className="w-5 h-5 rounded-md bg-primary text-white hover:bg-primary/90 grid place-items-center shadow-2xs transition cursor-pointer"
+                              className="w-5 h-5 rounded-xl bg-primary text-white hover:bg-primary/90 grid place-items-center shadow-2xs transition cursor-pointer"
                             >
                               <Plus size={12} />
                             </button>
@@ -655,7 +655,7 @@ export default function Interviews() {
                                 e.stopPropagation();
                                 setSelectedDate(cell.dateStr);
                               }}
-                              className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium truncate transition hover:opacity-85 border flex items-center justify-between gap-1 shadow-2xs ${cat.badgeClass}`}
+                              className={`text-[10px] px-1.5 py-0.5 rounded-xl font-medium truncate transition hover:opacity-85 border flex items-center justify-between gap-1 shadow-2xs ${cat.badgeClass}`}
                               title={`${ev.candidateName} • ${ev.type} (${ev.start})`}
                             >
                               <span className="truncate">{ev.candidateName}</span>
@@ -724,7 +724,7 @@ export default function Interviews() {
                       setForm((prev) => ({ ...prev, date: toHumanDate(selectedDate) }));
                       setDrawerOpen(true);
                     }}
-                    className="w-7 h-7 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white grid place-items-center transition cursor-pointer"
+                    className="w-7 h-7 rounded-xl bg-primary/10 text-primary hover:bg-primary hover:text-white grid place-items-center transition cursor-pointer"
                     title="Schedule interview for this date"
                   >
                     <Plus size={14} />

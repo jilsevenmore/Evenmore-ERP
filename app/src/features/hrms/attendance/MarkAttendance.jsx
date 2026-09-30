@@ -357,10 +357,11 @@ export default function MarkAttendance() {
         .mark-select-status:focus { border-color: #94a3b8; }
 
         .mark-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px; background: #ffffff; border-top: 1px solid #f1f5f9; }
-        .mark-btn-cancel { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 18px; font-size: 13.5px; font-weight: 500; color: #475569; cursor: pointer; transition: background 0.15s ease; }
-        .mark-btn-cancel:hover { background: #f8fafc; color: #111827; }
-        .mark-btn-save { background: #16233a; color: #fff; border: none; border-radius: 10px; padding: 9px 20px; font-size: 13.5px; font-weight: 700; cursor: pointer; transition: background 0.15s ease; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .mark-btn-save:hover { background: #0f172a; }
+        .mark-btn-cancel { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+        .mark-btn-cancel:hover { background: var(--card-hover); color: var(--text); }
+        .mark-btn-save { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--primary); color: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(31,107,255,0.25); }
+        .mark-btn-save:hover { background: var(--primary-dark); }
+        .mark-btn-cancel:active, .mark-btn-save:active { transform: scale(0.99); }
         @media (max-width: 1023px) {
           .mark-att-page { margin: -16px -20px -24px; }
         }
