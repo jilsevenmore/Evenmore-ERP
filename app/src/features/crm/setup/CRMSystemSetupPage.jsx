@@ -132,14 +132,20 @@ export default function CRMSystemSetupPage() {
   const [dragLead, setDragLead] = useState(null);
   const [dragDeal, setDragDeal] = useState(null);
 
-  // Edits are written back to the pipelines they came from.
-  useEffect(() => {
-    if (leadStages.length > 0) syncStages('stages', leadStages, storeLeadStages);
-  }, [leadStages, storeLeadStages]);
+  // Edits are written back to the pipelines they came from -- from the
+  // handlers, never from an effect. An effect on [local, store] compared a
+  // copy a render behind the store and wrote again on every server reply.
+  function commitLeadStages(update) {
+    const next = typeof update === 'function' ? update(leadStages) : update;
+    setLeadStages(next);
+    syncStages('stages', next, storeLeadStages);
+  }
 
-  useEffect(() => {
-    if (dealStages.length > 0) syncStages('dealStages', dealStages, storeDealStages);
-  }, [dealStages, storeDealStages]);
+  function commitDealStages(update) {
+    const next = typeof update === 'function' ? update(dealStages) : update;
+    setDealStages(next);
+    syncStages('dealStages', next, storeDealStages);
+  }
 
   const leadActive = useMemo(() => leadStages.filter((s) => s.status === 'Active').length, [leadStages]);
   const leadInactive = leadStages.length - leadActive;
@@ -183,10 +189,10 @@ export default function CRMSystemSetupPage() {
     const name = leadModal.name.trim();
     if (!name) return;
     if (leadModal.id) {
-      setLeadStages((prev) => prev.map((s) => (s.id === leadModal.id ? { ...s, name, status: leadModal.status } : s)));
+      commitLeadStages((prev) => prev.map((s) => (s.id === leadModal.id ? { ...s, name, status: leadModal.status } : s)));
     } else {
       const item = { id: `ld-${Date.now()}`, name, status: leadModal.status, count: 0, icon: 'user', bg: '#e8f1ff', fg: '#2563eb' };
-      setLeadStages((prev) => [...prev, item]);
+      commitLeadStages((prev) => [...prev, item]);
     }
     setLeadModal(null);
   }
@@ -194,7 +200,7 @@ export default function CRMSystemSetupPage() {
   function duplicateLead(id) {
     const found = leadStages.find((s) => s.id === id);
     if (!found) return;
-    setLeadStages((prev) => [...prev, { ...found, id: `ld-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
+    commitLeadStages((prev) => [...prev, { ...found, id: `ld-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
   }
 
   function openAddDeal() {
@@ -210,10 +216,10 @@ export default function CRMSystemSetupPage() {
     if (!name) return;
     const pipeline = dealModal.pipeline.trim() || 'Sales';
     if (dealModal.id) {
-      setDealStages((prev) => prev.map((s) => (s.id === dealModal.id ? { ...s, name, status: dealModal.status, pipeline } : s)));
+      commitDealStages((prev) => prev.map((s) => (s.id === dealModal.id ? { ...s, name, status: dealModal.status, pipeline } : s)));
     } else {
       const item = { id: `dl-${Date.now()}`, name, status: dealModal.status, count: 0, pipeline, icon: 'file', bg: '#eef2f7', fg: '#475569' };
-      setDealStages((prev) => [...prev, item]);
+      commitDealStages((prev) => [...prev, item]);
     }
     setDealModal(null);
   }
@@ -221,27 +227,27 @@ export default function CRMSystemSetupPage() {
   function duplicateDeal(id) {
     const found = dealStages.find((s) => s.id === id);
     if (!found) return;
-    setDealStages((prev) => [...prev, { ...found, id: `dl-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
+    commitDealStages((prev) => [...prev, { ...found, id: `dl-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
   }
 
   function confirmDelete() {
     if (!deleteModal) return;
-    if (deleteModal.type === 'lead') setLeadStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
-    if (deleteModal.type === 'deal') setDealStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
+    if (deleteModal.type === 'lead') commitLeadStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
+    if (deleteModal.type === 'deal') commitDealStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
     setDeleteModal(null);
   }
 
   function toggleLeadStatus(id) {
-    setLeadStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
+    commitLeadStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
   }
 
   function toggleDealStatus(id) {
-    setDealStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
+    commitDealStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
   }
 
   function dropLead(targetIndex) {
     if (dragLead === null) return;
-    setLeadStages((prev) => {
+    commitLeadStages((prev) => {
       const order = visibleLeads.map((s) => s.id);
       const fromId = order[dragLead];
       const toId = order[targetIndex];
@@ -258,7 +264,7 @@ export default function CRMSystemSetupPage() {
 
   function dropDeal(targetIndex) {
     if (dragDeal === null) return;
-    setDealStages((prev) => {
+    commitDealStages((prev) => {
       const order = visibleDeals.map((s) => s.id);
       const fromId = order[dragDeal];
       const toId = order[targetIndex];

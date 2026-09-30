@@ -32,7 +32,6 @@ const ROLES = ['Tele Caller Executive', 'Sales Support Executive', 'BDE', 'Area 
 const DEPARTMENTS = ['Sales', 'Support', 'Marketing'];
 const PRIORITIES = ['High', 'Medium', 'Low'];
 const STATUSES = ['Active', 'Inactive'];
-const STAGES = ['New Lead', 'Details Collected', 'Quotation Shared', 'Demo Pending', 'Demo Done', 'Negotiation', 'Won', 'Lost'];
 const ICONS = ['call', 'demo', 'pending', 'meeting', 'formal', 'quotation'];
 const PER_PAGE_OPTIONS = [5, 10, 20, 50];
 
@@ -75,7 +74,9 @@ function iconFor(key) {
 const EMPTY_FORM = {
   name: '',
   icon: 'call',
+  // Stage ids from CRM System Setup; saving creates the linked stage tasks.
   stages: [],
+  formId: '',
   role: 'Tele Caller Executive',
   department: 'Sales',
   priority: 'Medium',
@@ -88,8 +89,34 @@ export default function MasterTasksPage() {
   // Master task templates live at `/crm/master-tasks/`; the automation that
   // generates a lead's stage tasks reads the same rows.
   const storeTasks = useCrmStore((s) => s.masterTasks);
+  // "Used in Stages" is the configured pipeline, by id -- renaming a stage in
+  // System Setup no longer breaks the link.
+  const storeStages = useCrmStore((s) => s.stages);
+  const storeForms = useCrmStore((s) => s.forms);
+  const pipeline = useMemo(
+    () => [...storeStages].sort((a, b) => (Number(a.order ?? a.sequence) || 0) - (Number(b.order ?? b.sequence) || 0)),
+    [storeStages],
+  );
+  const stageNameById = useMemo(() => new Map(storeStages.map((s) => [String(s.id), s.name])), [storeStages]);
+  // Older rows may still hold a stage name rather than an id.
+  const stageLabel = (value) => stageNameById.get(String(value)) || String(value);
+  const taskForms = useMemo(() => storeForms.filter((f) => f.kind === 'task'), [storeForms]);
   const [tasks, setTasks] = useState([]);
   useEffect(() => { setTasks(storeTasks); }, [storeTasks]);
+
+  // Save only what the user changed. Syncing from an effect on [tasks,
+  // storeTasks] compared the local copy -- one render behind the store --
+  // against the store's newer rows, so every server reply triggered another
+  // write: an endless PATCH loop, and create/delete churn for new rows.
+  function commitTasks(update) {
+    const next = typeof update === 'function' ? update(tasks) : update;
+    setTasks(next);
+    // The server keeps each master's stage tasks in step with "Used in
+    // Stages"; re-read them so Lead Stage Tasks shows the result.
+    syncCollection('masterTasks', next, storeTasks)
+      .then(() => useCrmStore.getState().refresh('stageTasks'))
+      .catch(() => {});
+  }
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const [deptFilter, setDeptFilter] = useState('All');
@@ -107,12 +134,6 @@ export default function MasterTasksPage() {
   const [bulkDelete, setBulkDelete] = useState(false);
   const [menuId, setMenuId] = useState(null);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
-
-  useEffect(() => {
-    if (tasks.length > 0 || storeTasks.length > 0) {
-      syncCollection('masterTasks', tasks, storeTasks);
-    }
-  }, [tasks, storeTasks]);
 
   useEffect(() => {
     setPage(1);
@@ -147,7 +168,7 @@ export default function MasterTasksPage() {
         text(t.name).includes(q) ||
         text(t.role).includes(q) ||
         text(t.department).includes(q) ||
-        (t.stages || []).join(' ').toLowerCase().includes(q)
+        (t.stages || []).map((s) => stageNameById.get(String(s)) || String(s)).join(' ').toLowerCase().includes(q)
       );
     });
     const sorted = [...out].sort((a, b) => {
@@ -157,7 +178,7 @@ export default function MasterTasksPage() {
       return sortDir === 'asc' ? cmp : -cmp;
     });
     return sorted;
-  }, [tasks, search, roleFilter, deptFilter, statusFilter, sortKey, sortDir]);
+  }, [tasks, search, roleFilter, deptFilter, statusFilter, sortKey, sortDir, stageNameById]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
   const safePage = Math.min(page, totalPages);
@@ -191,6 +212,7 @@ export default function MasterTasksPage() {
       name: task.name,
       icon: task.icon || 'call',
       stages: [...(task.stages || [])],
+      formId: task.formId || '',
       role: task.role,
       department: task.department,
       priority: task.priority,
@@ -220,10 +242,10 @@ export default function MasterTasksPage() {
       return;
     }
     if (editingId) {
-      setTasks((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...form, name: form.name.trim(), dueIn: Number(form.dueIn) || 0 } : t)));
+      commitTasks((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...form, name: form.name.trim(), dueIn: Number(form.dueIn) || 0 } : t)));
     } else {
       const maxOrder = tasks.reduce((m, t) => Math.max(m, t.order || 0), 0);
-      setTasks((prev) => [
+      commitTasks((prev) => [
         ...prev,
         { id: `mt-${Date.now()}`, order: maxOrder + 1, ...form, name: form.name.trim(), dueIn: Number(form.dueIn) || 0 },
       ]);
@@ -237,24 +259,24 @@ export default function MasterTasksPage() {
     if (!src) return;
     const maxOrder = tasks.reduce((m, t) => Math.max(m, t.order || 0), 0);
     const copy = { ...src, id: `mt-${Date.now()}`, order: maxOrder + 1, name: `${src.name} Copy`, stages: [...src.stages] };
-    setTasks((prev) => [...prev, copy]);
+    commitTasks((prev) => [...prev, copy]);
     setMenuId(null);
   }
 
   function toggleStatus(id) {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: t.status === 'Active' ? 'Inactive' : 'Active' } : t)));
+    commitTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status: t.status === 'Active' ? 'Inactive' : 'Active' } : t)));
     setMenuId(null);
   }
 
   function confirmDelete() {
     if (!deleteId) return;
-    setTasks((prev) => prev.filter((t) => t.id !== deleteId));
+    commitTasks((prev) => prev.filter((t) => t.id !== deleteId));
     setSelected((prev) => prev.filter((id) => id !== deleteId));
     setDeleteId(null);
   }
 
   function confirmBulkDelete() {
-    setTasks((prev) => prev.filter((t) => !selected.includes(t.id)));
+    commitTasks((prev) => prev.filter((t) => !selected.includes(t.id)));
     setSelected([]);
     setBulkDelete(false);
   }
@@ -395,7 +417,7 @@ export default function MasterTasksPage() {
                     <td className="px-3 py-3">
                       <span className="inline-flex items-center gap-1.5 flex-wrap">
                         {visibleStages.map((s) => (
-                          <span key={s} className={`px-2 py-0.5 rounded-md border text-[10px] font-semibold whitespace-nowrap ${STAGE_STYLES[s] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{s}</span>
+                          <span key={s} className={`px-2 py-0.5 rounded-md border text-[10px] font-semibold whitespace-nowrap ${STAGE_STYLES[stageLabel(s)] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>{stageLabel(s)}</span>
                         ))}
                         {extra > 0 && <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 text-[10px] font-bold border border-slate-200">+{extra}</span>}
                       </span>
@@ -561,7 +583,8 @@ export default function MasterTasksPage() {
               <div>
                 <label className="block font-semibold text-slate-700 mb-1.5">Used in Stages <span className="text-rose-500">*</span></label>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {STAGES.map((s) => {
+                  {pipeline.map((stage) => {
+                    const s = stage.id;
                     const checked = form.stages.includes(s);
                     return (
                       <button
@@ -573,11 +596,24 @@ export default function MasterTasksPage() {
                         <span className={`w-4 h-4 rounded border grid place-items-center shrink-0 ${checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300 text-transparent'}`}>
                           <Check size={11} />
                         </span>
-                        {s}
+                        {stage.name}
                       </button>
                     );
                   })}
                 </div>
+              </div>
+              <div>
+                <label htmlFor="master-task-form" className="block font-semibold text-slate-700 mb-1.5">Task Form</label>
+                <select
+                  id="master-task-form"
+                  value={form.formId || ''}
+                  onChange={(e) => setForm({ ...form, formId: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800"
+                >
+                  <option value="">No form</option>
+                  {taskForms.map((f) => <option key={f.id} value={f.id}>{f.title || f.name}</option>)}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1">Tasks of this type open this Lead Task Form when worked on a lead.</p>
               </div>
               {formError && <p className="text-[11px] font-semibold text-rose-600">{formError}</p>}
             </div>

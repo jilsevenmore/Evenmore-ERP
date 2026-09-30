@@ -15,6 +15,25 @@ import { createSync, compact, asText, isServerId, describeError, isBackendEnable
 import { api } from './api';
 import { formatDateDDMMYYYY, toISODate } from '../utils/dateUtils';
 
+/**
+ * The screens toggle `status` ('Active' / 'Inactive'); the API stores
+ * `isActive`. The status wins when present, because a toggled row still
+ * carries the `isActive` it was loaded with.
+ */
+/** "Max repeats" as typed (text or number) -> a count, or null when blank. */
+function maxRepeatsOut(value) {
+  if (value === undefined) return undefined;
+  if (value === '' || value === null) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : undefined;
+}
+
+function activeFlag(row) {
+  if (row?.status === 'Active') return true;
+  if (row?.status === 'Inactive') return false;
+  return row?.isActive ?? undefined;
+}
+
 export { isServerId, describeError, isBackendEnabled };
 
 /** `DD/MM/YYYY`, `Today`, a Date or an ISO string → `YYYY-MM-DD` for the API. */
@@ -59,7 +78,10 @@ export function avatarColorFor(seed) {
 
 // ── leads ───────────────────────────────────────────────────────────────────
 
-function leadFromApi(row) {
+function leadFromApi(raw) {
+  // PATCH answers `{ lead, createdTasks }` (the stage automation's output);
+  // every other read is the lead itself.
+  const row = raw && raw.lead && Array.isArray(raw.createdTasks) ? raw.lead : raw;
   return {
     ...asText(row, [
       'name', 'company', 'phone', 'email', 'owner', 'city', 'state',
@@ -84,8 +106,8 @@ function leadToApi(lead) {
     status: lead.status || undefined,
     ownerId: lead.ownerId || undefined,
     sourceId: lead.sourceId || undefined,
-    industryId: lead.industryId || undefined,
-    partyId: lead.partyId || undefined,
+    industry: lead.industry || undefined,
+    party: lead.partyId || lead.party || undefined,
     jobTitle: lead.jobTitle || undefined,
     city: lead.city || undefined,
     state: lead.state || undefined,
@@ -102,12 +124,22 @@ function leadToApi(lead) {
 
 function dealFromApi(row) {
   return {
-    ...asText(row, ['title', 'name', 'client', 'phone', 'status', 'source', 'assignedUser', 'notes', 'stage']),
+    ...asText(row, ['title', 'name', 'notes', 'stage', 'product', 'tag']),
     id: row.id,
+    dealNumber: row.dealNumber || '',
     name: row.title || row.name,
     title: row.title || row.name,
-    client: row.customerName || row.client || '',
+    client: row.clientName || row.customerName || '',
     customerId: row.customerId || undefined,
+    phone: row.contactPhone || '',
+    source: row.sourceLabel || '',
+    assignedUser: row.ownerName || '',
+    projectId: row.projectId || null,
+    products: Array.isArray(row.lineItems) ? row.lineItems : [],
+    discount: num(row.discount),
+    taxRate: num(row.taxRate),
+    description: row.description || '',
+    documents: Array.isArray(row.documents) ? row.documents : [],
     stage: row.stage || 'Draft',
     price: num(row.value ?? row.amount),
     value: num(row.value ?? row.amount),
@@ -125,12 +157,21 @@ function dealToApi(deal) {
     stage: deal.stage || undefined,
     ownerId: deal.ownerId || undefined,
     value: deal.value !== undefined ? num(deal.value) : (deal.price !== undefined ? num(deal.price) : undefined),
-    currency: deal.currency || undefined,
     probability: deal.probability !== undefined ? num(deal.probability) : undefined,
     expectedCloseDate: isoOut(deal.expectedCloseDate || deal.date),
-    status: deal.status || undefined,
     lostReasonId: deal.lostReasonId || undefined,
-    notes: deal.notes || undefined,
+    clientName: deal.client ?? undefined,
+    contactPhone: deal.phone ?? undefined,
+    product: deal.product ?? undefined,
+    sourceLabel: deal.source ?? undefined,
+    tag: deal.tag ?? undefined,
+    notes: deal.notes ?? undefined,
+    lineItems: Array.isArray(deal.products) ? deal.products : undefined,
+    discount: deal.discount !== undefined && deal.discount !== '' ? num(deal.discount) : undefined,
+    taxRate: deal.taxRate !== undefined && deal.taxRate !== '' ? num(deal.taxRate) : undefined,
+    description: deal.description ?? undefined,
+    // The signed `url` is minted per read; only the file ref is stored.
+    documents: Array.isArray(deal.documents) ? deal.documents.map(({ url: _url, data: _data, ...ref }) => ref) : undefined,
   });
 }
 
@@ -172,8 +213,8 @@ function taskToApi(task) {
     dueDate: isoOut(task.dueDate),
     priority: task.priority || undefined,
     status: task.status || undefined,
-    outcome: task.outcome || undefined,
-    nextAction: task.nextAction || undefined,
+    // Screen-level extras (due time, stage, task-form answers, linked documents).
+    extra: task.extra && typeof task.extra === 'object' ? task.extra : undefined,
   });
 }
 
@@ -187,6 +228,116 @@ const lookup = (path) => ({
   }),
   fromApi: (row) => ({ ...row, label: row.name, _synced: true }),
 });
+
+// ── forms ───────────────────────────────────────────────────────────────────
+//
+// The API stores a form as `name` + `kind` + a free `schema`. Everything the
+// builders design (sections, fields, description, icon…) rides in `schema`, and
+// the id the builder minted before the server answered is kept as `clientId`
+// so a builder opened on that id still finds the form (crmForms.findForm).
+
+const FORM_COLUMNS = ['id', 'name', 'kind', 'isPublished', 'publishedAt', 'slug', 'schema', 'createdAt', 'updatedAt', '_synced', '_pending'];
+
+function formToApi(form) {
+  const design = Object.fromEntries(
+    Object.entries(form).filter(([key]) => !FORM_COLUMNS.includes(key)),
+  );
+  const clientId = form.clientId || (form.id && !isServerId(form.id) ? String(form.id) : undefined);
+  return compact({
+    name: form.name || form.title || 'Untitled form',
+    kind: form.kind || undefined,
+    isPublished: form.isPublished ?? undefined,
+    schema: compact({ ...design, clientId }),
+  });
+}
+
+function formFromApi(row) {
+  const { schema, ...columns } = row;
+  const design = schema && typeof schema === 'object' ? schema : {};
+  return { ...design, ...columns, title: design.title || row.name, _synced: true };
+}
+
+// ── CRM projects ────────────────────────────────────────────────────────────
+//
+// The project card reads `customer`/`owner` as text, `projectNumber` and
+// `expectedEndDate`; the API links `customerId`/`ownerId` and keeps the typed
+// names beside them. Dates stay ISO -- the card's inputs are `type="date"`.
+
+function projectToApi(p) {
+  return compact({
+    name: p.name,
+    dealId: p.sourceDealId ?? p.dealId ?? undefined,
+    customerId: p.customerId || p.partyId || undefined,
+    customerName: p.customer ?? undefined,
+    ownerId: p.ownerId || undefined,
+    managerName: p.owner ?? undefined,
+    team: p.team ?? undefined,
+    projectType: p.projectType ?? undefined,
+    status: p.status || undefined,
+    startDate: isoOut(p.startDate),
+    endDate: isoOut(p.expectedEndDate ?? p.endDate),
+    value: p.value !== undefined && p.value !== '' ? num(p.value) : undefined,
+    description: p.description ?? undefined,
+  });
+}
+
+function projectFromApi(row) {
+  return {
+    ...row,
+    projectNumber: row.code || '',
+    customer: row.customerName || '',
+    owner: row.ownerName || row.managerName || '',
+    team: row.team || '',
+    projectType: row.projectType || '',
+    description: row.description || '',
+    sourceDealId: row.dealId || row.deal || null,
+    startDate: row.startDate || '',
+    expectedEndDate: row.endDate || '',
+    _synced: true,
+  };
+}
+
+// ── contracts ───────────────────────────────────────────────────────────────
+
+function contractToApi(c) {
+  return compact({
+    title: c.title || undefined,
+    dealId: c.dealId || undefined,
+    customerId: c.customerId || undefined,
+    customerName: c.customer ?? undefined,
+    contractType: c.contractType ?? undefined,
+    value: c.amount !== undefined && c.amount !== '' ? num(c.amount) : undefined,
+    startDate: isoOut(c.startDate),
+    endDate: isoOut(c.endDate),
+    description: c.description ?? undefined,
+    terms: c.terms ?? undefined,
+    templateKey: c.template ?? undefined,
+    status: c.status || undefined,
+    // The signed `url` is minted per read; only the file ref is stored.
+    attachments: Array.isArray(c.attachments) ? c.attachments.map(({ url: _url, ...ref }) => ref) : undefined,
+    notifyCustomer: c.notifyCustomer ?? undefined,
+  });
+}
+
+function contractFromApi(row) {
+  return {
+    ...row,
+    contractNumber: row.contractNumber || '',
+    customer: row.customerName || '',
+    client: row.customerName || '',
+    contractType: row.contractType || '',
+    amount: num(row.value),
+    template: row.templateKey || '',
+    description: row.description || '',
+    terms: row.terms || '',
+    dealId: row.dealId || row.deal || null,
+    dealName: row.dealTitle || '',
+    dealNumber: row.dealNumber || '',
+    createdBy: row.createdByName || '',
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    _synced: true,
+  };
+}
 
 export const CRM_RESOURCES = {
   leads: { path: '/crm/leads/', toApi: leadToApi, fromApi: leadFromApi },
@@ -204,7 +355,7 @@ export const CRM_RESOURCES = {
       fg: s.fg || undefined,
       isWon: s.isWon ?? undefined,
       isLost: s.isLost ?? undefined,
-      isActive: s.isActive ?? undefined,
+      isActive: activeFlag(s),
     }),
     fromApi: (row) => ({ ...row, _synced: true }),
   },
@@ -228,16 +379,21 @@ export const CRM_RESOURCES = {
   masterTasks: {
     path: '/crm/master-tasks/',
     toApi: (t) => compact({
-      name: t.name || t.title,
+      title: t.title || t.name,
       description: t.description || undefined,
       role: t.role || t.assigneeRole || undefined,
       department: t.department || undefined,
       priority: t.priority || undefined,
       dueIn: t.dueIn ?? t.offsetDays ?? undefined,
-      isActive: t.isActive ?? undefined,
+      order: t.order ?? undefined,
+      isActive: activeFlag(t),
+      // Stage ids: the server keeps one linked stage task per stage.
+      stages: Array.isArray(t.stages) ? t.stages.filter(isServerId) : undefined,
+      formId: t.formId === '' ? null : (isServerId(t.formId) ? t.formId : undefined),
     }),
     fromApi: (row) => ({
-      ...asText(row, ['name', 'description', 'role', 'department', 'priority']),
+      ...asText(row, ['description', 'role', 'department', 'priority']),
+      name: row.title || row.name || '',
       title: row.title || row.name || '',
       _synced: true,
     }),
@@ -255,10 +411,20 @@ export const CRM_RESOURCES = {
       dueIn: t.dueIn ?? t.offsetDays ?? undefined,
       priority: t.priority || undefined,
       isActive: t.isActive ?? undefined,
+      // The Tasks Master row it was picked from, and the form its tasks open.
+      masterTaskId: t.masterTaskId === null ? null : (isServerId(t.masterTaskId) ? t.masterTaskId : undefined),
+      formId: t.formId === '' || t.formId === null ? null : (isServerId(t.formId) ? t.formId : undefined),
+      required: t.required ?? undefined,
+      autoCreate: t.autoCreate ?? undefined,
+      // The screen's "Max repeats" number; blank means once per lead.
+      maxRepeats: maxRepeatsOut(t.repeats),
     }),
     fromApi: (row) => ({
       ...asText(row, ['name', 'description', 'role', 'department', 'priority', 'stageName']),
       title: row.title || row.name || '',
+      // The screen edits "Max repeats" as `repeats`; the API's yes/no flag stays behind it.
+      repeats: row.maxRepeats ?? '',
+      formId: row.formId || '',
       _synced: true,
     }),
   },
@@ -293,58 +459,13 @@ export const CRM_RESOURCES = {
 
   forms: {
     path: '/crm/forms/',
-    toApi: (f) => compact({
-      name: f.name || f.title,
-      description: f.description || undefined,
-      fields: f.fields || undefined,
-      isPublished: f.isPublished ?? undefined,
-    }),
-    fromApi: (row) => ({ ...row, _synced: true }),
+    toApi: formToApi,
+    fromApi: formFromApi,
   },
 
-  projects: {
-    path: '/crm/projects/',
-    toApi: (p) => compact({
-      name: p.name || p.title,
-      dealId: p.dealId || undefined,
-      partyId: p.partyId || p.customerId || undefined,
-      ownerId: p.ownerId || undefined,
-      status: p.status || undefined,
-      startDate: isoOut(p.startDate),
-      endDate: isoOut(p.endDate),
-      value: p.value !== undefined ? num(p.value) : undefined,
-      notes: p.notes || undefined,
-    }),
-    fromApi: (row) => ({
-      ...row,
-      startDate: displayIn(row.startDate),
-      endDate: displayIn(row.endDate),
-      _synced: true,
-    }),
-  },
+  projects: { path: '/crm/projects/', toApi: projectToApi, fromApi: projectFromApi },
 
-  contracts: {
-    path: '/crm/contracts/',
-    toApi: (c) => compact({
-      title: c.title || c.name,
-      dealId: c.dealId || undefined,
-      partyId: c.partyId || c.customerId || undefined,
-      projectId: c.projectId || undefined,
-      templateId: c.templateId || undefined,
-      status: c.status || undefined,
-      value: c.value !== undefined ? num(c.value) : undefined,
-      startDate: isoOut(c.startDate),
-      endDate: isoOut(c.endDate),
-      body: c.body || c.content || undefined,
-      terms: c.terms || undefined,
-    }),
-    fromApi: (row) => ({
-      ...row,
-      startDate: displayIn(row.startDate),
-      endDate: displayIn(row.endDate),
-      _synced: true,
-    }),
-  },
+  contracts: { path: '/crm/contracts/', toApi: contractToApi, fromApi: contractFromApi },
 };
 
 export const crmSync = createSync(CRM_RESOURCES, { label: 'crmSync' });
@@ -425,16 +546,63 @@ export async function pushLeadDetail(leadId, section, payload) {
   return api.post(`/crm/leads/${leadId}/${section}/`, payload);
 }
 
-/** Edit or remove one row in a lead's sub-collection. */
-export async function updateLeadNote(leadId, noteId, payload) {
-  if (!isBackendEnabled() || !isServerId(leadId) || !isServerId(noteId)) return null;
-  return api.patch(`/crm/leads/${leadId}/notes/${noteId}/`, payload);
+/** Edit or remove one row in a lead's sub-collection (`/crm/leads/{id}/{section}/{rowId}/`). */
+export async function updateLeadDetailRow(leadId, section, rowId, payload) {
+  if (!isBackendEnabled() || !isServerId(leadId) || !isServerId(rowId)) return null;
+  return api.patch(`/crm/leads/${leadId}/${section}/${rowId}/`, payload);
 }
 
-export async function deleteLeadNote(leadId, noteId) {
-  if (!isBackendEnabled() || !isServerId(leadId) || !isServerId(noteId)) return null;
-  await api.delete(`/crm/leads/${leadId}/notes/${noteId}/`);
+export async function deleteLeadDetailRow(leadId, section, rowId) {
+  if (!isBackendEnabled() || !isServerId(leadId) || !isServerId(rowId)) return null;
+  await api.delete(`/crm/leads/${leadId}/${section}/${rowId}/`);
   return true;
+}
+
+export const updateLeadNote = (leadId, noteId, payload) => updateLeadDetailRow(leadId, 'notes', noteId, payload);
+export const deleteLeadNote = (leadId, noteId) => deleteLeadDetailRow(leadId, 'notes', noteId);
+
+// ── deal activity log and deal → project ────────────────────────────────────
+
+/** A server activity row as the deal / contract timelines render it. */
+function dealActivityFromApi(row) {
+  const [title, ...rest] = String(row.description || '').split('\n');
+  return {
+    id: row.id,
+    type: row.type,
+    activityType: row.type,
+    title: title || row.type,
+    description: rest.join('\n'),
+    actor: row.actorName || 'System',
+    timestamp: row.createdAt,
+    time: row.createdAt,
+  };
+}
+
+/** `GET /crm/deals/{id}/activities/`. */
+export async function pullDealActivities(dealId) {
+  if (!isBackendEnabled() || !isServerId(dealId)) return [];
+  try {
+    const body = await api.get(`/crm/deals/${dealId}/activities/`);
+    return (Array.isArray(body) ? body : (body?.results || [])).map(dealActivityFromApi);
+  } catch (err) {
+    console.warn('[crmSync] pull deal activities failed:', err?.message || err);
+    return [];
+  }
+}
+
+/** `POST /crm/deals/{id}/activities/` -- `{ type, title, description }`. */
+export async function pushDealActivity(dealId, { type = 'activity', title = '', description = '' } = {}) {
+  if (!isBackendEnabled() || !isServerId(dealId)) return null;
+  const text = [title, description].filter(Boolean).join('\n');
+  const row = await api.post(`/crm/deals/${dealId}/activities/`, { type, description: text });
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('crm:data-updated'));
+  return dealActivityFromApi(row);
+}
+
+/** `POST /crm/deals/{id}/create-project/` -- the server links the deal and logs it. */
+export async function createDealProject(dealId, project) {
+  const row = await api.post(`/crm/deals/${dealId}/create-project/`, projectToApi(project));
+  return projectFromApi(row);
 }
 
 /** `POST /crm/leads/{id}/convert/` — the lead becomes a party and/or a deal. */
@@ -452,7 +620,7 @@ export async function completeTask(taskId, payload = {}) {
 
 export async function reorderStages(orderedIds) {
   if (!isBackendEnabled()) return null;
-  return api.post('/crm/stages/reorder/', { ids: orderedIds });
+  return api.post('/crm/stages/reorder/', { order: orderedIds });
 }
 
 export async function bulkDeleteLeads(ids) {

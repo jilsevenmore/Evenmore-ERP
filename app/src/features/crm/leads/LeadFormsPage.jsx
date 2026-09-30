@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import LeadFormsManager from '../leads/LeadFormsManager';
 import LeadGuideModal from '../leads/LeadGuideModal';
-import { defaultLeadFormSections } from '../../../data/crm/leadFormSchema';
+import { withStandardLeadFields } from '../../../data/crm/leadFormSchema';
 import { useCrmStore } from '../../../stores/crmStore';
 import { loadForms, saveForms, setActiveFormId, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
@@ -39,7 +39,8 @@ export default function LeadFormsPage() {
       name: formName.trim(),
       description: formDesc.trim() || 'Custom lead capture form',
       createdOn: new Date().toLocaleDateString('en-GB'),
-      sections: [{ id: 'lead-information', title: 'Lead Information', fields: [] }],
+      // Starts with the standard lead fields the Create Lead modal always shows.
+      sections: withStandardLeadFields([{ id: 'lead-information', title: 'Lead Information', fields: [] }]),
     };
 
     const updated = [...leadForms, newForm];

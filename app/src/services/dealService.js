@@ -50,9 +50,26 @@ export function loadDeals() {
   return useCrmStore.getState().deals;
 }
 
-/** Persist the deal list a screen just produced. */
+/**
+ * Persist the deal list a screen just produced. The deal form picks the
+ * assigned user by name; the API links the owner by id, so the name is
+ * resolved against the team roster here (the server returns it as `ownerName`).
+ */
 export function saveDeals(deals) {
-  syncCollection('deals', deals, useCrmStore.getState().deals);
+  const previous = useCrmStore.getState().deals;
+  const linked = deals.map((deal) => {
+    const ownerId = ownerIdFor(deal.assignedUser);
+    return ownerId && ownerId !== deal.ownerId ? { ...deal, ownerId } : deal;
+  });
+  syncCollection('deals', linked, previous);
+}
+
+/** The team member id for an assigned-user name, or undefined. */
+export function ownerIdFor(name) {
+  const key = String(name || '').trim().toLowerCase();
+  if (!key) return undefined;
+  const { teamMembers } = useCrmStore.getState();
+  return teamMembers.find((m) => String(m.name || '').trim().toLowerCase() === key)?.id;
 }
 
 export function buildDeal(input, id = `dl-${Date.now()}`) {

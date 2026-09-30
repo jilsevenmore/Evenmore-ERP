@@ -22,6 +22,15 @@ export default function TaskFormPage() {
   const storeForms = useCrmStore((s) => s.forms);
   const [forms, setForms] = useState([]);
   useEffect(() => { setForms(loadForms(TASK_FORM)); }, [storeForms]);
+
+  // Save only what the user changed. An effect on [forms, storeForms] compared
+  // a local copy a render behind the store and re-saved on every server reply
+  // -- re-creating each new form and deleting its server copy, endlessly.
+  function commitForms(update) {
+    const next = typeof update === 'function' ? update(forms) : update;
+    setForms(next);
+    saveForms(next, TASK_FORM);
+  }
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formName, setFormName] = useState('');
@@ -30,11 +39,6 @@ export default function TaskFormPage() {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [sortOrder, setSortOrder] = useState('Newest First');
   const [viewMode, setViewMode] = useState('grid');
-
-  // Task forms are the same server collection as lead forms, tagged by kind.
-  useEffect(() => {
-    if (forms.length > 0 || storeForms.length > 0) saveForms(forms, TASK_FORM);
-  }, [forms, storeForms]);
 
   function openCreateModal() {
     setEditingId(null);
@@ -65,7 +69,7 @@ export default function TaskFormPage() {
     const today = new Date().toLocaleDateString('en-GB');
 
     if (editingId) {
-      setForms((prev) => prev.map((f) => (f.id === editingId ? { ...f, title, description: desc, lastUpdated: today } : f)));
+      commitForms((prev) => prev.map((f) => (f.id === editingId ? { ...f, title, description: desc, lastUpdated: today } : f)));
       closeModal();
     } else {
       const newId = `task-form-${Date.now()}`;
@@ -79,7 +83,7 @@ export default function TaskFormPage() {
         status: 'ACTIVE',
         iconName: 'call',
       };
-      setForms((prev) => [...prev, newForm]);
+      commitForms((prev) => [...prev, newForm]);
       closeModal();
       try {
         localStorage.setItem('activeTaskFormId', newId);
@@ -90,7 +94,7 @@ export default function TaskFormPage() {
 
   function confirmDelete() {
     if (!deleteId) return;
-    setForms((prev) => prev.filter((f) => f.id !== deleteId));
+    commitForms((prev) => prev.filter((f) => f.id !== deleteId));
     setDeleteId(null);
   }
 

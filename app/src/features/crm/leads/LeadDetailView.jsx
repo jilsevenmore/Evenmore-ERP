@@ -63,8 +63,14 @@ import { createFieldFromType } from '../../../data/crm/leadFormSchema';
 import { exportToCSV } from '../../../services/exportUtils';
 import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
 import { useCrmStore } from '../../../stores/crmStore';
+import {
+  activeLeadForm, allCustomLeadFields, customLeadFields, formatCustomValue, missingRequiredField,
+} from '../../../services/leadFormFields';
+import { CustomLeadFieldInput } from './CustomLeadFieldInput';
 import { useLeadDetailStore, EMPTY_DETAIL } from '../../../stores/leadDetailStore';
 import { isServerId } from '../../../services/resourceSync';
+import { describeError } from '../../../services/crmSync';
+import { uploadFileToBackend } from '../../../services/fileUploadService';
 import { loadForms, saveForms, TASK_FORM } from '../../../services/crmForms';
 import { LineItemEditor } from '../../../components/common/LineItemEditor';
 import { loadCrmTasks, saveCrmTasks, runLeadStageAutomation, TASK_SOURCE_AUTOMATION } from '../../../services/leadStageAutomation';
@@ -106,32 +112,38 @@ const DETAIL_TAB_ICONS = {
  * Both now go to the API: the lead row through the CRM store, each section
  * through its own sub-collection endpoint.
  */
-function updateStoredLead(leadId, updates) {
-  if (!leadId || !updates || Object.keys(updates).length === 0) return false;
-  useCrmStore.getState().updateLead(leadId, updates).catch((err) => {
-    console.warn('[CRM] lead not saved:', err?.message || err);
+/** Merge display-only fields into the lead's store row, without a server write. */
+function patchLeadRowLocally(leadId, patch) {
+  if (!leadId) return;
+  useCrmStore.setState((state) => {
+    const row = state.leads.find((l) => l.id === leadId);
+    if (!row || Object.keys(patch).every((k) => row[k] === patch[k])) return state;
+    return { leads: state.leads.map((l) => (l.id === leadId ? { ...l, ...patch } : l)) };
   });
-  return true;
 }
 
 /**
- * Persist rows a tab just produced. Each key is a sub-collection, and only the
- * rows the server has not seen are posted — the rest are already its own.
+ * One write from a tab to a lead's sub-collection, server first. The tabs render
+ * the lead-detail store, so a saved row appears once the server has it; a
+ * rejected one is reported on the activity strip instead of vanishing.
+ *
+ *   leadDetailWrite(lead.id, 'add', 'sources', row, onActivity)
+ *   leadDetailWrite(lead.id, 'update', 'products', { id, ...changes }, onActivity)
+ *   leadDetailWrite(lead.id, 'remove', 'calls', { id }, onActivity)
  */
-function updateStoredLeadDetail(leadId, updates) {
-  if (!leadId || !updates || Object.keys(updates).length === 0) return false;
-  const { add } = useLeadDetailStore.getState();
-  Object.entries(updates).forEach(([section, rows]) => {
-    if (!Array.isArray(rows)) return;
-    rows
-      .filter((row) => row && !row._synced && !isServerId(row.id))
-      .forEach((row) => {
-        add(leadId, section, row).catch((err) => {
-          console.warn(`[CRM] ${section} not saved:`, err?.message || err);
-        });
-      });
+function leadDetailWrite(leadId, verb, section, row, onActivity) {
+  const store = useLeadDetailStore.getState();
+  if (!isServerId(leadId)) return Promise.resolve(null);
+  const request = verb === 'add'
+    ? store.add(leadId, section, row)
+    : verb === 'update'
+      ? store.update(leadId, section, row.id, row)
+      : store.remove(leadId, section, row.id);
+  return request.catch((err) => {
+    console.warn(`[CRM] ${section} not saved:`, err?.message || err);
+    onActivity?.(`Could not save ${section}: ${describeError(err)}`, '#ef4444');
+    return null;
   });
-  return true;
 }
 
 function limitItems(items, count) {
@@ -241,8 +253,18 @@ function createLeadTaskForm(name, sections = []) {
   };
 }
 
-function getTaskFormFields(formId) {
-  const form = getLeadTaskForms().find((f) => String(f.id) === String(formId));
+/** A task form by its server id or the id it had before it was saved. */
+function sameTaskForm(form, formId) {
+  if (!form || formId === undefined || formId === null || formId === '') return false;
+  const key = String(formId);
+  return String(form.id) === key || (form.clientId != null && String(form.clientId) === key);
+}
+
+/** The fields of a task form, given the form itself or its id. */
+function getTaskFormFields(formOrId) {
+  const form = formOrId && typeof formOrId === 'object'
+    ? formOrId
+    : getLeadTaskForms().find((f) => sameTaskForm(f, formOrId));
   if (!form) return [];
   if (Array.isArray(form.sections) && form.sections.length > 0) {
     return form.sections.flatMap((section) => section.fields || []);
@@ -250,9 +272,20 @@ function getTaskFormFields(formId) {
   return (form.fields || []).map((label, index) => ({ id: `f-${index}`, label, type: 'text' }));
 }
 
-/** The master task templates a stage can draw on, from `/crm/master-tasks/`. */
+/**
+ * The Tasks Master rows a lead task can start from, from `/crm/master-tasks/`:
+ * picking one fills the title, priority, role and the task form it uses.
+ */
 function getMasterTaskOptions() {
-  return useCrmStore.getState().masterTasks.map((task) => task.name || task.title).filter(Boolean);
+  return useCrmStore.getState().masterTasks
+    .filter((task) => (task.name || task.title) && task.status !== 'Inactive')
+    .map((task) => ({
+      id: task.id,
+      name: task.name || task.title,
+      priority: task.priority,
+      role: task.role,
+      formId: task.formId || '',
+    }));
 }
 
 /** `DD/MM/YYYY, hh:mm` — what the task rows render — and back again. */
@@ -264,6 +297,52 @@ function parseLeadTaskDueAt(value) {
   if (!match) return null;
   const [, dd, mm, yyyy, hh = '0', min = '0'] = match;
   return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
+}
+
+/** The Tasks tab's editor, blank. (`createLeadTaskForm` builds a task *form* definition.) */
+function emptyLeadTaskEditor(assignee, stage) {
+  return {
+    defaultTask: 'custom', title: '', stage: stage || 'New Lead', priority: 'Medium', status: 'Due',
+    assignee: assignee || '', description: '', proposalId: '', deliveryChallanId: '',
+    taskFormId: '', customValues: {}, taskDate: '', taskTime: '',
+  };
+}
+
+/** `dueAt` -> the editor's `<input type="date">` / `<input type="time">` values. */
+function splitLeadTaskDueAt(value) {
+  const date = parseLeadTaskDueAt(value);
+  if (!date || Number.isNaN(date.getTime())) return { taskDate: '', taskTime: '' };
+  const pad = (n) => String(n).padStart(2, '0');
+  return {
+    taskDate: `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    taskTime: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+  };
+}
+
+/**
+ * A CRM task (`/crm/tasks/`) as the lead's Tasks tab renders it. The columns
+ * the task list shares are the task's own; what only this tab captures (stage,
+ * due time, task-form answers, linked proposal / challan) rides in `extra`.
+ */
+function leadTaskFromCrmTask(task) {
+  const extra = task.extra || {};
+  const done = task.status === 'Completed';
+  return {
+    ...extra,
+    id: task.id,
+    crmTaskId: task.id,
+    title: task.title,
+    description: task.description || '',
+    priority: task.priority || 'Medium',
+    status: done ? 'Completed' : 'Due',
+    process: done ? 'Done' : (extra.process || 'Not Started'),
+    assignee: task.assigneeName || task.owner || 'Unassigned',
+    dueAt: extra.dueAt || task.dueDate || '',
+    source: task.source,
+    completionOutcome: task.completionOutcome || '',
+    nextAction: task.nextAction || task.next_action || '',
+    completedBy: task.completedBy || '',
+  };
 }
 
 function formatLeadTaskDueAt(value) {
@@ -417,9 +496,7 @@ function metricCards(counts) {
 // ── 1. Sources & Emails Tab (Screenshot Focus) ────────────────
 function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
   const initialState = useLeadDetailState(lead);
-  const [sources, setSources] = useState(() => initialState.sources);
-  const [emails, setEmails] = useState(() => initialState.emails);
-  const [timeline, setTimeline] = useState(() => initialState.timeline);
+  const { sources, emails, timeline } = initialState;
 
   const [showAddSource, setShowAddSource] = useState(false);
   const [showSendEmail, setShowSendEmail] = useState(false);
@@ -430,18 +507,6 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
   const [mailError, setMailError] = useState('');
   const editorRef = React.useRef(null);
   const [editorEmpty, setEditorEmpty] = useState(true);
-
-  React.useEffect(() => {
-    updateStoredLeadDetail(lead?.id, { sources: sources.map((s) => ({ ...s, icon: sourceIconName(s.icon) })), emails, timeline });
-  }, [lead?.id, sources, emails, timeline]);
-
-  React.useEffect(() => {
-    onCountsChange?.({ sources: sources.length });
-  }, [sources.length, onCountsChange]);
-
-  React.useEffect(() => {
-    updateStoredLeadDetail(lead?.id, { sources, emails, timeline });
-  }, [lead?.id, sources, emails, timeline]);
 
   React.useEffect(() => {
     onCountsChange?.({ sources: sources.length });
@@ -498,22 +563,12 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
   const handleAddSource = (e) => {
     e.preventDefault();
     if (!newSource.details) return;
-    const iconName = newSource.source === 'Referral' ? 'user' : newSource.source === 'Advertisement' ? 'megaphone' : 'globe';
-    const added = {
-      id: Date.now(),
-      source: newSource.source,
-      sourceType: String(newSource.source ?? '').toLowerCase(),
-      details: newSource.details,
-      date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      createdBy: currentUserName(),
-      avatar: '',
-      color: '#1f6bff',
-      icon: iconName,
-    };
-    setSources((current) => [added, ...current]);
+    const added = { source: newSource.source, details: newSource.details };
+    leadDetailWrite(lead.id, 'add', 'sources', added, onActivity).then((saved) => {
+      if (saved) onActivity?.(`Source "${added.source}" added`, '#10b981');
+    });
     setNewSource({ source: 'Website', details: '' });
     setShowAddSource(false);
-    onActivity?.(`Source "${added.source}" added`, '#10b981');
   };
 
   const handleSendEmail = (e) => {
@@ -525,43 +580,28 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
     }
     if (!newEmail.subject.trim()) return;
     const bodyText = (editorRef.current?.innerText || newEmail.message || '').trim();
-    const now = new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const addedEmail = {
-      id: Date.now(),
-      subject: newEmail.subject,
-      date: now,
-      person: currentUserName(),
-      avatar: '',
-      status: 'Sent',
-      statusColor: 'green',
-    };
-    const addedTimeline = {
-      id: Date.now(),
-      type: 'sent',
-      title: newEmail.subject,
-      preview: bodyText || 'Direct email communication with client representative.',
-      date: now,
-      author: currentUserName(),
-      dotColor: '#10b981',
-    };
-    setEmails((current) => [addedEmail, ...current]);
-    setTimeline((current) => [addedTimeline, ...current]);
+    // The email row is the record; the server adds it to the lead's timeline.
+    const addedEmail = { subject: newEmail.subject, body: bodyText, to: mailTo.trim() };
+    leadDetailWrite(lead.id, 'add', 'emails', addedEmail, onActivity).then((saved) => {
+      if (saved) onActivity?.(`Email "${addedEmail.subject}" sent`, '#3b82f6');
+    });
     setNewEmail({ subject: '', message: '' });
     setEditorEmpty(true);
     if (editorRef.current) editorRef.current.innerHTML = '';
     setShowSendEmail(false);
-    onActivity?.(`Email "${addedEmail.subject}" sent`, '#3b82f6');
   };
 
   const deleteSource = (id) => {
     const target = sources.find((s) => s.id === id);
-    setSources((current) => current.filter((source) => source.id !== id));
-    onActivity?.(`Source "${target?.source ?? 'entry'}" removed`, '#f59e0b');
+    leadDetailWrite(lead.id, 'remove', 'sources', { id }, onActivity).then((done) => {
+      if (done) onActivity?.(`Source "${target?.source ?? 'entry'}" removed`, '#f59e0b');
+    });
   };
   const deleteEmail = (id) => {
     const target = emails.find((e) => e.id === id);
-    setEmails((current) => current.filter((email) => email.id !== id));
-    onActivity?.(`Email "${target?.subject ?? 'entry'}" deleted`, '#f59e0b');
+    leadDetailWrite(lead.id, 'remove', 'emails', { id }, onActivity).then((done) => {
+      if (done) onActivity?.(`Email "${target?.subject ?? 'entry'}" deleted`, '#f59e0b');
+    });
   };
 
   // Graph compatibility alias: old codebase exposed SourcesEmailsTab; current UI uses SourcesAndEmailsTab.
@@ -874,7 +914,7 @@ function SourcesAndEmailsTab({ lead, onCountsChange, onActivity }) {
 // ── Files Tab ───────────────────────────────────────────────
 function FilesTab({ lead, onCountsChange, onActivity }) {
   const initialState = useLeadDetailState(lead);
-  const [files, setFiles] = useState(() => initialState.files);
+  const { files } = initialState;
   const [fileSearch, setFileSearch] = useState('');
   const [fileType, setFileType] = useState('All');
   const [viewFile, setViewFile] = useState(null);
@@ -886,31 +926,26 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
   }), [files, fileSearch, fileType]);
 
   React.useEffect(() => {
-    updateStoredLeadDetail(lead?.id, { files });
     onCountsChange?.({ files: files.length });
-  }, [lead?.id, files, files.length, onCountsChange]);
+  }, [files.length, onCountsChange]);
 
   async function handleUploadFiles(event) {
     const selected = Array.from(event.target.files || []);
     if (selected.length === 0) return;
-    const now = new Date().toLocaleDateString('en-GB');
-    const uploaded = await Promise.all(selected.map(async (file) => {
-      const imagePreview = file.type.startsWith('image/') ? await readFileAsDataUrl(file) : '';
-      return {
-        id: `file-upload-${Date.now()}-${file.name}`,
-        type: file.type.startsWith('image/') ? 'image' : 'document',
-        name: file.name,
-        size: `${Math.max(1, Math.round(file.size / 1024))} KB`,
-        sentOn: now,
-        sentBy: currentUserName() || lead?.owner || '',
-        preview: imagePreview,
-        downloadUrl: imagePreview,
-        description: 'Uploaded from Files tab.',
-      };
-    }));
-    setFiles((current) => [...uploaded, ...current]);
     event.target.value = '';
-    onActivity?.(`${uploaded.length} file${uploaded.length > 1 ? 's' : ''} uploaded`, '#8b5cf6');
+    // Each file is uploaded (`/files/…`), then attached to the lead by its id.
+    const results = await Promise.all(selected.map(async (file) => {
+      try {
+        const fileId = await uploadFileToBackend(file, file.name, 'crm_lead');
+        if (!fileId) throw new Error('Sign in to upload files.');
+        return leadDetailWrite(lead.id, 'add', 'files', { fileId, name: file.name }, onActivity);
+      } catch (err) {
+        onActivity?.(`Could not upload "${file.name}": ${describeError(err)}`, '#ef4444');
+        return null;
+      }
+    }));
+    const uploaded = results.filter(Boolean);
+    if (uploaded.length) onActivity?.(`${uploaded.length} file${uploaded.length > 1 ? 's' : ''} uploaded`, '#8b5cf6');
   }
 
   function handleViewFile(file) {
@@ -931,8 +966,9 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
 
   function handleRemoveFile(id) {
     const target = files.find((f) => f.id === id);
-    setFiles((current) => current.filter((f) => f.id !== id));
-    onActivity?.(`File "${target?.name ?? 'entry'}" removed`, '#f59e0b');
+    leadDetailWrite(lead.id, 'remove', 'files', { id }, onActivity).then((done) => {
+      if (done) onActivity?.(`File "${target?.name ?? 'entry'}" removed`, '#f59e0b');
+    });
   }
 
   return (
@@ -993,7 +1029,7 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
 
 function CallsTab({ lead, onCountsChange, onActivity }) {
   const initialState = useLeadDetailState(lead);
-  const [calls, setCalls] = useState(() => initialState.calls);
+  const { calls } = initialState;
   const [isLogOpen, setIsLogOpen] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [subject, setSubject] = useState('');
@@ -1009,9 +1045,8 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
   }, [lead?.owner]);
 
   React.useEffect(() => {
-    updateStoredLeadDetail(lead?.id, { calls });
     onCountsChange?.({ calls: calls.length });
-  }, [lead?.id, calls, calls.length, onCountsChange]);
+  }, [calls.length, onCountsChange]);
 
   function dialNumber() {
     const digits = String(lead?.phone || '').replace(/[^0-9]/g, '');
@@ -1025,16 +1060,10 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
   }
 
   function addCallLog(entry) {
-    const item = {
-      id: `call-${Date.now()}`,
-      date: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      by: currentUserName() || lead?.owner || '',
-      phone: lead?.phone || '',
-      direction: 'Outgoing',
-      ...entry,
-    };
-    setCalls((current) => [item, ...current]);
-    onActivity?.(`Call ${entry.outcome || 'logged'} with ${lead?.name || 'lead'}`, '#10b981');
+    const item = { phone: lead?.phone || '', direction: 'Outgoing', ...entry };
+    leadDetailWrite(lead.id, 'add', 'calls', item, onActivity).then((saved) => {
+      if (saved) onActivity?.(`Call ${entry.outcome || 'logged'} with ${lead?.name || 'lead'}`, '#10b981');
+    });
   }
 
   function callNow() {
@@ -1064,8 +1093,9 @@ function CallsTab({ lead, onCountsChange, onActivity }) {
 
   function removeCall(id) {
     const target = calls.find((c) => c.id === id);
-    setCalls((current) => current.filter((c) => c.id !== id));
-    onActivity?.(`Call log with ${target?.by ?? 'lead'} removed`, '#f59e0b');
+    leadDetailWrite(lead.id, 'remove', 'calls', { id }, onActivity).then((done) => {
+      if (done) onActivity?.(`Call log with ${target?.by ?? 'lead'} removed`, '#f59e0b');
+    });
   }
 
   function outcomeStyle(value) {
@@ -1250,7 +1280,13 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   const { quotations, deliveryChallans } = useERP() || {};
   const navigate = useNavigate();
   const initialState = useLeadDetailState(lead);
-  const [tasks, setTasks] = useState(() => initialState.tasks);
+  // This lead's tasks are the CRM task list's (`/crm/tasks/?lead=…`), not a copy.
+  const crmTasks = useCrmStore((s) => s.tasks);
+  const teamMembers = useCrmStore((s) => s.teamMembers);
+  const tasks = useMemo(
+    () => crmTasks.filter((task) => String(task.leadId) === String(lead?.id)).map(leadTaskFromCrmTask),
+    [crmTasks, lead?.id],
+  );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -1292,17 +1328,41 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       return customer.includes(customerName) || (leadName && customer.includes(leadName));
     });
   }, [deliveryChallans, lead]);
-  const [form, setForm] = useState(() => createLeadTaskForm(defaultAssignee));
+  const [form, setForm] = useState(() => emptyLeadTaskEditor(defaultAssignee, lead?.status));
   const [formError, setFormError] = useState('');
   const [completeId, setCompleteId] = useState(null);
   const currentUser = useAppStore((s) => s.currentUser);
-  const selectedTaskForm = useMemo(() => taskForms.find((f) => String(f.id) === String(form.taskFormId)) || null, [taskForms, form.taskFormId]);
+  const selectedTaskForm = useMemo(() => taskForms.find((f) => sameTaskForm(f, form.taskFormId)) || null, [taskForms, form.taskFormId]);
   const selectedTaskFormFields = useMemo(() => (selectedTaskForm ? getTaskFormFields(selectedTaskForm) : []), [selectedTaskForm]);
 
   React.useEffect(() => {
-    updateStoredLeadDetail(lead?.id, { tasks });
     onCountsChange?.({ openTasks: tasks.filter((t) => t.status !== 'Completed').length });
-  }, [lead?.id, tasks, onCountsChange]);
+  }, [tasks, onCountsChange]);
+
+  /** The task-list payload for what the editor holds. */
+  function crmTaskFromEditor() {
+    const assigneeId = teamMembers.find((m) => String(m.name || '').trim() === String(form.assignee || '').trim())?.id;
+    return {
+      title: form.title.trim(),
+      description: form.description.trim(),
+      leadId: lead.id,
+      assigneeId,
+      dueDate: form.taskDate || undefined,
+      priority: form.priority || 'Medium',
+      status: form.status === 'Completed' ? 'Completed' : 'Open',
+      extra: {
+        defaultTask: form.defaultTask,
+        stage: form.stage,
+        dueAt: formatLeadTaskDueAt(`${form.taskDate}T${form.taskTime || '00:00'}`),
+        process: form.status === 'Completed' ? 'Done' : 'Not Started',
+        proposalId: form.proposalId,
+        deliveryChallanId: form.deliveryChallanId,
+        taskFormId: form.taskFormId,
+        taskFormName: selectedTaskForm?.title || '',
+        customValues: form.customValues || {},
+      },
+    };
+  }
 
   React.useEffect(() => {
     function refreshTaskForms() {
@@ -1322,7 +1382,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 
   function openCreate() {
     setEditingId(null);
-    setForm(createLeadTaskForm(defaultAssignee));
+    setForm(emptyLeadTaskEditor(defaultAssignee, lead?.status));
     setFormError('');
     setTaskForms(getLeadTaskForms());
     setShowFormEditor(false);
@@ -1334,7 +1394,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   }
 
   function openEdit(task) {
-    const due = parseLeadTaskDueAt(task.dueAt);
+    const due = splitLeadTaskDueAt(task.dueAt);
     setEditingId(task.id);
     setForm({
       defaultTask: task.defaultTask || 'custom',
@@ -1363,7 +1423,15 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       if (key === 'defaultTask' && value && value !== 'custom') {
         const preset = masterTaskOptions.find((t) => String(t.id) === String(value));
         if (preset) {
-          return { ...current, defaultTask: value, title: current.title || preset.name || '', priority: preset.priority || current.priority, assignee: current.assignee || preset.role || defaultAssignee };
+          return {
+            ...current,
+            defaultTask: value,
+            title: current.title || preset.name || '',
+            priority: preset.priority || current.priority,
+            assignee: current.assignee || defaultAssignee,
+            // The master's task form opens with it (answers restart for a new form).
+            ...(preset.formId && preset.formId !== current.taskFormId ? { taskFormId: preset.formId, customValues: {} } : {}),
+          };
         }
       }
       if (key === 'taskFormId') {
@@ -1463,7 +1531,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     navigate(`/crm/leads/task-form/builder?formId=${selectedTaskForm.id}`);
   }
 
-  function submitTask(e) {
+  async function submitTask(e) {
     e.preventDefault();
     if (!form.title.trim()) {
       setFormError('Task name is required.');
@@ -1487,46 +1555,32 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
         return;
       }
     }
-    const nextTask = {
-      defaultTask: form.defaultTask,
-      title: form.title.trim(),
-      stage: form.stage,
-      status: form.status,
-      priority: form.priority,
-      dueAt: formatLeadTaskDueAt(form.taskDate, form.taskTime),
-      process: form.status === 'Completed' ? 'Done' : 'Not Started',
-      assignee: form.assignee,
-      description: form.description.trim(),
-      proposalId: form.proposalId,
-      deliveryChallanId: form.deliveryChallanId,
-      taskFormId: form.taskFormId,
-      taskFormName: selectedTaskForm?.title || '',
-      customValues: form.customValues || {},
-    };
-    if (editingId) {
-      setTasks((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...nextTask } : t)));
-      onActivity?.(`Task "${form.title.trim()}" updated`, '#1d6bff');
-    } else {
-      const manualTask = { id: `lt-${Date.now()}`, ...nextTask };
-      setTasks((prev) => [
-        manualTask,
-        ...prev,
-      ]);
-      onActivity?.(`Task "${form.title.trim()}" added`, '#16a34a');
-      emitCrmEvent({
-        type: CRM_EVENT_TYPES.TASK_CREATED,
-        entityType: 'lead-task',
-        entityId: manualTask.id,
-        payload: {
-          title: manualTask.title,
-          ownerName: manualTask.assignee,
-          leadName: lead?.name,
-          leadId: lead?.id,
-          path: `/crm/leads/${lead?.id}`,
-        },
-      });
+    const payload = crmTaskFromEditor();
+    const store = useCrmStore.getState();
+    try {
+      if (editingId) {
+        await store.updateTask(editingId, payload);
+        onActivity?.(`Task "${payload.title}" updated`, '#1d6bff');
+      } else {
+        const saved = await store.createTask(payload);
+        onActivity?.(`Task "${payload.title}" added`, '#16a34a');
+        emitCrmEvent({
+          type: CRM_EVENT_TYPES.TASK_CREATED,
+          entityType: 'lead-task',
+          entityId: saved?.id,
+          payload: {
+            title: payload.title,
+            ownerName: form.assignee,
+            leadName: lead?.name,
+            leadId: lead?.id,
+            path: `/crm/leads/${lead?.id}`,
+          },
+        });
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      setFormError(describeError(err));
     }
-    setIsModalOpen(false);
   }
 
   function toggleStatus(task) {
@@ -1534,43 +1588,11 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       setCompleteId(task.id);
       return;
     }
-    // Reopen a completed task: clear completion metadata
-    const reopened = tasks.find((t) => t.id === task.id);
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === task.id
-          ? {
-              ...t,
-              status: 'Due',
-              process: 'Not Started',
-              completionOutcome: undefined,
-              nextAction: undefined,
-              completedAt: undefined,
-              completedBy: undefined,
-            }
-          : t
-      )
-    );
-    if (reopened?.crmTaskId) {
-      try {
-        const crmTasks = loadCrmTasks();
-        const nextCrmTasks = crmTasks.map((t) =>
-          String(t.id) === String(reopened.crmTaskId)
-            ? {
-                ...t,
-                status: 'Open',
-                completionOutcome: undefined,
-                nextAction: undefined,
-                completedAt: undefined,
-                completedBy: undefined,
-              }
-            : t
-        );
-        saveCrmTasks(nextCrmTasks);
-      } catch (err) {
-        console.error('[CRM Completion] Error reopening task in Task List:', err);
-      }
-    }
+    // Reopen a completed task.
+    const current = crmTasks.find((t) => String(t.id) === String(task.id));
+    useCrmStore.getState()
+      .updateTask(task.id, { status: 'Open', extra: { ...(current?.extra || {}), process: 'Not Started' } })
+      .catch((err) => onActivity?.(`Could not reopen task: ${describeError(err)}`, '#ef4444'));
   }
 
   async function submitCompleteTask(outcome, nextAction, note) {
@@ -1578,14 +1600,10 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     if (!detailTask) {
       return { ok: false, message: 'Task could not be found.' };
     }
-    let crmTask = null;
-    try {
-      crmTask = loadCrmTasks().find((t) => String(t.id) === String(detailTask.crmTaskId)) || null;
-    } catch (err) {
-      console.error('[CRM Completion] Error loading Task List store:', err);
-    }
+    const crmTask = crmTasks.find((t) => String(t.id) === String(detailTask.crmTaskId)) || null;
     const actor = currentUser?.name || defaultAssignee || lead?.owner || 'CRM User';
-    const result = completeTaskWithOutcome({
+    // `POST /crm/tasks/{id}/complete/` -- the store re-reads, and this tab renders the store.
+    return completeTaskWithOutcome({
       task: crmTask,
       lead,
       outcome,
@@ -1594,33 +1612,14 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       completedBy: actor,
       leadDetailTask: detailTask,
     });
-    if (Array.isArray(result.leadDetailTasks)) {
-      setTasks(result.leadDetailTasks);
-    } else {
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === detailTask.id
-            ? {
-                ...t,
-                status: 'Completed',
-                process: 'Done',
-                completionOutcome: outcome,
-                nextAction,
-                completedAt: new Date().toISOString(),
-                completedBy: actor,
-              }
-            : t
-        )
-      );
-    }
-    return result;
   }
 
   function confirmDelete() {
     if (!deleteId) return;
     const target = tasks.find((t) => t.id === deleteId);
-    setTasks((prev) => prev.filter((t) => t.id !== deleteId));
-    onActivity?.(`Task "${target?.title ?? 'entry'}" removed`, '#f59e0b');
+    useCrmStore.getState().deleteTask(deleteId)
+      .then(() => onActivity?.(`Task "${target?.title ?? 'entry'}" removed`, '#f59e0b'))
+      .catch((err) => onActivity?.(`Could not remove task: ${describeError(err)}`, '#ef4444'));
     setDeleteId(null);
   }
 
@@ -1791,7 +1790,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
                   <div>
                     <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Status</label>
                     <select value={form.status} onChange={(e) => updateTaskForm('status', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
-                      {LEAD_TASK_STATUS_OPTIONS.map((status) => (<option key={status.value} value={status.value}>{status.label}</option>))}
+                      {LEAD_TASK_STATUS_OPTIONS.map((status) => (<option key={status} value={status}>{status}</option>))}
                     </select>
                   </div>
                 </div>
@@ -2743,6 +2742,17 @@ function DiscussionNotesTab({ lead, onActivity }) {
 
 // ── 2. General Tab ────────────────────────────────────────────
 function GeneralTab({ lead, activities = [] }) {
+  // Values for fields added in the Lead Create Form builder, under their
+  // current labels (a field removed from every form is no longer shown).
+  const storeForms = useCrmStore((s) => s.forms);
+  const customRows = React.useMemo(() => {
+    const fields = allCustomLeadFields();
+    return Object.entries(lead.customValues || {})
+      .filter(([id]) => fields.has(id))
+      .map(([id, value]) => [fields.get(id).label, formatCustomValue(value)]);
+    // storeForms: re-read the labels when a form changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead.customValues, storeForms]);
   const nameParts = String(lead.name || '').trim().split(/\s+/).filter(Boolean);
   const phone = displayPhone(lead.phone);
   const infoRows = [
@@ -2758,6 +2768,7 @@ function GeneralTab({ lead, activities = [] }) {
     ['Industry', lead.industry || '—'],
     ['Annual Revenue', formatAmount(lead.amount)],
     ['Website', lead.website || '—'],
+    ...customRows,
   ];
 
   const addressRows = [
@@ -2847,8 +2858,7 @@ function GeneralTab({ lead, activities = [] }) {
 // ── 3. Users | Products Tab ──────────────────────────────────
 function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   const initialState = useLeadDetailState(lead);
-  const [users, setUsers] = useState(() => initialState.users);
-  const [products, setProducts] = useState(() => initialState.products);
+  const { users, products } = initialState;
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
@@ -2877,53 +2887,41 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   );
 
   React.useEffect(() => {
-    updateStoredLeadDetail(lead?.id, { users, products });
     onCountsChange?.({ users: users.length, products: products.length });
-  }, [lead?.id, users, products, users.length, products.length, onCountsChange]);
+  }, [users.length, products.length, onCountsChange]);
 
   function addUser() {
     const employee = useCrmStore.getState().teamMembers.find((item) => item.id === selectedEmployeeId);
     if (!employee) return;
-    setUsers((current) => [
-      ...current,
-      {
-        id: employee.id,
-        initials: getInitials(employee.name),
-        name: employee.name,
-        email: employee.email,
-        role: employee.designation,
-        status: employee.status === 'Active' ? 'Active' : 'Inactive',
-        bg: '#3b82f6',
-      },
-    ]);
+    // `userId` is the employee's account; the row id is the server's.
+    leadDetailWrite(lead.id, 'add', 'users', { userId: employee.id, role: employee.designation || employee.role }, onActivity).then((saved) => {
+      if (saved) onActivity?.(`${employee.name} assigned to lead`, '#10b981');
+    });
     setSelectedEmployeeId('');
     setIsAddUserOpen(false);
-    onActivity?.(`${employee.name} assigned to lead`, '#10b981');
   }
 
   function deleteUser(id) {
     const target = users.find((u) => u.id === id);
-    setUsers((current) => current.filter((u) => u.id !== id));
-    onActivity?.(`User "${target?.name ?? 'entry'}" removed`, '#f59e0b');
+    leadDetailWrite(lead.id, 'remove', 'users', { id }, onActivity).then((done) => {
+      if (done) onActivity?.(`User "${target?.name ?? 'entry'}" removed`, '#f59e0b');
+    });
   }
 
   function addProduct() {
     if (!productDraft.name.trim() || !productDraft.sku.trim() || !productDraft.price || Number(productDraft.qty) < 1) return;
-    setProducts((current) => [
-      ...current,
-      {
-        id: Date.now(),
-        name: productDraft.name.trim(),
-        sku: productDraft.sku.trim().toUpperCase(),
-        price: `Rs. ${Number(productDraft.price).toLocaleString('en-IN')}`,
-        qty: Number(productDraft.qty),
-        status: productDraft.status,
-        image: productDraft.image,
-      },
-    ]);
+    const added = {
+      name: productDraft.name.trim(),
+      sku: productDraft.sku.trim().toUpperCase(),
+      price: Number(productDraft.price),
+      qty: Number(productDraft.qty),
+      status: productDraft.status,
+    };
+    leadDetailWrite(lead.id, 'add', 'products', added, onActivity).then((saved) => {
+      if (saved) onActivity?.(`Product "${added.name}" added`, '#ec4899');
+    });
     setProductDraft({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
     setIsAddProductOpen(false);
-    onActivity?.(`Product "${productDraft.name.trim()}" added`, '#ec4899');
   }
 
   function openEditProduct(product) {
@@ -2941,23 +2939,25 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   function saveEditProduct() {
     if (!editingProduct) return;
     if (!editingProduct.name.trim() || !editingProduct.sku.trim() || !editingProduct.price || Number(editingProduct.qty) < 1) return;
-    setProducts((current) => current.map((p) => (p.id === editingProduct.id ? {
-      ...p,
+    const changes = {
+      id: editingProduct.id,
       name: editingProduct.name.trim(),
       sku: editingProduct.sku.trim().toUpperCase(),
-      price: `Rs. ${Number(editingProduct.price).toLocaleString('en-IN')}`,
+      price: Number(editingProduct.price),
       qty: Number(editingProduct.qty),
       status: editingProduct.status,
-      image: editingProduct.image,
-    } : p)));
+    };
+    leadDetailWrite(lead.id, 'update', 'products', changes, onActivity).then((saved) => {
+      if (saved) onActivity?.(`Product "${changes.name}" updated`, '#3b82f6');
+    });
     setEditingProduct(null);
-    onActivity?.(`Product "${editingProduct.name.trim()}" updated`, '#3b82f6');
   }
 
   function deleteProduct(id) {
     const target = products.find((p) => p.id === id);
-    setProducts((current) => current.filter((p) => p.id !== id));
-    onActivity?.(`Product "${target?.name ?? 'entry'}" removed`, '#f59e0b');
+    leadDetailWrite(lead.id, 'remove', 'products', { id }, onActivity).then((done) => {
+      if (done) onActivity?.(`Product "${target?.name ?? 'entry'}" removed`, '#f59e0b');
+    });
   }
 
   async function handleProductImageChange(event) {
@@ -3426,6 +3426,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
   const [editForm, setEditForm] = useState(null);
   const storedDetailState = useLeadDetailState(lead);
   const storeLeads = useCrmStore((s) => s.leads);
+  const storeStages = useCrmStore((s) => s.stages);
+  const storeSources = useCrmStore((s) => s.sources);
+  const storeMembers = useCrmStore((s) => s.teamMembers);
   const [activeTab, setActiveTab] = useState('Users & Products');
   const { addCustomer, showToast } = useERP() || {};
   const [isConverted, setIsConverted] = useState(lead?.status === 'Converted');
@@ -3460,8 +3463,10 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     setDetailCounts((current) => ({ ...current, ...counts }));
   }, []);
 
+  // Display-only counters for the list: patched into the store row locally.
+  // Sending them to the server made a PATCH every time a lead was opened.
   React.useEffect(() => {
-    updateStoredLead(viewLead?.id ?? lead?.id, {
+    patchLeadRowLocally(viewLead?.id ?? lead?.id, {
       status: isConverted ? 'Converted' : (viewLead?.status ?? lead?.status),
       productsCount: detailCounts.products,
       sourcesCount: detailCounts.sources,
@@ -3518,6 +3523,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       amount: source.amount ?? '',
       leadNumber: source.leadNumber ?? '',
       createdOn: source.createdOn ?? '',
+      customValues: { ...(source.customValues || {}) },
     });
     setIsEditOpen(true);
   }
@@ -3552,17 +3558,32 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       amount: editForm.amount === '' ? 0 : Number(editForm.amount) || 0,
       leadNumber: String(editForm.leadNumber ?? '').trim(),
       createdOn: String(editForm.createdOn ?? '').trim(),
+      customValues: editForm.customValues || {},
     };
-    const prevStatus = viewLead?.status ?? lead?.status;
-    updateStoredLead(targetId, updates);
-    setViewLead((current) => ({ ...(current ?? lead), ...updates }));
-    if (updates.status && updates.status !== prevStatus) {
-      try {
-        runLeadStageAutomation({ ...(viewLead ?? lead), ...updates }, updates.status, { previousStage: prevStatus });
-      } catch (e) {
-        console.error('[CRM Automation] Error in stage change automation:', e);
-      }
+    const missing = missingRequiredField(customLeadFields(activeLeadForm()), updates.customValues);
+    if (missing) {
+      showToast?.(`${missing.label} is required.`);
+      return;
     }
+    const prevStatus = viewLead?.status ?? lead?.status;
+    // The server keys everything by id: the stage (which runs the stage
+    // automation), the source and the owner. Names are what the form shows.
+    const byName = (rows, name) => rows.find((r) => String(r.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase());
+    const stage = updates.status !== 'Converted' ? byName(storeStages, updates.status) : null;
+    if (stage) updates.stageId = stage.id;
+    const source = byName(storeSources, updates.source);
+    if (source) updates.sourceId = source.id;
+    const owner = byName(storeMembers, updates.owner);
+    if (owner) updates.ownerId = owner.id;
+    const stageChanged = Boolean(stage) && updates.status !== prevStatus;
+
+    setViewLead((current) => ({ ...(current ?? lead), ...updates }));
+    useCrmStore.getState().updateLead(targetId, updates)
+      .then(() => {
+        // The server generated this stage's tasks during the save; read them now.
+        if (stageChanged) runLeadStageAutomation({ ...(viewLead ?? lead), ...updates }, updates.status, { previousStage: prevStatus });
+      })
+      .catch((err) => showToast?.(`Lead not saved — ${err?.message || err}`));
     if (updates.status === 'Converted') {
       setIsConverted(true);
     } else if (isConverted && updates.status !== 'Converted') {
@@ -3824,14 +3845,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
                 Lead Source
                 <select className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white" value={editForm.source} onChange={(e) => updateEditField('source', e.target.value)}>
                   <option value="">Select source</option>
-                  <option value="Website">Website</option>
-                  <option value="Cold Call">Cold Call</option>
-                  <option value="Advertisement">Advertisement</option>
-                  <option value="Partner">Partner</option>
-                  <option value="Web Download">Web Download</option>
-                  <option value="Online Store">Online Store</option>
-                  <option value="External Referral">External Referral</option>
-                  <option value="Seminar Partner">Seminar Partner</option>
+                  {Array.from(new Set([editForm.source, ...storeSources.map((s) => s.name)].filter(Boolean))).map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
                 </select>
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
@@ -3844,7 +3860,12 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Lead Owner
-                <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.owner} onChange={(e) => updateEditField('owner', e.target.value)} placeholder="Select User" />
+                <select className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white" value={editForm.owner} onChange={(e) => updateEditField('owner', e.target.value)}>
+                  <option value="">Select user</option>
+                  {Array.from(new Set([editForm.owner, ...storeMembers.map((m) => m.name)].filter(Boolean))).map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
               </label>
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Title
@@ -3874,6 +3895,18 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
                 Zip Code
                 <input className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.zipCode} onChange={(e) => updateEditField('zipCode', e.target.value)} placeholder="Enter zip code" />
               </label>
+              {customLeadFields(activeLeadForm()).map((field) => (
+                <label key={field.id} htmlFor={`custom-${field.id}`} className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
+                  {field.label}{field.required ? ' *' : ''}
+                  <CustomLeadFieldInput
+                    field={field}
+                    value={editForm.customValues?.[field.id]}
+                    users={storeMembers}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400 bg-white"
+                    onChange={(value) => updateEditField('customValues', { ...(editForm.customValues || {}), [field.id]: value })}
+                  />
+                </label>
+              ))}
               <label className="flex flex-col gap-1 text-xs font-semibold text-slate-600">
                 Annual Revenue / Amount
                 <input type="number" className="border border-slate-200 rounded-lg px-3 py-2 text-xs font-normal text-slate-900 outline-none focus:border-blue-400" value={editForm.amount} onChange={(e) => updateEditField('amount', e.target.value)} placeholder="Enter amount" />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CheckCircle2, Copy, FileText, FolderPlus, Link2, Menu, MoreHorizontal, Pencil, Plus, Trophy, Upload, X } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
@@ -8,6 +8,10 @@ import DealProjectHandoff from './DealProjectHandoff';
 import './DealDetailView.css';
 import { ActivitiesTimeline, DocumentsTable, ProductsTable, QuotationsTable, RelatedCards, TasksTable, dealTotals } from './DealTabContent';
 import { useAppStore } from '../../../stores/appStore';
+import { useCrmStore } from '../../../stores/crmStore';
+import { describeError, pullDealActivities, pushDealActivity } from '../../../services/crmSync';
+import { CONTRACT_TYPES, createContract } from '../../../services/contractService';
+import { uploadFileToBackend } from '../../../services/fileUploadService';
 
 const money = (value) => `₹ ${Number(value || 0).toLocaleString('en-IN')}`;
 const date = (value) => {
@@ -33,32 +37,45 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
   // (backdrop, Escape and route-change dismissal live in MainLayout).
   const navigationOpen = useAppStore((state) => state.mobileSidebarOpen);
   const toggleNavigation = useAppStore((state) => state.toggleMobileSidebar);
+  const storeTasks = useCrmStore((state) => state.tasks);
+  useEffect(() => { setTasks(loadCrmTasks()); }, [storeTasks]);
+  // The activity feed is its own endpoint (`/crm/deals/{id}/activities/`).
+  const dealId = deal?.id;
+  const [activities, setActivities] = useState([]);
+  const loadActivities = useCallback(async () => {
+    setActivities(dealId ? await pullDealActivities(dealId) : []);
+  }, [dealId]);
   useEffect(() => {
-    const sync = () => setTasks(loadCrmTasks());
-    window.addEventListener(CRM_EVENT, sync);
-    window.addEventListener('storage', sync);
-    return () => { window.removeEventListener(CRM_EVENT, sync); window.removeEventListener('storage', sync); };
-  }, []);
+    loadActivities();
+    window.addEventListener(CRM_EVENT, loadActivities);
+    return () => window.removeEventListener(CRM_EVENT, loadActivities);
+  }, [loadActivities]);
+  const allContracts = useCrmStore((state) => state.contracts);
+  const teamMembers = useCrmStore((state) => state.teamMembers);
   if (!deal) return <div className="card p-8"><h1 className="text-xl font-bold mb-4">Deal not found</h1><Link to="/crm/deals" className="btn-outline">Back to Deals</Link></div>;
 
   const products = Array.isArray(deal.products) ? deal.products.map((item, index) => ({ ...item, id: item.id || `product-${index}`, name: item.name || item.description || item.product || item.id, qty: item.qty ?? item.quantity ?? 1, rate: item.rate ?? item.price ?? 0 })) : deal.product ? [{ id: 'legacy-product', name: deal.product, qty: deal.quantity || 1, unit: 'Qty', rate: Number(deal.price || 0) / (deal.quantity || 1) }] : [];
-  const activities = deal.activities || [];
   const documents = deal.documents || [];
-  const contracts = deal.contracts || [];
+  const contracts = allContracts.filter((contract) => String(contract.dealId) === String(deal.id));
   const linkedTasks = tasks.filter((task) => String(task.dealId) === String(deal.id));
   const linkedQuotes = quotations.filter((quote) => String(quote.dealId) === String(deal.id) || quote.dealReference === (deal.dealNumber || deal.id));
   const customer = customers.find((item) => String(item.id) === String(deal.customerId || deal.partyId) || item.name === deal.client);
   const actor = currentUser?.name || currentUser?.fullName || 'CRM User';
   const openEditor = (type, values = {}) => { setError(''); setEditor({ type, ...values }); };
-  const notifyFailure = (failure) => onNotify(failure.message || 'Unable to save changes.');
+  const notifyFailure = (failure) => onNotify(describeError(failure) || 'Unable to save changes.');
+  const memberId = (name) => teamMembers.find((m) => String(m.name || '').trim().toLowerCase() === String(name || '').trim().toLowerCase())?.id;
+  /** Save fields on the deal row and log what changed on its activity feed. */
   function save(patch, title) {
-    onUpdate({ ...patch, activities: [{ id: crypto.randomUUID(), title, actor, timestamp: new Date().toISOString(), type: 'deal-updated' }, ...activities] });
+    onUpdate(patch);
+    pushDealActivity(deal.id, { type: 'deal-updated', title })
+      .then(loadActivities)
+      .catch((err) => console.warn('[CRM] deal activity not saved:', err?.message || err));
     onNotify(title);
   }
   function createQuote() {
     navigate('/crm/quotations', { state: { fromDeal: true, dealId: deal.id, dealReference: deal.dealNumber || deal.id, customerId: deal.customerId || deal.partyId, company: deal.client, items: products.map((item) => ({ name: item.name, qty: item.qty, rate: item.rate })) } });
   }
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     try {
       if (editor.type === 'Pricing') {
@@ -74,7 +91,8 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
       if (!title) throw new Error('Enter a title.');
       if (editor.type === 'Task') {
         const existing = loadCrmTasks();
-        const task = { ...(editor.id ? existing.find((item) => item.id === editor.id) : {}), id: editor.id || `task-${crypto.randomUUID()}`, title, dealId: deal.id, owner: editor.owner || deal.assignedUser || 'Unassigned', dueDate: editor.dueDate, priority: editor.priority || 'Medium', status: editor.status || 'Open', source: 'Deal', updatedAt: new Date().toISOString() };
+        const owner = editor.owner || deal.assignedUser || '';
+        const task = { ...(editor.id ? existing.find((item) => item.id === editor.id) : {}), id: editor.id || `task-${crypto.randomUUID()}`, title, dealId: deal.id, leadId: deal.leadId || undefined, owner: owner || 'Unassigned', assigneeId: memberId(owner), dueDate: editor.dueDate, priority: editor.priority || 'Medium', status: editor.status || 'Open', source: 'Deal', updatedAt: new Date().toISOString() };
         if (!task.createdAt) task.createdAt = task.updatedAt;
         if (task.status === 'Completed') {
           task.completedAt ||= task.updatedAt;
@@ -94,31 +112,36 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
         save({ products: updated, discount: totals.discount, price: totals.total }, 'Products and deal value updated');
         setTab('Products');
       } else if (editor.type === 'Contract') {
-        save({ contracts: [{ id: crypto.randomUUID(), title, terms: editor.terms || '', status: 'Draft', createdAt: new Date().toISOString() }, ...contracts] }, 'Contract draft saved');
+        // A real contract (`/crm/contracts/`), saved as a Draft; the server logs it on the deal.
+        await createContract({
+          dealId: deal.id, customerId: deal.customerId, customer: deal.client,
+          contractType: editor.contractType || 'Other', startDate: editor.startDate, endDate: editor.endDate,
+          description: title, terms: editor.terms || '', status: 'Draft',
+        });
+        loadActivities();
+        onNotify('Contract draft saved');
         setTab('Related');
       } else if (editor.type === 'Summary') {
         save({ description: title }, 'Summary updated');
       } else {
-        onUpdate({ activities: [{ id: crypto.randomUUID(), title, description: editor.description || '', activityType: editor.activityType || 'Note Added', actor, timestamp: new Date().toISOString(), type: 'activity' }, ...activities] });
+        await pushDealActivity(deal.id, { type: editor.activityType || 'Note Added', title, description: editor.description || '' });
+        await loadActivities();
         onNotify('Activity added');
         setTab('Activities');
       }
       setEditor(null);
-    } catch (failure) { setError(failure.message); }
+    } catch (failure) { setError(describeError(failure)); }
   }
   async function upload(event) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
     try {
-      if (file.size > 2 * 1024 * 1024) throw new Error('Choose a document smaller than 2 MB.');
-      const data = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error('The document could not be read.'));
-        reader.readAsDataURL(file);
-      });
-      save({ documents: [...documents, { id: crypto.randomUUID(), name: file.name, size: file.size, mimeType: file.type, uploadedBy: actor, data, createdAt: new Date().toISOString() }] }, `Document added: ${file.name}`);
+      if (file.size > 25 * 1024 * 1024) throw new Error('Choose a document smaller than 25 MB.');
+      // Stored as an uploaded file; the deal keeps only the reference.
+      const fileId = await uploadFileToBackend(file, file.name, 'crm_lead');
+      if (!fileId) throw new Error('Sign in to upload documents.');
+      save({ documents: [...documents, { id: fileId, fileId, name: file.name, size: file.size, mimeType: file.type, uploadedBy: actor, createdAt: new Date().toISOString() }] }, `Document added: ${file.name}`);
     } catch (failure) { notifyFailure(failure); }
   }
   function removeRecord() {
@@ -130,7 +153,7 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
       } else if (removal.type === 'Document') {
         save({ documents: documents.filter((item) => item.id !== removal.item.id) }, 'Document removed');
       } else {
-        if (!saveCrmTasks(loadCrmTasks().filter((item) => item.id !== removal.item.id))) throw new Error('Task could not be removed.');
+        useCrmStore.getState().deleteTask(removal.item.id).catch(notifyFailure);
         onNotify('Task removed');
       }
       setRemoval(null);
@@ -150,13 +173,13 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
           return <button key={name} id={`deal-tab-${name}`} role="tab" aria-selected={tab === name} aria-controls="deal-tab-panel" tabIndex={tab === name ? 0 : -1} onKeyDown={(event) => { if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return; event.preventDefault(); const buttons = [...event.currentTarget.parentElement.children]; const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (buttons.indexOf(event.currentTarget) + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length; buttons[next].focus(); buttons[next].click(); }} onClick={() => setTab(name)}>{name}{count != null && <span>{count}</span>}</button>;
         })}</div>
         <div role="tabpanel" id="deal-tab-panel" aria-labelledby={`deal-tab-${tab}`}>
-          {tab === 'Overview' && <div className="deal-overview-grid"><Panel title="Deal Information"><dl className="deal-info-list">{[['Customer', deal.client], ['Contact Person', deal.contactPerson], ['Email', deal.email ? <a href={`mailto:${deal.email}`}>{deal.email}</a> : null], ['Phone', deal.phone ? <a href={`tel:${deal.phone}`}>{deal.phone}</a> : null], ['Deal Value', money(deal.price)], ['Expected Close Date', date(deal.expectedCloseDate || deal.date)], ['Source', deal.source], ['Owner', deal.assignedUser || deal.owner], ['Team', deal.team], ['Stage', deal.stage]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not specified'}</dd></div>)}</dl></Panel><div className="deal-detail-stack"><Panel title="Summary" action={<button aria-label="Edit summary" onClick={() => openEditor('Summary', { title: deal.description || deal.notes || '' })}><Pencil size={14} /></button>}><p className="deal-summary-text">{deal.description || deal.notes || 'Add a summary of the customer requirements and next steps.'}</p></Panel><Panel title={`Products (${products.length})`} action={<button className="deal-text-action" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add</button>}>{productTable}</Panel></div><div className="deal-detail-stack"><Panel title="Quick Actions"><div className="deal-quick-actions">{projectAction}<button className="btn-outline btn-sm" onClick={createQuote}><FileText size={16} />Create Quotation</button><button className="btn-outline btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract` })}><FileText size={16} />Create Contract</button><button className="btn-outline btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={16} />Add Task</button></div>{deal.stage !== 'Won' && !project && <p className="deal-action-hint">Project creation is available when the deal is Won.</p>}</Panel><Panel title="Related Information">{related}</Panel></div></div>}
+          {tab === 'Overview' && <div className="deal-overview-grid"><Panel title="Deal Information"><dl className="deal-info-list">{[['Customer', deal.client], ['Contact Person', deal.contactPerson], ['Email', deal.email ? <a href={`mailto:${deal.email}`}>{deal.email}</a> : null], ['Phone', deal.phone ? <a href={`tel:${deal.phone}`}>{deal.phone}</a> : null], ['Deal Value', money(deal.price)], ['Expected Close Date', date(deal.expectedCloseDate || deal.date)], ['Source', deal.source], ['Owner', deal.assignedUser || deal.owner], ['Team', deal.team], ['Stage', deal.stage]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value || 'Not specified'}</dd></div>)}</dl></Panel><div className="deal-detail-stack"><Panel title="Summary" action={<button aria-label="Edit summary" onClick={() => openEditor('Summary', { title: deal.description || deal.notes || '' })}><Pencil size={14} /></button>}><p className="deal-summary-text">{deal.description || deal.notes || 'Add a summary of the customer requirements and next steps.'}</p></Panel><Panel title={`Products (${products.length})`} action={<button className="deal-text-action" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add</button>}>{productTable}</Panel></div><div className="deal-detail-stack"><Panel title="Quick Actions"><div className="deal-quick-actions">{projectAction}<button className="btn-outline btn-sm" onClick={createQuote}><FileText size={16} />Create Quotation</button><button className="btn-outline btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract`, contractType: 'Other' })}><FileText size={16} />Create Contract</button><button className="btn-outline btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={16} />Add Task</button></div>{deal.stage !== 'Won' && !project && <p className="deal-action-hint">Project creation is available when the deal is Won.</p>}</Panel><Panel title="Related Information">{related}</Panel></div></div>}
           {tab === 'Products' && <Panel title={`Products (${products.length})`} action={<button className="btn-primary btn-sm" onClick={() => openEditor('Product', { qty: 1, rate: 0 })}><Plus size={14} />Add Product</button>}>{productTable}</Panel>}
           {tab === 'Activities' && <Panel title="Activities" action={<button className="btn-primary btn-sm" onClick={() => openEditor('Activity')}><Plus size={14} />Add Activity</button>}><ActivitiesTimeline activities={activities} /></Panel>}
-          {tab === 'Documents' && <Panel title={`Documents (${documents.length})`} action={<label className="btn-primary btn-sm cursor-pointer"><Upload size={14} />Upload Document<input aria-label="Upload document" type="file" className="sr-only" onChange={upload} /></label>}><DocumentsTable documents={documents} onRemove={(item) => setRemoval({ type: 'Document', item })} /><p className="deal-action-hint">Maximum file size: 2 MB.</p></Panel>}
+          {tab === 'Documents' && <Panel title={`Documents (${documents.length})`} action={<label className="btn-primary btn-sm cursor-pointer"><Upload size={14} />Upload Document<input aria-label="Upload document" type="file" className="sr-only" onChange={upload} /></label>}><DocumentsTable documents={documents} onRemove={(item) => setRemoval({ type: 'Document', item })} /><p className="deal-action-hint">Maximum file size: 25 MB.</p></Panel>}
           {tab === 'Quotations' && <Panel title={`Quotations (${linkedQuotes.length})`} action={<button className="btn-primary btn-sm" onClick={createQuote}><Plus size={14} />Create Quotation</button>}><QuotationsTable quotations={linkedQuotes} /></Panel>}
           {tab === 'Tasks' && <Panel title={`Tasks (${linkedTasks.length})`} action={<button className="btn-primary btn-sm" onClick={() => openEditor('Task', { owner: deal.assignedUser })}><Plus size={14} />Add Task</button>}><TasksTable tasks={linkedTasks} onEdit={(task) => openEditor('Task', task)} onRemove={(item) => setRemoval({ type: 'Task', item })} /></Panel>}
-          {tab === 'Related' && <div className="deal-detail-stack"><Panel title="Related Records"><RelatedCards deal={deal} project={project} customer={customer} /></Panel><Panel title="Contract Drafts" action={<button className="btn-primary btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract` })}><Plus size={14} />Create Contract</button>}>{contracts.length ? <ul className="deal-record-list">{contracts.map((contract) => <li key={contract.id}><FileText size={18} /><div><strong>{contract.title}</strong><p>{contract.status} · {date(contract.createdAt)}</p><p className="whitespace-pre-wrap">{contract.terms}</p><a download={`${contract.title}.txt`} href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${contract.title}\nDeal: ${deal.dealNumber || deal.id}\nCustomer: ${deal.client}\nStatus: Draft\n\n${contract.terms}`)}`}>Download draft</a></div></li>)}</ul> : <Empty>No contract drafts created yet.</Empty>}</Panel></div>}
+          {tab === 'Related' && <div className="deal-detail-stack"><Panel title="Related Records"><RelatedCards deal={deal} project={project} customer={customer} /></Panel><Panel title="Contract Drafts" action={<button className="btn-primary btn-sm" onClick={() => openEditor('Contract', { title: `${deal.name} — contract`, contractType: 'Other' })}><Plus size={14} />Create Contract</button>}>{contracts.length ? <ul className="deal-record-list">{contracts.map((contract) => <li key={contract.id}><FileText size={18} /><div><strong>{contract.contractNumber ? <Link to={`/crm/contracts/${encodeURIComponent(contract.id)}`}>{contract.contractNumber}</Link> : null} {contract.description || contract.title}</strong><p>{contract.status} · {date(contract.createdAt)}</p><p className="whitespace-pre-wrap">{contract.terms}</p><a download={`${contract.title}.txt`} href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${contract.title}\nDeal: ${deal.dealNumber || deal.id}\nCustomer: ${deal.client}\nStatus: Draft\n\n${contract.terms}`)}`}>Download draft</a></div></li>)}</ul> : <Empty>No contract drafts created yet.</Empty>}</Panel></div>}
         </div>
       </>;
     }} />
@@ -167,7 +190,7 @@ export default function DealDetailView({ deal, onEdit, onNotify, onUpdate, onDup
         {editor.type === 'Task' && <><label>Assigned to<input value={editor.owner || ''} onChange={(event) => setEditor({ ...editor, owner: event.target.value })} /></label><div className="deal-form-grid"><label>Due date *<input required type="date" value={editor.dueDate || ''} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label><label>Priority<select value={editor.priority || 'Medium'} onChange={(event) => setEditor({ ...editor, priority: event.target.value })}>{['Low', 'Medium', 'High', 'Urgent'].map((priority) => <option key={priority}>{priority}</option>)}</select></label></div><label>Status<select value={editor.status || 'Open'} onChange={(event) => setEditor({ ...editor, status: event.target.value })}>{['Open', 'In Progress', 'Waiting', 'Completed'].map((status) => <option key={status}>{status}</option>)}</select></label></>}
         {editor.type === 'Pricing' && <div className="deal-form-grid"><label>Discount (₹)<input aria-label="Discount" type="number" min="0" step="0.01" value={editor.discount} onChange={(event) => setEditor({ ...editor, discount: event.target.value })} /></label><label>Tax (%)<input aria-label="Tax rate" type="number" min="0" max="100" step="0.01" value={editor.taxRate} onChange={(event) => setEditor({ ...editor, taxRate: event.target.value })} /></label></div>}
         {editor.type === 'Activity' && <><label>Activity type<select value={editor.activityType || 'Note Added'} onChange={(event) => setEditor({ ...editor, activityType: event.target.value })}>{['Note Added', 'Call Completed', 'Meeting', 'Follow-up', 'Email'].map((type) => <option key={type}>{type}</option>)}</select></label><label>Details<textarea rows={3} value={editor.description || ''} onChange={(event) => setEditor({ ...editor, description: event.target.value })} /></label></>}
-        {editor.type === 'Contract'  && <label>Terms *<textarea required rows={6} value={editor.terms || ''} onChange={(event) => setEditor({ ...editor, terms: event.target.value })} /></label>}
+        {editor.type === 'Contract' && <><label>Contract type<select value={editor.contractType || 'Other'} onChange={(event) => setEditor({ ...editor, contractType: event.target.value })}>{CONTRACT_TYPES.map((type) => <option key={type}>{type}</option>)}</select></label><div className="deal-form-grid"><label>Start date *<input required type="date" value={editor.startDate || ''} onChange={(event) => setEditor({ ...editor, startDate: event.target.value })} /></label><label>End date *<input required type="date" value={editor.endDate || ''} onChange={(event) => setEditor({ ...editor, endDate: event.target.value })} /></label></div><label>Terms *<textarea required rows={6} value={editor.terms || ''} onChange={(event) => setEditor({ ...editor, terms: event.target.value })} /></label></>}
         {error && <p role="alert" className="text-rose-600">{error}</p>}<div className="deal-form-footer"><button type="button" className="btn-outline btn-sm" onClick={() => setEditor(null)}>Cancel</button><button className="btn-primary btn-sm" type="submit">Save {editor.type === 'Contract' ? 'Draft' : editor.type}</button></div></form>}
     </Modal>
   </div>;

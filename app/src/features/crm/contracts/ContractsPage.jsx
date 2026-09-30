@@ -9,6 +9,8 @@ import Modal from '../../../components/ui/Modal';
 import KpiCard from '../../../components/ui/KpiCard';
 import PageHeader from '../../../components/ui/PageHeader';
 import { loadDeals } from '../../../services/dealService';
+import { describeError } from '../../../services/crmSync';
+import { useCrmStore } from '../../../stores/crmStore';
 import {
   CONTRACT_TYPES,
   CONTRACT_TEMPLATES,
@@ -140,15 +142,10 @@ export default function ContractsPage() {
     } catch (failure) { setError(failure.message); }
   }
 
-  useEffect(() => {
-    refresh();
-    window.addEventListener('storage', refresh);
-    window.addEventListener('crm:data-updated', refresh);
-    return () => {
-      window.removeEventListener('storage', refresh);
-      window.removeEventListener('crm:data-updated', refresh);
-    };
-  }, []);
+  // Contracts and deals live in the CRM store; re-read whenever either changes.
+  const storeContracts = useCrmStore((s) => s.contracts);
+  const storeDeals = useCrmStore((s) => s.deals);
+  useEffect(() => { refresh(); }, [storeContracts, storeDeals]);
 
   useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, customerFilter, fromDate, toDate]);
 
@@ -190,18 +187,18 @@ export default function ContractsPage() {
     setPage(1);
   }
 
-  function submitCreate(event) {
+  async function submitCreate(event) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
     setFormError('');
     try {
-      const contract = createContract(form);
+      const contract = await createContract(form);
       setCreateOpen(false);
       setForm(EMPTY_FORM);
       setCreated(contract);
       refresh();
-    } catch (failure) { setFormError(failure.message); }
+    } catch (failure) { setFormError(describeError(failure)); }
     finally { setBusy(false); }
   }
 

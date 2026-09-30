@@ -1,7 +1,17 @@
 export { formatContractMoney, formatContractDate } from '../utils/contractFormatting.js';
-import { loadDeals, DEALS_STORAGE_KEY } from './dealService.js';
-import { crmStorage } from './crmStorage.js';
+import { useCrmStore } from '../stores/crmStore';
+import { pushDealActivity } from './crmSync';
 import { emitCrmEvent, CRM_EVENT_TYPES } from './crmEventNotifications.js';
+
+/**
+ * Contracts, at `/crm/contracts/`.
+ *
+ * They used to be stored inside each deal (`deal.contracts[]`) and written back
+ * through the deal, whose API has no such field -- so a contract vanished as
+ * soon as the deal save returned. They are now the CRM store's `contracts`
+ * collection. The server issues the `CON-…` number, resolves the customer from
+ * the deal and logs the creation on the deal's activity feed.
+ */
 
 export const CONTRACT_TYPES = [
   'Supply Agreement',
@@ -51,12 +61,7 @@ export function assertContractDates(startDate, endDate) {
   for (const date of [startDate, endDate]) {
     if (date && !isValidCalendarDate(date)) throw new Error('Enter valid contract dates.');
   }
-  if (startDate && endDate && startDate > endDate) throw new Error('End date must be on or after start date.');
-}
-
-export function nextContractNumber(contracts) {
-  const next = Math.max(0, ...contracts.map((item) => Number(/^CN-(\d+)$/.exec(item.contractNumber || '')?.[1]) || 0)) + 1;
-  return `CN-${String(next).padStart(5, '0')}`;
+  if (startDate && endDate && startDate >= endDate) throw new Error('End date must be after the start date.');
 }
 
 export function getContractDisplayStatus(contract, today = new Date()) {
@@ -73,77 +78,59 @@ export function getContractDisplayStatus(contract, today = new Date()) {
   return 'Active';
 }
 
-function enrich(deal, contract) {
+/** The deal-side labels the contract screens show next to a contract. */
+function enrich(contract, deals = useCrmStore.getState().deals) {
+  const deal = deals.find((item) => sameId(item.id, contract.dealId)) || null;
   return {
     ...contract,
-    dealId: deal.id,
-    dealName: deal.name,
-    dealNumber: deal.dealNumber,
-    client: contract.customer || deal.client,
-    leadId: deal.leadId,
-    leadNumber: deal.leadNumber,
-    projectId: deal.projectId,
+    dealName: contract.dealName || deal?.name || '',
+    dealNumber: contract.dealNumber || deal?.dealNumber || '',
+    client: contract.customer || deal?.client || '',
+    leadId: contract.leadId || deal?.leadId || null,
+    projectId: contract.projectId || deal?.projectId || null,
   };
 }
 
-export function loadContracts(storage = crmStorage) {
-  const deals = loadDeals(storage);
-  let sequence = 0;
-  deals.forEach((deal) => (deal.contracts || []).forEach((contract) => {
-    const match = /^CN-(\d+)$/.exec(contract.contractNumber || '');
-    if (match) sequence = Math.max(sequence, Number(match[1]));
-  }));
-  let changed = false;
-  const numbered = deals.map((deal) => {
-    if (!Array.isArray(deal.contracts)) return deal;
-    const contracts = deal.contracts.map((contract) => {
-      if (contract.contractNumber) return contract;
-      changed = true;
-      sequence += 1;
-      return { ...contract, contractNumber: `CN-${String(sequence).padStart(5, '0')}` };
-    });
-    return { ...deal, contracts };
-  });
-  if (changed) storage.setItem(DEALS_STORAGE_KEY, JSON.stringify(numbered));
-  const flat = [];
-  numbered.forEach((deal) => (deal.contracts || []).forEach((contract) => flat.push(enrich(deal, contract))));
-  return flat.sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
+export function loadContracts() {
+  const { contracts, deals } = useCrmStore.getState();
+  return contracts
+    .map((contract) => enrich(contract, deals))
+    .sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
 }
 
-export function findContract(contractId, storage = crmStorage) {
-  const deals = loadDeals(storage);
-  for (const deal of deals) {
-    const contract = (deal.contracts || []).find((item) => sameId(item.id, contractId));
-    if (contract) return { contract: enrich(deal, contract), deal };
-  }
-  return { contract: null, deal: null };
+export function findContract(contractId) {
+  const { contracts, deals } = useCrmStore.getState();
+  const contract = contracts.find((item) => sameId(item.id, contractId));
+  if (!contract) return { contract: null, deal: null };
+  return {
+    contract: enrich(contract, deals),
+    deal: deals.find((item) => sameId(item.id, contract.dealId)) || null,
+  };
 }
 
-function writeDeals(deals, storage) {
-  storage.setItem(DEALS_STORAGE_KEY, JSON.stringify(deals));
-  notifyUpdated();
+function cleanAmount(value) {
+  const amount = Number(value ?? 0);
+  if (!Number.isFinite(amount) || amount < 0) throw new Error('Enter a valid contract value.');
+  return amount;
 }
 
-export function createContract(input = {}, { storage = crmStorage } = {}) {
-  const deals = loadDeals(storage);
-  const deal = deals.find((item) => sameId(item.id, input.dealId));
+export async function createContract(input = {}) {
+  const deal = useCrmStore.getState().deals.find((item) => sameId(item.id, input.dealId));
   if (!deal) throw new Error('Select a deal for this contract.');
   const customer = String(input.customer ?? deal.client ?? '').trim();
   if (!customer) throw new Error('Customer is required.');
+  const customerId = input.customerId || deal.customerId;
+  if (!customerId) throw new Error('Link this deal to a customer record before creating a contract.');
   const contractType = String(input.contractType ?? '').trim();
   if (!contractType) throw new Error('Select a contract type.');
-  const amount = Number(input.amount ?? 0);
-  if (!Number.isFinite(amount) || amount < 0) throw new Error('Enter a valid contract value.');
+  const amount = cleanAmount(input.amount);
   const startDate = input.startDate || '';
   const endDate = input.endDate || '';
   if (!startDate || !endDate) throw new Error('Start date and end date are required.');
   assertContractDates(startDate, endDate);
-  const all = [];
-  deals.forEach((item) => (item.contracts || []).forEach((contract) => all.push(contract)));
-  const timestamp = new Date().toISOString();
-  const contract = {
-    id: `contract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    contractNumber: nextContractNumber(all),
+  const saved = await useCrmStore.getState().createRecord('contracts', {
+    dealId: deal.id,
+    customerId,
     customer,
     contractType,
     amount,
@@ -155,39 +142,32 @@ export function createContract(input = {}, { storage = crmStorage } = {}) {
     status: input.status || 'Active',
     attachments: Array.isArray(input.attachments) ? input.attachments : [],
     notifyCustomer: Boolean(input.notifyCustomer),
-    createdAt: timestamp,
-  };
-  writeDeals(deals.map((item) => sameId(item.id, deal.id) ? { ...item, contracts: [contract, ...(item.contracts || [])] } : item), storage);
-  appendDealActivity(deal.id, `Contract ${contract.contractNumber} created for ${customer}.`, 'CRM User', { storage });
-  return enrich(deal, contract);
+  });
+  if (!saved) throw new Error('Sign in to save contracts.');
+  notifyUpdated();
+  return enrich(saved);
 }
 
-export function updateContract(dealId, contractId, patch = {}, { storage = crmStorage } = {}) {
-  const deals = loadDeals(storage);
-  const deal = deals.find((item) => sameId(item.id, dealId));
-  if (!deal) throw new Error('Deal was not found.');
-  const current = (deal.contracts || []).find((item) => sameId(item.id, contractId));
+export async function updateContract(dealId, contractId, patch = {}) {
+  const current = useCrmStore.getState().contracts.find((item) => sameId(item.id, contractId));
   if (!current) throw new Error('Contract was not found.');
-  const updated = { ...current };
+  const updates = {};
   for (const field of ['customer', 'contractType', 'description', 'terms', 'template', 'status']) {
-    if (patch[field] !== undefined) updated[field] = typeof patch[field] === 'string' ? patch[field].trim() : patch[field];
+    if (patch[field] !== undefined) updates[field] = typeof patch[field] === 'string' ? patch[field].trim() : patch[field];
   }
-  if (patch.amount !== undefined) {
-    const amount = Number(patch.amount);
-    if (!Number.isFinite(amount) || amount < 0) throw new Error('Enter a valid contract value.');
-    updated.amount = amount;
-  }
-  if (patch.startDate !== undefined) updated.startDate = patch.startDate || '';
-  if (patch.endDate !== undefined) updated.endDate = patch.endDate || '';
-  if (patch.attachments !== undefined) updated.attachments = patch.attachments;
-  if (patch.notifyCustomer !== undefined) updated.notifyCustomer = Boolean(patch.notifyCustomer);
-  if (!updated.customer) throw new Error('Customer is required.');
-  if (!updated.contractType) throw new Error('Select a contract type.');
-  assertContractDates(updated.startDate, updated.endDate);
-  writeDeals(deals.map((item) => sameId(item.id, deal.id)
-    ? { ...item, contracts: (item.contracts || []).map((entry) => sameId(entry.id, contractId) ? updated : entry) }
-    : item), storage);
+  if (patch.amount !== undefined) updates.amount = cleanAmount(patch.amount);
+  if (patch.startDate !== undefined) updates.startDate = patch.startDate || '';
+  if (patch.endDate !== undefined) updates.endDate = patch.endDate || '';
+  if (patch.attachments !== undefined) updates.attachments = patch.attachments;
+  if (patch.notifyCustomer !== undefined) updates.notifyCustomer = Boolean(patch.notifyCustomer);
+  const next = { ...current, ...updates };
+  if (!next.customer) throw new Error('Customer is required.');
+  if (!next.contractType) throw new Error('Select a contract type.');
+  assertContractDates(next.startDate, next.endDate);
+  const saved = await useCrmStore.getState().updateRecord('contracts', contractId, updates);
+  const updated = enrich(saved || next);
   if (current.status !== 'Active' && updated.status === 'Active') {
+    const deal = useCrmStore.getState().deals.find((item) => sameId(item.id, updated.dealId || dealId));
     emitCrmEvent({
       type: CRM_EVENT_TYPES.CONTRACT_SIGNED,
       entityType: 'contract',
@@ -195,48 +175,40 @@ export function updateContract(dealId, contractId, patch = {}, { storage = crmSt
       payload: {
         contractRef: updated.contractNumber,
         customerName: updated.customer,
-        ownerName: deal.assignedUser || deal.owner,
+        ownerName: deal?.assignedUser || deal?.owner,
         path: `/crm/contracts/${updated.id}`,
       },
     });
   }
-  return enrich(deal, updated);
+  notifyUpdated();
+  return updated;
 }
 
-export function deleteContract(dealId, contractId, { storage = crmStorage } = {}) {
-  const deals = loadDeals(storage);
-  const deal = deals.find((item) => sameId(item.id, dealId));
-  if (!deal) throw new Error('Deal was not found.');
-  const removed = (deal.contracts || []).find((item) => sameId(item.id, contractId));
+export async function deleteContract(dealId, contractId) {
+  const removed = useCrmStore.getState().contracts.find((item) => sameId(item.id, contractId));
   if (!removed) throw new Error('Contract was not found.');
-  writeDeals(deals.map((item) => sameId(item.id, deal.id)
-    ? { ...item, contracts: (item.contracts || []).filter((entry) => !sameId(entry.id, contractId)) }
-    : item), storage);
+  await useCrmStore.getState().deleteRecord('contracts', contractId);
+  notifyUpdated();
   return removed;
 }
 
-export function appendDealActivity(dealId, title, actor = 'CRM User', { storage = crmStorage } = {}) {
-  const deals = loadDeals(storage);
-  const deal = deals.find((item) => sameId(item.id, dealId));
-  if (!deal) return;
-  const activity = {
-    id: `contract-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    title, actor, timestamp: new Date().toISOString(), type: 'contract',
-  };
-  writeDeals(deals.map((item) => sameId(item.id, deal.id) ? { ...item, activities: [activity, ...(item.activities || [])] } : item), storage);
+/** A one-line entry on the deal's activity feed (`/crm/deals/{id}/activities/`). */
+export async function appendDealActivity(dealId, title) {
+  if (!dealId || !title) return null;
+  try {
+    return await pushDealActivity(dealId, { type: 'contract', title });
+  } catch (err) {
+    console.warn('[CRM] deal activity not saved:', err?.message || err);
+    return null;
+  }
 }
 
-export function addDealActivity(dealId, entry = {}, { storage = crmStorage } = {}) {
-  const deals = loadDeals(storage);
-  const deal = deals.find((item) => sameId(item.id, dealId));
-  if (!deal) throw new Error('Deal was not found.');
-  const activity = {
-    id: `contract-activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    timestamp: new Date().toISOString(),
-    type: 'activity',
-    actor: 'CRM User',
-    ...entry,
-  };
-  writeDeals(deals.map((item) => sameId(item.id, deal.id) ? { ...item, activities: [activity, ...(item.activities || [])] } : item), storage);
-  return activity;
+/** A logged activity (call, meeting, note…) with its own type and details. */
+export async function addDealActivity(dealId, entry = {}) {
+  if (!useCrmStore.getState().deals.some((item) => sameId(item.id, dealId))) throw new Error('Deal was not found.');
+  return pushDealActivity(dealId, {
+    type: entry.activityType || entry.type || 'activity',
+    title: entry.title || '',
+    description: entry.description || '',
+  });
 }

@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import Modal from '../../../components/ui/Modal';
 import { loadDeals } from '../../../services/dealService';
 import { createProjectFromDeal, findDealProject, projectDefaults } from '../../../services/dealProjectService';
+import { describeError } from '../../../services/crmSync';
+import { useCrmStore } from '../../../stores/crmStore';
 
 function TransferConfirmation({ project }) {
   const items = [
@@ -20,6 +22,8 @@ export default function DealProjectHandoff({ deal, onNotify, renderTrigger }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
+  // Re-render when the store's projects change (a project created elsewhere, a delete).
+  useCrmStore((s) => s.projects);
   let project = null;
   let referenceError = '';
   try { project = findDealProject(deal); }
@@ -37,19 +41,21 @@ export default function DealProjectHandoff({ deal, onNotify, renderTrigger }) {
     } catch (failure) { onNotify(failure.message); }
   }
 
-  function submit(event) {
+  async function submit(event) {
     event.preventDefault();
     if (busy) return;
     setBusy(true);
     try {
-      const result = createProjectFromDeal(deal.id, form);
+      const result = await createProjectFromDeal(deal.id, form);
       setForm(null);
       setSuccess(result);
-      onNotify(result.created ? `Project ${result.project.projectNumber} created and linked to Deal ${deal.id}.` : `Project already exists: ${result.project.projectNumber}`);
+      const dealRef = deal.dealNumber || deal.id;
+      onNotify(result.created ? `Project ${result.project.projectNumber} created and linked to Deal ${dealRef}.` : `Project already exists: ${result.project.projectNumber}`);
     } catch (failure) {
       console.error('[CRM Project] Hand-off failed:', failure);
-      setError(failure.message);
-      onNotify(failure.message);
+      const message = describeError(failure);
+      setError(message);
+      onNotify(message);
     } finally { setBusy(false); }
   }
 

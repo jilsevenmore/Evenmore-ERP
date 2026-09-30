@@ -19,6 +19,28 @@ export { ApiError };
 /** Collections are pulled whole; the UI paginates in memory. */
 export const PAGE_SIZE = 200;
 
+/** Upper bound on pages per pull (200 × 50 = 10,000 rows), so a bad `next` cannot loop forever. */
+const MAX_PAGES = 50;
+
+/**
+ * Every row of a list endpoint. The server pages with `page`/`page_size` and
+ * caps a page at 200 rows (api.md §1.3), so a collection is read page by page
+ * until `next` runs out. Action endpoints answer with a bare array; that is
+ * returned as-is.
+ */
+export async function getAllPages(path, query = {}) {
+  const { limit, ...rest } = query;
+  const pageSize = Math.min(Number(limit) || PAGE_SIZE, PAGE_SIZE);
+  const rows = [];
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const body = await api.get(path, { query: { ...rest, page_size: pageSize, page } });
+    if (Array.isArray(body)) return body;
+    rows.push(...(body?.results || []));
+    if (!body?.next) break;
+  }
+  return rows;
+}
+
 /** No token → no server. */
 export function isBackendEnabled() {
   return Boolean(getStoredToken());
@@ -135,10 +157,10 @@ export function createSync(registry, { label = 'sync' } = {}) {
     const resource = get(key);
     if (!resource || !isBackendEnabled()) return null;
     try {
-      const body = await api.get(resource.pullPath || resource.path, {
-        query: { limit: PAGE_SIZE, ...(resource.pullQuery || {}), ...query },
+      const rows = await getAllPages(resource.pullPath || resource.path, {
+        ...(resource.pullQuery || {}),
+        ...query,
       });
-      const rows = rowsOf(body);
       return resource.fromApi ? rows.map(resource.fromApi) : rows;
     } catch (err) {
       console.warn(`[${label}] pull ${key} failed:`, err?.message || err);
