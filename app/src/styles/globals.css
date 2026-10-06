@@ -1049,6 +1049,10 @@ html, body, #root {
   min-height: 100%;
 }
 
+html {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   background: var(--body-bg);
@@ -1083,6 +1087,7 @@ img { display: block; max-width: 100%; }
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow-x: clip;
 }
 
 .content {
@@ -1107,18 +1112,16 @@ img { display: block; max-width: 100%; }
   }
 }
 
-/* Keep the page itself from scrolling sideways on small screens; wide
+/* Keep the page itself from scrolling sideways; wide
    content (tables, editors, boards) scrolls inside its own container.
    `clip` (unlike `hidden`) does not create a scroll container, so the
-   sticky topbar keeps working. */
-@media (max-width: 1023px) {
-  html {
-    overflow-x: hidden;
-  }
+   sticky sidebar and topbar keep working. */
+html {
+  overflow-x: clip;
+}
 
-  .main-col {
-    overflow-x: clip;
-  }
+.main-col {
+  overflow-x: clip;
 }
 
 /* ── Custom Scrollbars & Arrow Suppression ───────────────── */
