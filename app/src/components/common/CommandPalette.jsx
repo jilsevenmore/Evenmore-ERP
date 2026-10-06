@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
+import { useAppStore } from '../../stores/appStore';
+import { canOpenPath } from '../../utils/navAccess';
 import { Search, ShoppingCart, Truck, Receipt, Package, Users, Building2, FileSpreadsheet, ArrowRight, FileText, BarChart3, X, Layers, Sparkles, } from 'lucide-react';
 /** What the palette searches while it is closed: nothing. */
 const NO_RECORDS = {
@@ -9,6 +11,7 @@ const NO_RECORDS = {
 };
 export const CommandPalette = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
+    const grantedPermissions = useAppStore((s) => s.permissions);
     // The palette is mounted on every screen but searches only once it is open,
     // and reading a collection is what loads it — so the eight collections it
     // searches are pulled on the first Ctrl+K, not on every page.
@@ -138,7 +141,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         ...(cleanQuery ? matchedProformas : []),
         ...(cleanQuery ? matchedInvoices : []),
         ...navigationItems,
-    ];
+    ].filter((r) => !r.path || canOpenPath(r.path, grantedPermissions || []));
     const handleSelect = (result) => {
         navigate(result.path);
         onClose();

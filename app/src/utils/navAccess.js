@@ -42,7 +42,29 @@ const ROUTE_PERMISSIONS = [
   ['/administration/roles', 'manage_roles'],
   ['/administration/clients', 'menu_admin'],
   ['/customer/projects', ['view_projects', 'view_pms']],
+  ['/pms/tracking', ['view_projects', 'view_pms']],
+  // Old top-level alias of HRMS › Company Policy.
+  ['/company-policy', 'view_staff'],
 ];
+
+// The module section a URL belongs to, and the `menu_*` id that opens it (the
+// `menu` key of that section in Sidebar's NAV).
+const MODULE_MENUS = [
+  ['/crm', 'menu_crm'],
+  ['/pms', 'menu_pms'],
+  ['/sales', 'menu_sales'],
+  ['/purchase', 'menu_purchase'],
+  ['/inventory', 'menu_inventory'],
+  ['/accounts', 'menu_accounts'],
+  ['/hrms', 'menu_hrms'],
+  ['/company-policy', 'menu_hrms'],
+  ['/organization', 'menu_organization'],
+  ['/administration', 'menu_admin'],
+];
+
+// Self-service pages whose detail views (`/customer/projects/:id`) are
+// self-service too.
+const SELF_SERVICE_PREFIXES = ['/customer/projects', '/pms/tracking'];
 
 const SELF_SERVICE_ROUTES = new Set([
   '/crm/tasks',
@@ -68,6 +90,28 @@ export function canUse(permission, granted) {
   if (!permission) return true;
   const options = Array.isArray(permission) ? permission : [permission];
   return options.some((id) => granted.includes(id));
+}
+
+function moduleMenu(path) {
+  const found = MODULE_MENUS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`));
+  return found ? found[1] : null;
+}
+
+function isSelfService(path) {
+  return SELF_SERVICE_ROUTES.has(path) || SELF_SERVICE_PREFIXES.some((p) => path.startsWith(`${p}/`));
+}
+
+/**
+ * Whether a page may be opened at all — the sidebar's rule applied to any URL,
+ * so a page the menu hides cannot be reached by typing its address either:
+ * the page's own permission, plus its module's `menu_*` unless it is a
+ * self-service page.
+ */
+export function canOpenPath(path, granted) {
+  const clean = String(path || '/').split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+  if (!canUse(routePermission(clean), granted)) return false;
+  const menu = moduleMenu(clean);
+  return !menu || canUse(menu, granted) || isSelfService(clean);
 }
 
 /** NAV filtered to what `granted` (the /auth/me permission ids) allows. */

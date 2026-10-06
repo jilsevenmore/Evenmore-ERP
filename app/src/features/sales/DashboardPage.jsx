@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { useAppStore } from '../../stores/appStore';
+import { canOpenPath, canUse } from '../../utils/navAccess';
 // ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
 // Before (kept for reference if the CRM dashboard panel is ever re-added):
 // Reason: the ERP dashboard should compute from live ERP state (invoices, paymentIns,
@@ -55,12 +56,25 @@ const CARD_STYLES = {
 export const DashboardPage = () => {
   const navigate = useNavigate();
   const currentUser = useAppStore((s) => s.currentUser);
+  // Each panel shows only for a role that can open its module — the sidebar's
+  // rule (navAccess.js), so an HR login sees HR, a sales login sees sales.
+  const granted = useAppStore((s) => s.permissions) || [];
+  const open = (path) => canOpenPath(path, granted);
+  const show = {
+    sales: open('/sales/invoices'),
+    purchase: open('/purchase/orders'),
+    inventory: open('/inventory/items'),
+    accounts: open('/accounts/cash-bank'),
+    parties: open('/parties'),
+    crm: open('/crm/leads'),
+  };
   const isCustomer = currentUser?.isCustomer || currentUser?.role?.code === 'CU' || String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer';
+  const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock, cashPaymentReceipts, getInvoiceOutstanding } = useERP();
+  // A customer login has its own portal; after the hooks so their order never changes.
   if (isCustomer) {
     return <Navigate to="/customer/projects" replace />;
   }
 
-  const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock, cashPaymentReceipts, getInvoiceOutstanding } = useERP();
   // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──
   // Before (kept for reference): dashboardData.leadsOverview, dashboardData.taskStatus drove
   //   the chart + donut. Now we chart invoice revenue over the last 6 months and show
@@ -181,6 +195,7 @@ export const DashboardPage = () => {
     // ── [PHASE-1-DASHBOARD] CRM module card now counts ERP quotations (was: leads) ──
     // Old: { label: 'CRM', desc: `${leads.length} Leads | Deals | Tasks`, ... count: leads.length, tag: 'Leads' }
     { label: 'CRM', desc: `${quotations.length} Quotes | Deals | Tasks`, to: '/crm/dashboard', icon: Target, tone: 'blue', count: quotations.length, tag: 'Quotes' },
+    { label: 'PMS', desc: 'Projects | Stages | Delays', to: '/pms', icon: BriefcaseBusiness, tone: 'purple', tag: 'Projects' },
     { label: 'Sales', desc: `${salesOrders.length} Orders | ${quotations.length} Quotes | ${invoices.length} Invoices`, to: '/sales/quotations', icon: TrendingUp, tone: 'green', count: salesOrders.length, tag: 'Orders' },
     { label: 'Purchase', desc: `${purchaseOrders.length} Orders | ${purchaseBills.length} Bills`, to: '/purchase/orders', icon: Truck, tone: 'amber', count: purchaseOrders.length, tag: 'POs' },
     { label: 'Inventory', desc: `${items.length} SKUs | ${lowStockItems.length} Low Stock`, to: '/inventory/items', icon: Package, tone: 'purple', count: items.length, tag: 'SKUs' },
@@ -189,17 +204,43 @@ export const DashboardPage = () => {
     { label: 'HRMS', desc: 'Employees | Attendance | Payroll', to: '/hrms/dashboard', icon: UserCheck, tone: 'green', tag: 'Staff' },
     { label: 'Reports', desc: 'Sales | Stock | Finance Reports', to: '/reports', icon: PieChart, tone: 'pink', tag: 'Reports' },
     { label: 'Administration', desc: 'Users | Roles | Settings', to: '/administration/users', icon: Shield, tone: 'amber', tag: 'Admin' },
-  ];
+  ].filter((m) => open(m.to));
 
   const fmt = (n) => Number(n || 0).toLocaleString();
+  const hrLinks = [
+    { label: 'Employees', to: '/hrms/employees' },
+    { label: 'Attendance', to: '/hrms/attendance' },
+    { label: 'Leave', to: '/hrms/leave' },
+    { label: 'Payroll', to: '/hrms/payroll' },
+    { label: 'Users', to: '/administration/users' },
+    { label: 'Settings', to: '/administration/settings' },
+  ].filter((l) => open(l.to));
+  const topStats = [
+    show.sales && <StatCard key="quotations" label="Quotations" value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note="challans issued" />,
+    show.sales && <StatCard key="orders" label="Sales Orders" value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note="order value" />,
+    show.sales && <StatCard key="invoices" label="Invoices Value" value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />,
+    show.purchase && <StatCard key="po" label="Purchase Orders" value={fmt(purchaseOrders.length)} icon={ClipboardList} tone="amber" trend={`${fmt(Math.round(purchaseTotal / 1000))}k`} note="purchase value" />,
+    show.inventory && <StatCard key="stock" label="Stock Value" value={`₹${fmt(Math.round(totalStockValue))}`} icon={Package} tone="teal" trend={`${fmt(lowStockItems.length)}`} note="low stock" />,
+    show.accounts && <StatCard key="bank" label="Bank Balance" value={`₹${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note="net flow" />,
+  ].filter(Boolean);
+  const analyticsStats = [
+    show.sales && { label: 'Invoices (PKG)', value: fmt(invoices.length), icon: 'file', tone: 'blue', trend: `${fmt(Math.round(invoiceTotal))}`, note: 'billed value' },
+    show.sales && { label: 'SO Orders', value: fmt(salesOrders.length), icon: 'users', tone: 'green', trend: `${fmt(Math.round(salesTotal))}`, note: 'order value' },
+    show.purchase && { label: 'Purchase Bills', value: fmt(purchaseBills.length), icon: 'building', tone: 'amber', trend: `${fmt(Math.round(billTotal))}`, note: 'bill value' },
+    show.sales && { label: 'Payments In', value: fmt(paymentIns.length), icon: 'check', tone: 'purple', trend: `${fmt(Math.round(paymentInTotal))}`, note: 'received' },
+    show.purchase && { label: 'Payments Out', value: fmt(paymentOuts.length), icon: 'users', tone: 'teal', trend: `${fmt(Math.round(paymentOutTotal))}`, note: 'paid' },
+    show.purchase && { label: 'Expenses', value: fmt(expenses.length), icon: 'bars', tone: 'pink', trend: `${fmt(Math.round(expenseTotal))}`, note: 'mt expense' },
+  ].filter(Boolean);
+  const subtitle = [...modules.map((m) => m.label)].join(' + ') || 'Your workspace';
 
   return (
     <div className="space-y-5 sm:space-y-6 max-w-full">
       <PageHeader
         title="Unified Business Dashboard"
-        subtitle="CRM + Sales + Purchase + Inventory + Parties + Accounts + HRMS + Reports + Administration"
-        actions={
+        subtitle={subtitle}
+        actions={show.crm && (
           <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+            {open('/crm/dashboard') && (
             <Button
               variant="outline"
               className="flex-1 sm:flex-initial"
@@ -207,6 +248,8 @@ export const DashboardPage = () => {
             >
               CRM Dashboard
             </Button>
+            )}
+            {canUse('create_lead', granted) && (
             <Button
               icon={Plus}
               className="flex-1 sm:flex-initial"
@@ -214,20 +257,18 @@ export const DashboardPage = () => {
             >
               New Lead
             </Button>
+            )}
           </div>
-        }
+        )}
       />
+      {topStats.length > 0 && (
       <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3 sm:gap-4">
-        {/* [PHASE-1-DASHBOARD] "Total Leads" stat card replaced with ERP Totals */}
-        <StatCard label="Quotations" value={fmt(quotations.length)} icon={FileText} tone="blue" trend={`${fmt(deliveryChallans.length)}`} note="challans issued" />
-        <StatCard label="Sales Orders" value={fmt(salesOrders.length)} icon={ShoppingCart} tone="green" trend={`${fmt(Math.round(salesTotal / 1000))}k`} note="order value" />
-        <StatCard label="Invoices Value" value={`₹${fmt(Math.round(invoiceTotal))}`} icon={Receipt} tone="purple" trend={`${fmt(invoices.length)}`} note="invoices" />
-        <StatCard label="Purchase Orders" value={fmt(purchaseOrders.length)} icon={ClipboardList} tone="amber" trend={`${fmt(Math.round(purchaseTotal / 1000))}k`} note="purchase value" />
-        <StatCard label="Stock Value" value={`₹${fmt(Math.round(totalStockValue))}`} icon={Package} tone="teal" trend={`${fmt(lowStockItems.length)}`} note="low stock" />
-        <StatCard label="Bank Balance" value={`₹${fmt(Math.round(bankBalance))}`} icon={Wallet} tone="blue" trend={`${fmt(paymentInTotal - paymentOutTotal)}`} note="net flow" />
+        {topStats}
       </div>
+      )}
 
       {/* ── [PHASE-4] Sales & Collections Financial Summary (Billed vs Without-Bill Cash) ── */}
+      {show.sales && (
       <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
           <div>
@@ -330,13 +371,14 @@ export const DashboardPage = () => {
           </div>
         </div>
       </div>
+      )}
 
       {/* All Modules Directory Grid */}
       <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 mb-4">
           <div>
-            <h3 className="font-bold text-text text-sm sm:text-base">All Enterprise Modules</h3>
-            <p className="text-[11px] sm:text-xs text-muted">Direct single-click access across all unified modules</p>
+            <h3 className="font-bold text-text text-sm sm:text-base">Your Modules</h3>
+            <p className="text-[11px] sm:text-xs text-muted">Single-click access to the modules your role uses</p>
           </div>
           <Link to="/reports" className="text-xs font-bold text-primary hover:underline flex items-center gap-1 self-start sm:self-auto">
             <span>View Reports</span>
@@ -377,18 +419,12 @@ export const DashboardPage = () => {
       </div>
 
       {/* Dashboard Analytics & Trends */}
+      {(show.sales || show.purchase || show.inventory) && (
       <div className="dashboard-view">
         <div className="grid grid-cols-1 min-[420px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-3.5">
           {/* ── [PHASE-1-DASHBOARD] was: {dashboardData.stats.map((stat) => {...})} ──
               CRM stat cards (leads/tasks pipeline) replaced with live ERP stats below. */}
-          {[
-            { label: 'Invoices (PKG)', value: fmt(invoices.length), icon: 'file', tone: 'blue', trend: `${fmt(Math.round(invoiceTotal))}`, note: 'billed value' },
-            { label: 'SO Orders', value: fmt(salesOrders.length), icon: 'users', tone: 'green', trend: `${fmt(Math.round(salesTotal))}`, note: 'order value' },
-            { label: 'Purchase Bills', value: fmt(purchaseBills.length), icon: 'building', tone: 'amber', trend: `${fmt(Math.round(billTotal))}`, note: 'bill value' },
-            { label: 'Payments In', value: fmt(paymentIns.length), icon: 'check', tone: 'purple', trend: `${fmt(Math.round(paymentInTotal))}`, note: 'received' },
-            { label: 'Payments Out', value: fmt(paymentOuts.length), icon: 'users', tone: 'teal', trend: `${fmt(Math.round(paymentOutTotal))}`, note: 'paid' },
-            { label: 'Expenses', value: fmt(expenses.length), icon: 'bars', tone: 'pink', trend: `${fmt(Math.round(expenseTotal))}`, note: 'mt expense' },
-          ].map((stat) => {
+          {analyticsStats.map((stat) => {
             const Icon = ICONS[stat.icon] || Users;
             const style = CARD_STYLES[stat.tone] || CARD_STYLES.blue;
             const TrendIcon = stat.trendDirection === 'down' ? TrendingDown : TrendingUp;
@@ -412,6 +448,7 @@ export const DashboardPage = () => {
               </article>
             );
           })}
+          {show.sales && (
           <article className="dashboard-stat">
             <div className="dashboard-stat-top">
               <span className="dashboard-stat-icon" style={{ background: CARD_STYLES.green.bg, color: CARD_STYLES.green.fg }}>
@@ -428,6 +465,8 @@ export const DashboardPage = () => {
               <em className="truncate">converted</em>
             </small>
           </article>
+          )}
+          {show.inventory && (
           <article className="dashboard-stat">
             <div className="dashboard-stat-top">
               <span className="dashboard-stat-icon" style={{ background: CARD_STYLES.amber.bg, color: CARD_STYLES.amber.fg }}>
@@ -444,8 +483,10 @@ export const DashboardPage = () => {
               <em className="truncate">need reorder</em>
             </small>
           </article>
+          )}
         </div>
 
+        {show.sales && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6 mt-4 sm:mt-5">
           <section className="xl:col-span-2 bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
@@ -551,11 +592,15 @@ export const DashboardPage = () => {
             </div>
           </section>
         </div>
+        )}
       </div>
+      )}
 
       {/* Low-Stock Alerts & Snapshots Grid */}
+      {(show.inventory || show.sales || show.purchase) && (
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 sm:gap-6">
         {/* Left: Low Stock Alerts */}
+        {show.inventory && (
         <div className="xl:col-span-2 bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -591,12 +636,14 @@ export const DashboardPage = () => {
                       <StatusBadge status={item.status} />
                     </td>
                     <td className="py-2.5 sm:py-3 px-3 text-right whitespace-nowrap">
+                      {show.purchase && (
                       <Link
                         to="/purchase/orders"
                         className="inline-flex items-center justify-center px-2.5 sm:px-3 py-1 bg-primary text-white hover:bg-primary-hover rounded-lg text-[11px] font-semibold shadow-2xs transition"
                       >
                         Order
                       </Link>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -627,10 +674,13 @@ export const DashboardPage = () => {
             </Link>
           </div>
         </div>
+        )}
 
         {/* Right: Sales & Purchase Snapshots */}
+        {(show.sales || show.purchase) && (
         <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col justify-between gap-4">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
+            {show.sales && (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -655,7 +705,9 @@ export const DashboardPage = () => {
                 ))}
               </div>
             </div>
+            )}
 
+            {show.purchase && (
             <div>
               <div className="flex items-center justify-between mb-3">
                 <div>
@@ -680,30 +732,45 @@ export const DashboardPage = () => {
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           <div className="pt-3 border-t border-border grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2 text-xs font-semibold">
+            {open('/sales/invoices') && (
             <Link to="/sales/invoices" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Invoices ₹{fmt(Math.round(invoiceTotal))}
             </Link>
+            )}
+            {open('/purchase/bills') && (
             <Link to="/purchase/bills" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Bills ₹{fmt(Math.round(billTotal))}
             </Link>
+            )}
+            {open('/sales/payments') && (
             <Link to="/sales/payments" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               PayIn ₹{fmt(Math.round(paymentInTotal))}
             </Link>
+            )}
+            {open('/purchase/payments') && (
             <Link to="/purchase/payments" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               PayOut ₹{fmt(Math.round(paymentOutTotal))}
             </Link>
+            )}
+            {open('/purchase/expenses') && (
             <Link to="/purchase/expenses" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center col-span-2 sm:col-span-4 xl:col-span-2 transition text-[11px] sm:text-xs shadow-2xs truncate">
               Expenses ₹{fmt(Math.round(expenseTotal))} • Challans {fmt(deliveryChallans.length)} • Returns {fmt(salesReturns.length)}
             </Link>
+            )}
           </div>
         </div>
+        )}
       </div>
+      )}
 
       {/* Bottom Row: Parties, Accounts, HRMS + Admin */}
+      {(show.parties || show.accounts || hrLinks.length > 0) && (
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
+        {show.parties && (
         <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -715,6 +782,7 @@ export const DashboardPage = () => {
             </Link>
           </div>
           <div className="space-y-2 text-xs font-semibold">
+            {open('/crm/customers') && (
             <Link to="/crm/customers" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold min-w-0">
                 <Users size={14} className="text-primary shrink-0" />
@@ -722,6 +790,7 @@ export const DashboardPage = () => {
               </span>
               <strong className="text-text font-mono shrink-0">{fmt(customers.length)}</strong>
             </Link>
+            )}
             <Link to="/parties" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold min-w-0">
                 <Building2 size={14} className="text-primary shrink-0" />
@@ -738,7 +807,9 @@ export const DashboardPage = () => {
             </Link>
           </div>
         </div>
+        )}
 
+        {show.accounts && (
         <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
             <div>
@@ -773,37 +844,30 @@ export const DashboardPage = () => {
             </Link>
           </div>
         </div>
+        )}
 
+        {hrLinks.length > 0 && (
         <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs md:col-span-2 xl:col-span-1">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h3 className="font-bold text-text text-sm sm:text-base">HRMS + Admin</h3>
-              <p className="text-[11px] sm:text-xs text-muted">People + Settings</p>
+              <h3 className="font-bold text-text text-sm sm:text-base">{hrLinks.some((l) => l.to.startsWith('/administration')) ? 'HRMS + Admin' : 'HRMS'}</h3>
+              <p className="text-[11px] sm:text-xs text-muted">{hrLinks.some((l) => l.to.startsWith('/administration')) ? 'People + Settings' : 'People'}</p>
             </div>
+            {open('/hrms/dashboard') && (
             <Link to="/hrms/dashboard" className="text-xs font-bold text-primary hover:underline">
               HRMS
             </Link>
+            )}
           </div>
+          {hrLinks.length > 0 && (
           <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-2 gap-2 text-xs font-semibold">
-            <Link to="/hrms/employees" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
-              Employees
-            </Link>
-            <Link to="/hrms/attendance" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
-              Attendance
-            </Link>
-            <Link to="/hrms/leave" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
-              Leave
-            </Link>
-            <Link to="/hrms/payroll" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
-              Payroll
-            </Link>
-            <Link to="/administration/users" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
-              Users
-            </Link>
-            <Link to="/administration/settings" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
-              Settings
-            </Link>
+            {hrLinks.map((l) => (
+              <Link key={l.to} to={l.to} className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center transition truncate shadow-2xs">
+                {l.label}
+              </Link>
+            ))}
           </div>
+          )}
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-semibold">
             {/* Hidden: User Tracking & Zone Requests out of scope
             <Link to="/crm/user-allocation" className="p-2 rounded-xl border border-border bg-soft hover:bg-card text-text text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
@@ -814,13 +878,17 @@ export const DashboardPage = () => {
               <span className="truncate">Zone Requests ({pendingZoneReqs})</span>
             </Link>
             */}
+            {show.inventory && (
             <Link to="/inventory/transfers" className="btn-outline h-9 px-3 rounded-xl text-center transition flex items-center justify-center gap-1.5 shadow-2xs truncate">
               <ArrowLeftRight size={13} className="text-primary shrink-0" />
               <span className="truncate">Transfers ({pendingTransfers})</span>
             </Link>
+            )}
           </div>
         </div>
+        )}
       </div>
+      )}
     </div>
   );
 };

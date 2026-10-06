@@ -28,6 +28,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { canOpenPath, canUse } from '../../utils/navAccess';
 import { useAttendanceStore } from '../../stores/attendanceStore';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
@@ -43,12 +44,14 @@ const THEMES = [
 ];
 
 const QUICK_ACTIONS = [
-  { label: 'Create New Lead', path: '/crm/leads', icon: UserPlus, color: 'text-blue-500 bg-blue-50' },
-  { label: 'Create Sales Order', path: '/sales/orders', icon: ShoppingCart, color: 'text-indigo-500 bg-indigo-50' },
-  { label: 'Create Tax Invoice', path: '/sales/invoices', icon: Receipt, color: 'text-emerald-500 bg-emerald-50' },
-  { label: 'New Purchase Bill', path: '/purchase/bills', icon: FilePlus, color: 'text-amber-500 bg-amber-50' },
-  { label: 'Register Trade Party', path: '/parties', icon: Building, color: 'text-purple-500 bg-purple-50' },
-  { label: 'Add Inventory Item', path: '/inventory/items/new', icon: Layers, color: 'text-rose-500 bg-rose-50' },
+  // `permission` is the create right the target form needs; the page itself
+  // must also be open to the role (navAccess.canOpenPath).
+  { label: 'Create New Lead', path: '/crm/leads', permission: 'create_lead', icon: UserPlus, color: 'text-blue-500 bg-blue-50' },
+  { label: 'Create Sales Order', path: '/sales/orders', permission: 'create_sales_order', icon: ShoppingCart, color: 'text-indigo-500 bg-indigo-50' },
+  { label: 'Create Tax Invoice', path: '/sales/invoices', permission: 'create_invoice', icon: Receipt, color: 'text-emerald-500 bg-emerald-50' },
+  { label: 'New Purchase Bill', path: '/purchase/bills', permission: 'create_bill', icon: FilePlus, color: 'text-amber-500 bg-amber-50' },
+  { label: 'Register Trade Party', path: '/parties', permission: ['create_quotation', 'create_sales_order', 'create_invoice', 'create_purchase_order', 'create_bill'], icon: Building, color: 'text-purple-500 bg-purple-50' },
+  { label: 'Add Inventory Item', path: '/inventory/items/new', permission: 'view_inventory', icon: Layers, color: 'text-rose-500 bg-rose-50' },
 ];
 
 export default function Topbar() {
@@ -76,6 +79,11 @@ export default function Topbar() {
   const punchRef = useRef(null);
 
   const currentUser = useAppStore((s) => s.currentUser);
+  const grantedPermissions = useAppStore((s) => s.permissions);
+  const quickActions = useMemo(() => {
+    const granted = grantedPermissions || [];
+    return QUICK_ACTIONS.filter((a) => canUse(a.permission, granted) && canOpenPath(a.path, granted));
+  }, [grantedPermissions]);
   const todayPunch = useAttendanceStore((s) => s.todayPunch);
   const fetchTodayPunch = useAttendanceStore((s) => s.fetchTodayPunch);
   const punchIn = useAttendanceStore((s) => s.punchIn);
@@ -170,8 +178,8 @@ export default function Topbar() {
         path: '/sales/invoices',
       });
     }
-    return list;
-  }, [lowStockItems, /* pendingZoneRequests, */ inTransitChallans, overdueInvoices]);
+    return list.filter((n) => canOpenPath(n.path, grantedPermissions || []));
+  }, [lowStockItems, /* pendingZoneRequests, */ inTransitChallans, overdueInvoices, grantedPermissions]);
 
   const [notifTab, setNotifTab] = useState('all'); // 'all' | 'erp' | 'crm_reminders' | 'crm_workflow' | 'crm'
   const [isSectionMenuOpen, setIsSectionMenuOpen] = useState(false);
@@ -211,7 +219,8 @@ export default function Topbar() {
     setOpenSections({ erp: false, crm: false, workflow: false });
   };
 
-  const showToast = erp?.showToast || useAppStore((s) => s.showToast || s.setToast);
+  const storeShowToast = useAppStore((s) => s.showToast || s.setToast);
+  const showToast = erp?.showToast || storeShowToast;
 
   const handlePunchIn = async () => {
     try {
@@ -395,7 +404,8 @@ export default function Topbar() {
           )}
         </div>
 
-        {/* Quick Add Menu */}
+        {/* Quick Add Menu — only the create actions this role can use */}
+        {quickActions.length > 0 && (
         <div className="relative" ref={quickAddRef}>
           <button
             type="button"
@@ -418,7 +428,7 @@ export default function Topbar() {
                 Quick Actions
               </div>
               <div className="space-y-0.5">
-                {QUICK_ACTIONS.map((action, idx) => {
+                {quickActions.map((action, idx) => {
                   const Icon = action.icon;
                   return (
                     <button
@@ -441,6 +451,7 @@ export default function Topbar() {
             </div>
           )}
         </div>
+        )}
 
         {/* Harmonized Icon Buttons Cluster */}
         <div className="flex items-center gap-1.5 pl-1">

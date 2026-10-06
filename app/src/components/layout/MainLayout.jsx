@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import RouteAccessGuard from './RouteAccessGuard';
 import { CommandPalette } from '../common/CommandPalette';
 import { FloatingSupportModal } from '../common/FloatingSupportModal';
 import { useAppStore } from '../../stores/appStore';
@@ -96,7 +97,9 @@ export default function MainLayout() {
       <div className="main-col">
         <Topbar />
         <main className={`content${isErpRoute ? ' erp-scope' : ''}`}>
-          <Outlet />
+          <RouteAccessGuard>
+            <Outlet />
+          </RouteAccessGuard>
         </main>
       </div>
 
