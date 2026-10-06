@@ -3,7 +3,9 @@ import AdministrationGuideButton from './AdministrationGuideButton';
 import KpiCard from '../../components/ui/KpiCard';
 import React, { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { adminSync, duplicateRole, describeError } from '../../services/adminSync';
+import { adminSync, duplicateRole, describeError, pullPermissionCatalogue } from '../../services/adminSync';
+import { useAppStore } from '../../stores/appStore';
+import { PermissionPicker } from './PermissionPicker';
 import {
   Users,
   Shield,
@@ -17,255 +19,40 @@ import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
-  LayoutGrid,
-  Target,
-  Layers,
-  ListChecks,
-  Briefcase,
-  UserCheck,
-  Landmark,
-  ShoppingCart,
-  Menu,
-  Sparkles,
   AlertTriangle,
   Copy,
   Edit2,
+  Lock,
 } from 'lucide-react';
 
 const ROLES_PER_PAGE = 10;
-
-const DEFAULT_MODULE_PERMISSIONS = {
-  CRM: [
-    {
-      id: 'crm_dashboard',
-      name: 'CRM Dashboard',
-      description: 'Dashboard and reports',
-      icon: 'dashboard',
-      color: 'green',
-      permissions: [
-        { id: 'show_crm_dashboard', label: 'Show CRM Dashboard' },
-        { id: 'show_hrm_dashboard', label: 'Show HRM Dashboard' },
-        { id: 'show_account_dashboard', label: 'Show Account Dashboard' },
-        { id: 'show_templates_menu', label: 'Show Templates Menu' },
-      ],
-    },
-    {
-      id: 'lead_management',
-      name: 'Lead Management',
-      description: 'Manage leads and related activities',
-      icon: 'lead',
-      color: 'orange',
-      permissions: [
-        { id: 'create_lead', label: 'Create Lead' },
-        { id: 'view_lead', label: 'View Lead' },
-        { id: 'edit_lead', label: 'Edit Lead' },
-        { id: 'delete_lead', label: 'Delete Lead' },
-        { id: 'move_lead', label: 'Move Lead' },
-      ],
-    },
-    {
-      id: 'pipeline_stage',
-      name: 'Pipeline & Stage',
-      description: 'Manage pipeline and lead stages',
-      icon: 'pipeline',
-      color: 'green',
-      permissions: [
-        { id: 'manage_pipeline', label: 'Manage Pipeline' },
-        { id: 'create_pipeline', label: 'Create Pipeline' },
-        { id: 'edit_pipeline', label: 'Edit Pipeline' },
-        { id: 'delete_pipeline', label: 'Delete Pipeline' },
-      ],
-    },
-    {
-      id: 'tasks',
-      name: 'Tasks',
-      description: 'Task management and allocation',
-      icon: 'task',
-      color: 'blue',
-      permissions: [
-        { id: 'view_task', label: 'View Task' },
-        { id: 'create_task', label: 'Create Task' },
-        { id: 'edit_task', label: 'Edit Task' },
-        { id: 'delete_task', label: 'Delete Task' },
-        { id: 'assign_task', label: 'Assign Task' },
-        { id: 'manage_task_allocation', label: 'Manage Task Allocation' },
-      ],
-    },
-  ],
-  Staff: [
-    {
-      id: 'user_management',
-      name: 'Staff & User Access',
-      description: 'Manage employee system accounts and profiles',
-      icon: 'staff',
-      color: 'blue',
-      permissions: [
-        { id: 'view_staff', label: 'View Staff List' },
-        { id: 'create_staff', label: 'Create Staff Account' },
-        { id: 'edit_staff', label: 'Edit Staff Profile' },
-        { id: 'delete_staff', label: 'Delete Staff' },
-        { id: 'manage_roles', label: 'Manage Roles & Permissions' },
-        { id: 'reset_staff_password', label: 'Reset Staff Passwords' },
-      ],
-    },
-  ],
-  Project: [
-    {
-      id: 'project_management',
-      name: 'Projects & Milestones',
-      description: 'Manage project planning, timelines and boards',
-      icon: 'project',
-      color: 'purple',
-      permissions: [
-        { id: 'view_projects', label: 'View Projects' },
-        { id: 'create_project', label: 'Create Project' },
-        { id: 'edit_project', label: 'Edit Project' },
-        { id: 'delete_project', label: 'Delete Project' },
-        { id: 'manage_milestones', label: 'Manage Milestones' },
-        { id: 'assign_members', label: 'Assign Project Members' },
-      ],
-    },
-  ],
-  HRM: [
-    {
-      id: 'hrm_attendance',
-      name: 'Attendance & Leave',
-      description: 'Manage daily check-ins, leave requests and calendar',
-      icon: 'hrm',
-      color: 'rose',
-      permissions: [
-        { id: 'mark_attendance', label: 'Mark Attendance' },
-        { id: 'view_team_attendance', label: 'View Team Attendance' },
-        { id: 'apply_leave', label: 'Apply Leave' },
-        { id: 'approve_leave', label: 'Approve Leave Requests' },
-        { id: 'regularize_attendance', label: 'Regularize Attendance' },
-      ],
-    },
-    {
-      id: 'hrm_payroll',
-      name: 'Payroll & Compensation',
-      description: 'Salary structures, monthly generation and payslips',
-      icon: 'hrm',
-      color: 'purple',
-      permissions: [
-        { id: 'view_own_payslip', label: 'View Own Payslip' },
-        { id: 'generate_payroll', label: 'Generate Monthly Payroll' },
-        { id: 'edit_salary_structure', label: 'Edit Salary Structure' },
-        { id: 'approve_payroll', label: 'Approve Payroll Disbursal' },
-      ],
-    },
-  ],
-  Account: [
-    {
-      id: 'accounting_ledger',
-      name: 'General Ledger & Accounts',
-      description: 'Cash accounts, bank accounts and journal entries',
-      icon: 'account',
-      color: 'blue',
-      permissions: [
-        { id: 'view_bank_accounts', label: 'View Bank Accounts' },
-        { id: 'manage_journal_entries', label: 'Manage Journal Entries' },
-        { id: 'view_ledger', label: 'View General Ledger' },
-        { id: 'view_financial_reports', label: 'View Profit & Loss / Balance Sheet' },
-        { id: 'reconcile_bank', label: 'Bank Statement Reconciliation' },
-      ],
-    },
-  ],
-  POS: [
-    {
-      id: 'pos_sales',
-      name: 'Point of Sale & Invoicing',
-      description: 'Quick billing, quotation generation and sales orders',
-      icon: 'pos',
-      color: 'amber',
-      permissions: [
-        { id: 'create_pos_invoice', label: 'Create POS Invoice' },
-        { id: 'view_pos_orders', label: 'View POS Orders' },
-        { id: 'apply_discounts', label: 'Apply Custom Discounts' },
-        { id: 'process_returns', label: 'Process Returns' },
-        { id: 'print_receipts', label: 'Print Receipts' },
-      ],
-    },
-  ],
-  'Menu Access': [
-    {
-      id: 'sidebar_visibility',
-      name: 'Navigation Visibility',
-      description: 'Control top-level menu modules in sidebar',
-      icon: 'menu',
-      color: 'blue',
-      permissions: [
-        { id: 'menu_crm', label: 'Show CRM Menu' },
-        { id: 'menu_sales', label: 'Show Sales Menu' },
-        { id: 'menu_purchase', label: 'Show Purchase Menu' },
-        { id: 'menu_inventory', label: 'Show Inventory Menu' },
-        { id: 'menu_accounts', label: 'Show Accounts Menu' },
-        { id: 'menu_hrms', label: 'Show HRMS Menu' },
-        { id: 'menu_organization', label: 'Show Organization Menu' },
-        { id: 'menu_admin', label: 'Show Administration Menu' },
-      ],
-    },
-  ],
-  'Other Modules': [
-    {
-      id: 'system_settings',
-      name: 'System Utilities & Tools',
-      description: 'Audit logs, backups, exports and system configuration',
-      icon: 'settings',
-      color: 'purple',
-      permissions: [
-        { id: 'export_excel', label: 'Export Data to Excel/CSV' },
-        { id: 'view_audit_logs', label: 'View Audit Logs' },
-        { id: 'system_backup', label: 'Perform Data Backup' },
-        { id: 'manage_company_profile', label: 'Manage Company Legal Profile' },
-      ],
-    },
-  ],
-};
-
-const MODULE_TABS = [
-  'Staff',
-  'CRM',
-  'Project',
-  'HRM',
-  'Account',
-  'POS',
-  'Menu Access',
-  'Other Modules',
-];
 
 /** Lower-cased text, safe on a field the server left unset. */
 function text(value) {
   return String(value ?? '').toLowerCase();
 }
 
-function getGroupIcon(type) {
-  switch (type) {
-    case 'dashboard':
-      return LayoutGrid;
-    case 'lead':
-      return Target;
-    case 'pipeline':
-      return Layers;
-    case 'task':
-      return ListChecks;
-    case 'staff':
-      return Users;
-    case 'project':
-      return Briefcase;
-    case 'hrm':
-      return UserCheck;
-    case 'account':
-      return Landmark;
-    case 'pos':
-      return ShoppingCart;
-    case 'menu':
-      return Menu;
-    default:
-      return Sparkles;
-  }
+/** A stable chip colour per role, so a role added on the server needs no code. */
+const ROLE_BADGE_COLORS = [
+  'bg-blue-100 text-blue-700',
+  'bg-emerald-100 text-emerald-700',
+  'bg-amber-100 text-amber-700',
+  'bg-purple-100 text-purple-700',
+  'bg-rose-100 text-rose-700',
+  'bg-cyan-100 text-cyan-700',
+];
+
+function roleBadgeColor(role) {
+  const key = String(role?.code || role?.name || '');
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) | 0;
+  return ROLE_BADGE_COLORS[Math.abs(hash) % ROLE_BADGE_COLORS.length];
+}
+
+function sameSet(a, b) {
+  if (a.length !== b.length) return false;
+  const set = new Set(a);
+  return b.every((id) => set.has(id));
 }
 
 export function RolesPage() {
@@ -273,30 +60,45 @@ export function RolesPage() {
   // checkbox tree can only offer permissions the API will actually enforce.
   const [roles, setRoles] = useState([]);
   const [selectedRoleId, setSelectedRoleId] = useState(null);
+  const [rolesError, setRolesError] = useState(false);
+  const [catalogue, setCatalogue] = useState([]);
+  const [catalogueLoaded, setCatalogueLoaded] = useState(false);
+
+  // The server refuses role changes without `manage_roles`; the screen only
+  // follows suit so nobody fills in a form that cannot be saved.
+  const grantedPermissions = useAppStore((s) => s.permissions) || [];
+  const canManage = grantedPermissions.includes('manage_roles');
 
   useEffect(() => {
     let cancelled = false;
     adminSync.pull('roles').then((rows) => {
-      if (cancelled || !rows) return;
-      // The editor reads `selectedPermissions`; the API calls them `permissions`.
-      const mapped = rows.map((r) => ({ ...r, selectedPermissions: r.permissions || [] }));
-      setRoles(mapped);
-      setSelectedRoleId((current) => current || mapped[0]?.id || null);
+      if (cancelled) return;
+      if (!rows) {
+        setRolesError(true);
+        return;
+      }
+      setRoles(rows);
+      setSelectedRoleId((current) => current || rows[0]?.id || null);
+    });
+    pullPermissionCatalogue().then((modules) => {
+      if (cancelled) return;
+      setCatalogue(Array.isArray(modules) ? modules : []);
+      setCatalogueLoaded(true);
     });
     return () => { cancelled = true; };
   }, []);
-  const [activeTab, setActiveTab] = useState('CRM');
+
   const [roleSearchQuery, setRoleSearchQuery] = useState('');
-  const [permissionSearchQuery, setPermissionSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [toastMessage, setToastMessage] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState(null);
   const [openMenuRoleId, setOpenMenuRoleId] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const [editingRoleName, setEditingRoleName] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
   const [editingPermissions, setEditingPermissions] = useState([]);
 
   useEffect(() => {
@@ -313,12 +115,21 @@ export function RolesPage() {
     return roles.find((r) => r.id === selectedRoleId) || roles[0] || null;
   }, [roles, selectedRoleId]);
 
+  // Opening a role (or its saved copy coming back) starts the editor from
+  // exactly what the server holds.
   useEffect(() => {
     if (activeRole) {
       setEditingRoleName(activeRole.name);
-      setEditingPermissions(activeRole.selectedPermissions || []);
+      setEditingDescription(activeRole.description || '');
+      setEditingPermissions(activeRole.permissions || []);
     }
   }, [activeRole]);
+
+  const isDirty = Boolean(activeRole) && (
+    editingRoleName.trim() !== activeRole.name ||
+    editingDescription.trim() !== (activeRole.description || '') ||
+    !sameSet(editingPermissions, activeRole.permissions || [])
+  );
 
   const showNotification = (msg) => {
     setToastMessage(msg);
@@ -347,122 +158,56 @@ export function RolesPage() {
   const endCount = Math.min(currentPage * ROLES_PER_PAGE, filteredRoles.length);
 
   const stats = useMemo(() => {
-    const totalRoles = roles.length;
-    const totalUsers = roles.reduce((sum, r) => sum + (Number(r.usersCount) || 0), 0);
-    const allUniquePerms = new Set(
-      Object.values(DEFAULT_MODULE_PERMISSIONS).flatMap((g) =>
-        g.flatMap((grp) => grp.permissions.map((p) => p.id))
-      )
+    const permissionCount = catalogue.reduce(
+      (sum, m) => sum + m.groups.reduce((n, g) => n + g.permissions.length, 0),
+      0
     );
-    const totalPermissions = allUniquePerms.size;
-    const activeModules = MODULE_TABS.length;
     return {
-      totalRoles,
-      totalUsers,
-      totalPermissions: 328,
-      activeModules: 6,
+      totalRoles: roles.length,
+      systemRoles: roles.filter((r) => r.isSystem).length,
+      totalUsers: roles.reduce((sum, r) => sum + (Number(r.userCount) || 0), 0),
+      totalPermissions: permissionCount,
+      activeModules: catalogue.length,
     };
-  }, [roles]);
+  }, [roles, catalogue]);
 
-  const currentTabGroups = useMemo(() => {
-    const groups = DEFAULT_MODULE_PERMISSIONS[activeTab] || [];
-    const q = permissionSearchQuery.trim().toLowerCase();
-    if (!q) return groups;
-
-    return groups
-      .map((g) => {
-        const matchingPermissions = g.permissions.filter((p) =>
-          String(p.label ?? '').toLowerCase().includes(q)
-        );
-        if (matchingPermissions.length > 0 || String(g.name ?? '').toLowerCase().includes(q)) {
-          return {
-            ...g,
-            permissions: matchingPermissions.length > 0 ? matchingPermissions : g.permissions,
-          };
-        }
-        return null;
-      })
-      .filter(Boolean);
-  }, [activeTab, permissionSearchQuery]);
-
-  const allCurrentTabPermissionIds = useMemo(() => {
-    const groups = DEFAULT_MODULE_PERMISSIONS[activeTab] || [];
-    return groups.flatMap((g) => g.permissions.map((p) => p.id));
-  }, [activeTab]);
-
-  const isAllCurrentTabSelected = useMemo(() => {
-    if (allCurrentTabPermissionIds.length === 0) return false;
-    return allCurrentTabPermissionIds.every((id) => editingPermissions.includes(id));
-  }, [allCurrentTabPermissionIds, editingPermissions]);
-
-  const toggleAllCurrentTab = () => {
-    if (isAllCurrentTabSelected) {
-      setEditingPermissions((prev) =>
-        prev.filter((id) => !allCurrentTabPermissionIds.includes(id))
-      );
-    } else {
-      setEditingPermissions((prev) =>
-        Array.from(new Set([...prev, ...allCurrentTabPermissionIds]))
-      );
-    }
-  };
-
-  const toggleGroupPermissions = (groupPermissionIds) => {
-    const isAllGroupSelected = groupPermissionIds.every((id) =>
-      editingPermissions.includes(id)
-    );
-    if (isAllGroupSelected) {
-      setEditingPermissions((prev) =>
-        prev.filter((id) => !groupPermissionIds.includes(id))
-      );
-    } else {
-      setEditingPermissions((prev) =>
-        Array.from(new Set([...prev, ...groupPermissionIds]))
-      );
-    }
-  };
-
-  const toggleSinglePermission = (permissionId) => {
-    setEditingPermissions((prev) => {
-      if (prev.includes(permissionId)) {
-        return prev.filter((id) => id !== permissionId);
-      } else {
-        return [...prev, permissionId];
-      }
-    });
-  };
-
-  const toggleGroupCollapse = (groupId) => {
-    setCollapsedGroups((prev) => ({
-      ...prev,
-      [groupId]: !prev[groupId],
-    }));
-  };
-
-  const handleUpdateRole = () => {
-    if (!activeRole) return;
-    if (!editingRoleName.trim()) {
+  const handleUpdateRole = async () => {
+    if (!activeRole || !canManage) return;
+    const name = editingRoleName.trim();
+    if (!name) {
       showNotification('Please provide a valid role name.');
       return;
     }
 
-    const name = editingRoleName.trim();
-    setRoles((prev) =>
-      prev.map((r) =>
-        r.id === activeRole.id
-          ? { ...r, name, selectedPermissions: editingPermissions }
-          : r
-      )
-    );
-    adminSync.update('roles', activeRole.id, { name, permissions: editingPermissions })
-      .catch((err) => showNotification(`Role not saved — ${describeError(err)}`));
-    showNotification(`Role "${name}" updated successfully!`);
+    setIsSaving(true);
+    try {
+      const saved = await adminSync.update('roles', activeRole.id, {
+        name,
+        description: editingDescription.trim(),
+        permissions: editingPermissions,
+      });
+      if (saved) {
+        // The server's copy replaces ours, so the screen shows what was stored.
+        setRoles((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
+        const stored = saved.permissions || [];
+        showNotification(
+          sameSet(stored, editingPermissions)
+            ? `Role "${saved.name}" saved with ${stored.length} permissions.`
+            : `Role "${saved.name}" saved, but the server kept ${stored.length} permissions.`
+        );
+      }
+    } catch (err) {
+      showNotification(`Role not saved — ${describeError(err)}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancelChanges = () => {
     if (activeRole) {
       setEditingRoleName(activeRole.name);
-      setEditingPermissions(activeRole.selectedPermissions || []);
+      setEditingDescription(activeRole.description || '');
+      setEditingPermissions(activeRole.permissions || []);
       showNotification('Changes reverted.');
     }
   };
@@ -475,51 +220,45 @@ export function RolesPage() {
       // allocates a code that does not collide with an existing role.
       const copy = await duplicateRole(targetRole.id);
       if (!copy) return;
-      const mapped = { ...copy, selectedPermissions: copy.permissions || [] };
-      setRoles((prev) => [mapped, ...prev]);
-      setSelectedRoleId(mapped.id);
+      setRoles((prev) => [copy, ...prev]);
+      setSelectedRoleId(copy.id);
       showNotification(`Role "${targetRole.name}" duplicated successfully!`);
     } catch (err) {
       showNotification(`Role not duplicated — ${describeError(err)}`);
     }
   };
 
-  const handleDeleteRole = () => {
+  const handleDeleteRole = async () => {
     const target = roleToDelete || activeRole;
     if (!target) return;
-    if (roles.length <= 1) {
-      showNotification('At least one role must remain in the system.');
-      setIsDeleteModalOpen(false);
-      setRoleToDelete(null);
+    setIsDeleteModalOpen(false);
+    setRoleToDelete(null);
+    try {
+      await adminSync.remove('roles', target.id);
+    } catch (err) {
+      showNotification(`Role not deleted — ${describeError(err)}`);
       return;
     }
-
-    setRoles((prev) => prev.filter((r) => r.id !== target.id));
-    adminSync.remove('roles', target.id)
-      .catch((err) => showNotification(`Role not deleted — ${describeError(err)}`));
-    setIsDeleteModalOpen(false);
     const remaining = roles.filter((r) => r.id !== target.id);
-    if (remaining.length > 0 && selectedRoleId === target.id) {
-      setSelectedRoleId(remaining[0].id);
-    }
-    setRoleToDelete(null);
+    setRoles(remaining);
+    if (selectedRoleId === target.id) setSelectedRoleId(remaining[0]?.id || null);
     showNotification(`Role "${target.name}" was deleted.`);
   };
 
-  const handleCreateNewRole = async (name, description) => {
+  const handleCreateNewRole = async (name, description, copyFromId) => {
     if (!name.trim()) return;
+    const source = roles.find((r) => r.id === copyFromId);
     try {
       const created = await adminSync.create('roles', {
         name: name.trim(),
         description: description.trim() || undefined,
-        permissions: [],
+        permissions: source ? source.permissions : [],
       });
       if (!created) return;
-      const mapped = { ...created, selectedPermissions: created.permissions || [] };
-      setRoles((prev) => [mapped, ...prev]);
-      setSelectedRoleId(mapped.id);
+      setRoles((prev) => [created, ...prev]);
+      setSelectedRoleId(created.id);
       setIsCreateModalOpen(false);
-      showNotification(`New role "${mapped.name}" created!`);
+      showNotification(`New role "${created.name}" created. Now choose its permissions.`);
     } catch (err) {
       showNotification(`Role not created — ${describeError(err)}`);
     }
@@ -551,13 +290,15 @@ export function RolesPage() {
 
         <div className="flex flex-wrap items-center gap-2.5">
           <AdministrationGuideButton entity="role" />
+        {canManage && (
         <button
           onClick={() => setIsCreateModalOpen(true)}
           className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs hover:shadow transition-all duration-150 active:scale-[0.99] cursor-pointer"
         >
           <Plus size={16} strokeWidth={2.4} />
-          <span>Create New Role</span>
+          <span>Create Role</span>
         </button>
+        )}
         </div>
       </div>
 
@@ -569,31 +310,21 @@ export function RolesPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard label="Total Roles" value={stats.totalRoles} icon={Users} tone="blue">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
-              <span>↑ 12%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
+            <div className="text-[11px] text-slate-400 mt-1">
+              {stats.systemRoles} system · {stats.totalRoles - stats.systemRoles} custom
             </div>
         </KpiCard>
 
         <KpiCard label="Total Users" value={stats.totalUsers} icon={Users} tone="emerald">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
-              <span>↑ 5%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
-            </div>
+            <div className="text-[11px] text-slate-400 mt-1">assigned to a role</div>
         </KpiCard>
 
         <KpiCard label="Total Permissions" value={stats.totalPermissions} icon={Shield} tone="sky">
-            <div className="text-[11px] font-semibold text-emerald-600 mt-1 flex items-center gap-1">
-              <span>↑ 8%</span>
-              <span className="text-slate-400 font-normal">vs last month</span>
-            </div>
+            <div className="text-[11px] text-slate-400 mt-1">in the permission catalogue</div>
         </KpiCard>
 
         <KpiCard label="Active Modules" value={stats.activeModules} icon={Clock} tone="purple">
-            <div className="text-[11px] font-semibold text-slate-700 mt-1 flex items-center gap-1">
-              <span className="text-slate-900 font-bold">100%</span>
-              <span className="text-slate-400 font-normal">System Coverage</span>
-            </div>
+            <div className="text-[11px] text-slate-400 mt-1">permission modules</div>
         </KpiCard>
       </div>
 
@@ -637,7 +368,7 @@ export function RolesPage() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${r.badgeColor}`}
+                      className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${roleBadgeColor(r)}`}
                     >
                       {r.code}
                     </div>
@@ -653,7 +384,8 @@ export function RolesPage() {
                         {r.description}
                       </p>
                       <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                        {r.usersCount} users
+                        {r.userCount} {r.userCount === 1 ? 'user' : 'users'} · {(r.permissions || []).length} permissions
+                        {r.isSystem && <span className="ml-1.5 text-[10px] font-semibold uppercase text-slate-400">System</span>}
                       </p>
                     </div>
                   </div>
@@ -688,6 +420,7 @@ export function RolesPage() {
                           <span>Edit Role</span>
                         </button>
 
+                        {canManage && (
                         <button
                           type="button"
                           onClick={() => handleDuplicateRole(r)}
@@ -696,7 +429,10 @@ export function RolesPage() {
                           <Copy size={14} className="text-amber-600" />
                           <span>Duplicate Role</span>
                         </button>
+                        )}
 
+                        {canManage && !r.isSystem && (
+                        <>
                         <div className="my-1 border-t border-slate-100" />
 
                         <button
@@ -711,6 +447,8 @@ export function RolesPage() {
                           <Trash2 size={14} className="text-rose-500" />
                           <span>Delete Role</span>
                         </button>
+                        </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -756,18 +494,34 @@ export function RolesPage() {
           </div>
         </div>
 
-        <div className="flex-1 w-full bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-xs flex flex-col space-y-6">
+        <div className="flex-1 min-w-0 w-full bg-white border border-slate-200 rounded-2xl p-5 md:p-6 shadow-xs flex flex-col space-y-6">
+          {rolesError ? (
+            <div className="text-center py-16 text-xs text-slate-500">
+              <Lock size={28} className="mx-auto text-slate-300 mb-2" />
+              Roles could not be loaded. You may not have permission to manage roles.
+            </div>
+          ) : !activeRole ? (
+            <div className="text-center py-16 text-xs text-slate-400">
+              {roles.length === 0 ? 'No roles yet.' : 'Select a role to view its permissions.'}
+            </div>
+          ) : (
+          <>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#1f6bff]">
                 <FileText size={20} />
               </div>
               <div>
-                <h3 className="text-base font-bold text-slate-900">Edit Role</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Configure permissions for this role</p>
+                <h3 className="text-base font-bold text-slate-900">{canManage ? 'Edit Role' : 'View Role'}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {canManage
+                    ? 'Configure permissions for this role'
+                    : "You can view this role's permissions but not change them."}
+                </p>
               </div>
             </div>
 
+            {canManage && !activeRole.isSystem && (
             <button
               onClick={() => {
                 setRoleToDelete(activeRole);
@@ -778,191 +532,71 @@ export function RolesPage() {
               <Trash2 size={14} />
               <span>Delete Role</span>
             </button>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Role Name <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={editingRoleName}
-              onChange={(e) => setEditingRoleName(e.target.value)}
-              placeholder="e.g. Employee"
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-[11px] text-slate-400 mt-1">
-              Role name will be displayed across the system.
-            </p>
-          </div>
-
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between border-b border-slate-200 gap-3 pb-2">
-            <div className="flex flex-nowrap items-center gap-1 overflow-x-auto no-scrollbar scrollbar-none py-1">
-              {MODULE_TABS.map((tab) => {
-                const isActive = activeTab === tab;
-                return (
-                  <button
-                    key={tab}
-                    onClick={() => {
-                      setActiveTab(tab);
-                      setPermissionSearchQuery('');
-                    }}
-                    className={`shrink-0 lg:shrink px-3 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-                      isActive
-                        ? 'text-[#1f6bff] border-b-2 border-[#1f6bff] rounded-b-none bg-blue-50/30'
-                        : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap lg:flex-nowrap items-center gap-3">
-              <div className="relative min-w-[180px] flex-1 md:flex-initial">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search permissions..."
-                  value={permissionSearchQuery}
-                  onChange={(e) => setPermissionSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer select-none whitespace-nowrap">
-                <input
-                  type="checkbox"
-                  checked={isAllCurrentTabSelected}
-                  onChange={toggleAllCurrentTab}
-                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
-                />
-                <span>Select All</span>
-              </label>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {currentTabGroups.length === 0 ? (
-              <div className="text-center py-10 text-xs text-slate-400">
-                No matching permissions found in this module.
-              </div>
-            ) : (
-              currentTabGroups.map((group) => {
-                const IconComponent = getGroupIcon(group.icon);
-                const isCollapsed = Boolean(collapsedGroups[group.id]);
-                const groupPermIds = group.permissions.map((p) => p.id);
-                const selectedCount = groupPermIds.filter((id) =>
-                  editingPermissions.includes(id)
-                ).length;
-                const isGroupAllSelected =
-                  groupPermIds.length > 0 && selectedCount === groupPermIds.length;
-
-                return (
-                  <div
-                    key={group.id}
-                    className="border border-slate-200 rounded-2xl bg-white overflow-hidden transition-all shadow-2xs"
-                  >
-                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 p-3.5 bg-slate-50/50 border-b border-slate-100">
-                      <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
-                        <div
-                          className={`w-9 h-9 shrink-0 lg:shrink rounded-xl flex items-center justify-center ${
-                            group.color === 'green'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : group.color === 'orange'
-                              ? 'bg-amber-100 text-amber-700'
-                              : group.color === 'rose'
-                              ? 'bg-rose-100 text-rose-700'
-                              : group.color === 'purple'
-                              ? 'bg-purple-100 text-purple-700'
-                              : 'bg-blue-100 text-blue-700'
-                          }`}
-                        >
-                          <IconComponent size={18} />
-                        </div>
-                        <div>
-                          <h4 className="text-xs md:text-sm font-bold text-slate-800 leading-tight">
-                            {group.name}
-                          </h4>
-                          <p className="text-[11px] text-slate-400 mt-0.5">
-                            {group.description}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-4 gap-y-1 text-xs">
-                        <label className="flex items-center gap-1.5 font-medium text-slate-600 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={isGroupAllSelected}
-                            onChange={() => toggleGroupPermissions(groupPermIds)}
-                            className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500 border-slate-300"
-                          />
-                          <span>Select All</span>
-                        </label>
-
-                        <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-                          {selectedCount} of {group.permissions.length} selected
-                        </span>
-
-                        <button
-                          type="button"
-                          onClick={() => toggleGroupCollapse(group.id)}
-                          className="text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100"
-                        >
-                          {isCollapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {!isCollapsed && (
-                      <div className="p-3.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                        {group.permissions.map((perm) => {
-                          const isChecked = editingPermissions.includes(perm.id);
-                          return (
-                            <label
-                              key={perm.id}
-                              className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition-all cursor-pointer select-none ${
-                                isChecked
-                                  ? 'bg-[#1f6bff] border-[#1f6bff] text-white shadow-2xs font-medium'
-                                  : 'bg-slate-50/50 border-slate-200/80 text-slate-700 hover:bg-slate-100'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isChecked}
-                                onChange={() => toggleSinglePermission(perm.id)}
-                                className={`w-4 h-4 rounded border-slate-300 focus:ring-0 ${
-                                  isChecked ? 'accent-white text-blue-600' : 'text-blue-600'
-                                }`}
-                              />
-                              <span className="text-xs truncate">{perm.label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
             )}
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Role Name <span className="text-rose-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={editingRoleName}
+                disabled={!canManage}
+                onChange={(e) => setEditingRoleName(e.target.value)}
+                placeholder="e.g. Employee"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-70"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Role name will be displayed across the system. Code: <span className="font-mono">{activeRole.code}</span>
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Description</label>
+              <input
+                type="text"
+                value={editingDescription}
+                disabled={!canManage}
+                onChange={(e) => setEditingDescription(e.target.value)}
+                placeholder="What this role is for"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs md:text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-70"
+              />
+            </div>
+          </div>
+
+          {catalogueLoaded ? (
+            <PermissionPicker
+              modules={catalogue}
+              selected={editingPermissions}
+              onChange={setEditingPermissions}
+              readOnly={!canManage}
+            />
+          ) : (
+            <div className="text-center py-10 text-xs text-slate-400">Loading permissions…</div>
+          )}
+
+          {canManage && (
           <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            {isDirty && <span className="text-[11px] font-semibold text-amber-600 mr-auto">Unsaved changes</span>}
             <button
               onClick={handleCancelChanges}
-              className="px-4 h-9 border border-border bg-card hover:bg-card-hover text-text rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              disabled={!isDirty || isSaving}
+              className="px-4 h-9 border border-border bg-card hover:bg-card-hover text-text rounded-xl text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               onClick={handleUpdateRole}
-              className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs hover:shadow transition-all active:scale-[0.99] cursor-pointer"
+              disabled={!isDirty || isSaving}
+              className="px-4 h-9 bg-primary hover:bg-primary-dark text-white rounded-xl text-xs font-semibold shadow-2xs hover:shadow transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
             >
-              Update Role
+              {isSaving ? 'Saving…' : 'Update Role'}
             </button>
           </div>
+          )}
+          </>
+          )}
         </div>
       </div>
 
@@ -1006,6 +640,7 @@ export function RolesPage() {
 
       {isCreateModalOpen && (
         <CreateRoleModal
+          roles={roles}
           onClose={() => setIsCreateModalOpen(false)}
           onCreate={handleCreateNewRole}
         />
@@ -1014,14 +649,21 @@ export function RolesPage() {
   );
 }
 
-function CreateRoleModal({ onClose, onCreate }) {
+function CreateRoleModal({ roles, onClose, onCreate }) {
   const [roleName, setRoleName] = useState('');
   const [description, setDescription] = useState('');
+  const [copyFromId, setCopyFromId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!roleName.trim()) return;
-    onCreate(roleName, description);
+    if (!roleName.trim() || submitting) return;
+    setSubmitting(true);
+    try {
+      await onCreate(roleName, description, copyFromId);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -1063,6 +705,22 @@ function CreateRoleModal({ onClose, onCreate }) {
             />
           </div>
 
+          <div>
+            <label className="block font-semibold text-slate-700 mb-1">Start with permissions from</label>
+            <select
+              value={copyFromId}
+              onChange={(e) => setCopyFromId(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">No permissions (choose them next)</option>
+              {roles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({(r.permissions || []).length} permissions)
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
             <button
               type="button"
@@ -1073,9 +731,10 @@ function CreateRoleModal({ onClose, onCreate }) {
             </button>
             <button
               type="submit"
-              className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs"
+              disabled={submitting}
+              className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs disabled:opacity-60"
             >
-              Create Role
+              {submitting ? 'Creating…' : 'Create Role'}
             </button>
           </div>
         </form>
