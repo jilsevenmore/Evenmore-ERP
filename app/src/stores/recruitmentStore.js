@@ -15,6 +15,8 @@ function persist(state) {
   writeThrough("candidates", state.candidates);
   writeThrough("interviews", state.interviews);
   writeThrough("offers", state.offers);
+  writeThrough("applications", state.applications);
+  writeThrough("onboarding", state.onboarding);
   // writeThrough("recruitmentQuestions", state.questions); // Hidden: Screening Questions out of scope
 }
 
@@ -26,7 +28,8 @@ const useRecruitmentStoreBase = create((set) => ({
   questions: [],
   onboardedMap: {},
   verifiedDocsMap: {},
-
+  applications: [],
+  onboarding: [],
   toast: null,
   showToast: (msg) => set({ toast: { msg, id: Date.now().toString() } }),
   clear: () => set({ toast: null }),
@@ -39,6 +42,8 @@ const useRecruitmentStoreBase = create((set) => ({
       pullTracked("interviews"),
       pullTracked("offers"),
       null, // pullTracked("recruitmentQuestions"), -- Hidden: Screening Questions out of scope (keeps rows[4] slot)
+      pullTracked("applications"),
+      pullTracked("onboarding"),
     ]);
     set((s) => ({
       jobs: rows[0] || s.jobs,
@@ -46,6 +51,8 @@ const useRecruitmentStoreBase = create((set) => ({
       interviews: rows[2] || s.interviews,
       offers: rows[3] || s.offers,
       questions: rows[4] || s.questions,
+      applications: rows[5] || s.applications,
+      onboarding: rows[6] || s.onboarding,
     }));
     return rows;
   },
@@ -53,6 +60,7 @@ const useRecruitmentStoreBase = create((set) => ({
   /** Empty on sign-out so the next user sees nothing of the previous one. */
   clearData: () => set({
     jobs: [], candidates: [], interviews: [], offers: [], questions: [],
+    applications: [], onboarding: [],
     onboardedMap: {}, verifiedDocsMap: {},
   }),
 
@@ -228,6 +236,50 @@ const useRecruitmentStoreBase = create((set) => ({
       const nextMap = { ...st.verifiedDocsMap, [candidateId]: true };
       persist({ ...st, verifiedDocsMap: nextMap });
       return { verifiedDocsMap: nextMap };
+    }),
+
+  // ─── APPLICATIONS CRUD ─────────────────────────────
+  addApplication: (app) =>
+    set((st) => {
+      const ns = [app, ...st.applications];
+      persist({ ...st, applications: ns });
+      return { applications: ns };
+    }),
+
+  updateApplication: (id, patch) =>
+    set((st) => {
+      const ns = st.applications.map((a) => (a.id === id ? { ...a, ...patch } : a));
+      persist({ ...st, applications: ns });
+      return { applications: ns };
+    }),
+
+  deleteApplication: (id) =>
+    set((st) => {
+      const ns = st.applications.filter((a) => a.id !== id);
+      persist({ ...st, applications: ns });
+      return { applications: ns };
+    }),
+
+  // ─── ONBOARDING RECORDS CRUD ───────────────────────
+  addOnboarding: (item) =>
+    set((st) => {
+      const ns = [item, ...st.onboarding];
+      persist({ ...st, onboarding: ns });
+      return { onboarding: ns };
+    }),
+
+  updateOnboarding: (id, patch) =>
+    set((st) => {
+      const ns = st.onboarding.map((item) => (item.id === id ? { ...item, ...patch } : item));
+      persist({ ...st, onboarding: ns });
+      return { onboarding: ns };
+    }),
+
+  deleteOnboarding: (id) =>
+    set((st) => {
+      const ns = st.onboarding.filter((item) => item.id !== id);
+      persist({ ...st, onboarding: ns });
+      return { onboarding: ns };
     }),
 }));
 

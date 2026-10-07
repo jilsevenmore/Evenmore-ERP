@@ -138,6 +138,14 @@ export const hrmsService = {
   createAppraisal: (data) => api.post('/hrms/performance/appraisals/', data),
   trackGoal: (id, data) => api.patch(`/hrms/performance/goals/${id}/`, data),
   getTrainings: (query) => api.get('/hrms/trainings/', { query }),
+  // Recruitment public getters
+  getJobs: (query) => api.get('/hrms/jobs/', { query }),
+  getCandidates: (query) => api.get('/hrms/candidates/', { query }),
+  getInterviews: (query) => api.get('/hrms/interviews/', { query }),
+  getOffers: (query) => api.get('/hrms/offers/', { query }),
+  getApplications: (query) => api.get('/hrms/applications/', { query }),
+  getOnboarding: (query) => api.get('/hrms/onboarding/', { query }),
+  getTrainings: (query) => api.get('/hrms/trainings/', { query }),
 };
 
 // ── Inventory ────────────────────────────────────────────────────────────

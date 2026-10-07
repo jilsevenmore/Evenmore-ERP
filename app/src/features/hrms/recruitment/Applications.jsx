@@ -22,7 +22,8 @@ import {
 } from "lucide-react";
 
 export default function Applications() {
-  const candidates = useRecruitmentStore((s) => s.candidates);
+  const applications = useRecruitmentStore((s) => s.applications) || [];
+  const candidates = useRecruitmentStore((s) => s.candidates) || [];
   const changeStage = useRecruitmentStore((s) => s.changeStage);
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
@@ -31,8 +32,30 @@ export default function Applications() {
   const [stageFilter, setStageFilter] = useState("All");
   const [guideOpen, setGuideOpen] = useState(false);
 
+  // If applications collection has records, use it; otherwise fall back to candidate application records
+  const allApplicationRecords = useMemo(() => {
+    if (applications.length > 0) {
+      return applications.map((app) => {
+        const matchedCandidate = candidates.find((c) => c.id === app.candidateId || c.email === app.email);
+        return {
+          id: app.id || matchedCandidate?.id,
+          candidateId: app.candidateId || matchedCandidate?.id,
+          name: app.candidateName || matchedCandidate?.name || app.name || "Candidate",
+          email: app.email || matchedCandidate?.email || "",
+          avatar: app.avatar || matchedCandidate?.avatar,
+          position: app.jobTitle || app.position || matchedCandidate?.position || "—",
+          appliedDate: app.appliedDate || matchedCandidate?.appliedDate || "—",
+          source: app.source || matchedCandidate?.source || "Portal",
+          stage: app.stage || matchedCandidate?.stage || "Applied",
+          recruiter: app.recruiter || matchedCandidate?.recruiter || "—",
+        };
+      });
+    }
+    return candidates;
+  }, [applications, candidates]);
+
   const filtered = useMemo(() => {
-    return candidates.filter((c) => {
+    return allApplicationRecords.filter((c) => {
       if (
         search &&
         !`${c.name} ${c.position} ${c.source || ""}`.toLowerCase().includes(search.toLowerCase())
@@ -44,15 +67,15 @@ export default function Applications() {
       }
       return true;
     });
-  }, [candidates, search, stageFilter]);
+  }, [allApplicationRecords, search, stageFilter]);
 
   const stages = ["Applied", "Screening", "Interview", "Shortlisted", "Offer", "Hired", "Rejected"];
 
-  const appliedCount = candidates.filter((c) => c.stage === "Applied").length;
-  const screeningOrInterview = candidates.filter(
+  const appliedCount = allApplicationRecords.filter((c) => c.stage === "Applied").length;
+  const screeningOrInterview = allApplicationRecords.filter(
     (c) => c.stage === "Screening" || c.stage === "Interview"
   ).length;
-  const offeredOrHired = candidates.filter((c) => c.stage === "Offer" || c.stage === "Hired").length;
+  const offeredOrHired = allApplicationRecords.filter((c) => c.stage === "Offer" || c.stage === "Hired").length;
 
   const cols = [
     {
