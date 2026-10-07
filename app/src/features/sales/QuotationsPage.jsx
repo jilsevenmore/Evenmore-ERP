@@ -5,7 +5,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2 } from 'lucide-react';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
@@ -14,6 +14,7 @@ import { PrintQuotationModal } from '../../components/common/PrintQuotationModal
 import { isQuotationConvertible } from '../../utils/quotationDocument';
 import { sheetAutoDescription } from '../../utils/salesLineMetal';
 import { FormSection } from '../../components/common/FormSection';
+import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 
 // Replaced: moved to components/common/FormSection.jsx so every sales form shares it.
 // const FormSection = ({ number, title, hint }) => (
@@ -50,6 +51,7 @@ export const QuotationsPage = () => {
     const [selectedQuoteTarget, setSelectedQuote] = useState(null);
     const selectedQuote = quotations.find(q => q.id === selectedQuoteTarget?.id) || selectedQuoteTarget;
     const [printQuotationTarget, setPrintQuotationTarget] = useState(null);
+    const [approvalTarget, setApprovalTarget] = useState(null);
     const openedPrintRequest = React.useRef('');
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [validUntil, setValidUntil] = useState('In 30 days');
@@ -447,6 +449,15 @@ export const QuotationsPage = () => {
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => setApprovalTarget(selectedQuote)}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Send the customer a link to view, comment on and approve or reject this quotation"
+                >
+                  <Share2 size={13}/>
+                  Share for Approval
+                </button>
+                <button
+                  type="button"
                   onClick={() => setPrintQuotationTarget(selectedQuote)}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
@@ -517,6 +528,20 @@ export const QuotationsPage = () => {
             </div>
           </div>
         </div>)}
+
+      {/* Customer approval link (same flow as the PMS design proof link) */}
+      <ShareApprovalLinkModal
+        isOpen={Boolean(approvalTarget)}
+        onClose={() => setApprovalTarget(null)}
+        docType="quotation"
+        document={approvalTarget && {
+          id: approvalTarget.id,
+          number: approvalTarget.quoteNumber,
+          customerName: approvalTarget.customer,
+          total: approvalTarget.amount,
+          status: approvalTarget.status,
+        }}
+      />
 
       {/* Official Commercial Quotation PDF Voucher */}
       <PrintQuotationModal

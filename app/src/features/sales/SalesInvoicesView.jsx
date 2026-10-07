@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, SlidersHorizontal } from 'lucide-react';
+import { Search, CheckCircle2, Receipt, Eye, DollarSign, X, Zap, Printer, Clock, AlertCircle, FileText, Plus, Ban, Check, Edit, Lock, ShieldAlert, MapPin, SlidersHorizontal, Share2 } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { StatCard } from '../../components/ui/StatCard';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
@@ -7,6 +7,7 @@ import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 import { PrintInvoiceModal } from '../../components/common/PrintInvoiceModal';
+import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/common/PageHeader';
@@ -65,6 +66,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const [showPaymentModal, setShowPaymentModal] = useState(null);
     const [activeReceipt, setActiveReceipt] = useState(null);
     const [printInvoiceTarget, setPrintInvoiceTarget] = useState(null);
+    const [approvalTarget, setApprovalTarget] = useState(null);
 
     // Cancellation & Finalize modals
     const [cancelModalTarget, setCancelModalTarget] = useState(null);
@@ -1158,6 +1160,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                 <StatusBadge status={selectedInvoice.status}/>
                             </div>
                             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setApprovalTarget(selectedInvoice)}
+                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer"
+                                    title="Send the customer a link to view, comment on and approve or reject this invoice"
+                                >
+                                    <Share2 size={13}/>
+                                    Share for Approval
+                                </button>
                                 <button onClick={() => setPrintInvoiceTarget(selectedInvoice)} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer">
                                     <Printer size={13}/>
                                     Print Official Invoice
@@ -1597,6 +1608,20 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
             {/* Instant Settle Payment Receipt Modal */}
             <PaymentReceiptModal receipt={activeReceipt} onClose={() => setActiveReceipt(null)}/>
+
+            {/* Customer approval link (same flow as the PMS design proof link) */}
+            <ShareApprovalLinkModal
+                isOpen={Boolean(approvalTarget)}
+                onClose={() => setApprovalTarget(null)}
+                docType="sales_invoice"
+                document={approvalTarget && {
+                    id: approvalTarget.id,
+                    number: approvalTarget.invoiceNumber,
+                    customerName: approvalTarget.customer,
+                    total: approvalTarget.total,
+                    status: approvalTarget.status,
+                }}
+            />
 
             {/* Official Printable Commercial Tax Invoice Document */}
             <PrintInvoiceModal isOpen={Boolean(printInvoiceTarget)} onClose={() => setPrintInvoiceTarget(null)} invoice={printInvoiceTarget} balanceDue={printInvoiceTarget ? getInvoiceOutstanding(printInvoiceTarget.id).balanceDue : 0}/>
