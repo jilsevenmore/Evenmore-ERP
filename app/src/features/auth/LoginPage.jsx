@@ -8,7 +8,6 @@ import {
   EyeOff,
   ArrowRight,
   ShieldCheck,
-  Building2,
   Sparkles,
   Sun,
   Moon,
@@ -21,7 +20,6 @@ import {
   Layers,
   HelpCircle,
   Check,
-  ChevronDown,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { login as loginRequest } from '../../services/authService';
@@ -50,12 +48,6 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  // Empty by default: the server resolves the tenant from the email address and
-  // only needs a slug when the same address exists in more than one tenant
-  // (api.md §2). Pre-filling a mock persona's workspace made every real sign-in
-  // fail with 'Incorrect email or password'.
-  const [tenant, setTenant] = useState('');
-  const [showTenant, setShowTenant] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -104,7 +96,6 @@ export default function LoginPage() {
       const { user, permissions } = await loginRequest({
         email,
         password,
-        tenant,
         remember: rememberMe,
       });
 
@@ -346,34 +337,6 @@ export default function LoginPage() {
                       {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                     </button>
                   </div>
-                </div>
-
-                {/* Collapsible Tenant / Workspace ID */}
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowTenant(!showTenant)}
-                    className="flex items-center gap-1 text-[11px] font-medium text-[var(--muted)] hover:text-[var(--text)] cursor-pointer"
-                  >
-                    <Building2 size={12} />
-                    <span>{showTenant ? 'Hide workspace settings' : 'Custom workspace / tenant domain?'}</span>
-                    <ChevronDown size={12} className={`transition-transform duration-150 ${showTenant ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {showTenant && (
-                    <div className="mt-2 animate-in fade-in duration-150">
-                      <input
-                        type="text"
-                        value={tenant}
-                        onChange={(e) => setTenant(e.target.value)}
-                        placeholder="Tenant identifier (e.g. evenmore-main)"
-                        className="w-full bg-[var(--soft)] border border-[var(--border)] rounded-xl py-2 px-3 text-xs text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-                      />
-                      <p className="text-[10px] text-[var(--muted)] mt-1">
-                        Leave as default unless logging into a dedicated tenant silo.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Remember Me Checkbox */}

@@ -448,23 +448,60 @@ export default function DashboardView() {
           <h3 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: "#0f1f3d" }}>Quick Actions</h3>
           <p style={{ margin: "2px 0 12px", fontSize: 11, color: "#64748b" }}>Perform tasks with one click | {deals.length} deals {invoices.length} invoices</p>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, textAlign: "center" }}>
-            <button type="button" onClick={() => setIsCreateLeadOpen(true)} className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
-              <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0"><UserPlus size={16} /></span> Add Lead
+            <button
+              type="button"
+              onClick={() => setIsCreateLeadOpen(true)}
+              className="w-full flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-border bg-card hover:bg-card-hover hover:border-primary/40 text-text text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <UserPlus size={16} />
+              </span>
+              <span className="truncate w-full text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">Add Lead</span>
             </button>
-            <Link to="/crm/tasks" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
-              <span className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0"><ClipboardList size={16} /></span> Add Task
+            <Link
+              to="/crm/tasks"
+              className="w-full flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-border bg-card hover:bg-card-hover hover:border-primary/40 text-text text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                <ClipboardList size={16} />
+              </span>
+              <span className="truncate w-full text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">Add Task</span>
             </Link>
-            <Link to="/crm/tasks" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
-              <span className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0"><Video size={16} /></span> Meeting
+            <Link
+              to="/crm/tasks"
+              className="w-full flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-border bg-card hover:bg-card-hover hover:border-primary/40 text-text text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span className="w-8 h-8 rounded-lg bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                <Video size={16} />
+              </span>
+              <span className="truncate w-full text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">Meeting</span>
             </Link>
-            <Link to="/crm/leads" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
-              <span className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0"><Send size={16} /></span> Send Email
+            <Link
+              to="/crm/leads"
+              className="w-full flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-border bg-card hover:bg-card-hover hover:border-primary/40 text-text text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span className="w-8 h-8 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Send size={16} />
+              </span>
+              <span className="truncate w-full text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">Send Email</span>
             </Link>
-            <Link to="/crm/leads" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
-              <span className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0"><Phone size={16} /></span> Log Call
+            <Link
+              to="/crm/leads"
+              className="w-full flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-border bg-card hover:bg-card-hover hover:border-primary/40 text-text text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                <Phone size={16} />
+              </span>
+              <span className="truncate w-full text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">Log Call</span>
             </Link>
-            <Link to="/sales/quotations" className="btn-outline flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl text-xs font-semibold text-text shadow-2xs transition cursor-pointer">
-              <span className="w-8 h-8 rounded-lg bg-blue-50 text-primary flex items-center justify-center shrink-0"><FileText size={16} /></span> Quotation
+            <Link
+              to="/sales/quotations"
+              className="w-full flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-border bg-card hover:bg-card-hover hover:border-primary/40 text-text text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              <span className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/40 text-primary flex items-center justify-center shrink-0">
+                <FileText size={16} />
+              </span>
+              <span className="truncate w-full text-center text-[11px] font-semibold text-slate-700 dark:text-slate-200">Quotation</span>
             </Link>
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
@@ -484,6 +521,11 @@ export default function DashboardView() {
         onCancel={handleCompleteSuccess}
         onComplete={handleComplete}
         onSuccess={handleCompleteSuccess}
+      />
+      <CreateLeadModal
+        isOpen={isCreateLeadOpen}
+        onClose={() => setIsCreateLeadOpen(false)}
+        onCreate={handleCreateLead}
       />
     </div>
   );
