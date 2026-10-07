@@ -52,6 +52,7 @@ const PMSDelayDashboardPage = lazy(() => import('../features/pms/delays/DelayDas
 const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage'));
 const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
 const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/ClientProofApprovalPage'));
+const SalesCustomerApprovalPage = lazy(() => import('../features/sales/approval/CustomerApprovalPage'));
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
@@ -230,6 +231,12 @@ const router = createBrowserRouter([
   {
     path: '/pms/approve/:token',
     element: <Page component={PMSClientProofApprovalPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  // Same for an estimate / quotation / proforma / invoice approval link.
+  {
+    path: '/sales/approve/:token',
+    element: <Page component={SalesCustomerApprovalPage} />,
     errorElement: <RootErrorBoundary />,
   },
   // ── Protected Application Shell (Guarded by RequireAuth) ─

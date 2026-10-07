@@ -4,13 +4,14 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2 } from 'lucide-react';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
 import { useEstimates, addEstimate, updateEstimate } from '../../services/estimateStore';
 import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
+import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 
 function logLeadActivity(leadId, title, color) {
     if (!leadId || !title) return;
@@ -46,6 +47,7 @@ export const EstimatesPage = () => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedEstimate, setSelectedEstimate] = useState(null);
     const [printEstimateTarget, setPrintEstimateTarget] = useState(null);
+    const [approvalTarget, setApprovalTarget] = useState(null);
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [validUntil, setValidUntil] = useState('15 Days');
     const [lineItems, setLineItems] = useState([]);
@@ -401,6 +403,15 @@ export const EstimatesPage = () => {
                             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                                 <button
                                     type="button"
+                                    onClick={() => setApprovalTarget(selectedEstimate)}
+                                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                    title="Send the customer a link to view, comment on and approve or reject this estimate"
+                                >
+                                    <Share2 size={13} />
+                                    Share for Approval
+                                </button>
+                                <button
+                                    type="button"
                                     onClick={() => setPrintEstimateTarget(selectedEstimate)}
                                     className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                                 >
@@ -460,6 +471,20 @@ export const EstimatesPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* Customer approval link (same flow as the PMS design proof link) */}
+            <ShareApprovalLinkModal
+                isOpen={Boolean(approvalTarget)}
+                onClose={() => setApprovalTarget(null)}
+                docType="estimate"
+                document={approvalTarget && {
+                    id: approvalTarget.id,
+                    number: approvalTarget.estimateNumber,
+                    customerName: approvalTarget.customer,
+                    total: approvalTarget.amount,
+                    status: approvalTarget.status,
+                }}
+            />
 
             {/* Official Commercial Sales Estimate Voucher */}
             <PrintEstimateModal

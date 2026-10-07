@@ -33,12 +33,14 @@ import {
   Trash2,
   SlidersHorizontal,
   ExternalLink,
+  Share2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
 import { PrintProformaInvoiceModal } from '../../components/common/PrintProformaInvoiceModal';
+import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 
 const proformaGuide = {
@@ -128,6 +130,7 @@ export const ProformaInvoicesPage = () => {
   const [selectedPi, setSelectedPi] = useState(null);
   const [deleteTargetPi, setDeleteTargetPi] = useState(null);
   const [printPiTarget, setPrintPiTarget] = useState(null);
+  const [approvalTarget, setApprovalTarget] = useState(null);
 
   // Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
@@ -1413,6 +1416,14 @@ export const ProformaInvoicesPage = () => {
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => setApprovalTarget(selectedPi)}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  title="Send the customer a link to view, comment on and approve or reject this proforma invoice"
+                >
+                  <Share2 size={13} /> Share for Approval
+                </button>
+                <button
+                  type="button"
                   onClick={() => setPrintPiTarget(selectedPi)}
                   className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
                 >
@@ -1961,6 +1972,20 @@ export const ProformaInvoicesPage = () => {
           </div>
         </div>
       )}
+
+      {/* Customer approval link (same flow as the PMS design proof link) */}
+      <ShareApprovalLinkModal
+        isOpen={Boolean(approvalTarget)}
+        onClose={() => setApprovalTarget(null)}
+        docType="proforma_invoice"
+        document={approvalTarget && {
+          id: approvalTarget.id,
+          number: approvalTarget.proformaNumber,
+          customerName: approvalTarget.customer,
+          total: approvalTarget.grandTotal || approvalTarget.total || 0,
+          status: approvalTarget.status,
+        }}
+      />
 
       {/* Official Executive Proforma Invoice Print Voucher */}
       <PrintProformaInvoiceModal
