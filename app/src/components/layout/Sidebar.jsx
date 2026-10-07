@@ -326,8 +326,6 @@ const NAV = [
       { label: 'Users', to: '/administration/users' },
       { label: 'Roles', to: '/administration/roles' },
       { label: 'Clients', to: '/administration/clients' },
-      { label: 'Custom Fields', to: '/administration/custom-fields' },
-      { label: 'Webhooks & Alerts', to: '/settings/webhooks' },
       { label: 'System Settings', to: '/administration/settings' },
     ],
   },
