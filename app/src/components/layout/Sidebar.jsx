@@ -63,7 +63,7 @@ import { useERP } from '../../context/ERPContext';
 import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
 import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
-import { clearStoredAuth } from '../../utils/authUtils';
+import { logout } from '../../services/authService';
 import { filterNavByPermission } from '../../utils/navAccess';
 
 const SIDEBAR_THEMES = [
@@ -900,9 +900,9 @@ export default function Sidebar() {
               {/* Sign Out / Switch User Button in Person Profile */}
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setIsProfileOpen(false);
-                  clearStoredAuth();
+                  await logout();
                   navigate('/login');
                 }}
                 className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl hover:bg-rose-500/15 text-rose-300 hover:text-rose-200 transition text-left cursor-pointer group mt-1"
@@ -922,9 +922,9 @@ export default function Sidebar() {
               <span className="text-[9px] text-slate-400">Evenmore Cloud v2.6</span>
               <button
                 type="button"
-                onClick={() => {
+                onClick={async () => {
                   setIsProfileOpen(false);
-                  clearStoredAuth();
+                  await logout();
                   navigate('/login');
                 }}
                 className="hover:text-rose-400 flex items-center gap-1 cursor-pointer transition text-slate-300"

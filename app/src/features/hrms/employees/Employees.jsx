@@ -481,12 +481,12 @@ export default function Employees() {
             {form.createUserAccount !== false && (
               <div style={{ marginTop: 10, marginLeft: 25 }}>
                 <label className="form-label" style={{ fontSize: "12px", marginBottom: 4 }}>
-                  Initial Password <span style={{ color: "#94a3b8", fontWeight: 400 }}>(defaults to Password@123)</span>
+                  Initial Password <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
                   className="form-input"
                   type="password"
-                  placeholder="Enter login password or leave empty for default"
+                  placeholder="Leave empty to email the employee an activation link"
                   value={form.password || ""}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   style={{ maxWidth: 320, fontSize: "13px" }}

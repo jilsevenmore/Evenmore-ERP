@@ -50,6 +50,17 @@ import {
 const USERS_PER_PAGE = 16;
 
 /**
+ * A random temporary password from the browser's CSPRNG. A guessable pattern
+ * ("Password@" + 3 digits) is a few hundred tries from an account takeover.
+ */
+function generateTempPassword(length = 16) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%&*!';
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (n) => alphabet[n % alphabet.length]).join('');
+}
+
+/**
  * Case-insensitive contains, safe on a field the server left unset — a user can
  * exist before they have been given a role, a department or an employee number.
  */
@@ -274,7 +285,7 @@ export function UsersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Password Reset State ─────────────────────────────────────
-  const [newPassword, setNewPassword] = useState('Evenmore@2026!');
+  const [newPassword, setNewPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // ── Notification toast ───────────────────────────────────────
@@ -396,7 +407,8 @@ export function UsersPage() {
         createEmployee: userForm.employeeLink === 'new',
         location: userForm.location,
         reportingManager: userForm.reportingManager,
-        password: userForm.password || 'Password@123',
+        // Empty = no password; the server emails an activation link instead.
+        password: userForm.password || undefined,
       });
     } catch (err) {
       showNotification(`User not created — ${describeError(err)}`);
@@ -505,7 +517,7 @@ export function UsersPage() {
     const target = user || activeUser;
     if (!target) return;
     setUserToModify(target);
-    setNewPassword('Evenmore@2026!');
+    setNewPassword('');
     setPasswordSuccess(false);
     setIsResetPasswordModalOpen(true);
   };
@@ -1126,13 +1138,12 @@ export function UsersPage() {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Password * <span className="font-normal text-slate-400">(Saved in PBKDF2 format for login)</span>
+                  Password <span className="font-normal text-slate-400">(leave empty to email the user an activation link)</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    required
-                    placeholder="Enter password"
+                    placeholder="Leave empty to send an activation link"
                     value={userForm.password || ''}
                     onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                     className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
@@ -1142,7 +1153,7 @@ export function UsersPage() {
                     onClick={() =>
                       setUserForm({
                         ...userForm,
-                        password: 'Password@' + Math.floor(100 + Math.random() * 900),
+                        password: generateTempPassword(),
                       })
                     }
                     className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
@@ -1459,9 +1470,7 @@ export function UsersPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setNewPassword(
-                        'Evenmore@' + Math.floor(1000 + Math.random() * 9000) + '!'
-                      )
+                      setNewPassword(generateTempPassword())
                     }
                     className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
                   >

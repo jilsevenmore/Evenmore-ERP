@@ -11,6 +11,7 @@ import {
   saveStoredAuth,
   clearStoredAuth,
   getStoredToken,
+  REFRESH_TOKEN_KEY,
 } from '../utils/authUtils';
 
 /** `{id, name, role: {name}, …}` from the API → what the header/sidebar read. */
@@ -95,7 +96,12 @@ export async function fetchMe() {
 /** Tell the server, then forget locally either way. */
 export async function logout() {
   try {
-    if (getStoredToken()) await api.post('/auth/logout/', {});
+    // The server revokes the session, so a copied access token stops working
+    // at once instead of living until it expires.
+    if (getStoredToken()) {
+      const refresh = localStorage.getItem(REFRESH_TOKEN_KEY);
+      await api.post('/auth/logout/', refresh ? { refresh } : {});
+    }
   } catch {
     // A failed logout must still end the local session.
   } finally {

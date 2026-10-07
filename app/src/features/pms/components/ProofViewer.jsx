@@ -12,6 +12,13 @@ import {
 } from 'lucide-react';
 import { resolveFileUrl } from '../../../services/api';
 
+/** Text for interpolation into an HTML string. */
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+  ));
+}
+
 /**
  * ProofViewer — proof renderer with photo/PDF support and comment stream.
  *
@@ -111,12 +118,15 @@ export function ProofViewer({ document: doc, annotations = [], onAddAnnotation }
     const win = window.open();
     if (win) {
       if (isImage) {
+        // The popup shares this origin, so the uploaded name and URL must be
+        // escaped -- a crafted file name would otherwise run as script here.
+        const name = escapeHtml(doc.fileName);
         win.document.write(`
           <!DOCTYPE html>
           <html>
-            <head><title>${doc.fileName}</title></head>
+            <head><title>${name}</title></head>
             <body style="margin:0;background:#0f172a;display:flex;align-items:center;justify-content:center;height:100vh;overflow:auto;">
-              <img src="${fileSource}" alt="${doc.fileName}" style="max-width:96%;max-height:96vh;object-fit:contain;box-shadow:0 10px 30px rgba(0,0,0,0.5);border-radius:6px;" />
+              <img src="${escapeHtml(fileSource)}" alt="${name}" style="max-width:96%;max-height:96vh;object-fit:contain;box-shadow:0 10px 30px rgba(0,0,0,0.5);border-radius:6px;" />
             </body>
           </html>
         `);
