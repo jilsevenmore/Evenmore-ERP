@@ -53,6 +53,8 @@ const PMSReportsPage = lazy(() => import('../features/pms/reports/PMSReportsPage
 const PMSSettingsPage = lazy(() => import('../features/pms/settings/PMSSettingsPage'));
 const PMSClientProofApprovalPage = lazy(() => import('../features/pms/approval/ClientProofApprovalPage'));
 const SalesCustomerApprovalPage = lazy(() => import('../features/sales/approval/CustomerApprovalPage'));
+const PMSTaskCalendarPage = lazy(() => import('../features/pms/calendar/TaskCalendarPage'));
+const PMSTimesheetsPage = lazy(() => import('../features/pms/timesheets/TimesheetsPage'));
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
@@ -76,7 +78,7 @@ const Applications = lazy(() => import('../features/hrms/recruitment/Application
 const Offers = lazy(() => import('../features/hrms/recruitment/Offers'));
 const Onboarding = lazy(() => import('../features/hrms/recruitment/Onboarding'));
 // const Career = lazy(() => import('../features/hrms/recruitment/Career')); // Hidden: Career Portal out of scope
-// const CustomQuestions = lazy(() => import('../features/hrms/recruitment/CustomQuestions')); // Hidden: Screening Questions out of scope
+const CustomQuestions = lazy(() => import('../features/hrms/recruitment/CustomQuestions'));
 const RecruitmentFunnel = lazy(() => import('../features/hrms/recruitment/RecruitmentFunnel'));
 const PerformanceDashboard = lazy(() => import('../features/hrms/performance/Dashboard'));
 const Indicators = lazy(() => import('../features/hrms/performance/Indicators'));
@@ -130,6 +132,8 @@ const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage
 // const ZoneRequestsPage = lazy(() => import('../features/inventory/ZoneRequestsPage').then(m => ({ default: m.ZoneRequestsPage })));
 // const ValuationAgeingPage = lazy(() => import('../features/inventory/ValuationAgeingPage').then(m => ({ default: m.ValuationAgeingPage })));
 const MonthEndAuditPage = lazy(() => import('../features/inventory/MonthEndAuditPage').then(m => ({ default: m.MonthEndAuditPage })));
+const DemoUnitsPage = lazy(() => import('../features/inventory/DemoUnitsPage'));
+const ReworkDashboard = lazy(() => import('../features/inventory/ReworkDashboard'));
 
 // ── ERP — Parties (Lazy Loaded) ───────────────────────────────
 const PartiesPage = lazy(() => import('../features/parties/PartiesPage'));
@@ -140,15 +144,18 @@ const VendorsPage = lazy(() => import('../features/parties/VendorsPage').then(m 
 const CashBankPage = lazy(() => import('../features/accounts/CashBankPage').then(m => ({ default: m.CashBankPage })));
 const GeneralLedgerPage = lazy(() => import('../features/accounts/GeneralLedgerPage').then(m => ({ default: m.GeneralLedgerPage })));
 const FinancialReportsPage = lazy(() => import('../features/accounts/FinancialReportsPage'));
+const BudgetsPage = lazy(() => import('../features/accounts/BudgetsPage'));
 
 // ── ERP — Reports & Settings (Lazy Loaded) ────────────────────
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const WebhooksPage = lazy(() => import('../features/settings/WebhooksPage'));
 
 // ── Administration (Lazy Loaded) ──────────────────────────────
 const UsersPage = lazy(() => import('../features/administration/UsersPage'));
 const RolesPage = lazy(() => import('../features/administration/RolesPage'));
 const ClientsPage = lazy(() => import('../features/administration/ClientsPage'));
+const CustomFieldsPage = lazy(() => import('../features/administration/CustomFieldsPage'));
 
 // ── Main Dashboard (Lazy Loaded) ──────────────────────────────
 const DashboardPage = lazy(() => import('../features/sales/DashboardPage').then(m => ({ default: m.DashboardPage })));
@@ -295,6 +302,8 @@ const router = createBrowserRouter([
       { path: 'pms/stages', element: <Page component={PMSStageConfigPage} /> },
       { path: 'pms/timeline', element: <Page component={PMSTimelinePage} /> },
       { path: 'pms/delays', element: <Page component={PMSDelayDashboardPage} /> },
+      { path: 'pms/calendar', element: <Page component={PMSTaskCalendarPage} /> },
+      { path: 'pms/timesheets', element: <Page component={PMSTimesheetsPage} /> },
       { path: 'pms/reports', element: <Page component={PMSReportsPage} /> },
       { path: 'pms/settings', element: <Page component={PMSSettingsPage} /> },
 
@@ -347,6 +356,8 @@ const router = createBrowserRouter([
       // { path: 'inventory/zone-requests', element: <Page component={ZoneRequestsPage} /> }, // Hidden: Zone Requests out of scope
       // { path: 'inventory/valuation', element: <Page component={ValuationAgeingPage} /> }, // Hidden: Valuation & Ageing out of scope
       { path: 'inventory/audit', element: <Page component={MonthEndAuditPage} /> },
+      { path: 'inventory/demo-units', element: <Page component={DemoUnitsPage} /> },
+      { path: 'inventory/rework', element: <Page component={ReworkDashboard} /> },
 
       // ── Legacy Root Aliases ───────────────────────────────
       // [PHASE-4] NAV-AUDITED DEAD ALIASES — no sidebar/navigate() links point at these
@@ -369,6 +380,7 @@ const router = createBrowserRouter([
       { path: 'accounts', element: <Navigate to="/accounts/cash-bank" replace /> },
       { path: 'accounts/cash-bank', element: <Page component={CashBankPage} /> },
       { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
+      { path: 'accounts/budgets', element: <Page component={BudgetsPage} /> },
       { path: 'accounts/reports', element: <Page component={FinancialReportsPage} /> },
 
       // ── HRMS ──────────────────────────────────────────────
@@ -394,7 +406,7 @@ const router = createBrowserRouter([
       { path: 'hrms/recruitment/offers', element: <Page component={Offers} /> },
       { path: 'hrms/recruitment/onboarding', element: <Page component={Onboarding} /> },
       // { path: 'hrms/recruitment/career', element: <Page component={Career} /> }, // Hidden: Career Portal out of scope
-      // { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> }, // Hidden: Screening Questions out of scope
+      { path: 'hrms/recruitment/questions', element: <Page component={CustomQuestions} /> },
       // { path: 'hrms/recruitment/funnel', element: <Page component={RecruitmentFunnel} /> }, // Hidden: Recruitment Funnel feature commented out
       { path: 'hrms/performance', element: <Page component={PerformanceDashboard} /> },
       { path: 'hrms/performance/indicators', element: <Page component={Indicators} /> },
@@ -445,17 +457,22 @@ const router = createBrowserRouter([
       { path: 'hrms/hr-admin/resignations', element: <Page component={HRAdminPage} defaultTab="resignations" /> },
       { path: 'hrms/hr-admin/complaints', element: <Page component={HRAdminPage} defaultTab="complaints" /> },
       { path: 'hrms/hr-admin/holidays', element: <Page component={HRAdminPage} defaultTab="holidays" /> },
+      { path: 'hrms/hr-admin/announcements', element: <Page component={HRAdminPage} defaultTab="announcements" /> },
+      { path: 'hrms/hr-admin/travel', element: <Page component={HRAdminPage} defaultTab="travel" /> },
 
       // ── Reports ───────────────────────────────────────────
       { path: 'reports', element: <Page component={ReportsPage} /> },
 
-      // ── Administration ────────────────────────────────────
+      // ── Administration & Settings ─────────────────────────
       { path: 'administration', element: <Navigate to="/administration/settings" replace /> },
       { path: 'administration/users', element: <Page component={UsersPage} /> },
       { path: 'administration/roles', element: <Page component={RolesPage} /> },
       { path: 'administration/clients', element: <Page component={ClientsPage} /> },
       { path: 'administration/client', element: <Navigate to="/administration/clients" replace /> },
+      { path: 'administration/custom-fields', element: <Page component={CustomFieldsPage} /> },
       { path: 'administration/settings', element: <Page component={SettingsPage} /> },
+      { path: 'settings/webhooks', element: <Page component={WebhooksPage} /> },
+      { path: 'administration/webhooks', element: <Navigate to="/settings/webhooks" replace /> },
 
       // ── Catch-all ─────────────────────────────────────────
       { path: '*', element: <Navigate to="/dashboard" replace /> },

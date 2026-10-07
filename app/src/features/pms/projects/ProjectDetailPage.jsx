@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History, MessagesSquare } from 'lucide-react';
+import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History, MessagesSquare, Bug, DollarSign } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { EmptyStatePms } from '../components/EmptyStatePms';
 import { usePmsStore, getProjectRowMeta } from '../../../stores/pmsStore';
@@ -11,6 +11,8 @@ import { StageTasksTab } from './components/StageTasksTab';
 import { DocumentsProofTab } from './components/DocumentsProofTab';
 import { ApprovalsTab } from './components/ApprovalsTab';
 import { ActivityAuditTab } from './components/ActivityAuditTab';
+import { ProjectBugsTab } from './components/ProjectBugsTab';
+import { ProjectProfitabilityTab } from './components/ProjectProfitabilityTab';
 import { AssignStageModal } from './components/AssignStageModal';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { StageHandoffModal } from '../components/StageHandoffModal';
@@ -22,19 +24,14 @@ import { useAppStore } from '../../../stores/appStore';
 
 /**
  * ProjectDetailPage (/pms/projects/:id) — the project workspace.
- *
- * Seven tabs over one project. All figures derive from the store, so an edit in
- * the Tasks tab moves the stage bar in Timeline and the hero gauge at once.
- * Messenger is the exception: chat is server-only, read through
- * useProjectMessenger, and its tab badge is the caller's unread count.
- * `?tab=messenger&conversation=<id>` (the link in a chat notification) opens
- * straight into that conversation.
  */
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Info },
   { id: 'timeline', label: 'Stage Timeline', icon: GitBranch },
   { id: 'tasks', label: 'Tasks', icon: ListChecks },
+  { id: 'bugs', label: 'Bugs & Defects', icon: Bug },
+  { id: 'profitability', label: 'Profitability & Costs', icon: DollarSign },
   { id: 'documents', label: 'Design Proofs', icon: FileText },
   { id: 'approvals', label: 'Approvals', icon: ShieldCheck },
   { id: 'activity', label: 'Activity', icon: History },
@@ -242,6 +239,9 @@ export default function ProjectDetailPage() {
             }
           />
         )}
+
+        {tab === 'bugs' && <ProjectBugsTab project={project} />}
+        {tab === 'profitability' && <ProjectProfitabilityTab project={project} />}
 
         {tab === 'documents' && <DocumentsProofTab project={project} />}
         {tab === 'approvals' && <ApprovalsTab project={project} />}

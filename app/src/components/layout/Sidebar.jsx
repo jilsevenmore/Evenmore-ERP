@@ -137,6 +137,8 @@ const NAV = [
       { label: 'My Tasks', icon: ListChecks, to: '/pms/my-tasks', badgeKey: 'pmsMyTasksPending' },
       { label: 'Dynamic Stages', icon: Sliders, to: '/pms/stages' },
       { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
+      { label: 'Task Calendar', icon: Calendar, to: '/pms/calendar' },
+      { label: 'Timesheets', icon: CalendarCheck, to: '/pms/timesheets' },
       { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
       { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
       { label: 'PMS Settings', icon: Settings, to: '/pms/settings' },
@@ -210,6 +212,8 @@ const NAV = [
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
       { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' },
+      { label: 'Demo Units & Trials', icon: PackageCheck, to: '/inventory/demo-units' },
+      { label: 'Rework & Scrap', icon: Wrench, to: '/inventory/rework' },
       // { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' }, // Hidden: Service Usage out of scope
       // { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests', badgeKey: 'zone' }, // Hidden: Zone Requests out of scope
       // { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' }, // Hidden: Valuation & Ageing out of scope
@@ -224,6 +228,7 @@ const NAV = [
     children: [
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
       { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
+      { label: 'Budgets & Burn', icon: Sliders, to: '/accounts/budgets' },
       { label: 'Financial Reports', icon: PieChart, to: '/accounts/reports' },
     ],
   },
@@ -263,7 +268,7 @@ const NAV = [
           { label: 'Offers', to: '/hrms/recruitment/offers' },
           { label: 'Onboarding', to: '/hrms/recruitment/onboarding' },
           // { label: 'Career', to: '/hrms/recruitment/career' }, // Hidden: Career Portal out of scope
-          // { label: 'Custom Questions', to: '/hrms/recruitment/questions' }, // Hidden: Screening Questions out of scope
+          { label: 'Screening Questions', to: '/hrms/recruitment/questions' },
           // { label: 'Funnel', to: '/hrms/recruitment/funnel' }, // Hidden: Recruitment Funnel feature commented out
         ],
       },
@@ -317,6 +322,9 @@ const NAV = [
       { label: 'Users', to: '/administration/users' },
       { label: 'Roles', to: '/administration/roles' },
       { label: 'Clients', to: '/administration/clients' },
+      { label: 'Custom Fields', to: '/administration/custom-fields' },
+      { label: 'Webhooks & Alerts', to: '/settings/webhooks' },
+      { label: 'System Settings', to: '/administration/settings' },
     ],
   },
 ];

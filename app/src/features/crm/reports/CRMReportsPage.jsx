@@ -19,8 +19,9 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import { exportToCSV } from '../../../services/exportUtils';
 import { getLeadStageOrder, DEFAULT_STAGE_ORDER, loadLeadRows } from '../../../services/taskCompletionService';
-import { CRM_EVENT } from '../../../services/leadStageAutomation';
 import { useCrmStore } from '../../../stores/crmStore';
+import { fetchWonRevenueAttribution } from '../../../services/upgradeService';
+
 
 function formatINR(value) {
   const n = Number(value) || 0;
@@ -168,6 +169,7 @@ const TABS = [
   { id: 'pendingTasks', label: 'Pending Tasks', icon: Clock },
   { id: 'overdueTasks', label: 'Overdue Tasks', icon: AlertTriangle },
   { id: 'dealValue', label: 'Deal Value', icon: DollarSign },
+  { id: 'attribution', label: 'Won-Revenue Attribution', icon: TrendingUp },
 ];
 
 const reportsGuide = {
@@ -604,6 +606,98 @@ export default function CRMReportsPage() {
             columns={['Deal', 'Client / Product', 'Stage', 'Employee', 'Price']}
             rows={dealDetailRows}
             empty="No deals available yet."
+          />
+        </div>
+      )}
+
+      {activeTab === 'attribution' && (
+        <div className="space-y-4 text-xs">
+          <div className="flex items-center justify-between bg-card p-4 rounded-xl border border-border">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Closed-Won Revenue Attribution Matrix</h2>
+              <p className="text-xs text-muted">Multi-dimensional attribution grouped by month, sales representative, and lead source.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-muted">Year:</label>
+              <select
+                value={attributionYear}
+                onChange={(e) => setAttributionYear(Number(e.target.value))}
+                className="bg-card border border-border rounded-lg px-2.5 py-1 text-xs text-foreground"
+              >
+                {[2024, 2025, 2026, 2027].map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <CrmKpiCard
+              label="Total Won Deals"
+              value={attribution?.total_won_count ?? '0'}
+              helper="Decided closed-won transactions"
+              tone="positive"
+            />
+            <CrmKpiCard
+              label="Won Revenue"
+              value={formatINR(attribution?.total_won_value ?? 0)}
+              helper="Total closed-won contract value"
+              tone="positive"
+            />
+            <CrmKpiCard
+              label="Top Performing Rep"
+              value={attribution?.by_rep?.[0]?.rep || '—'}
+              helper={attribution?.by_rep?.[0] ? `${formatINR(attribution.by_rep[0].value)} won` : 'No data'}
+              tone="neutral"
+            />
+            <CrmKpiCard
+              label="Top Lead Source"
+              value={attribution?.by_source?.[0]?.source || '—'}
+              helper={attribution?.by_source?.[0] ? `${formatINR(attribution.by_source[0].value)} won` : 'No data'}
+              tone="neutral"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <ReportBlock
+              title="Attribution by Sales Rep"
+              subtitle="Closed-won volume per representative"
+              columns={['Representative', 'Won Deals', 'Revenue Value']}
+              rows={(attribution?.by_rep || []).map((r) => [r.rep, r.count, formatINR(r.value)])}
+              empty="No won deals attributed yet."
+            />
+            <ReportBlock
+              title="Attribution by Lead Source"
+              subtitle="Marketing & inbound channel performance"
+              columns={['Lead Source', 'Won Deals', 'Revenue Value']}
+              rows={(attribution?.by_source || []).map((s) => [s.source, s.count, formatINR(s.value)])}
+              empty="No won deals attributed yet."
+            />
+          </div>
+
+          <ReportBlock
+            title="Monthly Revenue Realization"
+            subtitle="Closed-won revenue by month"
+            columns={['Month', 'Won Deals', 'Total Value']}
+            rows={(attribution?.by_month || []).map((m) => [m.month, m.count, formatINR(m.value)])}
+            empty="No monthly won deals yet."
+          />
+
+          <ReportBlock
+            title="Closed-Won Deals Detail Register"
+            subtitle="Drilldown list of all won deals"
+            actions={
+              <DownloadButton
+                onClick={() =>
+                  exportToCSV(
+                    'CRM_Won_Revenue_Attribution',
+                    ['Deal No', 'Title', 'Customer', 'Representative', 'Source', 'Month', 'Value (Rs)'],
+                    (attribution?.deals || []).map((d) => [d.deal_number, d.title, d.customer_name, d.rep, d.source, d.month, d.value])
+                  )
+                }
+              />
+            }
+            columns={['Deal No', 'Title', 'Customer', 'Representative', 'Source', 'Month', 'Value']}
+            rows={(attribution?.deals || []).map((d) => [d.deal_number, d.title, d.customer_name || '—', d.rep, d.source, d.month, formatINR(d.value)])}
+            empty="No deals available."
           />
         </div>
       )}
