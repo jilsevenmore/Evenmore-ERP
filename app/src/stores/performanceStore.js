@@ -47,24 +47,27 @@ const usePerformanceStoreBase = create((set, get) => ({
       pullTracked("appraisals"),
       pullTracked("indicators"),
       pullTracked("kpis"),
+      pullTracked("goals"),
     ]);
     set((s) => ({
       cycles: rows[0] || s.cycles,
       appraisals: rows[1] || s.appraisals,
       indicators: rows[2] || s.indicators,
       kpis: rows[3] || s.kpis,
+      goals: rows[4] || s.goals,
     }));
     return rows;
   },
 
   /** Empty on sign-out so the next user sees nothing of the previous one. */
-  clear: () => set({ cycles: [], appraisals: [], indicators: [], kpis: [] }),
+  clear: () => set({ cycles: [], appraisals: [], indicators: [], kpis: [], goals: [] }),
 
   cycles: [],
   activeCycleId: null,
   appraisals: [],
   indicators: [],
   kpis: [],
+  goals: [],
 
   // Role Simulation ('HR' | 'Manager' | 'Employee'). Empty names mean
   // "the signed-in user" — screens fall back to the session's own name.
@@ -103,6 +106,7 @@ const usePerformanceStoreBase = create((set, get) => ({
     writeThrough("appraisals", s.appraisals);
     writeThrough("indicators", s.indicators);
     writeThrough("kpis", s.kpis);
+    writeThrough("goals", s.goals);
   },
 
   // ── Cycle Management ──────────────────────────────────────────
@@ -204,6 +208,32 @@ const usePerformanceStoreBase = create((set, get) => ({
 
   deleteKpi: (id) => {
     set((s) => ({ kpis: s.kpis.filter((k) => k.id !== id) }));
+    get().persist();
+  },
+
+  // ── Goals Management ──────────────────────────────────────────
+  addGoal: (goal) => {
+    const id = goal.id || `GOAL-${get().goals.length + 101}`;
+    const created = {
+      ...goal,
+      id,
+      progress: Number(goal.progress) || 0,
+      status: goal.status || "In Progress",
+    };
+    set((s) => ({ goals: [created, ...s.goals] }));
+    get().persist();
+    return created;
+  },
+
+  updateGoal: (id, patch) => {
+    set((s) => ({
+      goals: s.goals.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+    }));
+    get().persist();
+  },
+
+  deleteGoal: (id) => {
+    set((s) => ({ goals: s.goals.filter((g) => g.id !== id) }));
     get().persist();
   },
 

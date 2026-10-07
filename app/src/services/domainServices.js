@@ -120,9 +120,11 @@ export const hrmsService = {
   getPayroll: (query) => api.get('/hrms/payroll/', { query }),
   getCandidates: (query) => api.get('/hrms/candidates/', { query }),
   // Attendance & regularization
+  getAttendance: (query) => api.get('/hrms/attendance/', { query }),
+  getRegularizations: (query) => api.get('/hrms/attendance/regularizations/', { query }),
   markAttendance: (data) => api.post('/hrms/attendance/', data),
   bulkMarkAttendance: (data) => api.post('/hrms/attendance/bulk/', data),
-  requestRegularization: (data) => api.post('/hrms/attendance/regularize/', data),
+  requestRegularization: (data) => api.post('/hrms/attendance/regularizations/', data),
   approveRegularization: (id, approved) => api.patch(`/hrms/attendance/regularizations/${id}/`, { approved }),
   // Leave & payroll
   requestLeave: (data) => api.post('/hrms/leave/', data),
@@ -135,6 +137,10 @@ export const hrmsService = {
   createOffer: (data) => api.post('/hrms/offers/', data),
   // Performance / training / org
   getKpis: (query) => api.get('/hrms/performance/kpis/', { query }),
+  getAppraisals: (query) => api.get('/hrms/performance/appraisals/', { query }),
+  getCycles: (query) => api.get('/hrms/performance/cycles/', { query }),
+  getIndicators: (query) => api.get('/hrms/performance/indicators/', { query }),
+  getGoals: (query) => api.get('/hrms/performance/goals/', { query }),
   createAppraisal: (data) => api.post('/hrms/performance/appraisals/', data),
   trackGoal: (id, data) => api.patch(`/hrms/performance/goals/${id}/`, data),
   getTrainings: (query) => api.get('/hrms/trainings/', { query }),
@@ -145,7 +151,6 @@ export const hrmsService = {
   getOffers: (query) => api.get('/hrms/offers/', { query }),
   getApplications: (query) => api.get('/hrms/applications/', { query }),
   getOnboarding: (query) => api.get('/hrms/onboarding/', { query }),
-  getTrainings: (query) => api.get('/hrms/trainings/', { query }),
 };
 
 // ── Inventory ────────────────────────────────────────────────────────────
