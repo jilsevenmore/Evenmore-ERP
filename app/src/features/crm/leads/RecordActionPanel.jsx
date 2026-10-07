@@ -1,6 +1,6 @@
-import { Trash2, X } from "lucide-react";
+import { Trash2, UserCheck, X } from "lucide-react";
 
-export default function RecordActionPanel({ lead, leads = [], onClose, onDelete }) {
+export default function RecordActionPanel({ lead, leads = [], onClose, onDelete, onBulkAssign }) {
   const selectedLeads = leads.length > 0 ? leads : lead ? [lead] : [];
   const isBulk = selectedLeads.length > 1;
   const activeLead = lead ?? selectedLeads[0] ?? null;
@@ -16,10 +16,22 @@ export default function RecordActionPanel({ lead, leads = [], onClose, onDelete 
 
   return (
     <div className="record-action-panel" role="toolbar" aria-label="Record actions">
-      <div className="record-action-buttons">
+      <div className="record-action-buttons flex items-center gap-2">
+        <span className="text-xs font-bold text-slate-700 px-2 py-1 rounded bg-slate-100">
+          {selectedLeads.length} selected
+        </span>
+        <button
+          type="button"
+          className="record-action-button text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5 transition-colors"
+          onClick={() => onBulkAssign?.(selectedLeads)}
+          aria-label="Bulk assign owner"
+        >
+          <UserCheck size={15} />
+          <span>Assign Owner</span>
+        </button>
         <button type="button" className="record-action-button delete" onClick={handleDelete} aria-label="Delete record">
           <Trash2 size={17} />
-          <span>{isBulk ? "Delete Records" : "Delete"}</span>
+          <span>{isBulk ? "Delete" : "Delete"}</span>
         </button>
         <button type="button" className="record-action-close" onClick={onClose} aria-label="Close record actions">
           <X size={17} />

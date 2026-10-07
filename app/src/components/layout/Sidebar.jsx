@@ -56,6 +56,7 @@ import {
   LogOut,
   Lock,
   KeyRound,
+  ExternalLink,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
@@ -174,6 +175,7 @@ const NAV = [
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
       { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },
       { label: 'Expenses', icon: Landmark, to: '/purchase/expenses' },
+      { label: 'Supplier Portal', icon: ExternalLink, to: '/vendor/portal' },
     ],
   },
 
@@ -212,6 +214,7 @@ const NAV = [
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
       { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' },
+      // { label: 'Quality Control (QC)', icon: ShieldCheck, to: '/inventory/quality-control' }, // Hidden: QC out of scope
       { label: 'Demo Units & Trials', icon: PackageCheck, to: '/inventory/demo-units' },
       { label: 'Rework & Scrap', icon: Wrench, to: '/inventory/rework' },
       // { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' }, // Hidden: Service Usage out of scope
@@ -291,6 +294,7 @@ const NAV = [
       { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
+      { label: 'Meetings & Rooms', icon: Calendar, to: '/hrms/meetings' },
       { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
       // { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' }, // Hidden: HRMS Setup commented out
     ],

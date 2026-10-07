@@ -81,14 +81,14 @@ export async function reconcileVendorAdvance(advanceId, purchaseBillId, amount) 
 }
 
 export async function createShortSupplyDebitNote(billId, { noteReason, shortfallAmount, shortfallItems }) {
-  return apiClient('/purchase/goods-receipts/create-short-supply-debit-note/', {
+  return apiClient('/purchase/receipts/create-short-supply-debit-note/', {
     method: 'POST',
     data: { billId, noteReason, shortfallAmount, shortfallItems },
   });
 }
 
 export async function fetchVendorWeightVariations() {
-  return apiClient('/purchase/goods-receipts/vendor-weight-variations/');
+  return apiClient('/purchase/receipts/vendor-weight-variations/');
 }
 
 export async function fetchDemoUnits(params = {}) {
@@ -376,4 +376,112 @@ export async function sendOmnichannelNotification(data) {
     data,
   });
 }
+
+// ── 7. Targeted Services Implementation Scope ─────────────────────────────
+// §2.1 CRM Bulk Lead Assignment
+export async function bulkAssignLeads(data) {
+  return apiClient('/crm/leads/bulk-assign/', {
+    method: 'POST',
+    data,
+  });
+}
+
+// §2.2 Quality Control (QC) Inspection Desk (Hidden: QC out of scope)
+// export async function fetchQualityInspections(params = {}) {
+//   return apiClient('/inventory/quality-inspections/', { query: params });
+// }
+// export async function createQualityInspection(data) {
+//   return apiClient('/inventory/quality-inspections/', {
+//     method: 'POST',
+//     data,
+//   });
+// }
+// export async function completeQualityInspection(id, data) {
+//   return apiClient(`/inventory/quality-inspections/${id}/complete-inspection/`, {
+//     method: 'POST',
+//     data,
+//   });
+// }
+
+// §2.5 Universal Meetings & Conference Room Booking
+export async function fetchMeetingRooms(params = {}) {
+  return apiClient('/hrms/meeting-rooms/', { query: params });
+}
+
+export async function createMeetingRoom(data) {
+  return apiClient('/hrms/meeting-rooms/', {
+    method: 'POST',
+    data,
+  });
+}
+
+export async function fetchCompanyMeetings(params = {}) {
+  return apiClient('/hrms/meetings/', { query: params });
+}
+
+export async function createCompanyMeeting(data) {
+  return apiClient('/hrms/meetings/', {
+    method: 'POST',
+    data,
+  });
+}
+
+export async function updateCompanyMeeting(id, data) {
+  return apiClient(`/hrms/meetings/${id}/`, {
+    method: 'PUT',
+    data,
+  });
+}
+
+export async function saveMeetingMinutes(id, data) {
+  return apiClient(`/hrms/meetings/${id}/mom/`, {
+    method: 'POST',
+    data,
+  });
+}
+
+// §2.8 Vendor Self-Service Portal
+export async function vendorPortalLogin(email) {
+  return apiClient('/purchase/vendor-portal/auth/login/', {
+    method: 'POST',
+    data: { email },
+  });
+}
+
+export async function fetchVendorOrders(token) {
+  const headers = token ? { 'X-Vendor-Token': token } : {};
+  return apiClient('/purchase/vendor-portal/orders/', { headers });
+}
+
+export async function acknowledgeVendorOrder(orderId, token) {
+  const headers = token ? { 'X-Vendor-Token': token } : {};
+  return apiClient(`/purchase/vendor-portal/orders/${orderId}/acknowledge/`, {
+    method: 'POST',
+    headers,
+  });
+}
+
+export async function submitVendorMilestone(orderId, data, token) {
+  const headers = token ? { 'X-Vendor-Token': token } : {};
+  return apiClient(`/purchase/vendor-portal/orders/${orderId}/milestones/`, {
+    method: 'POST',
+    data,
+    headers,
+  });
+}
+
+export async function submitVendorASN(data, token) {
+  const headers = token ? { 'X-Vendor-Token': token } : {};
+  return apiClient('/purchase/vendor-portal/asn/create/', {
+    method: 'POST',
+    data,
+    headers,
+  });
+}
+
+export async function fetchVendorLedger(token) {
+  const headers = token ? { 'X-Vendor-Token': token } : {};
+  return apiClient('/purchase/vendor-portal/ledger/', { headers });
+}
+
 

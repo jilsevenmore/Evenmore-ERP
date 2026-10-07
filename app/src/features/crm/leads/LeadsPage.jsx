@@ -12,6 +12,7 @@ import NotesDrawer from './NotesDrawer';
 import CreateLeadModal from './CreateLeadModal';
 import DeleteLeadModal from './DeleteLeadModal';
 import LeadGuideModal from './LeadGuideModal';
+import BulkAssignModal from './components/BulkAssignModal';
 import InfoBanner from '../common/InfoBanner';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAppStore } from '../../../stores/appStore';
@@ -148,6 +149,8 @@ export default function LeadsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isCreateLeadOpen, setIsCreateLeadOpen] = useState(false);
+  const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
+  const refresh = useCrmStore((s) => s.refresh);
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -567,6 +570,7 @@ export default function LeadsPage() {
         onCloseRecordAction={clearSelected}
         onDeleteRecord={requestDeleteSelection}
         onPrint={() => setIsPrintOpen(true)}
+        onBulkAssign={() => setIsBulkAssignOpen(true)}
       />
 
       {isPrintOpen && (
@@ -713,6 +717,15 @@ export default function LeadsPage() {
         }}
       />
       <LeadGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
+      <BulkAssignModal
+        isOpen={isBulkAssignOpen}
+        onClose={() => setIsBulkAssignOpen(false)}
+        selectedLeads={selectedLeads}
+        onSuccess={async () => {
+          clearSelected();
+          await refresh?.('leads');
+        }}
+      />
     </>
   );
 }

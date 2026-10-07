@@ -134,6 +134,10 @@ const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage
 const MonthEndAuditPage = lazy(() => import('../features/inventory/MonthEndAuditPage').then(m => ({ default: m.MonthEndAuditPage })));
 const DemoUnitsPage = lazy(() => import('../features/inventory/DemoUnitsPage'));
 const ReworkDashboard = lazy(() => import('../features/inventory/ReworkDashboard'));
+// const QualityControlPage = lazy(() => import('../features/inventory/QualityControlPage')); // Hidden: QC out of scope
+const MeetingsPage = lazy(() => import('../features/hrms/meetings/MeetingsPage'));
+const VendorLoginPage = lazy(() => import('../features/vendor/VendorLoginPage'));
+const VendorPortalDashboard = lazy(() => import('../features/vendor/VendorPortalDashboard'));
 
 // ── ERP — Parties (Lazy Loaded) ───────────────────────────────
 const PartiesPage = lazy(() => import('../features/parties/PartiesPage'));
@@ -246,6 +250,17 @@ const router = createBrowserRouter([
     element: <Page component={SalesCustomerApprovalPage} />,
     errorElement: <RootErrorBoundary />,
   },
+  // ── Vendor Self-Service Portal (Unauthenticated / Dedicated Token Auth) ─
+  {
+    path: '/vendor/login',
+    element: <Page component={VendorLoginPage} />,
+    errorElement: <RootErrorBoundary />,
+  },
+  {
+    path: '/vendor/portal',
+    element: <Page component={VendorPortalDashboard} />,
+    errorElement: <RootErrorBoundary />,
+  },
   // ── Protected Application Shell (Guarded by RequireAuth) ─
   {
     element: <RequireAuth />,
@@ -331,6 +346,7 @@ const router = createBrowserRouter([
       { path: 'purchase/returns', element: <Page component={PurchaseReturnsPage} /> },
       { path: 'purchase/payments', element: <Page component={PaymentOutPage} /> },
       { path: 'purchase/expenses', element: <Page component={ExpensesPage} /> },
+      { path: 'purchase/vendor-portal', element: <Page component={VendorPortalDashboard} /> },
 
       // ── Parties Directory ──────────────────────────────────
       { path: 'parties', element: <Page component={PartiesPage} /> },
@@ -358,6 +374,8 @@ const router = createBrowserRouter([
       { path: 'inventory/audit', element: <Page component={MonthEndAuditPage} /> },
       { path: 'inventory/demo-units', element: <Page component={DemoUnitsPage} /> },
       { path: 'inventory/rework', element: <Page component={ReworkDashboard} /> },
+      // { path: 'inventory/quality-control', element: <Page component={QualityControlPage} /> }, // Hidden: QC out of scope
+      // { path: 'inventory/qc', element: <Navigate to="/inventory/quality-control" replace /> }, // Hidden: QC out of scope
 
       // ── Legacy Root Aliases ───────────────────────────────
       // [PHASE-4] NAV-AUDITED DEAD ALIASES — no sidebar/navigate() links point at these
@@ -420,6 +438,7 @@ const router = createBrowserRouter([
       { path: 'hrms/training/training-funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
       { path: 'hrms/training/trainers', element: <Page component={() => <TrainingDashboard initialTab="trainers" />} /> },
       { path: 'hrms/training/funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
+      { path: 'hrms/meetings', element: <Page component={MeetingsPage} /> },
       // Moved to the Organization section; old links still land there.
       { path: 'hrms/org-chart', element: <Navigate to="/organization/org-chart" replace /> },
       { path: 'hrms/departments', element: <Navigate to="/organization/departments" replace /> },
