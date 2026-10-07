@@ -2,6 +2,12 @@ import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, Truck, ShieldCheck, FileText, MapPin } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { addressLines, companyInitial, joinNonEmpty } from './printLetterhead';
+import { LetterpadBrand, LetterpadFooter } from './SalesLetterpad';
+import { lineSpecText, lineTotalWeight, formatKg } from '../../utils/salesLineMetal';
+
+// Letterpad (documents/sewen letter pad.pdf). The previous letterhead block is
+// kept below, switched off -- flip this to restore it.
+const USE_LEGACY_LETTERHEAD = false;
 
 export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
     const { companyProfile, resolvePartyAddresses } = useERP();
@@ -65,6 +71,7 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                 <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
                     {/* Header / Letterhead */}
                     <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
+                        {USE_LEGACY_LETTERHEAD ? (
                         <div className="space-y-1">
                             <div className="flex items-center gap-2.5">
                                 {companyShort && (
@@ -83,6 +90,7 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                 {taxLine && <p>{taxLine}</p>}
                             </div>
                         </div>
+                        ) : <LetterpadBrand company={companyProfile} contactLabel="Dispatch" />}
 
                         {/* Challan Meta Block */}
                         <div className="text-right space-y-1">
@@ -158,6 +166,40 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                         </div>
                     </div>
 
+                    {/* Weighbridge (sheet-metal dispatch is by weight): gross − tare = net, vs theoretical. */}
+                    {(challan.weighbridgeSlip || Number(challan.grossWeight) > 0 || Number(challan.netWeight) > 0) && (() => {
+                        const gross = Number(challan.grossWeight) || 0;
+                        const tare = Number(challan.tareWeight) || 0;
+                        const net = Number(challan.netWeight) || (gross && tare ? gross - tare : 0);
+                        const theoretical = items.reduce((acc, it) => acc + lineTotalWeight(it), 0);
+                        const variation = net > 0 && theoretical > 0 ? ((net - theoretical) / theoretical) * 100 : null;
+                        return (
+                            <div className="grid grid-cols-5 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px]">
+                                <div>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Weighbridge Slip #</span>
+                                    <strong className="font-mono text-slate-900">{challan.weighbridgeSlip || '—'}</strong>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Gross</span>
+                                    <strong className="font-mono text-slate-900">{gross ? formatKg(gross) : '—'}</strong>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Tare</span>
+                                    <strong className="font-mono text-slate-900">{tare ? formatKg(tare) : '—'}</strong>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Net Weight</span>
+                                    <strong className="font-mono text-slate-900">{net ? formatKg(net) : '—'}</strong>
+                                </div>
+                                <div>
+                                    <span className="text-[10px] font-bold uppercase text-slate-400 block">Theoretical</span>
+                                    <strong className="font-mono text-slate-900">{theoretical ? formatKg(theoretical) : '—'}</strong>
+                                    {variation !== null && <span className="block text-[10px] text-slate-500">{variation > 0 ? '+' : ''}{variation.toFixed(2)}% variation</span>}
+                                </div>
+                            </div>
+                        );
+                    })()}
+
                     {/* Itemized Commercial Table */}
                     <div className="space-y-2">
                         <table className="w-full text-left border-collapse text-xs">
@@ -187,12 +229,15 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                                                     {it.itemSku && (
                                                         <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku}</p>
                                                     )}
+                                                    {lineSpecText(it) && <p className="text-[10px] text-slate-500">{lineSpecText(it)}</p>}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center font-mono text-slate-600">
                                                     {it.serialNumber || '—'}
                                                 </td>
+                                                {/* Replaced: {qty} {it.unit || 'Units'} -- the server's field is `uom`. */}
                                                 <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900">
-                                                    {qty} {it.unit || 'Units'}
+                                                    {qty} {it.uom || it.unit || 'Units'}
+                                                    {Number(it.unitWeight) > 0 && <span className="block text-[10px] font-normal text-slate-500">{formatKg(lineTotalWeight({ ...it, qty }))}</span>}
                                                 </td>
                                                 <td className="py-2.5 px-3 text-center text-slate-600">
                                                     {it.packaging || '—'}
@@ -213,6 +258,11 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                         <div className="text-slate-600">
                             Total Physical Units Dispatched: <strong className="text-slate-900 font-mono font-bold">{totalUnits} units</strong>
                         </div>
+                        {items.some((it) => Number(it.unitWeight) > 0) && (
+                            <div className="text-slate-600">
+                                Total Weight: <strong className="text-slate-900 font-mono font-bold">{formatKg(items.reduce((acc, it) => acc + lineTotalWeight({ ...it, qty: it.qty || it.dispatchedQty || it.quantity || 1 }), 0))}</strong>
+                            </div>
+                        )}
                     </div>
 
                     {/* Dual Signatures & POD (Proof of Delivery) */}
@@ -242,6 +292,7 @@ export const PrintDeliveryChallanModal = ({ isOpen, onClose, challan }) => {
                     <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">
                         Official Goods In-Transit Waybill & Delivery Challan. Non-sale transport document under commercial transit laws.
                     </div>
+                    <LetterpadFooter company={companyProfile} />
                 </div>
                 </div>
 

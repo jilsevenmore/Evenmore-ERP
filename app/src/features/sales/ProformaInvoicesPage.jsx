@@ -37,6 +37,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
 import { PrintProformaInvoiceModal } from '../../components/common/PrintProformaInvoiceModal';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 
@@ -824,6 +825,7 @@ export const ProformaInvoicesPage = () => {
 
             {/* Modal Form Body */}
             <form onSubmit={(e) => { e.preventDefault(); handleSave('Sent'); }} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              <FormSection number="01" title="Customer & proforma details" />
               {/* Header Details Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {/* Customer Account */}
@@ -930,11 +932,13 @@ export const ProformaInvoicesPage = () => {
                   <label className="font-semibold text-slate-800 block text-xs">
                     Product Line Items & Machine Components
                   </label>
+                  {/* Hidden: Warranty Cards out of scope (Sweven spec).
                   <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded flex items-center gap-1 font-semibold">
                     <ShieldAlert size={12} /> Warranty Activation: Pending Final Invoice
-                  </span>
+                  </span> */}
                 </div>
-                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" />
+                {/* Metal-industry sales lines: custom / fabrication rows, unit, material, spec, weight (was: no allowCustomLines). */}
+                <LineItemEditor allowCustomLines items={lineItems} onChange={setLineItems} type="sales" />
               </div>
 
               {/* Proposed Payment Information & Totals Split */}
@@ -1340,6 +1344,7 @@ export const ProformaInvoicesPage = () => {
                 </div>
               </div>
 
+              <FormSection number="03" title="Notes & commercial terms" />
               {/* Notes & Commercial Terms */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div>

@@ -11,6 +11,7 @@ import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
+import { FormSection } from '../../components/common/FormSection';
 import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderModal';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 import { usePmsStore } from '../../stores/pmsStore';
@@ -646,6 +647,7 @@ export const SalesOrdersPage = () => {
               </div>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              <FormSection number="01" title="Customer & delivery" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
@@ -690,9 +692,11 @@ export const SalesOrdersPage = () => {
                   </div>
                 </div>)}
 
+              <FormSection number="02" title="Sheet, plate, sections & fabrication" hint="Weight is worked out from size and pieces; bill each line by kg or by piece." />
               <div>
                 <label className="font-semibold text-slate-700 block mb-2">Order Line Items & Inventory Allocation</label>
-                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" onRequestPO={(item, deficitQty) => {
+                {/* Metal-industry sales lines: custom / fabrication rows, unit, material, spec, weight (was: no allowCustomLines). */}
+                <LineItemEditor allowCustomLines items={lineItems} onChange={setLineItems} type="sales" onRequestPO={(item, deficitQty) => {
                 setAutoPOState({
                     isOpen: true,
                     item,

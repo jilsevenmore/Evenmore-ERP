@@ -8,10 +8,13 @@ import {
   activateUser,
   deactivateUser,
   setUserPermissions,
+  pullUserPermissions,
   pullPermissionCatalogue,
   describeError,
 } from '../../services/adminSync';
 import { hrmsSync } from '../../services/hrmsSync';
+import { useAppStore } from '../../stores/appStore';
+import { PermissionPicker, permissionLabels } from './PermissionPicker';
 import {
   Users,
   UserCheck,
@@ -47,6 +50,17 @@ import {
 const USERS_PER_PAGE = 16;
 
 /**
+ * A random temporary password from the browser's CSPRNG. A guessable pattern
+ * ("Password@" + 3 digits) is a few hundred tries from an account takeover.
+ */
+function generateTempPassword(length = 16) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%&*!';
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (n) => alphabet[n % alphabet.length]).join('');
+}
+
+/**
  * Case-insensitive contains, safe on a field the server left unset — a user can
  * exist before they have been given a role, a department or an employee number.
  */
@@ -75,6 +89,77 @@ function getRoleBadgeStyle(role) {
   let hash = 0;
   for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) | 0;
   return ROLE_BADGE_STYLES[Math.abs(hash) % ROLE_BADGE_STYLES.length];
+}
+
+/**
+ * The person's initials in a coloured circle. Users carry no photo here, so
+ * there is never a broken image or a call to an outside avatar service.
+ */
+function UserInitials({ name, className = 'w-12 h-12 text-sm' }) {
+  const initials = String(name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join('')
+    .toUpperCase();
+  return (
+    <div
+      aria-hidden="true"
+      className={`${className} rounded-full flex items-center justify-center font-bold ring-2 ring-slate-100 shadow-xs flex-shrink-0 border ${getRoleBadgeStyle(name)}`}
+    >
+      {initials || <User size={18} />}
+    </div>
+  );
+}
+
+/** Roles from `/admin/roles/`; the value is the role id the API writes. */
+function RoleSelect({ value, onChange, roles, currentName }) {
+  const known = roles.some((r) => String(r.id) === String(value));
+  return (
+    <div>
+      <label className="block font-semibold text-slate-700 mb-1">Role *</label>
+      <select
+        required={roles.length > 0}
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">{roles.length ? 'Select a role' : 'No roles available'}</option>
+        {value && !known && <option value={value}>{currentName || 'Current role'}</option>}
+        {roles.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/** Departments from `/hrms/departments/` (Organization), by name. */
+function DepartmentSelect({ value, onChange, departments }) {
+  const names = departments.map((d) => d.name).filter(Boolean);
+  const known = names.some((n) => n.toLowerCase() === String(value || '').toLowerCase());
+  return (
+    <div>
+      <label className="block font-semibold text-slate-700 mb-1">Department</label>
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+        <option value="">No department</option>
+        {value && !known && <option value={value}>{value}</option>}
+        {names.map((n) => (
+          <option key={n} value={n}>
+            {n}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 }
 
 /**
@@ -121,6 +206,27 @@ export function UsersPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Roles and departments for the user form and the filters -- both from the
+  // server, so a role or department added there appears here as-is.
+  const [roles, setRoles] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    adminSync.pull('roles').then((rows) => {
+      if (!cancelled && rows) setRoles(rows);
+    });
+    hrmsSync.pull('departments').then((rows) => {
+      if (!cancelled && rows) setDepartments(rows.filter((d) => !d.status || d.status === 'Active'));
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Only `manage_roles` may change per-user permissions; the server enforces
+  // it, the screen just doesn't offer an editor that can only fail.
+  const grantedPermissions = useAppStore((s) => s.permissions) || [];
+  const canManageRoles = grantedPermissions.includes('manage_roles');
+  const permissionLabelMap = useMemo(() => permissionLabels(permissionModules), [permissionModules]);
+
   // HRMS employees, for the "Linked HRMS Employee" picker.
   const [hrEmployees, setHrEmployees] = useState([]);
   const reloadHrEmployees = () => hrmsSync.pull('employees').then((rows) => {
@@ -165,17 +271,21 @@ export function UsersPage() {
     name: '',
     email: '',
     phone: '',
-    role: 'Tele Caller Executive',
-    department: 'Sales',
+    roleId: '',
+    department: '',
     status: 'Active',
     employeeLink: '',
     location: '',
     reportingManager: '',
-    permissions: ['View Leads', 'Create Tasks', 'Manage Deals'],
+    permissions: [],
   });
+  // The role's own permissions, so the modal can save the difference.
+  const [rolePermissions, setRolePermissions] = useState([]);
+  const [permissionsLoading, setPermissionsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Password Reset State ─────────────────────────────────────
-  const [newPassword, setNewPassword] = useState('Evenmore@2026!');
+  const [newPassword, setNewPassword] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   // ── Notification toast ───────────────────────────────────────
@@ -192,14 +302,16 @@ export function UsersPage() {
 
   // ── Dynamic Roles & Departments list for Dropdowns ───────────
   const uniqueRoles = useMemo(() => {
-    const set = new Set(users.map((u) => u.role));
+    const set = new Set([...roles.map((r) => r.name), ...users.map((u) => u.role)].filter(Boolean));
     return ['All Roles', ...Array.from(set)];
-  }, [users]);
+  }, [roles, users]);
 
   const uniqueDepartments = useMemo(() => {
-    const set = new Set(users.map((u) => u.department).filter(Boolean));
+    const set = new Set(
+      [...departments.map((d) => d.name), ...users.map((u) => u.department)].filter(Boolean)
+    );
     return ['All Departments', ...Array.from(set)];
-  }, [users]);
+  }, [departments, users]);
 
   // ── Filtering Logic ──────────────────────────────────────────
   const filteredUsers = useMemo(() => {
@@ -264,23 +376,24 @@ export function UsersPage() {
       name: '',
       email: '',
       phone: '+91 ',
-      role: 'Sales support execut.',
-      department: 'Sales',
+      roleId: '',
+      department: '',
       status: 'Active',
       employeeLink: 'new',
       location: '',
       reportingManager: '',
       password: '',
-      permissions: ['View Leads', 'Manage Deals', 'Create Tasks', 'View Reports'],
+      permissions: [],
     });
     setIsCreateModalOpen(true);
   };
 
   const handleCreateSubmit = async (e) => {
     e.preventDefault();
-    if (!userForm.name || !userForm.email) return;
+    if (!userForm.name || !userForm.email || isSubmitting) return;
 
     let newUser;
+    setIsSubmitting(true);
     try {
       newUser = await adminSync.create('users', {
         name: userForm.name,
@@ -294,11 +407,14 @@ export function UsersPage() {
         createEmployee: userForm.employeeLink === 'new',
         location: userForm.location,
         reportingManager: userForm.reportingManager,
-        password: userForm.password || 'Password@123',
+        // Empty = no password; the server emails an activation link instead.
+        password: userForm.password || undefined,
       });
     } catch (err) {
       showNotification(`User not created — ${describeError(err)}`);
       return;
+    } finally {
+      setIsSubmitting(false);
     }
     if (!newUser) return;
 
@@ -317,7 +433,7 @@ export function UsersPage() {
       name: target.name,
       email: target.email,
       phone: target.phone,
-      role: target.role,
+      roleId: target.roleId || '',
       department: target.department,
       status: target.status,
       employeeLink: target.employeeRecordId || '',
@@ -328,9 +444,9 @@ export function UsersPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
-    if (!userToModify) return;
+    if (!userToModify || isSubmitting) return;
 
     const updates = {
       name: userForm.name,
@@ -342,30 +458,35 @@ export function UsersPage() {
       location: userForm.location,
       reportingManager: userForm.reportingManager,
     };
-    setUsers((prev) => prev.map((u) => (u.id === userToModify.id ? { ...u, ...updates } : u)));
-    // The server answers with the linked employee's code and name, and may
-    // take HR's values on a fresh link, so its row replaces the optimistic one.
-    adminSync.update('users', userToModify.id, { ...updates, employeeId: userForm.employeeLink })
-      .then((saved) => {
-        if (saved) setUsers((prev) => prev.map((u) => (u.id === saved.id ? saved : u)));
-        reloadHrEmployees();
-      })
-      .catch((err) => showNotification(`Change not saved — ${describeError(err)}`));
-    setIsEditModalOpen(false);
-    showNotification(`User details updated for "${userForm.name}"!`);
+    // The server answers with the role name, the linked employee's code and
+    // name, and may take HR's values on a fresh link -- its row is what we show.
+    setIsSubmitting(true);
+    try {
+      const saved = await adminSync.update('users', userToModify.id, { ...updates, employeeId: userForm.employeeLink });
+      if (saved) setUsers((prev) => prev.map((u) => (u.id === saved.id ? saved : u)));
+      reloadHrEmployees();
+      setIsEditModalOpen(false);
+      showNotification(`User details updated for "${saved?.name || userForm.name}"!`);
+    } catch (err) {
+      showNotification(`Change not saved — ${describeError(err)}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleToggleStatus = (user) => {
     const target = user || activeUser;
     if (!target) return;
     const newStatus = target.status === 'Active' ? 'Inactive' : 'Active';
-    setUsers((prev) =>
-      prev.map((u) => (u.id === target.id ? { ...u, status: newStatus } : u))
-    );
     // Activation is its own endpoint: it also ends the user's open sessions.
     (newStatus === 'Active' ? activateUser(target.id) : deactivateUser(target.id))
+      .then((saved) => {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === target.id ? (saved?.id ? saved : { ...u, status: newStatus }) : u))
+        );
+        showNotification(`User "${target.name}" is now marked as ${newStatus}.`);
+      })
       .catch((err) => showNotification(`Status not saved — ${describeError(err)}`));
-    showNotification(`User "${target.name}" is now marked as ${newStatus}.`);
   };
 
   const openDeleteModal = (user) => {
@@ -375,12 +496,16 @@ export function UsersPage() {
     setIsDeleteModalOpen(true);
   };
 
-  const confirmDeleteUser = () => {
+  const confirmDeleteUser = async () => {
     if (!userToModify) return;
-    setUsers((prev) => prev.filter((u) => u.id !== userToModify.id));
-    adminSync.remove('users', userToModify.id)
-      .catch((err) => showNotification(`User not deleted — ${describeError(err)}`));
     setIsDeleteModalOpen(false);
+    try {
+      await adminSync.remove('users', userToModify.id);
+    } catch (err) {
+      showNotification(`User not deleted — ${describeError(err)}`);
+      return;
+    }
+    setUsers((prev) => prev.filter((u) => u.id !== userToModify.id));
     if (selectedUserId === userToModify.id) {
       const remaining = users.filter((u) => u.id !== userToModify.id);
       if (remaining.length > 0) setSelectedUserId(remaining[0].id);
@@ -392,7 +517,7 @@ export function UsersPage() {
     const target = user || activeUser;
     if (!target) return;
     setUserToModify(target);
-    setNewPassword('Evenmore@2026!');
+    setNewPassword('');
     setPasswordSuccess(false);
     setIsResetPasswordModalOpen(true);
   };
@@ -418,31 +543,37 @@ export function UsersPage() {
     if (!target) return;
     setUserToModify(target);
     setUserForm((prev) => ({ ...prev, permissions: target.permissions || [] }));
+    setRolePermissions([]);
     setIsPermissionsModalOpen(true);
+    if (!canManageRoles) return;
+    // Start from what the server holds: the role's set plus this user's overrides.
+    setPermissionsLoading(true);
+    pullUserPermissions(target.id)
+      .then((body) => {
+        if (!body) return;
+        setRolePermissions(body.role || []);
+        setUserForm((prev) => ({ ...prev, permissions: body.effective || [] }));
+      })
+      .catch((err) => showNotification(`Permissions not loaded — ${describeError(err)}`))
+      .finally(() => setPermissionsLoading(false));
   };
 
-  const togglePermissionItem = (permLabel) => {
-    setUserForm((prev) => {
-      const current = prev.permissions || [];
-      if (current.includes(permLabel)) {
-        return { ...prev, permissions: current.filter((p) => p !== permLabel) };
-      } else {
-        return { ...prev, permissions: [...current, permLabel] };
-      }
-    });
-  };
-
-  const handleSavePermissions = () => {
-    if (!userToModify) return;
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === userToModify.id ? { ...u, permissions: userForm.permissions } : u
-      )
-    );
-    setUserPermissions(userToModify.id, userForm.permissions)
-      .catch((err) => showNotification(`Permissions not saved — ${describeError(err)}`));
-    setIsPermissionsModalOpen(false);
-    showNotification(`Permissions updated for "${userToModify.name}".`);
+  const handleSavePermissions = async () => {
+    if (!userToModify || !canManageRoles || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const body = await setUserPermissions(userToModify.id, userForm.permissions, rolePermissions);
+      const effective = body?.effective || userForm.permissions;
+      setUsers((prev) =>
+        prev.map((u) => (u.id === userToModify.id ? { ...u, permissions: effective } : u))
+      );
+      setIsPermissionsModalOpen(false);
+      showNotification(`Permissions saved for "${userToModify.name}" (${effective.length} effective).`);
+    } catch (err) {
+      showNotification(`Permissions not saved — ${describeError(err)}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -737,14 +868,7 @@ export function UsersPage() {
 
             {/* Profile Hero */}
             <div className="flex items-center gap-3.5">
-              <img
-                src={activeUser.avatar}
-                alt={activeUser.name}
-                className="w-14 h-14 rounded-full object-cover ring-2 ring-slate-100 flex-shrink-0 shadow-xs"
-                onError={(e) => {
-                  e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(activeUser.name)}&background=1f6bff&color=fff`;
-                }}
-              />
+              <UserInitials name={activeUser.name} className="w-14 h-14 text-base" />
               <div className="min-w-0">
                 <h3 className="font-bold text-slate-900 text-base leading-tight truncate">
                   {activeUser.name}
@@ -829,7 +953,7 @@ export function UsersPage() {
                     className="inline-flex items-center gap-1.5 bg-blue-50/80 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-lg text-[11px] font-medium"
                   >
                     <ShieldCheck size={12} className="text-blue-600" />
-                    {p}
+                    {permissionLabelMap[p] || p}
                   </span>
                 ))}
                 {(activeUser.permissions || []).length > 4 && (
@@ -976,43 +1100,18 @@ export function UsersPage() {
                   allowNew
                 />
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Role</label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Accountant">Accountant</option>
-                    <option value="Tele Caller Executive">Tele Caller Executive</option>
-                    <option value="Tele sales coordinator">Tele sales coordinator</option>
-                    <option value="Relation ship manager">Relation ship manager</option>
-                    <option value="Sales support execut.">Sales support execut.</option>
-                    <option value="Area sales manager">Area sales manager</option>
-                    <option value="HR Manager">HR Manager</option>
-                    <option value="Driver">Driver</option>
-                    <option value="CIW">CIW</option>
-                    <option value="DIC">DIC</option>
-                    <option value="Employee">Employee</option>
-                    <option value="Super Administrator">Super Administrator</option>
-                  </select>
-                </div>
+                <RoleSelect
+                  value={userForm.roleId}
+                  onChange={(roleId) => setUserForm({ ...userForm, roleId })}
+                  roles={roles}
+                  currentName={userToModify?.role}
+                />
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
-                  <select
-                    value={userForm.department}
-                    onChange={(e) => setUserForm({ ...userForm, department: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Sales">Sales</option>
-                    <option value="Accounts">Accounts</option>
-                    <option value="HR">HR</option>
-                    <option value="Logistics">Logistics</option>
-                    <option value="Executive">Executive</option>
-                    <option value="Warehouse">Warehouse</option>
-                  </select>
-                </div>
+                <DepartmentSelect
+                  value={userForm.department}
+                  onChange={(department) => setUserForm({ ...userForm, department })}
+                  departments={departments}
+                />
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Location</label>
@@ -1039,13 +1138,12 @@ export function UsersPage() {
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Password * <span className="font-normal text-slate-400">(Saved in PBKDF2 format for login)</span>
+                  Password <span className="font-normal text-slate-400">(leave empty to email the user an activation link)</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    required
-                    placeholder="Enter password"
+                    placeholder="Leave empty to send an activation link"
                     value={userForm.password || ''}
                     onChange={(e) => setUserForm({ ...userForm, password: e.target.value })}
                     className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-xs"
@@ -1055,7 +1153,7 @@ export function UsersPage() {
                     onClick={() =>
                       setUserForm({
                         ...userForm,
-                        password: 'Password@' + Math.floor(100 + Math.random() * 900),
+                        password: generateTempPassword(),
                       })
                     }
                     className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold transition-colors"
@@ -1103,9 +1201,10 @@ export function UsersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-colors disabled:opacity-60"
                 >
-                  Save & Create User
+                  {isSubmitting ? 'Saving…' : 'Save & Create User'}
                 </button>
               </div>
             </form>
@@ -1173,43 +1272,18 @@ export function UsersPage() {
                   userId={userToModify?.id}
                 />
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Role</label>
-                  <select
-                    value={userForm.role}
-                    onChange={(e) => setUserForm({ ...userForm, role: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Accountant">Accountant</option>
-                    <option value="Tele Caller Executive">Tele Caller Executive</option>
-                    <option value="Tele sales coordinator">Tele sales coordinator</option>
-                    <option value="Relation ship manager">Relation ship manager</option>
-                    <option value="Sales support execut.">Sales support execut.</option>
-                    <option value="Area sales manager">Area sales manager</option>
-                    <option value="HR Manager">HR Manager</option>
-                    <option value="Driver">Driver</option>
-                    <option value="CIW">CIW</option>
-                    <option value="DIC">DIC</option>
-                    <option value="Employee">Employee</option>
-                    <option value="Super Administrator">Super Administrator</option>
-                  </select>
-                </div>
+                <RoleSelect
+                  value={userForm.roleId}
+                  onChange={(roleId) => setUserForm({ ...userForm, roleId })}
+                  roles={roles}
+                  currentName={userToModify?.role}
+                />
 
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Department</label>
-                  <select
-                    value={userForm.department}
-                    onChange={(e) => setUserForm({ ...userForm, department: e.target.value })}
-                    className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="Sales">Sales</option>
-                    <option value="Accounts">Accounts</option>
-                    <option value="HR">HR</option>
-                    <option value="Logistics">Logistics</option>
-                    <option value="Executive">Executive</option>
-                    <option value="Warehouse">Warehouse</option>
-                  </select>
-                </div>
+                <DepartmentSelect
+                  value={userForm.department}
+                  onChange={(department) => setUserForm({ ...userForm, department })}
+                  departments={departments}
+                />
 
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Location</label>
@@ -1270,9 +1344,10 @@ export function UsersPage() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-colors"
+                  disabled={isSubmitting}
+                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-colors disabled:opacity-60"
                 >
-                  Save Changes
+                  {isSubmitting ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -1283,7 +1358,7 @@ export function UsersPage() {
       {/* ── Modal 3: View & Configure Permissions Matrix ─────────── */}
       {isPermissionsModalOpen && userToModify && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-4xl w-full p-4 sm:p-6 shadow-2xl border border-slate-100 max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">
@@ -1302,38 +1377,36 @@ export function UsersPage() {
               </button>
             </div>
 
-            <div className="space-y-4 my-5 text-xs">
-              {permissionModules.map((group) => (
-                <div key={group.module} className="border border-slate-200 rounded-xl p-3.5 bg-slate-50/40">
-                  <h4 className="font-bold text-slate-800 mb-2.5 flex items-center gap-2">
-                    <ShieldCheck size={14} className="text-[#1f6bff]" />
-                    <span>{group.module}</span>
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {group.actions.map((act) => {
-                      const isChecked = (userForm.permissions || []).includes(act.label);
-                      return (
-                        <label
-                          key={act.id}
-                          className={`flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer select-none ${
-                            isChecked
-                              ? 'bg-blue-50/80 border-blue-200 text-blue-800 font-semibold'
-                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => togglePermissionItem(act.label)}
-                            className="rounded text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="truncate">{act.label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
+            <div className="my-5 text-xs">
+              {canManageRoles && (
+                <p className="text-[11px] text-slate-500 mb-3">
+                  Ticks marked <span className="font-bold uppercase">role</span> come from the user's role.
+                  Adding one the role lacks grants it to this user only; removing a role permission denies it to this user only.
+                </p>
+              )}
+              {permissionsLoading ? (
+                <div className="text-center py-10 text-slate-400">Loading permissions…</div>
+              ) : permissionModules.length ? (
+                <PermissionPicker
+                  modules={permissionModules}
+                  selected={userForm.permissions || []}
+                  onChange={(permissions) => setUserForm((prev) => ({ ...prev, permissions }))}
+                  readOnly={!canManageRoles}
+                  inherited={new Set(rolePermissions)}
+                />
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {(userForm.permissions || []).map((p) => (
+                    <span
+                      key={p}
+                      className="inline-flex items-center gap-1.5 bg-blue-50/80 text-blue-700 border border-blue-100 px-2.5 py-1 rounded-lg text-[11px] font-medium"
+                    >
+                      <ShieldCheck size={12} className="text-blue-600" />
+                      {p}
+                    </span>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
 
             <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-100">
@@ -1348,13 +1421,16 @@ export function UsersPage() {
                 >
                   Cancel
                 </button>
+                {canManageRoles && (
                 <button
                   type="button"
                   onClick={handleSavePermissions}
-                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-colors"
+                  disabled={permissionsLoading || isSubmitting}
+                  className="px-5 py-2 bg-[#1f6bff] hover:bg-blue-700 text-white rounded-xl font-semibold shadow-xs transition-colors disabled:opacity-60"
                 >
-                  Save Permissions
+                  {isSubmitting ? 'Saving…' : 'Save Permissions'}
                 </button>
+                )}
               </div>
             </div>
           </div>
@@ -1394,9 +1470,7 @@ export function UsersPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      setNewPassword(
-                        'Evenmore@' + Math.floor(1000 + Math.random() * 9000) + '!'
-                      )
+                      setNewPassword(generateTempPassword())
                     }
                     className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold"
                   >
@@ -1611,14 +1685,7 @@ function UserCardItem({
 
       {/* ── Middle: Avatar, Name, Email, Department ───────────── */}
       <div className="flex items-center gap-3 mb-4">
-        <img
-          src={user.avatar}
-          alt={user.name}
-          className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100 shadow-xs flex-shrink-0"
-          onError={(e) => {
-            e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=1f6bff&color=fff`;
-          }}
-        />
+        <UserInitials name={user.name} />
         <div className="min-w-0 flex-1">
           <h4 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-blue-600 transition-colors truncate">
             {user.name}
@@ -1694,14 +1761,7 @@ function UserListItem({
     >
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <img
-            src={user.avatar}
-            alt={user.name}
-            className="w-12 h-12 rounded-full object-cover ring-2 ring-slate-100 shadow-xs flex-shrink-0"
-            onError={(e) => {
-              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=1f6bff&color=fff`;
-            }}
-          />
+          <UserInitials name={user.name} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h4 className="font-bold text-slate-900 text-sm leading-tight group-hover:text-blue-600 transition-colors truncate">

@@ -481,12 +481,12 @@ export default function Employees() {
             {form.createUserAccount !== false && (
               <div style={{ marginTop: 10, marginLeft: 25 }}>
                 <label className="form-label" style={{ fontSize: "12px", marginBottom: 4 }}>
-                  Initial Password <span style={{ color: "#94a3b8", fontWeight: 400 }}>(defaults to Password@123)</span>
+                  Initial Password <span style={{ color: "#94a3b8", fontWeight: 400 }}>(optional)</span>
                 </label>
                 <input
                   className="form-input"
                   type="password"
-                  placeholder="Enter login password or leave empty for default"
+                  placeholder="Leave empty to email the employee an activation link"
                   value={form.password || ""}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
                   style={{ maxWidth: 320, fontSize: "13px" }}
@@ -498,7 +498,7 @@ export default function Employees() {
       </Modal>
 
       <style>{`
-        .emp-dir-page { background: #f8fafc; margin: -24px -28px -40px; padding: 18px 26px 28px; min-height: calc(100vh - 62px); }
+        .emp-dir-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
         .emp-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
         .emp-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
         .emp-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }

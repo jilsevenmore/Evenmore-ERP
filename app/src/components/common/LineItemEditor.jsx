@@ -2,6 +2,11 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Plus, Trash2, Package, ShoppingCart, Boxes, AlertTriangle, Search, X, Layers, ChevronDown, Scale } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../ui/Button';
+import { SALES_LINE_KINDS, lineTotalWeight, formatKg, lineSpecText } from '../../utils/salesLineMetal';
+import {
+  METAL_MATERIALS, METAL_FORMS, METAL_FINISHES, materialOf, formOf, dimLabel, KIND_DEFAULT_FORM,
+  kindUsesCalculator, suggestHsn, calcPieceWeight, pieceWeightOf, applySheetSpec, linePieces, sheetAutoDescription,
+} from '../../utils/salesLineMetal';
 
 const createEmptyLine = () => ({
   id: `li-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -18,7 +23,47 @@ const createEmptyLine = () => ({
   isUserModified: false,
 });
 
-export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly = false, onRequestPO }) => {
+// Sheet-metal sales (allowCustomLines): a new line starts as an MS sheet billed
+// by weight -- Sweven's everyday line. Fabrication is priced per piece.
+const createMetalLine = (kind = 'Sheet Metal', extra = {}) => {
+  const base = { ...createEmptyLine(), lineKind: kind, uom: kind === 'Service' ? 'Job' : 'Nos', ...extra };
+  if (!kindUsesCalculator(kind)) return base;
+  const spec = { material: 'MS', form: KIND_DEFAULT_FORM[kind] || 'Sheet', pieces: 1, basis: kind === 'Fabrication' ? 'pcs' : 'kg' };
+  return { ...base, ...applySheetSpec(spec), qty: 1 };
+};
+
+// Processing / logistics charges added as service lines in one click.
+const CHARGE_PRESETS = [
+  'Cutting / shearing charges',
+  'Laser / plasma cutting charges',
+  'Bending / folding charges',
+  'Rolling charges',
+  'Polishing / finishing charges',
+  'Transport charges',
+  'Loading & unloading charges',
+];
+
+const MetalField = ({ label, children, className = '' }) => (
+  <label className={`flex flex-col gap-0.5 text-[10px] font-semibold text-muted uppercase tracking-wide ${className}`}>
+    {label}
+    {children}
+  </label>
+);
+const metalInput = 'text-[11px] font-normal normal-case tracking-normal px-2 py-1 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition';
+
+// `allowCustomLines` (quotation-first sales): a line may be an inventory item
+// or a service / fabrication / custom / free-text line with no item at all.
+// It adds the unit field and names item-less lines as such; screens that do
+// not pass it render exactly as before.
+// Metal-industry sales (Sweven: machines, spare parts, MS table fabrication).
+// The helpers live in utils/salesLineMetal.js so print views that must not
+// load the ERP context (the public quotation page) can use them too.
+const KIND_FROM_ITEM = { Machine: 'Machine', Part: 'Spare Part', Service: 'Service' };
+// The earlier compact metal row (kind / material / spec / weight under the
+// description) -- superseded by the calculator row, kept for rollback.
+const USE_COMPACT_METAL_ROW = false;
+
+export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly = false, onRequestPO, allowCustomLines = false }) => {
     const {
       items: masterItems = [],
       categories = [],
@@ -54,17 +99,22 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
       });
     }, [items, masterItems]);
 
+    // Sheet-metal mode starts every blank row as a metal line (was: createEmptyLine()).
+    const newLine = () => (allowCustomLines ? createMetalLine() : createEmptyLine());
+
     // Ensure there is at least one default empty line item for editable forms
     useEffect(() => {
       if (!readOnly && items.length === 0 && onChange) {
-        onChange([createEmptyLine()]);
+        // Replaced: onChange([createEmptyLine()]);
+        onChange([allowCustomLines ? createMetalLine() : createEmptyLine()]);
       }
-    }, [items.length, readOnly, onChange]);
+    }, [items.length, readOnly, onChange, allowCustomLines]);
 
     // Create a new line item (empty by default or populated if selected from stock picker)
     const handleAddItem = (defaultItem = null) => {
         if (!defaultItem) {
-            onChange([...items, createEmptyLine()]);
+            // Replaced: onChange([...items, createEmptyLine()]);
+            onChange([...items, newLine()]);
             return;
         }
 
@@ -201,7 +251,8 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             const currentPos = filteredItems.findIndex((it) => it.id === current.id || it === current);
             const updated = [...filteredItems];
             updated[currentPos >= 0 ? currentPos : index] = {
-                ...createEmptyLine(),
+                // Replaced: ...createEmptyLine(),
+                ...newLine(),
                 id: current.id || `li-${Date.now()}`,
             };
             onChange(updated);
@@ -239,6 +290,30 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             // [PHASE-2E.1] propagate HSN/SAC codes for GST invoice printing
             hsnCode: selected.hsnCode || current.hsnCode || '',
             sacCode: selected.sacCode || current.sacCode || '',
+            // Metal-industry sales: kind and weight per unit from the item master.
+            // Replaced (sheet-metal sales): + calculator bound to the item's stock unit.
+            // ...(allowCustomLines ? {
+            //     lineKind: KIND_FROM_ITEM[selected.itemKind] || current.lineKind || '',
+            //     unitWeight: Number(selected.theoreticalWeight) || current.unitWeight || '',
+            // } : {}),
+            ...(allowCustomLines ? (() => {
+                const unit = selected.salesUnit || selected.uom || 'Nos';
+                const kgItem = Boolean(selected.isWeightItem) || /^kgs?$/i.test(String(unit));
+                const kind = KIND_FROM_ITEM[selected.itemKind] || (kgItem ? 'Sheet Metal' : (current.lineKind || 'Sheet Metal'));
+                const theoretical = Number(selected.theoreticalWeight) || 0;
+                return {
+                    lineKind: kind,
+                    uom: unit,
+                    unitWeight: theoretical || current.unitWeight || '',
+                    // Stock moves in the item's unit, so the basis is fixed by it.
+                    sheetSpec: kindUsesCalculator(kind) ? {
+                        ...(current.sheetSpec || {}),
+                        basis: kgItem ? 'kg' : 'pcs',
+                        weightPerPiece: theoretical || current.sheetSpec?.weightPerPiece || '',
+                        weightManual: theoretical > 0,
+                    } : null,
+                };
+            })() : {}),
         };
 
         // 1. Check machine-specific BOM from itemParts (authoritative source)
@@ -361,6 +436,59 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         onChange(updated);
     };
 
+    // ── sheet-metal calculator ────────────────────────────────────────────
+    const withAmount = (line) => {
+        const qty = Number(line.qty) || 0;
+        const rate = Number(line.rate) || 0;
+        const discount = Number(line.discount) || 0;
+        const tax = Number(line.tax) || 0;
+        const afterDisc = qty * rate * (1 - discount / 100);
+        return { ...line, amount: Math.round(afterDisc * (1 + tax / 100) * 100) / 100 };
+    };
+
+    /** Change the calculator inputs; qty, unit, weight and spec text follow. */
+    const handleSheetSpecChange = (index, patch) => {
+        const current = items[index];
+        if (!current) return;
+        const spec = { ...(current.sheetSpec || {}), ...patch };
+        const applied = applySheetSpec(spec);
+        const master = current.itemId ? masterItems.find((mi) => mi.id === current.itemId) : null;
+        if (master) applied.uom = master.salesUnit || master.uom || applied.uom;
+        // A custom line names itself from the spec until the user types a name.
+        const previousAuto = sheetAutoDescription(current.sheetSpec || {});
+        const rename = !current.itemId && (!current.description || current.description === previousAuto);
+        const updated = [...items];
+        updated[index] = withAmount({
+            ...current,
+            ...applied,
+            ...(rename ? { description: sheetAutoDescription(spec) } : {}),
+        });
+        onChange(updated);
+    };
+
+    const handleKindChange = (index, kind) => {
+        const current = items[index];
+        if (!current) return;
+        if (!kindUsesCalculator(kind)) {
+            const updated = [...items];
+            updated[index] = { ...current, lineKind: kind, sheetSpec: null };
+            onChange(updated);
+            return;
+        }
+        const spec = current.sheetSpec || {
+            material: 'MS', form: KIND_DEFAULT_FORM[kind] || 'Sheet', pieces: 1,
+            basis: kind === 'Fabrication' ? 'pcs' : 'kg',
+        };
+        const updated = [...items];
+        updated[index] = withAmount({ ...current, lineKind: kind, ...applySheetSpec(spec) });
+        onChange(updated);
+    };
+
+    const addChargeLine = (description) => {
+        if (!description) return;
+        onChange([...items, createMetalLine('Service', { description, uom: 'Job' })]);
+    };
+
     const handleRemove = (index) => {
         const itemToRemove = items[index];
         if (!itemToRemove) return;
@@ -375,7 +503,8 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
 
         if (updated.length === 0) {
             // Keep at least one ready-to-select line item
-            onChange([createEmptyLine()]);
+            // Replaced: onChange([createEmptyLine()]);
+            onChange([newLine()]);
         } else {
             onChange(updated);
         }
@@ -401,6 +530,9 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         return acc + (grossAfterDisc * (((it.tax !== undefined ? Number(it.tax) : 18)) / 100));
     }, 0);
     const grandTotal = Math.round((subtotal - totalDiscount + totalTax) * 100) / 100;
+    // Sheet-metal totals: what the truck carries.
+    const totalWeightKg = allowCustomLines ? displayItems.reduce((acc, it) => acc + lineTotalWeight(it), 0) : 0;
+    const totalPieces = allowCustomLines ? displayItems.reduce((acc, it) => acc + linePieces(it), 0) : 0;
 
     return (
     <div className="space-y-4 font-sans text-xs">
@@ -509,7 +641,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                   onChange={(e) => handleItemSelect(index, e.target.value)}
                                   className="w-full text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition cursor-pointer"
                                 >
-                                  <option value="">-- Select Master Item --</option>
+                                  <option value="">{allowCustomLines ? '-- Custom / service line (no inventory item) --' : '-- Select Master Item --'}</option>
                                   {masterItems.map((mi) => (
                                     <option key={mi.id} value={mi.id}>
                                       [{mi.sku}] {mi.name} {mi.itemKind === 'Machine' ? '(Machine & BOM)' : ''}
@@ -556,11 +688,52 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                               )}
                               <input
                                 type="text"
-                                placeholder="Custom line description / serial notes..."
+                                placeholder={allowCustomLines && !item.itemId ? 'Description * (e.g. Custom MS Fabrication Work)' : 'Custom line description / serial notes...'}
                                 value={item.description || ''}
                                 onChange={(e) => handleFieldChange(index, 'description', e.target.value)}
                                 className="w-full text-[11px] px-2.5 py-1 mt-1.5 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
                               />
+                              {allowCustomLines && USE_COMPACT_METAL_ROW && (
+                                /* Metal-industry detail: kind, material / grade, size / specification, weight per unit.
+                                   Replaced by the sheet-metal calculator row below the line; kept switched off. */
+                                <div className="grid grid-cols-2 sm:grid-cols-[110px_1fr_1.4fr_78px] gap-1.5 mt-1.5">
+                                  <select
+                                    aria-label="Line type"
+                                    value={item.lineKind || ''}
+                                    onChange={(e) => handleFieldChange(index, 'lineKind', e.target.value)}
+                                    className="text-[11px] px-2 py-1 rounded-md border border-border/70 bg-card text-text focus:outline-none focus:border-primary transition cursor-pointer"
+                                  >
+                                    <option value="">Type…</option>
+                                    {SALES_LINE_KINDS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+                                  </select>
+                                  <input
+                                    type="text"
+                                    aria-label="Material / grade"
+                                    placeholder="Material / grade (MS IS 2062)"
+                                    value={item.materialGrade || ''}
+                                    onChange={(e) => handleFieldChange(index, 'materialGrade', e.target.value)}
+                                    className="text-[11px] px-2 py-1 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                                  />
+                                  <input
+                                    type="text"
+                                    aria-label="Size / specification"
+                                    placeholder="Size / section / thickness / finish"
+                                    value={item.specification || ''}
+                                    onChange={(e) => handleFieldChange(index, 'specification', e.target.value)}
+                                    className="text-[11px] px-2 py-1 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                                  />
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    aria-label="Weight per unit (kg)"
+                                    placeholder="Wt kg/unit"
+                                    value={item.unitWeight ?? ''}
+                                    onChange={(e) => handleFieldChange(index, 'unitWeight', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                    className="text-[11px] text-right px-2 py-1 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                                  />
+                                </div>
+                              )}
                             </div>
                           )
                         ) : (
@@ -588,6 +761,12 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                     SKU: {item.itemSku}
                                   </span>
                                 )}
+                                {allowCustomLines && item.description && item.description !== (item.name || item.description) && (
+                                  <span className="text-[11px] text-text-secondary block mt-0.5">{item.description}</span>
+                                )}
+                                {allowCustomLines && lineSpecText(item) && (
+                                  <span className="text-[10px] text-muted block mt-0.5">{lineSpecText(item)}</span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -598,7 +777,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                         <div className="flex flex-col items-center gap-1">
                           {!item.itemId ? (
                             <span className="inline-block text-[11px] font-medium px-2 py-0.5 rounded-full border border-border text-muted bg-soft">
-                              —
+                              {allowCustomLines && (item.description || item.name) ? 'Non-stock' : '—'}
                             </span>
                           ) : (
                             <>
@@ -637,7 +816,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                         {!readOnly ? (() => {
                           const unit = (masterObj?.salesUnit || masterObj?.uom || masterObj?.unit || 'Nos').toLowerCase();
                           const allowsDecimal = ['kg', 'mtr', 'meter', 'ltr', 'liter', 'ton'].includes(unit);
-                          return (
+                          const qtyInput = (
                             <input
                               type="number"
                               min={allowsDecimal ? "0.01" : "1"}
@@ -654,8 +833,23 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                               className="w-16 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
                             />
                           );
+                          if (!allowCustomLines) return qtyInput;
+                          // Unit: typed for a custom line, defaults to the item's own unit.
+                          return (
+                            <div className="flex flex-col items-center gap-1">
+                              {qtyInput}
+                              <input
+                                type="text"
+                                aria-label="Unit"
+                                placeholder={masterObj?.salesUnit || masterObj?.uom || 'Unit'}
+                                value={item.uom || ''}
+                                onChange={(e) => handleFieldChange(index, 'uom', e.target.value)}
+                                className="w-16 text-center text-[11px] px-2 py-1 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
+                              />
+                            </div>
+                          );
                         })() : (
-                          <span className="font-bold text-text">{item.qty}</span>
+                          <span className="font-bold text-text">{item.qty}{allowCustomLines && item.uom ? ` ${item.uom}` : ''}</span>
                         )}
                       </td>
 
@@ -671,6 +865,9 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                           />
                         ) : (
                           <span className="font-mono font-semibold text-text">₹{Number(item.rate || 0).toFixed(2)}</span>
+                        )}
+                        {allowCustomLines && item.uom && (
+                          <span className="block text-[10px] text-muted mt-0.5">per {item.uom}</span>
                         )}
                       </td>
 
@@ -722,6 +919,116 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                       )}
                     </tr>
 
+                    {/* Sheet-metal calculator: material, form, size, pieces, weight, billing basis. */}
+                    {allowCustomLines && !readOnly && !item.isBomPart && (() => {
+                      const spec = item.sheetSpec || {};
+                      const calc = kindUsesCalculator(item.lineKind || '') && item.sheetSpec;
+                      const form = formOf(spec.form);
+                      const auto = calcPieceWeight(spec);
+                      const piece = pieceWeightOf(spec);
+                      const lineKg = lineTotalWeight(item);
+                      const basisLocked = Boolean(item.itemId);
+                      const grades = materialOf(spec.material)?.grades || [];
+                      return (
+                        <tr className="bg-soft/30">
+                          <td colSpan={8} className="px-3.5 pb-3 pt-0">
+                            <div className="rounded-lg border border-border/70 bg-card-alt/60 p-2.5 space-y-2">
+                              <div className="flex flex-wrap items-end gap-2">
+                                <MetalField label="Type">
+                                  <select value={item.lineKind || ''} onChange={(e) => handleKindChange(index, e.target.value)} className={`${metalInput} cursor-pointer`}>
+                                    <option value="">—</option>
+                                    {SALES_LINE_KINDS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}
+                                  </select>
+                                </MetalField>
+                                {calc && (
+                                  <>
+                                    <MetalField label="Material">
+                                      <select value={spec.material || ''} onChange={(e) => handleSheetSpecChange(index, { material: e.target.value })} className={`${metalInput} cursor-pointer`}>
+                                        <option value="">—</option>
+                                        {METAL_MATERIALS.map((m) => <option key={m.code} value={m.code}>{m.label}</option>)}
+                                      </select>
+                                    </MetalField>
+                                    <MetalField label="Grade / make">
+                                      <input list={`metal-grades-${index}`} value={spec.grade || ''} onChange={(e) => handleSheetSpecChange(index, { grade: e.target.value })} placeholder={grades[0] || 'Grade'} className={`${metalInput} w-28`} />
+                                      <datalist id={`metal-grades-${index}`}>{grades.map((g) => <option key={g} value={g} />)}</datalist>
+                                    </MetalField>
+                                    <MetalField label="Form">
+                                      <select value={spec.form || ''} onChange={(e) => handleSheetSpecChange(index, { form: e.target.value })} className={`${metalInput} cursor-pointer`}>
+                                        {METAL_FORMS.map((f) => <option key={f.code} value={f.code}>{f.code}</option>)}
+                                      </select>
+                                    </MetalField>
+                                    <MetalField label="Finish">
+                                      <input list="metal-finishes" value={spec.finish || ''} onChange={(e) => handleSheetSpecChange(index, { finish: e.target.value })} placeholder="Mill / 2B / HR…" className={`${metalInput} w-28`} />
+                                    </MetalField>
+                                  </>
+                                )}
+                                <MetalField label="HSN / SAC">
+                                  <input value={item.hsnCode || ''} onChange={(e) => handleFieldChange(index, 'hsnCode', e.target.value)} placeholder={calc ? `e.g. ${suggestHsn(spec)}` : 'HSN / SAC'} className={`${metalInput} w-24 font-mono`} />
+                                </MetalField>
+                                {!calc && (
+                                  <>
+                                    <MetalField label="Specification" className="flex-1 min-w-[180px]">
+                                      <input value={item.specification || ''} onChange={(e) => handleFieldChange(index, 'specification', e.target.value)} placeholder="Model, size, capacity…" className={metalInput} />
+                                    </MetalField>
+                                    <MetalField label="Wt / unit (kg)">
+                                      <input type="number" min="0" step="0.01" value={item.unitWeight ?? ''} onChange={(e) => handleFieldChange(index, 'unitWeight', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} className={`${metalInput} w-24 text-right`} />
+                                    </MetalField>
+                                  </>
+                                )}
+                              </div>
+                              {calc && (
+                                <div className="flex flex-wrap items-end gap-2">
+                                  {(form?.dims || []).map((dim) => (
+                                    <MetalField key={dim} label={dimLabel(spec.form, dim)}>
+                                      <input type="number" min="0" step="0.01" value={spec[dim] ?? ''} onChange={(e) => handleSheetSpecChange(index, { [dim]: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })} className={`${metalInput} w-24 text-right font-mono`} />
+                                    </MetalField>
+                                  ))}
+                                  <MetalField label="Pieces">
+                                    <input type="number" min="0" step="1" value={spec.pieces ?? ''} onChange={(e) => handleSheetSpecChange(index, { pieces: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) })} className={`${metalInput} w-20 text-right font-mono`} />
+                                  </MetalField>
+                                  <MetalField label={auto !== null && !spec.weightManual ? 'Wt / piece (auto)' : 'Wt / piece (kg)'}>
+                                    {auto !== null && !spec.weightManual ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <span className={`${metalInput} w-24 text-right font-mono bg-soft`}>{formatKg(auto)}</span>
+                                        <button type="button" onClick={() => handleSheetSpecChange(index, { weightManual: true, weightPerPiece: auto })} className="text-[10px] font-semibold normal-case text-primary hover:underline cursor-pointer">Edit</button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-1.5">
+                                        <input type="number" min="0" step="0.001" value={spec.weightPerPiece ?? ''} onChange={(e) => handleSheetSpecChange(index, { weightManual: true, weightPerPiece: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })} className={`${metalInput} w-24 text-right font-mono`} />
+                                        {auto !== null && (
+                                          <button type="button" onClick={() => handleSheetSpecChange(index, { weightManual: false })} className="text-[10px] font-semibold normal-case text-primary hover:underline cursor-pointer">Auto</button>
+                                        )}
+                                      </div>
+                                    )}
+                                  </MetalField>
+                                  <MetalField label="Total weight">
+                                    <span className="text-[12px] font-bold normal-case tracking-normal font-mono text-text py-1">{piece > 0 || lineKg > 0 ? formatKg(lineKg) : '—'}</span>
+                                  </MetalField>
+                                  <MetalField label="Bill by" className="ml-auto">
+                                    <div className="inline-flex rounded-md border border-border/70 overflow-hidden" title={basisLocked ? 'Follows the inventory item\'s stock unit' : ''}>
+                                      {[['kg', 'Weight (₹/kg)'], ['pcs', 'Piece (₹/pc)']].map(([basis, label]) => (
+                                        <button
+                                          key={basis}
+                                          type="button"
+                                          disabled={basisLocked}
+                                          onClick={() => handleSheetSpecChange(index, { basis })}
+                                          className={`px-2.5 py-1 text-[11px] font-semibold normal-case tracking-normal transition ${
+                                            (spec.basis || 'kg') === basis ? 'bg-primary text-white' : 'bg-card text-text hover:bg-card-hover'
+                                          } ${basisLocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                        >
+                                          {label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </MetalField>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })()}
+
                     {/* Inline connector button to add another component to this machine */}
                     {!readOnly && (isLastChildOfMachine || isStandaloneMachineWithoutChildren) && (
                       <tr key={`add-part-btn-${targetMachineIdForSubAdd}`} className="bg-purple-500/[0.02] dark:bg-purple-950/10">
@@ -758,8 +1065,29 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-primary bg-primary-subtle border border-primary/20 hover:bg-primary hover:text-white transition cursor-pointer shadow-2xs"
             >
               <Plus className="w-3.5 h-3.5"/>
-              Add Line Item
+              {/* Replaced label in sheet-metal mode (was always "Add Line Item"). */}
+              {allowCustomLines ? 'Sheet / Plate' : 'Add Line Item'}
             </button>
+            {allowCustomLines && (
+              <>
+                <button type="button" onClick={() => onChange([...items, createMetalLine('Section / Pipe')])} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-primary bg-primary-subtle border border-primary/20 hover:bg-primary hover:text-white transition cursor-pointer shadow-2xs">
+                  <Plus className="w-3.5 h-3.5"/> Section / Pipe
+                </button>
+                <button type="button" onClick={() => onChange([...items, createMetalLine('Fabrication')])} className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl text-primary bg-primary-subtle border border-primary/20 hover:bg-primary hover:text-white transition cursor-pointer shadow-2xs">
+                  <Plus className="w-3.5 h-3.5"/> Fabrication
+                </button>
+                <select
+                  value=""
+                  onChange={(e) => addChargeLine(e.target.value)}
+                  aria-label="Add a processing or transport charge"
+                  className="px-3 py-2 text-xs font-bold rounded-xl text-text bg-card border border-border hover:bg-card-hover transition cursor-pointer"
+                >
+                  <option value="">+ Processing / transport charge…</option>
+                  {CHARGE_PRESETS.map((charge) => <option key={charge} value={charge}>{charge}</option>)}
+                </select>
+                <datalist id="metal-finishes">{METAL_FINISHES.map((f) => <option key={f} value={f} />)}</datalist>
+              </>
+            )}
             <button
               type="button"
               onClick={() => openStockPicker(null)}
@@ -786,6 +1114,20 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             <span>Estimated GST / Tax:</span>
             <strong className="font-mono text-text">₹{totalTax.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>
           </div>
+          {/* Replaced: shown only when a line had a unit weight; kg-billed sheet lines have none.
+          {allowCustomLines && displayItems.some((it) => Number(it.unitWeight) > 0) && ( ...Total Weight... )} */}
+          {allowCustomLines && totalPieces > 0 && (
+            <div className="flex items-center justify-between text-text-secondary">
+              <span>Total Pieces:</span>
+              <strong className="font-mono text-text">{totalPieces.toLocaleString('en-IN')}</strong>
+            </div>
+          )}
+          {allowCustomLines && totalWeightKg > 0 && (
+            <div className="flex items-center justify-between text-text-secondary">
+              <span>Total Weight:</span>
+              <strong className="font-mono text-text">{formatKg(totalWeightKg)}</strong>
+            </div>
+          )}
           <div className="pt-2 border-t border-border flex items-center justify-between font-bold text-sm text-text">
             <span>Grand Total:</span>
             <strong className="font-mono text-primary">₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>

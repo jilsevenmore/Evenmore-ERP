@@ -18,6 +18,7 @@ import { api, ApiError } from './api';
 import { mapWithLimit, getAllPages } from './resourceSync';
 import { getStoredToken } from '../utils/authUtils';
 import { formatDateDDMMYYYY, toISODate } from '../utils/dateUtils';
+import { sheetAutoDescription } from '../utils/salesLineMetal';
 
 export { ApiError };
 
@@ -62,7 +63,9 @@ function lineToApi(line, index) {
     itemId: line.itemId || line.inventoryItemId || undefined,
     sku: line.sku || line.itemSku || undefined,
     itemName: line.itemName || line.name || undefined,
-    description: line.description || line.name || line.itemName || '',
+    // Replaced: a sheet-metal line with no typed name is named from its spec.
+    // description: line.description || line.name || line.itemName || '',
+    description: line.description || line.name || line.itemName || sheetAutoDescription(line.sheetSpec || {}) || '',
     hsnCode: line.hsnCode || undefined,
     uom: line.uom || line.unit || undefined,
     qty: num(line.qty ?? line.quantity, 1),
@@ -75,10 +78,30 @@ function lineToApi(line, index) {
     parentLineId: line.parentLineId || undefined,
     isBomPart: line.isBomPart ?? undefined,
     isUserModified: line.isUserModified ?? undefined,
+    // Metal-industry detail on sales lines (ignored by purchase documents).
+    lineKind: line.lineKind || undefined,
+    materialGrade: line.materialGrade || undefined,
+    specification: line.specification || undefined,
+    unitWeight: line.unitWeight !== undefined && line.unitWeight !== null && line.unitWeight !== '' ? num(line.unitWeight) : undefined,
+    // The sheet-metal calculator's inputs (material, form, size, pieces, basis).
+    sheetSpec: line.sheetSpec && typeof line.sheetSpec === 'object' ? line.sheetSpec : undefined,
     // Dispatch/sale screens keep the picked units in `selectedSerials`.
     serials: Array.isArray(line.serials) ? line.serials
       : (Array.isArray(line.selectedSerials) && line.selectedSerials.length ? line.selectedSerials : undefined),
   });
+}
+
+/**
+ * A line with nothing on it: no inventory item and no text. The editors keep
+ * one such placeholder row open, and it must never reach the server — a
+ * service / custom line is identified by its description (the server requires
+ * one when there is no item), so an empty row is simply not a line.
+ */
+function isBlankLine(line) {
+  if (!line) return true;
+  if (line.itemId || line.inventoryItemId) return false;
+  const text = [line.description, line.name, line.itemName].some((v) => String(v ?? '').trim());
+  return !text && !num(line.rate ?? line.price);
 }
 
 function lineFromApi(line) {
@@ -116,7 +139,10 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [], partial = 
     otherCharges: doc.otherCharges !== undefined ? num(doc.otherCharges) : undefined,
     roundOff: doc.roundOff !== undefined ? num(doc.roundOff) : undefined,
     discountOverride: doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined,
-    lineItems: lines ? lines.map(lineToApi) : undefined,
+    // Replaced (quotation-first sales): the editor's empty placeholder row is
+    // dropped rather than saved as a nameless ₹0 line.
+    // lineItems: lines ? lines.map(lineToApi) : undefined,
+    lineItems: lines ? lines.filter((line) => !isBlankLine(line)).map(lineToApi) : undefined,
   });
 }
 
@@ -399,6 +425,11 @@ export const RESOURCES = {
         ...base.toApi(doc, opts),
         status: knownStatus(doc.status, QUOTATION_STATUSES),
         estimate: serverRef(doc.sourceEstimateId),
+        // Quotation-first commercial header (printed on the quotation PDF).
+        salesperson: doc.salesperson || undefined,
+        paymentTerms: doc.paymentTerms || undefined,
+        deliveryTerms: doc.deliveryTerms || undefined,
+        authorizedPerson: doc.authorizedPerson || undefined,
       }),
       fromApi: (row) => {
         const mapped = base.fromApi(row);
@@ -492,6 +523,10 @@ export const RESOURCES = {
         transporter: doc.transporter || undefined,
         vehicleNumber: doc.vehicleNo || doc.vehicleNumber || undefined,
         lrNumber: doc.lrNumber || undefined,
+        // Weighbridge; the server derives net = gross − tare.
+        weighbridgeSlip: doc.weighbridgeSlip || undefined,
+        grossWeight: doc.grossWeight !== undefined && doc.grossWeight !== '' ? num(doc.grossWeight) : undefined,
+        tareWeight: doc.tareWeight !== undefined && doc.tareWeight !== '' ? num(doc.tareWeight) : undefined,
       }),
       fromApi: (row) => ({
         ...base.fromApi(row),
@@ -902,6 +937,10 @@ export async function pullCompanyProfile() {
       phone: row.phone || '',
       email: row.email || '',
       currency: row.currency || 'INR',
+      // The printed letterpad: logo, authorised signature and website.
+      website: row.website || '',
+      logo: row.logo || '',
+      signature: row.signature || '',
     };
   } catch (err) {
     console.warn('[backendSync] pull company profile failed:', err?.message || err);

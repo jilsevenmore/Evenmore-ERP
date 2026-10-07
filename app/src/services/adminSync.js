@@ -48,15 +48,20 @@ export const ADMIN_RESOURCES = {
 
   roles: {
     path: '/admin/roles/',
+    // The server reads the permission set from `selectedPermissions` and
+    // answers with it as `permissions` (api.md §3.2). Without a code it
+    // derives one from the name.
     toApi: (r) => compact({
       name: r.name,
       code: r.code || undefined,
-      description: r.description || undefined,
-      permissions: Array.isArray(r.permissions) ? r.permissions : undefined,
+      description: r.description !== undefined ? r.description : undefined,
+      selectedPermissions: Array.isArray(r.permissions) ? r.permissions : undefined,
     }),
     fromApi: (row) => ({
       ...asText(row, ['name', 'code', 'description']),
       permissions: row.permissions || [],
+      userCount: Number(row.userCount) || 0,
+      isSystem: Boolean(row.isSystem),
       _synced: true,
     }),
   },
@@ -124,9 +129,27 @@ export const resetUserPassword = (id, payload = {}) =>
   adminSync.act('users', id, 'reset-password', payload, { raw: true });
 export const duplicateRole = (id, payload = {}) => adminSync.act('roles', id, 'duplicate', payload);
 
-export async function setUserPermissions(id, permissions) {
+/**
+ * `GET /admin/users/{id}/permissions/` — `{ effective, role, grant, deny }`:
+ * what the role gives, the per-user overrides on top, and the result.
+ */
+export async function pullUserPermissions(id) {
+  if (!isBackendEnabled() || !isServerId(id)) return null;
+  return api.get(`/admin/users/${id}/permissions/`);
+}
+
+/**
+ * Save a user's final permission set as overrides on their role: whatever the
+ * role lacks is granted, whatever it gives that was unticked is denied.
+ */
+export async function setUserPermissions(id, permissions, rolePermissions = []) {
   if (!isBackendEnabled()) return null;
-  return api.post(`/admin/users/${id}/permissions/`, { permissions });
+  const wanted = new Set(permissions);
+  const fromRole = new Set(rolePermissions);
+  return api.post(`/admin/users/${id}/permissions/`, {
+    grant: [...wanted].filter((p) => !fromRole.has(p)),
+    deny: [...fromRole].filter((p) => !wanted.has(p)),
+  });
 }
 
 export default adminSync;

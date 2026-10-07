@@ -2,6 +2,12 @@ import React, { useEffect } from 'react';
 import { X, Printer, CheckCircle2, FileText } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { addressLines, companyInitial, joinNonEmpty, pickPrintBankAccount } from './printLetterhead';
+import { LetterpadBrand, LetterpadFooter } from './SalesLetterpad';
+import { lineSpecText, lineTotalWeight, formatKg } from '../../utils/salesLineMetal';
+
+// Letterpad (documents/sewen letter pad.pdf). The previous letterhead block is
+// kept below, switched off -- flip this to restore it.
+const USE_LEGACY_LETTERHEAD = false;
 export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, }) => {
     const { companyProfile, currency, bankAccounts, resolvePartyAddresses } = useERP();
     // GST split: same state as the place of supply → CGST+SGST, otherwise IGST.
@@ -79,6 +85,7 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
         <div className="p-8 sm:p-12 min-w-[720px] lg:min-w-0 print:min-w-0 text-slate-800 bg-white font-sans text-xs space-y-6 printable-document">
           {/* Header / Letterhead */}
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
+            {USE_LEGACY_LETTERHEAD ? (
             <div className="space-y-1">
               <div className="flex items-center gap-2.5">
                 {companyShort && (<div className="w-9 h-9 rounded-lg bg-[#1F2E4A] text-white flex items-center justify-center font-bold text-lg font-mono">
@@ -96,6 +103,7 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
                 {contactLine && <p>{contactLine}</p>}
               </div>
             </div>
+            ) : <LetterpadBrand company={companyProfile} />}
 
             {/* Invoice Meta Block */}
             <div className="text-right space-y-1">
@@ -112,6 +120,13 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
                 </p>)}
                 {invoice.salesOrderRef && (<p className="text-xs text-blue-700 font-semibold">
                   Reference: {invoice.salesOrderRef}
+                </p>)}
+                {/* Quotation-first chain: the order and quotation this invoice bills. */}
+                {!invoice.salesOrderRef && invoice.salesOrderNumber && (<p className="text-xs text-blue-700 font-semibold">
+                  Sales Order: {invoice.salesOrderNumber}
+                </p>)}
+                {invoice.quotationNumber && (<p className="text-xs text-slate-600">
+                  Quotation: {invoice.quotationNumber}
                 </p>)}
               </div>
 
@@ -179,10 +194,11 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
                       <td className="py-2.5 px-3">
                         <p className="font-bold text-slate-900">{it.description || it.itemSku || 'Part Description'}</p>
                         {it.itemSku && <p className="text-[10px] text-slate-500 font-mono">SKU: {it.itemSku}</p>}
+                        {lineSpecText(it) && <p className="text-[10px] text-slate-500">{lineSpecText(it)}</p>}
                       </td>
                       {/* [PHASE-2E.1] HSN/SAC code for GST e-invoice compliance */}
                       <td className="py-2.5 px-3 text-center font-mono text-slate-600">{it.hsnCode || it.hsnSac || '—'}</td>
-                      <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{it.qty}</td>
+                      <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">{it.qty}{it.uom ? ` ${it.uom}` : ''}</td>
                       <td className="py-2.5 px-3 text-right font-mono">{money(it.rate)}</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{it.discount || 0}%</td>
                       <td className="py-2.5 px-3 text-center text-slate-500 font-mono">{it.tax || 0}%</td>
@@ -193,6 +209,11 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
                   }))}
               </tbody>
             </table>
+            {(invoice.items || []).some((it) => Number(it.unitWeight) > 0) && (
+              <p className="text-[10px] text-slate-500 text-right font-mono">
+                Total weight: {formatKg((invoice.items || []).reduce((acc, it) => acc + lineTotalWeight(it), 0))} (theoretical)
+              </p>
+            )}
           </div>
 
           {/* Subtotals & Payment Remittance */}
@@ -278,6 +299,7 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
           <div className="text-center text-[10px] text-slate-400 pt-4 border-t border-slate-100">
             Thank you for your business! All deliveries are subject to {companyName ? `${companyName} standard` : 'our standard'} Terms of Supply.
           </div>
+          <LetterpadFooter company={companyProfile} />
         </div>
         </div>
 

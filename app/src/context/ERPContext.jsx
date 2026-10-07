@@ -3,6 +3,7 @@ import { publishEstimates } from '../services/estimateStore';
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES, setBaseCurrency } from '../utils/currencyUtils';
 import { calculateWarrantyCoverageStatus } from '../utils/warrantyUtils';
+import { isQuotationConvertible } from '../utils/quotationDocument';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../services/crmEventNotifications';
 import {
     isBackendEnabled,
@@ -2405,7 +2406,15 @@ export const ERPProvider = ({ children, }) => {
             dealReference: quote.dealReference,
             terms: quote.terms,
             termsAndConditions: quote.termsAndConditions,
-            freight: quote.freight,
+            // Quotation-first commercial header (printed on the quotation PDF).
+            referenceNumber: quote.referenceNumber || '',
+            salesperson: quote.salesperson || '',
+            paymentTerms: quote.paymentTerms || '',
+            deliveryTerms: quote.deliveryTerms || '',
+            authorizedPerson: quote.authorizedPerson || '',
+            freight: quote.freight ?? quote.freightCharges,
+            // Sent as the document's freight charge (part of the server total).
+            freightCharges: quote.freightCharges,
             sourceEstimateId: quote.sourceEstimateId,
             sourceEstimateNumber: quote.sourceEstimateNumber,
             customerId: quote.customerId,
@@ -2419,7 +2428,10 @@ export const ERPProvider = ({ children, }) => {
             amount: totalAmount,
             status: quote.status || 'Draft',
             items: quote.items || [],
-            notes: quote.notes || 'Commercial quotation',
+            // Replaced (quotation-first sales): notes now print on the quotation,
+            // so a placeholder would reach the customer.
+            // notes: quote.notes || 'Commercial quotation',
+            notes: quote.notes || '',
         };
         setQuotations((prev) => [newQ, ...prev]);
         showToast(`Quotation ${newQ.quoteNumber} issued.`);
@@ -2512,10 +2524,33 @@ export const ERPProvider = ({ children, }) => {
             });
         }
     };
+    // Customer approval (quotation-first sales). Recorded through the server's
+    // /accept/, /reject/ and /cancel/ actions: past Sent a quotation is no
+    // longer a draft, so a status PATCH would be refused.
+    const decideQuotation = (id, action, status, label, reason) => {
+        const quote = quotations.find((q) => q.id === id);
+        if (!quote) return;
+        setQuotations((prev) => prev.map((q) => (q.id === id ? {
+            ...q,
+            status,
+            activity: [...(q.activity || []), { id: crypto.randomUUID(), type: label, quotationId: id, timestamp: new Date().toISOString() }],
+        } : q)));
+        persistAction('quotations', id, action, reason ? { reason } : {}, setQuotations, `Quotation ${quote.quoteNumber} ${status.toLowerCase()}`);
+        showToast(`Quotation ${quote.quoteNumber} marked ${status}.`);
+    };
+    const approveQuotation = (id) => decideQuotation(id, 'accept', 'Accepted', 'Quotation Accepted');
+    const rejectQuotation = (id, reason) => decideQuotation(id, 'reject', 'Rejected', 'Quotation Rejected', reason);
+    const cancelQuotation = (id, reason) => decideQuotation(id, 'cancel', 'Cancelled', 'Quotation Cancelled', reason);
     const convertQuotationToSalesOrder = (quoteId) => {
         const quote = quotations.find((q) => q.id === quoteId);
         if (!quote)
             return undefined;
+        // Quotation-first sales: only a live offer becomes an order (the server
+        // refuses these too, with 409).
+        if (!isQuotationConvertible(quote)) {
+            showToast(`Quotation ${quote.quoteNumber} is ${quote.status} and cannot be converted.`);
+            return undefined;
+        }
         // Local only: the server's convert-to-order below moves the quotation on
         // itself (to Converted, which reads back as 'Confirmed'); a PATCH racing
         // it would be refused once the quotation is no longer a draft.
@@ -2534,7 +2569,17 @@ export const ERPProvider = ({ children, }) => {
             remainingQty: Number(line.qty) || 1,
             rate: Number(line.rate) || 0,
             discount: Number(line.discount) || 0,
-            tax: Number(line.tax) || 18,
+            // Replaced (quotation-first sales): a 0% GST service line stayed 0%,
+            // not 18% — `|| 18` treated a real zero as missing.
+            // tax: Number(line.tax) || 18,
+            tax: line.tax !== undefined && line.tax !== null && line.tax !== '' ? Number(line.tax) || 0 : 18,
+            // Unit and HSN/SAC travel with custom / service lines too.
+            uom: line.uom || line.unit || undefined,
+            hsnCode: line.hsnCode || undefined,
+            // Metal-industry detail (kind, material, specification, weight).
+            lineKind: line.lineKind, materialGrade: line.materialGrade,
+            specification: line.specification, unitWeight: line.unitWeight,
+            sheetSpec: line.sheetSpec,
             amount: Number(line.amount) || ((Number(line.qty) || 1) * (Number(line.rate) || 0)),
         })) : [
             {
@@ -2556,6 +2601,7 @@ export const ERPProvider = ({ children, }) => {
             quotationNumber: quote.quoteNumber,
             sourceQuotationId: quote.id,
             sourceQuotationNumber: quote.quoteNumber,
+            referenceNumber: quote.referenceNumber || undefined,
             dealId: quote.dealId,
             dealReference: quote.dealReference,
             terms: quote.terms,
@@ -2872,6 +2918,11 @@ export const ERPProvider = ({ children, }) => {
                     discount: line.discount || line.discountPercent || 0,
                     tax: line.tax !== undefined ? line.tax : (line.taxRate !== undefined ? line.taxRate : 18),
                     amount: (remainingQty || 1) * (line.rate || 0),
+                    // Unit, HSN/SAC and metal-industry detail travel to the invoice.
+                    uom: line.uom || undefined, hsnCode: line.hsnCode || undefined,
+                    lineKind: line.lineKind, materialGrade: line.materialGrade,
+                    specification: line.specification, unitWeight: line.unitWeight,
+                    sheetSpec: line.sheetSpec,
                 };
             })
             : [
@@ -2973,6 +3024,12 @@ export const ERPProvider = ({ children, }) => {
             dispatchDate: challan.dispatchDate || getCurrentISODate(),
             transporter: challan.transporter || '',
             vehicleNo: challan.vehicleNo || '',
+            // Weighbridge (sheet-metal dispatch); net is gross − tare.
+            weighbridgeSlip: challan.weighbridgeSlip || '',
+            grossWeight: challan.grossWeight,
+            tareWeight: challan.tareWeight,
+            netWeight: challan.grossWeight !== undefined && challan.tareWeight !== undefined
+                ? Number(challan.grossWeight) - Number(challan.tareWeight) : challan.netWeight,
             status: challan.status || 'In Transit',
             items: challanItems,
             lineItems: challanItems,
@@ -3068,6 +3125,9 @@ export const ERPProvider = ({ children, }) => {
                 transporter: newChallan.transporter,
                 vehicleNo: newChallan.vehicleNo,
                 dispatchDate: newChallan.dispatchDate,
+                weighbridgeSlip: newChallan.weighbridgeSlip,
+                grossWeight: newChallan.grossWeight,
+                tareWeight: newChallan.tareWeight,
             };
             let serverId;
             const order = salesOrders.find((o) => o.id === newChallan.salesOrderId);
@@ -5397,6 +5457,9 @@ export const ERPProvider = ({ children, }) => {
             syncQuotationShare,
             convertQuotationToDeliveryChallan,
             convertQuotationToSalesOrder,
+            approveQuotation,
+            rejectQuotation,
+            cancelQuotation,
             addSalesOrder,
             updateSalesOrderAllocation,
             updateSalesOrderStage,

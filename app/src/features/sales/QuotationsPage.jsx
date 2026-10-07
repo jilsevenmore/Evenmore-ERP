@@ -11,6 +11,18 @@ import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintQuotationModal } from '../../components/common/PrintQuotationModal';
+import { isQuotationConvertible } from '../../utils/quotationDocument';
+import { sheetAutoDescription } from '../../utils/salesLineMetal';
+import { FormSection } from '../../components/common/FormSection';
+
+// Replaced: moved to components/common/FormSection.jsx so every sales form shares it.
+// const FormSection = ({ number, title, hint }) => (
+//     <div className="pt-2">
+//         <p className="font-mono text-[10px] tracking-[0.2em] text-blue-700 uppercase">{number} · {title}</p>
+//         <div className="h-1 w-12 mt-1.5 rounded-full bg-gradient-to-r from-[#1F3A6E] to-[#29A8E0]" />
+//         {hint && <p className="text-[11px] text-slate-500 mt-1.5">{hint}</p>}
+//     </div>
+// );
 const quotationGuide = {
     title: 'Quotations & Estimates',
     subtitle: 'Commercial price proposals and direct 1-click conversion to Sales Orders.',
@@ -28,7 +40,7 @@ const quotationGuide = {
     workflow: ['Quotation Created', 'Customer Approval', 'Convert to Sales Order', 'Warehouse Dispatch', 'Invoiced'],
 };
 export const QuotationsPage = () => {
-    const { customers, quotations, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { customers, quotations, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
     const leadRequest = location.state && (location.state.fromLead || location.state.fromDeal) ? location.state : null;
@@ -44,6 +56,24 @@ export const QuotationsPage = () => {
     const [quoteDate, setQuoteDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [dealReference, setDealReference] = useState('');
     const [terms, setTerms] = useState('');
+    // Quotation-first commercial header (printed on the quotation PDF).
+    const [referenceNumber, setReferenceNumber] = useState('');
+    const [salesperson, setSalesperson] = useState('');
+    const [paymentTerms, setPaymentTerms] = useState('');
+    const [deliveryTerms, setDeliveryTerms] = useState('');
+    const [notes, setNotes] = useState('');
+    const [authorizedPerson, setAuthorizedPerson] = useState('');
+    // Sweven spec §2.1: "line items with tax, discount & freight".
+    const [freight, setFreight] = useState('');
+    const resetCommercialHeader = (quote = null) => {
+        setFreight(quote?.freightCharges ?? quote?.freight ?? '');
+        setReferenceNumber(quote?.referenceNumber || '');
+        setSalesperson(quote?.salesperson || '');
+        setPaymentTerms(quote?.paymentTerms || '');
+        setDeliveryTerms(quote?.deliveryTerms || '');
+        setNotes(quote?.notes || '');
+        setAuthorizedPerson(quote?.authorizedPerson || '');
+    };
     const [lineItems, setLineItems] = useState([]);
     const [autoPOState, setAutoPOState] = useState({ isOpen: false, item: null, deficitQty: 0 });
 
@@ -82,6 +112,7 @@ export const QuotationsPage = () => {
         setQuoteDate(new Date().toLocaleDateString('en-CA'));
         setDealReference('');
         setTerms('');
+        resetCommercialHeader();
         setLineItems([]);
         setIsFullscreen(false);
         setIsModalOpen(true);
@@ -94,6 +125,7 @@ export const QuotationsPage = () => {
         setQuoteDate(new Date().toLocaleDateString('en-CA'));
         setDealReference('');
         setTerms('');
+        resetCommercialHeader();
         setLineItems([]);
         setIsFullscreen(false);
     };
@@ -109,6 +141,7 @@ export const QuotationsPage = () => {
         setValidUntil(quote.validUntil || 'In 30 days');
         setDealReference(quote.dealReference || '');
         setTerms(quote.termsAndConditions || quote.terms || '');
+        resetCommercialHeader(quote);
         setLineItems((quote.items || []).map((it) => ({
             ...it,
             id: `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
@@ -202,14 +235,17 @@ export const QuotationsPage = () => {
                   >
                     <CheckCircle2 size={12}/> Converted
                   </button>
-                ) : (
+                ) : isQuotationConvertible(q) ? (
+                  /* Replaced (quotation-first sales): Rejected / Expired / Cancelled
+                     quotations are no longer offers, so they get no Convert button.
+                     Was: ) : ( <button ...>Convert</button> ) */
                   <button
                     onClick={() => handleConvert(q.id)}
                     className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
                   >
                     Convert <ArrowRight size={12}/>
                   </button>
-                )}
+                ) : null}
               </div>
             ),
         },
@@ -218,7 +254,29 @@ export const QuotationsPage = () => {
         e.preventDefault();
         const cust = customers.find((c) => c.id === selectedCustomerId);
         if (!cust) return;
-        const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
+        // Quotation-first sales: a line is an inventory item or a custom /
+        // service line named by its description. The empty placeholder row is
+        // dropped; a priced line with no item and no description is refused.
+        // Replaced: a sheet-metal line whose spec was filled is named by it.
+        // const quoteLines = lineItems.filter((it) => it.itemId || String(it.description || it.name || '').trim() || Number(it.rate));
+        const quoteLines = lineItems
+            .map((it) => (!it.itemId && !String(it.description || it.name || '').trim() && sheetAutoDescription(it.sheetSpec || {}) && Number(it.rate)
+                ? { ...it, description: sheetAutoDescription(it.sheetSpec) } : it))
+            .filter((it) => it.itemId || String(it.description || it.name || '').trim() || Number(it.rate));
+        if (quoteLines.length === 0) {
+            showToast('Add at least one line: an inventory item or a custom / service description.');
+            return;
+        }
+        const unnamed = quoteLines.findIndex((it) => !it.itemId && !String(it.description || it.name || '').trim());
+        if (unnamed !== -1) {
+            showToast('Line ' + (unnamed + 1) + ' needs a description (or pick an inventory item).');
+            return;
+        }
+        // Replaced: totals come from the kept lines only.
+        // const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
+        // Replaced: freight is part of the quoted total.
+        // const computedTotal = quoteLines.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
+        const computedTotal = quoteLines.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) + (Number(freight) || 0);
         addQuotation({
             customerId: cust?.id,
             customer: cust?.name || '',
@@ -228,10 +286,19 @@ export const QuotationsPage = () => {
             date: quoteDate,
             dealReference,
             terms,
+            referenceNumber,
+            salesperson,
+            paymentTerms,
+            deliveryTerms,
+            notes,
+            authorizedPerson,
+            freightCharges: freight === '' ? undefined : Number(freight) || 0,
             validUntil: validUntil || '30 Days',
             amount: computedTotal,
             status: 'Draft',
-            items: lineItems,
+            // Replaced: the placeholder row is not a line.
+            // items: lineItems,
+            items: quoteLines,
         });
         handleCloseCreateModal();
     };
@@ -285,6 +352,7 @@ export const QuotationsPage = () => {
               </div>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
+              <FormSection number="01" title="Customer & quote details" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
@@ -323,9 +391,16 @@ export const QuotationsPage = () => {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><label className="font-semibold text-slate-700">Quote Date<input required type="date" value={quoteDate} onChange={event => setQuoteDate(event.target.value)} className="block mt-1 w-full p-2 border border-slate-300 rounded"/></label><label className="font-semibold text-slate-700">Deal Reference (optional)<input value={dealReference} onChange={event => setDealReference(event.target.value)} placeholder="Existing deal reference" className="block mt-1 w-full p-2 border border-slate-300 rounded"/></label></div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><label className="font-semibold text-slate-700">Reference No. (optional)<input value={referenceNumber} onChange={event => setReferenceNumber(event.target.value)} placeholder="Customer enquiry / PO reference" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label><label className="font-semibold text-slate-700">Salesperson (optional)<input value={salesperson} onChange={event => setSalesperson(event.target.value)} placeholder="Who is handling this quotation" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label></div>
+              {/* Replaced title: "Machines, spare parts & fabrication". */}
+              <FormSection number="02" title="Sheet, plate, sections & fabrication" />
               <div>
                 <label className="font-semibold text-slate-700 block mb-2">Quotation Line Items</label>
-                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" onRequestPO={(item, deficitQty) => {
+                {/* Replaced: hint now covers the metal detail row too.
+                <p className="text-[11px] text-slate-500 mb-2">Pick an inventory item, or leave the item empty and type a description for a service, fabrication or custom line. Custom lines never enter Inventory.</p> */}
+                {/* Replaced hint (compact metal row): "Pick a machine or spare part from inventory, or leave the item empty…" */}
+                <p className="text-[11px] text-slate-500 mb-2">Each line has a sheet-metal calculator: choose material, form and finish, enter thickness × width × length (or OD / dia / kg per metre for pipe, bar and sections) and pieces — the weight is worked out, and the line bills by weight (₹/kg) or by piece. Pick an inventory item for stocked material, or leave it empty for cut-to-size, fabrication or service lines — those never enter Inventory.</p>
+                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" allowCustomLines onRequestPO={(item, deficitQty) => {
                 setAutoPOState({
                     isOpen: true,
                     item,
@@ -334,7 +409,15 @@ export const QuotationsPage = () => {
             }}/>
               </div>
 
-              <label className="block font-semibold text-slate-700">Terms & Conditions<textarea rows="3" value={terms} onChange={event => setTerms(event.target.value)} placeholder="Payment terms, validity and delivery conditions" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
+              <FormSection number="03" title="Commercial terms" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><label className="font-semibold text-slate-700">Payment Terms<input value={paymentTerms} onChange={event => setPaymentTerms(event.target.value)} placeholder="e.g. 50% advance, balance before dispatch" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label><label className="font-semibold text-slate-700">Delivery Terms<input value={deliveryTerms} onChange={event => setDeliveryTerms(event.target.value)} placeholder="e.g. Ex-works Surat, 3–4 weeks from PO & advance" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label></div>
+              <label className="block font-semibold text-slate-700">Notes<textarea rows="2" value={notes} onChange={event => setNotes(event.target.value)} placeholder="Notes printed on the quotation" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
+              <label className="block font-semibold text-slate-700">Terms & Conditions<textarea rows="3" value={terms} onChange={event => setTerms(event.target.value)} placeholder={'e.g. Prices ex-works; GST extra as applicable.\nWeight-based items billed at actual weight (±2% variation).\nTransport, unloading & installation extra unless stated.'} className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
+              {/* Replaced: Authorized Person now sits beside Freight under its own section.
+              <label className="block font-semibold text-slate-700 sm:w-1/2">Authorized Person<input value={authorizedPerson} onChange={event => setAuthorizedPerson(event.target.value)} placeholder="Name printed above the signature" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label> */}
+              <label className="block font-semibold text-slate-700 sm:w-1/2">Freight / Transport Charges (₹)<input type="number" min="0" step="0.01" value={freight} onChange={event => setFreight(event.target.value)} placeholder="Leave empty if ex-works / extra at actuals" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
+              <FormSection number="04" title="Authorisation" hint="Printed above the signature on the quotation PDF." />
+              <label className="block font-semibold text-slate-700 sm:w-1/2">Authorized Person<input value={authorizedPerson} onChange={event => setAuthorizedPerson(event.target.value)} placeholder="Name printed above the signature" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
                   Cancel
@@ -391,13 +474,19 @@ export const QuotationsPage = () => {
                   <span className="text-[10px] text-slate-400 font-semibold uppercase">Validity Window</span>
                   <p className="text-sm font-semibold text-slate-800 mt-0.5">{selectedQuote.validUntil || '30 Days'}</p>
                 </div>
+                {[['Reference No.', selectedQuote.referenceNumber], ['Salesperson', selectedQuote.salesperson], ['Payment Terms', selectedQuote.paymentTerms], ['Delivery Terms', selectedQuote.deliveryTerms], ['Sales Order', (selectedQuote.salesOrders || []).map(o => o.orderNumber).filter(Boolean).join(', ')]].filter(([, value]) => value).map(([label, value]) => (
+                  <div key={label}>
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">{label}</span>
+                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{value}</p>
+                  </div>
+                ))}
               </div>
 
               <div className="space-y-2">
                 <h4 className="font-bold text-slate-700 uppercase tracking-wider text-xs">
                   Quoted Line Items ({selectedQuote.items?.length || 0})
                 </h4>
-                <LineItemEditor items={selectedQuote.items || []} onChange={() => { }} readOnly={true}/>
+                <LineItemEditor items={selectedQuote.items || []} onChange={() => { }} readOnly={true} allowCustomLines/>
               </div>
             </div>
 
@@ -406,7 +495,19 @@ export const QuotationsPage = () => {
                 Total Estimate: <strong className="text-slate-900">{formatCurrency(selectedQuote.amount || 0)}</strong>
               </div>
               <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                {selectedQuote.status !== 'Confirmed' && (<Button onClick={() => { handleConvert(selectedQuote.id); setSelectedQuote(null); }}>
+                {/* Customer approval: recorded here when given by phone, email or in person. */}
+                {['Draft', 'Sent', 'Viewed'].includes(selectedQuote.status) && (<Button variant="outline" onClick={() => approveQuotation(selectedQuote.id)}>
+                    Mark Customer Approved
+                  </Button>)}
+                {!['Confirmed', 'Converted', 'Invoiced', 'Cancelled'].includes(selectedQuote.status) && (<Button variant="outline" onClick={() => {
+                    const reason = window.prompt('Cancel quotation ' + selectedQuote.quoteNumber + '? Enter a reason (optional):');
+                    if (reason !== null) cancelQuotation(selectedQuote.id, reason.trim());
+                  }}>
+                    Cancel Quotation
+                  </Button>)}
+                {/* Replaced (quotation-first sales): only a live offer converts. Was:
+                    {selectedQuote.status !== 'Confirmed' && (<Button ...>Convert to Sales Order</Button>)} */}
+                {isQuotationConvertible(selectedQuote) && (<Button onClick={() => { handleConvert(selectedQuote.id); setSelectedQuote(null); }}>
                     Convert to Sales Order
                   </Button>)}
                 <Button variant="outline" onClick={() => setSelectedQuote(null)}>

@@ -77,6 +77,9 @@ export default function LoginPage() {
   useEffect(() => {
     const action = searchParams.get('action');
     if (action === 'forgot-password' || action === 'reset-password') {
+      // An account-activation email links here with the address filled in.
+      const linkedEmail = searchParams.get('email');
+      if (linkedEmail) setEmail(linkedEmail);
       setIsForgotModalOpen(true);
     }
   }, [searchParams]);
