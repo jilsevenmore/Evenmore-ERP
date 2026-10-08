@@ -220,7 +220,13 @@ function RootRedirect() {
     currentUser?.role?.code === 'CU' ||
     String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
   );
-  return <Navigate to={isCustomer ? '/customer/projects' : '/dashboard'} replace />;
+  const isEmployee = Boolean(
+    currentUser?.role?.code === 'EM' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'employee'
+  );
+  if (isCustomer) return <Navigate to="/customer/projects" replace />;
+  if (isEmployee) return <Navigate to="/pms/my-tasks" replace />;
+  return <Navigate to="/dashboard" replace />;
 }
 
 function CustomerGuardedDashboard() {
@@ -230,8 +236,15 @@ function CustomerGuardedDashboard() {
     currentUser?.role?.code === 'CU' ||
     String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
   );
+  const isEmployee = Boolean(
+    currentUser?.role?.code === 'EM' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'employee'
+  );
   if (isCustomer) {
     return <Navigate to="/customer/projects" replace />;
+  }
+  if (isEmployee) {
+    return <Navigate to="/pms/my-tasks" replace />;
   }
   return <Page component={DashboardPage} />;
 }

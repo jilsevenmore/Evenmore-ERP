@@ -1575,7 +1575,7 @@ const usePmsStoreBase = create((set, get) => ({
     if (get().status.loaded && !force) return null;
 
     const permissions = useAppStore.getState().permissions || [];
-    if (!canOpenPath('/pms', permissions)) {
+    if (!canOpenPath('/pms', permissions) && !canOpenPath('/pms/my-tasks', permissions) && !permissions.includes('view_pms')) {
       set({
         projects: [], stageConfigs: [], departments: [], employees: [],
         statusColors: {}, settings: EMPTY_SETTINGS,

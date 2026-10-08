@@ -3,6 +3,7 @@ import { CalendarClock, Loader, CalendarDays, CheckCircle2, Share2, Plus, Check,
 import { PageHeader } from '../../../components/common/PageHeader';
 import { EmptyStatePms } from '../components/EmptyStatePms';
 import { usePmsStore, groupMyTasks } from '../../../stores/pmsStore';
+import { useAppStore } from '../../../stores/appStore';
 import { TaskFilterBar } from './components/TaskFilterBar';
 import { TaskCardItem } from './components/TaskCardItem';
 import { TaskDetailModal } from './components/TaskDetailModal';
@@ -36,6 +37,7 @@ export default function MyTasksPage() {
   const currentUserId = usePmsStore((s) => s.currentUserId);
   const employees = usePmsStore((s) => s.employees);
   const updateTask = usePmsStore((s) => s.updateTask);
+  const appUser = useAppStore((s) => s.currentUser);
 
   const [activeTab, setActiveTab] = useState('assigned'); // 'assigned' | 'delegated'
   const [filters, setFilters] = useState(EMPTY);
@@ -122,7 +124,7 @@ export default function MyTasksPage() {
     }
   };
 
-  const currentUser = employees.find((e) => e.id === currentUserId) ?? null;
+  const currentUser = employees.find((e) => e.id === currentUserId) ?? appUser ?? null;
 
   // Flatten this user's tasks with the project/stage context each card needs.
   const myTasks = useMemo(
@@ -130,7 +132,18 @@ export default function MyTasksPage() {
       projects.flatMap((p) =>
         (p.stages ?? []).flatMap((stage) =>
           (stage.tasks ?? [])
-            .filter((t) => t.assignedUser?.id === currentUserId)
+            .filter((t) => {
+              const uid = String(t.assignedUser?.id || '');
+              const uname = String(t.assignedUser?.name || '').trim().toLowerCase();
+              const myId = String(currentUserId || '');
+              const appUserId = String(appUser?.id || '');
+              const appUserName = String(appUser?.name || '').trim().toLowerCase();
+              return (
+                (myId && uid === myId) ||
+                (appUserId && uid === appUserId) ||
+                (appUserName && uname === appUserName)
+              );
+            })
             .map((t) => ({
               ...t,
               stageId: stage.id,
@@ -141,7 +154,7 @@ export default function MyTasksPage() {
             }))
         )
       ),
-    [projects, currentUserId]
+    [projects, currentUserId, appUser]
   );
 
   const options = useMemo(() => {

@@ -42,6 +42,7 @@ const ROUTE_PERMISSIONS = [
   ['/administration/roles', 'manage_roles'],
   ['/administration/clients', 'menu_admin'],
   ['/customer/projects', ['view_projects', 'view_pms']],
+  ['/pms/my-tasks', ['view_pms', 'view_task']],
   ['/pms/tracking', ['view_projects', 'view_pms']],
   // Old top-level alias of HRMS › Company Policy.
   ['/company-policy', 'view_staff'],
@@ -67,7 +68,6 @@ const MODULE_MENUS = [
 const SELF_SERVICE_PREFIXES = ['/customer/projects', '/pms/tracking'];
 
 const SELF_SERVICE_ROUTES = new Set([
-  '/crm/tasks',
   '/hrms/leave',
   '/hrms/payroll',
   '/hrms/attendance/mark',

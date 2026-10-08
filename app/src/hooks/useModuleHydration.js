@@ -93,7 +93,7 @@ export function useModuleHydration() {
 
       // PMS filters "my projects" / "my tasks" by the signed-in user.
       const me = app.currentUser;
-      if (me?.id) usePmsStore.getState().setCurrentUserId(me.employeeId || me.id);
+      if (me?.id) usePmsStore.getState().setCurrentUserId(me.id);
     };
 
     run();

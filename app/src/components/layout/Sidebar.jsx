@@ -95,6 +95,14 @@ const NAV = [
     to: '/project-chats',
   },
 
+  // Every stage employee: their assigned PMS stage tasks (Fabrication, Welding, QA, etc.)
+  {
+    label: 'My Stage Tasks',
+    icon: ListChecks,
+    to: '/pms/my-tasks',
+    badgeKey: 'pmsMyTasksPending',
+  },
+
   {
     label: 'CRM',
     menu: 'menu_crm',
