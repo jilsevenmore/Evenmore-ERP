@@ -19,6 +19,7 @@ import {
 import PageHeader from '../../../components/ui/PageHeader';
 import { exportToCSV } from '../../../services/exportUtils';
 import { getLeadStageOrder, DEFAULT_STAGE_ORDER, loadLeadRows } from '../../../services/taskCompletionService';
+import { CRM_EVENT } from '../../../services/leadStageAutomation';
 import { useCrmStore } from '../../../stores/crmStore';
 import { fetchWonRevenueAttribution } from '../../../services/upgradeService';
 
@@ -192,6 +193,9 @@ export default function CRMReportsPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [tick, setTick] = useState(0);
   const [printView, setPrintView] = useState(false);
+  const [attributionYear, setAttributionYear] = useState(() => new Date().getFullYear());
+  const [attribution, setAttribution] = useState(null);
+  const [attributionLoading, setAttributionLoading] = useState(false);
 
   useEffect(() => {
     function refresh() {
@@ -206,6 +210,26 @@ export default function CRMReportsPage() {
       window.removeEventListener('focus', refresh);
     };
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'attribution') return;
+    let isMounted = true;
+    setAttributionLoading(true);
+    fetchWonRevenueAttribution(attributionYear)
+      .then((res) => {
+        if (!isMounted) return;
+        setAttribution(res?.data || res || null);
+      })
+      .catch((err) => {
+        console.error('Failed to load won-revenue attribution:', err);
+      })
+      .finally(() => {
+        if (isMounted) setAttributionLoading(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, attributionYear, tick]);
 
   function handlePrint() {
     setPrintView(true);

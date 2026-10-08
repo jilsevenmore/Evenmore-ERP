@@ -190,16 +190,7 @@ const NAV = [
     menu: 'menu_inventory',
     icon: Package,
     children: [
-      {
-        label: 'Items Master',
-        icon: Boxes,
-        defaultOpen: false,
-        children: [
-          { label: 'All Items', to: '/inventory/items', dot: true },
-          { label: 'Machine Master', to: '/inventory/items/machines' },
-          { label: 'Stock Inventory', to: '/inventory/items/stock' },
-        ],
-      },
+      { label: 'Item Master', icon: Boxes, to: '/inventory/items' },
       {
         label: 'Categories',
         icon: Layers,

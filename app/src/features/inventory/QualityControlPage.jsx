@@ -238,7 +238,7 @@ export function QualityControlPageOriginal() {
         </button>
       </div>
 
-      {/* KPI Stat Cards */}
+      {/* KPI Stat Cards * /}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Pending Inspection Lots"
@@ -269,7 +269,7 @@ export function QualityControlPageOriginal() {
         />
       </div>
 
-      {/* Filter and Tab Bar */}
+      {/* Filter and Tab Bar * /}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-50/50">
           <div className="flex items-center gap-1 overflow-x-auto">
@@ -316,7 +316,7 @@ export function QualityControlPageOriginal() {
           </div>
         </div>
 
-        {/* Inspections Table */}
+        {/* Inspections Table * /}
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -404,7 +404,7 @@ export function QualityControlPageOriginal() {
         </div>
       </div>
 
-      {/* Interactive Inspection Desk Modal / Sheet */}
+      {/* Interactive Inspection Desk Modal / Sheet * /}
       {isInspectModalOpen && selectedInspection && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden my-6">
@@ -432,7 +432,7 @@ export function QualityControlPageOriginal() {
             </div>
 
             <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-              {/* Lot Overview */}
+              {/* Lot Overview * /}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-xl bg-slate-50 border border-slate-100 text-xs">
                 <div>
                   <span className="text-slate-400 block text-[10px] uppercase font-bold">Total Received</span>
@@ -452,7 +452,7 @@ export function QualityControlPageOriginal() {
                 </div>
               </div>
 
-              {/* Parameter Checklist Table */}
+              {/* Parameter Checklist Table * /}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
@@ -506,7 +506,7 @@ export function QualityControlPageOriginal() {
                 </div>
               </div>
 
-              {/* Quantity Release Distribution */}
+              {/* Quantity Release Distribution * /}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -546,7 +546,7 @@ export function QualityControlPageOriginal() {
                 </div>
               </div>
 
-              {/* Inspector Sign-off Notes */}
+              {/* Inspector Sign-off Notes * /}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Inspector Sign-Off Notes & Certificate Observations
@@ -560,7 +560,7 @@ export function QualityControlPageOriginal() {
                 />
               </div>
 
-              {/* 3-Way Final Disposition Action Buttons */}
+              {/* 3-Way Final Disposition Action Buttons * /}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
                 <span className="block text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
                   Commit 3-Way Final Disposition:
@@ -605,7 +605,7 @@ export function QualityControlPageOriginal() {
         </div>
       )}
 
-      {/* New Inspection Intake Modal */}
+      {/* New Inspection Intake Modal * /}
       {isNewModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
