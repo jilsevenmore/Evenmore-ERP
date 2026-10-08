@@ -25,6 +25,7 @@ import { useAppStore } from '../../stores/appStore';
 import { login as loginRequest } from '../../services/authService';
 import { describeError } from '../../services/resourceSync';
 import { getStoredToken } from '../../utils/authUtils';
+import { api } from '../../services/api';
 import ForgotPasswordModal from './ForgotPasswordModal';
 
 const THEMES = [
@@ -83,13 +84,41 @@ export default function LoginPage() {
     }
   }, [searchParams]);
 
-  const handleLoginSubmit = async (e) => {
+  // Test-account picker: only when the server has it on (development, see
+  // TEST_LOGIN_PICKER) and a test tenant exists. A 404 means hide it.
+  const [testTenants, setTestTenants] = useState([]);
+  const [testAccount, setTestAccount] = useState('');
+  useEffect(() => {
+    let cancelled = false;
+    api.get('/auth/test-accounts/')
+      .then((body) => { if (!cancelled) setTestTenants(body?.tenants || []); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  const testAccounts = testTenants.flatMap((t) =>
+    t.accounts.map((a) => ({ ...a, password: t.password, tenantName: t.name }))
+  );
+
+  const handleLoginSubmit = (e) => {
     e?.preventDefault();
-    if (!email.trim()) {
+    signIn(email, password);
+  };
+
+  /** Sign in as a picked test account — fills the form and signs straight in. */
+  const signInAsTestAccount = () => {
+    const account = testAccounts.find((a) => a.email === testAccount);
+    if (!account) return;
+    setEmail(account.email);
+    setPassword(account.password || '');
+    signIn(account.email, account.password || '');
+  };
+
+  const signIn = async (emailValue, passwordValue) => {
+    if (!String(emailValue || '').trim()) {
       setError('Please enter your email address.');
       return;
     }
-    if (!password) {
+    if (!passwordValue) {
       setError('Please enter your password.');
       return;
     }
@@ -101,15 +130,15 @@ export default function LoginPage() {
       // The server owns the session. There is no local persona to fall back on:
       // if this throws, the user is not signed in and the form says why.
       const { user, permissions } = await loginRequest({
-        email,
-        password,
+        email: emailValue,
+        password: passwordValue,
         remember: rememberMe,
       });
 
       setCurrentUser(user);
       setPermissions(permissions);
 
-      showToast?.(`Signed in successfully as ${user?.name || email}`);
+      showToast?.(`Signed in successfully as ${user?.name || emailValue}`);
       const isCustomer = Boolean(
         user?.isCustomer ||
         user?.role?.code === 'CU' ||
@@ -384,6 +413,50 @@ export default function LoginPage() {
                   )}
                 </button>
               </form>
+
+              {/* Test-account picker (development only; the server decides) */}
+              {testAccounts.length > 0 && (
+                <div className="mt-4 rounded-xl border border-dashed border-amber-400/70 bg-amber-50/60 dark:bg-amber-500/10 p-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-amber-800 dark:text-amber-300">
+                      Test accounts
+                    </span>
+                    <span className="text-[10px] text-amber-700/80 dark:text-amber-300/80 truncate">
+                      {testTenants.map((t) => t.name).join(', ')} · development only
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      value={testAccount}
+                      onChange={(e) => setTestAccount(e.target.value)}
+                      className="flex-1 min-w-0 text-xs rounded-lg border border-amber-300 bg-white dark:bg-[var(--card)] px-2.5 py-2 text-[var(--text)]"
+                      aria-label="Choose a test account"
+                    >
+                      <option value="">Choose who to sign in as…</option>
+                      {testTenants.map((t) => (
+                        <optgroup key={t.slug} label={t.name}>
+                          {t.accounts.map((a) => (
+                            <option key={a.email} value={a.email}>
+                              {a.role || 'No role'} — {a.name}{a.designation ? ` (${a.designation})` : ''}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={signInAsTestAccount}
+                      disabled={!testAccount || isLoading}
+                      className="shrink-0 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer"
+                    >
+                      Sign in
+                    </button>
+                  </div>
+                  {testAccount && (
+                    <p className="mt-1.5 text-[10.5px] text-amber-800/80 dark:text-amber-300/80 font-mono truncate">{testAccount}</p>
+                  )}
+                </div>
+              )}
 
               {/* Bottom Support Link */}
               <div className="mt-5 pt-4 border-t border-[var(--border)] flex items-center justify-between text-[11px] text-[var(--muted)]">

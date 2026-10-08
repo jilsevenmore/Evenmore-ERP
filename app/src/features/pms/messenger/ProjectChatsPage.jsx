@@ -4,8 +4,8 @@
  * Opens without PMS access: a welder on the Fabrication team has no business
  * in the PMS screens, but should talk to the people on the projects they work
  * on. The list is the server's `/pms/my-chats/` — the projects I am on (as PM,
- * stage or task owner, or on the project's team list) — and each opens the
- * same messenger the project page uses.
+ * stage or task owner, or on the project's team list), or every project for an
+ * administrator — and each opens the same messenger the project page uses.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, MessagesSquare, RefreshCw } from 'lucide-react';
@@ -70,7 +70,7 @@ export default function ProjectChatsPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           <aside className="lg:col-span-3 bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
             <div className="px-4 py-3 border-b border-bdr/60 text-[11px] font-bold uppercase tracking-wide text-muted">
-              My projects
+              Projects
             </div>
             <ul className="divide-y divide-bdr/40">
               {projects.map((p) => {
