@@ -103,11 +103,25 @@ const useAppStoreBase = create((set) => ({
 
     set((s) => ({ hrmsStatus: { ...s.hrmsStatus, loading: true, error: null } }));
     try {
+      // Only what this user may read (the server's permission_map): anything
+      // else comes back 403. Leave rows are scoped to the caller on the server,
+      // so a self-service employee still gets their own.
+      const granted = state.permissions || [];
+      const holds = (codes) => codes.some((code) => granted.includes(code));
+      const staff = holds(["view_staff"]);
+      const leave = holds(["apply_leave", "approve_leave"]);
+      const keys = [
+        staff && "employees",
+        staff && "candidates",
+        holds(["view_team_attendance"]) && "attendance",
+        leave && "leaves",
+        leave && "leaveEncashments",
+        leave && "compOffs",
+      ].filter(Boolean);
       const [core, balances, settings] = await Promise.all([
-        hrmsSync.pullMany(["employees", "leaves", "attendance", "candidates",
-          "leaveEncashments", "compOffs"]),
-        hrmsApi.pullLeaveBalances(),
-        hrmsApi.pullHrmsSettings(),
+        keys.length ? hrmsSync.pullMany(keys) : {},
+        leave ? hrmsApi.pullLeaveBalances() : null,
+        staff ? hrmsApi.pullHrmsSettings() : null,
       ]);
       set((s) => ({
         employees: core.employees ?? s.employees,

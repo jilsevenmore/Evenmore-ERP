@@ -4,6 +4,7 @@ import { useIdleReady } from './useIdleReady';
 import { loadEventNotifications, NOTIFICATION_EVENT } from '../services/crmEventNotifications';
 import { useCrmStore } from '../stores/crmStore';
 import { useAppStore } from '../stores/appStore';
+import { canOpenPath } from '../utils/navAccess';
 
 const CRM_EVENT = 'crm:data-updated';
 const EMPTY_ROWS = [];
@@ -318,23 +319,27 @@ export function useCrmNotificationDigest() {
     String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
   );
 
+  const permissions = useAppStore((s) => s.permissions) || [];
+  const hasSales = !isCustomer && canOpenPath('/sales/invoices', permissions);
+  const hasCrm = !isCustomer && (canOpenPath('/crm', permissions) || canOpenPath('/crm/tasks', permissions));
+
   const erp = useERP() || {};
   const digestReady = useIdleReady();
-  const { quotations, deliveryChallans } = (!isCustomer && digestReady) ? erp : {};
+  const { quotations, deliveryChallans } = (hasSales && digestReady) ? erp : {};
   const crmStoreHook = useCrmStore.raw || useCrmStore;
-  const leadRows = (!isCustomer ? crmStoreHook((s) => s.leads) : EMPTY_ROWS) || EMPTY_ROWS;
-  const crmTasks = (!isCustomer ? crmStoreHook((s) => s.tasks) : EMPTY_ROWS) || EMPTY_ROWS;
-  const allAllocations = (!isCustomer ? crmStoreHook((s) => s.taskAllocations) : EMPTY_ROWS) || EMPTY_ROWS;
+  const leadRows = (hasCrm ? crmStoreHook((s) => s.leads) : EMPTY_ROWS) || EMPTY_ROWS;
+  const crmTasks = (hasCrm ? crmStoreHook((s) => s.tasks) : EMPTY_ROWS) || EMPTY_ROWS;
+  const allAllocations = (hasCrm ? crmStoreHook((s) => s.taskAllocations) : EMPTY_ROWS) || EMPTY_ROWS;
 
   const currentUserId = currentUser?.id;
   const allocationTasks = useMemo(
-    () => (!isCustomer ? allAllocations.filter((task) => currentUserId && String(task.assigneeId) === String(currentUserId)) : EMPTY_ROWS),
-    [allAllocations, currentUserId, isCustomer],
+    () => (hasCrm ? allAllocations.filter((task) => currentUserId && String(task.assigneeId) === String(currentUserId)) : EMPTY_ROWS),
+    [allAllocations, currentUserId, hasCrm],
   );
-  const [eventItems, setEventItems] = useState(() => (isCustomer ? EMPTY_ROWS : loadEventNotifications()));
+  const [eventItems, setEventItems] = useState(() => (hasCrm ? loadEventNotifications() : EMPTY_ROWS));
 
   useEffect(() => {
-    if (isCustomer) return;
+    if (!hasCrm) return;
     const sync = () => setEventItems(loadEventNotifications());
     sync();
 
@@ -349,7 +354,7 @@ export function useCrmNotificationDigest() {
       window.removeEventListener('focus', sync);
       window.clearInterval(timer);
     };
-  }, [isCustomer]);
+  }, [hasCrm]);
 
   return useMemo(
     () => {

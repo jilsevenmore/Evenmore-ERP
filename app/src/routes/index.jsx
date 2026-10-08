@@ -57,6 +57,7 @@ const PMSTaskCalendarPage = lazy(() => import('../features/pms/calendar/TaskCale
 const PMSTimesheetsPage = lazy(() => import('../features/pms/timesheets/TimesheetsPage'));
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
+const MyProfilePage = lazy(() => import('../features/profile/MyProfilePage'));
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
 const AttendanceOverview = lazy(() => import('../features/hrms/attendance/Overview'));
@@ -413,6 +414,9 @@ const router = createBrowserRouter([
       { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
       { path: 'accounts/budgets', element: <Page component={BudgetsPage} /> },
       { path: 'accounts/reports', element: <Page component={FinancialReportsPage} /> },
+
+      // Every employee's own record — outside /hrms so it needs no HRMS access.
+      { path: 'my-profile', element: <Page component={MyProfilePage} /> },
 
       // ── HRMS ──────────────────────────────────────────────
       { path: 'hrms', element: <Navigate to="/hrms/dashboard" replace /> },

@@ -12,6 +12,8 @@
  */
 import { create } from 'zustand';
 import { lazyStore } from '../services/lazyModules';
+import { useAppStore } from './appStore';
+import { canOpenPath } from '../utils/navAccess';
 import {
   crmSync,
   CRM_PULL_ORDER,
@@ -24,6 +26,23 @@ import {
   describeError,
   isBackendEnabled,
 } from '../services/crmSync';
+
+const CRM_KEY_PERMISSIONS = {
+  stages: '/crm/leads',
+  dealStages: '/crm/deals',
+  sources: '/crm/leads',
+  industries: '/crm/leads',
+  lostReasons: '/crm/deals',
+  leads: '/crm/leads',
+  deals: '/crm/deals',
+  tasks: '/crm/tasks',
+  masterTasks: '/crm/leads/tasks-master',
+  stageTasks: '/crm/leads/stage-tasks',
+  taskAllocations: '/crm/tasks',
+  forms: '/crm/leads/forms',
+  projects: '/crm/projects',
+  contracts: '/crm/contracts',
+};
 
 const EMPTY = {
   leads: [],
@@ -82,10 +101,18 @@ const useCrmStoreBase = create((set, get) => ({
 
     set((s) => ({ status: { ...s.status, loading: true, error: null } }));
     try {
+      const permissions = useAppStore.getState().permissions || [];
+      const keysToPull = CRM_PULL_ORDER.filter((key) => {
+        const path = CRM_KEY_PERMISSIONS[key];
+        return !path || canOpenPath(path, permissions);
+      });
+      const canSeeLeads = canOpenPath('/crm/leads', permissions);
+      const canSeeRoster = canOpenPath('/crm', permissions) || canOpenPath('/crm/tasks', permissions);
+
       const [collections, roster, stats] = await Promise.all([
-        crmSync.pullMany(CRM_PULL_ORDER),
-        pullTeamRoster(),
-        pullLeadStats(),
+        keysToPull.length ? crmSync.pullMany(keysToPull) : Promise.resolve({}),
+        canSeeRoster ? pullTeamRoster() : Promise.resolve(null),
+        canSeeLeads ? pullLeadStats() : Promise.resolve(null),
       ]);
       set({
         ...collections,

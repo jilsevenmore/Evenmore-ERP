@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { lazyStore } from "../services/lazyModules";
+import { lazyStore, sessionCan } from "../services/lazyModules";
 import {
   writeThrough,
   pullTracked,
@@ -84,20 +84,35 @@ function mapPunchPayload(res) {
   };
 }
 
+/**
+ * The flexibility policy is a team read (`view_team_attendance`). Attendance
+ * rows are readable by anyone who marks attendance — the server returns only
+ * their own unless they hold the team permission.
+ */
+function canViewTeamAttendance() {
+  return sessionCan("view_team_attendance");
+}
+
+function canReadAttendance() {
+  return sessionCan(["view_team_attendance", "mark_attendance"]);
+}
+
 const useAttendanceStoreBase = create((set, get) => ({
-  /** Load this module's collections from the API. */
+  /**
+   * Load this module's collections from the API. Today's punch status is not
+   * here: the topbar and the HRMS dashboard each fetch it themselves.
+   */
   hydrate: async () => {
-    const [attRows, reqRows, flex, punchStatus] = await Promise.all([
-      pullTracked("attendance"),
+    const team = canViewTeamAttendance();
+    const [attRows, reqRows, flex] = await Promise.all([
+      canReadAttendance() ? pullTracked("attendance") : null,
       pullTracked("attendanceRegularizations"),
-      pullFlexibility(),
-      pullTodayPunch().catch(() => null),
+      team ? pullFlexibility() : null,
     ]);
     set((s) => ({
       records: attRows || s.records,
       requests: reqRows || s.requests,
       flexibility: flex || s.flexibility,
-      todayPunch: punchStatus ? mapPunchPayload(punchStatus) : s.todayPunch,
     }));
     return [attRows, reqRows, flex];
   },
@@ -197,6 +212,7 @@ const useAttendanceStoreBase = create((set, get) => ({
 
   // Refresh attendance records from API
   refreshAttendance: async () => {
+    if (!canReadAttendance()) return null;
     try {
       const recs = await pullTracked("attendance");
       if (recs) set({ records: recs });

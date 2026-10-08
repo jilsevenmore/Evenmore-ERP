@@ -13,6 +13,8 @@
 
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
+import { useAppStore } from "./appStore";
+import { canOpenPath } from "../utils/navAccess";
 import * as pmsApi from "../services/pmsSync";
 import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
 
@@ -1571,6 +1573,16 @@ const usePmsStoreBase = create((set, get) => ({
     }
     if (get().status.loading) return null;
     if (get().status.loaded && !force) return null;
+
+    const permissions = useAppStore.getState().permissions || [];
+    if (!canOpenPath('/pms', permissions)) {
+      set({
+        projects: [], stageConfigs: [], departments: [], employees: [],
+        statusColors: {}, settings: EMPTY_SETTINGS,
+        status: { loading: false, loaded: true, error: null, lastSyncAt: null },
+      });
+      return null;
+    }
 
     set((st) => ({ status: { ...st.status, loading: true, error: null } }));
     try {

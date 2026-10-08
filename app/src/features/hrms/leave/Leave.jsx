@@ -1,5 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAppStore } from "../../../stores/appStore";
+import { hrmsSync } from "../../../services/hrmsSync";
+import { api } from "../../../services/api";
+import { rowsOf } from "../../../services/resourceSync";
 import { useCalendarStore } from "../../../stores/calendarStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { Badge } from "../../../components/hrms/Badge";
@@ -54,7 +57,43 @@ export default function Leave() {
     approveCompOff,
     rejectCompOff,
     toggleSandwichRule,
+    permissions = [],
   } = useAppStore();
+
+  // Leave details (the team's requests, balances, delegations, comp-off and
+  // encashment) are for approvers — HR admin, super admin, or any role granted
+  // `approve_leave` — and for reporting managers, who read their own team's
+  // (the server scopes the rows). Everyone else only applies for leave.
+  const canApproveLeave = permissions.includes("approve_leave");
+  const canSeeLeaveDetails = canApproveLeave || Boolean(currentUser?.managesTeam);
+  // Only an approver with the staff directory can apply on someone's behalf.
+  const canPickEmployee = canApproveLeave && employees.length > 0;
+  const canWriteCalendar = permissions.includes("edit_staff");
+
+  // The tenant's leave types: an application must name one by id.
+  const [leaveTypes, setLeaveTypes] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    hrmsSync.pull("leaveTypes").then((rows) => {
+      if (!cancelled && rows) setLeaveTypes(rows);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Who can cover your work. Self-service cannot read the staff directory, so
+  // it gets the names-only colleague list instead.
+  const [colleagues, setColleagues] = useState([]);
+  const needsColleagues = employees.length === 0;
+  useEffect(() => {
+    if (!needsColleagues) return undefined;
+    let cancelled = false;
+    api.get("/hrms/employees/colleagues/")
+      .then((body) => { if (!cancelled) setColleagues(rowsOf(body)); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [needsColleagues]);
+  const delegateDirectory = employees.length > 0 ? employees : colleagues;
+  const myEmployeeId = currentUser?.employeeRecordId ? String(currentUser.employeeRecordId) : "";
 
   const calendarEvents = useCalendarStore((s) => s.events || []);
   const addCalendarEvent = useCalendarStore((s) => s.addEvent);
@@ -94,7 +133,8 @@ export default function Leave() {
 
   const [form, setForm] = useState({
     employeeName: currentUser?.name || "",
-    type: "Annual Leave",
+    type: "",
+    leaveTypeId: "",
     from: todayISO,
     to: todayISO,
     reason: "",
@@ -148,13 +188,15 @@ export default function Leave() {
 
   const filteredEmployees = useMemo(() => {
     if (!form.delegateSearch) return [];
-    return employees
+    const applicant = String((canPickEmployee ? form.employeeName : currentUser?.name) ?? '').toLowerCase();
+    return delegateDirectory
       .filter((e) =>
         String(e.name ?? '').toLowerCase().includes(String(form.delegateSearch ?? '').toLowerCase()) &&
-        String(e.name ?? '').toLowerCase() !== String(form.employeeName ?? '').toLowerCase()
+        String(e.name ?? '').toLowerCase() !== applicant &&
+        String(e.id) !== myEmployeeId
       )
       .slice(0, 5);
-  }, [employees, form.delegateSearch, form.employeeName]);
+  }, [delegateDirectory, form.delegateSearch, form.employeeName, canPickEmployee, currentUser?.name, myEmployeeId]);
 
   // Check if requested leave interval overlaps with official holidays
   const holidayOverlap = useMemo(() => {
@@ -215,20 +257,35 @@ export default function Leave() {
     }
   }, [form.from, form.to, holidayOverlap.length, sandwichRuleEnabled]);
 
+  // The selected leave type, defaulting to the first one the tenant has.
+  const selectedLeaveType =
+    leaveTypes.find((t) => String(t.id) === String(form.leaveTypeId)) || leaveTypes[0] || null;
+
   function submitLeave() {
-    if (!form.employeeName) return showToast("Select the applying employee");
+    // Self-service applies for the linked employee record; an approver may pick.
+    const applicantName = canPickEmployee ? form.employeeName : currentUser?.name || "";
+    const applicantId = canPickEmployee
+      ? employees.find((e) => e.name === form.employeeName)?.id
+      : currentUser?.employeeRecordId;
+    if (canPickEmployee && !applicantId) return showToast("Select the applying employee");
+    if (!applicantId) return showToast("Your login is not linked to an employee record — ask HR to link it");
+    if (!selectedLeaveType) return showToast("No leave types are set up yet — ask HR to add them");
     if (!form.reason.trim()) return showToast("Reason required for leave application");
     if (new Date(form.to) < new Date(form.from)) return showToast("To Date cannot be before From Date");
 
     const netDeductedDays = calculatedDays;
+    const leaveTypeName = selectedLeaveType.name;
     const chosenDelegate = form.delegate || "";
-    const chosenDelegateEmp = employees.find((e) => e.name === chosenDelegate);
+    const chosenDelegateEmp = delegateDirectory.find((e) => e.name === chosenDelegate);
 
     addLeave({
       id: "LV-" + Date.now().toString().slice(-4),
-      employee: form.employeeName,
-      avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(form.employeeName)}`,
-      type: form.type,
+      employeeId: applicantId,
+      leaveTypeId: selectedLeaveType.id,
+      delegateId: chosenDelegateEmp?.id,
+      employee: applicantName,
+      avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(applicantName)}`,
+      type: leaveTypeName,
       from: form.from,
       to: form.to,
       days: netDeductedDays,
@@ -240,16 +297,17 @@ export default function Leave() {
       submittedAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
     });
 
-    if (addCalendarEvent) {
+    // The shared calendar is an HR write; self-service has no access to it.
+    if (addCalendarEvent && canWriteCalendar) {
       addCalendarEvent({
-        title: `${form.type} (${form.employeeName})`,
+        title: `${leaveTypeName} (${applicantName})`,
         startDate: form.from,
         endDate: form.to,
         type: "Leave",
         time: "Full Day",
         location: "Out of Office",
         dept: "General",
-        organizer: form.employeeName,
+        organizer: applicantName,
         description: `Coverage delegate: ${chosenDelegate || "—"}. Reason: ${form.reason}`,
       });
     }
@@ -310,10 +368,12 @@ export default function Leave() {
 
   const userDelegations = useMemo(() => {
     const currentUserName = String(currentUser?.name || "").toLowerCase();
-    if (!currentUserName) return { assigned: [], mine: [] };
+    if (!currentUserName && !myEmployeeId) return { assigned: [], mine: [] };
+    const isMe = (id, name) =>
+      myEmployeeId ? String(id || "") === myEmployeeId : String(name || "").toLowerCase() === currentUserName;
 
     const assigned = leaves
-      .filter((l) => l.delegate?.toLowerCase() === currentUserName)
+      .filter((l) => isMe(l.delegateId, l.delegate))
       .map((l) => ({
         id: l.id,
         emp: l.employee,
@@ -325,7 +385,7 @@ export default function Leave() {
       }));
 
     const mine = leaves
-      .filter((l) => l.employee?.toLowerCase() === currentUserName)
+      .filter((l) => isMe(l.employeeId, l.employee))
       .map((l) => ({
         id: l.id,
         emp: l.delegate || "Not assigned",
@@ -337,7 +397,7 @@ export default function Leave() {
       }));
 
     return { assigned, mine };
-  }, [leaves, currentUser]);
+  }, [leaves, currentUser, myEmployeeId]);
 
   const delegationLoad = useMemo(() => {
     const counts = {};
@@ -360,6 +420,8 @@ export default function Leave() {
           <p className="text-[13px] text-muted">Apply, approve, monitor leave quotas, encashment, and comp-off credits</p>
         </div>
         <div className="flex items-center gap-2.5 flex-wrap">
+          {canSeeLeaveDetails && (
+          <>
           <button
             type="button"
             onClick={() => setCompOffModalOpen(true)}
@@ -376,6 +438,8 @@ export default function Leave() {
             <Coins size={15} className="text-emerald-700" />
             Encash Leave
           </button>
+          </>
+          )}
           <button
             type="button"
             onClick={() => setApplyModalOpen(true)}
@@ -388,6 +452,7 @@ export default function Leave() {
       </div>
 
       {/* ── Leave Quota Balance Cards Row (5 Categories with Carry-Forward & Comp-Off) ── */}
+      {canSeeLeaveDetails && (
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5">
         {Object.entries(leaveBalances).map(([key, item]) => {
           const remaining = Math.max(0, item.total - item.used);
@@ -433,10 +498,11 @@ export default function Leave() {
           );
         })}
       </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Leave Application Form */}
-        <div className="lg:col-span-5 lg:sticky lg:top-6 self-start bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col gap-4">
+        <div className={`${canSeeLeaveDetails ? "lg:col-span-5 lg:sticky lg:top-6" : "lg:col-span-12 w-full max-w-2xl"} self-start bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col gap-4`}>
           <div className="flex items-center justify-between border-b border-bdr/60 pb-3">
             <div>
               <h3 className="font-bold text-[15px] text-slate-900">Apply for Leave</h3>
@@ -450,33 +516,38 @@ export default function Leave() {
           <div className="space-y-3.5">
             <div>
               <label className="text-[12px] font-semibold text-slate-700 block mb-1">Applying Employee</label>
-              <select
-                value={form.employeeName}
-                onChange={(e) => setForm({ ...form, employeeName: e.target.value })}
-                className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13.5px] font-medium text-slate-900 focus:outline-none focus:border-navy"
-              >
-                <option value="">Select employee</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.name}>
-                    {emp.name} ({emp.department} • {emp.designation})
-                  </option>
-                ))}
-              </select>
+              {canPickEmployee ? (
+                <select
+                  value={form.employeeName}
+                  onChange={(e) => setForm({ ...form, employeeName: e.target.value })}
+                  className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13.5px] font-medium text-slate-900 focus:outline-none focus:border-navy"
+                >
+                  <option value="">Select employee</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.name}>
+                      {emp.name} ({emp.department} • {emp.designation})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="w-full h-10 px-3 flex items-center bg-off border border-bdr rounded-xl text-[13.5px] font-medium text-slate-900">
+                  {currentUser?.name || "—"}
+                </div>
+              )}
             </div>
 
             <div>
               <label className="text-[12px] font-semibold text-slate-700 block mb-1">Leave Type</label>
               <select
-                value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value })}
-                className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy"
+                value={selectedLeaveType?.id ?? ""}
+                onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })}
+                disabled={leaveTypes.length === 0}
+                className="w-full h-10 px-3 bg-off border border-bdr rounded-xl text-[13.5px] focus:outline-none focus:border-navy disabled:opacity-60"
               >
-                <option>Annual Leave</option>
-                <option>Sick Leave</option>
-                <option>Casual Leave</option>
-                <option>Floating Holiday</option>
-                <option>Comp-Off Leave</option>
-                <option>Unpaid / Sabbatical</option>
+                {leaveTypes.length === 0 && <option value="">No leave types set up yet</option>}
+                {leaveTypes.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
               </select>
             </div>
 
@@ -538,9 +609,12 @@ export default function Leave() {
               />
             </div>
 
+            {/* Picking a delegate needs the staff directory, which self-service
+                cannot read; the manager arranges cover instead. */}
+            {delegateDirectory.length > 0 && (
             <div>
               <label className="text-[12px] font-semibold text-slate-700 block mb-1">
-                Assign Work Coverage (Delegate) *
+                Assign Work Coverage (Delegate)
               </label>
               <div className="relative">
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
@@ -584,6 +658,7 @@ export default function Leave() {
                 </span>
               </div>
             </div>
+            )}
 
             <div>
               <label className="text-[12px] font-semibold text-slate-700 block mb-1">
@@ -614,6 +689,7 @@ export default function Leave() {
         </div>
 
         {/* Pending Approvals Queue */}
+        {canSeeLeaveDetails && (
         <div className="lg:col-span-7 bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col gap-4">
           <div className="flex flex-wrap justify-between items-center gap-3 border-b border-bdr/60 pb-3">
             <div>
@@ -734,7 +810,7 @@ export default function Leave() {
                       </div>
                     </div>
 
-                    {l.status === "Pending Review" && (
+                    {canApproveLeave && l.status === "Pending Review" && (
                       <div className="flex items-center gap-1.5 self-end sm:self-center">
                         <span className="text-[11.5px] text-muted">Reassign:</span>
                         <select
@@ -768,7 +844,7 @@ export default function Leave() {
                     </div>
                   )}
 
-                  {l.status === "Pending Review" && (
+                  {canApproveLeave && l.status === "Pending Review" && (
                     <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-1 border-t border-bdr/40">
                       <button
                         type="button"
@@ -809,9 +885,12 @@ export default function Leave() {
             </div>
           )}
         </div>
+        )}
       </div>
 
-      {/* ── Delegations & Governance Tracker Card ── */}
+      {/* ── Delegations & Governance Tracker Card ──
+          Everyone sees it: a colleague's handover to you shows under
+          "Assigned to me". Approving comp-off / encashment stays with approvers. */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
         <div className="p-5 pb-0">
           <div className="flex flex-wrap justify-between items-center gap-3">
@@ -1020,7 +1099,7 @@ export default function Leave() {
                       </Badge>
                     </td>
                     <td className="py-3.5 px-5 text-right">
-                      {c.status === "Pending" ? (
+                      {c.status === "Pending" && canApproveLeave ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
@@ -1047,6 +1126,8 @@ export default function Leave() {
                         <span className="text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1">
                           <Check size={11} /> Credited to Balance
                         </span>
+                      ) : c.status === "Pending" ? (
+                        <span className="text-[11.5px] text-amber-700 font-medium">Awaiting approval</span>
                       ) : (
                         <span className="text-[11.5px] text-rose-700 font-medium">Rejected</span>
                       )}
@@ -1117,7 +1198,7 @@ export default function Leave() {
                       </Badge>
                     </td>
                     <td className="py-3.5 px-5 text-right">
-                      {e.status === "Pending" ? (
+                      {e.status === "Pending" && canApproveLeave ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
@@ -1144,6 +1225,8 @@ export default function Leave() {
                         <span className="text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200 inline-flex items-center gap-1">
                           <Coins size={12} /> Synced to Payroll (+₹{(e.amount || e.days * 2083).toLocaleString()})
                         </span>
+                      ) : e.status === "Pending" ? (
+                        <span className="text-[11.5px] text-amber-700 font-medium">Awaiting approval</span>
                       ) : (
                         <span className="text-[11.5px] text-rose-700 font-medium">Rejected</span>
                       )}
@@ -1183,33 +1266,36 @@ export default function Leave() {
         <div style={{ display: "grid", gap: 14 }}>
           <div className="form-group">
             <label className="form-label">Applying Employee</label>
-            <select
-              className="form-select"
-              value={form.employeeName}
-              onChange={(e) => setForm({ ...form, employeeName: e.target.value })}
-            >
-              <option value="">Select employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.name}>
-                  {emp.name} ({emp.department} • {emp.designation})
-                </option>
-              ))}
-            </select>
+            {canPickEmployee ? (
+              <select
+                className="form-select"
+                value={form.employeeName}
+                onChange={(e) => setForm({ ...form, employeeName: e.target.value })}
+              >
+                <option value="">Select employee</option>
+                {employees.map((emp) => (
+                  <option key={emp.id} value={emp.name}>
+                    {emp.name} ({emp.department} • {emp.designation})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input className="form-input" value={currentUser?.name || ""} readOnly />
+            )}
           </div>
 
           <div className="form-group">
             <label className="form-label">Leave Type</label>
             <select
               className="form-select"
-              value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value })}
+              value={selectedLeaveType?.id ?? ""}
+              onChange={(e) => setForm({ ...form, leaveTypeId: e.target.value })}
+              disabled={leaveTypes.length === 0}
             >
-              <option>Annual Leave</option>
-              <option>Sick Leave</option>
-              <option>Casual Leave</option>
-              <option>Floating Holiday</option>
-              <option>Comp-Off Leave</option>
-              <option>Unpaid / Sabbatical</option>
+              {leaveTypes.length === 0 && <option value="">No leave types set up yet</option>}
+              {leaveTypes.map((t) => (
+                <option key={t.id} value={t.id}>{t.name}</option>
+              ))}
             </select>
           </div>
 
@@ -1241,6 +1327,7 @@ export default function Leave() {
             </div>
           )}
 
+          {delegateDirectory.length > 0 && (
           <div className="form-group">
             <label className="form-label">Assign Work Delegate</label>
             <select
@@ -1249,8 +1336,8 @@ export default function Leave() {
               onChange={(e) => setForm({ ...form, delegate: e.target.value })}
             >
               <option value="">No delegate</option>
-              {employees
-                .filter((e) => e.name !== form.employeeName)
+              {delegateDirectory
+                .filter((e) => e.name !== (canPickEmployee ? form.employeeName : currentUser?.name))
                 .map((e) => (
                   <option key={e.id} value={e.name}>
                     {e.name} ({e.department})
@@ -1258,6 +1345,7 @@ export default function Leave() {
                 ))}
             </select>
           </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Reason for Leave *</label>

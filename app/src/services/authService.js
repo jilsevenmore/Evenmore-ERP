@@ -30,6 +30,11 @@ export function normalizeUser(row) {
     department: row.department || '',
     location: row.location || '',
     employeeId: row.employeeId || null,
+    // The linked HRMS employee's primary key, for `?employeeId=` filters
+    // (`employeeId` above is the display code).
+    employeeRecordId: row.employeeRecordId || null,
+    // Someone reports to this user, so they may read their team's leave.
+    managesTeam: Boolean(row.managesTeam),
     reportingManager: row.reportingManager || null,
     status: row.status || 'Active',
     avatar: row.avatar || null,

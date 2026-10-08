@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useAppStore } from '../stores/appStore';
+import { canOpenPath } from '../utils/navAccess';
 import { publishEstimates } from '../services/estimateStore';
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES, setBaseCurrency } from '../utils/currencyUtils';
@@ -35,6 +36,52 @@ function mapCategoryToHSN(category) {
     if (cat.includes('fabrication') || cat.includes('fabricated')) return '7308.90';
     return '7216.99';
 }
+
+/**
+ * Maps each collection to the application route that gates its permission.
+ * If a user cannot open the corresponding section, requestCollection will not
+ * dispatch network calls for that collection.
+ */
+const COLLECTION_ROUTE_MAP = {
+    // Sales
+    salesOrders: '/sales/orders',
+    quotations: '/sales/quotations',
+    proformaInvoices: '/sales/proforma',
+    deliveryChallans: '/sales/delivery',
+    invoices: '/sales/invoices',
+    paymentIns: '/sales/invoices',
+    cashPaymentReceipts: '/sales/invoices',
+    salesReturns: '/sales/returns',
+
+    // Purchase
+    purchaseOrders: '/purchase/orders',
+    purchaseBills: '/purchase/bills',
+    paymentOuts: '/purchase/bills',
+    purchaseReturns: '/purchase/returns',
+    expenses: '/purchase/expenses',
+
+    // Inventory
+    items: '/inventory/items',
+    categories: '/inventory/categories',
+    stockPositions: '/inventory/stock',
+    transfers: '/inventory/transfers',
+    locations: '/inventory/locations',
+    faultyParts: '/inventory/faulty-parts',
+    monthEndAudits: '/inventory/audits',
+    inventoryMovements: '/inventory/stock',
+
+    // Accounts
+    bankAccounts: '/accounts/cash-bank',
+    chartOfAccounts: '/accounts/general-ledger',
+    journalEntries: '/accounts/general-ledger',
+    budgets: '/accounts/reports',
+
+    // Parties
+    parties: '/parties',
+    customers: '/parties/customers',
+    vendors: '/parties/vendors',
+};
+
 /**
  * The collections the server owns, and how long a failed pull is left alone
  * before a read may ask for it again.
@@ -246,13 +293,20 @@ export const ERPProvider = ({ children, }) => {
      */
     const requestCollection = useCallback((key) => {
         if (!isBackendEnabled()) return;
-        const currentUser = useAppStore.getState().currentUser;
+        const appState = useAppStore.getState();
+        const currentUser = appState.currentUser;
         const isCustomer = Boolean(
             currentUser?.isCustomer ||
             currentUser?.role?.code === 'CU' ||
             String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
         );
         if (isCustomer) return;
+        // Verify user has permission to view this collection's module
+        const requiredRoute = COLLECTION_ROUTE_MAP[key];
+        const permissions = appState.permissions || [];
+        if (requiredRoute && !canOpenPath(requiredRoute, permissions)) {
+            return;
+        }
         if (!syncSettersRef.current[key]) return;
         if (loadedKeysRef.current.has(key)
             || inFlightKeysRef.current.has(key)

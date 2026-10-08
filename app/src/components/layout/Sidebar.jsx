@@ -65,7 +65,7 @@ import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
 import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import { logout } from '../../services/authService';
-import { filterNavByPermission } from '../../utils/navAccess';
+import { filterNavByPermission, canOpenPath } from '../../utils/navAccess';
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -604,12 +604,14 @@ export default function Sidebar() {
   // `.raw` subscribes without pulling PMS: a badge in the sidebar must not be
   // the reason every screen in the app loads the project list. `useModuleWhenIdle`
   // asks for it once the browser has finished with the page the user opened.
-  const shellReady = useModuleWhenIdle('pms');
-  const pmsProjects = usePmsStore.raw((s) => s.projects);
-  const pmsCurrentUserId = usePmsStore.raw((s) => s.currentUserId);
+  const hasPmsAccess = !isCustomer && canOpenPath('/pms', permissions);
+  const hasInventoryAccess = !isCustomer && canOpenPath('/inventory/items', permissions);
+  const shellReady = useModuleWhenIdle(hasPmsAccess ? 'pms' : null);
+  const pmsProjects = hasPmsAccess ? usePmsStore.raw((s) => s.projects) : [];
+  const pmsCurrentUserId = hasPmsAccess ? usePmsStore.raw((s) => s.currentUserId) : null;
   const pmsBadges = useMemo(
-    () => computeNavBadges(pmsProjects, pmsCurrentUserId),
-    [pmsProjects, pmsCurrentUserId]
+    () => (hasPmsAccess ? computeNavBadges(pmsProjects, pmsCurrentUserId) : {}),
+    [pmsProjects, pmsCurrentUserId, hasPmsAccess]
   );
 
   useEffect(() => {
@@ -622,11 +624,11 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  let badges = { zone: 0, faulty: 0, ...(isCustomer ? {} : pmsBadges) };
+  let badges = { zone: 0, faulty: 0, ...(hasPmsAccess ? pmsBadges : {}) };
   try {
     const erp = useERP();
     // Reading these is what loads them, so they wait for the same idle moment.
-    if (!isCustomer && erp && shellReady) {
+    if (hasInventoryAccess && erp && shellReady) {
       // badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0; // Hidden: Zone Requests out of scope
       badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
     }
@@ -846,30 +848,45 @@ export default function Sidebar() {
             <div className="space-y-0.5 text-xs">
               {!isCustomer && (
                 <>
+                  {/* Every employee's own record; the rest only for roles that can open them. */}
                   <Link
-                    to="/hrms/dashboard"
+                    to="/my-profile"
                     onClick={() => setIsProfileOpen(false)}
                     className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
                   >
                     <User size={13} className="text-blue-400 group-hover:scale-110 transition-transform" />
-                    <span className="text-[11px] font-medium">HR Profile & Attendance</span>
+                    <span className="text-[11px] font-medium">My Profile</span>
                   </Link>
-                  <Link
-                    to="/administration/users"
-                    onClick={() => setIsProfileOpen(false)}
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-                  >
-                    <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-                    <span className="text-[11px] font-medium">Administration & Roles</span>
-                  </Link>
-                  <Link
-                    to="/administration/settings"
-                    onClick={() => setIsProfileOpen(false)}
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-                  >
-                    <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
-                    <span className="text-[11px] font-medium">System Preferences & Currency</span>
-                  </Link>
+                  {canOpenPath('/hrms/dashboard', permissions) && (
+                    <Link
+                      to="/hrms/dashboard"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                    >
+                      <CalendarCheck size={13} className="text-sky-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] font-medium">HR Dashboard & Attendance</span>
+                    </Link>
+                  )}
+                  {canOpenPath('/administration/users', permissions) && (
+                    <Link
+                      to="/administration/users"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                    >
+                      <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] font-medium">Administration & Roles</span>
+                    </Link>
+                  )}
+                  {canOpenPath('/administration/settings', permissions) && (
+                    <Link
+                      to="/administration/settings"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                    >
+                      <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] font-medium">System Preferences & Currency</span>
+                    </Link>
+                  )}
                 </>
               )}
               <button
