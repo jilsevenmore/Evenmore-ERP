@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { PageHeader } from '../../components/common/PageHeader';
-import { PackageCheck, Truck, ClipboardCheck, ShieldCheck, X, CheckCircle2, AlertTriangle, Boxes, Scale } from 'lucide-react';
+import { PackageCheck, Truck, ClipboardCheck, ShieldCheck, X, CheckCircle2, AlertTriangle, Boxes, Scale, FileText, ArrowRight } from 'lucide-react';
+import { createShortSupplyDebitNote, fetchVendorWeightVariations } from '../../services/upgradeService';
 
 // ── [PHASE-2B] Standalone Goods Receipt (GRN) page ────────────────────────
 // New: before this page, goods receipt was an embedded action inside bill
@@ -48,6 +49,26 @@ export const GoodsReceiptPage = () => {
     const [receivedWeights, setReceivedWeights] = useState({}); // [PHASE-2A] weighbridge kg per line
     const [qcStatus, setQcStatus] = useState('Approved');
     const [note, setNote] = useState('');
+
+    // Short-Supply Debit Note State
+    const [showDebitNoteModal, setShowDebitNoteModal] = useState(false);
+    const [debitNoteBill, setDebitNoteBill] = useState(null);
+    const [debitNoteItems, setDebitNoteItems] = useState([]);
+    const [debitNoteTotal, setDebitNoteTotal] = useState(0);
+    const [debitNoteReason, setDebitNoteReason] = useState('Warehouse Intake Short Supply — Received less than invoiced quantity');
+    const [isSubmittingDebitNote, setIsSubmittingDebitNote] = useState(false);
+
+    // Server-side Vendor Weight Variations
+    const [serverWeightVariations, setServerWeightVariations] = useState([]);
+    useEffect(() => {
+        fetchVendorWeightVariations().then(res => {
+            if (res?.data && Array.isArray(res.data)) {
+                setServerWeightVariations(res.data);
+            } else if (Array.isArray(res)) {
+                setServerWeightVariations(res);
+            }
+        }).catch(() => {});
+    }, []);
 
     // ── [PHASE-2A] helper: resolve weight metadata for a bill line (master item + line fields) ──
     const getLineWeightMeta = (line) => {
@@ -143,22 +164,91 @@ export const GoodsReceiptPage = () => {
         };
     };
 
+    const handleInitiateDebitNote = (bill, customItems = null) => {
+        setDebitNoteBill(bill);
+        let items = [];
+        if (customItems) {
+            items = customItems;
+        } else {
+            items = (bill.items || []).map((it, idx) => {
+                const ordered = Number(it.orderedQty ?? it.qty) || 0;
+                const rec = Number(it.receivedQty ?? it.qty) || 0;
+                const diff = Math.max(0, ordered - rec);
+                const unitPrice = Number(it.rate ?? it.price ?? 0) || (it.amount && ordered ? it.amount / ordered : 0);
+                return {
+                    name: it.name || it.description || 'Item',
+                    sku: it.sku || it.itemSku || '',
+                    ordered,
+                    received: rec,
+                    shortfallQty: diff,
+                    unitPrice,
+                    shortfallAmount: diff * unitPrice,
+                };
+            }).filter(x => x.shortfallQty > 0);
+        }
+        const tot = items.reduce((acc, it) => acc + (it.shortfallAmount || 0), 0);
+        setDebitNoteItems(items);
+        setDebitNoteTotal(tot);
+        setDebitNoteReason(`Intake shortfall claim against Bill ${bill.billNumber || bill.id}`);
+        setShowDebitNoteModal(true);
+    };
+
+    const handleSubmitDebitNote = async (e) => {
+        e.preventDefault();
+        if (!debitNoteBill) return;
+        setIsSubmittingDebitNote(true);
+        try {
+            await createShortSupplyDebitNote(debitNoteBill.id, {
+                noteReason: debitNoteReason,
+                shortfallAmount: debitNoteTotal,
+                shortfallItems: debitNoteItems,
+            });
+            alert(`Short Supply Debit Note successfully created against ${debitNoteBill.billNumber || 'Bill'}.`);
+            setShowDebitNoteModal(false);
+            setDebitNoteBill(null);
+        } catch (err) {
+            alert('Failed to create debit note: ' + (err.message || 'Error occurred'));
+        } finally {
+            setIsSubmittingDebitNote(false);
+        }
+    };
+
     const confirmReceipt = () => {
         if (!selectedBill) return;
+        const shortfalls = [];
         const overrides = (selectedBill.items || []).map((it, idx) => {
             const key = it.id || `line-${idx}`;
             const meta = getLineWeightMeta(it);
+            const ordered = Number(it.orderedQty ?? it.qty) || 0;
+            const rec = Number(receivedQtys[key] || 0) || 0;
+            if (rec < ordered) {
+                const diff = ordered - rec;
+                const unitPrice = Number(it.rate ?? it.price ?? 0) || (it.amount && ordered ? it.amount / ordered : 0);
+                shortfalls.push({
+                    name: it.name || it.description || 'Item',
+                    sku: it.sku || it.itemSku || '',
+                    ordered,
+                    received: rec,
+                    shortfallQty: diff,
+                    unitPrice,
+                    shortfallAmount: diff * unitPrice,
+                });
+            }
             return {
                 lineIndex: idx,
                 lineId: it.id,
                 sku: it.sku || it.itemSku,
-                receivedQty: Number(receivedQtys[key] || 0) || 0,
-                // [PHASE-2A] pass the weighbridge reading when the line is a weight item
+                receivedQty: rec,
                 receivedWeight: meta.isWeightItem ? (Number(receivedWeights[key]) > 0 ? Number(receivedWeights[key]) : undefined) : undefined,
             };
         });
+        const currentBill = selectedBill;
         receivePurchaseBillGoods(selectedBill.id, overrides, qcStatus);
         setSelectedBill(null);
+
+        if (shortfalls.length > 0) {
+            handleInitiateDebitNote(currentBill, shortfalls);
+        }
     };
 
     const orderedVsReceivedPct = (bill, idx) => {
@@ -545,6 +635,111 @@ export const GoodsReceiptPage = () => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Short-Supply Debit Note Claim Modal */}
+            {showDebitNoteModal && debitNoteBill && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-150 text-xs">
+                    <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-xl max-h-[95vh] overflow-y-auto">
+                        <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
+                            <div>
+                                <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                                    <FileText className="text-rose-600" size={18} />
+                                    Claim Short-Supply Debit Note
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {debitNoteBill.billNumber} • {debitNoteBill.vendor}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setShowDebitNoteModal(false)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmitDebitNote} className="p-5 space-y-4">
+                            <div className="bg-rose-50 border border-rose-200 rounded-xl p-3.5 flex items-start gap-3">
+                                <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={16} />
+                                <div>
+                                    <p className="font-bold text-rose-800">Shortfall Detected at Warehouse Dock</p>
+                                    <p className="text-slate-600 text-xs mt-0.5">
+                                        Received quantities are lower than invoiced quantities. Issue this debit note to deduct the shortfall amount from the supplier's accounts payable balance.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Shortfall breakdown */}
+                            <div>
+                                <h4 className="font-bold text-slate-700 uppercase tracking-wider text-[11px] mb-2">Shortfall Items Breakdown</h4>
+                                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="py-2 px-3 text-left">Item</th>
+                                                <th className="py-2 px-3 text-center">Ordered</th>
+                                                <th className="py-2 px-3 text-center">Received</th>
+                                                <th className="py-2 px-3 text-center">Shortfall</th>
+                                                <th className="py-2 px-3 text-right">Shortfall Value</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {debitNoteItems.map((it, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="py-2 px-3 font-medium text-slate-800">{it.name}</td>
+                                                    <td className="py-2 px-3 text-center font-mono text-slate-600">{it.ordered}</td>
+                                                    <td className="py-2 px-3 text-center font-mono text-slate-600">{it.received}</td>
+                                                    <td className="py-2 px-3 text-center font-mono font-bold text-rose-600">{it.shortfallQty}</td>
+                                                    <td className="py-2 px-3 text-right font-mono font-bold text-rose-700">
+                                                        {formatCurrency(it.shortfallAmount)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                        <tfoot className="bg-slate-50 font-bold border-t border-slate-200 text-slate-800">
+                                            <tr>
+                                                <td colSpan={4} className="py-2.5 px-3 text-right">Total Debit Claim:</td>
+                                                <td className="py-2.5 px-3 text-right font-mono text-rose-700 text-sm">
+                                                    {formatCurrency(debitNoteTotal)}
+                                                </td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="font-semibold text-slate-700 block mb-1">Debit Note Reason / Remarks *</label>
+                                <textarea
+                                    required
+                                    rows={2}
+                                    value={debitNoteReason}
+                                    onChange={(e) => setDebitNoteReason(e.target.value)}
+                                    className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                                />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDebitNoteModal(false)}
+                                    className="px-4 py-2 border border-slate-300 text-slate-600 rounded-xl hover:bg-slate-50 font-semibold"
+                                >
+                                    Dismiss
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingDebitNote}
+                                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold shadow-xs flex items-center gap-1.5"
+                                >
+                                    <CheckCircle2 size={14} />
+                                    {isSubmittingDebitNote ? 'Generating...' : 'Issue Short-Supply Debit Note'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

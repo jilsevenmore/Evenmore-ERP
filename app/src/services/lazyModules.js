@@ -15,9 +15,30 @@
  * produces one pull.
  */
 import { getStoredToken } from '../utils/authUtils';
+import { useAppStore } from '../stores/appStore';
+import { canOpenPath, canUse } from '../utils/navAccess';
+
+/**
+ * Whether the signed-in user holds `permission` (a code, or an any-of list).
+ * A store's `hydrate` asks this before reading a collection the server would
+ * only answer with 403 — a self-service employee has no business pulling the
+ * staff directory just because their own leave screen shares its store.
+ */
+export function sessionCan(permission) {
+  return canUse(permission, useAppStore.getState().permissions || []);
+}
 
 /** How long a failed hydration is left alone before a read may retry it. */
 const RETRY_AFTER_MS = 15000;
+
+function isCustomerSession() {
+  const user = useAppStore.getState().currentUser;
+  return Boolean(
+    user?.isCustomer ||
+    user?.role?.code === 'CU' ||
+    String(user?.role?.name || user?.role || '').toLowerCase() === 'customer'
+  );
+}
 
 /** name → { hydrate, loaded, promise, failedAt } */
 const modules = new Map();
@@ -43,9 +64,17 @@ function defer(fn) {
  * update.
  */
 export function ensureModule(name) {
+  if (!name) return;
   // No session → no server. `useModuleHydration` empties the stores on sign-out;
   // hydrating here would only bounce state on every render of the login screen.
   if (!getStoredToken()) return;
+  // Customer role has portal access only — do not hydrate internal ERP/CRM/PMS modules
+  if (isCustomerSession()) return;
+
+  const permissions = useAppStore.getState().permissions || [];
+  if (name === 'pms' && !canOpenPath('/pms', permissions)) return;
+  if (name === 'crm' && !canOpenPath('/crm', permissions) && !canOpenPath('/crm/tasks', permissions)) return;
+
   const mod = entry(name);
   if (!mod.hydrate || mod.loaded || mod.promise) return;
   if (mod.failedAt && Date.now() - mod.failedAt < RETRY_AFTER_MS) return;

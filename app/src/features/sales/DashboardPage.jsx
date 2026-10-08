@@ -69,23 +69,41 @@ export const DashboardPage = () => {
     crm: open('/crm/leads'),
   };
   const isCustomer = currentUser?.isCustomer || currentUser?.role?.code === 'CU' || String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer';
-  const { items, transfers, zoneRequests, faultyParts, salesOrders, quotations, invoices, paymentIns, purchaseOrders, purchaseBills, paymentOuts, expenses, customers, vendors, parties, bankAccounts, deliveryChallans, salesReturns, calculateItemStock, cashPaymentReceipts, getInvoiceOutstanding } = useERP();
+  const erp = useERP() || {};
+  const { calculateItemStock, getInvoiceOutstanding } = erp;
+
+  // Only read collections for modules the user is permitted to open.
+  // Accessing an erp collection triggers a lazy API pull, so we must never read collections the user cannot access.
+  const invoices = show.sales ? (erp.invoices || []) : [];
+  const salesOrders = show.sales ? (erp.salesOrders || []) : [];
+  const quotations = show.sales ? (erp.quotations || []) : [];
+  const deliveryChallans = show.sales ? (erp.deliveryChallans || []) : [];
+  const paymentIns = show.sales ? (erp.paymentIns || []) : [];
+  const salesReturns = show.sales ? (erp.salesReturns || []) : [];
+  const cashPaymentReceipts = show.sales ? (erp.cashPaymentReceipts || []) : [];
+
+  const purchaseOrders = show.purchase ? (erp.purchaseOrders || []) : [];
+  const purchaseBills = show.purchase ? (erp.purchaseBills || []) : [];
+  const paymentOuts = show.purchase ? (erp.paymentOuts || []) : [];
+  const expenses = show.purchase ? (erp.expenses || []) : [];
+
+  const items = show.inventory ? (erp.items || []) : [];
+  const transfers = show.inventory ? (erp.transfers || []) : [];
+  const zoneRequests = [];
+  const faultyParts = show.inventory ? (erp.faultyParts || []) : [];
+
+  const bankAccounts = show.accounts ? (erp.bankAccounts || []) : [];
+
+  const parties = show.parties ? (erp.parties || []) : [];
+  const customers = (show.parties || show.sales) ? (erp.customers || []) : [];
+  const vendors = (show.parties || show.purchase) ? (erp.vendors || []) : [];
+
   // A customer login has its own portal; after the hooks so their order never changes.
   if (isCustomer) {
     return <Navigate to="/customer/projects" replace />;
   }
 
   // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──
-  // Before (kept for reference): dashboardData.leadsOverview, dashboardData.taskStatus drove
-  //   the chart + donut. Now we chart invoice revenue over the last 6 months and show
-  //   invoice status distribution, both computed from live ERP state.
-  // const overview = dashboardData.leadsOverview;
-  // const chart = buildChart(overview.series.map((item) => item.value), 620, 260, 28);
-  // const totalTasks = dashboardData.taskStatus.reduce((sum, item) => sum + item.value, 0);
-  // const completedTasks = dashboardData.taskStatus.find((item) => item.key === 'done')?.value || 0;
-  // const completedPct = Math.round((completedTasks / (totalTasks || 1)) * 100);
-  // let currentAngle = 0;
-  // const donutSegments = dashboardData.taskStatus.map((item) => {...});
   const monthKey = (iso) => { const p = String(iso || '').split('-'); return p.length === 3 ? `${p[0]}-${p[1]}` : ''; };
   const last6Months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date();
@@ -93,16 +111,18 @@ export const DashboardPage = () => {
     d.setMonth(d.getMonth() - (5 - i));
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   });
-  const revenueByMonth = last6Months.map((mk) => invoices
-    .filter((inv) => inv.status !== 'Cancelled' && monthKey(toISODate(inv.date)) === mk)
-    .reduce((sum, inv) => sum + (Number(inv.total ?? inv.amount) || 0), 0));
-  const overview = {
+  const revenueByMonth = show.sales
+    ? last6Months.map((mk) => invoices
+        .filter((inv) => inv.status !== 'Cancelled' && monthKey(toISODate(inv.date)) === mk)
+        .reduce((sum, inv) => sum + (Number(inv.total ?? inv.amount) || 0), 0))
+    : [0, 0, 0, 0, 0, 0];
+  const overview = show.sales ? {
     headline: `${invoices.filter((inv) => last6Months.includes(monthKey(toISODate(inv.date)))).length} tax invoices booked across the last 6 months`,
     period: 'Last 6 Months',
     summary: 'Invoiced value trend by month. Filter or open Sales > Invoices for details.',
     series: last6Months.map((mk, i) => ({ month: mk.split('-')[1], value: revenueByMonth[i] })),
-  };
-  const chart = buildChart(revenueByMonth, 620, 260, 28);
+  } : { headline: '', period: '', summary: '', series: [] };
+  const chart = show.sales ? buildChart(revenueByMonth, 620, 260, 28) : null;
   const invoiceStatusMap = {
     Paid: { label: 'Paid', color: '#1bb878' },
     Unpaid: { label: 'Unpaid', color: '#1f6bff' },
@@ -110,14 +130,16 @@ export const DashboardPage = () => {
     Cancelled: { label: 'Cancelled', color: '#ef4444' },
     Draft: { label: 'Draft', color: '#94a3b8' },
   };
-  const taskStatus = Object.entries(invoiceStatusMap)
-    .map(([key, meta]) => ({
-      key: key.toLowerCase(),
-      label: meta.label,
-      color: meta.color,
-      value: invoices.filter((inv) => (inv.status || 'Unpaid') === key).length,
-    }))
-    .filter((s) => s.value > 0);
+  const taskStatus = show.sales
+    ? Object.entries(invoiceStatusMap)
+        .map(([key, meta]) => ({
+          key: key.toLowerCase(),
+          label: meta.label,
+          color: meta.color,
+          value: invoices.filter((inv) => (inv.status || 'Unpaid') === key).length,
+        }))
+        .filter((s) => s.value > 0)
+    : [];
   const totalTasks = taskStatus.reduce((sum, item) => sum + item.value, 0);
   const doneKey = taskStatus.find((s) => s.key === 'paid');
   const completedTasks = doneKey?.value || 0;
@@ -130,42 +152,44 @@ export const DashboardPage = () => {
     currentAngle += angle;
     return segment;
   });
-  const recentActivity = [...invoices]
-    .sort((a, b) => toISODate(b.date).localeCompare(toISODate(a.date)))
-    .slice(0, 3)
-    .map((inv) => ({
-      key: inv.id || inv.invoiceNumber,
-      icon: 'task',
-      tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
-      title: inv.customer || '—',
-      person: [inv.invoiceNumber, inv.status].filter(Boolean).join(' • '),
-      time: inv.date || '',
-    }));
-  const enriched = items.map((itm) => {
-    const calc = calculateItemStock(itm.id);
+  const recentActivity = show.sales
+    ? [...invoices]
+        .sort((a, b) => toISODate(b.date).localeCompare(toISODate(a.date)))
+        .slice(0, 3)
+        .map((inv) => ({
+          key: inv.id || inv.invoiceNumber,
+          icon: 'task',
+          tone: inv.status === 'Paid' ? 'green' : inv.status === 'Overdue' ? 'amber' : 'blue',
+          title: inv.customer || '—',
+          person: [inv.invoiceNumber, inv.status].filter(Boolean).join(' • '),
+          time: inv.date || '',
+        }))
+    : [];
+  const enriched = show.inventory && calculateItemStock ? items.map((itm) => {
+    const calc = calculateItemStock(itm.id) || { available: 0, onHand: 0 };
     let status = 'Optimal';
     if (calc.available <= (itm.reorderLevel || 5) / 2) status = 'Critical';
     else if (calc.available <= (itm.reorderLevel || 5)) status = 'Low Stock';
     return { ...itm, availableQty: calc.available, onHandQty: calc.onHand, status };
-  });
+  }) : [];
 
   const lowStockItems = enriched.filter((itm) => itm.status === 'Low Stock' || itm.status === 'Critical');
   const totalStockValue = enriched.reduce((acc, itm) => acc + (itm.costPrice || itm.unitCost || 0) * (itm.onHandQty || 0), 0);
   const pendingTransfers = transfers.filter((t) => t.status !== 'Received').length;
-  const pendingZoneReqs = zoneRequests.filter((r) => r.status === 'Requested').length;
+  const pendingZoneReqs = 0;
   const openFaulty = faultyParts.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement').length;
 
-  const salesTotal = salesOrders.reduce((a, o) => a + (o.amount || o.total || 0), 0);
-  const invoiceTotal = invoices.reduce((a, i) => a + (i.total || 0), 0);
-  const purchaseTotal = purchaseOrders.reduce((a, o) => a + (o.total || o.amount || 0), 0);
-  const billTotal = purchaseBills.reduce((a, b) => a + (b.total || b.amount || 0), 0);
-  const paymentInTotal = paymentIns.reduce((a, p) => a + (p.amount || 0), 0);
-  const paymentOutTotal = paymentOuts.reduce((a, p) => a + (p.amount || 0), 0);
-  const expenseTotal = expenses.reduce((a, e) => a + (e.amount || e.total || 0), 0);
-  const bankBalance = bankAccounts.reduce((a, b) => a + (b.balance || b.currentBalance || 0), 0);
+  const salesTotal = show.sales ? salesOrders.reduce((a, o) => a + (o.amount || o.total || 0), 0) : 0;
+  const invoiceTotal = show.sales ? invoices.reduce((a, i) => a + (i.total || 0), 0) : 0;
+  const purchaseTotal = show.purchase ? purchaseOrders.reduce((a, o) => a + (o.total || o.amount || 0), 0) : 0;
+  const billTotal = show.purchase ? purchaseBills.reduce((a, b) => a + (b.total || b.amount || 0), 0) : 0;
+  const paymentInTotal = show.sales ? paymentIns.reduce((a, p) => a + (p.amount || 0), 0) : 0;
+  const paymentOutTotal = show.purchase ? paymentOuts.reduce((a, p) => a + (p.amount || 0), 0) : 0;
+  const expenseTotal = show.purchase ? expenses.reduce((a, e) => a + (e.amount || e.total || 0), 0) : 0;
+  const bankBalance = show.accounts ? bankAccounts.reduce((a, b) => a + (b.balance || b.currentBalance || 0), 0) : 0;
 
   // ── [PHASE-4] Core Financial Metrics: Distinguishing Billed Sales vs Without-Bill Cash ──
-  const activeInvoices = invoices.filter((inv) => inv.status !== 'Cancelled');
+  const activeInvoices = show.sales ? invoices.filter((inv) => inv.status !== 'Cancelled') : [];
   const billedSales = activeInvoices.reduce((sum, inv) => sum + (Number(inv.grandTotal ?? inv.total ?? inv.amount) || 0), 0);
   const gstTotal = activeInvoices.reduce((sum, inv) => {
     const out = getInvoiceOutstanding ? getInvoiceOutstanding(inv.id) : null;

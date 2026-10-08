@@ -4,13 +4,14 @@ import {
   Package, Calendar, Clock, CheckCircle2, AlertTriangle, ArrowLeft,
   RefreshCw, ShieldCheck, FileText, ExternalLink, ChevronRight, Eye,
   Sparkles, Layers, Info, Check, Circle, Building2, Download, AlertCircle,
-  HelpCircle,
+  HelpCircle, UserCheck, LogOut, X,
 } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
-import { fetchCustomerProjectTracking } from '../../../services/customerTrackingService';
+import { fetchCustomerProjectTracking, fetchCustomerProjects } from '../../../services/customerTrackingService';
 import { useAppStore } from '../../../stores/appStore';
+import { impersonateCustomer } from '../../../services/upgradeService';
 
 function formatDate(isoString) {
   if (!isoString) return '—';
@@ -71,6 +72,28 @@ export default function CustomerTrackingPage() {
   const projectLookup = id || projectId;
   const navigate = useNavigate();
   const currentUser = useAppStore((s) => s.currentUser);
+  const showToast = useAppStore((s) => s.showToast);
+  const setCurrentUser = useAppStore((s) => s.setCurrentUser);
+
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
+  const [totalProjectsCount, setTotalProjectsCount] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchCustomerProjects()
+      .then((rows) => {
+        if (!active) return;
+        setTotalProjectsCount(Array.isArray(rows) ? rows.length : 1);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -78,6 +101,50 @@ export default function CustomerTrackingPage() {
   const [error, setError] = useState(null);
   const [selectedStageId, setSelectedStageId] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
+
+  // Impersonation state
+  const [isImpersonateModalOpen, setIsImpersonateModalOpen] = useState(false);
+  const [impersonateReason, setImpersonateReason] = useState('Audited customer portal inspection');
+  const [impersonatingSubmitting, setImpersonatingSubmitting] = useState(false);
+
+  const handleStartImpersonation = async (e) => {
+    e.preventDefault();
+    const customerId = project?.partyId || project?.customerId || project?.clientId || project?.clientPartyId;
+    if (!customerId) {
+      showToast('No customer party identifier associated with this project', 'error');
+      return;
+    }
+    setImpersonatingSubmitting(true);
+    try {
+      const res = await impersonateCustomer(customerId, impersonateReason);
+      const data = res?.data || res;
+      if (data?.access || data?.accessToken) {
+        localStorage.setItem('auth_token', data.access || data.accessToken);
+        localStorage.setItem('impersonated_from_user', JSON.stringify(currentUser));
+        if (setCurrentUser) setCurrentUser(data);
+      }
+      showToast(`Impersonating customer view as ${project.customerName || 'Customer'}`, 'success');
+      setIsImpersonateModalOpen(false);
+      window.location.reload();
+    } catch (err) {
+      showToast(err?.message || 'Failed to initialize customer impersonation', 'error');
+    } finally {
+      setImpersonatingSubmitting(false);
+    }
+  };
+
+  const handleExitImpersonation = () => {
+    const original = localStorage.getItem('impersonated_from_user');
+    if (original) {
+      try {
+        const userObj = JSON.parse(original);
+        localStorage.removeItem('impersonated_from_user');
+        if (setCurrentUser) setCurrentUser(userObj);
+      } catch (_) {}
+    }
+    showToast('Exited customer impersonation mode', 'info');
+    window.location.reload();
+  };
 
   const loadData = useCallback(async (isRefresh = false) => {
     if (!projectLookup) return;
@@ -170,21 +237,53 @@ export default function CustomerTrackingPage() {
 
   return (
     <div className="space-y-5">
-      {/* ── Top Bar: Back, Badge, Refresh ── */}
+      {/* ── Customer Impersonation Override Banner ── */}
+      {currentUser?.impersonating?.is_impersonating && (
+        <div className="bg-amber-500 text-slate-950 px-4 py-2.5 rounded-xl border border-amber-600 shadow-sm flex flex-wrap items-center justify-between gap-3 font-medium text-xs">
+          <div className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-slate-950" />
+            <span>
+              <strong>Staff Impersonation Mode:</strong> Currently viewing portal as client &quot;{currentUser.impersonating.party_name}&quot; (Audited Session).
+            </span>
+          </div>
+          <button
+            onClick={handleExitImpersonation}
+            className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-900 text-white rounded-lg hover:bg-black transition-colors font-semibold"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            Exit Impersonation
+          </button>
+        </div>
+      )}
+
+      {/* ── Top Bar: Back, Badge, Refresh, Impersonate ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link
-            to="/customer/projects"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-slate-100"
-          >
-            <ArrowLeft size={14} />
-            <span>All Projects</span>
-          </Link>
-          <span className="text-slate-300">/</span>
+          {(!isCustomer || (totalProjectsCount !== null && totalProjectsCount > 1)) && (
+            <>
+              <Link
+                to="/customer/projects?view=list"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <ArrowLeft size={14} />
+                <span>All Projects</span>
+              </Link>
+              <span className="text-slate-300">/</span>
+            </>
+          )}
           <span className="text-xs font-semibold text-slate-500 font-mono">{project.code}</span>
         </div>
 
         <div className="flex items-center gap-2">
+          {(currentUser?.is_superuser || currentUser?.is_staff || ['AD', 'PM', 'SA', 'OM'].includes(currentUser?.role?.code)) && !currentUser?.impersonating?.is_impersonating && (
+            <button
+              onClick={() => setIsImpersonateModalOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 transition-colors"
+            >
+              <UserCheck size={13} className="text-amber-700" />
+              <span>Impersonate Client View</span>
+            </button>
+          )}
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <ShieldCheck size={13} className="text-emerald-600" />
             <span>Verified Customer Tracking</span>
@@ -645,6 +744,56 @@ export default function CustomerTrackingPage() {
           This tracking page displays live dynamic stages directly synchronized from the Project Management System (PMS).
         </p>
       </div>
+
+      {/* ── Impersonation Reason Modal ── */}
+      {isImpersonateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-amber-600" />
+                <h3 className="text-base font-bold text-slate-900">Impersonate Customer Portal</h3>
+              </div>
+              <button onClick={() => setIsImpersonateModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleStartImpersonation} className="mt-4 space-y-3">
+              <p className="text-xs text-slate-500">
+                This action grants staff override mode to view exactly what customer &quot;{project.customerName || 'Customer'}&quot; sees. An audit log entry will be permanently written with your staff credentials and reason.
+              </p>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">
+                  Reason for Impersonation (Audit Log)
+                </label>
+                <input
+                  type="text"
+                  value={impersonateReason}
+                  onChange={(e) => setImpersonateReason(e.target.value)}
+                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-amber-500/20"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsImpersonateModalOpen(false)}
+                  className="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-lg"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={impersonatingSubmitting}
+                  className="px-4 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 shadow-sm disabled:opacity-50"
+                >
+                  {impersonatingSubmitting ? 'Switching...' : 'Start Impersonation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

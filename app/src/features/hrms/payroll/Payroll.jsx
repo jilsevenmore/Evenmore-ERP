@@ -28,6 +28,7 @@ import {
 import { useAppStore } from "../../../stores/appStore";
 import {
   usePayrollStore,
+  PAYROLL_MANAGERS,
   getDepartmentDays,
   getDepartmentHours,
   DEFAULT_DEPARTMENT_WORKING_DAYS,
@@ -340,6 +341,12 @@ export default function Payroll() {
   const storeEncashments = useAppStore((s) => s.encashments || []);
   const currentUser = useAppStore((s) => s.currentUser) || {};
   const directoryEmployees = useAppStore((s) => s.employees || []);
+  const permissions = useAppStore((s) => s.permissions) || [];
+  // Company payroll — every employee's pay, running and paying it — is for HR
+  // admin, super admin and executive roles granted payroll. Everyone else gets
+  // their own salary only (the server returns only their payslips anyway).
+  const canManagePayroll = PAYROLL_MANAGERS.some((code) => permissions.includes(code));
+  const myEmployeeId = currentUser?.employeeRecordId ? String(currentUser.employeeRecordId) : "";
 
   const {
     employees: payrollEmployees,
@@ -363,15 +370,17 @@ export default function Payroll() {
     loadOwnHistory,
   } = usePayrollStore();
 
-  // The "My Salary" tab shows this user's own payslips, read by employee id.
+  // The "My Salary" tab shows this user's own payslips, read by the linked
+  // employee's record id (not the EMP-… code, which the filter rejects). A user
+  // with no employee record has no payslips to ask for.
+  const ownEmployeeRecordId = currentUser?.employeeRecordId;
   useEffect(() => {
-    if (currentUser?.employeeId || currentUser?.id) {
-      loadOwnHistory?.(currentUser.employeeId || currentUser.id);
-    }
-  }, [currentUser?.employeeId, currentUser?.id, loadOwnHistory]);
+    if (ownEmployeeRecordId) loadOwnHistory?.(ownEmployeeRecordId);
+  }, [ownEmployeeRecordId, loadOwnHistory]);
 
   // Primary 4 views: 'overall' | 'department' | 'employee' | 'own'
-  const [activeTab, setActiveTab] = useState("overall");
+  const [selectedTab, setActiveTab] = useState("overall");
+  const activeTab = canManagePayroll ? selectedTab : "own";
 
   // Filters for Employee-wise tab
   const [empSearch, setEmpSearch] = useState("");
@@ -546,14 +555,23 @@ export default function Payroll() {
     });
   }, [computedEmployeePayrolls, empSearch, deptFilter, statusFilter]);
 
-  // Own Salary Record
+  // Own Salary Record — matched by employee record, never "the first payslip
+  // in the list", so nobody is shown a colleague's salary as their own. A
+  // payroll manager may switch to a colleague from the selector below.
   const ownRecord = useMemo(() => {
-    return (
+    const byName = (name) =>
       computedEmployeePayrolls.find(
-        (p) => String(p.name ?? '').toLowerCase() === activeOwnUser.toLowerCase()
-      ) || computedEmployeePayrolls[0]
+        (p) => String(p.name ?? '').toLowerCase() === String(name ?? '').toLowerCase()
+      );
+    if (canManagePayroll && activeOwnUser && activeOwnUser !== currentUser?.name) {
+      return byName(activeOwnUser) || null;
+    }
+    return (
+      (myEmployeeId && computedEmployeePayrolls.find((p) => String(p.employeeId ?? '') === myEmployeeId)) ||
+      (!myEmployeeId && byName(currentUser?.name)) ||
+      null
     );
-  }, [computedEmployeePayrolls, activeOwnUser]);
+  }, [computedEmployeePayrolls, activeOwnUser, canManagePayroll, currentUser?.name, myEmployeeId]);
 
   // Real-world scenario descriptions for each payroll lifecycle stage
   const STAGE_SCENARIOS = {
@@ -739,6 +757,7 @@ export default function Payroll() {
           </p>
         </div>
 
+        {canManagePayroll && (
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
           {/* Department Working Days Schedule Dropdown (Pure Dropdown - No Up/Down Arrows) */}
           <div className="flex items-center gap-2 px-3 h-10 w-full sm:w-auto max-w-full lg:max-w-none min-w-0 lg:min-w-auto bg-white border border-bdr rounded-xl text-[13px] font-medium text-slate-700 shadow-xs">
@@ -811,9 +830,11 @@ export default function Payroll() {
             <span>Process Month-End Payroll</span>
           </button>
         </div>
+        )}
       </div>
 
-      {/* ── Minimal 4-Tab Navigation Bar ── */}
+      {/* ── Minimal 4-Tab Navigation Bar ── (an employee only has their own salary) */}
+      {canManagePayroll && (
       <div className="flex border-b border-bdr gap-1 bg-white px-3 pt-2.5 rounded-2xl border shadow-xs overflow-x-auto lg:overflow-visible scrollbar-none">
         <button
           type="button"
@@ -873,6 +894,7 @@ export default function Payroll() {
           <span>Own Salary</span>
         </button>
       </div>
+      )}
 
       {/* =========================================================================
           TAB 1: OVERALL SALARY (COMPANY SUMMARY & LIFECYCLE)
@@ -1581,7 +1603,8 @@ export default function Payroll() {
             </div>
           </div>
 
-          {/* Perspective Switcher */}
+          {/* Perspective Switcher (payroll managers only) */}
+          {canManagePayroll && (
           <div className="bg-white border border-bdr rounded-2xl p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-[12.5px]">
             <div className="flex items-center gap-2 text-slate-600">
               <span>View As Colleague:</span>
@@ -1605,6 +1628,7 @@ export default function Payroll() {
               Cycle: <b className="text-slate-800">{ownRecord.month}</b>
             </span>
           </div>
+          )}
 
           {/* Quick Metrics Strip: Standard vs Earned vs Deductions vs Advance */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">

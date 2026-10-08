@@ -13,6 +13,8 @@
 
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
+import { useAppStore } from "./appStore";
+import { canOpenPath } from "../utils/navAccess";
 import * as pmsApi from "../services/pmsSync";
 import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
 
@@ -1572,6 +1574,16 @@ const usePmsStoreBase = create((set, get) => ({
     if (get().status.loading) return null;
     if (get().status.loaded && !force) return null;
 
+    const permissions = useAppStore.getState().permissions || [];
+    if (!canOpenPath('/pms', permissions) && !canOpenPath('/pms/my-tasks', permissions) && !permissions.includes('view_pms')) {
+      set({
+        projects: [], stageConfigs: [], departments: [], employees: [],
+        statusColors: {}, settings: EMPTY_SETTINGS,
+        status: { loading: false, loaded: true, error: null, lastSyncAt: null },
+      });
+      return null;
+    }
+
     set((st) => ({ status: { ...st.status, loading: true, error: null } }));
     try {
       const [projects, stageConfigs, departments, settings, employees] = await Promise.all([
@@ -1872,8 +1884,16 @@ const usePmsStoreBase = create((set, get) => ({
       if (idx === -1 || target < 0 || target >= ordered.length) return {};
       [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
       const stageConfigs = ordered.map((c, i) => ({ ...c, sequence: i + 1 }));
-      pmsSync.act("stageConfigs", null, "reorder", { ids: stageConfigs.map((c) => c.id) })
-        .catch((err) => console.warn("[PMS] order not saved:", describeError(err)));
+      const previous = st.stageConfigs;
+      // The server takes the full order as `order` (or `{ id, direction }`);
+      // it renumbers every template, so this list is what it stores.
+      pmsSync.act("stageConfigs", null, "reorder", { order: stageConfigs.map((c) => c.id) })
+        .catch((err) => {
+          // Not saved: put the list back rather than show an order that a
+          // reload would undo.
+          set({ stageConfigs: previous });
+          console.warn("[PMS] order not saved:", describeError(err));
+        });
       return { stageConfigs };
     }),
 
@@ -2411,7 +2431,7 @@ const usePmsStoreBase = create((set, get) => ({
    * assigns the next stage in sequence, and writes a handoff record carrying
    * From User → To User and From Dept → To Dept with the handover notes.
    */
-  handoffStage: (
+  handoffStage: async (
     projectId,
     stageId,
     { recipient, recipientTeam, notes = "", checklist = [], actor = null, force = false } = {}
@@ -2436,6 +2456,31 @@ const usePmsStoreBase = create((set, get) => ({
 
     const nextStage = ordered[index + 1] ?? null;
     const nowIso = new Date().toISOString();
+
+    // Server first: it re-checks every gate (including company policy the
+    // browser cannot see) and only then completes the stage. Moving the stage
+    // here first and snapping it back on a refusal is what made a blocked
+    // handoff look like it had worked.
+    if (isBackendEnabled()) {
+      try {
+        const result = await pmsApi.handoffStage(projectId, stageId, {
+          recipientId: recipient?.id || undefined,
+          notes,
+          force,
+        });
+        const fresh = result?.project?.stages ? result.project : await pmsApi.pullProject(projectId);
+        if (fresh) applyServerProject(fresh);
+        return result?.nextStage?.id ?? nextStage?.id ?? null;
+      } catch (err) {
+        // The error body is `{ message, code, payload: { blockers } }`.
+        const blockers = (err?.payload?.payload?.blockers || err?.payload?.blockers)?.filter((b) => b.hard);
+        const e = new Error(
+          blockers?.length ? blockers.map((b) => b.label).join(" ") : describeError(err)
+        );
+        e.blockers = blockers || [];
+        throw e;
+      }
+    }
 
     const handoff = makeActivity(
       "STAGE_HANDOFF",
@@ -2490,14 +2535,6 @@ const usePmsStoreBase = create((set, get) => ({
         handoff
       )
     );
-
-    // The server re-checks the handoff prerequisites and notifies the next
-    // department, so the local pointer move is only the optimistic half.
-    pushProject(projectId, () => pmsApi.handoffStage(projectId, stageId, {
-      recipientId: recipient?.id,
-      notes,
-      force,
-    }));
 
     return nextStage?.id ?? null;
   },

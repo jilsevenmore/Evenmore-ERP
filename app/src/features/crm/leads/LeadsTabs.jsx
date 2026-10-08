@@ -47,6 +47,7 @@ export default function LeadsTabs({
   onCloseRecordAction,
   onDeleteRecord,
   onPrint,
+  onBulkAssign,
 }) {
   // One tab per configured stage, counted from the leads the server returned.
   const leads = useCrmStore((s) => s.leads);
@@ -121,6 +122,7 @@ export default function LeadsTabs({
               leads={recordActionLeads}
               onClose={onCloseRecordAction}
               onDelete={onDeleteRecord}
+              onBulkAssign={onBulkAssign}
             />
           )}
         </div>

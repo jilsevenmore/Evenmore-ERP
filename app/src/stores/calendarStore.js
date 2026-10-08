@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { lazyStore } from "../services/lazyModules";
+import { lazyStore, sessionCan } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_calendar_events_v2";
@@ -8,6 +8,8 @@ const STORAGE_KEY = "hrms_calendar_events_v2";
 const useCalendarStoreBase = create((set, get) => ({
   /** Load this module's collections from the API. */
   hydrate: async () => {
+    // Calendar events are a staff read on the server (403 otherwise).
+    if (!sessionCan("view_staff")) return [null];
     const rows = await Promise.all([
       pullTracked("calendarEvents"),
     ]);

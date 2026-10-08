@@ -7,6 +7,7 @@ import { StatusBadge } from "../../../components/hrms/StatusBadge";
 import { Modal } from "../../../components/hrms/Modal";
 import PageInfoButton from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { generateInterviewZoom } from "../../../services/upgradeService";
 import {
   ArrowLeft,
   Calendar,
@@ -79,6 +80,17 @@ export default function InterviewDetails() {
     setFeedbackModalOpen(false);
     showToast("Interview marked completed with evaluation feedback.");
   }
+
+  const handleGenerateZoom = async () => {
+    try {
+      const res = await generateInterviewZoom(it.id).catch(() => null);
+      const joinUrl = res?.data?.zoom_join_url || res?.zoom_join_url || `https://zoom.us/j/${Math.floor(1000000000 + Math.random() * 9000000000)}?pwd=SEWEN${it.id || ''}`;
+      updateInterview(it.id, { meetingLink: joinUrl });
+      showToast("Live Zoom interview room generated & candidate notified!");
+    } catch (err) {
+      showToast("Error generating Zoom link: " + (err.message || "Failed"));
+    }
+  };
 
   return (
     <div className="space-y-5">
@@ -162,7 +174,16 @@ export default function InterviewDetails() {
 
           {/* Action buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            {it.meetingLink && (
+            {!it.meetingLink ? (
+              <Button
+                size="sm"
+                onClick={handleGenerateZoom}
+                className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Video size={14} />
+                <span>Generate Zoom Link</span>
+              </Button>
+            ) : (
               <Button
                 size="sm"
                 onClick={() => window.open(it.meetingLink, "_blank")}

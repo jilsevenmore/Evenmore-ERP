@@ -480,3 +480,32 @@ export const pullActivity = (query) => readAggregate('/pms/activity/', query, 'a
 export const pullPmsReport = (key, query) => readAggregate(`/pms/reports/${key}/`, query, `report ${key}`);
 
 export default pmsSync;
+
+// ── project team ────────────────────────────────────────────────────────────
+//
+// Everyone working on a project — the PM, stage and task assignees (derived),
+// plus the people the PM adds to the team list. Being on it is what puts
+// someone in the project's chats (see the server's `pms/team.py`).
+
+/** `{ members, teams, canManage, candidates? }` */
+export async function pullProjectTeam(projectId) {
+  if (!isBackendEnabled()) return null;
+  return api.get(`${projectPath(projectId)}team/`);
+}
+
+export async function addProjectMember(projectId, { userId, departmentId = null }) {
+  if (!isBackendEnabled()) return null;
+  return api.post(`${projectPath(projectId)}team/`, { userId, departmentId });
+}
+
+export async function removeProjectMember(projectId, memberId) {
+  if (!isBackendEnabled()) return null;
+  return api.delete(`${projectPath(projectId)}team/${memberId}/`);
+}
+
+/** The projects I work on, for the Project Chats page (no PMS access needed). */
+export async function pullMyChats() {
+  if (!isBackendEnabled()) return [];
+  const body = await api.get('/pms/my-chats/');
+  return body?.results || [];
+}

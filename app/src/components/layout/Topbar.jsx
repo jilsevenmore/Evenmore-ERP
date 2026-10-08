@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { canOpenPath, canUse } from '../../utils/navAccess';
-import { useAttendanceStore } from '../../stores/attendanceStore';
+import { usePunchActions } from '../../features/hrms/attendance/usePunchActions';
 import { useERP } from '../../context/ERPContext';
 import { useCrmNotificationDigest } from '../../hooks/useCrmNotificationDigest';
 import { useIdleReady } from '../../hooks/useIdleReady';
@@ -69,9 +69,6 @@ export default function Topbar() {
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
   const [isPunchOpen, setIsPunchOpen] = useState(false);
-  const [punchSubmitting, setPunchSubmitting] = useState(false);
-  const [punchError, setPunchError] = useState(null);
-  const [isEarlyPunchModalOpen, setIsEarlyPunchModalOpen] = useState(false);
 
   const themeRef = useRef(null);
   const quickAddRef = useRef(null);
@@ -79,30 +76,51 @@ export default function Topbar() {
   const punchRef = useRef(null);
 
   const currentUser = useAppStore((s) => s.currentUser);
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
   const grantedPermissions = useAppStore((s) => s.permissions);
   const quickActions = useMemo(() => {
+    if (isCustomer) return [];
     const granted = grantedPermissions || [];
     return QUICK_ACTIONS.filter((a) => canUse(a.permission, granted) && canOpenPath(a.path, granted));
-  }, [grantedPermissions]);
-  const todayPunch = useAttendanceStore((s) => s.todayPunch);
-  const fetchTodayPunch = useAttendanceStore((s) => s.fetchTodayPunch);
-  const punchIn = useAttendanceStore((s) => s.punchIn);
-  const punchOut = useAttendanceStore((s) => s.punchOut);
-  const tickPunch = useAttendanceStore((s) => s.tickPunch);
+  }, [grantedPermissions, isCustomer]);
+  const canOpenAttendance = canOpenPath('/hrms/attendance', grantedPermissions || []);
+  // `.raw`: the punch button only needs today's status, which it fetches itself
+  // below. Reading through the lazy hook would pull the whole attendance module
+  // (team register, regularizations, flexibility) on every screen, for every
+  // role — and 403 for anyone without team attendance access.
+  // Shared with the Mark Attendance page, so both drive the same punch.
+  const {
+    todayPunch,
+    fetchTodayPunch,
+    tickPunch,
+    submitting: punchSubmitting,
+    error: punchError,
+    doPunchIn: handlePunchIn,
+    doPunchOut: handlePunchOut,
+    executePunchOut,
+    earlyModalOpen: isEarlyPunchModalOpen,
+    setEarlyModalOpen: setIsEarlyPunchModalOpen,
+  } = usePunchActions();
 
-  // Poll / load today's punch status on mount
+  // Load today's punch status once per signed-in user (employees only)
+  const currentUserId = currentUser?.id;
   useEffect(() => {
+    if (isCustomer || !currentUserId) return;
     fetchTodayPunch();
-  }, [fetchTodayPunch]);
+  }, [fetchTodayPunch, isCustomer, currentUserId]);
 
   // Live timer for active punch session
   useEffect(() => {
-    if (!todayPunch?.isPunchedIn) return;
+    if (isCustomer || !todayPunch?.isPunchedIn) return;
     const interval = setInterval(() => {
       tickPunch();
     }, 1000);
     return () => clearInterval(interval);
-  }, [todayPunch?.isPunchedIn, tickPunch]);
+  }, [todayPunch?.isPunchedIn, tickPunch, isCustomer]);
 
   // Live ERP data for notifications.
   //
@@ -112,11 +130,13 @@ export default function Topbar() {
   const erp = useERP();
   const crmDigest = useCrmNotificationDigest();
   const alertsReady = useIdleReady();
-  const items = alertsReady ? erp?.items : undefined;
-  const deliveryChallans = alertsReady ? erp?.deliveryChallans : undefined;
+  const hasInventory = canOpenPath('/inventory/items', grantedPermissions);
+  const hasSales = canOpenPath('/sales/invoices', grantedPermissions);
+  const items = (!isCustomer && hasInventory && alertsReady) ? erp?.items : undefined;
+  const deliveryChallans = (!isCustomer && hasSales && alertsReady) ? erp?.deliveryChallans : undefined;
   // const zoneRequests = alertsReady ? erp?.zoneRequests : undefined; // Hidden: Zone Requests out of scope
   const zoneRequests = undefined;
-  const salesInvoices = alertsReady ? erp?.invoices : undefined;
+  const salesInvoices = (!isCustomer && hasSales && alertsReady) ? erp?.invoices : undefined;
   const isCrmRoute = pathname === '/crm' || pathname.startsWith('/crm/');
 
   const lowStockItems = useMemo(() => {
@@ -221,61 +241,6 @@ export default function Topbar() {
 
   const storeShowToast = useAppStore((s) => s.showToast || s.setToast);
   const showToast = erp?.showToast || storeShowToast;
-
-  const handlePunchIn = async () => {
-    try {
-      setPunchSubmitting(true);
-      setPunchError(null);
-      await punchIn();
-      if (showToast) showToast('Punched In successfully!');
-    } catch (err) {
-      const msg = err?.payload?.message || err?.message || 'Failed to punch in';
-      setPunchError(msg);
-      if (showToast) showToast(msg, 'error');
-    } finally {
-      setPunchSubmitting(false);
-    }
-  };
-
-  const isEarlyDeparture = () => {
-    const shiftEndStr = todayPunch?.shiftEnd || '18:30';
-    const [endH, endM] = shiftEndStr.split(':').map((v) => parseInt(v, 10) || 0);
-    const now = new Date();
-    const shiftEndDt = new Date(now.getFullYear(), now.getMonth(), now.getDate(), endH, endM, 0);
-    const earlyMins = Math.floor((shiftEndDt.getTime() - now.getTime()) / 60000);
-    const workingHours = Number(todayPunch?.workingHours || 0);
-    return earlyMins > 0 || (workingHours > 0 && workingHours < 8);
-  };
-
-  const handlePunchOut = async () => {
-    if (isEarlyDeparture()) {
-      setIsEarlyPunchModalOpen(true);
-      return;
-    }
-    await executePunchOut();
-  };
-
-  const executePunchOut = async (earlyPayload = null) => {
-    try {
-      setPunchSubmitting(true);
-      setPunchError(null);
-      await punchOut(earlyPayload || {});
-      if (showToast) {
-        if (earlyPayload?.requestRegularization) {
-          showToast('Early Punch Out recorded & Regularization submitted!');
-        } else {
-          showToast('Punched Out successfully!');
-        }
-      }
-      setIsEarlyPunchModalOpen(false);
-    } catch (err) {
-      const msg = err?.payload?.message || err?.message || 'Failed to punch out';
-      setPunchError(msg);
-      if (showToast) showToast(msg, 'error');
-    } finally {
-      setPunchSubmitting(false);
-    }
-  };
 
   // Close popovers on click outside
   useEffect(() => {
@@ -769,7 +734,8 @@ export default function Topbar() {
             )}
           </div>
 
-          {/* Punch In / Out Primary Control & Popover */}
+          {/* Punch In / Out Primary Control & Popover (employees only) */}
+          {!isCustomer && (
           <div className="relative" ref={punchRef}>
             {todayPunch?.isPunchedIn ? (
               <div className="flex items-center gap-1.5">
@@ -981,59 +947,75 @@ export default function Topbar() {
                 </div>
 
                 {/* Link to Attendance Overview */}
-                <div className="mt-2.5 pt-2 border-t border-border flex justify-end">
-                  <Link
-                    to="/hrms/attendance"
-                    onClick={() => setIsPunchOpen(false)}
-                    className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
-                  >
-                    <span>View Attendance →</span>
-                  </Link>
-                </div>
+                {canOpenAttendance && (
+                  <div className="mt-2.5 pt-2 border-t border-border flex justify-end">
+                    <Link
+                      to="/hrms/attendance"
+                      onClick={() => setIsPunchOpen(false)}
+                      className="text-[11px] font-semibold text-primary hover:underline flex items-center gap-1"
+                    >
+                      <span>View Attendance →</span>
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </div>
+          )}
 
-          {/* Calendar Shortcut */}
-          <Link
-            to="/hrms/attendance"
-            className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="Calendar & Schedule"
-            title="Attendance & Schedule"
-          >
-            <CalendarDays size={16} />
-          </Link>
+          {/* Each shortcut shows only to a role that can open its page. */}
+          {!isCustomer && (
+            <>
+              {/* Calendar Shortcut */}
+              {canOpenAttendance && (
+                <Link
+                  to="/hrms/attendance"
+                  className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
+                  aria-label="Calendar & Schedule"
+                  title="Attendance & Schedule"
+                >
+                  <CalendarDays size={16} />
+                </Link>
+              )}
 
-          {/* Messages & Tasks Shortcut */}
-          <Link
-            to="/crm/tasks"
-            className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="Tasks & Activities"
-            title="Tasks & Activities"
-          >
-            <Inbox size={16} />
-          </Link>
+              {/* Messages & Tasks Shortcut */}
+              {canOpenPath('/crm/tasks', grantedPermissions) && (
+                <Link
+                  to="/crm/tasks"
+                  className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
+                  aria-label="Tasks & Activities"
+                  title="Tasks & Activities"
+                >
+                  <Inbox size={16} />
+                </Link>
+              )}
 
-          {/* Settings Shortcut */}
-          <Link
-            to="/administration/settings"
-            className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="System Settings"
-            title="System Settings"
-          >
-            <Settings size={16} />
-          </Link>
+              {/* Settings Shortcut */}
+              {canOpenPath('/administration/settings', grantedPermissions) && (
+                <Link
+                  to="/administration/settings"
+                  className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
+                  aria-label="System Settings"
+                  title="System Settings"
+                >
+                  <Settings size={16} />
+                </Link>
+              )}
+            </>
+          )}
         </div>
       </div>
 
       {/* Early Punch Out Confirmation Modal */}
-      <EarlyPunchOutModal
-        isOpen={isEarlyPunchModalOpen}
-        onClose={() => setIsEarlyPunchModalOpen(false)}
-        onConfirm={executePunchOut}
-        todayPunch={todayPunch}
-        isSubmitting={punchSubmitting}
-      />
+      {!isCustomer && (
+        <EarlyPunchOutModal
+          isOpen={isEarlyPunchModalOpen}
+          onClose={() => setIsEarlyPunchModalOpen(false)}
+          onConfirm={executePunchOut}
+          todayPunch={todayPunch}
+          isSubmitting={punchSubmitting}
+        />
+      )}
     </header>
   );
 }

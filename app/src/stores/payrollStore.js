@@ -1,5 +1,8 @@
 import { create } from "zustand";
-import { lazyStore } from "../services/lazyModules";
+import { lazyStore, sessionCan } from "../services/lazyModules";
+
+/** HR admin, super admin, or an executive role granted payroll. */
+export const PAYROLL_MANAGERS = ["generate_payroll", "approve_payroll", "edit_salary_structure"];
 import { writeThrough, pullTracked, pullWorkingDays, pushWorkingDays, pullPayrollFor } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_payroll_store_v4";
@@ -95,10 +98,13 @@ const usePayrollStoreBase = create((set, get) => ({
 
   /** Load this period's payslips and the salary structures. */
   hydrate: async () => {
+    // Payslips are open to anyone who may see their own slip (the server
+    // scopes the rows to them); the salary templates are payroll-manager data
+    // and working days an HR setting.
     const [employees, structures, settings] = await Promise.all([
       pullTracked("payroll"),
-      pullTracked("salaryStructures"),
-      pullWorkingDays(),
+      sessionCan(PAYROLL_MANAGERS) ? pullTracked("salaryStructures") : null,
+      sessionCan("view_staff") ? pullWorkingDays() : null,
     ]);
     set((s) => ({
       employees: employees || s.employees,
@@ -358,6 +364,9 @@ const usePayrollStoreBase = create((set, get) => ({
    * endpoints; the working-day configuration is a tenant setting.
    */
   persist: () => {
+    // Only payroll managers change payroll; for anyone else the server would
+    // refuse every one of these writes.
+    if (!sessionCan(PAYROLL_MANAGERS)) return;
     writeThrough("payroll", get().employees);
     writeThrough("salaryStructures", get().structures);
     pushWorkingDays({

@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, DollarSign, Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin } from 'lucide-react';
+import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, DollarSign, Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin, BookOpen, CreditCard, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintPurchaseOrderModal } from '../../components/common/PrintPurchaseOrderModal';
+import { fetchPoRegister, fetchVendorAdvances, createVendorAdvance, reconcileVendorAdvance } from '../../services/upgradeService';
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
     subtitle: 'Supplier procurement contracts driving inventory replenishment and vendor billing.',
@@ -19,16 +20,19 @@ const purchaseOrderGuide = {
         { term: 'Purchase Order (PO)', definition: 'A legally binding procurement contract sent to a vendor before goods are shipped.' },
         { term: 'Vendor Lead Time', definition: 'The expected days between issuing the PO and receiving physical delivery at the warehouse dock.' },
         { term: 'PO to Bill Conversion', definition: 'Converts the verified order into a vendor invoice and automatically increases warehouse inventory on-hand.' },
+        { term: 'Commitments Book', definition: 'Tracks gross supplier contractual commitments versus actual invoiced totals and unsettled unbilled exposure.' },
     ],
     tips: [
         'Use the 📋 Clone button on frequent supplier orders to duplicate items into a new draft in 1 click.',
         'Once goods arrive at the dock, click "Create Bill" to post inventory intake and record Accounts Payable.',
+        'Switch to the Commitments Book tab to review unbilled commitments and record vendor advances.',
     ],
     workflow: ['Auto-Generated / Draft PO', 'Issued to Vendor', 'Goods Intake & Vendor Bill', '3-Way Match Verified', 'Disbursement Settlement'],
 };
 export const PurchaseOrdersPage = () => {
     const navigate = useNavigate();
     const { purchaseOrders, vendors, addPurchaseOrder, updatePurchaseOrderStatus, cancelPurchaseOrder, deletePurchaseOrder, getPoBilledStatus, convertPurchaseOrderToBill, purchaseBills, paymentOuts, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO } = useERP();
+    const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'register'
     const [showAddModal, setShowAddModal] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedPo, setSelectedPo] = useState(null);
@@ -36,6 +40,24 @@ export const PurchaseOrdersPage = () => {
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
     const [expectedDate, setExpectedDate] = useState(() => addDaysISO(getCurrentISODate(), 10));
     const [lineItems, setLineItems] = useState([]);
+    
+    // Commitments & Advances State
+    const [registerData, setRegisterData] = useState([]);
+    const [advances, setAdvances] = useState([]);
+    const [isLoadingRegister, setIsLoadingRegister] = useState(false);
+    const [showAdvanceModal, setShowAdvanceModal] = useState(false);
+    const [showReconcileModal, setShowReconcileModal] = useState(false);
+    const [selectedAdvance, setSelectedAdvance] = useState(null);
+    const [newAdvance, setNewAdvance] = useState({
+        party: '',
+        amount: '',
+        advance_date: new Date().toISOString().slice(0, 10),
+        payment_mode: 'Bank Transfer',
+        reference_number: '',
+        purchase_order: '',
+        notes: '',
+    });
+    const [reconcileForm, setReconcileForm] = useState({ bill_id: '', amount: '' });
 
     const handleOpenCreateModal = () => {
         setSelectedVendorId(vendors[0]?.id || '');
@@ -85,6 +107,77 @@ export const PurchaseOrdersPage = () => {
         convertPurchaseOrderToBill(poId);
         navigate('/purchase/bills');
     };
+
+    const loadRegisterData = async () => {
+        setIsLoadingRegister(true);
+        try {
+            const regRes = await fetchPoRegister().catch(() => null);
+            if (regRes?.data) {
+                setRegisterData(Array.isArray(regRes.data) ? regRes.data : []);
+            } else if (Array.isArray(regRes)) {
+                setRegisterData(regRes);
+            }
+            const advRes = await fetchVendorAdvances().catch(() => null);
+            if (advRes?.data) {
+                setAdvances(Array.isArray(advRes.data) ? advRes.data : []);
+            } else if (Array.isArray(advRes)) {
+                setAdvances(advRes);
+            }
+        } catch (err) {
+            console.error('Error loading PO register / advances:', err);
+        } finally {
+            setIsLoadingRegister(false);
+        }
+    };
+
+    useEffect(() => {
+        if (activeTab === 'register') {
+            loadRegisterData();
+        }
+    }, [activeTab]);
+
+    const handleCreateAdvanceSubmit = async (e) => {
+        e.preventDefault();
+        try {
+            await createVendorAdvance({
+                party: newAdvance.party,
+                amount: parseFloat(newAdvance.amount),
+                advance_date: newAdvance.advance_date,
+                payment_mode: newAdvance.payment_mode,
+                reference_number: newAdvance.reference_number,
+                purchase_order: newAdvance.purchase_order || undefined,
+                notes: newAdvance.notes,
+            });
+            setShowAdvanceModal(false);
+            setNewAdvance({
+                party: '',
+                amount: '',
+                advance_date: new Date().toISOString().slice(0, 10),
+                payment_mode: 'Bank Transfer',
+                reference_number: '',
+                purchase_order: '',
+                notes: '',
+            });
+            await loadRegisterData();
+        } catch (err) {
+            alert('Failed to record vendor advance: ' + (err.message || 'Unknown error'));
+        }
+    };
+
+    const handleReconcileSubmit = async (e) => {
+        e.preventDefault();
+        if (!selectedAdvance) return;
+        try {
+            await reconcileVendorAdvance(selectedAdvance.id, reconcileForm.bill_id, reconcileForm.amount);
+            setShowReconcileModal(false);
+            setSelectedAdvance(null);
+            setReconcileForm({ bill_id: '', amount: '' });
+            await loadRegisterData();
+        } catch (err) {
+            alert('Failed to reconcile advance: ' + (err.message || 'Unknown error'));
+        }
+    };
+
     const getPoTimelineSteps = (po) => {
         const isIssued = po.status !== 'Draft';
         const poStatusInfo = getPoBilledStatus(po.id);
@@ -256,20 +349,228 @@ export const PurchaseOrdersPage = () => {
     const receivedPoCount = purchaseOrders.filter(p => p.status === 'Received' || p.status === 'Billed').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Purchase Orders Management" subtitle="Issue procurement orders to suppliers for stock intake, manage component line items, and seamlessly convert to vendor bills." guide={purchaseOrderGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
-            Create Purchase Order
-          </Button>}/>
+      <PageHeader
+        title="Purchase Orders & Commitments"
+        subtitle="Issue procurement orders, track supplier contractual commitments, manage goods intake, and settle vendor advances."
+        guide={purchaseOrderGuide}
+        actions={
+          <div className="flex items-center gap-2">
+            {activeTab === 'register' && (
+              <>
+                <Button variant="outline" icon={RefreshCw} onClick={loadRegisterData}>
+                  Refresh
+                </Button>
+                <Button icon={Plus} onClick={() => setShowAdvanceModal(true)}>
+                  Record Vendor Advance
+                </Button>
+              </>
+            )}
+            {activeTab === 'orders' && (
+              <Button icon={Plus} onClick={handleOpenCreateModal}>
+                Create Purchase Order
+              </Button>
+            )}
+          </div>
+        }
+      />
 
-      {/* Purchase Orders KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Committed Procurement" value={formatCurrency(totalPoValue)} icon={DollarSign} />
-        <StatCard label="Active Orders In-Flight" value={`${activePoCount} Orders`} icon={Clock} trend={{ positive: true, text: 'Awaiting dock arrival' }} highlight={activePoCount > 0} />
-        <StatCard label="Draft Orders" value={`${draftPoCount} Drafts`} icon={Package} subtext="Ready for vendor dispatch" />
-        <StatCard label="Fulfilled & Billed" value={`${receivedPoCount} Received`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
+      {/* Primary Tab Navigation */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab('orders')}
+          className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-2 ${
+            activeTab === 'orders'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <ClipboardList size={14} />
+          Purchase Orders ({purchaseOrders.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('register')}
+          className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-2 ${
+            activeTab === 'register'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <BookOpen size={14} />
+          Commitments Book & Vendor Advances
+        </button>
       </div>
 
-      <DataTable title="Supplier Purchase Orders" columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder="Search PO # or vendor..." searchFilter={(p, term) => String(p.poNumber ?? '').toLowerCase().includes(term) ||
-            String(p.vendor ?? '').toLowerCase().includes(term)}/>
+      {activeTab === 'orders' ? (
+        <>
+          {/* Purchase Orders KPI Stat Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Committed Procurement" value={formatCurrency(totalPoValue)} icon={DollarSign} />
+            <StatCard label="Active Orders In-Flight" value={`${activePoCount} Orders`} icon={Clock} trend={{ positive: true, text: 'Awaiting dock arrival' }} highlight={activePoCount > 0} />
+            <StatCard label="Draft Orders" value={`${draftPoCount} Drafts`} icon={Package} subtext="Ready for vendor dispatch" />
+            <StatCard label="Fulfilled & Billed" value={`${receivedPoCount} Received`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
+          </div>
+
+          <DataTable title="Supplier Purchase Orders" columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder="Search PO # or vendor..." searchFilter={(p, term) => String(p.poNumber ?? '').toLowerCase().includes(term) ||
+                String(p.vendor ?? '').toLowerCase().includes(term)}/>
+        </>
+      ) : (
+        /* Commitments Book & Vendor Advances View */
+        <div className="space-y-6">
+          {/* Commitments KPIs */}
+          {(() => {
+            const totalCommit = registerData.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
+            const totalBilled = registerData.reduce((acc, r) => acc + (Number(r.billed_total) || 0), 0);
+            const totalUnbilled = registerData.reduce((acc, r) => acc + (Number(r.unbilled_commitment) || 0), 0);
+            const totalAdv = advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
+            const unallocAdv = advances.reduce((acc, a) => acc + (Number(a.unallocated_amount) || 0), 0);
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard label="Gross PO Commitments" value={formatCurrency(totalCommit)} icon={DollarSign} subtext={`${registerData.length} total orders`} />
+                <StatCard label="Billed / Invoiced to Date" value={formatCurrency(totalBilled)} icon={CheckCircle2} />
+                <StatCard label="Open Unbilled Commitments" value={formatCurrency(totalUnbilled)} icon={Clock} highlight={totalUnbilled > 0} trend={{ positive: false, text: 'Future AP exposure' }} />
+                <StatCard label="Unallocated Advances" value={formatCurrency(unallocAdv)} icon={CreditCard} subtext={`${advances.length} advances recorded`} />
+              </div>
+            );
+          })()}
+
+          {/* Section 1: PO Commitments Register */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Purchase Commitments Register</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Tracking ordered quantities, warehouse receipts, and unbilled commitment liabilities</p>
+              </div>
+              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">
+                {registerData.length} records
+              </span>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-4">PO #</th>
+                    <th className="py-2.5 px-4">Supplier</th>
+                    <th className="py-2.5 px-4">Order Date</th>
+                    <th className="py-2.5 px-4">Delivery Due</th>
+                    <th className="py-2.5 px-4 text-center">Ordered / Received</th>
+                    <th className="py-2.5 px-4 text-right">Gross Committed</th>
+                    <th className="py-2.5 px-4 text-right">Invoiced / Billed</th>
+                    <th className="py-2.5 px-4 text-right">Open Unbilled</th>
+                    <th className="py-2.5 px-4 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {registerData.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="text-center py-8 text-slate-400">
+                        {isLoadingRegister ? 'Loading commitments...' : 'No purchase commitments found.'}
+                      </td>
+                    </tr>
+                  ) : (
+                    registerData.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-4 font-mono font-bold text-primary">{row.po_number}</td>
+                        <td className="py-2.5 px-4 font-medium text-slate-800">{row.vendor_name || '—'}</td>
+                        <td className="py-2.5 px-4 text-slate-600">{row.doc_date ? formatDateDDMMYYYY(row.doc_date) : '—'}</td>
+                        <td className="py-2.5 px-4 text-slate-600">{row.expected_date ? formatDateDDMMYYYY(row.expected_date) : '—'}</td>
+                        <td className="py-2.5 px-4 text-center font-mono">
+                          <span className="text-slate-800 font-bold">{row.received_qty}</span>
+                          <span className="text-slate-400"> / {row.ordered_qty}</span>
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono font-medium">{formatCurrency(row.total)}</td>
+                        <td className="py-2.5 px-4 text-right font-mono text-emerald-600">{formatCurrency(row.billed_total)}</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-600">
+                          {formatCurrency(row.unbilled_commitment)}
+                        </td>
+                        <td className="py-2.5 px-4 text-center">
+                          <StatusBadge status={row.status} />
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section 2: Vendor Advances Book */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800 text-sm">Vendor Advance Disbursements</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Prepayments made to suppliers prior to invoice presentation, eligible for settlement against final bills</p>
+              </div>
+              <Button size="sm" icon={Plus} onClick={() => setShowAdvanceModal(true)}>
+                Record Advance
+              </Button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-4">Advance #</th>
+                    <th className="py-2.5 px-4">Vendor</th>
+                    <th className="py-2.5 px-4">Date</th>
+                    <th className="py-2.5 px-4">Payment Mode</th>
+                    <th className="py-2.5 px-4">Reference #</th>
+                    <th className="py-2.5 px-4 text-right">Advance Amount</th>
+                    <th className="py-2.5 px-4 text-right">Reconciled</th>
+                    <th className="py-2.5 px-4 text-right">Unallocated Balance</th>
+                    <th className="py-2.5 px-4 text-center">Status</th>
+                    <th className="py-2.5 px-4 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {advances.length === 0 ? (
+                    <tr>
+                      <td colSpan={10} className="text-center py-8 text-slate-400">
+                        No vendor advances recorded. Click "Record Advance" to log a supplier prepayment.
+                      </td>
+                    </tr>
+                  ) : (
+                    advances.map((adv) => (
+                      <tr key={adv.id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-4 font-mono font-bold text-primary">{adv.advance_number || adv.advanceNumber}</td>
+                        <td className="py-2.5 px-4 font-medium text-slate-800">{adv.party_name || adv.partyName || adv.vendor || '—'}</td>
+                        <td className="py-2.5 px-4 text-slate-600">{adv.advance_date ? formatDateDDMMYYYY(adv.advance_date) : '—'}</td>
+                        <td className="py-2.5 px-4 text-slate-600">{adv.payment_mode || adv.paymentMode || '—'}</td>
+                        <td className="py-2.5 px-4 font-mono text-slate-500">{adv.reference_number || adv.referenceNumber || '—'}</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-semibold">{formatCurrency(adv.amount)}</td>
+                        <td className="py-2.5 px-4 text-right font-mono text-emerald-600">{formatCurrency(adv.reconciled_amount || 0)}</td>
+                        <td className="py-2.5 px-4 text-right font-mono font-bold text-amber-600">
+                          {formatCurrency(adv.unallocated_amount !== undefined ? adv.unallocated_amount : adv.amount - (adv.reconciled_amount || 0))}
+                        </td>
+                        <td className="py-2.5 px-4 text-center">
+                          <StatusBadge status={adv.status || 'Active'} />
+                        </td>
+                        <td className="py-2.5 px-4 text-center">
+                          {Number(adv.unallocated_amount ?? adv.amount) > 0 ? (
+                            <button
+                              onClick={() => {
+                                setSelectedAdvance(adv);
+                                setReconcileForm({ bill_id: '', amount: adv.unallocated_amount || adv.amount });
+                                setShowReconcileModal(true);
+                              }}
+                              className="px-2.5 py-1 text-xs bg-slate-100 hover:bg-primary hover:text-white rounded font-medium transition cursor-pointer text-slate-700"
+                            >
+                              Reconcile
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-medium">Settled</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create PO Modal */}
       {showAddModal && (
@@ -486,6 +787,194 @@ export const PurchaseOrdersPage = () => {
             </div>
           </div>
         </div>)}
+
+      {/* Record Vendor Advance Modal */}
+      {showAdvanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 text-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 max-w-lg w-full shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-[#1F2E4A]">Record Vendor Advance</h3>
+              <button onClick={() => setShowAdvanceModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateAdvanceSubmit} className="space-y-3.5 mt-4">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Supplier / Vendor *</label>
+                <select
+                  required
+                  value={newAdvance.party}
+                  onChange={(e) => setNewAdvance({ ...newAdvance, party: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                >
+                  <option value="">Select Vendor...</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name} ({v.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Advance Amount (Rs) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    min="1"
+                    placeholder="e.g. 50000"
+                    value={newAdvance.amount}
+                    onChange={(e) => setNewAdvance({ ...newAdvance, amount: e.target.value })}
+                    className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Disbursement Date *</label>
+                  <input
+                    type="date"
+                    required
+                    value={newAdvance.advance_date}
+                    onChange={(e) => setNewAdvance({ ...newAdvance, advance_date: e.target.value })}
+                    className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Payment Mode</label>
+                  <select
+                    value={newAdvance.payment_mode}
+                    onChange={(e) => setNewAdvance({ ...newAdvance, payment_mode: e.target.value })}
+                    className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                  >
+                    <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
+                    <option value="Cheque">Cheque</option>
+                    <option value="UPI">UPI</option>
+                    <option value="Cash">Cash</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Transaction / UTR Ref</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. UTR-98765432"
+                    value={newAdvance.reference_number}
+                    onChange={(e) => setNewAdvance({ ...newAdvance, reference_number: e.target.value })}
+                    className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Link to Purchase Order (Optional)</label>
+                <select
+                  value={newAdvance.purchase_order}
+                  onChange={(e) => setNewAdvance({ ...newAdvance, purchase_order: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                >
+                  <option value="">None / General Advance</option>
+                  {purchaseOrders.map((po) => (
+                    <option key={po.id} value={po.id}>{po.poNumber} — {po.vendor} ({formatCurrency(po.amount)})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Notes / Remarks</label>
+                <textarea
+                  rows={2}
+                  placeholder="Terms or conditions for this advance payment..."
+                  value={newAdvance.notes}
+                  onChange={(e) => setNewAdvance({ ...newAdvance, notes: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvanceModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg font-semibold shadow-xs"
+                >
+                  Confirm & Disburse Advance
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reconcile Advance Modal */}
+      {showReconcileModal && selectedAdvance && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 text-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl p-5 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="font-bold text-base text-[#1F2E4A]">Reconcile Advance Against Bill</h3>
+              <button onClick={() => setShowReconcileModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleReconcileSubmit} className="space-y-3.5 mt-4">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                <p className="text-slate-600">Advance: <span className="font-mono font-bold text-slate-800">{selectedAdvance.advance_number || selectedAdvance.advanceNumber}</span></p>
+                <p className="text-slate-600">Available Balance: <span className="font-mono font-bold text-emerald-600">{formatCurrency(selectedAdvance.unallocated_amount ?? selectedAdvance.amount)}</span></p>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Select Purchase Bill *</label>
+                <select
+                  required
+                  value={reconcileForm.bill_id}
+                  onChange={(e) => setReconcileForm({ ...reconcileForm, bill_id: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                >
+                  <option value="">Select Bill to Settle...</option>
+                  {(purchaseBills || []).filter(b => b.status !== 'Paid' && b.status !== 'Cancelled').map((bill) => (
+                    <option key={bill.id} value={bill.id}>{bill.billNumber} — {bill.vendor} (Total: {formatCurrency(bill.total || bill.amount)})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Settlement Amount (Rs) *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  min="1"
+                  max={selectedAdvance.unallocated_amount ?? selectedAdvance.amount}
+                  value={reconcileForm.amount}
+                  onChange={(e) => setReconcileForm({ ...reconcileForm, amount: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setShowReconcileModal(false)}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold shadow-xs"
+                >
+                  Apply Settlement
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Official Commercial Purchase Order PDF Voucher */}
       <PrintPurchaseOrderModal

@@ -43,6 +43,8 @@ import {
   Layers,
   CheckCircle,
   HelpCircle,
+  Megaphone,
+  Plane,
 } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useRecruitmentStore } from "../../../stores/recruitmentStore";
@@ -54,6 +56,12 @@ import {
   DEFAULT_DEPARTMENT_WORKING_DAYS,
   DEFAULT_DEPARTMENT_WORKING_HOURS,
 } from "../../../stores/payrollStore";
+import {
+  fetchAnnouncements,
+  createAnnouncement,
+  fetchTravelRequests,
+  createTravelRequest,
+} from "../../../services/upgradeService";
 import TerminationLetterModal from "./TerminationLetterModal";
 import OfferLetterModal from "./OfferLetterModal";
 import GenerateOfferModal from "./GenerateOfferModal";
@@ -127,6 +135,103 @@ export default function HRAdminPage({ defaultTab }) {
   const [resignations, setResignations] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [holidays, setHolidays] = useState([]);
+
+  // Upgradation Scope: Announcements & Travel Requisitions (§2.5.5)
+  const [announcements, setAnnouncements] = useState([]);
+  const [travelRequests, setTravelRequests] = useState([]);
+  const [isAnnouncementModalOpen, setIsAnnouncementModalOpen] = useState(false);
+  const [isTravelModalOpen, setIsTravelModalOpen] = useState(false);
+  const [announcementPriorityFilter, setAnnouncementPriorityFilter] = useState("all");
+  const [travelStatusFilter, setTravelStatusFilter] = useState("all");
+
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: "",
+    content: "",
+    priority: "normal",
+    is_pinned: false,
+    publish_date: isoToday(),
+    expiry_date: isoInDays(30),
+    author_name: currentUser?.name || "HR Department",
+  });
+
+  const [newTravel, setNewTravel] = useState({
+    employeeId: "",
+    purpose: "",
+    destination: "",
+    start_date: isoToday(),
+    end_date: isoInDays(3),
+    advance_requested: 0,
+    status: "submitted",
+  });
+
+  const loadAnnouncementsAndTravel = () => {
+    fetchAnnouncements()
+      .then((res) => {
+        const list = res?.data || res?.results || res || [];
+        if (Array.isArray(list)) setAnnouncements(list);
+      })
+      .catch(() => {});
+    fetchTravelRequests()
+      .then((res) => {
+        const list = res?.data || res?.results || res || [];
+        if (Array.isArray(list)) setTravelRequests(list);
+      })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    loadAnnouncementsAndTravel();
+  }, []);
+
+  const handleCreateAnnouncementSubmit = async (e) => {
+    e.preventDefault();
+    if (!newAnnouncement.title || !newAnnouncement.content) {
+      showToast("Title and content are required", "error");
+      return;
+    }
+    try {
+      await createAnnouncement(newAnnouncement);
+      showToast("Announcement published successfully", "success");
+      setIsAnnouncementModalOpen(false);
+      setNewAnnouncement({
+        title: "",
+        content: "",
+        priority: "normal",
+        is_pinned: false,
+        publish_date: isoToday(),
+        expiry_date: isoInDays(30),
+        author_name: currentUser?.name || "HR Department",
+      });
+      loadAnnouncementsAndTravel();
+    } catch (err) {
+      showToast(err?.message || "Failed to publish announcement", "error");
+    }
+  };
+
+  const handleCreateTravelSubmit = async (e) => {
+    e.preventDefault();
+    if (!newTravel.employeeId || !newTravel.destination) {
+      showToast("Employee and destination are required", "error");
+      return;
+    }
+    try {
+      await createTravelRequest(newTravel);
+      showToast("Travel requisition submitted successfully", "success");
+      setIsTravelModalOpen(false);
+      setNewTravel({
+        employeeId: "",
+        purpose: "",
+        destination: "",
+        start_date: isoToday(),
+        end_date: isoInDays(3),
+        advance_requested: 0,
+        status: "submitted",
+      });
+      loadAnnouncementsAndTravel();
+    } catch (err) {
+      showToast(err?.message || "Failed to submit travel request", "error");
+    }
+  };
 
   // Search & Filters for each tab
   const [search, setSearch] = useState("");
@@ -721,6 +826,24 @@ export default function HRAdminPage({ defaultTab }) {
       accentBg: "bg-indigo-50 text-indigo-700 border-indigo-200",
     },
     {
+      id: "announcements",
+      label: "Announcements",
+      count: announcements.length,
+      subtext: "Circulars & notices",
+      icon: Megaphone,
+      iconColor: "text-amber-700",
+      accentBg: "bg-amber-50 text-amber-700 border-amber-200",
+    },
+    {
+      id: "travel",
+      label: "Travel Requisitions",
+      count: travelRequests.length,
+      subtext: "Conveyance & tours",
+      icon: Plane,
+      iconColor: "text-sky-700",
+      accentBg: "bg-sky-50 text-sky-700 border-sky-200",
+    },
+    {
       id: "settings",
       label: "Org Settings",
       count: "8 Rules",
@@ -926,6 +1049,24 @@ export default function HRAdminPage({ defaultTab }) {
               className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
             >
               <Calendar size={16} /> Add Holiday
+            </button>
+          )}
+          {activeTab === "announcements" && (
+            <button
+              type="button"
+              onClick={() => setIsAnnouncementModalOpen(true)}
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+            >
+              <Megaphone size={16} /> Publish Announcement
+            </button>
+          )}
+          {activeTab === "travel" && (
+            <button
+              type="button"
+              onClick={() => setIsTravelModalOpen(true)}
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+            >
+              <Plane size={16} /> Request Travel Approval
             </button>
           )}
           {activeTab === "settings" && (
@@ -2387,6 +2528,178 @@ export default function HRAdminPage({ defaultTab }) {
         </div>
       )}
 
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 10: ANNOUNCEMENTS & COMPANY BROADCASTS
+         ════════════════════════════════════════════════════════════════ */}
+      {activeTab === "announcements" && (
+        <div className="flex flex-col gap-4">
+          <div className="bg-white border border-bdr rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center font-bold">
+                <Megaphone size={20} />
+              </div>
+              <div>
+                <h2 className="text-[15px] font-bold text-slate-900">Company Announcements &amp; Circulars</h2>
+                <p className="text-[12px] text-muted">
+                  Broadcast organization-wide notices, departmental circulars, and executive updates.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAnnouncementModalOpen(true)}
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+            >
+              <Plus size={16} /> Publish Announcement
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {announcements.length === 0 ? (
+              <div className="col-span-full bg-white border border-dashed border-bdr rounded-xl p-12 text-center text-slate-400 space-y-2">
+                <Megaphone size={36} className="mx-auto text-slate-300" />
+                <p className="text-sm font-semibold text-slate-600">No active company announcements</p>
+                <p className="text-xs">Click &quot;Publish Announcement&quot; to issue a new organizational circular.</p>
+              </div>
+            ) : (
+              announcements.map((ann) => (
+                <div
+                  key={ann.id}
+                  className={`bg-white rounded-xl border p-5 flex flex-col justify-between shadow-xs transition hover:shadow-md ${
+                    ann.is_pinned ? "border-amber-300 ring-1 ring-amber-200" : "border-bdr"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {ann.is_pinned && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800">
+                            📌 PINNED
+                          </span>
+                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            ann.priority === "urgent"
+                              ? "bg-red-100 text-red-700"
+                              : ann.priority === "high"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-blue-100 text-blue-700"
+                          }`}
+                        >
+                          {ann.priority || "normal"}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-muted">{ann.publish_date}</span>
+                    </div>
+                    <h3 className="font-bold text-[15px] text-slate-900 mb-1.5">{ann.title}</h3>
+                    <p className="text-[12.5px] text-slate-600 line-clamp-4 leading-relaxed whitespace-pre-wrap">
+                      {ann.content}
+                    </p>
+                  </div>
+                  <div className="mt-4 pt-3 border-t border-bdr/60 flex items-center justify-between text-[11px] text-muted">
+                    <span>By: <strong className="text-slate-700">{ann.author_name || "HR Admin"}</strong></span>
+                    {ann.targetDepartmentName && (
+                      <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-700 font-medium">
+                        Dept: {ann.targetDepartmentName}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════
+          VIEW 11: EMPLOYEE TRAVEL REQUISITIONS & ALLOWANCES
+         ════════════════════════════════════════════════════════════════ */}
+      {activeTab === "travel" && (
+        <div className="flex flex-col gap-4">
+          <div className="bg-white border border-bdr rounded-xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-sky-50 text-sky-700 border border-sky-200 flex items-center justify-center font-bold">
+                <Plane size={20} />
+              </div>
+              <div>
+                <h2 className="text-[15px] font-bold text-slate-900">Employee Travel Requisitions &amp; Conveyance</h2>
+                <p className="text-[12px] text-muted">
+                  Manage business tours, flight/rail requisition workflows, travel advances, and expense settlements.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsTravelModalOpen(true)}
+              className="inline-flex items-center gap-2 btn-primary h-9 px-4 rounded-xl text-xs font-semibold hover:bg-navy/90 transition shadow-xs cursor-pointer"
+            >
+              <Plus size={16} /> Request Travel Approval
+            </button>
+          </div>
+
+          <div className="bg-white border border-bdr rounded-xl overflow-hidden shadow-xs">
+            {travelRequests.length === 0 ? (
+              <div className="p-12 text-center text-slate-400 space-y-2">
+                <Plane size={36} className="mx-auto text-slate-300" />
+                <p className="text-sm font-semibold text-slate-600">No travel requisitions submitted</p>
+                <p className="text-xs">Submit a business tour or site-visit approval request using the button above.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[12.5px] text-slate-600">
+                  <thead className="bg-slate-50 border-b border-bdr text-[11px] uppercase font-bold text-slate-500">
+                    <tr>
+                      <th className="py-3 px-4">Travel #</th>
+                      <th className="py-3 px-4">Employee</th>
+                      <th className="py-3 px-4">Destination &amp; Purpose</th>
+                      <th className="py-3 px-4">Dates</th>
+                      <th className="py-3 px-4">Advance Req.</th>
+                      <th className="py-3 px-4">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-bdr">
+                    {travelRequests.map((trv) => (
+                      <tr key={trv.id} className="hover:bg-slate-50/60">
+                        <td className="py-3.5 px-4 font-mono font-bold text-navy">
+                          {trv.travel_number || `TRV-${trv.id?.slice(0, 6)}`}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-900">{trv.employeeName || "Employee"}</div>
+                          <div className="text-[11px] text-muted font-mono">{trv.employeeCode}</div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="font-medium text-slate-800">{trv.destination}</div>
+                          <div className="text-[11px] text-muted line-clamp-1">{trv.purpose}</div>
+                        </td>
+                        <td className="py-3.5 px-4 text-[12px]">
+                          {trv.start_date} → {trv.end_date}
+                        </td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-900">
+                          ₹{Number(trv.advance_requested || 0).toLocaleString()}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold capitalize ${
+                              trv.status === "approved"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : trv.status === "rejected"
+                                ? "bg-red-50 text-red-700 border border-red-200"
+                                : "bg-amber-50 text-amber-700 border border-amber-200"
+                            }`}
+                          >
+                            {trv.status || "Submitted"}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Modal: Add / Edit Team ── */}
       {isTeamModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
@@ -3138,6 +3451,254 @@ export default function HRAdminPage({ defaultTab }) {
         offer={activeOfferLetter}
         onUpdateOffer={handleUpdateOffer}
       />
+
+      {/* ── Modal: Publish Announcement ── */}
+      {isAnnouncementModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-5 sm:p-6 max-h-[95vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-bdr">
+              <div className="flex items-center gap-2">
+                <Megaphone size={18} className="text-amber-600" />
+                <h3 className="font-bold text-[16px] text-slate-900">Publish Company Announcement</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAnnouncementModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateAnnouncementSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Announcement Title
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Q4 Townhall & All-Hands Strategy Meeting"
+                  value={newAnnouncement.title}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Content / Circular Text
+                </label>
+                <textarea
+                  rows={4}
+                  placeholder="Provide comprehensive announcement details, timings, and agenda..."
+                  value={newAnnouncement.content}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Priority Level
+                  </label>
+                  <select
+                    value={newAnnouncement.priority}
+                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, priority: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Target Department
+                  </label>
+                  <select
+                    value={newAnnouncement.targetDepartmentId || ""}
+                    onChange={(e) => setNewAnnouncement({ ...newAnnouncement, targetDepartmentId: e.target.value || null })}
+                    className="w-full px-3 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                  >
+                    <option value="">All Organization</option>
+                    {departmentsConfig.map((d) => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Author / Publisher Name
+                </label>
+                <input
+                  type="text"
+                  value={newAnnouncement.author_name}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, author_name: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="is_ann_pinned"
+                  checked={newAnnouncement.is_pinned}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, is_pinned: e.target.checked })}
+                  className="rounded border-bdr text-navy"
+                />
+                <label htmlFor="is_ann_pinned" className="text-[12.5px] font-medium text-slate-700">
+                  Pin to top of employee dashboard &amp; circular feed
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-bdr">
+                <button
+                  type="button"
+                  onClick={() => setIsAnnouncementModalOpen(false)}
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 shadow-xs"
+                >
+                  Publish Announcement
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Request Travel Approval ── */}
+      {isTravelModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-lg p-5 sm:p-6 max-h-[95vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-bdr">
+              <div className="flex items-center gap-2">
+                <Plane size={18} className="text-sky-600" />
+                <h3 className="font-bold text-[16px] text-slate-900">Request Travel Requisition</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsTravelModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleCreateTravelSubmit} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Employee
+                </label>
+                <select
+                  value={newTravel.employeeId}
+                  onChange={(e) => setNewTravel({ ...newTravel, employeeId: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                  required
+                >
+                  <option value="">Select Employee...</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.name} ({emp.employee_code || emp.id}) - {emp.department}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Destination
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Bangalore Plant / Client HQ Mumbai"
+                  value={newTravel.destination}
+                  onChange={(e) => setNewTravel({ ...newTravel, destination: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Tour Purpose
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. On-site commissioning and acceptance testing"
+                  value={newTravel.purpose}
+                  onChange={(e) => setNewTravel({ ...newTravel, purpose: e.target.value })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newTravel.start_date}
+                    onChange={(e) => setNewTravel({ ...newTravel, start_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                    End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={newTravel.end_date}
+                    onChange={(e) => setNewTravel({ ...newTravel, end_date: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Advance Amount Requested (₹)
+                </label>
+                <input
+                  type="number"
+                  value={newTravel.advance_requested}
+                  onChange={(e) => setNewTravel({ ...newTravel, advance_requested: Number(e.target.value) })}
+                  className="w-full px-3.5 py-2 rounded-xl border border-bdr text-[13px] bg-off"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-bdr">
+                <button
+                  type="button"
+                  onClick={() => setIsTravelModalOpen(false)}
+                  className="px-4 py-2 border border-bdr rounded-xl text-[13px] hover:bg-off font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-navy text-white rounded-xl text-[13px] font-medium hover:bg-navy/90 shadow-xs"
+                >
+                  Submit Requisition
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal: Generate Offer Letter (Connected to Recruits) ── */}
       <GenerateOfferModal

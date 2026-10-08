@@ -56,6 +56,7 @@ import {
   LogOut,
   Lock,
   KeyRound,
+  ExternalLink,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { usePmsStore, computeNavBadges } from '../../stores/pmsStore';
@@ -64,7 +65,7 @@ import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
 import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import { logout } from '../../services/authService';
-import { filterNavByPermission } from '../../utils/navAccess';
+import { filterNavByPermission, canOpenPath } from '../../utils/navAccess';
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -85,6 +86,21 @@ const NAV = [
     label: 'Track Orders',
     icon: Package,
     to: '/customer/projects',
+  },
+
+  // Every employee: chats of the projects they work on (no PMS access needed).
+  {
+    label: 'Project Chats',
+    icon: MessagesSquare,
+    to: '/project-chats',
+  },
+
+  // Every stage employee: their assigned PMS stage tasks (Fabrication, Welding, QA, etc.)
+  {
+    label: 'My Stage Tasks',
+    icon: ListChecks,
+    to: '/pms/my-tasks',
+    badgeKey: 'pmsMyTasksPending',
   },
 
   {
@@ -137,6 +153,8 @@ const NAV = [
       { label: 'My Tasks', icon: ListChecks, to: '/pms/my-tasks', badgeKey: 'pmsMyTasksPending' },
       { label: 'Dynamic Stages', icon: Sliders, to: '/pms/stages' },
       { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
+      { label: 'Task Calendar', icon: Calendar, to: '/pms/calendar' },
+      { label: 'Timesheets', icon: CalendarCheck, to: '/pms/timesheets' },
       { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
       { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
       { label: 'PMS Settings', icon: Settings, to: '/pms/settings' },
@@ -172,6 +190,7 @@ const NAV = [
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
       { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },
       { label: 'Expenses', icon: Landmark, to: '/purchase/expenses' },
+      { label: 'Supplier Portal', icon: ExternalLink, to: '/vendor/portal' },
     ],
   },
 
@@ -186,16 +205,7 @@ const NAV = [
     menu: 'menu_inventory',
     icon: Package,
     children: [
-      {
-        label: 'Items Master',
-        icon: Boxes,
-        defaultOpen: false,
-        children: [
-          { label: 'All Items', to: '/inventory/items', dot: true },
-          { label: 'Machine Master', to: '/inventory/items/machines' },
-          { label: 'Stock Inventory', to: '/inventory/items/stock' },
-        ],
-      },
+      { label: 'Item Master', icon: Boxes, to: '/inventory/items' },
       {
         label: 'Categories',
         icon: Layers,
@@ -210,6 +220,9 @@ const NAV = [
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
       { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' },
+      // { label: 'Quality Control (QC)', icon: ShieldCheck, to: '/inventory/quality-control' }, // Hidden: QC out of scope
+      { label: 'Demo Units & Trials', icon: PackageCheck, to: '/inventory/demo-units' },
+      { label: 'Rework & Scrap', icon: Wrench, to: '/inventory/rework' },
       // { label: 'Service Usage', icon: Wrench, to: '/inventory/service-usage' }, // Hidden: Service Usage out of scope
       // { label: 'Zone Requests', icon: Send, to: '/inventory/zone-requests', badgeKey: 'zone' }, // Hidden: Zone Requests out of scope
       // { label: 'Valuation & Ageing', icon: TrendingUp, to: '/inventory/valuation' }, // Hidden: Valuation & Ageing out of scope
@@ -224,6 +237,7 @@ const NAV = [
     children: [
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
       { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
+      { label: 'Budgets & Burn', icon: Sliders, to: '/accounts/budgets' },
       { label: 'Financial Reports', icon: PieChart, to: '/accounts/reports' },
     ],
   },
@@ -263,7 +277,7 @@ const NAV = [
           { label: 'Offers', to: '/hrms/recruitment/offers' },
           { label: 'Onboarding', to: '/hrms/recruitment/onboarding' },
           // { label: 'Career', to: '/hrms/recruitment/career' }, // Hidden: Career Portal out of scope
-          // { label: 'Custom Questions', to: '/hrms/recruitment/questions' }, // Hidden: Screening Questions out of scope
+          { label: 'Screening Questions', to: '/hrms/recruitment/questions' },
           // { label: 'Funnel', to: '/hrms/recruitment/funnel' }, // Hidden: Recruitment Funnel feature commented out
         ],
       },
@@ -286,6 +300,7 @@ const NAV = [
       { label: 'Asset Setup', icon: Briefcase, to: '/hrms/assets' },
       { label: 'Documents', icon: FileText, to: '/hrms/documents' },
       { label: 'Company Policy', icon: ShieldCheck, to: '/hrms/company-policy' },
+      { label: 'Meetings & Rooms', icon: Calendar, to: '/hrms/meetings' },
       { label: 'Calendar', icon: Calendar, to: '/hrms/calendar' },
       // { label: 'HRMS Setup', icon: Sliders, to: '/hrms/hrms-setup' }, // Hidden: HRMS Setup commented out
     ],
@@ -317,6 +332,7 @@ const NAV = [
       { label: 'Users', to: '/administration/users' },
       { label: 'Roles', to: '/administration/roles' },
       { label: 'Clients', to: '/administration/clients' },
+      { label: 'System Settings', to: '/administration/settings' },
     ],
   },
 ];
@@ -583,8 +599,8 @@ export default function Sidebar() {
   const permittedNav = useMemo(() => {
     let list = filterNavByPermission(NAV, permissions || []);
     if (isCustomer) {
-      // Customer role should only see customer-facing navigation
-      list = list.filter((item) => item.to === '/customer/projects' || item.to === '/dashboard');
+      // Customer role should only see customer-facing navigation (Track Orders)
+      list = list.filter((item) => item.to === '/customer/projects');
     } else {
       // Internal staff (Admin, PM, Employee) already have Customer Tracking under PMS (Projects).
       // Hide the top-level "Track Orders" to avoid duplicate highlighted menu items.
@@ -603,12 +619,14 @@ export default function Sidebar() {
   // `.raw` subscribes without pulling PMS: a badge in the sidebar must not be
   // the reason every screen in the app loads the project list. `useModuleWhenIdle`
   // asks for it once the browser has finished with the page the user opened.
-  const shellReady = useModuleWhenIdle('pms');
-  const pmsProjects = usePmsStore.raw((s) => s.projects);
-  const pmsCurrentUserId = usePmsStore.raw((s) => s.currentUserId);
+  const hasPmsAccess = !isCustomer && canOpenPath('/pms', permissions);
+  const hasInventoryAccess = !isCustomer && canOpenPath('/inventory/items', permissions);
+  const shellReady = useModuleWhenIdle(hasPmsAccess ? 'pms' : null);
+  const pmsProjects = hasPmsAccess ? usePmsStore.raw((s) => s.projects) : [];
+  const pmsCurrentUserId = hasPmsAccess ? usePmsStore.raw((s) => s.currentUserId) : null;
   const pmsBadges = useMemo(
-    () => computeNavBadges(pmsProjects, pmsCurrentUserId),
-    [pmsProjects, pmsCurrentUserId]
+    () => (hasPmsAccess ? computeNavBadges(pmsProjects, pmsCurrentUserId) : {}),
+    [pmsProjects, pmsCurrentUserId, hasPmsAccess]
   );
 
   useEffect(() => {
@@ -621,11 +639,11 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  let badges = { zone: 0, faulty: 0, ...pmsBadges };
+  let badges = { zone: 0, faulty: 0, ...(hasPmsAccess ? pmsBadges : {}) };
   try {
     const erp = useERP();
     // Reading these is what loads them, so they wait for the same idle moment.
-    if (erp && shellReady) {
+    if (hasInventoryAccess && erp && shellReady) {
       // badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0; // Hidden: Zone Requests out of scope
       badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
     }
@@ -843,30 +861,49 @@ export default function Sidebar() {
 
             {/* Quick Navigation Links */}
             <div className="space-y-0.5 text-xs">
-              <Link
-                to="/hrms/dashboard"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-              >
-                <User size={13} className="text-blue-400 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-medium">HR Profile & Attendance</span>
-              </Link>
-              <Link
-                to="/administration/users"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-              >
-                <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-medium">Administration & Roles</span>
-              </Link>
-              <Link
-                to="/administration/settings"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-              >
-                <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-medium">System Preferences & Currency</span>
-              </Link>
+              {!isCustomer && (
+                <>
+                  {/* Every employee's own record; the rest only for roles that can open them. */}
+                  <Link
+                    to="/my-profile"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                  >
+                    <User size={13} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-[11px] font-medium">My Profile</span>
+                  </Link>
+                  {canOpenPath('/hrms/dashboard', permissions) && (
+                    <Link
+                      to="/hrms/dashboard"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                    >
+                      <CalendarCheck size={13} className="text-sky-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] font-medium">HR Dashboard & Attendance</span>
+                    </Link>
+                  )}
+                  {canOpenPath('/administration/users', permissions) && (
+                    <Link
+                      to="/administration/users"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                    >
+                      <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] font-medium">Administration & Roles</span>
+                    </Link>
+                  )}
+                  {canOpenPath('/administration/settings', permissions) && (
+                    <Link
+                      to="/administration/settings"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                    >
+                      <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
+                      <span className="text-[11px] font-medium">System Preferences & Currency</span>
+                    </Link>
+                  )}
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => {

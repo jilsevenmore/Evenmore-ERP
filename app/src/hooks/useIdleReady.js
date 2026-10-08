@@ -34,7 +34,7 @@ export function useIdleReady(timeout = 3000) {
 export function useModuleWhenIdle(name) {
   const ready = useIdleReady();
   useEffect(() => {
-    if (ready) ensureModule(name);
+    if (ready && name) ensureModule(name);
   }, [ready, name]);
   return ready;
 }

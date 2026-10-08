@@ -1,10 +1,20 @@
 import { useState, useMemo, useEffect } from "react";
-import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2 } from "lucide-react";
+import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { hrmsSync } from "../../../services/hrmsSync";
+import {
+  fetchEmployeeTransfers,
+  createEmployeeTransfer,
+  fetchEmployeePromotions,
+  createEmployeePromotion,
+  fetchEmployeeWarnings,
+  createEmployeeWarning,
+  fetchEmployeeAwards,
+  createEmployeeAward
+} from "../../../services/upgradeService";
 
 const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
@@ -53,6 +63,48 @@ export default function Employees() {
   const [departmentsList, setDepartmentsList] = useState([]);
   const [designationsList, setDesignationsList] = useState([]);
   const [locationsList, setLocationsList] = useState([]);
+
+  // Lifecycle State
+  const [selectedLifecycleEmp, setSelectedLifecycleEmp] = useState(null);
+  const [lifecycleTab, setLifecycleTab] = useState("transfers"); // 'transfers' | 'promotions' | 'warnings' | 'awards'
+  const [transfers, setTransfers] = useState([]);
+  const [promotions, setPromotions] = useState([]);
+  const [warnings, setWarnings] = useState([]);
+  const [awards, setAwards] = useState([]);
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
+
+  // Sub-forms for creating lifecycle events
+  const [showEventCreateModal, setShowEventCreateModal] = useState(false);
+  const [transferForm, setTransferForm] = useState({ to_department: '', to_branch: '', effective_date: new Date().toISOString().slice(0, 10), reason: '' });
+  const [promotionForm, setPromotionForm] = useState({ new_designation: '', previous_salary: '', new_salary: '', effective_date: new Date().toISOString().slice(0, 10), notes: '' });
+  const [warningForm, setWarningForm] = useState({ warning_level: 'Medium', title: '', explanation: '', warning_date: new Date().toISOString().slice(0, 10) });
+  const [awardForm, setAwardForm] = useState({ award_name: '', citation: '', cash_reward: '', presentation_date: new Date().toISOString().slice(0, 10) });
+
+  const loadLifecycleData = async (empId) => {
+    setLifecycleLoading(true);
+    try {
+      const [tRes, pRes, wRes, aRes] = await Promise.all([
+        fetchEmployeeTransfers(empId).catch(() => []),
+        fetchEmployeePromotions(empId).catch(() => []),
+        fetchEmployeeWarnings(empId).catch(() => []),
+        fetchEmployeeAwards(empId).catch(() => []),
+      ]);
+      setTransfers(Array.isArray(tRes?.data) ? tRes.data : Array.isArray(tRes) ? tRes : []);
+      setPromotions(Array.isArray(pRes?.data) ? pRes.data : Array.isArray(pRes) ? pRes : []);
+      setWarnings(Array.isArray(wRes?.data) ? wRes.data : Array.isArray(wRes) ? wRes : []);
+      setAwards(Array.isArray(aRes?.data) ? aRes.data : Array.isArray(aRes) ? aRes : []);
+    } catch (err) {
+      console.error('Failed to load employee lifecycle:', err);
+    } finally {
+      setLifecycleLoading(false);
+    }
+  };
+
+  const handleOpenLifecycle = (emp) => {
+    setSelectedLifecycleEmp(emp);
+    setLifecycleTab('transfers');
+    loadLifecycleData(emp.id);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -291,11 +343,20 @@ export default function Employees() {
                     <td>
                       <LoginBadge login={row.login} />
                     </td>
-                    <td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLifecycle(row)}
+                        className="emp-trash-btn inline-block mr-1"
+                        style={{ color: "#2563eb" }}
+                        title="Employee Lifecycle (Transfers, Promotions, Warnings, Awards)"
+                      >
+                        <Award size={15} />
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleDelete(row.id, row.name)}
-                        className="emp-trash-btn"
+                        className="emp-trash-btn inline-block"
                         title="Delete employee"
                       >
                         <Trash2 size={15} />
@@ -496,6 +557,480 @@ export default function Employees() {
           </div>
         </div>
       </Modal>
+
+      {/* Employee Lifecycle Management Modal */}
+      {selectedLifecycleEmp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 text-xs">
+          <div className="bg-white border border-slate-200 rounded-2xl max-w-3xl w-full shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-3">
+                <img
+                  src={selectedLifecycleEmp.img}
+                  alt={selectedLifecycleEmp.name}
+                  className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                />
+                <div>
+                  <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
+                    {selectedLifecycleEmp.name}
+                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800">
+                      {selectedLifecycleEmp.employeeCode || selectedLifecycleEmp.empId || selectedLifecycleEmp.id}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {selectedLifecycleEmp.designation} • {selectedLifecycleEmp.department}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedLifecycleEmp(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Lifecycle Tabs */}
+            <div className="flex border-b border-slate-200 px-6 pt-2 bg-white">
+              <button
+                onClick={() => { setLifecycleTab("transfers"); setShowEventCreateModal(false); }}
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                  lifecycleTab === "transfers" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <ArrowRightLeft size={14} /> Transfers ({transfers.length})
+              </button>
+              <button
+                onClick={() => { setLifecycleTab("promotions"); setShowEventCreateModal(false); }}
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                  lifecycleTab === "promotions" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <TrendingUp size={14} /> Promotions ({promotions.length})
+              </button>
+              <button
+                onClick={() => { setLifecycleTab("warnings"); setShowEventCreateModal(false); }}
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                  lifecycleTab === "warnings" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <AlertTriangle size={14} /> Disciplinary ({warnings.length})
+              </button>
+              <button
+                onClick={() => { setLifecycleTab("awards"); setShowEventCreateModal(false); }}
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                  lifecycleTab === "awards" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Award size={14} /> Awards ({awards.length})
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-slate-700">
+                  {lifecycleTab === "transfers" && "Department & Location Transfer History"}
+                  {lifecycleTab === "promotions" && "Career Progression & Salary Revisions"}
+                  {lifecycleTab === "warnings" && "Formal Performance & Conduct Notices"}
+                  {lifecycleTab === "awards" && "Excellence Awards & Spot Recognition"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowEventCreateModal(!showEventCreateModal)}
+                  className="px-3 py-1.5 bg-primary text-white rounded-lg font-semibold flex items-center gap-1 hover:bg-primary/90 transition"
+                >
+                  <Plus size={13} /> {showEventCreateModal ? "Close Form" : `Record ${lifecycleTab.slice(0, -1)}`}
+                </button>
+              </div>
+
+              {/* Event Creation Forms */}
+              {showEventCreateModal && (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                  <h4 className="font-bold text-slate-800">
+                    Add New {lifecycleTab.slice(0, 1).toUpperCase() + lifecycleTab.slice(1, -1)} Record
+                  </h4>
+                  {lifecycleTab === "transfers" && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        await createEmployeeTransfer({
+                          employee: selectedLifecycleEmp.id,
+                          from_department: selectedLifecycleEmp.department,
+                          to_department: transferForm.to_department,
+                          to_branch: transferForm.to_branch,
+                          effective_date: transferForm.effective_date,
+                          reason: transferForm.reason,
+                        });
+                        setShowEventCreateModal(false);
+                        loadLifecycleData(selectedLifecycleEmp.id);
+                      }}
+                      className="space-y-3"
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Target Department *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Operations / R&D"
+                            value={transferForm.to_department}
+                            onChange={(e) => setTransferForm({ ...transferForm, to_department: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>
+                          <input
+                            type="date"
+                            required
+                            value={transferForm.effective_date}
+                            onChange={(e) => setTransferForm({ ...transferForm, effective_date: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Transfer Justification</label>
+                        <textarea
+                          rows={2}
+                          value={transferForm.reason}
+                          onChange={(e) => setTransferForm({ ...transferForm, reason: e.target.value })}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          placeholder="Operational requirement or employee request..."
+                        />
+                      </div>
+                      <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg font-semibold">
+                        Confirm Transfer
+                      </button>
+                    </form>
+                  )}
+
+                  {lifecycleTab === "promotions" && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        await createEmployeePromotion({
+                          employee: selectedLifecycleEmp.id,
+                          previous_designation: selectedLifecycleEmp.designation,
+                          new_designation: promotionForm.new_designation,
+                          previous_salary: parseFloat(promotionForm.previous_salary) || 0,
+                          new_salary: parseFloat(promotionForm.new_salary) || 0,
+                          effective_date: promotionForm.effective_date,
+                          notes: promotionForm.notes,
+                        });
+                        setShowEventCreateModal(false);
+                        loadLifecycleData(selectedLifecycleEmp.id);
+                      }}
+                      className="space-y-3"
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Promoted Designation *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Senior Systems Engineer"
+                            value={promotionForm.new_designation}
+                            onChange={(e) => setPromotionForm({ ...promotionForm, new_designation: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>
+                          <input
+                            type="date"
+                            required
+                            value={promotionForm.effective_date}
+                            onChange={(e) => setPromotionForm({ ...promotionForm, effective_date: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Previous CTC (Rs)</label>
+                          <input
+                            type="number"
+                            value={promotionForm.previous_salary}
+                            onChange={(e) => setPromotionForm({ ...promotionForm, previous_salary: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Revised CTC (Rs)</label>
+                          <input
+                            type="number"
+                            value={promotionForm.new_salary}
+                            onChange={(e) => setPromotionForm({ ...promotionForm, new_salary: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold">
+                        Confirm Promotion
+                      </button>
+                    </form>
+                  )}
+
+                  {lifecycleTab === "warnings" && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        await createEmployeeWarning({
+                          employee: selectedLifecycleEmp.id,
+                          warning_level: warningForm.warning_level,
+                          title: warningForm.title,
+                          explanation: warningForm.explanation,
+                          warning_date: warningForm.warning_date,
+                        });
+                        setShowEventCreateModal(false);
+                        loadLifecycleData(selectedLifecycleEmp.id);
+                      }}
+                      className="space-y-3"
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Notice Title *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Unexcused Absence / Security Violation"
+                            value={warningForm.title}
+                            onChange={(e) => setWarningForm({ ...warningForm, title: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Severity Level</label>
+                          <select
+                            value={warningForm.warning_level}
+                            onChange={(e) => setWarningForm({ ...warningForm, warning_level: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                          >
+                            <option value="Low">Low (Informal Counseling)</option>
+                            <option value="Medium">Medium (Written Warning)</option>
+                            <option value="Severe">Severe (Final Notice / PIP)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Notice Explanation</label>
+                        <textarea
+                          rows={2}
+                          value={warningForm.explanation}
+                          onChange={(e) => setWarningForm({ ...warningForm, explanation: e.target.value })}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          placeholder="Details of the infraction and corrective measures required..."
+                        />
+                      </div>
+                      <button type="submit" className="px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold">
+                        Issue Warning Notice
+                      </button>
+                    </form>
+                  )}
+
+                  {lifecycleTab === "awards" && (
+                    <form
+                      onSubmit={async (e) => {
+                        e.preventDefault();
+                        await createEmployeeAward({
+                          employee: selectedLifecycleEmp.id,
+                          award_name: awardForm.award_name,
+                          citation: awardForm.citation,
+                          cash_reward: parseFloat(awardForm.cash_reward) || 0,
+                          presentation_date: awardForm.presentation_date,
+                        });
+                        setShowEventCreateModal(false);
+                        loadLifecycleData(selectedLifecycleEmp.id);
+                      }}
+                      className="space-y-3"
+                    >
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Award Title *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Star Performer of the Quarter / Innovation Award"
+                            value={awardForm.award_name}
+                            onChange={(e) => setAwardForm({ ...awardForm, award_name: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Cash Reward (Rs)</label>
+                          <input
+                            type="number"
+                            placeholder="e.g. 10000"
+                            value={awardForm.cash_reward}
+                            onChange={(e) => setAwardForm({ ...awardForm, cash_reward: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Citation / Accomplishment</label>
+                        <textarea
+                          rows={2}
+                          value={awardForm.citation}
+                          onChange={(e) => setAwardForm({ ...awardForm, citation: e.target.value })}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          placeholder="Key milestone or client feedback leading to this recognition..."
+                        />
+                      </div>
+                      <button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold">
+                        Present Award
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+
+              {/* Data Tables */}
+              {lifecycleTab === "transfers" && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-4">From Department</th>
+                        <th className="py-2.5 px-4">To Department</th>
+                        <th className="py-2.5 px-4">Effective Date</th>
+                        <th className="py-2.5 px-4">Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {transfers.length === 0 ? (
+                        <tr><td colSpan={4} className="py-6 text-center text-slate-400">No transfers recorded for this employee.</td></tr>
+                      ) : (
+                        transfers.map((t, idx) => (
+                          <tr key={idx}>
+                            <td className="py-2.5 px-4 text-slate-600">{t.from_department || "—"}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.to_department}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{t.effective_date}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{t.reason || "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {lifecycleTab === "promotions" && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-4">Previous Role</th>
+                        <th className="py-2.5 px-4">Promoted Role</th>
+                        <th className="py-2.5 px-4">Effective Date</th>
+                        <th className="py-2.5 px-4 text-right">Revised Salary</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {promotions.length === 0 ? (
+                        <tr><td colSpan={4} className="py-6 text-center text-slate-400">No promotions recorded for this employee.</td></tr>
+                      ) : (
+                        promotions.map((p, idx) => (
+                          <tr key={idx}>
+                            <td className="py-2.5 px-4 text-slate-600">{p.previous_designation || "—"}</td>
+                            <td className="py-2.5 px-4 font-semibold text-emerald-700">{p.new_designation}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{p.effective_date}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              {p.new_salary ? `Rs ${p.new_salary}` : "—"}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {lifecycleTab === "warnings" && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-4">Notice Title</th>
+                        <th className="py-2.5 px-4">Severity</th>
+                        <th className="py-2.5 px-4">Date Issued</th>
+                        <th className="py-2.5 px-4">Explanation</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {warnings.length === 0 ? (
+                        <tr><td colSpan={4} className="py-6 text-center text-slate-400">No disciplinary warnings on file.</td></tr>
+                      ) : (
+                        warnings.map((w, idx) => (
+                          <tr key={idx}>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{w.title}</td>
+                            <td className="py-2.5 px-4">
+                              <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                w.warning_level === "Severe" ? "bg-rose-100 text-rose-800" :
+                                w.warning_level === "Medium" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
+                              }`}>
+                                {w.warning_level}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{w.warning_date}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{w.explanation || "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {lifecycleTab === "awards" && (
+                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                      <tr>
+                        <th className="py-2.5 px-4">Award Title</th>
+                        <th className="py-2.5 px-4">Date Presented</th>
+                        <th className="py-2.5 px-4 text-right">Cash Prize</th>
+                        <th className="py-2.5 px-4">Citation</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {awards.length === 0 ? (
+                        <tr><td colSpan={4} className="py-6 text-center text-slate-400">No awards recorded.</td></tr>
+                      ) : (
+                        awards.map((a, idx) => (
+                          <tr key={idx}>
+                            <td className="py-2.5 px-4 font-semibold text-amber-800 flex items-center gap-1.5">
+                              <Award size={14} className="text-amber-600" /> {a.award_name}
+                            </td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{a.presentation_date}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
+                              {a.cash_reward ? `Rs ${a.cash_reward}` : "—"}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600">{a.citation || "—"}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-slate-200 flex justify-end bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setSelectedLifecycleEmp(null)}
+                className="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-100 font-semibold"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         .emp-dir-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }

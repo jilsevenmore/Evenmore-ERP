@@ -79,6 +79,13 @@ export function useModuleHydration() {
         return;
       }
 
+      const isCustomer = Boolean(
+        app.currentUser?.isCustomer ||
+        app.currentUser?.role?.code === 'CU' ||
+        String(app.currentUser?.role?.name || app.currentUser?.role || '').toLowerCase() === 'customer'
+      );
+      if (isCustomer) return;
+
       // A session just appeared (or changed). Anything this tab already pulled
       // belongs to the previous one, so re-pull exactly that much; everything
       // else stays unloaded until a screen asks.
@@ -86,7 +93,7 @@ export function useModuleHydration() {
 
       // PMS filters "my projects" / "my tasks" by the signed-in user.
       const me = app.currentUser;
-      if (me?.id) usePmsStore.getState().setCurrentUserId(me.employeeId || me.id);
+      if (me?.id) usePmsStore.getState().setCurrentUserId(me.id);
     };
 
     run();
@@ -94,7 +101,13 @@ export function useModuleHydration() {
     // The notification bell lives in the topbar on every screen, so its feed is
     // session-wide — but it is one request behind the page the user asked for.
     const idle = whenIdle(() => {
-      if (!cancelled && getStoredToken()) refreshNotifications();
+      const app = useAppStore.getState();
+      const isCustomer = Boolean(
+        app.currentUser?.isCustomer ||
+        app.currentUser?.role?.code === 'CU' ||
+        String(app.currentUser?.role?.name || app.currentUser?.role || '').toLowerCase() === 'customer'
+      );
+      if (!cancelled && getStoredToken() && !isCustomer) refreshNotifications();
     });
 
     // Signing in from another tab, or the token being cleared by a 401, both

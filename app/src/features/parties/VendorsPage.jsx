@@ -44,6 +44,7 @@ export const VendorsPage = () => {
         email: '',
         phone: '',
         paymentTerms: 'Net 30',
+        weightTolerancePct: '1.50',
     });
     const totalPayable = vendors.reduce((sum, v) => sum + (Number(v.balance) || 0), 0);
     const columns = [
@@ -108,6 +109,17 @@ export const VendorsPage = () => {
             },
         },
         {
+            header: 'Weight Tol. (±%)',
+            accessor: 'weightTolerancePct',
+            align: 'center',
+            width: '10%',
+            render: (v) => (
+              <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded bg-blue-50 text-blue-700">
+                ±{v.weightTolerancePct !== undefined && v.weightTolerancePct !== null ? v.weightTolerancePct : '1.5'}%
+              </span>
+            ),
+        },
+        {
             header: 'Status',
             align: 'center',
             width: '8%',
@@ -146,10 +158,11 @@ export const VendorsPage = () => {
             phone: newVend.phone || '',
             balance: 0,
             paymentTerms: newVend.paymentTerms || 'Net 30',
+            weightTolerancePct: parseFloat(newVend.weightTolerancePct) || 1.5,
             status: 'Active',
         });
         setIsModalOpen(false);
-        setNewVend({ name: '', code: '', category: 'Hardware', contactPerson: '', email: '', phone: '', paymentTerms: 'Net 30' });
+        setNewVend({ name: '', code: '', category: 'Hardware', contactPerson: '', email: '', phone: '', paymentTerms: 'Net 30', weightTolerancePct: '1.50' });
     };
     const vendorEntries = selectedVendor ? getVendorLedger(selectedVendor.id) : [];
     return (<div className="space-y-6">
@@ -222,6 +235,24 @@ export const VendorsPage = () => {
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Email</label>
                   <input type="email" value={newVend.email} onChange={(e) => setNewVend({ ...newVend, email: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                </div>
+              </div>
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Weight Tolerance Threshold (±%)</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-500 font-mono text-sm">±</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="20"
+                    placeholder="1.5"
+                    value={newVend.weightTolerancePct}
+                    onChange={(e) => setNewVend({ ...newVend, weightTolerancePct: e.target.value })}
+                    className="w-32 p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"
+                  />
+                  <span className="text-slate-500 text-xs">% (Deviation threshold for weighbridge intake)</span>
                 </div>
               </div>
 

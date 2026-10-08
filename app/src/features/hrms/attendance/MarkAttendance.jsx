@@ -1,379 +1,490 @@
-import { useState, useMemo, useEffect } from "react";
-import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+/**
+ * Mark Attendance — two screens behind one route.
+ *
+ *  - HR admin, super admin and executive roles (`mark_attendance` together
+ *    with `view_team_attendance`) get the team register for any day: every
+ *    employee, with the check-in / check-out the server already worked out
+ *    from their Punch In / Punch Out, editable as a correction.
+ *  - Everyone else gets their own attendance: Punch In / Punch Out (the same
+ *    punch as the topbar button), today's punches and their own history. The
+ *    server only returns their own rows and refuses hand edits from them —
+ *    corrections go through regularization.
+ */
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Calendar as CalendarIcon, Clock, Fingerprint, Loader2, LogIn, LogOut, RefreshCw, Search } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
-import { ConfirmModal } from "../../../components/hrms/Shared";
+import { hrmsSync } from "../../../services/hrmsSync";
+import { api } from "../../../services/api";
+import { Badge } from "../../../components/hrms/Badge";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { EarlyPunchOutModal } from "./components/EarlyPunchOutModal";
+import { usePunchActions } from "./usePunchActions";
 
-function buildRows(storeRecords, storeEmployees) {
-  if (storeRecords && storeRecords.length > 0) {
-    return storeRecords.map((r) => ({
-      ...r,
-      avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
-      remarks: r.remarks || "",
-      checked: false,
-    }));
-  }
-  return (storeEmployees || []).map((emp, i) => {
-    const empId = emp.empId || emp.id || `EMP${1024 + i}`;
-    return {
-      id: empId,
-      name: emp.name,
-      dept: emp.department || "",
-      checkIn: "09:00",
-      checkOut: "18:00",
-      status: "Present",
-      remarks: "",
-      checked: false,
-      avatar: emp.avatar || `https://i.pravatar.cc/100?u=${empId}`,
-    };
-  });
+const STATUSES = ["Present", "Late", "Half Day", "WFH", "Absent", "On Leave"];
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const SHIFTS = ["All", "General", "Flexible", "Night"];
-const STATUSES = ["Present", "Late", "Absent", "WFH", "Half Day", "On Leave"];
+/** ISO timestamp → local `HH:MM` for a time input; blank when absent. */
+function toHHMM(value) {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return /^\d{2}:\d{2}/.test(value) ? value.slice(0, 5) : "";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function statusTone(status) {
+  if (status === "Present" || status === "WFH") return "success";
+  if (status === "Late" || status === "Half Day") return "warning";
+  if (status === "Absent") return "critical";
+  return "neutral";
+}
+
+function PageTitle({ subtitle }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2.5">
+        <h1 className="text-[24px] font-bold tracking-tight text-slate-900">Mark Attendance</h1>
+        <PageInfoButton guide={hrmsGuides.attendanceMark} />
+      </div>
+      <p className="text-[13px] text-muted">{subtitle}</p>
+    </div>
+  );
+}
 
 export default function MarkAttendance() {
-  const setToast = useAppStore((s) => s.setToast || s.showToast);
-  const storeRecords = useAttendanceStore((s) => s.records);
-  const saveDailyAttendance = useAttendanceStore((s) => s.saveDailyAttendance);
-  const bulkUpdateStore = useAttendanceStore((s) => s.bulkUpdate);
+  const permissions = useAppStore((s) => s.permissions) || [];
+  const canMarkTeam = permissions.includes("mark_attendance") && permissions.includes("view_team_attendance");
+  return canMarkTeam ? <TeamMarkAttendance /> : <MyAttendance />;
+}
 
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [dept, setDept] = useState("All");
-  const [location, setLocation] = useState("All");
-  const [shift, setShift] = useState("All");
+// ── Self-service: Punch In / Punch Out and my own record ───────────────────
 
-  const storeEmployees = useAppStore((s) => s.employees);
+function MyAttendance() {
+  const {
+    todayPunch, fetchTodayPunch, submitting, error,
+    doPunchIn, doPunchOut, executePunchOut, earlyModalOpen, setEarlyModalOpen,
+  } = usePunchActions();
+  // Reading the store loads this user's own attendance rows (server-scoped).
+  const records = useAttendanceStore((s) => s.records);
+  const refreshAttendance = useAttendanceStore((s) => s.refreshAttendance);
 
-  const [rows, setRows] = useState(() => buildRows(storeRecords, storeEmployees));
+  useEffect(() => { fetchTodayPunch(); }, [fetchTodayPunch]);
 
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const DEPARTMENTS = useMemo(
-    () => ["All", ...new Set(rows.map((r) => r.dept).filter(Boolean))],
-    [rows]
+  const month = todayISO().slice(0, 7);
+  const history = useMemo(
+    () => (records || [])
+      .filter((r) => String(r.rawDate || "").startsWith(month))
+      .sort((a, b) => String(b.rawDate).localeCompare(String(a.rawDate))),
+    [records, month]
   );
-  const LOCATIONS = useMemo(
-    () => ["All", ...new Set((storeEmployees || []).map((e) => e.location).filter(Boolean))],
-    [storeEmployees]
-  );
+  const summary = useMemo(() => {
+    const count = (fn) => history.filter(fn).length;
+    return {
+      present: count((r) => ["Present", "Late", "WFH", "Half Day"].includes(r.status)),
+      late: count((r) => r.status === "Late"),
+      absent: count((r) => r.status === "Absent"),
+      leave: count((r) => r.status === "On Leave"),
+    };
+  }, [history]);
 
-  // Sync rows if store records or employees change
-  useEffect(() => {
-    if (storeRecords && storeRecords.length > 0) {
-      setRows((prev) => {
-        return storeRecords.map((r) => {
-          const existing = prev.find((p) => p.id === r.id);
-          return {
-            ...r,
-            avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
-            remarks: existing ? existing.remarks : r.remarks || "",
-            checked: existing ? existing.checked : false,
-          };
-        });
-      });
-    } else if (storeEmployees && storeEmployees.length > 0) {
-      setRows((prev) => {
-        return storeEmployees.map((emp, i) => {
-          const empId = emp.empId || emp.id || `EMP${1024 + i}`;
-          const existing = prev.find((p) => p.id === empId);
-          return {
-            id: empId,
-            name: emp.name,
-            dept: emp.department || '',
-            checkIn: '09:00',
-            checkOut: '18:00',
-            status: 'Present',
-            remarks: existing ? existing.remarks : '',
-            checked: existing ? existing.checked : false,
-            avatar: emp.avatar || `https://i.pravatar.cc/100?u=${empId}`,
-          };
-        });
-      });
-    }
-  }, [storeRecords, storeEmployees]);
-
-  const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (dept !== "All" && r.dept !== dept) return false;
-      return true;
-    });
-  }, [rows, dept]);
-
-  const selectedCount = rows.filter((r) => r.checked).length;
-
-  function toggleAll(v) {
-    setRows(rows.map((r) => (filtered.some((f) => f.id === r.id) ? { ...r, checked: v } : r)));
-  }
-
-  function updateRow(id, patch) {
-    setRows(rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-  }
-
-  function formatAttendanceRows(targetRows) {
-    return targetRows.map((r) => {
-      const emp = (storeEmployees || []).find(
-        (e) => e.empId === r.id || e.id === r.id || e.name === r.name
-      );
-      return {
-        ...r,
-        employeeId: emp?.id || r.id,
-        date: date,
-        checkIn: r.checkIn ? (r.checkIn.includes('T') ? r.checkIn : `${date}T${r.checkIn.length === 5 ? r.checkIn + ':00' : r.checkIn}`) : null,
-        checkOut: r.checkOut ? (r.checkOut.includes('T') ? r.checkOut : `${date}T${r.checkOut.length === 5 ? r.checkOut + ':00' : r.checkOut}`) : null,
-      };
-    });
-  }
-
-  function handleSave() {
-    const formatted = formatAttendanceRows(rows);
-    saveDailyAttendance(date, formatted);
-    setToast(`Attendance saved for ${rows.length} employees on ${date}`);
-  }
+  const punches = todayPunch?.punches || [];
+  const noEmployee = todayPunch?.hasEmployee === false;
 
   return (
-    <div className="mark-att-page">
-      {/* Breadcrumb */}
-      <nav className="mark-crumb">
-        <span style={{ cursor: "pointer" }}>Home</span>
-        <ChevronRight size={13} style={{ color: "#9aa7bd" }} />
-        <span style={{ color: "#111f36", fontWeight: 600 }}>Attendance / Mark Attendance</span>
-      </nav>
+    <div className="flex flex-col gap-6">
+      <PageTitle subtitle="Punch in when you start and punch out when you leave — your attendance is recorded from your punches." />
 
-      {/* Header Row */}
-      <div className="mark-title-row">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="mark-title">Mark Attendance</h1>
-            <PageInfoButton guide={hrmsGuides.attendanceMark} />
+      {noEmployee ? (
+        <div className="bg-white border border-bdr rounded-2xl p-8 text-center shadow-xs text-[13px] text-muted">
+          Your login is not linked to an employee record, so attendance cannot be recorded. Ask HR to link it.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Today */}
+          <div className="lg:col-span-5 bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-[15px] text-slate-900">Today</h3>
+                <p className="text-[12px] text-muted">
+                  Shift {todayPunch?.shiftStart || "—"} – {todayPunch?.shiftEnd || "—"}
+                </p>
+              </div>
+              <Badge tone={todayPunch?.isPunchedIn ? "success" : todayPunch?.dayCompleted ? "info" : "neutral"}>
+                {todayPunch?.status || "Not Punched In"}
+              </Badge>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                ["First In", todayPunch?.firstPunch || "—"],
+                ["Last Out", todayPunch?.isPunchedIn ? "—" : todayPunch?.lastPunch || "—"],
+                ["Worked", todayPunch?.formattedWorkingTime || "00h 00m"],
+              ].map(([label, value]) => (
+                <div key={label} className="bg-slate-50 border border-bdr/70 rounded-xl p-3">
+                  <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">{label}</div>
+                  <div className="text-[15px] font-bold text-slate-900 mt-0.5">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            {todayPunch?.isPunchedIn ? (
+              <button
+                type="button"
+                onClick={doPunchOut}
+                disabled={submitting || todayPunch?.canPunchOut === false}
+                className="h-11 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold text-[14px] flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
+                Punch Out
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={doPunchIn}
+                disabled={submitting || todayPunch?.canPunchIn === false}
+                className="h-11 rounded-xl bg-primary hover:bg-primary-dark disabled:opacity-50 text-white font-semibold text-[14px] flex items-center justify-center gap-2 cursor-pointer"
+              >
+                {submitting ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />}
+                {todayPunch?.dayCompleted ? "Punch In Again" : "Punch In"}
+              </button>
+            )}
+            {error && <p className="text-[12px] text-rose-700">{error}</p>}
+
+            <div>
+              <div className="text-[12px] font-semibold text-slate-700 mb-2">Today&apos;s punches</div>
+              {punches.length === 0 ? (
+                <p className="text-[12.5px] text-muted">No punches yet today.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {punches.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between text-[12.5px] bg-slate-50 border border-bdr/60 rounded-lg px-3 py-1.5">
+                      <span className={`font-semibold ${p.punchType === "IN" ? "text-emerald-700" : "text-rose-700"}`}>
+                        Punch {p.punchType === "IN" ? "In" : "Out"}
+                      </span>
+                      <span className="text-slate-700">{p.timeDisplay}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-          <p className="mark-sub">Record daily employee attendance.</p>
+
+          {/* My month */}
+          <div className="lg:col-span-7 bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
+            <div className="p-5 pb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-bold text-[15px] text-slate-900">My attendance this month</h3>
+                <p className="text-[12px] text-muted">Missed a punch or a wrong time? Ask HR for a correction.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { refreshAttendance?.(); fetchTodayPunch(); }}
+                className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw size={13} /> Refresh
+              </button>
+            </div>
+            <div className="grid grid-cols-4 gap-3 px-5 pb-4">
+              {[
+                ["Present", summary.present, "text-emerald-700"],
+                ["Late", summary.late, "text-amber-700"],
+                ["Absent", summary.absent, "text-rose-700"],
+                ["On Leave", summary.leave, "text-slate-700"],
+              ].map(([label, value, tone]) => (
+                <div key={label} className="bg-slate-50 border border-bdr/70 rounded-xl p-3">
+                  <div className="text-[10.5px] font-semibold uppercase text-muted">{label}</div>
+                  <div className={`text-[18px] font-bold ${tone}`}>{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-[13px]">
+                <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
+                  <tr>
+                    <th className="py-3 px-5">Date</th>
+                    <th className="py-3 px-5">Check In</th>
+                    <th className="py-3 px-5">Check Out</th>
+                    <th className="py-3 px-5">Hours</th>
+                    <th className="py-3 px-5">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-bdr/40">
+                  {history.length === 0 && (
+                    <tr><td colSpan={5} className="py-8 px-5 text-center text-muted">No attendance recorded this month yet.</td></tr>
+                  )}
+                  {history.map((r) => (
+                    <tr key={r.id}>
+                      <td className="py-3 px-5 font-medium text-slate-900">{r.date}</td>
+                      <td className="py-3 px-5">{toHHMM(r.checkIn) || "—"}</td>
+                      <td className="py-3 px-5">{toHHMM(r.checkOut) || "—"}</td>
+                      <td className="py-3 px-5">{r.workingHours ? `${r.workingHours}h` : "—"}</td>
+                      <td className="py-3 px-5"><Badge tone={statusTone(r.status)}>{r.status || "—"}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <EarlyPunchOutModal
+        isOpen={earlyModalOpen}
+        onClose={() => setEarlyModalOpen(false)}
+        onConfirm={executePunchOut}
+        todayPunch={todayPunch}
+        isSubmitting={submitting}
+      />
+    </div>
+  );
+}
+
+// ── HR / admin: the team register for a day ────────────────────────────────
+
+function TeamMarkAttendance() {
+  const showToast = useAppStore((s) => s.showToast);
+  const employees = useAppStore((s) => s.employees);
+  // A punch (here or in the topbar) changes today's rows; reload when it does.
+  const todayPunch = useAttendanceStore.raw((s) => s.todayPunch);
+
+  const [date, setDate] = useState(todayISO);
+  const [dept, setDept] = useState("All");
+  const [search, setSearch] = useState("");
+  const [serverRows, setServerRows] = useState([]);
+  const [edits, setEdits] = useState({});
+  const [checked, setChecked] = useState({});
+  const [bulkStatus, setBulkStatus] = useState("Present");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      setServerRows((await hrmsSync.pull("attendance", { date })) || []);
+      setEdits({});
+      setChecked({});
+    } finally {
+      setLoading(false);
+    }
+  }, [date]);
+
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (date === todayISO()) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayPunch?.isPunchedIn, todayPunch?.lastPunchIso]);
+
+  // Everyone on the payroll of people, with the day's row where there is one.
+  const rows = useMemo(() => {
+    const byEmployee = new Map(serverRows.map((r) => [String(r.employeeId), r]));
+    const people = employees?.length
+      ? employees.filter((e) => !["Resigned", "Terminated"].includes(e.status))
+      : serverRows.map((r) => ({ id: r.employeeId, name: r.name, department: r.dept, empId: r.empId }));
+    return people.map((e) => {
+      const att = byEmployee.get(String(e.id));
+      const base = {
+        employeeId: String(e.id),
+        name: e.name,
+        empId: e.empId || e.employeeCode || att?.empId || "",
+        dept: e.department || att?.dept || "",
+        checkIn: toHHMM(att?.checkIn),
+        checkOut: toHHMM(att?.checkOut),
+        status: att?.status || "",
+        remark: att?.remark || "",
+        source: att?.source || "",
+        punchCount: (att?.punches || []).length,
+        marked: Boolean(att),
+      };
+      return { ...base, ...(edits[base.employeeId] || {}) };
+    });
+  }, [employees, serverRows, edits]);
+
+  const departments = useMemo(() => ["All", ...new Set(rows.map((r) => r.dept).filter(Boolean))], [rows]);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) =>
+      (dept === "All" || r.dept === dept) &&
+      (!q || r.name?.toLowerCase().includes(q) || r.empId?.toLowerCase().includes(q))
+    );
+  }, [rows, dept, search]);
+
+  const dirtyIds = Object.keys(edits);
+  const selectedIds = filtered.filter((r) => checked[r.employeeId]).map((r) => r.employeeId);
+  const counts = useMemo(() => ({
+    punched: rows.filter((r) => r.source === "punch" || r.punchCount > 0).length,
+    marked: rows.filter((r) => r.marked).length,
+    notMarked: rows.filter((r) => !r.marked).length,
+  }), [rows]);
+
+  function edit(employeeId, patch) {
+    setEdits((prev) => ({ ...prev, [employeeId]: { ...(prev[employeeId] || {}), ...patch } }));
+  }
+
+  function applyBulkStatus() {
+    if (!selectedIds.length) return;
+    setEdits((prev) => {
+      const next = { ...prev };
+      selectedIds.forEach((id) => { next[id] = { ...(next[id] || {}), status: bulkStatus }; });
+      return next;
+    });
+  }
+
+  async function save() {
+    const records = rows
+      .filter((r) => edits[r.employeeId])
+      .map((r) => ({
+        employeeId: r.employeeId,
+        checkIn: r.checkIn || null,
+        checkOut: r.checkOut || null,
+        status: r.status || (r.checkIn ? "Present" : "Absent"),
+        remark: r.remark || null,
+      }));
+    if (!records.length) return;
+    setSaving(true);
+    try {
+      await api.post("/hrms/attendance/bulk/", { date, records });
+      showToast?.(`Attendance saved for ${records.length} employee${records.length === 1 ? "" : "s"} on ${date.split("-").reverse().join("-")}`);
+      await load();
+    } catch (err) {
+      showToast?.(`Attendance not saved — ${err?.payload?.message || err?.message || "try again"}`);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const allChecked = filtered.length > 0 && filtered.every((r) => checked[r.employeeId]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageTitle subtitle="The day's register, filled from each employee's Punch In / Punch Out. Edit a row to correct it." />
+
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          ["From punches", counts.punched, "text-emerald-700"],
+          ["Marked", counts.marked, "text-slate-900"],
+          ["Not marked yet", counts.notMarked, "text-amber-700"],
+        ].map(([label, value, tone]) => (
+          <div key={label} className="bg-white border border-bdr rounded-2xl p-4 shadow-xs">
+            <div className="text-[11px] font-semibold uppercase text-muted">{label}</div>
+            <div className={`text-[22px] font-extrabold ${tone}`}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]">
+          <CalendarIcon size={14} className="text-slate-500" />
+          <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} className="bg-transparent outline-none" />
+        </label>
+        <select value={dept} onChange={(e) => setDept(e.target.value)} className="h-9 px-3 bg-off border border-bdr rounded-xl text-[13px]">
+          {departments.map((d) => <option key={d} value={d}>{d === "All" ? "All Departments" : d}</option>)}
+        </select>
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search employee or ID…" className="w-full h-9 pl-8 pr-3 bg-off border border-bdr rounded-xl text-[13px] outline-none" />
+        </div>
+        <button type="button" onClick={load} className="btn-outline h-9 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer">
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] text-muted">{selectedIds.length} selected →</span>
+          <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value)} className="h-9 px-2 bg-off border border-bdr rounded-xl text-[13px]">
+            {STATUSES.map((s) => <option key={s}>{s}</option>)}
+          </select>
+          <button type="button" onClick={applyBulkStatus} disabled={!selectedIds.length} className="btn-outline h-9 px-3 rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer">
+            Apply
+          </button>
         </div>
       </div>
 
-      {/* Filter Control Bar */}
-      <div className="mark-card mark-filter-card">
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          {/* Date Picker Input */}
-          <div className="mark-date-wrap">
-            <span>{date.split("-").reverse().join("-")}</span>
-            <CalendarIcon size={14} style={{ color: "#475569" }} />
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => e.target.value && setDate(e.target.value)}
-              className="mark-date-native"
-              aria-label="Select date"
-            />
-          </div>
-
-          <select value={dept} onChange={(e) => setDept(e.target.value)} className="mark-select">
-            {DEPARTMENTS.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-
-          <select value={location} onChange={(e) => setLocation(e.target.value)} className="mark-select">
-            {LOCATIONS.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </select>
-
-          <select value={shift} onChange={(e) => setShift(e.target.value)} className="mark-select">
-            {SHIFTS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <span style={{ fontSize: "13px", color: "#6b7280" }}>{selectedCount} selected</span>
-      </div>
-
-      {/* Main Table Card */}
-      <div className="mark-card mark-main-card">
-        <div style={{ overflowX: "auto" }}>
-          <table className="mark-table">
-            <thead>
+      <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[900px] text-left text-[13px]">
+            <thead className="bg-slate-50/75 border-b border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
               <tr>
-                <th style={{ width: 40, paddingLeft: 20 }}>
-                  <input
-                    type="checkbox"
-                    checked={filtered.length > 0 && filtered.every((r) => r.checked)}
-                    onChange={(e) => toggleAll(e.target.checked)}
-                    className="mark-checkbox"
-                  />
+                <th className="py-3 pl-5 w-10">
+                  <input type="checkbox" checked={allChecked} onChange={(e) => setChecked(Object.fromEntries(filtered.map((r) => [r.employeeId, e.target.checked])))} />
                 </th>
-                <th>EMPLOYEE</th>
-                <th>EMPLOYEE ID</th>
-                <th>DEPARTMENT</th>
-                <th>CHECK IN</th>
-                <th>CHECK OUT</th>
-                <th>STATUS</th>
-                <th>REMARKS</th>
+                <th className="py-3 px-3">Employee</th>
+                <th className="py-3 px-3">Department</th>
+                <th className="py-3 px-3">Source</th>
+                <th className="py-3 px-3">Check In</th>
+                <th className="py-3 px-3">Check Out</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3">Remark</th>
               </tr>
             </thead>
-            <tbody>
-              {filtered.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ paddingLeft: 20 }}>
-                    <input
-                      type="checkbox"
-                      checked={r.checked}
-                      onChange={(e) => updateRow(r.id, { checked: e.target.checked })}
-                      className="mark-checkbox"
-                    />
-                  </td>
-                  <td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <img src={r.avatar} alt={r.name} className="mark-avatar" loading="lazy" />
-                      <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>{r.name}</span>
-                    </div>
-                  </td>
-                  <td className="mark-id">{r.id}</td>
-                  <td style={{ color: "#374151" }}>{r.dept}</td>
-                  <td>
-                    <input
-                      type="text"
-                      value={r.checkIn}
-                      onChange={(e) => updateRow(r.id, { checkIn: e.target.value })}
-                      className="mark-input mark-input-time"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      value={r.checkOut}
-                      onChange={(e) => updateRow(r.id, { checkOut: e.target.value })}
-                      className="mark-input mark-input-time"
-                    />
-                  </td>
-                  <td>
-                    <select
-                      value={r.status}
-                      onChange={(e) => updateRow(r.id, { status: e.target.value })}
-                      className="mark-select-status"
-                    >
-                      {STATUSES.map((st) => (
-                        <option key={st} value={st}>
-                          {st}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      value={r.remarks}
-                      onChange={(e) => updateRow(r.id, { remarks: e.target.value })}
-                      placeholder="—"
-                      className="mark-input mark-input-remarks"
-                    />
-                  </td>
-                </tr>
-              ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
-                    No employees match the selected department filter.
-                  </td>
-                </tr>
+            <tbody className="divide-y divide-bdr/40">
+              {loading && serverRows.length === 0 && (
+                <tr><td colSpan={8} className="py-8 text-center text-muted"><Loader2 size={16} className="inline animate-spin mr-2" />Loading…</td></tr>
               )}
+              {!loading && filtered.length === 0 && (
+                <tr><td colSpan={8} className="py-8 text-center text-muted">No employees match the filters.</td></tr>
+              )}
+              {filtered.map((r) => {
+                const punched = r.source === "punch" || r.punchCount > 0;
+                const dirty = Boolean(edits[r.employeeId]);
+                return (
+                  <tr key={r.employeeId} className={dirty ? "bg-amber-50/40" : "hover:bg-slate-50/60"}>
+                    <td className="py-2.5 pl-5">
+                      <input type="checkbox" checked={Boolean(checked[r.employeeId])} onChange={(e) => setChecked((p) => ({ ...p, [r.employeeId]: e.target.checked }))} />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <div className="font-semibold text-slate-900">{r.name}</div>
+                      <div className="text-[11px] text-muted">{r.empId}</div>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-700">{r.dept || "—"}</td>
+                    <td className="py-2.5 px-3">
+                      {punched ? (
+                        <span className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                          <Fingerprint size={11} /> Punch{r.punchCount > 1 ? ` ×${r.punchCount}` : ""}
+                        </span>
+                      ) : r.marked ? (
+                        <span className="text-[11.5px] font-semibold text-slate-600 capitalize">{r.source || "manual"}</span>
+                      ) : (
+                        <span className="text-[11.5px] text-amber-700 inline-flex items-center gap-1"><Clock size={11} /> Not marked</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <input type="time" value={r.checkIn} onChange={(e) => edit(r.employeeId, { checkIn: e.target.value })} className="h-8 px-2 bg-white border border-bdr rounded-lg" />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <input type="time" value={r.checkOut} onChange={(e) => edit(r.employeeId, { checkOut: e.target.value })} className="h-8 px-2 bg-white border border-bdr rounded-lg" />
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <select value={r.status} onChange={(e) => edit(r.employeeId, { status: e.target.value })} className="h-8 px-2 bg-white border border-bdr rounded-lg">
+                        <option value="">—</option>
+                        {STATUSES.map((s) => <option key={s}>{s}</option>)}
+                      </select>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <input value={r.remark} onChange={(e) => edit(r.employeeId, { remark: e.target.value })} placeholder={punched && dirty ? "Reason for correction" : "—"} className="h-8 px-2 w-40 bg-white border border-bdr rounded-lg" />
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
-
-        {/* Footer Actions */}
-        <div className="mark-footer">
-          <button
-            type="button"
-            onClick={() => setRows(buildRows(storeRecords, storeEmployees))}
-            className="mark-btn-cancel"
-          >
-            Cancel
-          </button>
-          <button type="button" onClick={handleSave} className="mark-btn-save">
-            Save Attendance
-          </button>
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-bdr/60">
+          <span className="text-[12px] text-muted">
+            {dirtyIds.length ? `${dirtyIds.length} change${dirtyIds.length === 1 ? "" : "s"} not saved` : "Rows from punches update on their own."}
+          </span>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setEdits({})} disabled={!dirtyIds.length || saving} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50 cursor-pointer">
+              Discard
+            </button>
+            <button type="button" onClick={save} disabled={!dirtyIds.length || saving} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50 inline-flex items-center gap-1.5 cursor-pointer">
+              {saving && <Loader2 size={13} className="animate-spin" />} Save Attendance
+            </button>
+          </div>
         </div>
       </div>
-
-      <ConfirmModal
-        open={confirmOpen}
-        title="Confirm bulk update?"
-        desc={`You are about to update attendance for ${selectedCount} employees on ${date}. This will overwrite previous records.`}
-        confirmLabel="Confirm Update"
-        onClose={() => setConfirmOpen(false)}
-        onConfirm={() => {
-          const selectedIds = rows.filter((r) => r.checked).map((r) => r.id);
-          const formatted = formatAttendanceRows(rows);
-          saveDailyAttendance(date, formatted);
-          setConfirmOpen(false);
-          setToast(`Attendance saved for ${selectedIds.length || rows.length} employees`);
-        }}
-      />
-
-      <style>{`
-        .mark-att-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }
-        .mark-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6b7a90; margin-bottom: 10px; }
-        .mark-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
-        .mark-title { margin: 0; font-size: 24px; font-weight: 800; color: #111827; letter-spacing: -0.01em; }
-        .mark-sub { margin: 4px 0 0; font-size: 13px; color: #6b7280; }
-
-        .mark-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
-        .mark-filter-card { border: none; padding: 14px 18px; display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
-
-        .mark-date-wrap { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 14px; font-size: 13px; color: #374151; min-width: 110px; cursor: pointer; }
-        .mark-date-native { position: absolute; right: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-
-        .mark-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 100px; }
-        .mark-select:focus { border-color: #94a3b8; background-color: #fff; }
-
-        .mark-main-card { overflow: hidden; }
-        .mark-table { width: 100%; border-collapse: collapse; min-width: 800px; font-size: 13.5px; }
-        .mark-table thead tr { background: #ffffff; border-bottom: 1px solid #e2e8f0; }
-        .mark-table th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.05em; color: #7b8aa0; padding: 14px 16px; white-space: nowrap; }
-        .mark-table tbody tr { border-bottom: 1px solid #f1f5f9; transition: background 0.12s ease; }
-        .mark-table tbody tr:hover { background: #f8fafc; }
-        .mark-table td { padding: 12px 16px; vertical-align: middle; }
-
-        .mark-checkbox { width: 16px; height: 16px; border-radius: 4px; accent-color: #16233a; cursor: pointer; }
-        .mark-avatar { width: 32px; height: 32px; border-radius: 999px; object-fit: cover; }
-        .mark-id { font-family: inherit; font-size: 12.5px; color: #6b7280; white-space: nowrap; }
-
-        .mark-input { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 12px; font-size: 13px; color: #1e293b; outline: none; transition: border-color 0.15s ease; }
-        .mark-input:focus { border-color: #94a3b8; }
-        .mark-input-time { width: 84px; text-align: center; }
-        .mark-input-remarks { width: 110px; }
-
-        .mark-select-status { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 6px 28px 6px 12px; font-size: 13px; color: #1e293b; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; width: 110px; }
-        .mark-select-status:focus { border-color: #94a3b8; }
-
-        .mark-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 20px; background: #ffffff; border-top: 1px solid #f1f5f9; }
-        .mark-btn-cancel { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--card); color: var(--text); border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
-        .mark-btn-cancel:hover { background: var(--card-hover); color: var(--text); }
-        .mark-btn-save { display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 36px; padding: 0 16px; border-radius: var(--radius-lg, 12px); font-size: 13px; font-weight: 600; line-height: 1; white-space: nowrap; cursor: pointer; transition: all 0.15s ease; background: var(--primary); color: #fff; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(31,107,255,0.25); }
-        .mark-btn-save:hover { background: var(--primary-dark); }
-        .mark-btn-cancel:active, .mark-btn-save:active { transform: scale(0.99); }
-        @media (max-width: 1023px) {
-          .mark-att-page { margin: -16px -20px -24px; }
-        }
-        @media (max-width: 767px) {
-          .mark-att-page { margin: -12px -14px -20px; }
-        }
-        @media (max-width: 640px) {
-          .mark-att-page { padding: 14px 14px 22px; }
-          .mark-filter-card { padding: 12px 14px; }
-          .mark-footer { flex-wrap: wrap; padding: 12px 14px; }
-        }
-      `}</style>
     </div>
   );
 }

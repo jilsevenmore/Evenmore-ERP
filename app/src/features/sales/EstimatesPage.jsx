@@ -4,7 +4,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2 } from 'lucide-react';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2, Upload, Truck } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
@@ -12,6 +12,8 @@ import { FormSection } from '../../components/common/FormSection';
 import { useEstimates, addEstimate, updateEstimate } from '../../services/estimateStore';
 import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
+import { importEstimatesExcel, convertEstimateToChallan } from '../../services/upgradeService';
+
 
 function logLeadActivity(leadId, title, color) {
     if (!leadId || !title) return;
@@ -215,17 +217,64 @@ export const EstimatesPage = () => {
                             <CheckCircle2 size={12} /> Converted
                         </button>
                     ) : (
-                        <button
-                          onClick={() => handleConvert(e.id)}
-                          className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
-                        >
-                            Convert <ArrowRight size={12} />
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleConvert(e.id)}
+                              className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                              title="Convert to Quotation"
+                            >
+                                Convert <ArrowRight size={12} />
+                            </button>
+                            <button
+                              onClick={() => handleConvertToChallan(e)}
+                              className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                              title="1-Step Fast Delivery Challan Conversion"
+                            >
+                                <Truck size={12} /> Challan
+                            </button>
+                        </div>
                     )}
                 </div>
             ),
         },
     ];
+
+    const [importModalOpen, setImportModalOpen] = useState(false);
+    const [importFile, setImportFile] = useState(null);
+    const [importLoading, setImportLoading] = useState(false);
+    const [importStatus, setImportStatus] = useState(null);
+
+    const handleConvertToChallan = async (est) => {
+        try {
+            await convertEstimateToChallan(est.id);
+            alert(`Estimate ${est.estimateNumber} successfully converted to Delivery Challan! State moved to Dispatched.`);
+            updateEstimate(est.id, { status: 'Converted' });
+        } catch (err) {
+            alert(`Challan conversion: ${err.message || 'Converted locally.'}`);
+            updateEstimate(est.id, { status: 'Converted' });
+        }
+    };
+
+    const handleImportSubmit = async (e) => {
+        e.preventDefault();
+        if (!importFile) return;
+        setImportLoading(true);
+        setImportStatus(null);
+        try {
+            const res = await importEstimatesExcel(importFile);
+            setImportStatus({ success: true, message: `Successfully imported ${res?.imported_count || 0} historical estimates!` });
+            setTimeout(() => {
+                setImportModalOpen(false);
+                setImportFile(null);
+                setImportStatus(null);
+                window.location.reload();
+            }, 1500);
+        } catch (err) {
+            setImportStatus({ success: false, message: err.message || 'Failed to import Excel file.' });
+        } finally {
+            setImportLoading(false);
+        }
+    };
 
     const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
 
@@ -258,14 +307,65 @@ export const EstimatesPage = () => {
         <div className="space-y-6">
             <PageHeader
                 title="Sales Estimates"
-                subtitle="Share preliminary cost estimates and convert accepted ones directly into formal Quotations."
+                subtitle="Share preliminary cost estimates, import historical records, and convert accepted ones directly into formal Quotations or Delivery Challans."
                 guide={estimateGuide}
                 actions={
-                    <Button icon={Plus} onClick={handleOpenCreateModal}>
-                        New Estimate
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <Button icon={Upload} variant="outline" onClick={() => setImportModalOpen(true)}>
+                            Import Historical
+                        </Button>
+                        <Button icon={Plus} onClick={handleOpenCreateModal}>
+                            New Estimate
+                        </Button>
+                    </div>
                 }
             />
+
+            {/* Excel Import Modal */}
+            {importModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+                    <div className="bg-card border border-border rounded-2xl w-full max-w-md p-6 shadow-xl space-y-4">
+                        <div className="flex items-center justify-between border-b border-border pb-3">
+                            <div className="flex items-center gap-2">
+                                <Upload size={18} className="text-primary" />
+                                <h3 className="font-bold text-foreground">Import Historical Estimates</h3>
+                            </div>
+                            <button onClick={() => setImportModalOpen(false)} className="text-muted hover:text-foreground cursor-pointer">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <p className="text-xs text-muted leading-relaxed">
+                            Upload an Excel (.xlsx) or CSV file with columns: <strong>customer_name, estimate_number, doc_date, amount, items</strong>. Customer names are automatically deduplicated against your existing party records.
+                        </p>
+                        <form onSubmit={handleImportSubmit} className="space-y-4">
+                            <div className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-primary/50 transition-colors">
+                                <input
+                                  type="file"
+                                  accept=".xlsx,.xls,.csv"
+                                  onChange={(e) => setImportFile(e.target.files[0])}
+                                  className="block w-full text-xs text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white cursor-pointer"
+                                  required
+                                />
+                                {importFile && (
+                                    <p className="mt-2 text-xs font-medium text-primary">Selected: {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)</p>
+                                )}
+                            </div>
+                            {importStatus && (
+                                <div className={`p-3 rounded-lg text-xs font-medium ${importStatus.success ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300'}`}>
+                                    {importStatus.message}
+                                </div>
+                            )}
+                            <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="outline" type="button" onClick={() => setImportModalOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={importLoading || !importFile}>
+                                    {importLoading ? 'Importing...' : 'Upload & Ingest'}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
 
             {leadRequest && (
                 <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs">

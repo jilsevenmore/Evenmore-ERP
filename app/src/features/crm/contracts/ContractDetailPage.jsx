@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Pencil, Download, MoreHorizontal, RefreshCw,
   FileText, Upload, Trash2, X, CheckCircle2, Plus, ChevronDown,
   Handshake, UserRound, FolderOpen, Link2, Phone, Flag, Users, FolderPlus,
+  PenTool, Mail, Check, XCircle, FileCheck,
 } from 'lucide-react';
 import Modal from '../../../components/ui/Modal';
 import './ContractDetailPage.css';
@@ -14,6 +15,13 @@ import { describeError, pullDealActivities } from '../../../services/crmSync';
 import { uploadFileToBackend } from '../../../services/fileUploadService';
 import { resolveFileUrl } from '../../../services/api';
 import { useCrmStore } from '../../../stores/crmStore';
+import {
+  captureContractSignature,
+  updateContractWorkflowStatus,
+  generateContractPdf,
+  sendContractEmail,
+} from '../../../services/upgradeService';
+
 import {
   CONTRACT_TYPES,
   CONTRACT_TEMPLATES,
@@ -113,6 +121,113 @@ export default function ContractDetailPage() {
   const [openClause, setOpenClause] = useState(-1);
   const [termsOpen, setTermsOpen] = useState(false);
   const [termsForm, setTermsForm] = useState([]);
+
+  // Upgradation Scope: Dual E-Signatures & Workflow Status (§2.1.3 & §2.1.4)
+  const [sigModalOpen, setSigModalOpen] = useState(false);
+  const [sigRole, setSigRole] = useState('client');
+  const [sigName, setSigName] = useState('');
+  const [sigEmail, setSigEmail] = useState('');
+  const canvasRef = useRef(null);
+  const isDrawing = useRef(false);
+
+  const [workflowModalOpen, setWorkflowModalOpen] = useState(false);
+  const [targetWorkflowStatus, setTargetWorkflowStatus] = useState('Accepted');
+  const [declineReason, setDeclineReason] = useState('');
+
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [targetEmail, setTargetEmail] = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+
+  const startDrawing = (e) => {
+    isDrawing.current = true;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    ctx.beginPath();
+    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    isDrawing.current = false;
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  };
+
+  const submitSignature = async (e) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL('image/png');
+    setBusy(true);
+    try {
+      await captureContractSignature(id, {
+        role: sigRole,
+        signature: dataUrl,
+        signatoryName: sigName,
+        signatoryEmail: sigEmail,
+      });
+      setNotice(`Successfully recorded ${sigRole === 'client' ? 'Client' : 'Company'} e-signature.`);
+      setSigModalOpen(false);
+      clearCanvas();
+      refresh();
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitWorkflow = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await updateContractWorkflowStatus(id, {
+        status: targetWorkflowStatus,
+        rejectionReason: declineReason,
+      });
+      setNotice(`Contract status updated to ${targetWorkflowStatus}.`);
+      setWorkflowModalOpen(false);
+      refresh();
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const submitEmailDispatch = async (e) => {
+    e.preventDefault();
+    if (!targetEmail) return;
+    setEmailLoading(true);
+    try {
+      await sendContractEmail(id, targetEmail);
+      setNotice(`Contract email successfully dispatched to ${targetEmail}.`);
+      setEmailModalOpen(false);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setEmailLoading(false);
+    }
+  };
 
   function refresh() {
     try {
@@ -370,6 +485,10 @@ export default function ContractDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button type="button" className="btn-primary btn-sm" onClick={() => { setSigRole('client'); setSigModalOpen(true); }}><PenTool size={14} /> E-Sign</button>
+            <button type="button" className="btn-outline btn-sm" onClick={() => { setTargetEmail(deal?.email || ''); setEmailModalOpen(true); }}><Mail size={14} /> Email</button>
+            <button type="button" className="btn-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs" onClick={() => { setTargetWorkflowStatus('Accepted'); setWorkflowModalOpen(true); }}><Check size={14} /> Accept</button>
+            <button type="button" className="btn-sm bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-medium rounded-lg flex items-center gap-1.5 px-3 py-1.5 cursor-pointer text-xs" onClick={() => { setTargetWorkflowStatus('Declined'); setWorkflowModalOpen(true); }}><XCircle size={14} /> Decline</button>
             <button type="button" className="btn-outline btn-sm" onClick={openEdit}><Pencil size={14} /> Edit</button>
             <button type="button" className="btn-outline btn-sm" onClick={() => printContract(contract, deal)}><Download size={14} /> Download PDF</button>
             <details className="relative">
@@ -382,6 +501,7 @@ export default function ContractDetailPage() {
             </details>
           </div>
         </div>
+
 
         {tab === 'Overview' && <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
@@ -421,6 +541,78 @@ export default function ContractDetailPage() {
                 </dl>
               </Panel>
               <div className="grid gap-4 content-start">
+                <Panel title="Dual E-Signatures (In-App Capture)" action={
+                  <button type="button" className="btn-primary btn-sm text-[11px]" onClick={() => { setSigRole('client'); setSigModalOpen(true); }}>
+                    <PenTool size={12} /> Capture Signature
+                  </button>
+                }>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    {/* Client Signature */}
+                    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-slate-700">Client Signature</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${contract.clientSignature ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {contract.clientSignature ? 'Signed' : 'Awaiting Sign'}
+                          </span>
+                        </div>
+                        {contract.clientSignature ? (
+                          <div className="bg-white border border-slate-200 rounded-lg p-2 h-20 flex items-center justify-center overflow-hidden">
+                            <img src={contract.clientSignature} alt="Client Signature" className="max-h-full object-contain" />
+                          </div>
+                        ) : (
+                          <div className="bg-white/80 border border-dashed border-slate-300 rounded-lg h-20 flex flex-col items-center justify-center text-slate-400">
+                            <PenTool size={16} />
+                            <span className="text-[10px] mt-1">Pending client signature</span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setSigRole('client'); setSigModalOpen(true); }}
+                        className="mt-2 text-[11px] font-semibold text-blue-600 hover:underline text-left cursor-pointer"
+                      >
+                        {contract.clientSignature ? 'Re-sign as Client' : '+ Sign as Client'}
+                      </button>
+                    </div>
+
+                    {/* Company Signature */}
+                    <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 flex flex-col justify-between">
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="font-semibold text-slate-700">Company Signature</span>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${contract.companySignature ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {contract.companySignature ? 'Signed' : 'Awaiting Sign'}
+                          </span>
+                        </div>
+                        {contract.companySignature ? (
+                          <div className="bg-white border border-slate-200 rounded-lg p-2 h-20 flex items-center justify-center overflow-hidden">
+                            <img src={contract.companySignature} alt="Company Signature" className="max-h-full object-contain" />
+                          </div>
+                        ) : (
+                          <div className="bg-white/80 border border-dashed border-slate-300 rounded-lg h-20 flex flex-col items-center justify-center text-slate-400">
+                            <PenTool size={16} />
+                            <span className="text-[10px] mt-1">Pending company authorization</span>
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setSigRole('company'); setSigModalOpen(true); }}
+                        className="mt-2 text-[11px] font-semibold text-blue-600 hover:underline text-left cursor-pointer"
+                      >
+                        {contract.companySignature ? 'Re-sign as Company' : '+ Sign as Company'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {contract.status === 'Declined' && (
+                    <div className="mt-3 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs">
+                      <strong>Contract Declined:</strong> {contract.rejectionReason || 'No reason specified'}
+                    </div>
+                  )}
+                </Panel>
+
                 <Panel title="Summary">
                   <p className="text-xs leading-7 whitespace-pre-wrap break-words text-slate-600">{contract.description || 'No summary recorded.'}</p>
                 </Panel>
@@ -713,6 +905,127 @@ export default function ContractDetailPage() {
             </div>
           ))}
         </dl>
+      </Modal>
+
+      {/* Signature Modal */}
+      <Modal isOpen={sigModalOpen} onClose={() => !busy && setSigModalOpen(false)} title="Capture E-Signature" subtitle={`Record legally binding digital signature for ${contract.contractNumber}`}>
+        <form onSubmit={submitSignature} className="space-y-4 text-xs">
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setSigRole('client')}
+              className={`flex-1 py-1.5 rounded-md font-semibold text-center cursor-pointer ${sigRole === 'client' ? 'bg-white text-primary shadow-xs' : 'text-slate-600'}`}
+            >
+              Client Signatory
+            </button>
+            <button
+              type="button"
+              onClick={() => setSigRole('company')}
+              className={`flex-1 py-1.5 rounded-md font-semibold text-center cursor-pointer ${sigRole === 'company' ? 'bg-white text-primary shadow-xs' : 'text-slate-600'}`}
+            >
+              Company Authorization
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="space-y-1 font-semibold text-slate-600">
+              Signatory Full Name *
+              <input required value={sigName} onChange={(e) => setSigName(e.target.value)} placeholder="e.g. John Doe"
+                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+            </label>
+            <label className="space-y-1 font-semibold text-slate-600">
+              Signatory Email
+              <input type="email" value={sigEmail} onChange={(e) => setSigEmail(e.target.value)} placeholder="e.g. john@company.com"
+                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400" />
+            </label>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-semibold text-slate-600">Draw Signature on Touch/Mouse Pad</span>
+              <button type="button" onClick={clearCanvas} className="text-[11px] text-rose-600 hover:underline cursor-pointer">
+                Clear Pad
+              </button>
+            </div>
+            <div className="border border-slate-300 rounded-xl bg-white overflow-hidden shadow-inner flex items-center justify-center">
+              <canvas
+                ref={canvasRef}
+                width={450}
+                height={160}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+                className="cursor-crosshair w-full h-[160px] touch-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setSigModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={busy}>{busy ? 'Saving...' : 'Record & Seal Signature'}</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Workflow Modal */}
+      <Modal isOpen={workflowModalOpen} onClose={() => !busy && setWorkflowModalOpen(false)} title={`${targetWorkflowStatus} Contract`} subtitle={`Update formal approval status for ${contract.contractNumber}`}>
+        <form onSubmit={submitWorkflow} className="space-y-4 text-xs">
+          {targetWorkflowStatus === 'Declined' ? (
+            <label className="block space-y-1.5 font-semibold text-slate-600">
+              Reason for Declining / Rejection *
+              <textarea
+                required
+                rows={4}
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="State the commercial or legal reasons for declining this contract…"
+                className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400"
+              />
+            </label>
+          ) : (
+            <p className="text-slate-600 leading-relaxed">
+              Moving contract to <strong>Accepted</strong> confirms that both parties have agreed to the stipulated terms, pricing, and execution schedule.
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <button type="button" className="btn-outline" disabled={busy} onClick={() => setWorkflowModalOpen(false)}>Cancel</button>
+            <button
+              type="submit"
+              className={`btn-sm font-medium rounded-lg text-white px-4 py-2 ${targetWorkflowStatus === 'Declined' ? 'bg-rose-600 hover:bg-rose-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+              disabled={busy}
+            >
+              {busy ? 'Updating...' : `Confirm ${targetWorkflowStatus}`}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Email Dispatch Modal */}
+      <Modal isOpen={emailModalOpen} onClose={() => !emailLoading && setEmailModalOpen(false)} title="Dispatch Contract via Email" subtitle={`Send PDF copy and portal signing link for ${contract.contractNumber}`}>
+        <form onSubmit={submitEmailDispatch} className="space-y-4 text-xs">
+          <label className="block space-y-1.5 font-semibold text-slate-600">
+            Recipient Email Address *
+            <input
+              type="email"
+              required
+              value={targetEmail}
+              onChange={(e) => setTargetEmail(e.target.value)}
+              placeholder="client@acme.com"
+              className="block w-full border border-slate-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400"
+            />
+          </label>
+          <p className="text-slate-500 text-[11px]">
+            The recipient will receive an email containing contract terms, summary value, and an authenticated link to review and sign.
+          </p>
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <button type="button" className="btn-outline" disabled={emailLoading} onClick={() => setEmailModalOpen(false)}>Cancel</button>
+            <button type="submit" className="btn-primary" disabled={emailLoading || !targetEmail}>
+              {emailLoading ? 'Dispatching...' : 'Dispatch Email'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   );
