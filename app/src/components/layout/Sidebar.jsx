@@ -154,7 +154,7 @@ const NAV = [
       { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
       { label: 'Task Calendar', icon: Calendar, to: '/pms/calendar' },
       { label: 'Timesheets', icon: CalendarCheck, to: '/pms/timesheets' },
-      { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
+      { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays' },
       { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
       { label: 'PMS Settings', icon: Settings, to: '/pms/settings' },
     ],
