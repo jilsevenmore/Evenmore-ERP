@@ -37,10 +37,11 @@ const THEMES = [
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || '/dashboard';
+  const returnToParam = searchParams.get('returnTo');
 
   const theme = useAppStore((s) => s.theme) || 'light';
   const setTheme = useAppStore((s) => s.setTheme);
+  const currentUser = useAppStore((s) => s.currentUser);
   const setCurrentUser = useAppStore((s) => s.setCurrentUser);
   const setPermissions = useAppStore((s) => s.setPermissions);
   const showToast = useAppStore((s) => s.showToast);
@@ -57,13 +58,19 @@ export default function LoginPage() {
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
-  // If already authenticated with a valid token, auto-forward to dashboard or returnTo
+  // If already authenticated with a valid token, auto-forward to appropriate landing page
   useEffect(() => {
     const existingToken = getStoredToken();
     if (existingToken) {
-      navigate(returnTo || '/dashboard', { replace: true });
+      const isCustomer = Boolean(
+        currentUser?.isCustomer ||
+        currentUser?.role?.code === 'CU' ||
+        String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+      );
+      const dest = returnToParam || (isCustomer ? '/customer/projects' : '/dashboard');
+      navigate(dest, { replace: true });
     }
-  }, [navigate, returnTo]);
+  }, [navigate, returnToParam, currentUser]);
 
   // Open forgot password modal if navigated with ?action=forgot-password or ?action=reset-password
   useEffect(() => {
@@ -103,7 +110,13 @@ export default function LoginPage() {
       setPermissions(permissions);
 
       showToast?.(`Signed in successfully as ${user?.name || email}`);
-      navigate(returnTo, { replace: true });
+      const isCustomer = Boolean(
+        user?.isCustomer ||
+        user?.role?.code === 'CU' ||
+        String(user?.role?.name || user?.role || '').toLowerCase() === 'customer'
+      );
+      const destination = returnToParam || (isCustomer ? '/customer/projects' : '/dashboard');
+      navigate(destination, { replace: true });
     } catch (err) {
       setError(describeError(err));
     } finally {

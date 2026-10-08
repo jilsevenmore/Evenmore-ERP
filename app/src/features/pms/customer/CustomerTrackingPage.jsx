@@ -9,7 +9,7 @@ import {
 import { Button } from '../../../components/ui/Button';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
 import { ProgressBar } from '../../../components/ui/ProgressBar';
-import { fetchCustomerProjectTracking } from '../../../services/customerTrackingService';
+import { fetchCustomerProjectTracking, fetchCustomerProjects } from '../../../services/customerTrackingService';
 import { useAppStore } from '../../../stores/appStore';
 import { impersonateCustomer } from '../../../services/upgradeService';
 
@@ -74,6 +74,26 @@ export default function CustomerTrackingPage() {
   const currentUser = useAppStore((s) => s.currentUser);
   const showToast = useAppStore((s) => s.showToast);
   const setCurrentUser = useAppStore((s) => s.setCurrentUser);
+
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
+  const [totalProjectsCount, setTotalProjectsCount] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    fetchCustomerProjects()
+      .then((rows) => {
+        if (!active) return;
+        setTotalProjectsCount(Array.isArray(rows) ? rows.length : 1);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -239,14 +259,18 @@ export default function CustomerTrackingPage() {
       {/* ── Top Bar: Back, Badge, Refresh, Impersonate ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Link
-            to="/customer/projects"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-slate-100"
-          >
-            <ArrowLeft size={14} />
-            <span>All Projects</span>
-          </Link>
-          <span className="text-slate-300">/</span>
+          {(!isCustomer || (totalProjectsCount !== null && totalProjectsCount > 1)) && (
+            <>
+              <Link
+                to="/customer/projects?view=list"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-slate-100"
+              >
+                <ArrowLeft size={14} />
+                <span>All Projects</span>
+              </Link>
+              <span className="text-slate-300">/</span>
+            </>
+          )}
           <span className="text-xs font-semibold text-slate-500 font-mono">{project.code}</span>
         </div>
 

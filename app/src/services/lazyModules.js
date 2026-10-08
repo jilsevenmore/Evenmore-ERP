@@ -15,9 +15,19 @@
  * produces one pull.
  */
 import { getStoredToken } from '../utils/authUtils';
+import { useAppStore } from '../stores/appStore';
 
 /** How long a failed hydration is left alone before a read may retry it. */
 const RETRY_AFTER_MS = 15000;
+
+function isCustomerSession() {
+  const user = useAppStore.getState().currentUser;
+  return Boolean(
+    user?.isCustomer ||
+    user?.role?.code === 'CU' ||
+    String(user?.role?.name || user?.role || '').toLowerCase() === 'customer'
+  );
+}
 
 /** name → { hydrate, loaded, promise, failedAt } */
 const modules = new Map();
@@ -46,6 +56,8 @@ export function ensureModule(name) {
   // No session → no server. `useModuleHydration` empties the stores on sign-out;
   // hydrating here would only bounce state on every render of the login screen.
   if (!getStoredToken()) return;
+  // Customer role has portal access only — do not hydrate internal ERP/CRM/PMS modules
+  if (isCustomerSession()) return;
   const mod = entry(name);
   if (!mod.hydrate || mod.loaded || mod.promise) return;
   if (mod.failedAt && Date.now() - mod.failedAt < RETRY_AFTER_MS) return;

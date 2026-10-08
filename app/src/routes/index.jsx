@@ -221,6 +221,19 @@ function RootRedirect() {
   return <Navigate to={isCustomer ? '/customer/projects' : '/dashboard'} replace />;
 }
 
+function CustomerGuardedDashboard() {
+  const currentUser = useAppStore((s) => s.currentUser);
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
+  if (isCustomer) {
+    return <Navigate to="/customer/projects" replace />;
+  }
+  return <Page component={DashboardPage} />;
+}
+
 const router = createBrowserRouter([
   // ── Authentication ────────────────────────────────────────
   {
@@ -274,7 +287,7 @@ const router = createBrowserRouter([
           { index: true, element: <RootRedirect /> },
 
       // ── Main Dashboard ─────────────────────────────────────
-      { path: 'dashboard', element: <Page component={DashboardPage} /> },
+      { path: 'dashboard', element: <CustomerGuardedDashboard /> },
 
       // ── Customer Project & Product Tracking ───────────────
       { path: 'customer/projects', element: <Page component={CustomerProjectsListPage} /> },

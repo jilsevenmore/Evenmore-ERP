@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import { useAppStore } from '../stores/appStore';
 import { publishEstimates } from '../services/estimateStore';
 import { formatDateDDMMYYYY, getCurrentDateFormatted, getCurrentISODate, addDaysISO, toISODate, toDisplayDate } from '../utils/dateUtils';
 import { formatCurrency as formatCurrencyUtil, getCurrencySymbol, getCurrencyConfig, CURRENCY_CONFIGS, fetchLiveExchangeRates, DEFAULT_RATES, setBaseCurrency } from '../utils/currencyUtils';
@@ -245,6 +246,13 @@ export const ERPProvider = ({ children, }) => {
      */
     const requestCollection = useCallback((key) => {
         if (!isBackendEnabled()) return;
+        const currentUser = useAppStore.getState().currentUser;
+        const isCustomer = Boolean(
+            currentUser?.isCustomer ||
+            currentUser?.role?.code === 'CU' ||
+            String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+        );
+        if (isCustomer) return;
         if (!syncSettersRef.current[key]) return;
         if (loadedKeysRef.current.has(key)
             || inFlightKeysRef.current.has(key)

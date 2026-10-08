@@ -584,8 +584,8 @@ export default function Sidebar() {
   const permittedNav = useMemo(() => {
     let list = filterNavByPermission(NAV, permissions || []);
     if (isCustomer) {
-      // Customer role should only see customer-facing navigation
-      list = list.filter((item) => item.to === '/customer/projects' || item.to === '/dashboard');
+      // Customer role should only see customer-facing navigation (Track Orders)
+      list = list.filter((item) => item.to === '/customer/projects');
     } else {
       // Internal staff (Admin, PM, Employee) already have Customer Tracking under PMS (Projects).
       // Hide the top-level "Track Orders" to avoid duplicate highlighted menu items.
@@ -622,11 +622,11 @@ export default function Sidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  let badges = { zone: 0, faulty: 0, ...pmsBadges };
+  let badges = { zone: 0, faulty: 0, ...(isCustomer ? {} : pmsBadges) };
   try {
     const erp = useERP();
     // Reading these is what loads them, so they wait for the same idle moment.
-    if (erp && shellReady) {
+    if (!isCustomer && erp && shellReady) {
       // badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0; // Hidden: Zone Requests out of scope
       badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
     }
@@ -844,30 +844,34 @@ export default function Sidebar() {
 
             {/* Quick Navigation Links */}
             <div className="space-y-0.5 text-xs">
-              <Link
-                to="/hrms/dashboard"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-              >
-                <User size={13} className="text-blue-400 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-medium">HR Profile & Attendance</span>
-              </Link>
-              <Link
-                to="/administration/users"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-              >
-                <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-medium">Administration & Roles</span>
-              </Link>
-              <Link
-                to="/administration/settings"
-                onClick={() => setIsProfileOpen(false)}
-                className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
-              >
-                <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
-                <span className="text-[11px] font-medium">System Preferences & Currency</span>
-              </Link>
+              {!isCustomer && (
+                <>
+                  <Link
+                    to="/hrms/dashboard"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                  >
+                    <User size={13} className="text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-[11px] font-medium">HR Profile & Attendance</span>
+                  </Link>
+                  <Link
+                    to="/administration/users"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                  >
+                    <ShieldCheck size={13} className="text-emerald-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-[11px] font-medium">Administration & Roles</span>
+                  </Link>
+                  <Link
+                    to="/administration/settings"
+                    onClick={() => setIsProfileOpen(false)}
+                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-slate-200 hover:text-white transition group"
+                  >
+                    <Settings size={13} className="text-purple-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-[11px] font-medium">System Preferences & Currency</span>
+                  </Link>
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => {

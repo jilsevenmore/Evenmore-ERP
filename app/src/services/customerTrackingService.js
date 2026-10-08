@@ -28,7 +28,30 @@ export async function fetchCustomerProjects() {
   // Fallback to local / store state (e.g. offline, mock data, or freshly created store projects)
   try {
     const { usePmsStore } = await import('../stores/pmsStore');
-    const storeProjects = usePmsStore.getState().projects || [];
+    const { useAppStore } = await import('../stores/appStore');
+    const currentUser = useAppStore.getState().currentUser;
+    const isCustomer = Boolean(
+      currentUser?.isCustomer ||
+      currentUser?.role?.code === 'CU' ||
+      String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+    );
+    let storeProjects = usePmsStore.getState().projects || [];
+    if (isCustomer) {
+      const userPartyId = currentUser?.partyId || currentUser?.party_id || currentUser?.party;
+      const userPartyName = String(currentUser?.partyName || '').toLowerCase().trim();
+      const userName = String(currentUser?.name || '').toLowerCase().trim();
+      storeProjects = storeProjects.filter((p) => {
+        if (userPartyId && (p.partyId === userPartyId || p.party_id === userPartyId || p.party === userPartyId)) return true;
+        const pCust = String(p.customerName || p.clientName || '').toLowerCase().trim();
+        if (userPartyName && pCust && (pCust.includes(userPartyName) || userPartyName.includes(pCust))) return true;
+        if (userName && pCust) {
+          const userWords = userName.split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+          const custWords = pCust.split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+          if (userWords.some((w) => custWords.includes(w))) return true;
+        }
+        return false;
+      });
+    }
     if (storeProjects.length > 0) {
       return storeProjects.map((p) => ({
         id: p.id,

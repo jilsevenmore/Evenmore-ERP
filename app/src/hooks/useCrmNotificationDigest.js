@@ -311,24 +311,30 @@ function buildCrmNotificationDigest({ leadRows, leadDetails, crmTasks, allocatio
 }
 
 export function useCrmNotificationDigest() {
-  // The digest hangs off the topbar on every screen, and reading a collection
-  // is what pulls it — so these two wait for an idle moment rather than
-  // competing with the page the user opened.
+  const currentUser = useAppStore((s) => s.currentUser);
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
+
   const erp = useERP() || {};
   const digestReady = useIdleReady();
-  const { quotations, deliveryChallans } = digestReady ? erp : {};
-  const leadRows = useCrmStore((s) => s.leads) || EMPTY_ROWS;
-  const crmTasks = useCrmStore((s) => s.tasks) || EMPTY_ROWS;
-  const allAllocations = useCrmStore((s) => s.taskAllocations) || EMPTY_ROWS;
-  // Remind people of work allocated to them, not of everything a manager can see.
-  const currentUserId = useAppStore((s) => s.currentUser?.id);
+  const { quotations, deliveryChallans } = (!isCustomer && digestReady) ? erp : {};
+  const crmStoreHook = useCrmStore.raw || useCrmStore;
+  const leadRows = (!isCustomer ? crmStoreHook((s) => s.leads) : EMPTY_ROWS) || EMPTY_ROWS;
+  const crmTasks = (!isCustomer ? crmStoreHook((s) => s.tasks) : EMPTY_ROWS) || EMPTY_ROWS;
+  const allAllocations = (!isCustomer ? crmStoreHook((s) => s.taskAllocations) : EMPTY_ROWS) || EMPTY_ROWS;
+
+  const currentUserId = currentUser?.id;
   const allocationTasks = useMemo(
-    () => allAllocations.filter((task) => currentUserId && String(task.assigneeId) === String(currentUserId)),
-    [allAllocations, currentUserId],
+    () => (!isCustomer ? allAllocations.filter((task) => currentUserId && String(task.assigneeId) === String(currentUserId)) : EMPTY_ROWS),
+    [allAllocations, currentUserId, isCustomer],
   );
-  const [eventItems, setEventItems] = useState(() => loadEventNotifications());
+  const [eventItems, setEventItems] = useState(() => (isCustomer ? EMPTY_ROWS : loadEventNotifications()));
 
   useEffect(() => {
+    if (isCustomer) return;
     const sync = () => setEventItems(loadEventNotifications());
     sync();
 
@@ -343,19 +349,29 @@ export function useCrmNotificationDigest() {
       window.removeEventListener('focus', sync);
       window.clearInterval(timer);
     };
-  }, []);
+  }, [isCustomer]);
 
   return useMemo(
-    () => buildCrmNotificationDigest({
-      leadRows,
-      leadDetails: groupTasksByLead(crmTasks),
-      crmTasks,
-      allocationTasks,
-      quotations,
-      deliveryChallans,
-      eventItems,
-      now: new Date(),
-    }),
-    [deliveryChallans, quotations, leadRows, crmTasks, allocationTasks, eventItems]
+    () => {
+      if (isCustomer) {
+        return {
+          reminders: [],
+          notifications: [],
+          spotlight: [],
+          counts: { unread: 0, urgent: 0, overdue: 0, today: 0, total: 0 },
+        };
+      }
+      return buildCrmNotificationDigest({
+        leadRows,
+        leadDetails: groupTasksByLead(crmTasks),
+        crmTasks,
+        allocationTasks,
+        quotations,
+        deliveryChallans,
+        eventItems,
+        now: new Date(),
+      });
+    },
+    [isCustomer, deliveryChallans, quotations, leadRows, crmTasks, allocationTasks, eventItems]
   );
 }

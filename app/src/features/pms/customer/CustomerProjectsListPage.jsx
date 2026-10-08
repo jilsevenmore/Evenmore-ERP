@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Package, Search, Filter, Calendar, Layers, ArrowRight,
   ShieldCheck, RefreshCw, CheckCircle2, Clock, AlertTriangle,
@@ -24,6 +24,8 @@ function formatDate(isoString) {
 
 export default function CustomerProjectsListPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const forceList = searchParams.get('view') === 'list';
   const currentUser = useAppStore((s) => s.currentUser);
 
   const isCustomer = Boolean(
@@ -46,8 +48,44 @@ export default function CustomerProjectsListPage() {
     setError(null);
 
     try {
-      const rows = await fetchCustomerProjects();
+      let rows = await fetchCustomerProjects();
+      if (isCustomer && Array.isArray(rows)) {
+        // Enforce customer project isolation on client side as an extra safeguard
+        const userPartyId = currentUser?.partyId || currentUser?.party_id || currentUser?.party;
+        const userPartyName = String(currentUser?.partyName || '').toLowerCase().trim();
+        const userName = String(currentUser?.name || '').toLowerCase().trim();
+
+        const ownRows = rows.filter((p) => {
+          if (userPartyId && (p.partyId === userPartyId || p.party_id === userPartyId || p.party === userPartyId)) {
+            return true;
+          }
+          const pCust = String(p.customerName || p.clientName || '').toLowerCase().trim();
+          if (userPartyName && pCust && (pCust.includes(userPartyName) || userPartyName.includes(pCust))) {
+            return true;
+          }
+          if (userName && pCust) {
+            const userWords = userName.split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+            const custWords = pCust.split(/[^a-z0-9]+/).filter((w) => w.length > 3);
+            if (userWords.some((w) => custWords.includes(w))) {
+              return true;
+            }
+          }
+          return false;
+        });
+
+        if (ownRows.length > 0) {
+          rows = ownRows;
+        }
+      }
+
       setProjects(rows || []);
+
+      // If only one project is there for the customer, show that project directly
+      if (isCustomer && rows && rows.length === 1 && !forceList) {
+        const single = rows[0];
+        navigate(`/customer/projects/${encodeURIComponent(single.code || single.id)}`, { replace: true });
+        return;
+      }
     } catch (err) {
       console.error('Failed to load customer projects:', err);
       setError(err?.message || 'Unable to retrieve projects. Please try again.');

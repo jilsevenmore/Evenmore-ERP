@@ -79,30 +79,37 @@ export default function Topbar() {
   const punchRef = useRef(null);
 
   const currentUser = useAppStore((s) => s.currentUser);
+  const isCustomer = Boolean(
+    currentUser?.isCustomer ||
+    currentUser?.role?.code === 'CU' ||
+    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
+  );
   const grantedPermissions = useAppStore((s) => s.permissions);
   const quickActions = useMemo(() => {
+    if (isCustomer) return [];
     const granted = grantedPermissions || [];
     return QUICK_ACTIONS.filter((a) => canUse(a.permission, granted) && canOpenPath(a.path, granted));
-  }, [grantedPermissions]);
+  }, [grantedPermissions, isCustomer]);
   const todayPunch = useAttendanceStore((s) => s.todayPunch);
   const fetchTodayPunch = useAttendanceStore((s) => s.fetchTodayPunch);
   const punchIn = useAttendanceStore((s) => s.punchIn);
   const punchOut = useAttendanceStore((s) => s.punchOut);
   const tickPunch = useAttendanceStore((s) => s.tickPunch);
 
-  // Poll / load today's punch status on mount
+  // Poll / load today's punch status on mount (employees only)
   useEffect(() => {
+    if (isCustomer) return;
     fetchTodayPunch();
-  }, [fetchTodayPunch]);
+  }, [fetchTodayPunch, isCustomer]);
 
   // Live timer for active punch session
   useEffect(() => {
-    if (!todayPunch?.isPunchedIn) return;
+    if (isCustomer || !todayPunch?.isPunchedIn) return;
     const interval = setInterval(() => {
       tickPunch();
     }, 1000);
     return () => clearInterval(interval);
-  }, [todayPunch?.isPunchedIn, tickPunch]);
+  }, [todayPunch?.isPunchedIn, tickPunch, isCustomer]);
 
   // Live ERP data for notifications.
   //
@@ -112,11 +119,11 @@ export default function Topbar() {
   const erp = useERP();
   const crmDigest = useCrmNotificationDigest();
   const alertsReady = useIdleReady();
-  const items = alertsReady ? erp?.items : undefined;
-  const deliveryChallans = alertsReady ? erp?.deliveryChallans : undefined;
+  const items = (!isCustomer && alertsReady) ? erp?.items : undefined;
+  const deliveryChallans = (!isCustomer && alertsReady) ? erp?.deliveryChallans : undefined;
   // const zoneRequests = alertsReady ? erp?.zoneRequests : undefined; // Hidden: Zone Requests out of scope
   const zoneRequests = undefined;
-  const salesInvoices = alertsReady ? erp?.invoices : undefined;
+  const salesInvoices = (!isCustomer && alertsReady) ? erp?.invoices : undefined;
   const isCrmRoute = pathname === '/crm' || pathname.startsWith('/crm/');
 
   const lowStockItems = useMemo(() => {
@@ -769,7 +776,8 @@ export default function Topbar() {
             )}
           </div>
 
-          {/* Punch In / Out Primary Control & Popover */}
+          {/* Punch In / Out Primary Control & Popover (employees only) */}
+          {!isCustomer && (
           <div className="relative" ref={punchRef}>
             {todayPunch?.isPunchedIn ? (
               <div className="flex items-center gap-1.5">
@@ -993,47 +1001,54 @@ export default function Topbar() {
               </div>
             )}
           </div>
+          )}
 
-          {/* Calendar Shortcut */}
-          <Link
-            to="/hrms/attendance"
-            className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="Calendar & Schedule"
-            title="Attendance & Schedule"
-          >
-            <CalendarDays size={16} />
-          </Link>
+          {!isCustomer && (
+            <>
+              {/* Calendar Shortcut */}
+              <Link
+                to="/hrms/attendance"
+                className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
+                aria-label="Calendar & Schedule"
+                title="Attendance & Schedule"
+              >
+                <CalendarDays size={16} />
+              </Link>
 
-          {/* Messages & Tasks Shortcut */}
-          <Link
-            to="/crm/tasks"
-            className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="Tasks & Activities"
-            title="Tasks & Activities"
-          >
-            <Inbox size={16} />
-          </Link>
+              {/* Messages & Tasks Shortcut */}
+              <Link
+                to="/crm/tasks"
+                className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
+                aria-label="Tasks & Activities"
+                title="Tasks & Activities"
+              >
+                <Inbox size={16} />
+              </Link>
 
-          {/* Settings Shortcut */}
-          <Link
-            to="/administration/settings"
-            className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
-            aria-label="System Settings"
-            title="System Settings"
-          >
-            <Settings size={16} />
-          </Link>
+              {/* Settings Shortcut */}
+              <Link
+                to="/administration/settings"
+                className="w-9 h-9 rounded-xl border border-border bg-card hover:bg-soft text-text hidden sm:flex items-center justify-center transition shadow-2xs"
+                aria-label="System Settings"
+                title="System Settings"
+              >
+                <Settings size={16} />
+              </Link>
+            </>
+          )}
         </div>
       </div>
 
       {/* Early Punch Out Confirmation Modal */}
-      <EarlyPunchOutModal
-        isOpen={isEarlyPunchModalOpen}
-        onClose={() => setIsEarlyPunchModalOpen(false)}
-        onConfirm={executePunchOut}
-        todayPunch={todayPunch}
-        isSubmitting={punchSubmitting}
-      />
+      {!isCustomer && (
+        <EarlyPunchOutModal
+          isOpen={isEarlyPunchModalOpen}
+          onClose={() => setIsEarlyPunchModalOpen(false)}
+          onConfirm={executePunchOut}
+          todayPunch={todayPunch}
+          isSubmitting={punchSubmitting}
+        />
+      )}
     </header>
   );
 }
