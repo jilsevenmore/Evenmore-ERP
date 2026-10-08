@@ -17,8 +17,8 @@ import { PageHeader } from '../../../components/common/PageHeader';
 import { StatCard } from '../../../components/ui/StatCard';
 import { Button } from '../../../components/ui/Button';
 import { 
-  fetchTimesheets, 
-  createTimesheet, 
+  fetchTimesheetEntries,
+  logTimesheetHours,
   submitTimesheet, 
   approveTimesheet, 
   rejectTimesheet,
@@ -28,6 +28,31 @@ import {
 } from '../../../services/upgradeService';
 import { usePmsStore } from '../../../stores/pmsStore';
 import { useERP } from '../../../context/ERPContext';
+import { useAppStore } from '../../../stores/appStore';
+import { rowsOf } from '../../../services/resourceSync';
+
+/** Who signs off timesheets (the server's PMS_MANAGERS). */
+const PMS_MANAGERS = ['create_pms_project', 'assign_stage'];
+
+/** A logged entry as a table row; its approval state is its week's timesheet. */
+function toRow(e) {
+  return {
+    id: e.id,
+    timesheetId: e.timesheetId,
+    timesheetNumber: e.timesheetNumber,
+    work_date: e.date,
+    project_name: e.projectName || e.projectCode,
+    task_name: e.taskName || e.description || 'Work',
+    hours: Number(e.durationHours ?? 0),
+    hourly_rate: e.hourlyRate != null ? Number(e.hourlyRate) : null,
+    status: e.isRunning ? 'Recording' : (e.timesheetStatus || 'Draft'),
+    userName: e.userName,
+  };
+}
+
+function errorText(err) {
+  return err?.payload?.message || err?.message || 'Unknown error';
+}
 
 const timesheetGuide = {
   title: 'Engineering Timesheets & Live Timer',
@@ -48,7 +73,8 @@ const timesheetGuide = {
 export const TimesheetsPage = () => {
   const { formatCurrency } = useERP();
   const storeProjects = usePmsStore((s) => s.projects || []);
-  const currentUserId = usePmsStore((s) => s.currentUserId);
+  const permissions = useAppStore((s) => s.permissions);
+  const canApprove = PMS_MANAGERS.some((code) => (permissions || []).includes(code));
 
   const [timesheets, setTimesheets] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -73,12 +99,9 @@ export const TimesheetsPage = () => {
   const loadTimesheets = async () => {
     setLoading(true);
     try {
-      const res = await fetchTimesheets().catch(() => null);
-      if (res?.data && Array.isArray(res.data)) {
-        setTimesheets(res.data);
-      } else if (Array.isArray(res)) {
-        setTimesheets(res);
-      }
+      // Entries, not weekly headers: one row per block of work logged.
+      const res = await fetchTimesheetEntries({ page_size: 200 });
+      setTimesheets(rowsOf(res).map(toRow));
     } catch (err) {
       console.error('Failed to load timesheets:', err);
     } finally {
@@ -88,15 +111,12 @@ export const TimesheetsPage = () => {
 
   const checkActiveTimer = async () => {
     try {
+      // `{ active, timer }`, the timer in API (camelCase) shape.
       const res = await getActiveTimesheetTimer().catch(() => null);
-      if (res?.data?.active && res.data.entry) {
-        setActiveTimer(res.data.entry);
-        const start = new Date(res.data.entry.start_time).getTime();
-        setTimerSeconds(Math.floor((Date.now() - start) / 1000));
-      } else if (res?.active && res.entry) {
-        setActiveTimer(res.entry);
-        const start = new Date(res.entry.start_time).getTime();
-        setTimerSeconds(Math.floor((Date.now() - start) / 1000));
+      if (res?.active && res.timer) {
+        setActiveTimer(res.timer);
+        const start = new Date(res.timer.startTime).getTime();
+        setTimerSeconds(Math.max(0, Math.floor((Date.now() - start) / 1000)));
       } else {
         setActiveTimer(null);
       }
@@ -128,41 +148,41 @@ export const TimesheetsPage = () => {
     }
     try {
       const res = await startTimesheetTimer({
-        project: selectedProjectForTimer,
-        task_name: timerTaskName || 'General Engineering Task',
+        projectId: selectedProjectForTimer,
+        description: timerTaskName || 'General Engineering Task',
       });
-      setActiveTimer(res.data || res);
+      setActiveTimer(res);
       setTimerSeconds(0);
       setTimerTaskName('');
+      loadTimesheets();
     } catch (err) {
-      alert('Failed to start timer: ' + (err.message || 'Unknown error'));
+      alert('Failed to start timer: ' + errorText(err));
     }
   };
 
   const handleStopTimer = async () => {
     if (!activeTimer) return;
     try {
-      await stopTimesheetTimer({ entry_id: activeTimer.id });
+      await stopTimesheetTimer(activeTimer.id);
       setActiveTimer(null);
       setTimerSeconds(0);
       loadTimesheets();
       alert('Timer stopped and work hours logged successfully!');
     } catch (err) {
-      alert('Failed to stop timer: ' + (err.message || 'Unknown error'));
+      alert('Failed to stop timer: ' + errorText(err));
     }
   };
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
     try {
-      await createTimesheet({
-        project: logForm.project,
-        task_name: logForm.task_name,
-        hours: parseFloat(logForm.hours) || 1,
-        hourly_rate: parseFloat(logForm.hourly_rate) || 650,
-        work_date: logForm.work_date,
+      await logTimesheetHours({
+        projectId: logForm.project,
+        taskName: logForm.task_name,
+        hours: parseFloat(logForm.hours) || 0,
+        hourlyRate: logForm.hourly_rate === '' ? null : parseFloat(logForm.hourly_rate),
+        date: logForm.work_date,
         description: logForm.description,
-        status: 'Draft',
       });
       setShowLogModal(false);
       setLogForm({
@@ -175,7 +195,7 @@ export const TimesheetsPage = () => {
       });
       loadTimesheets();
     } catch (err) {
-      alert('Failed to log time: ' + (err.message || 'Unknown error'));
+      alert('Failed to log time: ' + errorText(err));
     }
   };
 
@@ -184,7 +204,7 @@ export const TimesheetsPage = () => {
       await submitTimesheet(id);
       loadTimesheets();
     } catch (err) {
-      alert('Failed to submit timesheet: ' + (err.message || 'Unknown error'));
+      alert('Failed to submit timesheet: ' + errorText(err));
     }
   };
 
@@ -193,7 +213,7 @@ export const TimesheetsPage = () => {
       await approveTimesheet(id);
       loadTimesheets();
     } catch (err) {
-      alert('Failed to approve timesheet: ' + (err.message || 'Unknown error'));
+      alert('Failed to approve timesheet: ' + errorText(err));
     }
   };
 
@@ -204,7 +224,7 @@ export const TimesheetsPage = () => {
       await rejectTimesheet(id, reason);
       loadTimesheets();
     } catch (err) {
-      alert('Failed to reject timesheet: ' + (err.message || 'Unknown error'));
+      alert('Failed to reject timesheet: ' + errorText(err));
     }
   };
 
@@ -217,9 +237,9 @@ export const TimesheetsPage = () => {
 
   // KPIs
   const totalHours = timesheets.reduce((acc, t) => acc + (Number(t.hours) || 0), 0);
-  const totalLaborCost = timesheets.reduce((acc, t) => acc + (Number(t.hours || 0) * Number(t.hourly_rate || 650)), 0);
+  const totalLaborCost = timesheets.reduce((acc, t) => acc + (Number(t.hours || 0) * Number(t.hourly_rate || 0)), 0);
   const approvedHours = timesheets.filter(t => t.status === 'Approved').reduce((acc, t) => acc + (Number(t.hours) || 0), 0);
-  const pendingApprovals = timesheets.filter(t => t.status === 'Submitted' || t.status === 'Pending').length;
+  const pendingApprovals = new Set(timesheets.filter(t => t.status === 'Submitted').map(t => t.timesheetId)).size;
 
   return (
     <div className="space-y-6">
@@ -255,7 +275,7 @@ export const TimesheetsPage = () => {
               )}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              {activeTimer ? `Tracking: ${activeTimer.task_name || 'Active Task'}` : 'Select a project and task to start recording billable hours'}
+              {activeTimer ? `Tracking: ${activeTimer.description || activeTimer.taskName || 'Active Task'}` : 'Select a project and task to start recording billable hours'}
             </p>
           </div>
         </div>
@@ -323,7 +343,7 @@ export const TimesheetsPage = () => {
         />
         <StatCard
           label="Pending Approvals"
-          value={`${pendingApprovals} Entries`}
+          value={`${pendingApprovals} Week${pendingApprovals === 1 ? '' : 's'}`}
           icon={AlertCircle}
           highlight={pendingApprovals > 0}
           trend={{ positive: false, text: 'Awaiting manager signoff' }}
@@ -372,16 +392,17 @@ export const TimesheetsPage = () => {
                       {Number(t.hours).toFixed(1)} hrs
                     </td>
                     <td className="py-2.5 px-4 text-right font-mono text-slate-600">
-                      Rs {t.hourly_rate || 650}/hr
+                      {t.hourly_rate != null ? `Rs ${t.hourly_rate}/hr` : '—'}
                     </td>
                     <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
-                      {formatCurrency(Number(t.hours || 0) * Number(t.hourly_rate || 650))}
+                      {t.hourly_rate != null ? formatCurrency(Number(t.hours || 0) * t.hourly_rate) : '—'}
                     </td>
                     <td className="py-2.5 px-4 text-center">
                       <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                         t.status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
                         t.status === 'Submitted' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
                         t.status === 'Rejected' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                        t.status === 'Recording' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
                         'bg-slate-100 text-slate-600'
                       }`}>
                         {t.status || 'Draft'}
@@ -389,24 +410,28 @@ export const TimesheetsPage = () => {
                     </td>
                     <td className="py-2.5 px-4 text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        {t.status === 'Draft' && (
+                        {(t.status === 'Draft' || t.status === 'Rejected') && t.timesheetId && (
                           <button
-                            onClick={() => handleSubmitForApproval(t.id)}
+                            onClick={() => handleSubmitForApproval(t.timesheetId)}
+                            title={`Submits the whole week (${t.timesheetNumber || 'timesheet'})`}
                             className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded font-semibold text-[11px] transition"
                           >
-                            Submit
+                            Submit week
                           </button>
                         )}
-                        {(t.status === 'Submitted' || t.status === 'Pending') && (
+                        {t.status === 'Submitted' && !canApprove && (
+                          <span className="text-[11px] text-blue-600 font-medium">Awaiting approval</span>
+                        )}
+                        {t.status === 'Submitted' && canApprove && (
                           <>
                             <button
-                              onClick={() => handleApprove(t.id)}
+                              onClick={() => handleApprove(t.timesheetId)}
                               className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-semibold text-[11px] transition"
                             >
                               Approve
                             </button>
                             <button
-                              onClick={() => handleReject(t.id)}
+                              onClick={() => handleReject(t.timesheetId)}
                               className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded font-semibold text-[11px] transition"
                             >
                               Reject

@@ -8,6 +8,7 @@ import {
   validateStageHandoff,
   summariseStageForHandoff,
 } from '../../../stores/pmsStore';
+import { handoffCheck } from '../../../services/pmsSync';
 
 /**
  * StageHandoffModal — department-to-department handoff with PM sign-off.
@@ -48,6 +49,10 @@ export function StageHandoffModal({ isOpen, onClose, project, stageId, onHandedO
   const [notes, setNotes] = useState('');
   const [checked, setChecked] = useState([]);
   const [submitError, setSubmitError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  // The server's own gate check (`/handoff-check/`) — the same rules the
+  // handoff itself enforces, company policy included. `null` until it answers.
+  const [serverBlockers, setServerBlockers] = useState(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -58,10 +63,20 @@ export function StageHandoffModal({ isOpen, onClose, project, stageId, onHandedO
     setSubmitError('');
   }, [isOpen, nextStage]);
 
-  const blockers = useMemo(
-    () => (stage ? validateStageHandoff(stage, config) : []),
-    [stage, config]
-  );
+  useEffect(() => {
+    if (!isOpen || !project?.id || !stage?.id) return undefined;
+    let cancelled = false;
+    setServerBlockers(null);
+    handoffCheck(project.id, stage.id).then((res) => {
+      if (!cancelled && Array.isArray(res?.blockers)) setServerBlockers(res.blockers);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen, project?.id, stage?.id]);
+
+  const blockers = useMemo(() => {
+    if (serverBlockers) return serverBlockers;
+    return stage ? validateStageHandoff(stage, config) : [];
+  }, [serverBlockers, stage, config]);
   const hardBlockers = blockers.filter((b) => b.hard);
   const softBlockers = blockers.filter((b) => !b.hard);
   const summary = useMemo(() => (stage ? summariseStageForHandoff(stage) : null), [stage]);
@@ -73,17 +88,19 @@ export function StageHandoffModal({ isOpen, onClose, project, stageId, onHandedO
   }, [employees, nextStage]);
 
   const allChecked = checked.length === QUALITY_CHECKS.length;
-  const canConfirm = hardBlockers.length === 0 && allChecked;
+  const canConfirm = hardBlockers.length === 0 && allChecked && !submitting;
 
   function toggleCheck(item) {
     setChecked((prev) => (prev.includes(item) ? prev.filter((c) => c !== item) : [...prev, item]));
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!stage) return;
     const recipient = employees.find((e) => e.id === recipientId) ?? null;
+    setSubmitting(true);
+    setSubmitError('');
     try {
-      const nextId = handoffStage(project.id, stage.id, {
+      const nextId = await handoffStage(project.id, stage.id, {
         recipient: recipient ? { id: recipient.id, name: recipient.name, email: recipient.email } : null,
         recipientTeam: recipientTeam.trim() || null,
         notes: notes.trim(),
@@ -95,6 +112,8 @@ export function StageHandoffModal({ isOpen, onClose, project, stageId, onHandedO
       onClose?.();
     } catch (err) {
       setSubmitError(err.message);
+    } finally {
+      setSubmitting(false);
     }
   }
 

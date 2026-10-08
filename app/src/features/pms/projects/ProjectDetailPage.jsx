@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History, MessagesSquare, Bug, DollarSign } from 'lucide-react';
+import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History, MessagesSquare, Bug, DollarSign, Users } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { EmptyStatePms } from '../components/EmptyStatePms';
 import { usePmsStore, getProjectRowMeta } from '../../../stores/pmsStore';
@@ -13,6 +13,7 @@ import { ApprovalsTab } from './components/ApprovalsTab';
 import { ActivityAuditTab } from './components/ActivityAuditTab';
 import { ProjectBugsTab } from './components/ProjectBugsTab';
 import { ProjectProfitabilityTab } from './components/ProjectProfitabilityTab';
+import { ProjectTeamTab } from './components/ProjectTeamTab';
 import { AssignStageModal } from './components/AssignStageModal';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { StageHandoffModal } from '../components/StageHandoffModal';
@@ -35,6 +36,7 @@ const TABS = [
   { id: 'documents', label: 'Design Proofs', icon: FileText },
   { id: 'approvals', label: 'Approvals', icon: ShieldCheck },
   { id: 'activity', label: 'Activity', icon: History },
+  { id: 'team', label: 'Team', icon: Users },
   { id: 'messenger', label: 'Messenger', icon: MessagesSquare },
 ];
 
@@ -246,6 +248,7 @@ export default function ProjectDetailPage() {
         {tab === 'documents' && <DocumentsProofTab project={project} />}
         {tab === 'approvals' && <ApprovalsTab project={project} />}
         {tab === 'activity' && <ActivityAuditTab project={project} />}
+        {tab === 'team' && <ProjectTeamTab project={project} onOpenChat={() => setTab('messenger')} />}
         {tab === 'messenger' && (
           <MessengerTab
             project={project}

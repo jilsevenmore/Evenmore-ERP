@@ -58,6 +58,7 @@ const PMSTimesheetsPage = lazy(() => import('../features/pms/timesheets/Timeshee
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
 const MyProfilePage = lazy(() => import('../features/profile/MyProfilePage'));
+const ProjectChatsPage = lazy(() => import('../features/pms/messenger/ProjectChatsPage'));
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
 const Employees = lazy(() => import('../features/hrms/employees/Employees'));
 const AttendanceOverview = lazy(() => import('../features/hrms/attendance/Overview'));
@@ -417,6 +418,8 @@ const router = createBrowserRouter([
 
       // Every employee's own record — outside /hrms so it needs no HRMS access.
       { path: 'my-profile', element: <Page component={MyProfilePage} /> },
+      // Chats of the projects you work on — every employee, no PMS access needed.
+      { path: 'project-chats', element: <Page component={ProjectChatsPage} /> },
 
       // ── HRMS ──────────────────────────────────────────────
       { path: 'hrms', element: <Navigate to="/hrms/dashboard" replace /> },

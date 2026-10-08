@@ -291,22 +291,27 @@ export const ERPProvider = ({ children, }) => {
      * must never touch state synchronously (a read happens during render) and
      * must collapse the twenty reads one page makes into a single batch.
      */
-    const requestCollection = useCallback((key) => {
-        if (!isBackendEnabled()) return;
+    /**
+     * Whether the signed-in user may read `key` at all — the section that shows
+     * it has to be one they can open. Anything else would only come back 403.
+     */
+    const canReadCollection = useCallback((key) => {
         const appState = useAppStore.getState();
         const currentUser = appState.currentUser;
+        if (!currentUser) return false;
         const isCustomer = Boolean(
             currentUser?.isCustomer ||
             currentUser?.role?.code === 'CU' ||
             String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
         );
-        if (isCustomer) return;
-        // Verify user has permission to view this collection's module
+        if (isCustomer) return false;
         const requiredRoute = COLLECTION_ROUTE_MAP[key];
-        const permissions = appState.permissions || [];
-        if (requiredRoute && !canOpenPath(requiredRoute, permissions)) {
-            return;
-        }
+        return !requiredRoute || canOpenPath(requiredRoute, appState.permissions || []);
+    }, []);
+
+    const requestCollection = useCallback((key) => {
+        if (!isBackendEnabled()) return;
+        if (!canReadCollection(key)) return;
         if (!syncSettersRef.current[key]) return;
         if (loadedKeysRef.current.has(key)
             || inFlightKeysRef.current.has(key)
@@ -324,7 +329,7 @@ export const ERPProvider = ({ children, }) => {
             queuedKeysRef.current.clear();
             loadKeys(batch);
         }, 0);
-    }, [loadKeys]);
+    }, [loadKeys, canReadCollection]);
 
     /**
      * Every collection the registry covers, whether or not a screen has read it.
@@ -336,9 +341,9 @@ export const ERPProvider = ({ children, }) => {
     const loadAllCollections = useCallback(async () => {
         if (!isBackendEnabled()) return {};
         const missing = Object.keys(syncSettersRef.current)
-            .filter((key) => !loadedKeysRef.current.has(key));
+            .filter((key) => !loadedKeysRef.current.has(key) && canReadCollection(key));
         return missing.length ? loadKeys(missing) : {};
-    }, [loadKeys]);
+    }, [loadKeys, canReadCollection]);
 
     /** The tenant's currency and letterhead — one request, needed everywhere. */
     const loadCompanyProfile = useCallback(async () => {
@@ -353,8 +358,9 @@ export const ERPProvider = ({ children, }) => {
     }, []);
 
     /**
-     * Re-read everything this tab has on screen — the "Sync now" affordance and
-     * what a sign-in triggers. Collections nobody has looked at stay unloaded.
+     * Re-read everything this tab has on screen — the "Sync now" affordance.
+     * Collections nobody has looked at stay unloaded, and only what the
+     * signed-in user may read is asked for.
      */
     const refreshFromBackend = useCallback(async () => {
         if (!isBackendEnabled()) {
@@ -370,7 +376,7 @@ export const ERPProvider = ({ children, }) => {
                 ...loadedKeysRef.current,
                 ...inFlightKeysRef.current,
                 ...failedKeysRef.current.keys(),
-            ])];
+            ])].filter(canReadCollection);
             loadedKeysRef.current.clear();
             failedKeysRef.current.clear();
             const [collections] = await Promise.all([
@@ -386,26 +392,36 @@ export const ERPProvider = ({ children, }) => {
         } finally {
             refreshInFlight.current = null;
         }
-    }, [loadKeys, loadCompanyProfile]);
+    }, [loadKeys, loadCompanyProfile, canReadCollection]);
+
+    /** Forget every collection — nothing here may outlive the session that read it. */
+    const clearCollections = useCallback(() => {
+        Object.values(syncSettersRef.current).forEach((set) => set([]));
+        loadedKeysRef.current.clear();
+        failedKeysRef.current.clear();
+        queuedKeysRef.current.clear();
+    }, []);
 
     useEffect(() => {
-        let cancelled = false;
         // On mount only the company profile is read: currency formatting and the
         // letterhead are needed on every screen, and it is a single request.
         // Every collection waits to be asked for.
         if (isBackendEnabled()) loadCompanyProfile();
 
-        // A session change invalidates whatever this tab is holding.
-        const onSession = () => { if (!cancelled) refreshFromBackend(); };
-        window.addEventListener('evenmore:authorized', onSession);
-        window.addEventListener('storage', onSession);
+        // Signing out empties the tab, so the next person to sign in here never
+        // sees (or re-pulls) the previous user's data. A sign-in needs nothing
+        // from here: SessionGate remounts this provider for the new user, and
+        // their screens ask for exactly what they may read. (This used to
+        // re-pull the previous user's collections on `evenmore:authorized` — a
+        // burst of 403s for a smaller role — and on every `storage` event, which
+        // fires for any localStorage write in another tab.)
+        const onSignedOut = () => clearCollections();
+        window.addEventListener('evenmore:unauthorized', onSignedOut);
         return () => {
-            cancelled = true;
             if (flushHandleRef.current) clearTimeout(flushHandleRef.current);
-            window.removeEventListener('evenmore:authorized', onSession);
-            window.removeEventListener('storage', onSession);
+            window.removeEventListener('evenmore:unauthorized', onSignedOut);
         };
-    }, [refreshFromBackend, loadCompanyProfile]);
+    }, [loadCompanyProfile, clearCollections]);
 
     const setCurrency = (newCurr) => {
         setCurrencyState(newCurr);

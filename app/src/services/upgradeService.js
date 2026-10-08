@@ -311,6 +311,14 @@ export async function fetchTimesheetEntries(params = {}) {
   return apiClient('/pms/timesheet-entries/', { query: params });
 }
 
+/** Log worked hours by hand; the entry joins the caller's timesheet for that week. */
+export async function logTimesheetHours({ projectId, taskId, taskName, hours, hourlyRate, date, description }) {
+  return apiClient('/pms/timesheet-entries/log/', {
+    method: 'POST',
+    data: { projectId, taskId, taskName, hours, hourlyRate, date, description },
+  });
+}
+
 export async function startLiveTimer({ projectId, taskId, description, isBillable }) {
   return apiClient('/pms/timesheet-entries/start-timer/', {
     method: 'POST',

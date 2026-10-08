@@ -88,6 +88,13 @@ const NAV = [
     to: '/customer/projects',
   },
 
+  // Every employee: chats of the projects they work on (no PMS access needed).
+  {
+    label: 'Project Chats',
+    icon: MessagesSquare,
+    to: '/project-chats',
+  },
+
   {
     label: 'CRM',
     menu: 'menu_crm',
