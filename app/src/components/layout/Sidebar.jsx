@@ -144,7 +144,6 @@ const NAV = [
     label: 'PMS (Projects)',
     menu: 'menu_pms',
     icon: Briefcase,
-    badgeKey: 'pmsActiveCount',
     children: [
       { label: 'PMS Dashboard', icon: Home, to: '/pms' },
       { label: 'All Projects', icon: Layers, to: '/pms/projects' },

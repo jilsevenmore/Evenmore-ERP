@@ -751,29 +751,72 @@ export const PaymentInPage = () => {
                                         </select>
                                     </div>
 
-                                    {/* Live Bill Outstanding Summary */}
-                                    {selectedInv && (
-                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-1.5 text-xs">
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-500">Invoice Total:</span>
-                                                <span className="font-mono text-slate-800">{formatCurrency(selectedInv.grandTotal || selectedInv.total || 0)}</span>
+                                    {/* Live Bill Outstanding Summary & Allocation Impact */}
+                                    {selectedInv && (() => {
+                                        const currentAlloc = Math.max(0, Math.min(Number(amount) || 0, selectedOutstanding.balanceDue));
+                                        const newOutstanding = Math.max(0, selectedOutstanding.balanceDue - currentAlloc);
+                                        const nextStatus = newOutstanding <= 0.001
+                                            ? 'Paid'
+                                            : currentAlloc > 0
+                                                ? 'Partially Paid'
+                                                : selectedInv.status || 'Unpaid';
+
+                                        return (
+                                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-xs">
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-500">Invoice Total:</span>
+                                                    <span className="font-mono text-slate-800">{formatCurrency(selectedInv.grandTotal || selectedInv.total || 0)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-slate-500">
+                                                    <span>Taxable Amount / GST:</span>
+                                                    <span className="font-mono">
+                                                        {formatCurrency(selectedOutstanding.taxableAmount)} / {formatCurrency(selectedOutstanding.gst)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-500">Paid Against Invoice:</span>
+                                                    <span className="font-mono text-emerald-700 font-semibold">{formatCurrency(selectedOutstanding.paidAgainstInvoice)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1.5">
+                                                    <span>Remaining Invoice Outstanding:</span>
+                                                    <span className="font-mono font-bold">{formatCurrency(selectedOutstanding.balanceDue)}</span>
+                                                </div>
+
+                                                {/* Live Allocation Impact Breakdown */}
+                                                <div className="mt-2 pt-2 border-t border-slate-200">
+                                                    <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-1.5">Allocation Impact</span>
+                                                    <div className="grid grid-cols-4 gap-1.5 p-2 bg-white rounded border border-slate-200 text-center">
+                                                        <div>
+                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">Previous Outstanding</span>
+                                                            <span className="font-mono font-bold text-slate-700">{formatCurrency(selectedOutstanding.balanceDue)}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="block text-[9px] text-blue-500 font-medium uppercase">Current Allocation</span>
+                                                            <span className="font-mono font-bold text-blue-600">{formatCurrency(currentAlloc)}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">New Outstanding</span>
+                                                            <span className={`font-mono font-bold ${newOutstanding <= 0.001 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                                {formatCurrency(newOutstanding)}
+                                                            </span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">Payment Status After Allocation</span>
+                                                            <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                                                nextStatus === 'Paid'
+                                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                                    : nextStatus === 'Partially Paid'
+                                                                        ? 'bg-amber-100 text-amber-800'
+                                                                        : 'bg-slate-100 text-slate-700'
+                                                            }`}>
+                                                                {nextStatus}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="flex justify-between text-slate-500">
-                                                <span>Taxable Amount / GST:</span>
-                                                <span className="font-mono">
-                                                    {formatCurrency(selectedOutstanding.taxableAmount)} / {formatCurrency(selectedOutstanding.gst)}
-                                                </span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-slate-500">Paid Against Invoice:</span>
-                                                <span className="font-mono text-emerald-700 font-semibold">{formatCurrency(selectedOutstanding.paidAgainstInvoice)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1.5">
-                                                <span>Remaining Invoice Outstanding:</span>
-                                                <span className="font-mono font-bold">{formatCurrency(selectedOutstanding.balanceDue)}</span>
-                                            </div>
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </>
                             ) : (
                                 /* WITHOUT-BILL SPECIFIC FIELDS */
