@@ -130,6 +130,10 @@ export const hrmsService = {
   requestLeave: (data) => api.post('/hrms/leave/', data),
   approveLeave: (id, approved) => api.patch(`/hrms/leave/${id}/`, { approved }),
   processPayroll: (data) => api.post('/hrms/payroll/process/', data),
+  // Asset requests & categories
+  getAssetRequests: (query) => api.get('/hrms/asset-requests/', { query }),
+  requestAsset: (data) => api.post('/hrms/asset-requests/', data),
+  getAssetCategories: () => api.get('/hrms/asset-categories/'),
   // Recruitment pipeline
   createJob: (data) => api.post('/hrms/jobs/', data),
   moveCandidate: (id, stage) => api.patch(`/hrms/candidates/${id}/`, { stage }),

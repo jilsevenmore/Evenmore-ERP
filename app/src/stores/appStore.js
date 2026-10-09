@@ -235,8 +235,20 @@ const useAppStoreBase = create((set) => ({
         return saved;
       })
       .catch((err) => {
+        const errMsg = hrmsApi.describeError(err);
+        if (errMsg && (errMsg.toLowerCase().includes("already approved") || errMsg.toLowerCase().includes("already done"))) {
+          // If already approved on the backend, update status to Approved and re-sync leaves
+          set((s) => ({
+            leaves: s.leaves.map((l) => (l.id === id ? { ...l, status: "Approved" } : l)),
+          }));
+          hrmsSync.pull("leaves").then((fresh) => {
+            if (fresh) set({ leaves: fresh });
+          }).catch(() => {});
+          useAppStore.getState().showToast("Leave is already approved.");
+          return;
+        }
         set({ leaves: previous });
-        useAppStore.getState().showToast(`Leave not updated — ${hrmsApi.describeError(err)}`);
+        useAppStore.getState().showToast(`Leave not updated — ${errMsg}`);
       });
   },
 

@@ -82,6 +82,13 @@ const NAV = [
     to: '/dashboard',
   },
 
+  // Every employee: self-service portal to request leave, assets, attendance regularization, and punch in/out
+  {
+    label: 'Employee Portal',
+    icon: UserCheck,
+    to: '/employee/portal',
+  },
+
   {
     label: 'Track Orders',
     icon: Package,

@@ -291,10 +291,11 @@ const useAttendanceStoreBase = create((set, get) => ({
               ...rec,
               checkIn: targetReq.requestedIn || rec.checkIn,
               checkOut: targetReq.requestedOut || rec.checkOut,
-              status: targetReq.type === "Regularization" ? "Present" : rec.status,
+              status: targetReq.type === "Half Day" ? "Half Day" : targetReq.type === "Work From Home (WFH)" ? "WFH" : "Present",
               earlyLeavingMinutes: 0,
               earlyMins: 0,
-              workHours: "08:30",
+              isEarlyOut: false,
+              workHours: targetReq.type === "Half Day" ? "04:30" : "08:30",
             };
           }
           return rec;

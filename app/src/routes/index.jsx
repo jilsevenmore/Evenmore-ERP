@@ -57,6 +57,7 @@ const PMSTaskCalendarPage = lazy(() => import('../features/pms/calendar/TaskCale
 const PMSTimesheetsPage = lazy(() => import('../features/pms/timesheets/TimesheetsPage'));
 
 // ── HRMS (Lazy Loaded) ───────────────────────────────────────
+const EmployeePortal = lazy(() => import('../features/portal/EmployeePortal'));
 const MyProfilePage = lazy(() => import('../features/profile/MyProfilePage'));
 const ProjectChatsPage = lazy(() => import('../features/pms/messenger/ProjectChatsPage'));
 const HRMSDashboard = lazy(() => import('../features/hrms/dashboard/Dashboard'));
@@ -225,7 +226,7 @@ function RootRedirect() {
     String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'employee'
   );
   if (isCustomer) return <Navigate to="/customer/projects" replace />;
-  if (isEmployee) return <Navigate to="/pms/my-tasks" replace />;
+  if (isEmployee) return <Navigate to="/employee/portal" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -244,7 +245,7 @@ function CustomerGuardedDashboard() {
     return <Navigate to="/customer/projects" replace />;
   }
   if (isEmployee) {
-    return <Navigate to="/pms/my-tasks" replace />;
+    return <Navigate to="/employee/portal" replace />;
   }
   return <Page component={DashboardPage} />;
 }
@@ -303,6 +304,8 @@ const router = createBrowserRouter([
 
       // ── Main Dashboard ─────────────────────────────────────
       { path: 'dashboard', element: <CustomerGuardedDashboard /> },
+      { path: 'employee/portal', element: <Page component={EmployeePortal} /> },
+      { path: 'employee/requests', element: <Navigate to="/employee/portal" replace /> },
 
       // ── Customer Project & Product Tracking ───────────────
       { path: 'customer/projects', element: <Page component={CustomerProjectsListPage} /> },

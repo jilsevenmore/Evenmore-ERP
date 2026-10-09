@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, X } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { ChevronRight, ChevronDown, Search, Calendar as CalendarIcon, X, Check, Eye } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import Modal from "../../../components/ui/Modal";
@@ -28,12 +28,16 @@ const emptyEarlyForm = () => ({
   reason: "",
 });
 
-const TYPES = ["All", "Regularization", "Early Clock-Out"];
+const TYPES = ["All", "Regularization", "Early Clock-Out", "Early Leave", "Half Day", "Work From Home (WFH)", "General Request"];
 const STATUSES = ["All", "Pending", "Approved", "Rejected", "Cancelled"];
 
 const typeStyles = {
   Regularization: { background: "#eff6ff", color: "#2563eb", border: "#bfdbfe" },
   "Early Clock-Out": { background: "#f3e8ff", color: "#7e22ce", border: "#d8b4fe" },
+  "Early Leave": { background: "#fdf4ff", color: "#c026d3", border: "#f5d0fe" },
+  "Half Day": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
+  "Work From Home (WFH)": { background: "#e0f2fe", color: "#0369a1", border: "#bae6fd" },
+  "General Request": { background: "#ecfdf5", color: "#047857", border: "#a7f3d0" },
 };
 
 const statusStyles = {
@@ -51,16 +55,73 @@ export default function Requests() {
   const storeRequests = useAttendanceStore((s) => s.requests || []);
   const setStoreRequestStatus = useAttendanceStore((s) => s.setRequestStatus);
   const addStoreRequest = useAttendanceStore((s) => s.addRequest);
+  const hydrateAttendance = useAttendanceStore((s) => s.hydrate);
 
-  // Normalize requests
+  // Auto-fetch fresh requests on mount
+  useEffect(() => {
+    hydrateAttendance?.();
+  }, [hydrateAttendance]);
+
+  // Normalize requests with accurate type inference, times, and employee mapping
   const requestsList = useMemo(() => {
     if (storeRequests && storeRequests.length > 0) {
-      return storeRequests.map((r) => ({
-        ...r,
-        avatar: r.avatar || `https://i.pravatar.cc/100?u=${r.id || r.employee}`,
-        dept: r.dept || "General",
-        submitted: r.submitted || "Recent",
-      }));
+      return storeRequests.map((r) => {
+        const reasonStr = String(r.reason || "");
+        let inferredType = r.type || "Regularization";
+        if (!r.type || r.type === "Regularization") {
+          if (reasonStr.toLowerCase().includes("[half day") || reasonStr.toLowerCase().includes("half day")) {
+            inferredType = "Half Day";
+          } else if (reasonStr.toLowerCase().includes("early") || reasonStr.toLowerCase().includes("clock-out")) {
+            inferredType = "Early Clock-Out";
+          } else if (reasonStr.toLowerCase().includes("[work from home") || reasonStr.toLowerCase().includes("wfh")) {
+            inferredType = "Work From Home (WFH)";
+          } else if (reasonStr.toLowerCase().includes("[requirement:") || reasonStr.toLowerCase().includes("general request")) {
+            inferredType = "General Request";
+          }
+        }
+
+        const formatTime = (val) => {
+          if (!val || val === "undefined" || val === "null") return null;
+          if (typeof val === "string") {
+            if (val.length === 5 && val.includes(":")) return val;
+            if (val.includes("T")) {
+              const part = val.split("T")[1];
+              return part ? part.slice(0, 5) : null;
+            }
+          }
+          return null;
+        };
+
+        const curIn = formatTime(r.currentIn) || formatTime(r.curIn) || "09:00";
+        const curOut = formatTime(r.currentOut) || formatTime(r.curOut) || "18:30";
+        const reqIn = formatTime(r.requestedIn) || formatTime(r.reqIn) || curIn;
+        const reqOut = formatTime(r.requestedOut) || formatTime(r.reqOut) || (inferredType === "Early Clock-Out" ? "16:00" : curOut);
+
+        const shortId = r.id && String(r.id).length > 10 ? `REQ-${String(r.id).slice(0, 8)}` : r.id;
+
+        // Clean ISO date extraction (YYYY-MM-DD)
+        const rawIso = String(r.rawDate || r.work_date || r.workDate || r.date || "").slice(0, 10);
+        let isoDate = rawIso;
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(rawIso) && r.date) {
+          // If in DD-MM-YYYY or DD/MM/YYYY format
+          const parts = String(r.date).split(/[-/]/);
+          if (parts.length === 3 && parts[2]?.length === 4) {
+            isoDate = `${parts[2]}-${parts[1].padStart(2, "0")}-${parts[0].padStart(2, "0")}`;
+          }
+        }
+
+        return {
+          ...r,
+          idDisplay: shortId,
+          isoDate,
+          type: inferredType,
+          avatar: r.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(r.employee || r.id || "emp")}`,
+          dept: r.dept || "General",
+          currentTiming: `${curIn} – ${curOut}`,
+          requestedTiming: `${reqIn} – ${reqOut}`,
+          submitted: r.submitted || "Recent",
+        };
+      });
     }
     return [];
   }, [storeRequests]);
@@ -92,7 +153,6 @@ export default function Requests() {
   const [showEarlyModal, setShowEarlyModal] = useState(false);
 
   const [regForm, setRegForm] = useState(emptyRegForm);
-
   const [earlyForm, setEarlyForm] = useState(emptyEarlyForm);
 
   const filtered = useMemo(() => {
@@ -101,17 +161,22 @@ export default function Requests() {
       if (
         search &&
         !(
-          String(r.employee ?? '').toLowerCase().includes(search.toLowerCase()) ||
-          String(r.id ?? '').toLowerCase().includes(search.toLowerCase())
+          String(r.employee ?? "").toLowerCase().includes(search.toLowerCase()) ||
+          String(r.id ?? "").toLowerCase().includes(search.toLowerCase()) ||
+          String(r.reason ?? "").toLowerCase().includes(search.toLowerCase())
         )
       )
         return false;
       if (deptFilter !== "All" && r.dept !== deptFilter) return false;
       if (typeFilter !== "All" && r.type !== typeFilter) return false;
       if (statusFilter !== "All" && r.status !== statusFilter) return false;
+      if (dateFilter) {
+        const matchesDate = r.isoDate === dateFilter || String(r.date || "").includes(dateFilter);
+        if (!matchesDate) return false;
+      }
       return true;
     });
-  }, [requestsList, tab, search, deptFilter, typeFilter, statusFilter]);
+  }, [requestsList, tab, search, deptFilter, typeFilter, statusFilter, dateFilter]);
 
   const countForTab = (t) => {
     if (t === "All") return requestsList.length;
@@ -204,11 +269,11 @@ export default function Requests() {
             <h1 className="req-title">Attendance Requests</h1>
             <PageInfoButton guide={hrmsGuides.attendanceRequests} />
           </div>
-          <p className="req-sub">Single request management for regularization &amp; early clock-out.</p>
+          <p className="req-sub">Single request management for regularization, early departures, half day, WFH &amp; general requirements.</p>
         </div>
-        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="flex items-center gap-2.5 flex-wrap">
           <button type="button" onClick={() => setShowRegModal(true)} className="req-btn-outline">
-            Regularize
+            Regularize Attendance
           </button>
           <button type="button" onClick={() => setShowEarlyModal(true)} className="req-btn-primary">
             Early Clock-Out Request
@@ -238,7 +303,7 @@ export default function Requests() {
             <Search size={15} style={{ color: "#94a3b8" }} />
             <input
               type="text"
-              placeholder="Search"
+              placeholder="Search employee, ID, reason..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="req-search-input"
@@ -304,9 +369,41 @@ export default function Requests() {
           </div>
 
           {/* Date Picker Input */}
-          <div className="req-date-wrap">
-            <span>{dateFilter ? dateFilter.split("-").reverse().join("-") : "dd-mm-yyyy"}</span>
-            <CalendarIcon size={14} style={{ color: "#475569" }} />
+          <div
+            className={`req-date-wrap ${dateFilter ? "active" : ""}`}
+            onClick={(e) => {
+              if (e.target.closest(".req-date-clear-btn")) return;
+              const input = e.currentTarget.querySelector("input[type='date']");
+              if (input) {
+                if (typeof input.showPicker === "function") {
+                  try {
+                    input.showPicker();
+                    return;
+                  } catch {}
+                }
+                input.focus();
+              }
+            }}
+          >
+            <CalendarIcon size={14} className="req-date-icon" />
+            <span className="req-date-label">
+              {dateFilter ? dateFilter.split("-").reverse().join("-") : "Filter Date"}
+            </span>
+            {dateFilter ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDateFilter("");
+                }}
+                className="req-date-clear-btn"
+                title="Clear date"
+              >
+                <X size={12} />
+              </button>
+            ) : (
+              <ChevronDown size={13} className="req-date-arrow" />
+            )}
             <input
               type="date"
               value={dateFilter}
@@ -332,10 +429,9 @@ export default function Requests() {
                 <th>EMPLOYEE</th>
                 <th>REQUEST TYPE</th>
                 <th>DATE</th>
-                <th>CURRENT ATTENDANCE</th>
-                <th>REQUESTED ATTENDANCE</th>
-                <th>REASON</th>
-                <th>REQUESTED BY</th>
+                <th>SHIFT TIMING</th>
+                <th>REQUESTED TIMING</th>
+                <th>REASON / REQUIREMENT</th>
                 <th>SUBMITTED</th>
                 <th>STATUS</th>
                 <th>ACTIONS</th>
@@ -349,18 +445,19 @@ export default function Requests() {
                       type="button"
                       onClick={() => setSelectedReq(r)}
                       className="req-id-link"
+                      title={r.id}
                     >
-                      {r.id}
+                      {r.idDisplay || r.id}
                     </button>
                   </td>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <img src={r.avatar} alt={r.employee} className="req-avatar" loading="lazy" />
                       <div>
-                        <span style={{ fontWeight: 600, color: "#111827", display: "inline-block", marginRight: 6 }}>
+                        <div style={{ fontWeight: 600, color: "#111827", lineHeight: 1.2 }}>
                           {r.employee}
-                        </span>
-                        <span style={{ fontSize: "12px", color: "#6b7280" }}>{r.dept}</span>
+                        </div>
+                        <div style={{ fontSize: "11px", color: "#64748b", marginTop: 2 }}>{r.dept}</div>
                       </div>
                     </div>
                   </td>
@@ -370,13 +467,20 @@ export default function Requests() {
                     </span>
                   </td>
                   <td className="req-date">{r.date}</td>
-                  <td className="req-time">{r.currentIn === "—" ? "—" : `${r.currentIn}-${r.currentOut}`}</td>
-                  <td className="req-time">{`${r.requestedIn}-${r.requestedOut}`}</td>
+                  <td className="req-time">
+                    <span style={{ fontFamily: "monospace", fontSize: "12px", background: "#f1f5f9", padding: "2px 6px", borderRadius: "6px" }}>
+                      {r.currentTiming}
+                    </span>
+                  </td>
+                  <td className="req-time">
+                    <span style={{ fontFamily: "monospace", fontSize: "12px", background: "#eff6ff", color: "#1d4ed8", padding: "2px 6px", borderRadius: "6px", fontWeight: 600 }}>
+                      {r.requestedTiming}
+                    </span>
+                  </td>
                   <td className="req-reason" title={r.reason}>
                     {r.reason}
                   </td>
-                  <td style={{ color: "#374151" }}>{r.requestedBy}</td>
-                  <td style={{ color: "#6b7280" }}>{r.submitted}</td>
+                  <td style={{ color: "#64748b", fontSize: "12px" }}>{r.submitted}</td>
                   <td>
                     <span className="req-status" style={{ ...statusStyles[r.status] }}>
                       {r.status}
@@ -414,7 +518,7 @@ export default function Requests() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={11} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
+                  <td colSpan={10} style={{ textAlign: "center", color: "#64748b", padding: "36px" }}>
                     No attendance requests found matching filters.
                   </td>
                 </tr>
@@ -723,8 +827,18 @@ export default function Requests() {
         .req-search-wrap { display: flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 12px; min-width: 170px; }
         .req-search-input { border: none; background: transparent; font-size: 13px; color: #1e293b; outline: none; width: 100%; }
 
-        .req-date-wrap { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 14px; font-size: 13px; color: #374151; min-width: 120px; cursor: pointer; }
-        .req-date-native { position: absolute; right: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .req-date-wrap { position: relative; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 12px; height: 35px; cursor: pointer; transition: all 0.15s ease; box-sizing: border-box; min-width: 128px; user-select: none; }
+        .req-date-wrap:hover { border-color: #cbd5e1; background: #f1f5f9; }
+        .req-date-wrap.active { border-color: #3b82f6; background: #eff6ff; }
+        .req-date-icon { color: #64748b; flex-shrink: 0; pointer-events: none; }
+        .req-date-wrap.active .req-date-icon { color: #2563eb; }
+        .req-date-label { font-size: 13px; color: #374151; font-weight: 500; white-space: nowrap; }
+        .req-date-wrap.active .req-date-label { color: #1d4ed8; font-weight: 600; }
+        .req-date-arrow { color: #64748b; flex-shrink: 0; pointer-events: none; }
+        .req-date-wrap.active .req-date-arrow { color: #2563eb; }
+        .req-date-clear-btn { display: inline-flex; align-items: center; justify-content: center; background: transparent; border: none; color: #64748b; cursor: pointer; padding: 2px; border-radius: 4px; z-index: 2; position: relative; transition: all 0.15s ease; }
+        .req-date-clear-btn:hover { background: #dbeafe; color: #1e3a8a; }
+        .req-date-native { position: absolute; left: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 1; }
 
         .req-select { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 32px 7px 14px; font-size: 13px; color: #374151; font-weight: 500; outline: none; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%230f172a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; background-size: 12px; min-width: 90px; }
         .req-select:focus { border-color: #94a3b8; background-color: #fff; }

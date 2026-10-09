@@ -575,7 +575,7 @@ export default function HRMSDashboard() {
       ? "Payroll Core"
       : "HR Admin";
 
-    // If it's an asset-related request, register it directly in useAssetStore
+    // If it's an asset-related request, register it directly in useAssetStore & backend
     if (isAsset) {
       const category =
         lower.includes("laptop") ? "Laptop"
@@ -585,19 +585,59 @@ export default function HRMSDashboard() {
         : lower.includes("headphone") || lower.includes("peripheral") ? "Audio / Peripherals"
         : "Workstation";
 
+      const noteText = leaveNote.trim() || `Submitted via HRMS Dashboard Quick Request for ${leaveDate}.`;
       const newReq = useAssetStore.getState().addRequest({
         employeeName: currentUserName || "Staff Member",
         employeeId: currentUser?.employeeId || currentEmployee?.id || "",
         dept: currentEmployee?.department || currentEmployee?.dept || "General",
         category,
         assetName: leaveType,
-        reason: leaveNote.trim() || `Submitted via HRMS Dashboard Quick Request for ${leaveDate}.`,
+        reason: noteText,
         priority: "Medium",
         requestedDate: leaveDate,
         source: "HRMS Dashboard",
         notes: `Quick Request submitted on ${leaveDate}`,
       });
+      // Sync to backend
+      api.post("/hrms/asset-requests/", {
+        employeeId: currentUser?.employeeId || currentEmployee?.id || undefined,
+        justification: `${leaveType} — ${noteText}`,
+      }).catch(() => {});
       setLastSubmittedAssetReqId(newReq.id);
+    } else if (lower.includes("attendance") || lower.includes("regularization")) {
+      const noteText = leaveNote.trim() || `Attendance regularization for ${leaveDate}.`;
+      useAttendanceStore.getState().addRequest({
+        employee: currentUserName || "Staff Member",
+        dept: currentEmployee?.department || currentEmployee?.dept || "General",
+        date: leaveDate,
+        type: "Regularization",
+        curIn: "09:00",
+        curOut: "18:00",
+        reqIn: "09:00",
+        reqOut: "18:00",
+        reason: noteText,
+      });
+      // Sync to backend
+      api.post("/hrms/attendance/regularizations/", {
+        employeeId: currentUser?.employeeId || currentEmployee?.id || undefined,
+        date: leaveDate,
+        requestedCheckIn: "09:00",
+        requestedCheckOut: "18:00",
+        requestedStatus: "Present",
+        reason: noteText,
+      }).catch(() => {});
+      setLastSubmittedAssetReqId(null);
+    } else if (lower.includes("leave")) {
+      const noteText = leaveNote.trim() || `${leaveType} requested for ${leaveDate}.`;
+      useAppStore.getState().addLeave({
+        employeeId: currentUser?.employeeId || currentEmployee?.id || undefined,
+        type: leaveType,
+        fromDate: leaveDate,
+        toDate: leaveDate,
+        reason: noteText,
+        status: "Pending Review",
+      }).catch(() => {});
+      setLastSubmittedAssetReqId(null);
     } else {
       setLastSubmittedAssetReqId(null);
     }
