@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ShieldOff } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
-import { canOpenPath } from '../../utils/navAccess';
+import { canOpenPath, canUseDashboard } from '../../utils/navAccess';
 
 /**
  * Pages outside the signed-in user's role are not rendered, whether they were
@@ -24,9 +24,13 @@ export default function RouteAccessGuard({ children }) {
   );
   const customerOk = !isCustomer || CUSTOMER_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
-  if (customerOk && canOpenPath(pathname, permissions)) return children;
+  if (customerOk && canOpenPath(pathname, permissions, currentUser)) return children;
 
   const roleName = currentUser?.role?.name || currentUser?.role || '';
+  const userCanUseDashboard = canUseDashboard(currentUser, permissions);
+  const homeLink = isCustomer ? '/customer/projects' : userCanUseDashboard ? '/dashboard' : '/employee/portal';
+  const homeLabel = isCustomer ? 'Back to Projects' : userCanUseDashboard ? 'Back to Dashboard' : 'Back to Employee Portal';
+
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-card border border-border rounded-2xl shadow-xs p-6 text-center">
@@ -39,10 +43,10 @@ export default function RouteAccessGuard({ children }) {
           Ask an administrator if you need it.
         </p>
         <Link
-          to="/dashboard"
+          to={homeLink}
           className="inline-flex items-center justify-center mt-5 h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold"
         >
-          Back to Dashboard
+          {homeLabel}
         </Link>
       </div>
     </div>

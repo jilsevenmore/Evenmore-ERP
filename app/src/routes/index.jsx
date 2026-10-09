@@ -6,6 +6,7 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { PageLoadingSkeleton } from '../components/common/PageLoadingSkeleton';
 
 import { useAppStore } from '../stores/appStore';
+import { canUseDashboard } from '../utils/navAccess';
 
 // ── Customer Project Tracking (Lazy Loaded) ───────────────────
 const CustomerTrackingPage = lazy(() => import('../features/pms/customer/CustomerTrackingPage'));
@@ -216,35 +217,31 @@ const LoginPage = lazy(() => import('../features/auth/LoginPage'));
 
 function RootRedirect() {
   const currentUser = useAppStore((s) => s.currentUser);
+  const permissions = useAppStore((s) => s.permissions) || [];
   const isCustomer = Boolean(
     currentUser?.isCustomer ||
     currentUser?.role?.code === 'CU' ||
     String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
   );
-  const isEmployee = Boolean(
-    currentUser?.role?.code === 'EM' ||
-    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'employee'
-  );
   if (isCustomer) return <Navigate to="/customer/projects" replace />;
-  if (isEmployee) return <Navigate to="/employee/portal" replace />;
+  if (!canUseDashboard(currentUser, permissions)) {
+    return <Navigate to="/employee/portal" replace />;
+  }
   return <Navigate to="/dashboard" replace />;
 }
 
 function CustomerGuardedDashboard() {
   const currentUser = useAppStore((s) => s.currentUser);
+  const permissions = useAppStore((s) => s.permissions) || [];
   const isCustomer = Boolean(
     currentUser?.isCustomer ||
     currentUser?.role?.code === 'CU' ||
     String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
   );
-  const isEmployee = Boolean(
-    currentUser?.role?.code === 'EM' ||
-    String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'employee'
-  );
   if (isCustomer) {
     return <Navigate to="/customer/projects" replace />;
   }
-  if (isEmployee) {
+  if (!canUseDashboard(currentUser, permissions)) {
     return <Navigate to="/employee/portal" replace />;
   }
   return <Page component={DashboardPage} />;

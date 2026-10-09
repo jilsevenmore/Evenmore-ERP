@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { useAppStore } from '../../stores/appStore';
-import { canOpenPath, canUse } from '../../utils/navAccess';
+import { canOpenPath, canUse, canUseDashboard } from '../../utils/navAccess';
 // ── [PHASE-1-DASHBOARD] CRM mock imports removed from the ERP (sales) dashboard ──
 // Before (kept for reference if the CRM dashboard panel is ever re-added):
 // Reason: the ERP dashboard should compute from live ERP state (invoices, paymentIns,
@@ -101,6 +101,11 @@ export const DashboardPage = () => {
   // A customer login has its own portal; after the hooks so their order never changes.
   if (isCustomer) {
     return <Navigate to="/customer/projects" replace />;
+  }
+
+  // Employees or users without dashboard capabilities are redirected to their portal
+  if (!canUseDashboard(currentUser, granted)) {
+    return <Navigate to="/employee/portal" replace />;
   }
 
   // ── [PHASE-1-DASHBOARD] CRM lead/task analytics replaced with ERP-derived analytics ──

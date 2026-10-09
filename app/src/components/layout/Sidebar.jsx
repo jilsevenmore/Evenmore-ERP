@@ -65,7 +65,7 @@ import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
 import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import { logout } from '../../services/authService';
-import { filterNavByPermission, canOpenPath } from '../../utils/navAccess';
+import { filterNavByPermission, canOpenPath, canUseDashboard } from '../../utils/navAccess';
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -603,7 +603,11 @@ export default function Sidebar() {
   );
 
   const permittedNav = useMemo(() => {
-    let list = filterNavByPermission(NAV, permissions || []);
+    let list = filterNavByPermission(NAV, permissions || [], currentUser);
+    const userCanUseDashboard = canUseDashboard(currentUser, permissions || []);
+    if (!userCanUseDashboard) {
+      list = list.filter((item) => item.to !== '/dashboard');
+    }
     if (isCustomer) {
       // Customer role should only see customer-facing navigation (Track Orders)
       list = list.filter((item) => item.to === '/customer/projects');
@@ -613,7 +617,7 @@ export default function Sidebar() {
       list = list.filter((item) => item.to !== '/customer/projects');
     }
     return list;
-  }, [permissions, isCustomer]);
+  }, [permissions, isCustomer, currentUser]);
   const filteredNav = useMemo(
     () => filterNavTree(permittedNav, searchQuery),
     [permittedNav, searchQuery],
