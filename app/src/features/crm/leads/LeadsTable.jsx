@@ -47,7 +47,7 @@ function EditableCell({ row, field, className = "", onUpdate, renderValue }) {
   );
 }
 
-export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onRequestDelete, onRequestDeleteAll, onAddNote, onOpenLead, onUpdateLead, variant = "list" }) {
+export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onAddNote, onOpenLead, onUpdateLead, variant = "list" }) {
   const allChecked = rows.length > 0 && rows.every((row) => selected.includes(row.id));
   const [openMenuId, setOpenMenuId] = useState(null);
 
@@ -62,10 +62,10 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                   type="checkbox"
                   className="row-check"
                   checked={allChecked}
-                  onChange={() => {
-                    onToggleAll?.();
-                    onRequestDeleteAll?.(rows);
-                  }}
+                  // Replaced: also called onRequestDeleteAll(rows), which opened the
+                  // delete dialog on every tick. Selecting only selects now; Delete
+                  // lives in the selection bar above the table.
+                  onChange={() => onToggleAll?.()}
                   aria-label="Select all"
                 />
               </th>
@@ -94,10 +94,7 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                       type="checkbox"
                       className="row-check"
                       checked={selected.includes(row.id)}
-                      onChange={() => {
-                        onToggleOne?.(row.id);
-                        onRequestDelete?.(row);
-                      }}
+                      onChange={() => onToggleOne?.(row.id)}
                       aria-label={`Select ${row.name}`}
                     />
                   </td>

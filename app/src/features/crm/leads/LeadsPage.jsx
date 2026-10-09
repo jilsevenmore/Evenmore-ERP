@@ -424,10 +424,11 @@ export default function LeadsPage() {
     setBulkDeleteTargets(visibleLeads);
   }
 
+  // Replaced: also cleared the selection, so Cancel lost the ticked leads.
+  // A successful delete drops the deleted ids from the selection itself.
   function closeDeleteLead() {
     setDeleteTarget(null);
     setBulkDeleteTargets([]);
-    setSelected([]);
   }
 
   async function deleteLead(id) {
@@ -439,6 +440,7 @@ export default function LeadsPage() {
     }
     setSelected((current) => current.filter((selectedId) => selectedId !== id));
     closeDeleteLead();
+    showToast?.('Lead deleted.');
   }
 
   async function deleteAllLeads(leadsToDelete) {
@@ -451,6 +453,7 @@ export default function LeadsPage() {
     }
     setSelected((current) => current.filter((id) => !ids.includes(id)));
     closeDeleteLead();
+    showToast?.(`${ids.length} ${ids.length === 1 ? 'lead' : 'leads'} deleted.`);
   }
 
   async function pinLead(lead) {
@@ -620,12 +623,10 @@ export default function LeadsPage() {
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
                 onRequestDelete={requestDeleteLead}
-                onRequestDeleteAll={requestDeleteAll}
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
-                onDelete={deleteLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -648,13 +649,11 @@ export default function LeadsPage() {
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
                 onRequestDelete={requestDeleteLead}
-                onRequestDeleteAll={requestDeleteAll}
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
                 variant="grid"
-                onDelete={deleteLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -678,7 +677,6 @@ export default function LeadsPage() {
               onRequestDelete={requestDeleteLead}
               onAddNote={openNotes}
               onOpenLead={openLeadDetails}
-              onDelete={deleteLead}
             />
           ) : (
             <LeadMapView

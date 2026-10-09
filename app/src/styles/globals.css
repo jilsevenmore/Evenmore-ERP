@@ -2575,6 +2575,23 @@ html {
 
 .delete-lead-modal p strong { color: var(--text); }
 
+.delete-lead-list {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--soft);
+  max-height: 160px;
+  overflow-y: auto;
+  font-size: 0.82rem;
+  color: var(--text);
+}
+.delete-lead-list li { padding: 3px 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delete-lead-list li span { color: var(--muted); }
+.delete-lead-list .delete-lead-more { color: var(--muted); font-style: italic; }
+.delete-lead-actions button:disabled { opacity: 0.6; cursor: not-allowed; }
+
 .delete-lead-actions {
   display: flex;
   align-items: center;
@@ -3294,6 +3311,27 @@ html {
 }
 .record-action-close:hover { background: var(--soft); color: var(--text); }
 
+/* Selection bar: right side of the toolbar, above the table, while leads are selected. */
+.list-toolbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+.record-action-count {
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 12px;
+  border-radius: var(--radius-lg, 12px);
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.record-action-button { white-space: nowrap; color: var(--text); }
+.record-action-button:hover { background: var(--soft); }
+
 .list-toolbar-left {
   display: flex;
   align-items: center;
@@ -3303,6 +3341,7 @@ html {
 }
 
 @media (max-width: 960px) {
+  .list-toolbar-right { width: 100%; margin-left: 0; }
   .record-action-panel {
     width: 100%;
     justify-content: space-between;
