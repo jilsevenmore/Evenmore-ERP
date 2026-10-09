@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
 import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X } from "lucide-react";
-import { customLeadFields, missingRequiredField } from '../../../services/leadFormFields';
+import { customLeadFields, isBlankValue, isSupportedCustomField, leadFormLayout, missingRequiredField } from '../../../services/leadFormFields';
+import { PERMANENT_LEAD_FIELD_ID } from '../../../data/crm/leadFormSchema';
 import { CustomLeadFieldInput } from './CustomLeadFieldInput';
 
 /** Who a lead can be assigned to, from `/crm/team-roster/` (one row per person). */
@@ -27,7 +28,7 @@ function useProductOptions() {
   );
 }
 
-function MultiValueSelect({ label, placeholder, options, values, onChange }) {
+function MultiValueSelect({ label, required = false, placeholder, options, values, onChange, helpText }) {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const rootRef = useRef(null);
@@ -64,7 +65,7 @@ function MultiValueSelect({ label, placeholder, options, values, onChange }) {
 
   return (
     <div className="lead-create-field lead-create-field-wide">
-      <span>{label}</span>
+      <span>{label}{required ? ' *' : ''}</span>
       <div className="multi-value-select" ref={rootRef}>
         <div
           className={`token-field token-field-button${isOpen ? " open" : ""}`}
@@ -133,6 +134,7 @@ function MultiValueSelect({ label, placeholder, options, values, onChange }) {
           </div>
         )}
       </div>
+      {helpText && <small>{helpText}</small>}
     </div>
   );
 }
@@ -162,21 +164,41 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   // storeForms: re-read the fields when a form is saved or arrives.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const customFields = useMemo(() => customLeadFields(), [storeForms]);
+  // Replaced: the standard inputs were hard-coded here in a fixed order with
+  // fixed labels. They now follow the builder: order, label, placeholder,
+  // required, and whether they appear at all.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const layout = useMemo(() => leadFormLayout(), [storeForms]);
   const [customValues, setCustomValues] = useState({});
   const photoInputRef = useRef(null);
   const createdOnRef = useRef(null);
   const taskDateRef = useRef(null);
   const taskTimeRef = useRef(null);
 
+  // Replaced: every standard input except the photo and dates was mandatory,
+  // asterisk or not. Now the builder's Required flag decides (Lead Name always).
+  const standardValues = {
+    "lead-name": leadName.trim(),
+    "lead-photo": photoPreview,
+    company: company.trim(),
+    email: email.trim(),
+    phone: phone.trim(),
+    "lead-source": sourceId,
+    title: titleValue.trim(),
+    industry: industry.trim(),
+    "lead-owner": ownerId,
+    "created-on": createdOn,
+    products,
+    "lead-users": leadUsers,
+    "task-date": taskDate,
+    "task-time": taskTime,
+  };
+  const isRequired = (field) => field.id === PERMANENT_LEAD_FIELD_ID || Boolean(field.required);
   const isFormComplete =
     leadName.trim() !== "" &&
-    company.trim() !== "" &&
-    email.trim() !== "" &&
-    phone.trim() !== "" &&
-    sourceId !== "" &&
-    titleValue.trim() !== "" &&
-    industry.trim() !== "" &&
-    ownerId !== "" &&
+    layout.every((section) => section.fields.every(
+      (field) => !(field.id in standardValues) || !isRequired(field) || !isBlankValue(standardValues[field.id]),
+    )) &&
     !missingRequiredField(customFields, customValues);
 
   const isNavigatingToLayoutRef = useRef(false);
@@ -329,6 +351,128 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
     });
   }
 
+  function labelOf(field) {
+    return `${field.label}${isRequired(field) ? " *" : ""}`;
+  }
+
+  function dateInput(ref, value, setValue, type = "date") {
+    const openPicker = () => { try { ref.current?.showPicker?.(); } catch { ref.current?.focus(); } };
+    return (
+      <div className="input-icon-wrap">
+        <input ref={ref} type={type} value={value} onChange={(event) => setValue(event.target.value)} />
+        <span role="button" tabIndex={0} aria-label={type === "time" ? "Open time picker" : "Open calendar"} style={{ position: "absolute", top: 0, right: 0, width: 34, height: "100%", display: "grid", placeItems: "center", cursor: "pointer" }} onClick={openPicker} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); openPicker(); } }}>
+          {type === "time" ? <Clock3 size={16} /> : <CalendarDays size={16} />}
+        </span>
+      </div>
+    );
+  }
+
+  function textField(field, type, value, setValue, fallbackPlaceholder) {
+    return (
+      <label key={field.id} className="lead-create-field">
+        <span>{labelOf(field)}</span>
+        <input type={type} placeholder={field.placeholder || fallbackPlaceholder} value={value} onChange={(event) => setValue(event.target.value)} />
+        {field.helpText && <small>{field.helpText}</small>}
+      </label>
+    );
+  }
+
+  function selectField(field, value, setValue, options, fallbackPlaceholder) {
+    return (
+      <label key={field.id} className="lead-create-field">
+        <span>{labelOf(field)}</span>
+        <select value={value} onChange={(event) => setValue(event.target.value)}>
+          <option value="">{field.placeholder || fallbackPlaceholder}</option>
+          {options.map((option) => (
+            <option key={option.id} value={option.id}>{option.name}</option>
+          ))}
+        </select>
+        {field.helpText && <small>{field.helpText}</small>}
+      </label>
+    );
+  }
+
+  // One input per builder field, in builder order.
+  function renderField(field) {
+    switch (field.id) {
+      case "lead-name": return textField(field, "text", leadName, setLeadName, "Enter lead name");
+      case "company": return textField(field, "text", company, setCompany, "Enter company name");
+      case "email": return textField(field, "email", email, setEmail, "Enter email address");
+      case "phone": return textField(field, "tel", phone, setPhone, "Enter phone number");
+      case "title": return textField(field, "text", titleValue, setTitleValue, "Enter title");
+      case "industry": return textField(field, "text", industry, setIndustry, "Enter industry");
+      case "lead-source": return selectField(field, sourceId, setSourceId, sources, "Select source");
+      case "lead-owner": return selectField(field, ownerId, setOwnerId, userOptions, "Select User");
+      case "lead-photo":
+        return (
+          <div key={field.id} className="lead-create-field lead-create-photo-field">
+            <span>{labelOf(field)}</span>
+            <input ref={photoInputRef} type="file" accept="image/*" className="sr-only" onChange={handlePhotoChange} />
+            <button type="button" className="lead-photo-upload" onClick={() => photoInputRef.current?.click()}>
+              {photoPreview ? (
+                <img src={photoPreview} alt="Client preview" className="lead-photo-preview" />
+              ) : (
+                <>
+                  <span className="lead-photo-placeholder">
+                    <ImagePlus size={24} />
+                  </span>
+                  <strong>Upload Image</strong>
+                  <small>JPG, PNG or WebP</small>
+                </>
+              )}
+            </button>
+            {field.helpText && <small>{field.helpText}</small>}
+          </div>
+        );
+      case "created-on":
+        return (
+          <label key={field.id} className="lead-create-field">
+            <span>{labelOf(field)}</span>
+            {dateInput(createdOnRef, createdOn, setCreatedOn)}
+            {field.helpText && <small>{field.helpText}</small>}
+          </label>
+        );
+      case "products":
+        return (
+          <MultiValueSelect key={field.id} label={field.label} required={isRequired(field)} placeholder={field.placeholder || "Select Products"} options={productOptions} values={products} onChange={setProducts} helpText={field.helpText} />
+        );
+      case "lead-users":
+        return (
+          <MultiValueSelect key={field.id} label={field.label} required={isRequired(field)} placeholder={field.placeholder || "Select Users"} options={userOptions.map((member) => member.name)} values={leadUsers} onChange={setLeadUsers} helpText={field.helpText} />
+        );
+      case "task-date":
+        return (
+          <label key={field.id} className="lead-create-field">
+            <span>{labelOf(field)}</span>
+            {dateInput(taskDateRef, taskDate, setTaskDate)}
+            <small>{field.helpText || "Leave blank to allocate the first form task immediately."}</small>
+          </label>
+        );
+      case "task-time":
+        return (
+          <label key={field.id} className="lead-create-field">
+            <span>{labelOf(field)}</span>
+            {dateInput(taskTimeRef, taskTime, setTaskTime, "time")}
+            <small>{field.helpText || "No need to set time before calling."}</small>
+          </label>
+        );
+      default:
+        if (!isSupportedCustomField(field)) return null;
+        return (
+          <label key={field.id} className="lead-create-field" htmlFor={`custom-${field.id}`}>
+            <span>{labelOf(field)}</span>
+            <CustomLeadFieldInput
+              field={field}
+              value={customValues[field.id]}
+              users={userOptions}
+              onChange={(value) => setCustomValues((current) => ({ ...current, [field.id]: value }))}
+            />
+            {field.helpText && <small>{field.helpText}</small>}
+          </label>
+        );
+    }
+  }
+
   return (
     <div className="modal-overlay" role="presentation" onClick={handleClose}>
       <section
@@ -359,145 +503,12 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
         )}
 
         <div className="lead-create-modal-body">
-          <h3 className="lead-create-section-title">Lead Information</h3>
-          <label className="lead-create-field">
-            <span>Lead Name *</span>
-            <input type="text" placeholder="Enter lead name" value={leadName} onChange={(event) => setLeadName(event.target.value)} />
-          </label>
-
-          <div className="lead-create-field lead-create-photo-field">
-            <span>Lead Photo</span>
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={handlePhotoChange}
-            />
-            <button
-              type="button"
-              className="lead-photo-upload"
-              onClick={() => photoInputRef.current?.click()}
-            >
-              {photoPreview ? (
-                <img src={photoPreview} alt="Client preview" className="lead-photo-preview" />
-              ) : (
-                <>
-                  <span className="lead-photo-placeholder">
-                    <ImagePlus size={24} />
-                  </span>
-                    <strong>Upload Image</strong>
-                  <small>JPG, PNG or WebP</small>
-                </>
-              )}
-            </button>
-          </div>
-
-          <label className="lead-create-field">
-            <span>Company *</span>
-            <input type="text" placeholder="Enter company name" value={company} onChange={(event) => setCompany(event.target.value)} />
-          </label>
-
-          <label className="lead-create-field">
-            <span>Email</span>
-            <input type="email" placeholder="Enter email address" value={email} onChange={(event) => setEmail(event.target.value)} />
-          </label>
-
-          <label className="lead-create-field">
-            <span>Phone</span>
-            <input type="tel" placeholder="Enter phone number" value={phone} onChange={(event) => setPhone(event.target.value)} />
-          </label>
-
-          <label className="lead-create-field">
-            <span>Lead Source</span>
-            <select value={sourceId} onChange={(event) => setSourceId(event.target.value)}>
-              <option value="">Select source</option>
-              {sources.map((option) => (
-                <option key={option.id} value={option.id}>{option.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="lead-create-field">
-            <span>Title</span>
-            <input type="text" placeholder="Enter title" value={titleValue} onChange={(event) => setTitleValue(event.target.value)} />
-          </label>
-
-          <label className="lead-create-field">
-            <span>Industry</span>
-            <input type="text" placeholder="Enter industry" value={industry} onChange={(event) => setIndustry(event.target.value)} />
-          </label>
-
-          <label className="lead-create-field">
-            <span>Lead Owner *</span>
-            <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
-              <option value="">Select User</option>
-              {userOptions.map((member) => (
-                <option key={member.id} value={member.id}>{member.name}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="lead-create-field">
-            <span>Created On</span>
-            <div className="input-icon-wrap">
-              <input ref={createdOnRef} type="date" value={createdOn} onChange={(event) => setCreatedOn(event.target.value)} />
-              <span role="button" tabIndex={0} aria-label="Open calendar" style={{ position: "absolute", top: 0, right: 0, width: 34, height: "100%", display: "grid", placeItems: "center", cursor: "pointer" }} onClick={() => { try { createdOnRef.current?.showPicker?.(); } catch { createdOnRef.current?.focus(); } }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); try { createdOnRef.current?.showPicker?.(); } catch { createdOnRef.current?.focus(); } } }}>
-                <CalendarDays size={16} />
-              </span>
-            </div>
-          </label>
-
-          {customFields.map((field) => (
-            <label key={field.id} className="lead-create-field" htmlFor={`custom-${field.id}`}>
-              <span>{field.label}{field.required ? ' *' : ''}</span>
-              <CustomLeadFieldInput
-                field={field}
-                value={customValues[field.id]}
-                users={userOptions}
-                onChange={(value) => setCustomValues((current) => ({ ...current, [field.id]: value }))}
-              />
-              {field.helpText && <small>{field.helpText}</small>}
-            </label>
+          {layout.map((section) => section.fields.length > 0 && (
+            <Fragment key={section.id}>
+              <h3 className="lead-create-section-title">{section.title}</h3>
+              {section.fields.map(renderField)}
+            </Fragment>
           ))}
-
-          <MultiValueSelect
-            label="Products"
-            placeholder="Select Products"
-            options={productOptions}
-            values={products}
-            onChange={setProducts}
-          />
-
-          <MultiValueSelect
-            label="Lead Users"
-            placeholder="Select Users"
-            options={userOptions.map((member) => member.name)}
-            values={leadUsers}
-            onChange={setLeadUsers}
-          />
-
-          <label className="lead-create-field">
-            <span>Task Date (Optional)</span>
-            <div className="input-icon-wrap">
-              <input ref={taskDateRef} type="date" value={taskDate} onChange={(event) => setTaskDate(event.target.value)} />
-              <span role="button" tabIndex={0} aria-label="Open calendar" style={{ position: "absolute", top: 0, right: 0, width: 34, height: "100%", display: "grid", placeItems: "center", cursor: "pointer" }} onClick={() => { try { taskDateRef.current?.showPicker?.(); } catch { taskDateRef.current?.focus(); } }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); try { taskDateRef.current?.showPicker?.(); } catch { taskDateRef.current?.focus(); } } }}>
-                <CalendarDays size={16} />
-              </span>
-            </div>
-            <small>Leave blank to allocate the first form task immediately.</small>
-          </label>
-
-          <label className="lead-create-field">
-            <span>Task Time (Optional)</span>
-            <div className="input-icon-wrap">
-              <input ref={taskTimeRef} type="time" value={taskTime} onChange={(event) => setTaskTime(event.target.value)} />
-              <span role="button" tabIndex={0} aria-label="Open time picker" style={{ position: "absolute", top: 0, right: 0, width: 34, height: "100%", display: "grid", placeItems: "center", cursor: "pointer" }} onClick={() => { try { taskTimeRef.current?.showPicker?.(); } catch { taskTimeRef.current?.focus(); } }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); try { taskTimeRef.current?.showPicker?.(); } catch { taskTimeRef.current?.focus(); } } }}>
-                <Clock3 size={16} />
-              </span>
-            </div>
-            <small>No need to set time before calling.</small>
-          </label>
         </div>
 
         <div className="lead-create-modal-actions">

@@ -12,7 +12,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { defaultLeadFormSections, withStandardLeadFields } from "../../../data/crm/leadFormSchema";
+import { defaultLeadFormSections, visibleLeadFormSections } from "../../../data/crm/leadFormSchema";
 import { useCrmStore } from "../../../stores/crmStore";
 import { activeLeadForm } from "../../../services/leadFormFields";
 
@@ -199,7 +199,7 @@ export default function DynamicLeadFormPage({
     // The same form the Create Lead modal uses (resolves pre-save ids too).
     const savedForm = activeLeadForm();
     if (Array.isArray(savedForm?.sections) && savedForm.sections.length > 0) {
-      return withStandardLeadFields(savedForm.sections);
+      return visibleLeadFormSections(savedForm.sections);
     }
 
     return Array.isArray(sections) && sections.length > 0 ? sections : defaultLeadFormSections;

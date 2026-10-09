@@ -2460,7 +2460,8 @@ html {
   font-size: 0.76rem;
 }
 
-.lead-create-photo-field { grid-column: 2; grid-row: 2 / span 2; }
+/* Replaced: grid-column: 2; grid-row: 2 / span 2 — pinned it beside Lead Name; the field order is now set in the form builder. */
+.lead-create-photo-field { grid-row: span 2; }
 .lead-photo-upload {
   min-height: 96px;
   display: flex;
