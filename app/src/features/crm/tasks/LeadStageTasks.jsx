@@ -141,8 +141,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const [stageDrafts, setStageDrafts] = useState({});
   const masterTasks = useCrmStore((s) => s.masterTasks);
   const taskOptions = useMemo(() => getDynamicTaskOptions(masterTasks), [masterTasks]);
-  const storeForms = useCrmStore((s) => s.forms);
-  const taskForms = useMemo(() => storeForms.filter((f) => f.kind === 'task'), [storeForms]);
 
   /**
    * A task name picked from the list: when it is a Tasks Master row, the stage
@@ -641,18 +639,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
                                     </option>
                                   ))}
                                 </select>
-                                <select
-                                  value={task.formId || ''}
-                                  onChange={(e) => updateTask(stage.id, task.id, "formId", e.target.value)}
-                                  aria-label="Task form"
-                                  title="The Lead Task Form this task opens"
-                                  className="mt-1 w-full bg-white border border-slate-200 rounded-lg px-3 py-1 text-[11px] text-slate-500 focus:outline-none focus:border-blue-500 cursor-pointer"
-                                >
-                                  <option value="">No task form</option>
-                                  {taskForms.map((f) => (
-                                    <option key={f.id} value={f.id}>Form: {f.title || f.name}</option>
-                                  ))}
-                                </select>
                               </td>
                               <td className="px-3 py-2.5 whitespace-nowrap">
                                 <span className="inline-flex items-center px-2.5 py-1 bg-[#22b7c6] text-white text-xs font-semibold rounded-md shadow-2xs">
@@ -956,23 +942,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
                   placeholder="Enter Description"
                   className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 resize-none"
                 />
-              </div>
-
-              <div>
-                <label htmlFor="stage-task-form" className="block text-xs font-semibold text-slate-700 mb-1">
-                  Task Form
-                </label>
-                <select
-                  id="stage-task-form"
-                  value={masterTask.formId || ''}
-                  onChange={(e) => updateMasterTask("formId", e.target.value)}
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                >
-                  <option value="">No task form</option>
-                  {taskForms.map((f) => (
-                    <option key={f.id} value={f.id}>{f.title || f.name}</option>
-                  ))}
-                </select>
               </div>
             </div>
 
