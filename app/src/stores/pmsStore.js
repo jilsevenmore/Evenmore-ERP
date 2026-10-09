@@ -1278,8 +1278,11 @@ export function renameDepartmentIn(state, fromName, toName) {
 export function nextProjectId(projects = [], year = new Date().getFullYear()) {
   const prefix = `PRJ-${year}-`;
   const highest = projects.reduce((max, p) => {
-    if (typeof p?.id !== "string" || !p.id.startsWith(prefix)) return max;
-    const n = Number.parseInt(p.id.slice(prefix.length), 10);
+    // Replaced: read p.id only. Server projects carry a UUID id and the
+    // PRJ-YYYY-NNN number in `code`, so the preview always said "001".
+    const code = typeof p?.code === "string" ? p.code : p?.id;
+    if (typeof code !== "string" || !code.startsWith(prefix)) return max;
+    const n = Number.parseInt(code.slice(prefix.length), 10);
     return Number.isFinite(n) ? Math.max(max, n) : max;
   }, 0);
   return `${prefix}${String(highest + 1).padStart(3, "0")}`;

@@ -84,7 +84,14 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
   );
   const [errors, setErrors] = useState({});
 
-  const selectedOrder = availableOrders.find((o) => o.orderNumber === orderNumber) ?? null;
+  // Opened from a sales order's "PMS Project" button: the order is fixed and the
+  // picker is not shown; its details come straight from that order.
+  const isFixedOrder = Boolean(initialOrderNumber);
+  const effectiveOrderNumber = isFixedOrder ? initialOrderNumber : orderNumber;
+  const selectedOrder = availableOrders.find((o) => o.orderNumber === effectiveOrderNumber) ?? null;
+  const fixedOrderLinkedTo = isFixedOrder
+    ? linkedOrders.find((o) => o.orderNumber === initialOrderNumber)?.linkedProjectId ?? null
+    : null;
   const projectCode = useMemo(() => nextProjectId(projects), [projects]);
 
   const totalPercentage = useMemo(() => {
@@ -136,7 +143,13 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     e.preventDefault();
 
     const nextErrors = {};
-    if (!selectedOrder) nextErrors.order = 'Select a CRM sales order.';
+    if (!selectedOrder) {
+      nextErrors.order = isFixedOrder
+        ? fixedOrderLinkedTo
+          ? `${initialOrderNumber} already has project ${fixedOrderLinkedTo}.`
+          : `Sales order ${initialOrderNumber} could not be found.`
+        : 'Select a CRM sales order.';
+    }
     if (!managerId) nextErrors.manager = 'Assign a project manager.';
     if (selectedConfigIds.length === 0) nextErrors.stages = 'Pick at least one stage.';
     if (selectedConfigIds.length > 0 && Math.round(totalPercentage * 100) / 100 !== 100) {
@@ -179,7 +192,7 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Create Project from CRM Order"
+      title={isFixedOrder ? `Create Project from ${initialOrderNumber}` : 'Create Project from CRM Order'}
       subtitle={`New project will be created as ${projectCode}`}
       size="lg"
       footer={
@@ -194,7 +207,19 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
       }
     >
       <form id="pms-create-project" onSubmit={handleSubmit} className="space-y-4">
-        {/* CRM order */}
+        {/* CRM order — picked here only when the modal was not opened from a sales order. */}
+        {isFixedOrder ? (
+          (!selectedOrder || errors.order) && (
+            <p className="flex items-center gap-1 text-[11px] text-rose-600">
+              <AlertCircle size={11} />
+              {selectedOrder
+                ? errors.order
+                : fixedOrderLinkedTo
+                  ? `${initialOrderNumber} already has project ${fixedOrderLinkedTo}.`
+                  : `Sales order ${initialOrderNumber} could not be found. Refresh the page and try again.`}
+            </p>
+          )
+        ) : (
         <div>
           <label className={labelClass} htmlFor="pms-order">
             CRM Sales Order <span className="text-rose-500">*</span>
@@ -233,13 +258,16 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
             </p>
           )}
         </div>
+        )}
 
         {/* Auto-filled order summary */}
         {selectedOrder && (
           <div className="rounded-lg border border-[#dce5f4] bg-[#f6f9ff] p-3">
             <div className="flex items-center gap-1.5 mb-2">
               <Link2 size={12} className="text-blue-500" />
-              <span className="text-[11px] font-bold text-slate-700">Auto-filled from order</span>
+              <span className="text-[11px] font-bold text-slate-700">
+                {isFixedOrder ? `Details from sales order ${selectedOrder.orderNumber}` : 'Auto-filled from order'}
+              </span>
             </div>
             <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {[

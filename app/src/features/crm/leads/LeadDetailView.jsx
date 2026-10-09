@@ -63,6 +63,7 @@ import { createFieldFromType } from '../../../data/crm/leadFormSchema';
 import { exportToCSV } from '../../../services/exportUtils';
 import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
 import { useCrmStore } from '../../../stores/crmStore';
+import { generateProductSku } from './leadSubResources';
 import {
   activeLeadForm, allCustomLeadFields, customLeadFields, formatCustomValue, missingRequiredField,
 } from '../../../services/leadFormFields';
@@ -2859,9 +2860,11 @@ function GeneralTab({ lead, activities = [] }) {
 function UsersProductsTab({ lead, onCountsChange, onActivity }) {
   const initialState = useLeadDetailState(lead);
   const { users, products } = initialState;
+  const teamMembers = useCrmStore((s) => s.teamMembers);
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+  const [skuTouched, setSkuTouched] = useState(false);
   const [productDraft, setProductDraft] = useState({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
   const [editingProduct, setEditingProduct] = useState(null);
   const [userSearch, setUserSearch] = useState('');
@@ -2881,20 +2884,33 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
     return true;
   }), [products, productSearch, productFilter]);
 
-  const availableEmployees = useMemo(
-    () => useCrmStore.getState().teamMembers.filter((member) => !users.some((user) => user.name === member.name)),
-    [users],
-  );
+  const availableEmployees = useMemo(() => {
+    const assignedIds = new Set(users.map((u) => u.userId || u.id));
+    const assignedNames = new Set(users.map((u) => (u.name || '').toLowerCase().trim()));
+    const seen = new Set();
+    const result = [];
+    (teamMembers || []).forEach((member) => {
+      if (!member?.id || seen.has(member.id)) return;
+      seen.add(member.id);
+      if (assignedIds.has(member.id)) return;
+      if (member.name && assignedNames.has(member.name.toLowerCase().trim())) return;
+      result.push(member);
+    });
+    return result;
+  }, [teamMembers, users]);
 
   React.useEffect(() => {
     onCountsChange?.({ users: users.length, products: products.length });
   }, [users.length, products.length, onCountsChange]);
 
   function addUser() {
-    const employee = useCrmStore.getState().teamMembers.find((item) => item.id === selectedEmployeeId);
+    const employee = teamMembers.find((item) => item.id === selectedEmployeeId);
     if (!employee) return;
     // `userId` is the employee's account; the row id is the server's.
-    leadDetailWrite(lead.id, 'add', 'users', { userId: employee.id, role: employee.designation || employee.role }, onActivity).then((saved) => {
+    leadDetailWrite(lead.id, 'add', 'users', {
+      userId: employee.id,
+      role: employee.designation || employee.role || 'Staff',
+    }, onActivity).then((saved) => {
       if (saved) onActivity?.(`${employee.name} assigned to lead`, '#10b981');
     });
     setSelectedEmployeeId('');
@@ -2921,6 +2937,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
       if (saved) onActivity?.(`Product "${added.name}" added`, '#ec4899');
     });
     setProductDraft({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+    setSkuTouched(false);
     setIsAddProductOpen(false);
   }
 
@@ -3014,7 +3031,7 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                   ) : (
                     availableEmployees.map((employee) => (
                       <option key={employee.id} value={employee.id}>
-                        {employee.name} · {employee.designation} · {employee.department}
+                        {employee.name} · {employee.designation || employee.role || 'Staff'} · {employee.department || 'General'}
                       </option>
                     ))
                   )}
@@ -3128,7 +3145,11 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
           <h3 className="font-bold text-sm text-slate-900">Products ({filteredProducts.length})</h3>
           <button
             type="button"
-            onClick={() => setIsAddProductOpen(true)}
+            onClick={() => {
+              setProductDraft({ name: '', sku: '', price: '', qty: 1, status: 'Active', image: '' });
+              setSkuTouched(false);
+              setIsAddProductOpen(true);
+            }}
             className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
           >
             <Plus size={14} /> Add Product
@@ -3151,7 +3172,14 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                   <input
                     type="text"
                     value={productDraft.name}
-                    onChange={(event) => setProductDraft((current) => ({ ...current, name: event.target.value }))}
+                    onChange={(event) => {
+                      const newName = event.target.value;
+                      setProductDraft((current) => ({
+                        ...current,
+                        name: newName,
+                        sku: skuTouched ? current.sku : generateProductSku(newName, products),
+                      }));
+                    }}
                     placeholder="Enter product name"
                     className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
                     autoFocus
@@ -3172,7 +3200,10 @@ function UsersProductsTab({ lead, onCountsChange, onActivity }) {
                   <input
                     type="text"
                     value={productDraft.sku}
-                    onChange={(event) => setProductDraft((current) => ({ ...current, sku: event.target.value }))}
+                    onChange={(event) => {
+                      setSkuTouched(true);
+                      setProductDraft((current) => ({ ...current, sku: event.target.value }));
+                    }}
                     placeholder="e.g. PRD-001"
                     className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-normal text-slate-700 focus:outline-none focus:border-blue-500"
                   />
