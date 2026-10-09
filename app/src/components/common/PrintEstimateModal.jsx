@@ -165,10 +165,32 @@ export const PrintEstimateModal = ({ isOpen, onClose, estimate }) => {
                             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                                 PREPARED FOR (PROSPECT / CLIENT)
                             </span>
-                            <p className="text-sm font-bold text-slate-900">{estimate.customer || '—'}</p>
+                            <div className="flex items-center gap-2">
+                                <p className="text-sm font-bold text-slate-900">{estimate.customer || estimate.partyName || '—'}</p>
+                                {estimate.isOneTimeParty && (
+                                    <span className="text-[9px] font-semibold text-slate-500 bg-slate-200 px-1.5 py-0.2 rounded uppercase">
+                                        {estimate.partyType || 'Walk-in'}
+                                    </span>
+                                )}
+                            </div>
                             {customerAddress.map((line, i) => (
                                 <p key={i} className="text-slate-600 text-[11px]">{line}</p>
                             ))}
+                            {(estimate.partyPhone || estimate.partyEmail) && (
+                                <p className="text-slate-500 text-[11px]">
+                                    {[estimate.partyPhone, estimate.partyEmail].filter(Boolean).join(' | ')}
+                                </p>
+                            )}
+                            {estimate.partyGstin && (
+                                <p className="text-slate-600 text-[11px] font-mono font-semibold">
+                                    GSTIN: {estimate.partyGstin}
+                                </p>
+                            )}
+                            {estimate.placeOfSupply && (
+                                <p className="text-slate-500 text-[11px]">
+                                    Place of Supply: {estimate.placeOfSupply}
+                                </p>
+                            )}
                             {estimate.validUntil && <p className="text-slate-500 text-[11px]">Valid Until: {estimate.validUntil}</p>}
                         </div>
                     </div>

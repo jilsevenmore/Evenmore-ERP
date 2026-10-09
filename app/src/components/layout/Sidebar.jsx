@@ -65,7 +65,7 @@ import { useModuleWhenIdle } from '../../hooks/useIdleReady';
 import { UserGuideModal } from '../common/UserGuideModal';
 import ChangePasswordModal from '../../features/auth/ChangePasswordModal';
 import { logout } from '../../services/authService';
-import { filterNavByPermission, canOpenPath } from '../../utils/navAccess';
+import { filterNavByPermission, canOpenPath, canUseDashboard } from '../../utils/navAccess';
 
 const SIDEBAR_THEMES = [
   { id: 'light', name: 'Light', icon: Sun, color: '#1f6bff' },
@@ -80,6 +80,13 @@ const NAV = [
     label: 'Dashboard',
     icon: Home,
     to: '/dashboard',
+  },
+
+  // Every employee: self-service portal to request leave, assets, attendance regularization, and punch in/out
+  {
+    label: 'Employee Portal',
+    icon: UserCheck,
+    to: '/employee/portal',
   },
 
   {
@@ -144,7 +151,6 @@ const NAV = [
     label: 'PMS (Projects)',
     menu: 'menu_pms',
     icon: Briefcase,
-    badgeKey: 'pmsActiveCount',
     children: [
       { label: 'PMS Dashboard', icon: Home, to: '/pms' },
       { label: 'All Projects', icon: Layers, to: '/pms/projects' },
@@ -155,7 +161,7 @@ const NAV = [
       { label: 'Timeline & Gantt', icon: Calendar, to: '/pms/timeline' },
       { label: 'Task Calendar', icon: Calendar, to: '/pms/calendar' },
       { label: 'Timesheets', icon: CalendarCheck, to: '/pms/timesheets' },
-      { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays', badgeKey: 'pmsDelayedCount', badgeColor: '#ef4444' },
+      { label: 'Delay Center', icon: AlertTriangle, to: '/pms/delays' },
       { label: 'PMS Reports', icon: PieChart, to: '/pms/reports' },
       { label: 'PMS Settings', icon: Settings, to: '/pms/settings' },
     ],
@@ -597,7 +603,11 @@ export default function Sidebar() {
   );
 
   const permittedNav = useMemo(() => {
-    let list = filterNavByPermission(NAV, permissions || []);
+    let list = filterNavByPermission(NAV, permissions || [], currentUser);
+    const userCanUseDashboard = canUseDashboard(currentUser, permissions || []);
+    if (!userCanUseDashboard) {
+      list = list.filter((item) => item.to !== '/dashboard');
+    }
     if (isCustomer) {
       // Customer role should only see customer-facing navigation (Track Orders)
       list = list.filter((item) => item.to === '/customer/projects');
@@ -607,7 +617,7 @@ export default function Sidebar() {
       list = list.filter((item) => item.to !== '/customer/projects');
     }
     return list;
-  }, [permissions, isCustomer]);
+  }, [permissions, isCustomer, currentUser]);
   const filteredNav = useMemo(
     () => filterNavTree(permittedNav, searchQuery),
     [permittedNav, searchQuery],

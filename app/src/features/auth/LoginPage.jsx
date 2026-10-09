@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { login as loginRequest } from '../../services/authService';
+import { canUseDashboard } from '../../utils/navAccess';
 import { describeError } from '../../services/resourceSync';
 import { getStoredToken } from '../../utils/authUtils';
 import { api } from '../../services/api';
@@ -68,7 +69,14 @@ export default function LoginPage() {
         currentUser?.role?.code === 'CU' ||
         String(currentUser?.role?.name || currentUser?.role || '').toLowerCase() === 'customer'
       );
-      const dest = returnToParam || (isCustomer ? '/customer/projects' : '/dashboard');
+      const permissions = useAppStore.getState().permissions || [];
+      const userCanUseDashboard = canUseDashboard(currentUser, permissions);
+      const defaultDest = isCustomer
+        ? '/customer/projects'
+        : userCanUseDashboard
+        ? '/dashboard'
+        : '/employee/portal';
+      const dest = returnToParam || defaultDest;
       navigate(dest, { replace: true });
     }
   }, [navigate, returnToParam, currentUser]);
@@ -144,7 +152,13 @@ export default function LoginPage() {
         user?.role?.code === 'CU' ||
         String(user?.role?.name || user?.role || '').toLowerCase() === 'customer'
       );
-      const destination = returnToParam || (isCustomer ? '/customer/projects' : '/dashboard');
+      const userCanUseDashboard = canUseDashboard(user, permissions);
+      const defaultDest = isCustomer
+        ? '/customer/projects'
+        : userCanUseDashboard
+        ? '/dashboard'
+        : '/employee/portal';
+      const destination = returnToParam || defaultDest;
       navigate(destination, { replace: true });
     } catch (err) {
       setError(describeError(err));

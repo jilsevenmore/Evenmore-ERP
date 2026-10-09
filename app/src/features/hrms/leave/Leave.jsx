@@ -77,6 +77,12 @@ export default function Leave() {
     hrmsSync.pull("leaveTypes").then((rows) => {
       if (!cancelled && rows) setLeaveTypes(rows);
     });
+    // Fresh sync leaves from server so pending/approved statuses are current
+    hrmsSync.pull("leaves").then((freshLeaves) => {
+      if (!cancelled && freshLeaves) {
+        useAppStore.setState({ leaves: freshLeaves });
+      }
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []);
 

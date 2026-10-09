@@ -13,6 +13,7 @@ import { useEstimates, addEstimate, updateEstimate } from '../../services/estima
 import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import { importEstimatesExcel, convertEstimateToChallan } from '../../services/upgradeService';
+import PartySelector from '../../components/common/PartySelector';
 
 
 function logLeadActivity(leadId, title, color) {
@@ -50,12 +51,24 @@ export const EstimatesPage = () => {
     const [selectedEstimate, setSelectedEstimate] = useState(null);
     const [printEstimateTarget, setPrintEstimateTarget] = useState(null);
     const [approvalTarget, setApprovalTarget] = useState(null);
-    const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
+    const [partyData, setPartyData] = useState({
+        isOneTimeParty: false,
+        customerId: customers[0]?.id || '',
+        customer: customers[0]?.name || '',
+        partyName: customers[0]?.name || '',
+        partyType: 'Customer',
+    });
     const [validUntil, setValidUntil] = useState('15 Days');
     const [lineItems, setLineItems] = useState([]);
 
     const handleOpenCreateModal = () => {
-        setSelectedCustomerId(customers[0]?.id || '');
+        setPartyData({
+            isOneTimeParty: false,
+            customerId: customers[0]?.id || '',
+            customer: customers[0]?.name || '',
+            partyName: customers[0]?.name || '',
+            partyType: 'Customer',
+        });
         setValidUntil('15 Days');
         setLineItems([]);
         setIsFullscreen(false);
@@ -71,7 +84,19 @@ export const EstimatesPage = () => {
         if (!leadRequest || autoOpened.current) return;
         autoOpened.current = true;
         const match = customers.find((c) => c.name === leadRequest.company) || customers[0];
-        if (match) setSelectedCustomerId(match.id);
+        if (match) {
+            setPartyData({
+                isOneTimeParty: false,
+                customerId: match.id,
+                customer: match.name,
+                partyName: match.name,
+                partyType: match.type || 'Customer',
+                partyPhone: match.phone || '',
+                partyEmail: match.email || '',
+                partyGstin: match.gstin || '',
+                placeOfSupply: match.placeOfSupply || '',
+            });
+        }
         if (Array.isArray(leadRequest.items) && leadRequest.items.length > 0) {
             setLineItems(leadRequest.items.map((it, i) => ({
                 id: `li-${Date.now()}-${i}`,
@@ -91,18 +116,23 @@ export const EstimatesPage = () => {
     const handleConvert = (estimateId) => {
         const estimate = estimates.find((e) => e.id === estimateId);
         if (!estimate) return;
-        const cust = customers.find((c) => c.id === estimate.customerId) ||
-            customers.find((c) => c.name === estimate.customer) ||
-            customers[0];
         const nextQuote = {
             id: `quo-${Date.now()}`,
             quoteNumber: `QUO-2026-${String(Date.now()).slice(-3)}`,
             estimateRef: estimate.estimateNumber,
-            // Persisted as the quotation's `estimate` link (backendSync).
             sourceEstimateId: estimate.id,
             sourceEstimateNumber: estimate.estimateNumber,
-            customerId: cust?.id || '',
-            customer: cust?.name || estimate.customer || '',
+            isOneTimeParty: Boolean(estimate.isOneTimeParty),
+            customerId: estimate.isOneTimeParty ? '' : (estimate.customerId || ''),
+            customer: estimate.customer || estimate.partyName || '',
+            partyName: estimate.partyName || estimate.customer || '',
+            partyType: estimate.partyType || (estimate.isOneTimeParty ? 'Walk-in' : 'Customer'),
+            partyPhone: estimate.partyPhone || '',
+            partyEmail: estimate.partyEmail || '',
+            partyGstin: estimate.partyGstin || '',
+            placeOfSupply: estimate.placeOfSupply || '',
+            billingAddress: estimate.billingAddress || {},
+            shippingAddress: estimate.shippingAddress || {},
             leadId: estimate.leadId || '',
             leadName: estimate.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -276,17 +306,24 @@ export const EstimatesPage = () => {
         }
     };
 
-    const selectedCustomer = customers.find((c) => c.id === selectedCustomerId) || customers[0];
-
     const handleCreate = (e) => {
         e.preventDefault();
-        const cust = selectedCustomer || customers[0];
         const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
+        const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => c.id === partyData.customerId)?.name : '') || 'Walk-in Customer';
         const next = {
             id: `est-${Date.now()}`,
             estimateNumber: `EST-2026-${String(estimates.length + 3).padStart(3, '0')}`,
-            customerId: cust?.id || '',
-            customer: cust?.name || '',
+            isOneTimeParty: Boolean(partyData.isOneTimeParty),
+            customerId: partyData.isOneTimeParty ? '' : (partyData.customerId || ''),
+            customer: partyDisplayName,
+            partyName: partyDisplayName,
+            partyType: partyData.partyType || (partyData.isOneTimeParty ? 'Walk-in' : 'Customer'),
+            partyPhone: partyData.partyPhone || '',
+            partyEmail: partyData.partyEmail || '',
+            partyGstin: partyData.partyGstin || '',
+            placeOfSupply: partyData.placeOfSupply || '',
+            billingAddress: partyData.billingAddress || {},
+            shippingAddress: partyData.shippingAddress || {},
             leadId: leadRequest?.leadId || '',
             leadName: leadRequest?.leadName || '',
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -427,39 +464,13 @@ export const EstimatesPage = () => {
                         </div>
                         <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
                             <FormSection number="01" title="Customer & validity" />
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
-                                    <select
-                                        required
-                                        value={selectedCustomerId}
-                                        onChange={(e) => setSelectedCustomerId(e.target.value)}
-                                        className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium"
-                                    >
-                                        {customers.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.name}{c.code ? ` (${c.code})` : ''} - Balance: ₹{Number(c.balance || 0).toFixed(2)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {selectedCustomer && (
-                                        <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
-                                            <div className="flex items-center justify-between font-bold text-slate-800">
-                                                <span>{selectedCustomer.name}</span>
-                                                <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                                                    Credit Limit: {selectedCustomer.creditLimit ? `₹${Number(selectedCustomer.creditLimit).toLocaleString('en-IN')}` : '—'}
-                                                </span>
-                                            </div>
-                                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                                                <span>POC: <strong>{selectedCustomer.contactPerson || '—'}</strong></span>
-                                                <span>Email: {selectedCustomer.email || '—'}</span>
-                                                <span>Phone: {selectedCustomer.phone || '—'}</span>
-                                                <span>Outstanding: ₹{(selectedCustomer.balance || 0).toLocaleString('en-IN')}</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div>
+                            <div className="space-y-3">
+                                <PartySelector
+                                    value={partyData}
+                                    onChange={setPartyData}
+                                    customers={customers}
+                                />
+                                <div className="sm:w-1/2">
                                     <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
                                     <input
                                         type="text"

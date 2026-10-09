@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useERP } from '../../context/ERPContext';
 import { useAppStore } from '../../stores/appStore';
-import { canOpenPath } from '../../utils/navAccess';
+import { canOpenPath, canUseDashboard } from '../../utils/navAccess';
 import { Search, ShoppingCart, Truck, Receipt, Package, Users, Building2, FileSpreadsheet, ArrowRight, FileText, BarChart3, X, Layers, Sparkles, } from 'lucide-react';
 /** What the palette searches while it is closed: nothing. */
 const NO_RECORDS = {
@@ -11,6 +11,7 @@ const NO_RECORDS = {
 };
 export const CommandPalette = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
+    const currentUser = useAppStore((s) => s.currentUser);
     const grantedPermissions = useAppStore((s) => s.permissions);
     // The palette is mounted on every screen but searches only once it is open,
     // and reading a collection is what loads it — so the eight collections it
@@ -50,6 +51,7 @@ export const CommandPalette = ({ isOpen, onClose }) => {
     // Search results grouping
     const navigationItems = [
         { label: 'Dashboard', path: '/dashboard', icon: BarChart3, category: 'Navigation' },
+        { label: 'Employee Portal', path: '/employee/portal', icon: Users, category: 'Navigation' },
         { label: 'CRM Leads', path: '/crm/leads', icon: Users, category: 'Navigation' },
         { label: 'Sales Orders', path: '/sales/orders', icon: ShoppingCart, category: 'Navigation' },
         { label: 'Proforma Invoices', path: '/sales/proforma', icon: FileSpreadsheet, category: 'Navigation' },
@@ -63,7 +65,12 @@ export const CommandPalette = ({ isOpen, onClose }) => {
         { label: 'Parties Directory', path: '/parties', icon: Building2, category: 'Navigation' },
         { label: 'HRMS Employees', path: '/hrms/employees', icon: Users, category: 'Navigation' },
         { label: 'ERP Reports & Analytics', path: '/reports', icon: BarChart3, category: 'Navigation' },
-    ].filter((n) => !cleanQuery || String(n.label ?? '').toLowerCase().includes(cleanQuery));
+    ].filter((n) => {
+        if (n.path === '/dashboard') {
+            return canUseDashboard(currentUser, grantedPermissions);
+        }
+        return canOpenPath(n.path, grantedPermissions, currentUser);
+    }).filter((n) => !cleanQuery || String(n.label ?? '').toLowerCase().includes(cleanQuery));
     const matchedItems = items
         .filter((i) => String(i.name ?? '').toLowerCase().includes(cleanQuery) ||
         String(i.sku ?? '').toLowerCase().includes(cleanQuery) ||

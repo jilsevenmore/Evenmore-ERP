@@ -85,6 +85,23 @@ export const AddEditItemPage = () => {
   const [theoreticalWeight, setTheoreticalWeight] = useState('');
   const [tolerancePct, setTolerancePct] = useState('2');
 
+  // Metal Sheet & Tube Specification state
+  const [metalGrade, setMetalGrade] = useState('MS');
+  const [sheetThickness, setSheetThickness] = useState('');
+  const [sheetThicknessUnit, setSheetThicknessUnit] = useState('mm');
+  const [sheetLength, setSheetLength] = useState('');
+  const [sheetWidth, setSheetWidth] = useState('');
+  const [hasTubeSpec, setHasTubeSpec] = useState(false);
+  const [tubeProfile, setTubeProfile] = useState('Round');
+  const [outerDiameter, setOuterDiameter] = useState('');
+  const [outerWidth, setOuterWidth] = useState('');
+  const [outerHeight, setOuterHeight] = useState('');
+  const [wallThickness, setWallThickness] = useState('');
+  const [tubeLength, setTubeLength] = useState('');
+  const [weightPerMeter, setWeightPerMeter] = useState('');
+  const [weightPerPiece, setWeightPerPiece] = useState('');
+  const [metalCalcError, setMetalCalcError] = useState('');
+
   // Tracking Mode & Serial / Batch numbers
   const [trackingMode, setTrackingMode] = useState('Quantity'); // 'Quantity' | 'Serial' | 'Batch'
   const [batchNumber, setBatchNumber] = useState('');
@@ -208,6 +225,21 @@ export const AddEditItemPage = () => {
       setIsWeightItem(Boolean(existingItem.isWeightItem));
       setTheoreticalWeight(existingItem.theoreticalWeight !== undefined ? String(existingItem.theoreticalWeight) : '');
       setTolerancePct(existingItem.tolerancePct !== undefined ? String(existingItem.tolerancePct) : '2');
+      // Metal specifications
+      setMetalGrade(existingItem.metalGrade || 'MS');
+      setSheetThickness(existingItem.sheetThickness !== undefined ? String(existingItem.sheetThickness) : '');
+      setSheetThicknessUnit(existingItem.sheetThicknessUnit || 'mm');
+      setSheetLength(existingItem.sheetLength !== undefined ? String(existingItem.sheetLength) : '');
+      setSheetWidth(existingItem.sheetWidth !== undefined ? String(existingItem.sheetWidth) : '');
+      setHasTubeSpec(Boolean(existingItem.hasTubeSpec));
+      setTubeProfile(existingItem.tubeProfile || 'Round');
+      setOuterDiameter(existingItem.outerDiameter !== undefined ? String(existingItem.outerDiameter) : '');
+      setOuterWidth(existingItem.outerWidth !== undefined ? String(existingItem.outerWidth) : '');
+      setOuterHeight(existingItem.outerHeight !== undefined ? String(existingItem.outerHeight) : '');
+      setWallThickness(existingItem.wallThickness !== undefined ? String(existingItem.wallThickness) : '');
+      setTubeLength(existingItem.tubeLength !== undefined ? String(existingItem.tubeLength) : '');
+      setWeightPerMeter(existingItem.weightPerMeter !== undefined ? String(existingItem.weightPerMeter) : '');
+      setWeightPerPiece(existingItem.weightPerPiece !== undefined ? String(existingItem.weightPerPiece) : '');
       setTrackingMode(existingItem.trackingMode || (existingItem.serialNumbers?.length ? 'Serial' : existingItem.batchNumber ? 'Batch' : 'Quantity'));
       setBatchNumber(existingItem.batchNumber || '');
       setLotNumber(existingItem.lotNumber || '');
@@ -572,8 +604,23 @@ export const AddEditItemPage = () => {
       unitConversionFactor: parsedConv,
       // [PHASE-2A] persist weight-item configuration (Sweven steel)
       isWeightItem,
-      theoreticalWeight: isWeightItem ? (parseFloat(theoreticalWeight) || 0) : undefined,
+      theoreticalWeight: isWeightItem ? (parseFloat(theoreticalWeight) || 0) : (parseFloat(weightPerPiece) || undefined),
       tolerancePct: isWeightItem ? (parseFloat(tolerancePct) > 0 ? parseFloat(tolerancePct) : 2) : undefined,
+      // Metal Sheet & Tube Specifications
+      metalGrade,
+      sheetThickness: sheetThickness ? parseFloat(sheetThickness) : undefined,
+      sheetThicknessUnit,
+      sheetLength: sheetLength ? parseFloat(sheetLength) : undefined,
+      sheetWidth: sheetWidth ? parseFloat(sheetWidth) : undefined,
+      hasTubeSpec,
+      tubeProfile: hasTubeSpec ? tubeProfile : undefined,
+      outerDiameter: hasTubeSpec && tubeProfile === 'Round' && outerDiameter ? parseFloat(outerDiameter) : undefined,
+      outerWidth: hasTubeSpec && (tubeProfile === 'Square' || tubeProfile === 'Rectangular') && outerWidth ? parseFloat(outerWidth) : undefined,
+      outerHeight: hasTubeSpec && tubeProfile === 'Rectangular' && outerHeight ? parseFloat(outerHeight) : undefined,
+      wallThickness: hasTubeSpec && wallThickness ? parseFloat(wallThickness) : undefined,
+      tubeLength: hasTubeSpec && tubeLength ? parseFloat(tubeLength) : undefined,
+      weightPerMeter: weightPerMeter ? parseFloat(weightPerMeter) : undefined,
+      weightPerPiece: weightPerPiece ? parseFloat(weightPerPiece) : undefined,
       trackingMode: isService ? 'None' : trackingMode,
       serialNumbers: trackingMode === 'Serial' ? parsedSerialNumbers : [],
       batchNumber: trackingMode === 'Batch' ? batchNumber : undefined,
@@ -1037,6 +1084,274 @@ export const AddEditItemPage = () => {
                       </div>
                     </div>
                   )}
+                </div>
+
+                {/* ── Metal Sheet & Metal Tube Specifications (SEWEN Standard) ── */}
+                <div className="mt-4 border border-indigo-200 rounded-xl p-4 bg-indigo-50/30 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
+                      <Layers size={14} className="text-indigo-600" /> Metal Specifications & Theoretical Weight Calculation
+                    </span>
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-indigo-900">
+                      <input
+                        type="checkbox"
+                        checked={hasTubeSpec}
+                        onChange={(e) => {
+                          setHasTubeSpec(e.target.checked);
+                          setMetalCalcError('');
+                        }}
+                        className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
+                      />
+                      Is Metal Tube / Hollow Section
+                    </label>
+                  </div>
+
+                  {/* Material Grade Selection */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-700 mb-1">Material / Grade</label>
+                      <select
+                        value={metalGrade}
+                        onChange={(e) => setMetalGrade(e.target.value)}
+                        className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
+                      >
+                        <option value="MS">Mild Steel (MS - 7.85 g/cm³)</option>
+                        <option value="IS 2062">IS 2062 Structural Steel (7.85 g/cm³)</option>
+                        <option value="SS 304">Stainless Steel 304 (7.93 g/cm³)</option>
+                        <option value="SS 316">Stainless Steel 316 (7.98 g/cm³)</option>
+                        <option value="SS 202">Stainless Steel 202 (7.80 g/cm³)</option>
+                        <option value="Aluminium">Aluminium (2.70 g/cm³)</option>
+                        <option value="Copper">Copper (8.96 g/cm³)</option>
+                        <option value="Brass">Brass (8.50 g/cm³)</option>
+                      </select>
+                    </div>
+
+                    {!hasTubeSpec ? (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Sheet Thickness</label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="e.g. 2.0"
+                              value={sheetThickness}
+                              onChange={(e) => setSheetThickness(e.target.value)}
+                              className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                            />
+                            <select
+                              value={sheetThicknessUnit}
+                              onChange={(e) => setSheetThicknessUnit(e.target.value)}
+                              className="h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-700 text-xs"
+                            >
+                              <option value="mm">mm</option>
+                              <option value="gauge">gauge</option>
+                              <option value="inch">in</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Sheet Dimensions (L × W mm)</label>
+                          <div className="flex gap-1.5 items-center">
+                            <input
+                              type="number"
+                              step="1"
+                              placeholder="Length (mm)"
+                              value={sheetLength}
+                              onChange={(e) => setSheetLength(e.target.value)}
+                              className="w-1/2 h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                            />
+                            <span className="text-slate-400 text-xs">×</span>
+                            <input
+                              type="number"
+                              step="1"
+                              placeholder="Width (mm)"
+                              value={sheetWidth}
+                              onChange={(e) => setSheetWidth(e.target.value)}
+                              className="w-1/2 h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Tube Profile</label>
+                          <select
+                            value={tubeProfile}
+                            onChange={(e) => setTubeProfile(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
+                          >
+                            <option value="Round">Round Pipe / Tube</option>
+                            <option value="Square">Square Hollow Section (SHS)</option>
+                            <option value="Rectangular">Rectangular Hollow Section (RHS)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Wall Thickness (mm) *</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 2.0"
+                            value={wallThickness}
+                            onChange={(e) => setWallThickness(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Tube specific dimensions row */}
+                  {hasTubeSpec && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-indigo-100">
+                      {tubeProfile === 'Round' && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Outer Diameter (OD mm) *</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 48.3"
+                            value={outerDiameter}
+                            onChange={(e) => setOuterDiameter(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      )}
+                      {(tubeProfile === 'Square' || tubeProfile === 'Rectangular') && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                            {tubeProfile === 'Square' ? 'Side Width (mm) *' : 'Outer Width (mm) *'}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 50"
+                            value={outerWidth}
+                            onChange={(e) => setOuterWidth(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      )}
+                      {tubeProfile === 'Rectangular' && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Outer Height (mm) *</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 25"
+                            value={outerHeight}
+                            onChange={(e) => setOuterHeight(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">Length (mm)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder="e.g. 6000 (standard pipe)"
+                          value={tubeLength}
+                          onChange={(e) => setTubeLength(e.target.value)}
+                          className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Live Weight Calculation & Action */}
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-indigo-100 bg-white/70 p-2.5 rounded-lg">
+                    <div className="flex items-center gap-4 text-xs font-mono">
+                      <div>
+                        <span className="text-slate-500 font-sans block text-[10px]">Weight / Piece:</span>
+                        <span className="font-bold text-indigo-900">{weightPerPiece ? `${Number(weightPerPiece).toFixed(3)} kg` : '—'}</span>
+                      </div>
+                      {hasTubeSpec && (
+                        <div>
+                          <span className="text-slate-500 font-sans block text-[10px]">Weight / Meter:</span>
+                          <span className="font-bold text-indigo-900">{weightPerMeter ? `${Number(weightPerMeter).toFixed(3)} kg/m` : '—'}</span>
+                        </div>
+                      )}
+                      {metalCalcError && (
+                        <span className="text-rose-600 text-[11px] font-sans font-medium">{metalCalcError}</span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMetalCalcError('');
+                        const densities = {
+                          'MS': 7.85, 'IS 2062': 7.85, 'SS 304': 7.93, 'SS 316': 7.98,
+                          'SS 202': 7.80, 'Aluminium': 2.70, 'Copper': 8.96, 'Brass': 8.50,
+                        };
+                        const rho = densities[metalGrade] || 7.85;
+
+                        if (!hasTubeSpec) {
+                          const l = parseFloat(sheetLength);
+                          const w = parseFloat(sheetWidth);
+                          const t = parseFloat(sheetThickness);
+                          if (!l || !w || !t || l <= 0 || w <= 0 || t <= 0) {
+                            setMetalCalcError('Please enter valid Sheet Length, Width, and Thickness (> 0).');
+                            return;
+                          }
+                          const wt = (l * w * t * rho) / 1000000;
+                          const rounded = Math.round(wt * 1000) / 1000;
+                          setWeightPerPiece(String(rounded));
+                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(rounded));
+                        } else {
+                          const t = parseFloat(wallThickness);
+                          const l = parseFloat(tubeLength) || 1000;
+                          if (!t || t <= 0) {
+                            setMetalCalcError('Please enter valid Wall Thickness (> 0).');
+                            return;
+                          }
+                          let area = 0;
+                          if (tubeProfile === 'Round') {
+                            const od = parseFloat(outerDiameter);
+                            if (!od || od <= 0 || t >= od / 2) {
+                              setMetalCalcError(`Outer diameter must be > 0 and > 2× wall thickness (${2 * t} mm).`);
+                              return;
+                            }
+                            area = Math.PI * (od - t) * t;
+                          } else if (tubeProfile === 'Square') {
+                            const side = parseFloat(outerWidth);
+                            if (!side || side <= 0 || t >= side / 2) {
+                              setMetalCalcError(`Side width must be > 0 and > 2× wall thickness (${2 * t} mm).`);
+                              return;
+                            }
+                            area = 4 * t * (side - t);
+                          } else if (tubeProfile === 'Rectangular') {
+                            const ow = parseFloat(outerWidth);
+                            const oh = parseFloat(outerHeight);
+                            if (!ow || !oh || ow <= 0 || oh <= 0 || t >= ow / 2 || t >= oh / 2) {
+                              setMetalCalcError(`Outer width & height must be > 0 and > 2× wall thickness (${2 * t} mm).`);
+                              return;
+                            }
+                            area = 2 * t * (ow + oh - 2 * t);
+                          }
+                          const wtPerMeter = (area * rho) / 1000;
+                          const wtPerPiece = wtPerMeter * (l / 1000);
+                          const roundMeter = Math.round(wtPerMeter * 1000) / 1000;
+                          const roundPiece = Math.round(wtPerPiece * 1000) / 1000;
+                          setWeightPerMeter(String(roundMeter));
+                          setWeightPerPiece(String(roundPiece));
+                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(roundPiece));
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <Sparkles size={12} /> Compute Theoretical Weight
+                    </button>
+                  </div>
                 </div>
               </div>
 

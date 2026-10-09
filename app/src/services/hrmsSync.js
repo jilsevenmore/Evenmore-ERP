@@ -240,7 +240,66 @@ export const HRMS_RESOURCES = {
       _synced: true,
     }),
   },
-  attendanceRegularizations: dated('/hrms/attendance/regularizations/', ['date']),
+  attendanceRegularizations: {
+    path: '/hrms/attendance/regularizations/',
+    toApi: (r) => compact({
+      employeeId: r.employeeId || undefined,
+      date: isoOut(r.date || r.work_date),
+      requestedCheckIn: r.requestedCheckIn || r.reqIn || r.curIn || undefined,
+      requestedCheckOut: r.requestedCheckOut || r.reqOut || r.curOut || undefined,
+      requestedStatus: r.requestedStatus || undefined,
+      reason: r.reason || undefined,
+    }),
+    fromApi: (row) => {
+      const reasonStr = String(row.reason || '');
+      let inferredType = 'Regularization';
+      if (reasonStr.toLowerCase().includes('[half day') || reasonStr.toLowerCase().includes('half day')) {
+        inferredType = 'Half Day';
+      } else if (reasonStr.toLowerCase().includes('early') || reasonStr.toLowerCase().includes('clock-out')) {
+        inferredType = 'Early Clock-Out';
+      } else if (reasonStr.toLowerCase().includes('[work from home') || reasonStr.toLowerCase().includes('wfh')) {
+        inferredType = 'Work From Home (WFH)';
+      } else if (reasonStr.toLowerCase().includes('[requirement:') || reasonStr.toLowerCase().includes('general request')) {
+        inferredType = 'General Request';
+      }
+
+      const formatTime = (dtStr) => {
+        if (!dtStr) return null;
+        try {
+          const d = new Date(dtStr);
+          if (isNaN(d.getTime())) {
+            const match = String(dtStr).match(/\d{2}:\d{2}/);
+            return match ? match[0] : null;
+          }
+          return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+        } catch {
+          return null;
+        }
+      };
+
+      const reqInTime = formatTime(row.requestedCheckIn) || row.reqIn || '09:00';
+      const reqOutTime = formatTime(row.requestedCheckOut) || row.reqOut || '18:30';
+
+      return {
+        id: row.id,
+        employee: row.employeeName || row.employee || 'Employee',
+        employeeId: row.employeeId || row.employee,
+        type: row.type || inferredType,
+        date: displayIn(row.date || row.work_date),
+        rawDate: row.date || row.work_date,
+        currentIn: row.currentIn || row.curIn || '09:00',
+        currentOut: row.currentOut || row.curOut || '18:30',
+        requestedIn: reqInTime,
+        requestedOut: reqOutTime,
+        reason: row.reason || 'Attendance request',
+        requestedBy: row.employeeName || row.requestedBy || row.employee || 'Employee',
+        submitted: row.submitted || 'Recent',
+        status: row.status || 'Pending',
+        remark: row.remark || '',
+        _synced: true,
+      };
+    },
+  },
 
   // ── payroll ───────────────────────────────────────────────────────────────
   payroll: {
@@ -307,7 +366,24 @@ export const HRMS_RESOURCES = {
     }),
   },
   assetCategories: plain('/hrms/asset-categories/'),
-  assetRequests: dated('/hrms/asset-requests/', ['requestDate']),
+  assetRequests: {
+    path: '/hrms/asset-requests/',
+    toApi: (r) => compact({
+      employeeId: r.employeeId || undefined,
+      categoryId: r.categoryId || undefined,
+      justification: r.justification || r.reason || (r.assetName ? `${r.assetName}${r.reason ? ` - ${r.reason}` : ''}` : undefined),
+      status: r.status || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      id: row.id,
+      category: row.categoryName || row.category || 'Hardware',
+      reason: row.justification || '',
+      assetName: row.justification ? (row.justification.split(' - ')[0] || row.justification) : 'Requested Item',
+      requestedDate: row.created_at ? row.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+      _synced: true,
+    }),
+  },
 
   // ── employee lifecycle ────────────────────────────────────────────────────
   resignations: dated('/hrms/resignations/', ['resignationDate', 'lastWorkingDay']),

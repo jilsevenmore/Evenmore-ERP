@@ -44,6 +44,7 @@ const ROUTE_PERMISSIONS = [
   ['/customer/projects', ['view_projects', 'view_pms']],
   ['/pms/my-tasks', ['view_pms', 'view_task']],
   ['/pms/tracking', ['view_projects', 'view_pms']],
+  ['/employee/portal', null],
   // Old top-level alias of HRMS › Company Policy.
   ['/company-policy', 'view_staff'],
 ];
@@ -68,6 +69,7 @@ const MODULE_MENUS = [
 const SELF_SERVICE_PREFIXES = ['/customer/projects', '/pms/tracking'];
 
 const SELF_SERVICE_ROUTES = new Set([
+  '/employee/portal',
   '/hrms/leave',
   '/hrms/payroll',
   '/hrms/attendance/mark',
@@ -102,25 +104,91 @@ function isSelfService(path) {
 }
 
 /**
+ * Determines whether a user has permissions to view and use the ERP dashboard.
+ * The ERP dashboard aggregates Sales, Purchase, Inventory, Accounts, CRM, HRMS, and PMS.
+ *
+ * - Admin and superusers can always use the dashboard.
+ * - Customers cannot use the ERP dashboard.
+ * - Employees who have managerial or operational access (Sales, Purchase, Inventory, Accounts, CRM, HRMS, PMS, Admin) CAN use the dashboard.
+ * - Employees who only have self-service access (leave, mark attendance, own payslip, my stage tasks) CANNOT use the dashboard.
+ */
+export function canUseDashboard(currentUser, granted = []) {
+  if (!currentUser) return false;
+  if (currentUser.isSuperuser || currentUser.isAdmin) return true;
+
+  const roleName = String(currentUser?.role?.name || currentUser?.role || '').toLowerCase();
+  const roleCode = String(currentUser?.role?.code || '').toUpperCase();
+  if (roleCode === 'AD' || roleName === 'admin' || roleName === 'administrator') return true;
+
+  if (
+    currentUser.isCustomer ||
+    roleCode === 'CU' ||
+    roleName === 'customer'
+  ) {
+    return false;
+  }
+
+  const permissions = Array.isArray(granted) ? granted : [];
+  if (permissions.includes('*')) return true;
+
+  const DASHBOARD_CAPABILITIES = [
+    'menu_crm',
+    'menu_sales',
+    'menu_purchase',
+    'menu_inventory',
+    'menu_accounts',
+    'menu_hrms',
+    'menu_organization',
+    'menu_admin',
+    'menu_pms',
+    'show_crm_dashboard',
+    'show_hrm_dashboard',
+    'show_account_dashboard',
+    'view_sales',
+    'view_purchase',
+    'view_inventory',
+    'view_lead',
+    'view_projects',
+    'view_bank_accounts',
+    'view_ledger',
+    'view_financial_reports',
+    'view_staff',
+    'view_team_attendance',
+    'approve_leave',
+    'generate_payroll',
+    'approve_payroll',
+    'manage_roles',
+  ];
+
+  return DASHBOARD_CAPABILITIES.some((perm) => permissions.includes(perm));
+}
+
+/**
  * Whether a page may be opened at all — the sidebar's rule applied to any URL,
  * so a page the menu hides cannot be reached by typing its address either:
  * the page's own permission, plus its module's `menu_*` unless it is a
  * self-service page.
  */
-export function canOpenPath(path, granted) {
+export function canOpenPath(path, granted, currentUser) {
   const clean = String(path || '/').split(/[?#]/)[0].replace(/\/+$/, '') || '/';
+  if (clean === '/dashboard' && currentUser && !canUseDashboard(currentUser, granted)) {
+    return false;
+  }
   if (!canUse(routePermission(clean), granted)) return false;
   const menu = moduleMenu(clean);
   return !menu || canUse(menu, granted) || isSelfService(clean);
 }
 
 /** NAV filtered to what `granted` (the /auth/me permission ids) allows. */
-export function filterNavByPermission(items, granted) {
+export function filterNavByPermission(items, granted, currentUser) {
   function visit(item, inMenu) {
     if (item.children) {
       const open = inMenu && canUse(item.menu, granted);
       const children = item.children.map((child) => visit(child, open)).filter(Boolean);
       return children.length ? { ...item, children } : null;
+    }
+    if (item.to === '/dashboard' && currentUser && !canUseDashboard(currentUser, granted)) {
+      return null;
     }
     if (!canUse(routePermission(item.to), granted)) return null;
     if (!inMenu && !SELF_SERVICE_ROUTES.has(item.to)) return null;
