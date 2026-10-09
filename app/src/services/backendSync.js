@@ -125,8 +125,22 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [], partial = 
   // as the full set), and defaulting `date` would silently re-date it.
   const lines = doc.lineItems || doc.items || (partial ? undefined : []);
   const partyId = partyKeys.map((k) => doc[k]).find(Boolean);
+  const isOneTime = Boolean(
+    doc.isOneTimeParty || (!partyId && (doc.partyName || doc.customerName || doc.customer || doc.name))
+  );
+
   return compact({
-    [partyField]: partyId,
+    [partyField]: isOneTime ? undefined : partyId,
+    isOneTimeParty: isOneTime ? true : (doc.isOneTimeParty !== undefined ? Boolean(doc.isOneTimeParty) : undefined),
+    partyName: doc.partyName || doc.customerName || (isOneTime ? (doc.customer || doc.name) : undefined),
+    partyType: doc.partyType || (isOneTime ? (doc.type || 'Walk-in') : undefined),
+    partyPhone: doc.partyPhone || doc.phone || doc.customerPhone || doc.mobile || undefined,
+    partyEmail: doc.partyEmail || doc.email || doc.customerEmail || undefined,
+    partyGstin: doc.partyGstin || doc.party_gstin || doc.gstin || undefined,
+    party_gstin: doc.partyGstin || doc.party_gstin || doc.gstin || undefined,
+    billing_address: doc.billing_address || doc.billingAddress || undefined,
+    shipping_address: doc.shipping_address || doc.shippingAddress || undefined,
+    place_of_supply: stripStateCode(doc.place_of_supply || doc.placeOfSupply) || undefined,
     date: isoOut(doc.date) || (partial ? undefined : isoOut('Today')),
     dueDate: isoOut(doc.dueDate),
     expectedDate: isoOut(doc.expectedDate || doc.deliveryDate),
@@ -141,7 +155,6 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [], partial = 
     discountOverride: doc.discountTotal !== undefined ? num(doc.discountTotal) : undefined,
     // Replaced (quotation-first sales): the editor's empty placeholder row is
     // dropped rather than saved as a nameless ₹0 line.
-    // lineItems: lines ? lines.map(lineToApi) : undefined,
     lineItems: lines ? lines.filter((line) => !isBlankLine(line)).map(lineToApi) : undefined,
   });
 }
@@ -176,13 +189,25 @@ function linkIn(row, pairs) {
 function documentFromApi(row, { numberField, partyLabel = 'customer' } = {}) {
   const lines = (row.lineItems || []).map(lineFromApi);
   const total = num(row.total);
+  const partyName = row.partyName || row.party_name || row.vendorName || '';
+  const isOneTime = Boolean(row.isOneTimeParty || row.is_one_time_party || (!row.partyId && !row.vendorId && partyName));
+
   return {
     ...row,
     date: displayIn(row.date),
     dueDate: row.dueDate || undefined,
-    [partyLabel]: row.partyName || row.vendorName || '',
-    [`${partyLabel}Id`]: row.partyId || row.vendorId || undefined,
-    [`${partyLabel}Gstin`]: row.partyGstin || undefined,
+    isOneTimeParty: isOneTime,
+    partyName,
+    partyType: row.partyType || row.party_type || '',
+    partyPhone: row.partyPhone || row.party_phone || '',
+    partyEmail: row.partyEmail || row.party_email || '',
+    partyGstin: row.partyGstin || row.party_gstin || '',
+    billingAddress: row.billing_address || row.billingAddress || {},
+    shippingAddress: row.shipping_address || row.shippingAddress || {},
+    placeOfSupply: row.place_of_supply || row.placeOfSupply || '',
+    [partyLabel]: partyName,
+    [`${partyLabel}Id`]: isOneTime ? undefined : (row.partyId || row.vendorId || undefined),
+    [`${partyLabel}Gstin`]: row.partyGstin || row.party_gstin || undefined,
     items: lines,
     lineItems: lines,
     // The UI's own names for the totals the server computed.
@@ -389,7 +414,10 @@ export const RESOURCES = {
       theoreticalWeight: item.theoreticalWeight ? num(item.theoreticalWeight) : undefined,
       weightUnit: item.weightUnit || undefined,
       tolerancePct: item.tolerancePct !== undefined ? num(item.tolerancePct) : undefined,
+      metalGrade: item.metalGrade || undefined,
       hasSheetSpec: item.hasSheetSpec ?? undefined,
+      sheetThickness: item.sheetThickness ? num(item.sheetThickness) : undefined,
+      sheetThicknessUnit: item.sheetThicknessUnit || undefined,
       sheetHeight: item.sheetHeight ? num(item.sheetHeight) : undefined,
       sheetHeightUnit: item.sheetHeightUnit || undefined,
       sheetWidth: item.sheetWidth ? num(item.sheetWidth) : undefined,
@@ -397,11 +425,46 @@ export const RESOURCES = {
       sheetLength: item.sheetLength ? num(item.sheetLength) : undefined,
       sheetLengthUnit: item.sheetLengthUnit || undefined,
       sheetWeightKg: item.sheetWeightKg ? num(item.sheetWeightKg) : undefined,
+      dimensionUnit: item.dimensionUnit || undefined,
+      hasTubeSpec: item.hasTubeSpec ?? undefined,
+      tubeProfile: item.tubeProfile || undefined,
+      outerDiameter: item.outerDiameter ? num(item.outerDiameter) : undefined,
+      outerWidth: item.outerWidth ? num(item.outerWidth) : undefined,
+      outerHeight: item.outerHeight ? num(item.outerHeight) : undefined,
+      wallThickness: item.wallThickness ? num(item.wallThickness) : undefined,
+      tubeLength: item.tubeLength ? num(item.tubeLength) : undefined,
+      weightPerMeter: item.weightPerMeter ? num(item.weightPerMeter) : undefined,
+      weightPerPiece: item.weightPerPiece ? num(item.weightPerPiece) : undefined,
       customFieldValues: item.customFieldValues || undefined,
     }),
     // `availableQty` / `status` come off the movement ledger, so the row the
     // server returns is the only correct one.
-    fromApi: (row) => ({ ...row, vendor: row.vendor || '', _synced: true }),
+    fromApi: (row) => ({
+      ...row,
+      vendor: row.vendor || '',
+      metalGrade: row.metalGrade || row.metal_grade || '',
+      hasSheetSpec: Boolean(row.hasSheetSpec || row.has_sheet_spec),
+      sheetThickness: row.sheetThickness ?? row.sheet_thickness ?? '',
+      sheetThicknessUnit: row.sheetThicknessUnit || row.sheet_thickness_unit || 'mm',
+      sheetHeight: row.sheetHeight ?? row.sheet_height ?? '',
+      sheetHeightUnit: row.sheetHeightUnit || row.sheet_height_unit || 'mm',
+      sheetWidth: row.sheetWidth ?? row.sheet_width ?? '',
+      sheetWidthUnit: row.sheetWidthUnit || row.sheet_width_unit || 'mm',
+      sheetLength: row.sheetLength ?? row.sheet_length ?? '',
+      sheetLengthUnit: row.sheetLengthUnit || row.sheet_length_unit || 'mm',
+      sheetWeightKg: row.sheetWeightKg ?? row.sheet_weight_kg ?? '',
+      hasTubeSpec: Boolean(row.hasTubeSpec || row.has_tube_spec),
+      tubeProfile: row.tubeProfile || row.tube_profile || '',
+      outerDiameter: row.outerDiameter ?? row.outer_diameter ?? '',
+      outerWidth: row.outerWidth ?? row.outer_width ?? '',
+      outerHeight: row.outerHeight ?? row.outer_height ?? '',
+      wallThickness: row.wallThickness ?? row.wall_thickness ?? '',
+      tubeLength: row.tubeLength ?? row.tube_length ?? '',
+      weightPerMeter: row.weightPerMeter ?? row.weight_per_meter ?? '',
+      weightPerPiece: row.weightPerPiece ?? row.weight_per_piece ?? '',
+      theoreticalWeight: row.theoreticalWeight ?? row.theoretical_weight ?? '',
+      _synced: true,
+    }),
     // Derived columns are rejected on update (api.md §4.2).
     omitOnUpdate: ['availableQty', 'serialNumbers'],
   },

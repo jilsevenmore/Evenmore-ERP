@@ -13,6 +13,7 @@ import { Button } from '../../components/ui/Button';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
 import { Pagination } from '../../components/ui/Pagination';
+import PartySelector from '../../components/common/PartySelector';
 
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
@@ -80,6 +81,13 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
     // Create/Edit Invoice Form state
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
+    const [partyData, setPartyData] = useState({
+        isOneTimeParty: false,
+        customerId: customers[0]?.id || '',
+        customer: customers[0]?.name || '',
+        partyName: customers[0]?.name || '',
+        partyType: 'Customer',
+    });
     const [linkedSoId, setLinkedSoId] = useState('None');
     const [linkedPiId, setLinkedPiId] = useState('None');
     const [invoiceDate, setInvoiceDate] = useState(getCurrentDateFormatted());
@@ -134,6 +142,33 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 if (order.customerId) {
                     setSelectedCustomerId(order.customerId);
                     populateCustomerAddresses(order.customerId);
+                    setPartyData({
+                        isOneTimeParty: Boolean(order.isOneTimeParty),
+                        customerId: order.customerId,
+                        customer: order.customer || order.partyName,
+                        partyName: order.partyName || order.customer,
+                        partyType: order.partyType || (order.isOneTimeParty ? 'Walk-in' : 'Customer'),
+                        partyPhone: order.partyPhone || '',
+                        partyEmail: order.partyEmail || '',
+                        partyGstin: order.partyGstin || '',
+                        placeOfSupply: order.placeOfSupply || '',
+                        billingAddress: order.billingAddress || {},
+                        shippingAddress: order.shippingAddress || {},
+                    });
+                } else if (order.partyName || order.customer) {
+                    setPartyData({
+                        isOneTimeParty: true,
+                        customerId: '',
+                        customer: order.customer || order.partyName,
+                        partyName: order.partyName || order.customer,
+                        partyType: order.partyType || 'Walk-in',
+                        partyPhone: order.partyPhone || '',
+                        partyEmail: order.partyEmail || '',
+                        partyGstin: order.partyGstin || '',
+                        placeOfSupply: order.placeOfSupply || '',
+                        billingAddress: order.billingAddress || {},
+                        shippingAddress: order.shippingAddress || {},
+                    });
                 }
                 if (order.items && order.items.length > 0) {
                     setLineItems(order.items);
@@ -152,6 +187,33 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                 if (pi.customerId) {
                     setSelectedCustomerId(pi.customerId);
                     populateCustomerAddresses(pi.customerId);
+                    setPartyData({
+                        isOneTimeParty: Boolean(pi.isOneTimeParty),
+                        customerId: pi.customerId,
+                        customer: pi.customer || pi.partyName,
+                        partyName: pi.partyName || pi.customer,
+                        partyType: pi.partyType || (pi.isOneTimeParty ? 'Walk-in' : 'Customer'),
+                        partyPhone: pi.partyPhone || '',
+                        partyEmail: pi.partyEmail || '',
+                        partyGstin: pi.partyGstin || '',
+                        placeOfSupply: pi.placeOfSupply || '',
+                        billingAddress: pi.billingAddress || {},
+                        shippingAddress: pi.shippingAddress || {},
+                    });
+                } else if (pi.partyName || pi.customer) {
+                    setPartyData({
+                        isOneTimeParty: true,
+                        customerId: '',
+                        customer: pi.customer || pi.partyName,
+                        partyName: pi.partyName || pi.customer,
+                        partyType: pi.partyType || 'Walk-in',
+                        partyPhone: pi.partyPhone || '',
+                        partyEmail: pi.partyEmail || '',
+                        partyGstin: pi.partyGstin || '',
+                        placeOfSupply: pi.placeOfSupply || '',
+                        billingAddress: pi.billingAddress || {},
+                        shippingAddress: pi.shippingAddress || {},
+                    });
                 }
                 if (pi.referenceSo) setLinkedSoId(pi.referenceSo);
                 if (pi.items && pi.items.length > 0) {
@@ -170,6 +232,25 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         if (defaultCust) {
             setSelectedCustomerId(defaultCust.id);
             populateCustomerAddresses(defaultCust.id);
+            setPartyData({
+                isOneTimeParty: false,
+                customerId: defaultCust.id,
+                customer: defaultCust.name,
+                partyName: defaultCust.name,
+                partyType: defaultCust.type || 'Customer',
+                partyPhone: defaultCust.phone || '',
+                partyEmail: defaultCust.email || '',
+                partyGstin: defaultCust.gstin || '',
+                placeOfSupply: defaultCust.placeOfSupply || '',
+            });
+        } else {
+            setPartyData({
+                isOneTimeParty: true,
+                customerId: '',
+                customer: 'Walk-in Customer',
+                partyName: 'Walk-in Customer',
+                partyType: 'Walk-in',
+            });
         }
         setLinkedSoId('None');
         setLinkedPiId('None');
@@ -188,6 +269,19 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
     const handleOpenEditDraft = (inv) => {
         setEditingDraftTarget(inv);
         setSelectedCustomerId(inv.customerId || '');
+        setPartyData({
+            isOneTimeParty: Boolean(inv.isOneTimeParty),
+            customerId: inv.customerId || '',
+            customer: inv.customer || inv.partyName || '',
+            partyName: inv.partyName || inv.customer || '',
+            partyType: inv.partyType || (inv.isOneTimeParty ? 'Walk-in' : 'Customer'),
+            partyPhone: inv.partyPhone || '',
+            partyEmail: inv.partyEmail || '',
+            partyGstin: inv.partyGstin || '',
+            placeOfSupply: inv.placeOfSupply || '',
+            billingAddress: inv.billingAddress || {},
+            shippingAddress: inv.shippingAddress || {},
+        });
         setBillingAddress(inv.billingAddress || { line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
         setShippingAddress(inv.shippingAddress || { line1: '', line2: '', city: '', state: '', pincode: '', country: 'India' });
         setLinkedSoId(inv.salesOrderId || inv.linkedSo || 'None');
@@ -231,7 +325,12 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const so = salesOrders.find((o) => o.id === linkedSoId || o.orderNumber === linkedSoId);
         const pi = proformaInvoices.find((p) => p.id === linkedPiId || p.proformaNumber === linkedPiId);
 
-        const pos = party?.placeOfSupply || cust?.placeOfSupply || '';
+        const isOneTime = Boolean(partyData?.isOneTimeParty);
+        const resolvedPartyName = isOneTime
+            ? (partyData.partyName || partyData.customer || 'Walk-in Customer')
+            : (cust?.name || partyData.partyName || partyData.customer || '');
+
+        const pos = partyData?.placeOfSupply || party?.placeOfSupply || cust?.placeOfSupply || '';
         const homeStateCode = companyProfile?.stateCode || '';
         const homeState = String(companyProfile?.state || '').toLowerCase();
         const isInterState = Boolean(pos && (homeStateCode || homeState)
@@ -290,8 +389,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         if (editingDraftTarget) {
             // Update existing Draft
             updateDraftInvoice(editingDraftTarget.id, {
-                customerId: cust?.id,
-                customer: cust?.name,
+                isOneTimeParty: isOneTime,
+                partyType: isOneTime ? (partyData.partyType || 'Walk-in') : 'Customer',
+                partyPhone: partyData.partyPhone || '',
+                partyEmail: partyData.partyEmail || '',
+                partyGstin: partyData.partyGstin || '',
+                placeOfSupply: pos,
+                customerId: isOneTime ? null : (cust?.id || partyData.customerId || null),
+                customer: resolvedPartyName,
+                partyName: resolvedPartyName,
                 billingAddress,
                 shippingAddress: effectiveShipAddress,
                 items: effectiveItems,
@@ -316,8 +422,15 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const nextNumber = `INV-2026-${String(invoices.length + 101).padStart(3, '0')}`;
         const newInvoicePayload = {
             invoiceNumber: nextNumber,
-            customerId: cust?.id,
-            customer: cust?.name || '',
+            isOneTimeParty: isOneTime,
+            partyType: isOneTime ? (partyData.partyType || 'Walk-in') : 'Customer',
+            partyPhone: partyData.partyPhone || '',
+            partyEmail: partyData.partyEmail || '',
+            partyGstin: partyData.partyGstin || '',
+            placeOfSupply: pos,
+            customerId: isOneTime ? null : (cust?.id || partyData.customerId || null),
+            customer: resolvedPartyName,
+            partyName: resolvedPartyName,
             billingAddress,
             shippingAddress: effectiveShipAddress,
             salesOrderId: so?.id,
@@ -354,8 +467,8 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
         const created = onCreateInvoice(newInvoicePayload);
         if (isPaid && created) {
             addPaymentIn({
-                customerId: cust?.id,
-                customer: cust?.name,
+                customerId: isOneTime ? null : (cust?.id || partyData.customerId || null),
+                customer: resolvedPartyName,
                 invoiceId: created.id,
                 invoiceNumber: created.invoiceNumber,
                 amount: created.total,
@@ -824,23 +937,28 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
 
                         <div className="p-2 space-y-4 overflow-y-auto flex-1 my-2 pr-1">
                             <FormSection number="01" title="Customer & billing" />
-                            {/* Top Form Row */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-                                <div className="flex flex-col gap-1">
-                                    <label className="font-semibold text-slate-700">Customer Account *</label>
-                                    <select
-                                        value={selectedCustomerId}
-                                        onChange={(e) => handleCustomerChange(e.target.value)}
-                                        className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium"
-                                    >
-                                        {customers.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.name} ({c.code})
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
+                            
+                            {/* Party Selection (Registered or One-Time) */}
+                            <PartySelector
+                                value={partyData}
+                                onChange={(newParty) => {
+                                    setPartyData(newParty);
+                                    if (newParty.customerId) {
+                                        setSelectedCustomerId(newParty.customerId);
+                                    }
+                                    if (newParty.billingAddress && Object.keys(newParty.billingAddress).length > 0) {
+                                        setBillingAddress(newParty.billingAddress);
+                                        if (sameAsBilling) setShippingAddress(newParty.billingAddress);
+                                    }
+                                    if (newParty.shippingAddress && Object.keys(newParty.shippingAddress).length > 0 && !sameAsBilling) {
+                                        setShippingAddress(newParty.shippingAddress);
+                                    }
+                                }}
+                                showAddressFields={false}
+                            />
 
+                            {/* Top Form Row */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                                 <div className="flex flex-col gap-1">
                                     <label className="font-semibold text-slate-700">Source Proforma (PI)</label>
                                     <select value={linkedPiId} onChange={(e) => handlePiSelect(e.target.value)} className="border border-slate-300 rounded-xl px-3 py-2 bg-white text-slate-800 font-medium">

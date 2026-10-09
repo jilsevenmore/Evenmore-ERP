@@ -15,6 +15,7 @@ import { isQuotationConvertible } from '../../utils/quotationDocument';
 import { sheetAutoDescription } from '../../utils/salesLineMetal';
 import { FormSection } from '../../components/common/FormSection';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
+import PartySelector from '../../components/common/PartySelector';
 
 // Replaced: moved to components/common/FormSection.jsx so every sales form shares it.
 // const FormSection = ({ number, title, hint }) => (
@@ -53,7 +54,13 @@ export const QuotationsPage = () => {
     const [printQuotationTarget, setPrintQuotationTarget] = useState(null);
     const [approvalTarget, setApprovalTarget] = useState(null);
     const openedPrintRequest = React.useRef('');
-    const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
+    const [partyData, setPartyData] = useState({
+        isOneTimeParty: false,
+        customerId: customers[0]?.id || '',
+        customer: customers[0]?.name || '',
+        partyName: customers[0]?.name || '',
+        partyType: 'Customer',
+    });
     const [validUntil, setValidUntil] = useState('In 30 days');
     const [quoteDate, setQuoteDate] = useState(new Date().toLocaleDateString('en-CA'));
     const [dealReference, setDealReference] = useState('');
@@ -83,7 +90,19 @@ export const QuotationsPage = () => {
         if (!leadRequest || autoOpened.current) return;
         autoOpened.current = true;
         const match = customers.find((c) => c.id === leadRequest.customerId || c.name === leadRequest.company) || (!leadRequest.fromDeal ? customers[0] : null);
-        setSelectedCustomerId(match?.id || '');
+        if (match) {
+            setPartyData({
+                isOneTimeParty: false,
+                customerId: match.id,
+                customer: match.name,
+                partyName: match.name,
+                partyType: match.type || 'Customer',
+                partyPhone: match.phone || '',
+                partyEmail: match.email || '',
+                partyGstin: match.gstin || '',
+                placeOfSupply: match.placeOfSupply || '',
+            });
+        }
         if (leadRequest.fromDeal) setDealReference(leadRequest.dealReference || leadRequest.dealId);
         if (Array.isArray(leadRequest.items) && leadRequest.items.length > 0) {
             setLineItems(leadRequest.items.map((it, i) => ({
@@ -109,7 +128,13 @@ export const QuotationsPage = () => {
     const totalPipeline = quotations.reduce((sum, q) => sum + (q.amount || 0), 0);
 
     const handleOpenCreateModal = () => {
-        setSelectedCustomerId(customers[0]?.id || '');
+        setPartyData({
+            isOneTimeParty: false,
+            customerId: customers[0]?.id || '',
+            customer: customers[0]?.name || '',
+            partyName: customers[0]?.name || '',
+            partyType: 'Customer',
+        });
         setValidUntil('In 30 days');
         setQuoteDate(new Date().toLocaleDateString('en-CA'));
         setDealReference('');
@@ -122,7 +147,13 @@ export const QuotationsPage = () => {
 
     const handleCloseCreateModal = () => {
         setIsModalOpen(false);
-        setSelectedCustomerId(customers[0]?.id || '');
+        setPartyData({
+            isOneTimeParty: false,
+            customerId: customers[0]?.id || '',
+            customer: customers[0]?.name || '',
+            partyName: customers[0]?.name || '',
+            partyType: 'Customer',
+        });
         setValidUntil('In 30 days');
         setQuoteDate(new Date().toLocaleDateString('en-CA'));
         setDealReference('');
@@ -139,7 +170,19 @@ export const QuotationsPage = () => {
         }
     };
     const handleCloneQuote = (quote) => {
-        setSelectedCustomerId(quote.customerId || customers[0]?.id || '');
+        // Replaced: setSelectedCustomerId(...) — that setter no longer exists, so Clone threw.
+        const match = customers.find((c) => c.id === quote.customerId);
+        setPartyData({
+            isOneTimeParty: !match,
+            customerId: match?.id || '',
+            customer: match?.name || quote.customer || '',
+            partyName: match?.name || quote.customer || '',
+            partyType: match?.type || 'Customer',
+            partyPhone: match?.phone || '',
+            partyEmail: match?.email || '',
+            partyGstin: match?.gstin || '',
+            placeOfSupply: match?.placeOfSupply || '',
+        });
         setValidUntil(quote.validUntil || 'In 30 days');
         setDealReference(quote.dealReference || '');
         setTerms(quote.termsAndConditions || quote.terms || '');
@@ -254,13 +297,9 @@ export const QuotationsPage = () => {
     ];
     const handleCreate = (e) => {
         e.preventDefault();
-        const cust = customers.find((c) => c.id === selectedCustomerId);
-        if (!cust) return;
         // Quotation-first sales: a line is an inventory item or a custom /
         // service line named by its description. The empty placeholder row is
         // dropped; a priced line with no item and no description is refused.
-        // Replaced: a sheet-metal line whose spec was filled is named by it.
-        // const quoteLines = lineItems.filter((it) => it.itemId || String(it.description || it.name || '').trim() || Number(it.rate));
         const quoteLines = lineItems
             .map((it) => (!it.itemId && !String(it.description || it.name || '').trim() && sheetAutoDescription(it.sheetSpec || {}) && Number(it.rate)
                 ? { ...it, description: sheetAutoDescription(it.sheetSpec) } : it))
@@ -274,14 +313,20 @@ export const QuotationsPage = () => {
             showToast('Line ' + (unnamed + 1) + ' needs a description (or pick an inventory item).');
             return;
         }
-        // Replaced: totals come from the kept lines only.
-        // const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
-        // Replaced: freight is part of the quoted total.
-        // const computedTotal = quoteLines.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0);
         const computedTotal = quoteLines.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) + (Number(freight) || 0);
+        const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => c.id === partyData.customerId)?.name : '') || 'Walk-in Customer';
         addQuotation({
-            customerId: cust?.id,
-            customer: cust?.name || '',
+            isOneTimeParty: Boolean(partyData.isOneTimeParty),
+            customerId: partyData.isOneTimeParty ? '' : (partyData.customerId || ''),
+            customer: partyDisplayName,
+            partyName: partyDisplayName,
+            partyType: partyData.partyType || (partyData.isOneTimeParty ? 'Walk-in' : 'Customer'),
+            partyPhone: partyData.partyPhone || '',
+            partyEmail: partyData.partyEmail || '',
+            partyGstin: partyData.partyGstin || '',
+            placeOfSupply: partyData.placeOfSupply || '',
+            billingAddress: partyData.billingAddress || {},
+            shippingAddress: partyData.shippingAddress || {},
             leadId: leadRequest?.leadId || '',
             leadName: leadRequest?.leadName || '',
             dealId: leadRequest?.fromDeal ? leadRequest.dealId : undefined,
@@ -298,8 +343,6 @@ export const QuotationsPage = () => {
             validUntil: validUntil || '30 Days',
             amount: computedTotal,
             status: 'Draft',
-            // Replaced: the placeholder row is not a line.
-            // items: lineItems,
             items: quoteLines,
         });
         handleCloseCreateModal();
@@ -355,38 +398,13 @@ export const QuotationsPage = () => {
             </div>
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <FormSection number="01" title="Customer & quote details" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
-                  <select required value={selectedCustomerId} onChange={(e) => setSelectedCustomerId(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium">
-                    <option value="" disabled>Select a customer account</option>
-                    {customers.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}{c.code ? ` (${c.code})` : ''} - Balance: ₹{Number(c.balance || 0).toFixed(2)}
-                      </option>
-                    ))}
-                  </select>
-                  {(() => {
-                    const cust = customers.find(c => c.id === selectedCustomerId);
-                    if (!cust) return null;
-                    return (
-                      <div className="mt-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-[11px] space-y-1">
-                        <div className="flex items-center justify-between font-bold text-slate-800">
-                          <span>{cust.name}</span>
-                          <span className="text-blue-700 font-mono text-[10px] bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                            Limit: {cust.creditLimit ? `₹${Number(cust.creditLimit).toLocaleString('en-IN')}` : '—'}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 text-[10px]">
-                          <span>POC: <strong>{cust.contactPerson || '—'}</strong></span>
-                          <span>Email: {cust.email || '—'}</span>
-                          <span>Phone: {cust.phone || '—'}</span>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-                <div>
+              <div className="space-y-3">
+                <PartySelector
+                  value={partyData}
+                  onChange={setPartyData}
+                  customers={customers}
+                />
+                <div className="sm:w-1/2">
                   <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
                   <input type="text" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} placeholder="e.g. 30 Days or Nov 30, 2026" className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
@@ -437,34 +455,39 @@ export const QuotationsPage = () => {
 
       {/* Quotation Detail Modal */}
       {selectedQuote && (<div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-3 border-b border-slate-200">
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 sm:gap-3 min-w-0 lg:min-w-auto">
-                <h3 className="font-bold text-lg text-[#1F2E4A]">{selectedQuote.quoteNumber}</h3>
-                <span className="font-semibold text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded">
+          <div className="bg-white rounded-2xl border border-slate-200 max-w-4xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Replaced: single forced row (lg:flex-nowrap) that squeezed the number, customer and button labels onto two lines each. */}
+            <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-200">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-bold text-lg leading-tight text-[#1F2E4A] whitespace-nowrap">{selectedQuote.quoteNumber}</h3>
+                  <StatusBadge status={selectedQuote.status}/>
+                </div>
+                <p className="mt-1 text-[13px] font-medium text-slate-500 truncate" title={selectedQuote.customer}>
                   {selectedQuote.customer}
-                </span>
-                <StatusBadge status={selectedQuote.status}/>
+                </p>
               </div>
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => setApprovalTarget(selectedQuote)}
-                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="h-8 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors"
                   title="Send the customer a link to view, comment on and approve or reject this quotation"
                 >
                   <Share2 size={13}/>
-                  Share for Approval
+                  <span className="hidden sm:inline">Share for Approval</span>
+                  <span className="sm:hidden">Approval</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setPrintQuotationTarget(selectedQuote)}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  className="h-8 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors"
                 >
                   <Printer size={13}/>
-                  Print Official Quote
+                  <span className="hidden sm:inline">Print Official Quote</span>
+                  <span className="sm:hidden">Print</span>
                 </button>
-                <button onClick={() => setSelectedQuote(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
+                <button onClick={() => setSelectedQuote(null)} aria-label="Close" className="h-8 w-8 inline-flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
                   <X size={18}/>
                 </button>
               </div>
@@ -501,11 +524,12 @@ export const QuotationsPage = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pt-4 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
-              <div className="font-mono text-xs">
-                Total Estimate: <strong className="text-slate-900">{formatCurrency(selectedQuote.amount || 0)}</strong>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 -mx-4 -mb-4 px-4 sm:-mx-6 sm:-mb-6 sm:px-6 py-3">
+              <div className="leading-tight">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Quotation Total</span>
+                <strong className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(selectedQuote.amount || 0)}</strong>
               </div>
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+              <div className="flex flex-wrap items-center justify-end gap-2 [&>button]:whitespace-nowrap">
                 {/* Customer approval: recorded here when given by phone, email or in person. */}
                 {['Draft', 'Sent', 'Viewed'].includes(selectedQuote.status) && (<Button variant="outline" onClick={() => approveQuotation(selectedQuote.id)}>
                     Mark Customer Approved

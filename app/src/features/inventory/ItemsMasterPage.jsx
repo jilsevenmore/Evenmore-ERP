@@ -133,6 +133,15 @@ export const ItemsMasterPage = () => {
                     <span className="flex items-center gap-0.5">
                       <MapPin size={10} className="text-muted"/> {i.location || '—'}
                     </span>
+                    {(i.metalGrade || i.hasTubeSpec || i.sheetThickness) && (
+                      <>
+                        <span>•</span>
+                        <span className="font-bold text-sky-800 bg-sky-50 dark:bg-sky-500/15 dark:text-sky-300 px-1.5 py-0.5 rounded border border-sky-200 dark:border-sky-500/30 text-[10px]">
+                          {i.metalGrade || 'MS'} {i.hasTubeSpec ? `${i.tubeProfile || ''} Tube` : i.sheetThickness ? `${i.sheetThickness}mm Sheet` : ''}
+                          {i.weightPerPiece ? ` (${Number(i.weightPerPiece).toFixed(2)}kg)` : ''}
+                        </span>
+                      </>
+                    )}
                     {machinePartsCount > 0 && (
                       <>
                         <span>•</span>

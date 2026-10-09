@@ -158,12 +158,24 @@ export const PrintInvoiceModal = ({ isOpen, onClose, invoice, balanceDue = 0, })
               <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 BILLED TO (CLIENT ACCOUNT)
               </span>
-              <p className="text-sm font-bold text-slate-900">{invoice.customer || '—'}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold text-slate-900">{invoice.customer || invoice.partyName || '—'}</p>
+                {invoice.isOneTimeParty && (
+                  <span className="text-[9px] font-semibold text-slate-500 bg-slate-200 px-1.5 py-0.2 rounded uppercase">
+                    {invoice.partyType || 'Walk-in'}
+                  </span>
+                )}
+              </div>
               {/* [PHASE-2E.1] buyer GSTIN + place of supply drives intra/inter-state split */}
               <p className="text-slate-500 text-[11px]">
-                GSTIN: {invoice.customerGstin || 'URP / Unregistered'}
-                {hasStates ? ` • Place of Supply: ${posStateCode}` : ''}
+                GSTIN: {invoice.partyGstin || invoice.customerGstin || 'URP / Unregistered'}
+                {hasStates ? ` • Place of Supply: ${posStateCode}` : invoice.placeOfSupply ? ` • Place of Supply: ${invoice.placeOfSupply}` : ''}
               </p>
+              {(invoice.partyPhone || invoice.partyEmail) && (
+                <p className="text-slate-500 text-[11px]">
+                  {[invoice.partyPhone, invoice.partyEmail].filter(Boolean).join(' | ')}
+                </p>
+              )}
               {customerAddress.map((line, i) => (<p key={i} className="text-slate-500 text-[11px]">{line}</p>))}
               {invoice.dueDate && <p className="text-slate-500 text-[11px]">Payment Due: {invoice.dueDate}</p>}
             </div>
