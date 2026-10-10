@@ -358,14 +358,63 @@ export const RESOURCES = {
     toApi: (cat) => compact({
       name: cat.name,
       code: cat.code || undefined,
+      itemTypeId: cat.itemTypeId || undefined,
+      defaultUnitId: cat.defaultUnitId || undefined,
+      defaultUom: cat.defaultUom || undefined,
       kind: cat.kind || (cat.hasSubParts ? 'machine' : 'stock'),
       description: cat.description || undefined,
       hasSubParts: cat.hasSubParts ?? undefined,
       leadTimeDays: cat.leadTimeDays !== undefined ? num(cat.leadTimeDays) : undefined,
       defaultHsnCode: cat.defaultHsnCode || undefined,
+      isActive: cat.isActive !== undefined ? Boolean(cat.isActive) : undefined,
       customFields: cat.customFields?.length ? cat.customFields : undefined,
     }),
-    fromApi: (row) => ({ ...row, _synced: true }),
+    fromApi: (row) => ({
+      ...row,
+      itemTypeId: row.itemTypeId || row.item_type_id || '',
+      itemType: row.itemType || row.item_type || '',
+      defaultUnitId: row.defaultUnitId || row.default_unit_id || '',
+      defaultUnit: row.defaultUnit || row.default_unit || '',
+      defaultUom: row.defaultUom || row.default_uom || '',
+      isActive: row.isActive !== undefined ? Boolean(row.isActive) : (row.is_active !== undefined ? Boolean(row.is_active) : true),
+      _synced: true,
+    }),
+  },
+  itemTypes: {
+    path: '/inventory/item-types/',
+    toApi: (it) => compact({
+      name: it.name,
+      code: it.code || undefined,
+      description: it.description || undefined,
+      shapeProfile: it.shapeProfile || it.shape_profile || undefined,
+      dimensionSchema: it.dimensionSchema || it.dimension_schema || undefined,
+      isActive: it.isActive !== undefined ? Boolean(it.isActive) : undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      shapeProfile: row.shapeProfile || row.shape_profile || '',
+      dimensionSchema: row.dimensionSchema || row.dimension_schema || {},
+      isActive: row.isActive !== undefined ? Boolean(row.isActive) : (row.is_active !== undefined ? Boolean(row.is_active) : true),
+      _synced: true,
+    }),
+  },
+  materialGrades: {
+    path: '/inventory/material-grades/',
+    toApi: (mg) => compact({
+      name: mg.name,
+      code: mg.code || undefined,
+      materialCategoryId: mg.materialCategoryId || mg.categoryId || undefined,
+      family: mg.family || undefined,
+      density: mg.density !== undefined ? num(mg.density) : undefined,
+      isActive: mg.isActive !== undefined ? Boolean(mg.isActive) : undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      materialCategoryId: row.materialCategoryId || row.material_category_id || '',
+      materialCategory: row.materialCategory || row.material_category || '',
+      isActive: row.isActive !== undefined ? Boolean(row.isActive) : (row.is_active !== undefined ? Boolean(row.is_active) : true),
+      _synced: true,
+    }),
   },
   units: {
     path: '/inventory/units/',
@@ -394,6 +443,8 @@ export const RESOURCES = {
       name: item.name,
       description: item.description || undefined,
       categoryId: item.categoryId || undefined,
+      itemTypeId: item.itemTypeId || undefined,
+      gradeId: item.gradeId || undefined,
       itemKind: item.itemKind || 'Standalone',
       uom: item.uom || 'Unit',
       purchaseUnit: item.purchaseUnit || undefined,
@@ -435,12 +486,23 @@ export const RESOURCES = {
       tubeLength: item.tubeLength ? num(item.tubeLength) : undefined,
       weightPerMeter: item.weightPerMeter ? num(item.weightPerMeter) : undefined,
       weightPerPiece: item.weightPerPiece ? num(item.weightPerPiece) : undefined,
+      diameter: item.diameter ? num(item.diameter) : undefined,
+      innerDiameter: item.innerDiameter ? num(item.innerDiameter) : undefined,
+      finishCoating: item.finishCoating || undefined,
+      legA: item.legA ? num(item.legA) : undefined,
+      legB: item.legB ? num(item.legB) : undefined,
+      webThickness: item.webThickness ? num(item.webThickness) : undefined,
+      flangeThickness: item.flangeThickness ? num(item.flangeThickness) : undefined,
       customFieldValues: item.customFieldValues || undefined,
     }),
     // `availableQty` / `status` come off the movement ledger, so the row the
     // server returns is the only correct one.
     fromApi: (row) => ({
       ...row,
+      itemTypeId: row.itemTypeId || row.item_type_id || '',
+      itemType: row.itemType || row.item_type || '',
+      gradeId: row.gradeId || row.grade_id || '',
+      gradeName: row.gradeName || row.grade_name || '',
       vendor: row.vendor || '',
       metalGrade: row.metalGrade || row.metal_grade || '',
       hasSheetSpec: Boolean(row.hasSheetSpec || row.has_sheet_spec),
@@ -462,6 +524,13 @@ export const RESOURCES = {
       tubeLength: row.tubeLength ?? row.tube_length ?? '',
       weightPerMeter: row.weightPerMeter ?? row.weight_per_meter ?? '',
       weightPerPiece: row.weightPerPiece ?? row.weight_per_piece ?? '',
+      diameter: row.diameter ?? '',
+      innerDiameter: row.innerDiameter ?? row.inner_diameter ?? '',
+      finishCoating: row.finishCoating || row.finish_coating || '',
+      legA: row.legA ?? row.leg_a ?? '',
+      legB: row.legB ?? row.leg_b ?? '',
+      webThickness: row.webThickness ?? row.web_thickness ?? '',
+      flangeThickness: row.flangeThickness ?? row.flange_thickness ?? '',
       theoreticalWeight: row.theoreticalWeight ?? row.theoretical_weight ?? '',
       _synced: true,
     }),
@@ -477,6 +546,12 @@ export const RESOURCES = {
       toApi: (doc, opts) => compact({
         ...base.toApi(doc, opts),
         status: knownStatus(doc.status, ESTIMATE_STATUSES),
+        crmLead: serverRef(doc.leadId),
+      }),
+      fromApi: (row) => ({
+        ...base.fromApi(row),
+        ...linkIn(row, { leadId: 'crmLead' }),
+        leadName: row.leadName || undefined,
       }),
     };
   })(),
@@ -488,6 +563,7 @@ export const RESOURCES = {
         ...base.toApi(doc, opts),
         status: knownStatus(doc.status, QUOTATION_STATUSES),
         estimate: serverRef(doc.sourceEstimateId),
+        crmLead: serverRef(doc.leadId),
         // Quotation-first commercial header (printed on the quotation PDF).
         salesperson: doc.salesperson || undefined,
         paymentTerms: doc.paymentTerms || undefined,
@@ -502,7 +578,8 @@ export const RESOURCES = {
           quoteNumber: row.quotationNumber,
           // A quotation the server converted to an order is the UI's 'Confirmed'.
           status: mapped.status === 'Converted' ? 'Confirmed' : mapped.status,
-          ...linkIn(row, { sourceEstimateId: 'estimate' }),
+          ...linkIn(row, { sourceEstimateId: 'estimate', leadId: 'crmLead' }),
+          leadName: row.leadName || undefined,
         };
       },
     };
@@ -582,6 +659,7 @@ export const RESOURCES = {
         ...base.toApi(doc, opts),
         salesOrder: serverRef(doc.salesOrderId || doc.sourceSalesOrderId),
         quotation: serverRef(doc.sourceQuotationId),
+        crmLead: serverRef(doc.leadId),
         dispatchDate: isoOut(doc.dispatchDate),
         transporter: doc.transporter || undefined,
         vehicleNumber: doc.vehicleNo || doc.vehicleNumber || undefined,
@@ -598,7 +676,9 @@ export const RESOURCES = {
           salesOrderId: 'salesOrder',
           sourceSalesOrderId: 'salesOrder',
           sourceQuotationId: 'quotation',
+          leadId: 'crmLead',
         }),
+        leadName: row.leadName || undefined,
       }),
     };
   })(),
@@ -867,17 +947,18 @@ export const RESOURCES = {
     fromApi: (row) => ({ ...row, date: displayIn(row.date), _synced: true }),
   },
 
-  faultyParts: {
-    path: '/inventory/faulty-parts/',
-    toApi: (f) => compact({
-      itemId: f.itemId || undefined,
-      quantity: num(f.quantity ?? f.qty),
-      reason: f.reason || undefined,
-      status: f.status || undefined,
-      reportedOn: isoOut(f.reportedOn || f.date),
-    }),
-    fromApi: (row) => ({ ...row, reportedOn: displayIn(row.reportedOn), _synced: true }),
-  },
+  // Hidden: Faulty Parts out of scope; backend route commented out -- restore by uncommenting this entry.
+  // faultyParts: {
+  //   path: '/inventory/faulty-parts/',
+  //   toApi: (f) => compact({
+  //     itemId: f.itemId || undefined,
+  //     quantity: num(f.quantity ?? f.qty),
+  //     reason: f.reason || undefined,
+  //     status: f.status || undefined,
+  //     reportedOn: isoOut(f.reportedOn || f.date),
+  //   }),
+  //   fromApi: (row) => ({ ...row, reportedOn: displayIn(row.reportedOn), _synced: true }),
+  // },
 
   // Hidden: Zone Requests out of scope; backend route commented out -- restore by uncommenting this entry.
   // zoneRequests: {
@@ -937,13 +1018,13 @@ export const RESOURCES = {
 
 /** Every key the pull step knows how to load, in dependency order. */
 export const PULL_ORDER = [
-  'categories', 'units', 'locations', 'items',
+  'itemTypes', 'categories', 'materialGrades', 'units', 'locations', 'items',
   'parties', 'customers', 'vendors',
   'estimates', 'quotations', 'salesOrders', 'proformaInvoices',
   'deliveryChallans', 'invoices', 'paymentIns', 'cashPaymentReceipts', 'salesReturns', /* 'warranties', -- hidden: out of scope */
   'purchaseOrders', 'purchaseBills', 'paymentOuts', 'purchaseReturns', 'expenses',
   'transfers', /* 'serviceUsages', 'valuationItems', -- hidden: out of scope */ 'monthEndAudits',
-  'inventoryMovements', 'faultyParts', /* 'zoneRequests', -- hidden: out of scope */
+  'inventoryMovements', /* 'faultyParts', 'zoneRequests', -- hidden: out of scope */
   'bankAccounts', 'chartOfAccounts', 'journalEntries',
 ];
 

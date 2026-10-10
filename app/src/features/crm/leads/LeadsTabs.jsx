@@ -116,7 +116,11 @@ export default function LeadsTabs({
           <ViewButton label="Tile View" active={leadView === "tile"} onClick={() => onLeadViewChange("tile")}>
             <SquareChartGantt size={18} />
           </ViewButton>
-          {hasRecordAction && (
+        </div>
+        {/* Replaced: the selection actions sat inline after the view icons; they
+            now sit on the right, above the table, while any lead is selected. */}
+        {hasRecordAction && (
+          <div className="list-toolbar-right">
             <RecordActionPanel
               lead={recordActionLead}
               leads={recordActionLeads}
@@ -124,8 +128,8 @@ export default function LeadsTabs({
               onDelete={onDeleteRecord}
               onBulkAssign={onBulkAssign}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

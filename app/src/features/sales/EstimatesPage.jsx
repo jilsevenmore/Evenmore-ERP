@@ -180,11 +180,20 @@ export const EstimatesPage = () => {
         {
             header: 'Customer',
             accessor: 'customer',
-            width: '26%',
+            width: '22%',
             render: (e) => (
                 <div>
                     <strong className="text-slate-900 dark:text-slate-100 block">{e.customer}</strong>
                     <span className="text-[11px] text-muted">Validity: {e.validUntil || '15 Days'}</span>
+                    {(e.leadId || e.leadName) && (
+                        <button
+                          onClick={() => e.leadId && navigate(`/crm/leads/${encodeURIComponent(e.leadId)}`)}
+                          className="block text-[11px] font-semibold text-blue-600 hover:underline mt-0.5 cursor-pointer"
+                          title="Open linked lead"
+                        >
+                            Lead: {e.leadName || e.leadId}
+                        </button>
+                    )}
                 </div>
             ),
         },
@@ -433,6 +442,7 @@ export const EstimatesPage = () => {
                 searchFilter={(e, term) =>
                     String(e.estimateNumber ?? '').toLowerCase().includes(term) ||
                     String(e.customer ?? '').toLowerCase().includes(term) ||
+                    String(e.leadName ?? '').toLowerCase().includes(term) ||
                     String(e.status ?? '').toLowerCase().includes(term)
                 }
             />
@@ -540,6 +550,14 @@ export const EstimatesPage = () => {
                                 <div>
                                     <span className="text-[10px] text-slate-400 font-semibold uppercase">Client Account</span>
                                     <p className="text-sm font-bold text-slate-900 mt-0.5">{selectedEstimate.customer}</p>
+                                    {(selectedEstimate.leadId || selectedEstimate.leadName) && (
+                                        <button
+                                          onClick={() => selectedEstimate.leadId && navigate(`/crm/leads/${encodeURIComponent(selectedEstimate.leadId)}`)}
+                                          className="text-[11px] font-semibold text-blue-600 hover:underline mt-1 cursor-pointer"
+                                        >
+                                            Lead: {selectedEstimate.leadName || selectedEstimate.leadId} →
+                                        </button>
+                                    )}
                                 </div>
                                 <div>
                                     <span className="text-[10px] text-slate-400 font-semibold uppercase">Validity Window</span>

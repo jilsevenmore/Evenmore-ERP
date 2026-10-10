@@ -17,7 +17,7 @@ import {
   Hash,
   ImagePlus,
   ListChecks,
-  Lock,
+  RotateCcw,
   Mail,
   Pencil,
   Phone,
@@ -29,7 +29,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { FIELD_LIBRARY } from "../../../data/crm/leadFormSchema";
+import { FIELD_LIBRARY, isStandardLeadField, PERMANENT_LEAD_FIELD_ID } from "../../../data/crm/leadFormSchema";
 
 const FIELD_ICONS = {
   "Single Line": Type,
@@ -200,9 +200,8 @@ function FieldPreview({
             >
               <Pencil size={13} />
             </button>
-            {field.locked ? (
-              <Lock size={13} className="text-slate-300 shrink-0" />
-            ) : (
+            {/* Replaced: standard fields showed a lock here instead of a remove button. */}
+            {field.id !== PERMANENT_LEAD_FIELD_ID && (
               <button
                 type="button"
                 onClick={(event) => {
@@ -297,6 +296,8 @@ export default function LeadFormBuilder({
   onUpdateField,
   onAddField,
   onRemoveField,
+  removedStandardFields = [],
+  onRestoreStandardField,
   onMoveField,
   onAddSection,
   onRemoveSection,
@@ -403,6 +404,10 @@ export default function LeadFormBuilder({
     selectedField?.type === "Dropdown" ||
     selectedField?.type === "Multi Select" ||
     selectedField?.type === "Radio";
+  // Standard fields feed fixed lead columns: their type is fixed and their
+  // choices come from CRM settings / the item master, not from this builder.
+  const isStandardSelected = isStandardLeadField(selectedField);
+  const isPermanentSelected = selectedField?.id === PERMANENT_LEAD_FIELD_ID;
 
   return (
     <section className="w-full">
@@ -500,6 +505,30 @@ export default function LeadFormBuilder({
               </button>
             )}
           </div>
+
+          {onRestoreStandardField && removedStandardFields.length > 0 && (
+            <div className="mb-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-2">Removed standard fields</p>
+              <div className="flex flex-col gap-2">
+                {removedStandardFields.map((field) => {
+                  const Icon = FIELD_ICONS[field.type] ?? Type;
+                  return (
+                    <button
+                      key={field.id}
+                      type="button"
+                      onClick={() => onRestoreStandardField(field.id, effectiveSectionId)}
+                      title={`Add ${field.label} back to the selected section`}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 bg-slate-50 border border-dashed border-slate-300 rounded-xl hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 text-xs font-medium transition cursor-pointer text-left group"
+                    >
+                      <Icon size={14} className="text-slate-500 group-hover:text-blue-600 transition-colors shrink-0" />
+                      <span className="truncate flex-1">{field.label}</span>
+                      <RotateCcw size={13} className="text-slate-400 group-hover:text-blue-600 shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col gap-2.5">
             {libraryItems.map((type) => {
@@ -768,18 +797,24 @@ export default function LeadFormBuilder({
                   </label>
                   <select
                     value={selectedField.type}
+                    disabled={isStandardSelected}
                     onChange={(event) =>
                       onUpdateField(selectedField.id, { type: event.target.value })
                     }
-                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800"
+                    className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
                   >
                     {FIELD_LIBRARY.map((type) => (
                       <option key={type}>{type}</option>
                     ))}
                   </select>
+                  {isStandardSelected && (
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Standard lead field — the type is fixed{isOptionBasedField ? " and its choices come from CRM settings" : ""}.
+                    </p>
+                  )}
                 </div>
 
-                {isOptionBasedField && (
+                {isOptionBasedField && !isStandardSelected && (
                   <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2">
                     <label className="block text-xs font-semibold text-slate-700">
                       Field Options / Choices
@@ -825,11 +860,13 @@ export default function LeadFormBuilder({
                     <span className="text-xs font-medium text-slate-700">Required</span>
                     <input
                       type="checkbox"
-                      checked={!!selectedField.required}
+                      checked={isPermanentSelected || !!selectedField.required}
+                      disabled={isPermanentSelected}
+                      title={isPermanentSelected ? "Every lead needs a name" : undefined}
                       onChange={(event) =>
                         onUpdateField(selectedField.id, { required: event.target.checked })
                       }
-                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
+                      className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
                     />
                   </label>
 
@@ -875,8 +912,8 @@ export default function LeadFormBuilder({
               </div>
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-                {selectedField.locked ? (
-                  <span />
+                {isPermanentSelected ? (
+                  <span className="text-[11px] text-slate-400">Every lead needs a name, so this field stays.</span>
                 ) : (
                   <button
                     type="button"

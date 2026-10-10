@@ -203,11 +203,18 @@ export const linePieces = (line) => {
 //     Number(line.unitWeight) > 0 ? `${formatKg(line.unitWeight)}/unit` : '',
 // ].filter(Boolean).join(' · ');
 export const lineSpecText = (line) => {
+    if (!line) return '';
     if (line.sheetSpec && (line.sheetSpec.form || line.sheetSpec.material)) return sheetSpecText(line.sheetSpec);
+    const kind = line.lineKind || line.itemType || '';
+    const grade = line.materialGrade || line.grade || line.metalGrade || '';
+    const spec = line.specification || line.dimensions || '';
+    const category = (!kind && line.category) ? line.category : '';
+    const weight = Number(line.unitWeight) > 0 ? `${formatKg(line.unitWeight)}/unit` : '';
     return [
-        line.lineKind,
-        line.materialGrade,
-        line.specification,
-        Number(line.unitWeight) > 0 ? `${formatKg(line.unitWeight)}/unit` : '',
+        kind,
+        category,
+        grade,
+        spec,
+        weight,
     ].filter(Boolean).join(' · ');
 };

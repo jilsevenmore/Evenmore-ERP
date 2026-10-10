@@ -23,6 +23,8 @@ import { describeError } from '../../../services/crmSync';
 import { exportToCSV } from '../../../services/exportUtils';
 import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
+import { useERP } from '../../../context/ERPContext';
+import { attachLeadSubResources } from './leadSubResources';
 
 const INITIAL_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const INITIAL_SORT = { field: '', direction: 'ascending' };
@@ -144,6 +146,8 @@ export default function LeadsPage() {
       .filter((stage) => stage.isActive !== false)
       .sort((a, b) => (Number(a.order ?? a.sequence) || 0) - (Number(b.order ?? b.sequence) || 0))[0]?.id
   ));
+  const { items } = useERP() || {};
+  const teamMembers = useCrmStore((s) => s.teamMembers);
   const [activeTab, setActiveTab] = useState('All Leads');
   const [selected, setSelected] = useState([]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -376,6 +380,19 @@ export default function LeadsPage() {
     }
 
     if (createdLead) {
+      if ((data.products && data.products.length > 0) || (data.leadUsers && data.leadUsers.length > 0)) {
+        try {
+          await attachLeadSubResources(createdLead.id, {
+            products: data.products,
+            leadUsers: data.leadUsers,
+            items,
+            teamMembers,
+          });
+        } catch (err) {
+          console.error('[CRM] Error attaching sub-resources to new lead:', err);
+        }
+      }
+
       try {
         runLeadStageAutomation(createdLead, 'New Lead');
       } catch (err) {
@@ -424,10 +441,11 @@ export default function LeadsPage() {
     setBulkDeleteTargets(visibleLeads);
   }
 
+  // Replaced: also cleared the selection, so Cancel lost the ticked leads.
+  // A successful delete drops the deleted ids from the selection itself.
   function closeDeleteLead() {
     setDeleteTarget(null);
     setBulkDeleteTargets([]);
-    setSelected([]);
   }
 
   async function deleteLead(id) {
@@ -439,6 +457,7 @@ export default function LeadsPage() {
     }
     setSelected((current) => current.filter((selectedId) => selectedId !== id));
     closeDeleteLead();
+    showToast?.('Lead deleted.');
   }
 
   async function deleteAllLeads(leadsToDelete) {
@@ -451,6 +470,7 @@ export default function LeadsPage() {
     }
     setSelected((current) => current.filter((id) => !ids.includes(id)));
     closeDeleteLead();
+    showToast?.(`${ids.length} ${ids.length === 1 ? 'lead' : 'leads'} deleted.`);
   }
 
   async function pinLead(lead) {
@@ -620,12 +640,10 @@ export default function LeadsPage() {
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
                 onRequestDelete={requestDeleteLead}
-                onRequestDeleteAll={requestDeleteAll}
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
-                onDelete={deleteLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -648,13 +666,11 @@ export default function LeadsPage() {
                 onTogglePin={togglePinLead}
                 onToggleOne={toggleOne}
                 onRequestDelete={requestDeleteLead}
-                onRequestDeleteAll={requestDeleteAll}
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
                 onUpdateLead={updateLead}
                 variant="grid"
-                onDelete={deleteLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
                 <Pagination
@@ -678,7 +694,6 @@ export default function LeadsPage() {
               onRequestDelete={requestDeleteLead}
               onAddNote={openNotes}
               onOpenLead={openLeadDetails}
-              onDelete={deleteLead}
             />
           ) : (
             <LeadMapView

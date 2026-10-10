@@ -11,7 +11,7 @@
  * before the server assigned one, so a builder link made then still works.
  */
 import { findForm, getActiveFormId, loadForms, LEAD_FORM } from './crmForms';
-import { STANDARD_LEAD_FIELD_IDS } from '../data/crm/leadFormSchema';
+import { STANDARD_LEAD_FIELD_IDS, visibleLeadFormSections } from '../data/crm/leadFormSchema';
 
 /** Builder field ids that are real lead columns (the create modal has inputs for these). */
 export { STANDARD_LEAD_FIELD_IDS };
@@ -31,11 +31,23 @@ function fieldsOf(form) {
   return (form?.sections || []).flatMap((section) => section.fields || []);
 }
 
+/**
+ * The Create Lead form as the builder lays it out: sections in order, each with
+ * its visible fields — standard and custom — carrying their configured label,
+ * placeholder and required flag. No saved form yet means the default layout.
+ */
+export function leadFormLayout(form = activeLeadForm()) {
+  return visibleLeadFormSections(form?.sections);
+}
+
+/** True when the create form can hold a value for this custom field. */
+export function isSupportedCustomField(field) {
+  return Boolean(field?.id) && !STANDARD_LEAD_FIELD_IDS.has(field.id) && !UNSUPPORTED_TYPES.has(field.type);
+}
+
 /** The custom (non-column) fields of a lead form, in builder order. */
 export function customLeadFields(form = activeLeadForm()) {
-  return fieldsOf(form).filter(
-    (field) => field?.id && !STANDARD_LEAD_FIELD_IDS.has(field.id) && !UNSUPPORTED_TYPES.has(field.type),
-  );
+  return fieldsOf(form).filter(isSupportedCustomField);
 }
 
 /**

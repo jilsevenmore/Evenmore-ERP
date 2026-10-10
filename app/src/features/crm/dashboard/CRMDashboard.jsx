@@ -10,6 +10,7 @@ import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from 
 import CompleteTaskModal from "../tasks/CompleteTaskModal";
 import CreateLeadModal from "../leads/CreateLeadModal";
 import { runLeadStageAutomation } from "../../../services/leadStageAutomation";
+import { attachLeadSubResources } from "../leads/leadSubResources";
 import { toISODate } from "../../../utils/dateUtils";
 const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
 const SOURCE_COLORS = ["#2f6fed", "#7c3aed", "#f59e0b", "#10b981", "#ec4899", "#06b6d4", "#64748b"];
@@ -77,7 +78,7 @@ function formatShortINR(value) {
   return "Rs " + n.toLocaleString("en-IN", { minimumFractionDigits: 2 });
 }
 export default function DashboardView() {
-  const { invoices, quotations, salesOrders, paymentIns, formatCurrency, getInvoiceOutstanding } = useERP();
+  const { invoices, quotations, salesOrders, paymentIns, formatCurrency, getInvoiceOutstanding, items } = useERP() || {};
   const currentUser = useAppStore((s) => s.currentUser);
   const leads = useCrmStore((s) => s.leads);
   const deals = useCrmStore((s) => s.deals);
@@ -110,6 +111,18 @@ export default function DashboardView() {
         createdOn: data.createdOn || undefined,
       });
       if (newLead) {
+        if ((data.products && data.products.length > 0) || (data.leadUsers && data.leadUsers.length > 0)) {
+          try {
+            await attachLeadSubResources(newLead.id, {
+              products: data.products,
+              leadUsers: data.leadUsers,
+              items,
+              teamMembers: useCrmStore.getState().teamMembers,
+            });
+          } catch (err) {
+            console.error('[CRM] Error attaching sub-resources to new lead:', err);
+          }
+        }
         try {
           runLeadStageAutomation(newLead, 'New');
         } catch (err) {

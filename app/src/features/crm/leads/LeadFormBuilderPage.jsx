@@ -1,7 +1,23 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import LeadFormBuilder from './LeadFormBuilder';
-import { createFieldFromType, withStandardLeadFields } from '../../../data/crm/leadFormSchema';
+import { createFieldFromType, withStandardLeadFields, isStandardLeadField, PERMANENT_LEAD_FIELD_ID } from '../../../data/crm/leadFormSchema';
+
+// The canvas works on the visible fields; standard fields removed from the form
+// are kept aside and saved back as `hidden: true` so they are not re-added.
+function splitLayout(sections) {
+  const removed = [];
+  const visible = withStandardLeadFields(sections).map((section) => ({
+    ...section,
+    fields: (section.fields || []).flatMap((field) => {
+      // `locked` is retired: standard fields are configurable now.
+      const { locked: _locked, ...rest } = field;
+      if (rest.hidden) { removed.push(rest); return []; }
+      return [rest];
+    }),
+  }));
+  return { visible, removed };
+}
 import { useCrmStore } from '../../../stores/crmStore';
 import { loadForms, saveForms, findForm, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
@@ -29,15 +45,21 @@ export default function LeadFormBuilderPage() {
     [formId, storeForms],
   );
 
-  // The standard lead fields are always on the Create Lead form, so they are
-  // always in the layout — even for a form created with an empty section.
+  // Replaced: the standard lead fields were always in the layout (locked).
+  // Now they can be removed, and come back from the "Standard fields" list.
   const [leadFormSections, setLeadFormSections] = useState(
-    () => withStandardLeadFields(currentForm?.sections),
+    () => splitLayout(currentForm?.sections).visible,
+  );
+  const [removedStandardFields, setRemovedStandardFields] = useState(
+    () => splitLayout(currentForm?.sections).removed,
   );
 
   // A form loaded after the first render replaces the blank starting point.
   useEffect(() => {
-    if (currentForm?.sections) setLeadFormSections(withStandardLeadFields(currentForm.sections));
+    if (!currentForm?.sections) return;
+    const { visible, removed } = splitLayout(currentForm.sections);
+    setLeadFormSections(visible);
+    setRemovedStandardFields(removed);
   }, [currentForm]);
 
   const [selectedBuilderFieldId, setSelectedBuilderFieldId] = useState(() => {
@@ -76,7 +98,11 @@ export default function LeadFormBuilderPage() {
 
   function removeLeadFormField(fieldId) {
     const allFields = leadFormSections.flatMap((s) => s.fields);
-    if (allFields.find((f) => f.id === fieldId)?.locked) return;
+    const target = allFields.find((f) => f.id === fieldId);
+    if (!target || fieldId === PERMANENT_LEAD_FIELD_ID) return;
+    if (isStandardLeadField(target)) {
+      setRemovedStandardFields((current) => [...current, { ...target, hidden: true }]);
+    }
     const filtered = allFields.filter((f) => f.id !== fieldId);
     setLeadFormSections((current) =>
       current.map((section) => ({
@@ -85,6 +111,20 @@ export default function LeadFormBuilderPage() {
       }))
     );
     setSelectedBuilderFieldId(filtered[0]?.id ?? null);
+  }
+
+  function restoreStandardField(fieldId, sectionId) {
+    const field = removedStandardFields.find((f) => f.id === fieldId);
+    if (!field) return;
+    const { hidden: _hidden, ...restored } = field;
+    const targetSecId = sectionId || leadFormSections[0]?.id;
+    setRemovedStandardFields((current) => current.filter((f) => f.id !== fieldId));
+    setLeadFormSections((current) =>
+      current.map((section) =>
+        section.id === targetSecId ? { ...section, fields: [...section.fields, restored] } : section
+      )
+    );
+    setSelectedBuilderFieldId(fieldId);
   }
 
   function moveLeadFormField(fieldId, targetSectionId, targetIndex) {
@@ -122,10 +162,22 @@ export default function LeadFormBuilderPage() {
 
   function removeLeadFormSection(sectionId) {
     const target = leadFormSections.find((section) => section.id === sectionId);
-    // A section holding standard fields stays: those fields are always on the form.
-    if (target?.fields?.some((field) => field.locked)) return;
-    const remaining = leadFormSections.filter((section) => section.id !== sectionId);
-    if (remaining.length === 0) return;
+    let remaining = leadFormSections.filter((section) => section.id !== sectionId);
+    if (!target || remaining.length === 0) return;
+    // Replaced: a section holding standard fields could not be removed. Its
+    // standard fields now go to the removed list; Lead Name moves to the first
+    // remaining section, since every lead needs one.
+    const fields = target.fields || [];
+    const permanent = fields.find((field) => field.id === PERMANENT_LEAD_FIELD_ID);
+    if (permanent) {
+      remaining = remaining.map((section, index) =>
+        index === 0 ? { ...section, fields: [permanent, ...section.fields] } : section
+      );
+    }
+    const removedStandard = fields.filter((field) => isStandardLeadField(field) && field.id !== PERMANENT_LEAD_FIELD_ID);
+    if (removedStandard.length) {
+      setRemovedStandardFields((current) => [...current, ...removedStandard.map((field) => ({ ...field, hidden: true }))]);
+    }
     setLeadFormSections(remaining);
     const nextField = remaining.flatMap((section) => section.fields)[0];
     setSelectedBuilderFieldId(nextField?.id ?? null);
@@ -145,8 +197,7 @@ export default function LeadFormBuilderPage() {
       const clonedFields = (targetSec.fields || []).map((f, i) => ({
         ...f,
         id: `field-${Date.now()}-${i}`,
-        // A copy is an ordinary custom field, not the standard one it came from.
-        locked: false,
+        // A copy gets a new id, so it is an ordinary custom field, not the standard one it came from.
       }));
       const newSec = {
         ...targetSec,
@@ -172,9 +223,13 @@ export default function LeadFormBuilderPage() {
   function persistSections() {
     const forms = loadForms(LEAD_FORM);
     const targetId = currentForm?.id || formId;
+    // Removed standard fields are saved as hidden so the form does not re-add them.
+    const sectionsToSave = leadFormSections.map((section, index) =>
+      index === 0 ? { ...section, fields: [...section.fields, ...removedStandardFields] } : section
+    );
     const updated = forms.some((f) => f.id === targetId)
-      ? forms.map((f) => (f.id === targetId ? { ...f, sections: leadFormSections } : f))
-      : [...forms, { id: targetId, name: 'Lead create form', sections: leadFormSections }];
+      ? forms.map((f) => (f.id === targetId ? { ...f, sections: sectionsToSave } : f))
+      : [...forms, { id: targetId, name: 'Lead create form', sections: sectionsToSave }];
     saveForms(updated, LEAD_FORM);
   }
 
@@ -209,6 +264,8 @@ export default function LeadFormBuilderPage() {
       onUpdateField={updateLeadFormField}
       onAddField={addLeadFormField}
       onRemoveField={removeLeadFormField}
+      removedStandardFields={removedStandardFields}
+      onRestoreStandardField={restoreStandardField}
       onMoveField={moveLeadFormField}
       onAddSection={addLeadFormSection}
       onRemoveSection={removeLeadFormSection}

@@ -225,7 +225,7 @@ const NAV = [
       { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },
-      { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' },
+      // { label: 'Faulty Parts', icon: AlertTriangle, to: '/inventory/faulty-parts', badgeKey: 'faulty' }, // Hidden: Faulty Parts out of scope
       // { label: 'Quality Control (QC)', icon: ShieldCheck, to: '/inventory/quality-control' }, // Hidden: QC out of scope
       { label: 'Demo Units & Trials', icon: PackageCheck, to: '/inventory/demo-units' },
       { label: 'Rework & Scrap', icon: Wrench, to: '/inventory/rework' },
@@ -655,7 +655,7 @@ export default function Sidebar() {
     // Reading these is what loads them, so they wait for the same idle moment.
     if (hasInventoryAccess && erp && shellReady) {
       // badges.zone = erp.zoneRequests?.filter((r) => r.status === 'Requested')?.length || 0; // Hidden: Zone Requests out of scope
-      badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0;
+      // badges.faulty = erp.faultyParts?.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement')?.length || 0; // Hidden: Faulty Parts out of scope
     }
   } catch { }
 

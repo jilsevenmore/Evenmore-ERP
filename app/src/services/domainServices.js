@@ -168,11 +168,33 @@ export const inventoryService = {
   // Master, movements, valuation & audit
   createItem: (data) => api.post('/inventory/items/', data),
   updateItem: (id, data) => api.patch(`/inventory/items/${id}/`, data),
+  // Item Types
+  getItemTypes: (query) => api.get('/inventory/item-types/', { query }),
+  createItemType: (data) => api.post('/inventory/item-types/', data),
+  updateItemType: (id, data) => api.patch(`/inventory/item-types/${id}/`, data),
+  deleteItemType: (id) => api.delete(`/inventory/item-types/${id}/`),
+  activateItemType: (id) => api.post(`/inventory/item-types/${id}/activate/`),
+  deactivateItemType: (id) => api.post(`/inventory/item-types/${id}/deactivate/`),
+  // Categories
+  getCategories: (query) => api.get('/inventory/categories/', { query }),
+  createCategory: (data) => api.post('/inventory/categories/', data),
+  updateCategory: (id, data) => api.patch(`/inventory/categories/${id}/`, data),
+  deleteCategory: (id) => api.delete(`/inventory/categories/${id}/`),
+  activateCategory: (id) => api.post(`/inventory/categories/${id}/activate/`),
+  deactivateCategory: (id) => api.post(`/inventory/categories/${id}/deactivate/`),
+  // Material Grades
+  getMaterialGrades: (query) => api.get('/inventory/material-grades/', { query }),
+  createMaterialGrade: (data) => api.post('/inventory/material-grades/', data),
+  updateMaterialGrade: (id, data) => api.patch(`/inventory/material-grades/${id}/`, data),
+  deleteMaterialGrade: (id) => api.delete(`/inventory/material-grades/${id}/`),
+  activateMaterialGrade: (id) => api.post(`/inventory/material-grades/${id}/activate/`),
+  deactivateMaterialGrade: (id) => api.post(`/inventory/material-grades/${id}/deactivate/`),
+  // Stock adjustments and movements
   adjustStock: (data) => api.post('/inventory/adjustments/', data),
   getMovements: (query) => api.get('/inventory/movements/', { query }),
   createTransfer: (data) => api.post('/inventory/transfers/', data),
-  reportFaultyPart: (data) => api.post('/inventory/faulty-parts/', data),
-  updateFaultyPartStatus: (id, status) => api.patch(`/inventory/faulty-parts/${id}/`, { status }),
+  // reportFaultyPart: (data) => api.post('/inventory/faulty-parts/', data),
+  // updateFaultyPartStatus: (id, status) => api.patch(`/inventory/faulty-parts/${id}/`, { status }),  // Hidden: Faulty Parts out of scope
   // recordServiceUsage: (data) => api.post('/inventory/service-usage/', data),
   // getValuation: (query) => api.get('/inventory/valuation/', { query }),
   // createZoneRequest: (data) => api.post('/inventory/zone-requests/', data),

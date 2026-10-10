@@ -1,4 +1,4 @@
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
@@ -33,6 +33,7 @@ const challanGuide = {
 export const DeliveryChallansPage = () => {
     const { deliveryChallans, addDeliveryChallan, updateDeliveryChallanStatus, cancelDeliveryChallan, salesOrders, invoices, paymentIns, items: masterItems, calculateItemStock, warranties = [], getWarrantyByChallanId, companyProfile } = useERP();
     const location = useLocation();
+    const navigate = useNavigate();
     React.useEffect(() => {
         if (location.state?.challanId) setSelectedChallan(deliveryChallans.find(dc => dc.id === location.state.challanId) || null);
     }, [location.state, deliveryChallans]);
@@ -273,6 +274,15 @@ export const DeliveryChallansPage = () => {
             render: (c) => (
               <div>
                 <span className="font-bold text-text block">{c.customer}</span>
+                {(c.leadId || c.leadName) && (
+                  <button
+                    onClick={() => c.leadId && navigate(`/crm/leads/${encodeURIComponent(c.leadId)}`)}
+                    className="block text-[11px] font-semibold text-blue-600 hover:underline mt-0.5 cursor-pointer"
+                    title="Open linked lead"
+                  >
+                    Lead: {c.leadName || c.leadId}
+                  </button>
+                )}
                 {(c.shippingAddress?.city || c.shippingAddress?.state) && (
                   <span className="text-[10px] text-muted flex items-center gap-0.5">
                     <MapPin size={10}/> {[c.shippingAddress?.city, c.shippingAddress?.state].filter(Boolean).join(', ')}
@@ -466,6 +476,7 @@ export const DeliveryChallansPage = () => {
       <DataTable title="Active Dispatch Consignments" columns={columns} data={deliveryChallans} keyExtractor={(c) => c.id} searchPlaceholder="Search challan #, sales order, or carrier..." searchFilter={(c, term) => String(c.challanNumber ?? '').toLowerCase().includes(term) ||
             (c.salesOrderNumber && String(c.salesOrderNumber ?? '').toLowerCase().includes(term)) ||
             String(c.customer ?? '').toLowerCase().includes(term) ||
+            String(c.leadName ?? '').toLowerCase().includes(term) ||
             (c.transporter && String(c.transporter ?? '').toLowerCase().includes(term))}/>
 
       {/* Create Logistics Challan Modal */}

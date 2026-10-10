@@ -1,39 +1,45 @@
 import { Trash2, UserCheck, X } from "lucide-react";
 
+// Shown above the leads table while any lead is selected. Delete only asks for
+// confirmation (the parent opens the dialog); nothing is removed from here.
 export default function RecordActionPanel({ lead, leads = [], onClose, onDelete, onBulkAssign }) {
   const selectedLeads = leads.length > 0 ? leads : lead ? [lead] : [];
-  const isBulk = selectedLeads.length > 1;
-  const activeLead = lead ?? selectedLeads[0] ?? null;
-  if (!activeLead && selectedLeads.length === 0) return null;
+  if (selectedLeads.length === 0) return null;
+  const count = selectedLeads.length;
 
   function handleDelete() {
-    if (isBulk) {
+    if (count > 1) {
       onDelete(selectedLeads);
       return;
     }
-    onDelete(activeLead.id);
+    onDelete(selectedLeads[0].id);
   }
 
   return (
-    <div className="record-action-panel" role="toolbar" aria-label="Record actions">
-      <div className="record-action-buttons flex items-center gap-2">
-        <span className="text-xs font-bold text-slate-700 px-2 py-1 rounded bg-slate-100">
-          {selectedLeads.length} selected
+    <div className="record-action-panel" role="toolbar" aria-label="Selected lead actions">
+      <div className="record-action-buttons">
+        <span className="record-action-count" aria-live="polite">
+          {count} {count === 1 ? "lead" : "leads"} selected
         </span>
         <button
           type="button"
-          className="record-action-button text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1.5 transition-colors"
+          className="record-action-button"
           onClick={() => onBulkAssign?.(selectedLeads)}
-          aria-label="Bulk assign owner"
+          aria-label="Assign owner to selected leads"
         >
           <UserCheck size={15} />
           <span>Assign Owner</span>
         </button>
-        <button type="button" className="record-action-button delete" onClick={handleDelete} aria-label="Delete record">
-          <Trash2 size={17} />
-          <span>{isBulk ? "Delete" : "Delete"}</span>
+        <button
+          type="button"
+          className="record-action-button delete"
+          onClick={handleDelete}
+          aria-label={`Delete ${count} selected ${count === 1 ? "lead" : "leads"}`}
+        >
+          <Trash2 size={15} />
+          <span>Delete{count > 1 ? ` (${count})` : ""}</span>
         </button>
-        <button type="button" className="record-action-close" onClick={onClose} aria-label="Close record actions">
+        <button type="button" className="record-action-close" onClick={onClose} aria-label="Clear selection" title="Clear selection">
           <X size={17} />
         </button>
       </div>

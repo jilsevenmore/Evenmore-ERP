@@ -130,8 +130,8 @@ const CategoriesPage = lazy(() => import('../features/inventory/CategoriesPage')
 const StockPositionPage = lazy(() => import('../features/inventory/StockPositionPage').then(m => ({ default: m.StockPositionPage })));
 const TransfersPage = lazy(() => import('../features/inventory/TransfersPage').then(m => ({ default: m.TransfersPage })));
 const ERPLocationsPage = lazy(() => import('../features/inventory/LocationsPage').then(m => ({ default: m.LocationsPage })));
-const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage').then(m => ({ default: m.FaultyPartsPage })));
-// Hidden: Service Usage, Zone Requests, Valuation & Ageing out of scope
+// Hidden: Faulty Parts, Service Usage, Zone Requests, Valuation & Ageing out of scope
+// const FaultyPartsPage = lazy(() => import('../features/inventory/FaultyPartsPage').then(m => ({ default: m.FaultyPartsPage })));
 // const ServiceUsagePage = lazy(() => import('../features/inventory/ServiceUsagePage').then(m => ({ default: m.ServiceUsagePage })));
 // const ZoneRequestsPage = lazy(() => import('../features/inventory/ZoneRequestsPage').then(m => ({ default: m.ZoneRequestsPage })));
 // const ValuationAgeingPage = lazy(() => import('../features/inventory/ValuationAgeingPage').then(m => ({ default: m.ValuationAgeingPage })));
@@ -395,7 +395,7 @@ const router = createBrowserRouter([
       { path: 'inventory/stock', element: <Navigate to="/inventory/stock-position" replace /> },
       { path: 'inventory/transfers', element: <Page component={TransfersPage} /> },
       { path: 'inventory/locations', element: <Page component={ERPLocationsPage} /> },
-      { path: 'inventory/faulty-parts', element: <Page component={FaultyPartsPage} /> },
+      // { path: 'inventory/faulty-parts', element: <Page component={FaultyPartsPage} /> }, // Hidden: Faulty Parts out of scope
       // { path: 'inventory/service-usage', element: <Page component={ServiceUsagePage} /> }, // Hidden: Service Usage out of scope
       // { path: 'inventory/zone-requests', element: <Page component={ZoneRequestsPage} /> }, // Hidden: Zone Requests out of scope
       // { path: 'inventory/valuation', element: <Page component={ValuationAgeingPage} /> }, // Hidden: Valuation & Ageing out of scope

@@ -148,8 +148,8 @@ const GUIDE_MODULES = [
         content: 'When selecting a machine in quotations, orders, or transfers, you can expand nested parts, customize quantities, or cascade deletions together.'
       },
       {
-        heading: 'Warehouse Transfers & Faulty RMA',
-        content: 'Move goods between storage zones (Main Hub, North Bay, RMA Quarantine). Track defective units through QA repair cycles.'
+        heading: 'Warehouse Transfers',
+        content: 'Move goods between storage zones (Main Hub, North Bay) and track every transfer from dispatch to receipt.'
       }
     ],
     tips: [
