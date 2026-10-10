@@ -36,39 +36,75 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
     const getMovementTypeBadge = (type, qty) => {
         switch (type) {
             case 'PURCHASE':
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-            <ArrowDownLeft className="w-3 h-3"/> Purchase In
-          </span>);
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        <ArrowDownLeft className="w-3 h-3"/> Purchase In (GRN)
+                    </span>
+                );
+            case 'OPENING_STOCK':
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                        <ArrowDownLeft className="w-3 h-3"/> Opening Stock
+                    </span>
+                );
             case 'SALE':
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-            <ArrowUpRight className="w-3 h-3"/> Sales Dispatch
-          </span>);
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                        <ArrowUpRight className="w-3 h-3"/> Sales Dispatch (DC)
+                    </span>
+                );
             case 'SALES_RETURN':
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
-            <ArrowDownLeft className="w-3 h-3"/> Customer Return
-          </span>);
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200">
+                        <ArrowDownLeft className="w-3 h-3"/> Customer Return
+                    </span>
+                );
+            case 'RETURN_CANCELLATION':
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                        <ArrowUpRight className="w-3 h-3"/> Return Reversal
+                    </span>
+                );
             case 'PURCHASE_RETURN':
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-            <ArrowUpRight className="w-3 h-3"/> Vendor Return
-          </span>);
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                        <ArrowUpRight className="w-3 h-3"/> Vendor Return
+                    </span>
+                );
             case 'TRANSFER_IN':
             case 'TRANSFER_OUT':
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
-            <Layers className="w-3 h-3"/> {type.replace('_', ' ')}
-          </span>);
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
+                        <Layers className="w-3 h-3"/> {type.replace('_', ' ')}
+                    </span>
+                );
             case 'FAULTY':
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
-            <AlertTriangle className="w-3 h-3"/> Faulty Defect
-          </span>);
+            case 'SCRAP':
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                        <AlertTriangle className="w-3 h-3"/> {type === 'SCRAP' ? 'Scrap Write-off' : 'Faulty Defect'}
+                    </span>
+                );
             case 'SERVICE_USAGE':
             case 'ZONE_ISSUE':
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
-            Internal Issue
-          </span>);
+            case 'MATERIAL_ISSUE':
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">
+                        Internal Material Issue
+                    </span>
+                );
+            case 'ADJUSTMENT':
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                        {qty > 0 ? '+ Stock Adj' : '- Stock Adj'}
+                    </span>
+                );
             default:
-                return (<span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
-            {qty > 0 ? '+' : ''}{type}
-          </span>);
+                return (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {qty > 0 ? '+' : ''}{type}
+                    </span>
+                );
         }
     };
     return (<div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${item.name} stock detail`}>
@@ -304,35 +340,51 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
                   <tr>
                     <th className="py-2.5 px-3">Date</th>
                     <th className="py-2.5 px-3">Type</th>
-                    <th className="py-2.5 px-3">Reference #</th>
+                    <th className="py-2.5 px-3">Source / Reference</th>
                     <th className="py-2.5 px-3 text-right">Qty Change</th>
-                    <th className="py-2.5 px-3">Location</th>
+                    <th className="py-2.5 px-3">Warehouse / Location</th>
+                    <th className="py-2.5 px-3 text-center">Status</th>
                     <th className="py-2.5 px-3">Details / Serials</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {movements.length === 0 ? (<tr>
-                      <td colSpan={6} className="py-6 text-center text-slate-400">
+                      <td colSpan={7} className="py-6 text-center text-slate-400">
                         No ledger movements recorded for this item yet.
                       </td>
-                    </tr>) : (movements.map((m) => (<tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{m.date}</td>
-                        <td className="py-2 px-3">{getMovementTypeBadge(m.type, m.quantity)}</td>
-                        <td className="py-2 px-3 font-mono font-medium text-slate-800">
-                          {m.referenceNumber || m.referenceType}
-                        </td>
-                        <td className={`py-2 px-3 text-right font-mono font-bold ${m.quantity > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {m.quantity > 0 ? `+${m.quantity}` : m.quantity} {item.uom}
-                        </td>
-                        <td className="py-2 px-3 text-slate-500 text-[11px]">{m.locationName || '—'}</td>
-                        <td className="py-2 px-3 text-slate-500 text-[11px] max-w-xs">
-                          {m.serials && m.serials.length > 0 ? (
-                            <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
-                              SN: {m.serials.join(', ')}
+                    </tr>) : (movements.map((m) => {
+                      const isReversed = Boolean(m.isReversed || m.reversalMovementId || m.type === 'RETURN_CANCELLATION');
+                      const sourceDoc = m.sourceDocumentType
+                        ? `${m.sourceDocumentType}${m.sourceDocumentId ? ` #${m.sourceDocumentId}` : ''}`
+                        : (m.referenceNumber || m.referenceType || '—');
+                      return (
+                        <tr key={m.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="py-2 px-3 text-slate-500 whitespace-nowrap">{m.date}</td>
+                          <td className="py-2 px-3">{getMovementTypeBadge(m.type, m.quantity)}</td>
+                          <td className="py-2 px-3 font-mono font-medium text-slate-800 text-[11px]">
+                            {sourceDoc}
+                          </td>
+                          <td className={`py-2 px-3 text-right font-mono font-bold ${m.quantity > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            {m.quantity > 0 ? `+${m.quantity}` : m.quantity} <span className="text-[10px] font-normal text-slate-500">{m.uom || item.uom}</span>
+                          </td>
+                          <td className="py-2 px-3 text-slate-500 text-[11px]">{m.locationName || m.location || '—'}</td>
+                          <td className="py-2 px-3 text-center">
+                            <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isReversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-800'
+                            }`}>
+                              {isReversed ? 'Reversed' : 'Posted'}
                             </span>
-                          ) : m.notes || '-'}
-                        </td>
-                      </tr>)))}
+                          </td>
+                          <td className="py-2 px-3 text-slate-500 text-[11px] max-w-xs">
+                            {m.serials && m.serials.length > 0 ? (
+                              <span className="font-mono text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                SN: {m.serials.join(', ')}
+                              </span>
+                            ) : m.notes || '-'}
+                          </td>
+                        </tr>
+                      );
+                    }))}
                 </tbody>
               </table>
             </div>

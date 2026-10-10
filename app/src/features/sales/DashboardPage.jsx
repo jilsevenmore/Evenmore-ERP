@@ -12,7 +12,7 @@ import { canOpenPath, canUse, canUseDashboard } from '../../utils/navAccess';
 //   purchaseBills, items, calculateItemStock), not from static CRM fixture data.
 // import { toISODate, getCurrentISODate } from '../../utils/dateUtils';
 import { toISODate } from '../../utils/dateUtils';
-import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown, Plus } from 'lucide-react';
+import { Target, TrendingUp, ListChecks, FileText, ShoppingCart, Receipt, Send, Truck, ClipboardList, Landmark, Package, Boxes, ArrowLeftRight, MapPin, Building2, Users, Wallet, PieChart, UserCheck, BarChart3, Shield, Settings, ArrowRight, BriefcaseBusiness, UserPlus, CheckSquare, UserRoundPlus, TrendingDown, Plus, ArrowDownLeft, ArrowUpRight, Layers, Eye } from 'lucide-react';
 function buildChart(values, width, height, padding) {
   const max = Math.max(...values);
   const min = 0;
@@ -90,7 +90,11 @@ export const DashboardPage = () => {
   const items = show.inventory ? (erp.items || []) : [];
   const transfers = show.inventory ? (erp.transfers || []) : [];
   const zoneRequests = [];
-  const faultyParts = show.inventory ? (erp.faultyParts || []) : [];
+  // const faultyParts = show.inventory ? (erp.faultyParts || []) : []; // Hidden: Faulty Parts out of scope
+  const inventoryMovements = show.inventory ? (erp.inventoryMovements || []) : [];
+  const locations = show.inventory ? (erp.locations || []) : [];
+  const categories = show.inventory ? (erp.categories || []) : [];
+  const itemTypes = show.inventory ? (erp.itemTypes || []) : [];
 
   const bankAccounts = show.accounts ? (erp.bankAccounts || []) : [];
 
@@ -173,16 +177,64 @@ export const DashboardPage = () => {
   const enriched = show.inventory && calculateItemStock ? items.map((itm) => {
     const calc = calculateItemStock(itm.id) || { available: 0, onHand: 0 };
     let status = 'Optimal';
-    if (calc.available <= (itm.reorderLevel || 5) / 2) status = 'Critical';
+    if (calc.available <= 0) status = 'Critical';
+    else if (calc.available <= (itm.reorderLevel || 5) / 2) status = 'Critical';
     else if (calc.available <= (itm.reorderLevel || 5)) status = 'Low Stock';
-    return { ...itm, availableQty: calc.available, onHandQty: calc.onHand, status };
+    return {
+      ...itm,
+      availableQty: calc.available,
+      onHandQty: calc.onHand,
+      uom: itm.salesUnit || itm.uom || itm.unit || 'Unit',
+      status,
+    };
   }) : [];
 
-  const lowStockItems = enriched.filter((itm) => itm.status === 'Low Stock' || itm.status === 'Critical');
+  const activeItemsCount = show.inventory ? items.filter((itm) => (itm.lifecycleStatus || 'Active') !== 'Inactive').length : 0;
+  const lowStockItems = enriched.filter((itm) => itm.status === 'Low Stock');
+  const criticalStockItems = enriched.filter((itm) => itm.status === 'Critical');
+  const outOfStockItems = enriched.filter((itm) => (itm.availableQty ?? 0) <= 0);
   const totalStockValue = enriched.reduce((acc, itm) => acc + (itm.costPrice || itm.unitCost || 0) * (itm.onHandQty || 0), 0);
+
+  // Breakdown by item type (counts SKUs & asset valuation without summing incompatible units)
+  const stockByTypeMap = {};
+  enriched.forEach((itm) => {
+    const key = itm.itemType || itm.itemKind || 'Standard';
+    if (!stockByTypeMap[key]) stockByTypeMap[key] = { name: key, count: 0, value: 0 };
+    stockByTypeMap[key].count += 1;
+    stockByTypeMap[key].value += (itm.costPrice || itm.unitCost || 0) * (itm.onHandQty || 0);
+  });
+  const stockByType = Object.values(stockByTypeMap).sort((a, b) => b.value - a.value).slice(0, 5);
+
+  // Breakdown by category (counts SKUs & asset valuation without summing incompatible units)
+  const stockByCategoryMap = {};
+  enriched.forEach((itm) => {
+    const key = itm.category || 'General';
+    if (!stockByCategoryMap[key]) stockByCategoryMap[key] = { name: key, count: 0, value: 0 };
+    stockByCategoryMap[key].count += 1;
+    stockByCategoryMap[key].value += (itm.costPrice || itm.unitCost || 0) * (itm.onHandQty || 0);
+  });
+  const stockByCategory = Object.values(stockByCategoryMap).sort((a, b) => b.value - a.value).slice(0, 5);
+
+  // Warehouse-wise distribution
+  const stockByWarehouseMap = {};
+  locations.forEach((loc) => {
+    stockByWarehouseMap[loc.id] = { id: loc.id, name: loc.name, count: 0, value: 0 };
+  });
+  enriched.forEach((itm) => {
+    const locId = itm.locationId || itm.defaultLocationId;
+    const target = locId && stockByWarehouseMap[locId]
+      ? stockByWarehouseMap[locId]
+      : (stockByWarehouseMap['unassigned'] ||= { id: 'unassigned', name: itm.location || 'Central Store', count: 0, value: 0 });
+    target.count += 1;
+    target.value += (itm.costPrice || itm.unitCost || 0) * (itm.onHandQty || 0);
+  });
+  const stockByWarehouse = Object.values(stockByWarehouseMap).filter((l) => l.count > 0 || l.id !== 'unassigned').slice(0, 5);
+
+  // Recent movements feed
+  const recentMovements = show.inventory ? inventoryMovements.slice(0, 7) : [];
   const pendingTransfers = transfers.filter((t) => t.status !== 'Received').length;
   const pendingZoneReqs = 0;
-  const openFaulty = faultyParts.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement').length;
+  // const openFaulty = faultyParts.filter((f) => f.status === 'Reported' || f.status === 'Sent for Replacement').length; // Hidden: Faulty Parts out of scope
 
   const salesTotal = show.sales ? salesOrders.reduce((a, o) => a + (o.amount || o.total || 0), 0) : 0;
   const invoiceTotal = show.sales ? invoices.reduce((a, i) => a + (i.total || 0), 0) : 0;
@@ -633,8 +685,10 @@ export const DashboardPage = () => {
         <div className="xl:col-span-2 bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-text text-sm sm:text-base">Low-Stock Alerts</h3>
-              <p className="text-[11px] sm:text-xs text-muted">Items below safety reorder threshold</p>
+              <h3 className="font-bold text-text text-sm sm:text-base">Stock Alerts & Depletions</h3>
+              <p className="text-[11px] sm:text-xs text-muted">
+                {fmt(activeItemsCount)} active SKUs • {fmt(lowStockItems.length)} low • {fmt(criticalStockItems.length)} critical • Valuation: ₹{fmt(Math.round(totalStockValue))}
+              </p>
             </div>
             <Link to="/inventory/stock-position" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
               <span>View All</span>
@@ -647,19 +701,26 @@ export const DashboardPage = () => {
               <thead>
                 <tr className="border-b border-border text-muted uppercase tracking-wider font-bold text-[10px]">
                   <th className="py-2.5 px-3">SKU</th>
-                  <th className="py-2.5 px-3">Product</th>
+                  <th className="py-2.5 px-3">Product & Spec</th>
                   <th className="py-2.5 px-3 text-center">Available</th>
                   <th className="py-2.5 px-3 text-center">Status</th>
                   <th className="py-2.5 px-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {lowStockItems.slice(0, 6).map((item) => (
+                {[...criticalStockItems, ...lowStockItems].slice(0, 6).map((item) => (
                   <tr key={item.id || item.sku} className="hover:bg-soft/70 transition-colors">
                     <td className="py-2.5 sm:py-3 px-3 font-mono font-semibold text-text-secondary whitespace-nowrap">{item.sku}</td>
-                    <td className="py-2.5 sm:py-3 px-3 font-semibold text-text max-w-[160px] sm:max-w-none truncate">{item.name}</td>
+                    <td className="py-2.5 sm:py-3 px-3 max-w-[180px]">
+                      <p className="font-semibold text-text truncate">{item.name}</p>
+                      {(item.specification || item.dimensions || item.grade) && (
+                        <p className="text-[10px] font-mono text-muted truncate">
+                          {[item.itemType, item.grade, item.specification || item.dimensions].filter(Boolean).join(' • ')}
+                        </p>
+                      )}
+                    </td>
                     <td className="py-2.5 sm:py-3 px-3 text-center font-bold text-danger font-mono whitespace-nowrap">
-                      {item.availableQty}
+                      {Number(item.availableQty || 0).toLocaleString()} <span className="text-[10px] font-normal text-muted">{item.uom}</span>
                     </td>
                     <td className="py-2.5 sm:py-3 px-3 text-center whitespace-nowrap">
                       <StatusBadge status={item.status} />
@@ -676,7 +737,7 @@ export const DashboardPage = () => {
                     </td>
                   </tr>
                 ))}
-                {lowStockItems.length === 0 && (
+                {lowStockItems.length === 0 && criticalStockItems.length === 0 && (
                   <tr>
                     <td colSpan={5} className="py-6 text-center text-muted">
                       All inventory levels are healthy and stocked.
@@ -687,16 +748,18 @@ export const DashboardPage = () => {
             </table>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-xs font-semibold">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 text-xs font-semibold">
             <Link to="/inventory/items" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Items: {fmt(items.length)}
             </Link>
             <Link to="/inventory/transfers" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Transfers: {fmt(transfers.length)}
             </Link>
+            {/* Hidden: Faulty Parts out of scope
             <Link to="/inventory/faulty-parts" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition truncate">
               Faulty: {fmt(openFaulty)}
             </Link>
+            */}
             <Link to="/inventory/locations" className="btn-outline h-9 flex items-center justify-center px-2.5 rounded-xl text-center shadow-2xs transition gap-1 truncate">
               <MapPin size={12} className="shrink-0" />
               <span className="truncate">Locations</span>
@@ -793,6 +856,153 @@ export const DashboardPage = () => {
           </div>
         </div>
         )}
+      </div>
+      )}
+
+      {/* Inventory Physical Movements Feed & Taxonomic Breakdown */}
+      {show.inventory && (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 mt-2">
+        {/* Left 2 Cols: Recent Inward and Outward Movements */}
+        <div className="lg:col-span-2 bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="font-bold text-text text-sm sm:text-base">Recent Stock Movements (Inward & Outward)</h3>
+              <p className="text-[11px] sm:text-xs text-muted">Audited physical receipts, GRNs, delivery dispatches, and transfers</p>
+            </div>
+            <Link to="/inventory/stock-position" className="text-xs font-bold text-primary hover:underline flex items-center gap-1">
+              <span>View Stock Ledger</span>
+              <ArrowRight size={13} />
+            </Link>
+          </div>
+
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-thin">
+            <table className="w-full min-w-[500px] text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-border text-muted uppercase tracking-wider font-bold text-[10px]">
+                  <th className="py-2.5 px-3">Direction & Type</th>
+                  <th className="py-2.5 px-3">Date</th>
+                  <th className="py-2.5 px-3">SKU & Item Spec</th>
+                  <th className="py-2.5 px-3">Reference Doc</th>
+                  <th className="py-2.5 px-3 text-right">Quantity</th>
+                  <th className="py-2.5 px-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {recentMovements.map((m) => {
+                  const isPositive = Number(m.quantity) > 0 || String(m.direction || '').toUpperCase() === 'IN';
+                  return (
+                    <tr key={m.id} className="hover:bg-soft/70 transition-colors">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          isPositive
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/30'
+                            : 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-400 border border-rose-200 dark:border-rose-500/30'
+                        }`}>
+                          {isPositive ? <ArrowDownLeft size={11}/> : <ArrowUpRight size={11}/>}
+                          {isPositive ? 'IN' : 'OUT'} • {m.type || (isPositive ? 'RECEIPT' : 'DISPATCH')}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] text-muted whitespace-nowrap">
+                        {m.date || m.movement_date || '—'}
+                      </td>
+                      <td className="py-2.5 px-3 min-w-[140px]">
+                        <p className="font-mono font-bold text-text truncate">{m.itemSku || m.sku || '—'}</p>
+                        <p className="text-[10px] text-muted truncate">
+                          {[m.itemName || m.name, m.specification || m.dimensions || m.grade].filter(Boolean).join(' • ')}
+                        </p>
+                      </td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className="font-mono text-xs font-semibold text-text-secondary">
+                          {m.referenceNumber || m.reference_number || (m.referenceType ? `${m.referenceType} #${m.referenceId?.slice(0, 8)}` : '—')}
+                        </span>
+                      </td>
+                      <td className={`py-2.5 px-3 text-right font-mono font-bold whitespace-nowrap ${
+                        isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                      }`}>
+                        {isPositive ? '+' : ''}{Number(m.quantity || 0).toLocaleString()} {m.uom || ''}
+                      </td>
+                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                        <span className="inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                          {m.status || (m.isReversed ? 'Reversed' : 'Posted')}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {recentMovements.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-muted">
+                      No stock movements recorded yet. Incoming GRNs and Delivery dispatches will appear here.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Right Col: Category / Type & Warehouse Distribution */}
+        <div className="space-y-5">
+          {/* Stock by Item Classification */}
+          <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-bold text-text text-sm">Stock by Classification</h3>
+                <p className="text-[11px] text-muted">Category composition & asset valuation</p>
+              </div>
+              <Link to="/inventory/categories" className="text-xs font-bold text-primary hover:underline">
+                Categories
+              </Link>
+            </div>
+            <div className="space-y-2 text-xs">
+              {stockByCategory.map((c) => (
+                <div key={c.name} className="flex items-center justify-between p-2 rounded-lg bg-soft/60 hover:bg-soft transition border border-border/60">
+                  <span className="font-semibold text-text truncate max-w-[150px] flex items-center gap-1.5">
+                    <Layers size={13} className="text-primary shrink-0" />
+                    <span className="truncate">{c.name}</span>
+                  </span>
+                  <div className="text-right whitespace-nowrap font-mono text-[11px]">
+                    <span className="text-muted mr-1.5">{c.count} SKUs</span>
+                    <strong className="text-text font-bold">₹{fmt(Math.round(c.value))}</strong>
+                  </div>
+                </div>
+              ))}
+              {stockByCategory.length === 0 && (
+                <p className="text-xs text-muted py-2">No category allocations available.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Warehouse-wise Stock */}
+          <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-5 shadow-xs">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-bold text-text text-sm">Warehouse Stock Allocation</h3>
+                <p className="text-[11px] text-muted">Physical storage locations</p>
+              </div>
+              <Link to="/inventory/locations" className="text-xs font-bold text-primary hover:underline">
+                Locations
+              </Link>
+            </div>
+            <div className="space-y-2 text-xs">
+              {stockByWarehouse.map((w) => (
+                <div key={w.name} className="flex items-center justify-between p-2 rounded-lg bg-soft/60 hover:bg-soft transition border border-border/60">
+                  <span className="font-semibold text-text truncate max-w-[150px] flex items-center gap-1.5">
+                    <MapPin size={13} className="text-primary shrink-0" />
+                    <span className="truncate">{w.name}</span>
+                  </span>
+                  <div className="text-right whitespace-nowrap font-mono text-[11px]">
+                    <span className="text-muted mr-1.5">{w.count} SKUs</span>
+                    <strong className="text-text font-bold">₹{fmt(Math.round(w.value))}</strong>
+                  </div>
+                </div>
+              ))}
+              {stockByWarehouse.length === 0 && (
+                <p className="text-xs text-muted py-2">No storage locations configured.</p>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
       )}
 

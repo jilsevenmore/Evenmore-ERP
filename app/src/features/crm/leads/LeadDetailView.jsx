@@ -24,7 +24,6 @@ import {
   UserCheck,
   Building2,
   Paperclip,
-  Share2,
   ArrowRight,
   Sparkles,
   ShoppingBag,
@@ -84,10 +83,8 @@ const DETAIL_TABS = [
   'General',
   'Users & Products',
   'Sources & Emails',
-  'Discussion & Notes',
   'Files',
   'Tasks',
-  'Calls',
   'Estimates',
   'Quotations',
   'Delivery Challans',
@@ -98,10 +95,8 @@ const DETAIL_TAB_ICONS = {
   General: Info,
   'Users & Products': UserCheck,
   'Sources & Emails': Globe,
-  'Discussion & Notes': Share2,
   Files: FileStack,
   Tasks: ListChecks,
-  Calls: Phone,
   Estimates: Receipt,
   Quotations: FileText,
   'Delivery Challans': Truck,
@@ -304,7 +299,7 @@ function parseLeadTaskDueAt(value) {
 function emptyLeadTaskEditor(assignee, stage) {
   return {
     defaultTask: 'custom', title: '', stage: stage || 'New Lead', priority: 'Medium', status: 'Due',
-    assignee: assignee || '', description: '', proposalId: '', deliveryChallanId: '',
+    assignee: assignee || '', description: '',
     taskFormId: '', customValues: {}, taskDate: '', taskTime: '',
   };
 }
@@ -323,7 +318,7 @@ function splitLeadTaskDueAt(value) {
 /**
  * A CRM task (`/crm/tasks/`) as the lead's Tasks tab renders it. The columns
  * the task list shares are the task's own; what only this tab captures (stage,
- * due time, task-form answers, linked proposal / challan) rides in `extra`.
+ * due time, task-form answers) rides in `extra`.
  */
 function leadTaskFromCrmTask(task) {
   const extra = task.extra || {};
@@ -386,17 +381,6 @@ function useLeadDetailState(lead) {
     if (leadId) load(leadId);
   }, [leadId, load]);
   return useMemo(() => leadDetailState(detail), [detail]);
-}
-
-function DiscussionAvatar({ thread, lead }) {
-  if (thread?.kind === 'lead') {
-    return <LeadAvatar lead={lead} className="discussion-avatar lead" />;
-  }
-  return (
-    <span className="discussion-avatar discussion-avatar-badge" style={{ backgroundColor: thread?.color ?? '#2F6FED' }}>
-      {getInitials(thread?.name)}
-    </span>
-  );
 }
 
 function formatNoteValue(currentValue, textarea, prefix, suffix = prefix, fallback = 'text') {
@@ -1028,257 +1012,9 @@ function FilesTab({ lead, onCountsChange, onActivity }) {
   );
 }
 
-function CallsTab({ lead, onCountsChange, onActivity }) {
-  const initialState = useLeadDetailState(lead);
-  const { calls } = initialState;
-  const [isLogOpen, setIsLogOpen] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [subject, setSubject] = useState('');
-  const [callType, setCallType] = useState('Outbound');
-  const [assignee, setAssignee] = useState(() => lead?.owner || currentUserName());
-  const [description, setDescription] = useState('');
-  const [outcome, setOutcome] = useState('Connected');
-  const [duration, setDuration] = useState('');
-  const [notes, setNotes] = useState('');
-  const assigneeOptions = useMemo(() => {
-    const names = [lead?.owner, ...useCrmStore.getState().teamMembers.map((e) => e.name)].map((n) => String(n || '').trim()).filter(Boolean);
-    return [...new Set(names)];
-  }, [lead?.owner]);
-
-  React.useEffect(() => {
-    onCountsChange?.({ calls: calls.length });
-  }, [calls.length, onCountsChange]);
-
-  function dialNumber() {
-    const digits = String(lead?.phone || '').replace(/[^0-9]/g, '');
-    if (!digits) return;
-    const target = digits.length === 10 ? `+91${digits}` : `+${digits}`;
-    try {
-      window.location.href = `tel:${target}`;
-    } catch {
-      return;
-    }
-  }
-
-  function addCallLog(entry) {
-    const item = { phone: lead?.phone || '', direction: 'Outgoing', ...entry };
-    leadDetailWrite(lead.id, 'add', 'calls', item, onActivity).then((saved) => {
-      if (saved) onActivity?.(`Call ${entry.outcome || 'logged'} with ${lead?.name || 'lead'}`, '#10b981');
-    });
-  }
-
-  function callNow() {
-    addCallLog({ outcome: 'Dialled', duration: '-', notes: 'Dialled from Calls tab.' });
-    dialNumber();
-  }
-
-  function saveAddCall(event) {
-    event?.preventDefault();
-    if (!String(subject || '').trim()) return;
-    if (!assignee) return;
-    addCallLog({ subject: subject.trim(), direction: callType, outcome: 'Connected', duration: '-', notes: description.trim() || subject.trim(), by: assignee, callType });
-    setSubject('');
-    setCallType('Outbound');
-    setDescription('');
-    setIsAddOpen(false);
-  }
-
-  function saveManualLog(event) {
-    event?.preventDefault();
-    addCallLog({ outcome, duration: duration ? `${duration} min` : '-', notes: notes.trim() || '-' });
-    setOutcome('Connected');
-    setDuration('');
-    setNotes('');
-    setIsLogOpen(false);
-  }
-
-  function removeCall(id) {
-    const target = calls.find((c) => c.id === id);
-    leadDetailWrite(lead.id, 'remove', 'calls', { id }, onActivity).then((done) => {
-      if (done) onActivity?.(`Call log with ${target?.by ?? 'lead'} removed`, '#f59e0b');
-    });
-  }
-
-  function outcomeStyle(value) {
-    if (value === 'Connected') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    if (value === 'Dialled') return 'bg-blue-50 text-blue-700 border-blue-200';
-    if (value === 'Busy') return 'bg-amber-50 text-amber-700 border-amber-200';
-    if (value === 'Call Back') return 'bg-purple-50 text-purple-700 border-purple-200';
-    if (value === 'Wrong Number') return 'bg-rose-50 text-rose-700 border-rose-200';
-    return 'bg-slate-100 text-slate-600 border-slate-200';
-  }
-
-  return (
-    <div className="card">
-      <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-        <h3 className="font-bold text-sm">Calls ({calls.length})</h3>
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-          <button type="button" onClick={() => setIsLogOpen(true)} className="btn-outline btn-sm">
-            Log Call
-          </button>
-          <button type="button" onClick={callNow} className="btn-primary btn-sm flex items-center gap-1.5">
-            <Phone size={13} /> Call Lead
-          </button>
-          <button type="button" onClick={() => { setSubject(''); setCallType('Outbound'); setAssignee(lead?.owner || assigneeOptions[0] || currentUserName()); setDescription(''); setIsAddOpen(true); }} title="Add Call" aria-label="Add Call" className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors">
-            <Plus size={16} />
-          </button>
-        </div>
-      </div>
-
-      <div className="table-scroll">
-        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
-          <thead>
-            <tr>
-              <th style={{ width: 36 }}>#</th>
-              <th>Lead</th>
-              <th>Phone</th>
-              <th>Date & Time</th>
-              <th>Duration</th>
-              <th>Outcome</th>
-              <th>Called By</th>
-              <th style={{ width: 80, textAlign: 'center' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {calls.map((c, idx) => (
-              <React.Fragment key={c.id}>
-                <tr>
-                  <td className="text-slate-500 font-mono">{idx + 1}</td>
-                  <td className="font-semibold">{lead?.name}</td>
-                  <td>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="font-medium">{c.phone || lead?.phone}</span>
-                      <button type="button" onClick={callNow} title="Call now" className="p-1 rounded text-emerald-600 hover:bg-emerald-50 transition cursor-pointer">
-                        <Phone size={13} />
-                      </button>
-                    </span>
-                  </td>
-                  <td className="text-slate-500 text-xs whitespace-nowrap">{c.date}</td>
-                  <td className="text-slate-600">{c.duration}</td>
-                  <td>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${outcomeStyle(c.outcome)}`}>
-                      {c.outcome}
-                    </span>
-                  </td>
-                  <td className="text-xs font-medium">{c.by}</td>
-                  <td>
-                    <div className="flex items-center justify-center gap-1">
-                      <button type="button" onClick={() => removeCall(c.id)} className="p-1 rounded text-rose-500 hover:bg-rose-50 transition cursor-pointer" title="Delete">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                {(c.subject || c.callType || c.direction || c.notes) && (
-                  <tr>
-                    <td />
-                    <td colSpan={7} className="!py-1.5">
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-500">
-                        {c.subject && <span><span className="font-semibold text-slate-600">Subject:</span> {c.subject}</span>}
-                        {(c.callType || c.direction) && <span><span className="font-semibold text-slate-600">Call Type:</span> {c.callType || c.direction}</span>}
-                        {c.notes && c.notes !== '-' && c.notes !== c.subject && <span className="min-w-0"><span className="font-semibold text-slate-600">Description:</span> {c.notes}</span>}
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-            {calls.length === 0 && (
-              <tr>
-                <td colSpan={8} className="empty-row">No calls logged yet. Click Call Lead to dial {lead?.name || 'this lead'}.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {isLogOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsLogOpen(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">Log Call</h4>
-                <p className="text-xs text-slate-500 mt-1">Record a call with {lead?.name} ({lead?.phone}).</p>
-              </div>
-              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setIsLogOpen(false)} aria-label="Close log call dialog">×</button>
-            </div>
-            <form onSubmit={saveManualLog} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label text-xs">Outcome *</label>
-                  <select value={outcome} onChange={(e) => setOutcome(e.target.value)} className="form-select text-xs">
-                    <option value="Connected">Connected</option>
-                    <option value="Not Answered">Not Answered</option>
-                    <option value="Busy">Busy</option>
-                    <option value="Call Back">Call Back</option>
-                    <option value="Wrong Number">Wrong Number</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label text-xs">Duration (min)</label>
-                  <input type="number" min="0" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="e.g. 5" className="form-input text-xs" />
-                </div>
-              </div>
-              <div>
-                <label className="form-label text-xs">Notes</label>
-                <textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="What was discussed..." className="form-textarea text-xs resize-none" />
-              </div>
-              <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={() => setIsLogOpen(false)} className="btn-ghost btn-sm">Cancel</button>
-                <button type="submit" className="btn-primary btn-sm">Save Log</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {isAddOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setIsAddOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Add Call">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h4 className="text-[15px] font-semibold text-slate-900">Add Call</h4>
-              <button type="button" onClick={() => setIsAddOpen(false)} className="text-slate-400 hover:text-slate-600 transition" aria-label="Close add call dialog"><X size={20} /></button>
-            </div>
-            <form onSubmit={saveAddCall} className="px-6 py-5 space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Subject<span className="text-rose-500">*</span></label>
-                  <input autoFocus value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter Subject" className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
-                </div>
-                <div>
-                  <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Call Type<span className="text-rose-500">*</span></label>
-                  <select value={callType} onChange={(e) => setCallType(e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
-                    <option value="Outbound">Outbound</option>
-                    <option value="Inbound">Inbound</option>
-                    <option value="Missed">Missed</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Assignee<span className="text-rose-500">*</span></label>
-                <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
-                  <option value="">Select User</option>
-                  {assigneeOptions.map((n) => (<option key={n} value={n}>{n}</option>))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-[13px] font-medium text-slate-700 mb-1.5">Description</label>
-                <textarea rows={7} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter Description" className="w-full px-4 py-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 resize-y focus:outline-none focus:border-blue-500" />
-              </div>
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setIsAddOpen(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold">Cancel</button>
-                <button type="submit" disabled={!String(subject || '').trim() || !assignee} className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold disabled:opacity-50">Add</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// Replaced: CallsTab (lead call log) removed together with the Calls tab and KPI card.
 
 function LeadTasksTab({ lead, onCountsChange, onActivity }) {
-  const { quotations, deliveryChallans } = useERP() || {};
   const navigate = useNavigate();
   const initialState = useLeadDetailState(lead);
   // This lead's tasks are the CRM task list's (`/crm/tasks/?lead=…`), not a copy.
@@ -1315,20 +1051,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   React.useEffect(() => {
     setMasterTaskOptions(getMasterTaskOptions());
   }, [isModalOpen]);
-  const linkedQuotations = useMemo(
-    () => (quotations || []).filter((quotation) => quotationMatchesLead(quotation, lead)),
-    [lead, quotations]
-  );
-  const linkedChallans = useMemo(() => {
-    const customerName = String(lead?.company || lead?.name || '').trim().toLowerCase();
-    const leadName = String(lead?.name || '').trim().toLowerCase();
-
-    return (deliveryChallans || []).filter((challan) => {
-      const customer = String(challan.customer || '').trim().toLowerCase();
-      if (!customerName) return true;
-      return customer.includes(customerName) || (leadName && customer.includes(leadName));
-    });
-  }, [deliveryChallans, lead]);
   const [form, setForm] = useState(() => emptyLeadTaskEditor(defaultAssignee, lead?.status));
   const [formError, setFormError] = useState('');
   const [completeId, setCompleteId] = useState(null);
@@ -1356,8 +1078,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
         stage: form.stage,
         dueAt: formatLeadTaskDueAt(`${form.taskDate}T${form.taskTime || '00:00'}`),
         process: form.status === 'Completed' ? 'Done' : 'Not Started',
-        proposalId: form.proposalId,
-        deliveryChallanId: form.deliveryChallanId,
         taskFormId: form.taskFormId,
         taskFormName: selectedTaskForm?.title || '',
         customValues: form.customValues || {},
@@ -1405,8 +1125,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       status: task.status || 'Due',
       assignee: task.assignee || defaultAssignee,
       description: task.description || '',
-      proposalId: task.proposalId || '',
-      deliveryChallanId: task.deliveryChallanId || '',
       taskFormId: task.taskFormId || '',
       customValues: task.customValues || {},
       taskDate: due.taskDate,
@@ -1802,22 +1520,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
                     {assigneeOptions.map((name) => (<option key={name} value={name}>{name}</option>))}
                   </select>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Proposal</label>
-                    <select value={form.proposalId} onChange={(e) => updateTaskForm('proposalId', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
-                      <option value="">Select Proposal</option>
-                      {linkedQuotations.map((quotation) => (<option key={quotation.id} value={quotation.id}>{quotation.quoteNumber || quotation.quotationNumber || quotation.customer || 'Proposal'}</option>))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Delivery Challan</label>
-                    <select value={form.deliveryChallanId} onChange={(e) => updateTaskForm('deliveryChallanId', e.target.value)} className="w-full h-11 px-4 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
-                      <option value="">Select Delivery Challan</option>
-                      {linkedChallans.map((challan) => (<option key={challan.id} value={challan.id}>{challan.challanNumber || challan.linkedSo || challan.customer || 'Delivery Challan'}</option>))}
-                    </select>
-                  </div>
-                </div>
                 <div>
                   <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Task Form</label>
                   <select value={form.taskFormId} onChange={(e) => updateTaskForm('taskFormId', e.target.value)} className="w-full h-11 px-4 bg-white border-2 border-[#1d4a79] rounded-lg text-[13px] text-slate-800 focus:outline-none">
@@ -1910,6 +1612,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 function EstimatesTab({ lead, onCountsChange }) {
   const all = useEstimates();
   const { customers } = useERP() || {};
+  const navigate = useNavigate();
   const linked = useMemo(() => all.filter((e) => estimateMatchesLead(e, lead)), [all, lead]);
   const storedProducts = useLeadDetailState(lead).products;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -1968,9 +1671,14 @@ function EstimatesTab({ lead, onCountsChange }) {
     <div className="card">
       <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <h3 className="font-bold text-sm">Estimates ({linked.length})</h3>
-        <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
-          <Plus size={13} strokeWidth={2.4} /> New Estimate
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => navigate('/sales/estimates')} className="btn-outline btn-sm flex items-center gap-1.5">
+            Open in Sales <ArrowRight size={13} />
+          </button>
+          <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
+            <Plus size={13} strokeWidth={2.4} /> New Estimate
+          </button>
+        </div>
       </div>
       <div className="table-scroll">
         <table className="data-table text-xs min-w-[640px] lg:min-w-0">
@@ -1991,7 +1699,7 @@ function EstimatesTab({ lead, onCountsChange }) {
               <tr key={e.id}>
                 <td className="text-slate-500 font-mono">{idx + 1}</td>
                 <td>
-                  <button type="button" onClick={openCreateModal} className="font-mono font-bold text-blue-600 hover:underline">
+                  <button type="button" onClick={() => navigate('/sales/estimates')} className="font-mono font-bold text-blue-600 hover:underline">
                     {e.estimateNumber}
                   </button>
                 </td>
@@ -2008,7 +1716,7 @@ function EstimatesTab({ lead, onCountsChange }) {
                 </td>
                 <td>
                   <div className="flex items-center justify-center gap-1">
-                    <button type="button" onClick={openCreateModal} className="p-1 rounded text-blue-600 hover:bg-blue-50 transition cursor-pointer" title="Open estimate details">
+                    <button type="button" onClick={() => navigate('/sales/estimates')} className="p-1 rounded text-blue-600 hover:bg-blue-50 transition cursor-pointer" title="Open estimate in Sales">
                       <Eye size={13} />
                     </button>
                   </div>
@@ -2097,6 +1805,7 @@ function quotationMatchesLead(q, lead) {
 
 function QuotationsTab({ lead, onActivity }) {
   const { quotations, customers, updateQuotationStatus, addQuotation } = useERP() || {};
+  const navigate = useNavigate();
   const linked = useMemo(() => (quotations || []).filter((q) => quotationMatchesLead(q, lead)), [quotations, lead]);
   const storedProducts = useLeadDetailState(lead).products;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -2174,9 +1883,14 @@ function QuotationsTab({ lead, onActivity }) {
     <div className="card">
       <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <h3 className="font-bold text-sm">Quotations ({linked.length})</h3>
-        <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
-          <Plus size={13} strokeWidth={2.4} /> New Quotation
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => navigate('/sales/quotations')} className="btn-outline btn-sm flex items-center gap-1.5">
+            Open in Sales <ArrowRight size={13} />
+          </button>
+          <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
+            <Plus size={13} strokeWidth={2.4} /> New Quotation
+          </button>
+        </div>
       </div>
       <div className="table-scroll">
         <table className="data-table text-xs min-w-[640px] lg:min-w-0">
@@ -2197,7 +1911,7 @@ function QuotationsTab({ lead, onActivity }) {
               <tr key={q.id}>
                 <td className="text-slate-500 font-mono">{idx + 1}</td>
                 <td>
-                  <button type="button" onClick={openCreateModal} className="font-mono font-bold text-blue-600 hover:underline">
+                  <button type="button" onClick={() => navigate(`/sales/quotations?quotationId=${encodeURIComponent(q.id)}`)} className="font-mono font-bold text-blue-600 hover:underline">
                     {q.quoteNumber}
                   </button>
                 </td>
@@ -2214,7 +1928,7 @@ function QuotationsTab({ lead, onActivity }) {
                 </td>
                 <td>
                   <div className="flex items-center justify-center gap-1">
-                    <button type="button" onClick={openCreateModal} className="p-1 rounded text-blue-600 hover:bg-blue-50 transition cursor-pointer" title="Open quotation details">
+                    <button type="button" onClick={() => navigate(`/sales/quotations?quotationId=${encodeURIComponent(q.id)}`)} className="p-1 rounded text-blue-600 hover:bg-blue-50 transition cursor-pointer" title="Open quotation in Sales">
                       <Eye size={13} />
                     </button>
                     {q.status !== 'Sent' && (
@@ -2296,6 +2010,7 @@ function QuotationsTab({ lead, onActivity }) {
 
 function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
   const { deliveryChallans, salesOrders, addDeliveryChallan } = useERP() || {};
+  const navigate = useNavigate();
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [selectedSoId, setSelectedSoId] = useState('');
   const [transporter, setTransporter] = useState('');
@@ -2311,6 +2026,7 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
     const leadName = String(lead?.name || '').trim().toLowerCase();
 
     return allChallans.filter((challan) => {
+      if (challan.leadId && String(challan.leadId) === String(lead?.id)) return true;
       const customerMatch = challan.customer && (
         String(challan.customer).trim().toLowerCase().includes(customerName) ||
         (leadName && String(challan.customer).trim().toLowerCase().includes(leadName)) ||
@@ -2359,6 +2075,8 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
       linkedSo: order.orderNumber,
       customerId: order.customerId,
       customer: order.customer || lead?.company || lead?.name,
+      leadId: String(lead?.id || ''),
+      leadName: lead?.name || '',
       date: new Date().toISOString().split('T')[0],
       dispatchDate: new Date().toISOString().split('T')[0],
       transporter,
@@ -2376,9 +2094,14 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
     <div className="card">
       <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
         <h3 className="font-bold text-sm">Delivery Challans ({linked.length})</h3>
-        <button type="button" onClick={openIssueModal} className="btn-primary btn-sm flex items-center gap-1.5">
-          <Plus size={13} strokeWidth={2.4} /> New Challan
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => navigate('/sales/delivery')} className="btn-outline btn-sm flex items-center gap-1.5">
+            Open in Sales <ArrowRight size={13} />
+          </button>
+          <button type="button" onClick={openIssueModal} className="btn-primary btn-sm flex items-center gap-1.5">
+            <Plus size={13} strokeWidth={2.4} /> New Challan
+          </button>
+        </div>
       </div>
       <div className="table-scroll">
         <table className="data-table text-xs min-w-[640px] lg:min-w-0">
@@ -2397,7 +2120,7 @@ function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
             {linked.map((challan, idx) => (
               <tr key={challan.id}>
                 <td className="text-slate-500 font-mono">{idx + 1}</td>
-                <td className="font-mono font-bold text-blue-600">{challan.challanNumber}</td>
+                <td><button type="button" onClick={() => navigate('/sales/delivery')} className="font-mono font-bold text-blue-600 hover:underline">{challan.challanNumber}</button></td>
                 <td className="font-mono text-slate-600">{challan.salesOrderNumber || challan.linkedSo}</td>
                 <td className="font-semibold">{challan.customer}</td>
                 <td className="text-slate-500 text-xs whitespace-nowrap">{challan.dispatchDate || challan.date}</td>
@@ -2585,161 +2308,7 @@ function ActivityTab({ lead, items }) {
   );
 }
 
-// ── Discussion & Notes Tab ────────────────────────────────────
-function DiscussionNotesTab({ lead, onActivity }) {
-  const storedThreads = useLeadDetailState(lead).threads;
-  const initialThreads = storedThreads.length > 0
-    ? storedThreads
-    : [{ id: `lead-${lead?.id || 0}`, kind: 'lead', name: lead?.name || 'Lead', subtitle: lead?.company || '', note: '', messages: [] }];
-  const [threads, setThreads] = useState(initialThreads);
-  const [selectedThreadId, setSelectedThreadId] = useState(initialThreads[0]?.id ?? null);
-  const [messageDraft, setMessageDraft] = useState('');
-  const [noteDraft, setNoteDraft] = useState('');
-  const [pendingAttachments, setPendingAttachments] = useState([]);
-  const [notesList, setNotesList] = useState([]);
-
-  const selectedThread = threads.find((t) => t.id === selectedThreadId) ?? threads[0];
-
-  function updateThreadMessages(threadId, updater) {
-    setThreads((current) => current.map((t) => (t.id === threadId ? { ...t, messages: updater(t.messages || []) } : t)));
-  }
-
-  function appendSystemMessage(threadId, body) {
-    updateThreadMessages(threadId, (messages) => [...messages, { id: `sys-${Date.now()}`, side: 'out', sender: 'System', body, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-  }
-
-  function handleSendMessage(event) {
-    event?.preventDefault();
-    if (!messageDraft.trim() || !selectedThread) return;
-    const body = messageDraft.trim();
-    updateThreadMessages(selectedThread.id, (messages) => [...messages, { id: `msg-${Date.now()}`, side: 'out', sender: 'You', body, time: 'Now' }]);
-    setMessageDraft('');
-    onActivity?.('Message sent in discussion', '#3b82f6');
-  }
-
-  function handleCallAction() {
-    if (!selectedThread) return;
-    appendSystemMessage(selectedThread.id, `Call logged with ${selectedThread.name}.`);
-    onActivity?.(`Call logged with ${selectedThread.name}`, '#3b82f6');
-  }
-
-  function handleMailAction() {
-    if (!selectedThread) return;
-    appendSystemMessage(selectedThread.id, `Email sent to ${selectedThread.name}.`);
-    onActivity?.(`Email sent to ${selectedThread.name}`, '#3b82f6');
-  }
-
-  function handleUserAction() {
-    if (!selectedThread) return;
-    appendSystemMessage(selectedThread.id, `Mentioned ${selectedThread.name} in a note.`);
-  }
-
-  function handleSaveNote(event) {
-    event?.preventDefault();
-    const text = noteDraft.trim();
-    if ((!text && pendingAttachments.length === 0) || !selectedThread) return;
-    const entry = { id: `note-${Date.now()}`, body: text, attachments: [...pendingAttachments], time: new Date().toLocaleString([], { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }), author: 'You' };
-    setNotesList((current) => [entry, ...current]);
-    if (text) appendSystemMessage(selectedThread.id, `Note: ${text}`);
-    else appendSystemMessage(selectedThread.id, `Note with ${pendingAttachments.length} attachment(s) added.`);
-    setNoteDraft('');
-    setPendingAttachments([]);
-    onActivity?.('Note saved in discussion', '#8b5cf6');
-  }
-
-  function handleAttachmentSelect(event) {
-    const selected = Array.from(event.target.files || []).map((f) => ({ name: f.name, size: f.size }));
-    setPendingAttachments((current) => [...current, ...selected]);
-    event.target.value = '';
-  }
-
-  function removePendingAttachment(name) {
-    setPendingAttachments((current) => current.filter((a) => a.name !== name));
-  }
-
-  function handleNoteFormatting(prefix, suffix) {
-    setNoteDraft((current) => formatNoteValue(current, null, prefix, suffix).nextValue);
-  }
-
-  function applyNoteCommand(command) {
-    if (command === 'bold') handleNoteFormatting('**');
-    if (command === 'italic') handleNoteFormatting('*');
-    if (command === 'call') handleCallAction();
-    if (command === 'mail') handleMailAction();
-  }
-
-  if (!selectedThread) return null;
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card p-3 space-y-2">
-          {threads.map((thread) => (
-            <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full text-left p-2 rounded-lg flex items-center gap-2 ${thread.id === selectedThread.id ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
-              <DiscussionAvatar thread={thread} lead={lead} />
-              <span className="min-w-0"><strong className="block text-xs truncate">{thread.name}</strong><span className="block text-[11px] text-slate-400 truncate">{thread.note}</span></span>
-            </button>
-          ))}
-        </div>
-        <div className="card p-4 space-y-3 lg:col-span-2">
-          <div className="space-y-2">
-            {(selectedThread.messages || []).length === 0 && (
-              <p className="text-xs text-slate-400">No messages yet.</p>
-            )}
-            {(selectedThread.messages || []).map((m) => (
-              <div key={m.id} className={`text-xs p-2 rounded-lg ${m.side === 'out' ? 'bg-blue-50 ml-8' : 'bg-slate-100 mr-8'}`}>
-                <strong>{m.sender}</strong><p>{m.body}</p><span className="text-[10px] text-slate-400">{m.time}</span>
-              </div>
-            ))}
-          </div>
-          <form onSubmit={handleSendMessage} className="flex gap-2">
-            <input type="text" value={messageDraft} onChange={(e) => setMessageDraft(e.target.value)} placeholder="Write a message..." className="form-input text-xs flex-1" />
-            <button type="submit" className="btn-primary btn-sm flex items-center gap-1"><Send size={12} /> Send</button>
-          </form>
-        </div>
-      </div>
-      <div className="card p-4">
-        <h3 className="font-bold text-sm text-slate-900 mb-3">Notes</h3>
-        <form onSubmit={handleSaveNote} className="space-y-2">
-          <textarea rows={3} value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSaveNote(e); }} placeholder="Write a note..." className="form-textarea text-xs w-full" />
-          {pendingAttachments.length > 0 && (
-            <div className="flex gap-1 flex-wrap">
-              {pendingAttachments.map((a) => (
-                <span key={a.name} className="text-[11px] bg-slate-100 rounded-full px-2 py-0.5 flex items-center gap-1">
-                  <Paperclip size={11} /> {a.name}
-                  <button type="button" onClick={() => removePendingAttachment(a.name)} aria-label={`Remove ${a.name}`}>×</button>
-                </span>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-between items-center">
-            <label className="btn-ghost btn-sm cursor-pointer flex items-center gap-1"><Paperclip size={12} /> Attach<input type="file" multiple hidden onChange={handleAttachmentSelect} /></label>
-            <button type="submit" disabled={!noteDraft.trim() && pendingAttachments.length === 0} className="btn-outline btn-sm disabled:opacity-50">Save Note</button>
-          </div>
-        </form>
-        {notesList.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {notesList.map((n) => (
-              <div key={n.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs">
-                {n.body && <p className="text-slate-800 whitespace-pre-wrap">{n.body}</p>}
-                {n.attachments.length > 0 && (
-                  <div className="flex gap-1 flex-wrap mt-2">
-                    {n.attachments.map((a) => (
-                      <span key={a.name} className="text-[11px] bg-white border border-slate-200 rounded-full px-2 py-0.5 flex items-center gap-1 text-slate-600">
-                        <Paperclip size={11} /> {a.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <p className="text-[10px] text-slate-400 mt-1.5">{n.author} · {n.time}</p>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// Replaced: DiscussionNotesTab removed together with the Discussion & Notes tab.
 
 // ── 2. General Tab ────────────────────────────────────────────
 function GeneralTab({ lead, activities = [] }) {
@@ -3649,7 +3218,6 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     { label: 'Source', value: detailCounts.sources, icon: Globe, color: '#10b981', bg: '#f0fdf4' },
     { label: 'Files', value: detailCounts.files, icon: FileStack, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Open Tasks', value: detailCounts.openTasks, icon: ListChecks, color: '#f59e0b', bg: '#fffbeb' },
-    { label: 'Calls', value: detailCounts.calls, icon: Phone, color: '#3b82f6', bg: '#eff6ff' },
     { label: 'Estimates', value: detailCounts.estimates, icon: Receipt, color: '#06b6d4', bg: '#ecfeff' },
     { label: 'Delivery Challans', value: detailCounts.challans, icon: Truck, color: '#f97316', bg: '#fff7ed' },
   ];
@@ -3795,9 +3363,9 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
         {metrics.map((m, index) => (
-          <CrmKpiCard key={m.label} label={m.label} value={m.value} icon={m.icon} tone={['rose', 'emerald', 'purple', 'amber', 'blue', 'teal', 'orange'][index]} />
+          <CrmKpiCard key={m.label} label={m.label} value={m.value} icon={m.icon} tone={['rose', 'emerald', 'purple', 'amber', 'teal', 'orange'][index]} />
         ))}
       </div>
 
@@ -3827,15 +3395,13 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       {activeTab === 'Sources & Emails' && <SourcesAndEmailsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'General' && <GeneralTab lead={activeLeadData} activities={activities} />}
       {activeTab === 'Users & Products' && <UsersProductsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
-      {activeTab === 'Discussion & Notes' && <DiscussionNotesTab lead={activeLeadData} onActivity={logActivity} />}
       {activeTab === 'Files' && <FilesTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'Tasks' && <LeadTasksTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
-      {activeTab === 'Calls' && <CallsTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'Estimates' && <EstimatesTab lead={activeLeadData} onCountsChange={updateDetailCounts} />}
       {activeTab === 'Quotations' && <QuotationsTab lead={activeLeadData} onActivity={logActivity} />}
       {activeTab === 'Delivery Challans' && <DeliveryChallansTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'Activity' && <ActivityTab lead={activeLeadData} items={activities} />}
-      {!['Sources & Emails', 'General', 'Users & Products', 'Discussion & Notes', 'Files', 'Tasks', 'Calls', 'Estimates', 'Quotations', 'Delivery Challans', 'Activity'].includes(activeTab) && (
+      {!['Sources & Emails', 'General', 'Users & Products', 'Files', 'Tasks', 'Estimates', 'Quotations', 'Delivery Challans', 'Activity'].includes(activeTab) && (
         <div className="card p-8 text-center space-y-2">
           <Info size={28} className="text-blue-500 mx-auto" />
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{activeTab} Details</h4>

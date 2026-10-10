@@ -689,19 +689,20 @@ export default function EmployeePortal() {
       const formattedReason = `[Requirement: ${generalForm.category}] (${generalForm.urgency} Urgency) ${generalForm.title.trim()} — ${generalForm.description.trim()}`;
 
       // Sync to attendance/regularizations backend endpoint so HR can query & verify
-      await api.post('/hrms/attendance/regularizations/', {
-        employeeId: currentEmployee?.id || undefined,
+      const res = await api.post('/hrms/attendance/regularizations/', {
+        employeeId: currentEmployee?.id || currentUser?.employeeId || undefined,
         date: generalForm.date,
         requestedCheckIn: '09:00',
         requestedCheckOut: '18:30',
         requestedStatus: 'Present',
         reason: formattedReason,
-      }).catch((apiErr) => {
-        console.warn('Backend general request sync warning:', apiErr);
       });
+
+      const serverId = res?.id || res?.data?.id;
 
       // Add to store so HR Requests queue and Employee Portal update live
       addAttendanceRequest({
+        id: serverId || undefined,
         employee: employeeName,
         dept: department,
         date: generalForm.date,

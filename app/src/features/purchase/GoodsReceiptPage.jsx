@@ -23,7 +23,7 @@ const goodsReceiptGuide = {
     tips: [
         'Only bills with "Awaiting Receipt" status appear here — already received bills are hidden.',
         'Enter the actual weighed/measured quantity per line before confirming.',
-        'Rejected lines create a rework flag — send material to Faulty Parts for vendor claim.',
+        'Rejected lines create a rework flag — raise a purchase return for the vendor claim.',
     ],
     workflow: ['PO Issued', 'Goods Arrive', 'GRN Verified', 'QC Checked', 'Stock Updated'],
 };
@@ -33,6 +33,7 @@ export const GoodsReceiptPage = () => {
         purchaseOrders,
         vendors,
         items: masterItems,
+        locations = [],
         receivePurchaseBillGoods,
         updateQCStatus,
         qualityStandards = [],
@@ -45,6 +46,8 @@ export const GoodsReceiptPage = () => {
     } = useERP();
 
     const [selectedBill, setSelectedBill] = useState(null);
+    const [selectedLocationId, setSelectedLocationId] = useState('');
+    const [grnTab, setGrnTab] = useState('pending'); // 'pending' | 'received'
     const [receivedQtys, setReceivedQtys] = useState({});
     const [receivedWeights, setReceivedWeights] = useState({}); // [PHASE-2A] weighbridge kg per line
     const [qcStatus, setQcStatus] = useState('Approved');
@@ -85,7 +88,8 @@ export const GoodsReceiptPage = () => {
 
     // Bills still waiting for goods receipt
     const pendingReceipts = (purchaseBills || []).filter((b) => b.goodsReceived !== true && b.status !== 'Cancelled');
-    const receivedCount = (purchaseBills || []).filter((b) => b.goodsReceived === true).length;
+    const completedReceipts = (purchaseBills || []).filter((b) => b.goodsReceived === true && b.status !== 'Cancelled');
+    const receivedCount = completedReceipts.length;
     const pendingQty = pendingReceipts.reduce((sum, b) => sum + (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0), 0);
     const pendingValue = pendingReceipts.reduce((sum, b) => sum + (Number(b.total ?? b.amount) || 0), 0);
     const pendingWeight = pendingReceipts.reduce((sum, b) => sum + (b.items || []).reduce((s, it) => {
@@ -120,6 +124,7 @@ export const GoodsReceiptPage = () => {
 
     const openReceiveModal = (bill) => {
         setSelectedBill(bill);
+        setSelectedLocationId(locations[0]?.id || 'loc-1');
         const initial = {};
         const initialWeights = {};
         (bill.items || []).forEach((it, idx) => {
@@ -243,7 +248,7 @@ export const GoodsReceiptPage = () => {
             };
         });
         const currentBill = selectedBill;
-        receivePurchaseBillGoods(selectedBill.id, overrides, qcStatus);
+        receivePurchaseBillGoods(selectedBill.id, overrides, qcStatus, selectedLocationId);
         setSelectedBill(null);
 
         if (shortfalls.length > 0) {
@@ -437,66 +442,139 @@ export const GoodsReceiptPage = () => {
             </div>
 
             <div className="bg-white border border-[#CED4DA] rounded-lg overflow-hidden">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
                     <div>
-                        <h3 className="font-bold text-sm text-[#1F2E4A]">Bills Pending Goods Receipt</h3>
-                        <p className="text-xs text-slate-500 mt-0.5">Verify physical quantity, QC verdict, then confirm GRN to increase stock.</p>
+                        <h3 className="font-bold text-sm text-[#1F2E4A]">Goods Receipt Workbench</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">Physical intake verification, destination warehouse allocation, and posted ledger movements.</p>
+                    </div>
+                    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
+                        <button
+                            onClick={() => setGrnTab('pending')}
+                            className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${grnTab === 'pending' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                        >
+                            Pending Intake ({pendingReceipts.length})
+                        </button>
+                        <button
+                            onClick={() => setGrnTab('received')}
+                            className={`px-3 py-1 text-xs font-semibold rounded-md transition cursor-pointer ${grnTab === 'received' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+                        >
+                            Completed GRNs ({completedReceipts.length})
+                        </button>
                     </div>
                 </div>
 
-                {pendingReceipts.length === 0 ? (
-                    <div className="p-10 text-center text-slate-500 text-sm">
-                        <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500" />
-                        All purchase bills are received — no pending GRNs.
-                    </div>
+                {grnTab === 'pending' ? (
+                    pendingReceipts.length === 0 ? (
+                        <div className="p-10 text-center text-slate-500 text-sm">
+                            <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500" />
+                            All purchase bills are received — no pending GRNs.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[720px] lg:min-w-0 text-left text-xs text-slate-600">
+                                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th className="py-2.5 px-3">Bill / PO</th>
+                                        <th className="py-2.5 px-3">Vendor</th>
+                                        <th className="py-2.5 px-3 text-center">Lines</th>
+                                        <th className="py-2.5 px-3 text-center">Ordered Qty</th>
+                                        <th className="py-2.5 px-3 text-right">Bill Amount</th>
+                                        <th className="py-2.5 px-3 text-right">Due Date</th>
+                                        <th className="py-2.5 px-3 text-center">Status</th>
+                                        <th className="py-2.5 px-3 text-center">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {pendingReceipts.map((b) => {
+                                        const billQty = (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0);
+                                        return (
+                                            <tr key={b.id} className="hover:bg-slate-50/70">
+                                                <td className="p-2.5">
+                                                    <p className="font-mono font-semibold text-slate-800">{b.billNumber}</p>
+                                                    <span className="text-[10px] text-slate-400 font-mono">{b.linkedPo || b.poRef || 'Direct Bill'}</span>
+                                                </td>
+                                                <td className="p-2.5">
+                                                    <p className="font-semibold text-slate-700">{b.vendor}</p>
+                                                    <span className="text-[10px] text-slate-400">{vendors.find((v) => v.id === b.vendorId)?.city || ''}</span>
+                                                </td>
+                                                <td className="p-2.5 text-center font-mono">{(b.items || []).length}</td>
+                                                <td className="p-2.5 text-center font-mono">{billQty.toLocaleString()}</td>
+                                                <td className="p-2.5 text-right font-mono font-bold text-slate-900">{formatCurrency(Number(b.total ?? b.amount) || 0)}</td>
+                                                <td className="p-2.5 text-right font-mono">{b.dueDate ? formatDateDDMMYYYY(b.dueDate) : '—'}</td>
+                                                <td className="p-2.5 text-center"><StatusBadge status="Awaiting Receipt" tone="amber" /></td>
+                                                <td className="p-2.5 text-center">
+                                                    <button
+                                                        onClick={() => openReceiveModal(b)}
+                                                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-dark transition shadow-2xs cursor-pointer"
+                                                    >
+                                                        <PackageCheck size={13} /> Receive Goods
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
                 ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full min-w-[720px] lg:min-w-0 text-left text-xs text-slate-600">
-                            <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
-                                <tr>
-                                    <th className="py-2.5 px-3">Bill / PO</th>
-                                    <th className="py-2.5 px-3">Vendor</th>
-                                    <th className="py-2.5 px-3 text-center">Lines</th>
-                                    <th className="py-2.5 px-3 text-center">Ordered Qty</th>
-                                    <th className="py-2.5 px-3 text-right">Bill Amount</th>
-                                    <th className="py-2.5 px-3 text-right">Due Date</th>
-                                    <th className="py-2.5 px-3 text-center">Status</th>
-                                    <th className="py-2.5 px-3 text-center">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {pendingReceipts.map((b) => {
-                                    const poInfo = getPoBilledStatus?.(b.purchaseOrderId) || { totalOrderedQty: 0, lines: [] };
-                                    const billQty = (b.items || []).reduce((s, it) => s + (Number(it.qty) || 0), 0);
-                                    return (
-                                        <tr key={b.id} className="hover:bg-slate-50/70">
-                                            <td className="p-2.5">
-                                                <p className="font-mono font-semibold text-slate-800">{b.billNumber}</p>
-                                                <span className="text-[10px] text-slate-400 font-mono">{b.linkedPo || b.poRef || 'Direct Bill'}</span>
-                                            </td>
-                                            <td className="p-2.5">
-                                                <p className="font-semibold text-slate-700">{b.vendor}</p>
-                                                <span className="text-[10px] text-slate-400">{vendors.find((v) => v.id === b.vendorId)?.city || ''}</span>
-                                            </td>
-                                            <td className="p-2.5 text-center font-mono">{(b.items || []).length}</td>
-                                            <td className="p-2.5 text-center font-mono">{billQty.toLocaleString()}</td>
-                                            <td className="p-2.5 text-right font-mono font-bold text-slate-900">{formatCurrency(Number(b.total ?? b.amount) || 0)}</td>
-                                            <td className="p-2.5 text-right font-mono">{b.dueDate ? formatDateDDMMYYYY(b.dueDate) : '—'}</td>
-                                            <td className="p-2.5 text-center"><StatusBadge status={b.goodsReceived ? 'Received' : 'Awaiting Receipt'} /></td>
-                                            <td className="p-2.5 text-center">
-                                                <button
-                                                    onClick={() => openReceiveModal(b)}
-                                                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-primary text-white rounded-xl text-xs font-semibold hover:bg-primary-dark transition shadow-2xs cursor-pointer"
-                                                >
-                                                    <PackageCheck size={13} /> Receive Goods
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                    completedReceipts.length === 0 ? (
+                        <div className="p-10 text-center text-slate-500 text-sm">
+                            <Boxes size={28} className="mx-auto mb-2 text-slate-400" />
+                            No completed goods receipt notes found.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[780px] lg:min-w-0 text-left text-xs text-slate-600">
+                                <thead className="bg-slate-50 uppercase font-semibold text-slate-500 tracking-wider border-b border-slate-200">
+                                    <tr>
+                                        <th className="py-2.5 px-3">GRN / Bill #</th>
+                                        <th className="py-2.5 px-3">Vendor</th>
+                                        <th className="py-2.5 px-3">Received Date</th>
+                                        <th className="py-2.5 px-3">Warehouse Location</th>
+                                        <th className="py-2.5 px-3 text-center">Received Qty</th>
+                                        <th className="py-2.5 px-3 text-center">QC Status</th>
+                                        <th className="py-2.5 px-3 text-center">Ledger Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {completedReceipts.map((b) => {
+                                        const totalRec = (b.items || []).reduce((s, it) => s + (Number(it.receivedQty ?? it.qty) || 0), 0);
+                                        const locName = b.receiptLocationName || locations.find((l) => l.id === b.receiptLocationId)?.name || 'Main Warehouse';
+                                        return (
+                                            <tr key={b.id} className="hover:bg-slate-50/70">
+                                                <td className="p-2.5">
+                                                    <p className="font-mono font-semibold text-slate-800">{b.goodsReceiptNumber || `GRN-${b.billNumber}`}</p>
+                                                    <span className="text-[10px] text-slate-400 font-mono">Bill: {b.billNumber} • {b.linkedPo || 'Direct'}</span>
+                                                </td>
+                                                <td className="p-2.5 font-semibold text-slate-700">{b.vendor}</td>
+                                                <td className="p-2.5 font-mono text-slate-600">
+                                                    {b.receivedDate ? formatDateDDMMYYYY(b.receivedDate) : '—'}
+                                                </td>
+                                                <td className="p-2.5">
+                                                    <span className="font-semibold text-slate-700">{locName}</span>
+                                                </td>
+                                                <td className="p-2.5 text-center font-mono font-bold text-emerald-700">
+                                                    +{totalRec.toLocaleString()}
+                                                </td>
+                                                <td className="p-2.5 text-center">
+                                                    <StatusBadge
+                                                        status={b.qcStatus || 'Approved'}
+                                                        tone={b.qcStatus === 'Rejected' ? 'rose' : b.qcStatus === 'Rework' ? 'amber' : 'green'}
+                                                    />
+                                                </td>
+                                                <td className="p-2.5 text-center">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                                        <CheckCircle2 size={10} /> Posted to Ledger
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )
                 )}
             </div>
 
@@ -512,6 +590,25 @@ export const GoodsReceiptPage = () => {
                         </div>
 
                         <div className="p-4 sm:p-5 space-y-5">
+                            {/* Receiving Warehouse / Location */}
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 block">
+                                    Receiving Warehouse / Location *
+                                </label>
+                                <select
+                                    value={selectedLocationId}
+                                    onChange={(e) => setSelectedLocationId(e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg p-2 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    {(locations || []).map((loc) => (
+                                        <option key={loc.id} value={loc.id}>
+                                            {loc.name || loc.code} {loc.code ? `(${loc.code})` : ''} — {loc.type || 'Warehouse'}
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-[11px] text-slate-500 mt-1">Stock movements and physical on-hand will be posted directly to this warehouse.</p>
+                            </div>
+
                             {/* Line-by-line received quantity */}
                             <div>
                                 <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Received Quantity per Line (Actual / Weighed)</h4>
@@ -522,12 +619,42 @@ export const GoodsReceiptPage = () => {
                                         const pct = orderedVsReceivedPct(selectedBill, idx);
                                         const wMeta = getLineWeightMeta(it);
                                         const variation = computeVariation(it, idx);
+                                        const masterObj = it.itemId ? masterItems.find((mi) => mi.id === it.itemId || mi.sku === it.sku) : null;
+                                        const uom = it.uom || masterObj?.uom || 'units';
+                                        const specString = it.dimensions || masterObj?.dimensions || [
+                                            masterObj?.thicknessMm ? `${masterObj.thicknessMm}mm THK` : null,
+                                            masterObj?.diameterMm ? `Dia ${masterObj.diameterMm}mm` : null,
+                                            masterObj?.lengthMm && masterObj?.widthMm ? `${masterObj.lengthMm}x${masterObj.widthMm}mm` : null,
+                                        ].filter(Boolean).join(' | ');
+                                        const gradeStr = it.grade || masterObj?.grade || masterObj?.materialGrade;
+                                        const typeStr = it.itemType || masterObj?.itemType;
                                         return (
                                             <div key={key} className={`p-3 border rounded-lg bg-[#F8F9FA] ${variation && !variation.withinTolerance ? 'border-rose-300' : 'border-slate-200'}`}>
                                                 <div className="flex items-center gap-3">
                                                     <div className="flex-1 min-w-0">
                                                         <p className="font-semibold text-slate-800 text-xs truncate">{it.name || it.description || 'Item'}</p>
-                                                        <p className="text-[10px] text-slate-400 font-mono">{it.sku || it.itemSku} • Ordered: {ordered}</p>
+                                                        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                                            <span className="text-[10px] text-slate-500 font-mono font-medium">{it.sku || it.itemSku}</span>
+                                                            <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-1.5 py-0.2 rounded border border-emerald-200">
+                                                                UOM: {uom}
+                                                            </span>
+                                                            {typeStr && (
+                                                                <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-1.5 py-0.2 rounded border border-blue-200">
+                                                                    {typeStr}
+                                                                </span>
+                                                            )}
+                                                            {gradeStr && (
+                                                                <span className="text-[10px] font-semibold bg-amber-50 text-amber-700 px-1.5 py-0.2 rounded border border-amber-200">
+                                                                    {gradeStr}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {specString && (
+                                                            <p className="text-[10px] font-mono text-slate-600 mt-0.5">
+                                                                Spec: {specString}
+                                                            </p>
+                                                        )}
+                                                        <p className="text-[10px] text-slate-500 mt-0.5">Ordered: <span className="font-bold text-slate-700">{ordered} {uom}</span></p>
                                                         {wMeta.isWeightItem && (
                                                             <p className="text-[10px] text-blue-700 mt-0.5 flex items-center gap-1">
                                                                 <Scale size={10} /> Weight item • Thero. {wMeta.theoreticalWeight} {wMeta.weightUnit}/unit • Tol ±{wMeta.tolerancePct}%
@@ -537,14 +664,16 @@ export const GoodsReceiptPage = () => {
                                                             <p className="text-[10px] text-amber-700 mt-0.5 flex items-center gap-1"><AlertTriangle size={10} /> Short / partial receipt ({pct}% of order)</p>
                                                         )}
                                                     </div>
-                                                    <input
-                                                        type="number"
-                                                        min={0}
-                                                        value={receivedQtys[key] ?? ordered}
-                                                        onChange={(e) => updateQty(key, e.target.value)}
-                                                        className="w-24 border border-slate-300 rounded-lg p-2 text-right font-mono text-slate-800"
-                                                    />
-                                                    <span className="text-[10px] text-slate-400 w-14 text-center">Received</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <input
+                                                            type="number"
+                                                            min={0}
+                                                            value={receivedQtys[key] ?? ordered}
+                                                            onChange={(e) => updateQty(key, e.target.value)}
+                                                            className="w-24 border border-slate-300 rounded-lg p-2 text-right font-mono text-slate-800"
+                                                        />
+                                                        <span className="text-[11px] font-semibold text-slate-600 w-12 text-left">{uom}</span>
+                                                    </div>
                                                 </div>
                                                 {/* ── [PHASE-2A] weighbridge input — appears for steel / weight items ── */}
                                                 {wMeta.isWeightItem && (

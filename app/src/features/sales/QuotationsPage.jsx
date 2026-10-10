@@ -5,14 +5,14 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2 } from 'lucide-react';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2, Layers, AlertCircle, Check, Link as LinkIcon } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintQuotationModal } from '../../components/common/PrintQuotationModal';
 import { isQuotationConvertible } from '../../utils/quotationDocument';
-import { sheetAutoDescription } from '../../utils/salesLineMetal';
+import { sheetAutoDescription, lineSpecText } from '../../utils/salesLineMetal';
 import { FormSection } from '../../components/common/FormSection';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import PartySelector from '../../components/common/PartySelector';
@@ -42,7 +42,7 @@ const quotationGuide = {
     workflow: ['Quotation Created', 'Customer Approval', 'Convert to Sales Order', 'Warehouse Dispatch', 'Invoiced'],
 };
 export const QuotationsPage = () => {
-    const { customers, quotations, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { customers, quotations, items, calculateItemStock, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
     const leadRequest = location.state && (location.state.fromLead || location.state.fromDeal) ? location.state : null;
@@ -53,6 +53,8 @@ export const QuotationsPage = () => {
     const selectedQuote = quotations.find(q => q.id === selectedQuoteTarget?.id) || selectedQuoteTarget;
     const [printQuotationTarget, setPrintQuotationTarget] = useState(null);
     const [approvalTarget, setApprovalTarget] = useState(null);
+    const [conversionTarget, setConversionTarget] = useState(null);
+    const [conversionMappings, setConversionMappings] = useState({});
     const openedPrintRequest = React.useRef('');
     const [partyData, setPartyData] = useState({
         isOneTimeParty: false,
@@ -164,7 +166,37 @@ export const QuotationsPage = () => {
     };
 
     const handleConvert = (quoteId) => {
-        const order = convertQuotationToSalesOrder(quoteId);
+        const quote = quotations.find((q) => q.id === quoteId);
+        if (!quote) return;
+        const initialMappings = {};
+        (quote.items || []).forEach((line, idx) => {
+            const key = line.id || String(idx + 1);
+            initialMappings[key] = {
+                lineId: line.id,
+                lineNo: idx + 1,
+                itemId: line.itemId || 'custom',
+                qty: Number(line.qty) || 1,
+                uom: line.uom || line.unit || 'Nos',
+                itemType: line.lineKind || '',
+                category: line.category || '',
+                materialGrade: line.materialGrade || '',
+            };
+        });
+        setConversionMappings(initialMappings);
+        setConversionTarget(quote);
+    };
+
+    const confirmConversion = () => {
+        if (!conversionTarget) return;
+        const lineList = Object.values(conversionMappings);
+        for (const lm of lineList) {
+            if (!lm.qty || Number(lm.qty) <= 0) {
+                showToast(`Requested quantity for line ${lm.lineNo} must be greater than zero.`);
+                return;
+            }
+        }
+        const order = convertQuotationToSalesOrder(conversionTarget.id, lineList);
+        setConversionTarget(null);
         if (order) {
             navigate('/sales/orders');
         }
@@ -216,6 +248,15 @@ export const QuotationsPage = () => {
               <div>
                 <strong className="text-slate-900 dark:text-slate-100 block">{q.customer}</strong>
                 <span className="text-[11px] text-muted">Validity: {q.validUntil || '30 Days'}</span>
+                {(q.leadId || q.leadName) && (
+                  <button
+                    onClick={() => q.leadId && navigate(`/crm/leads/${encodeURIComponent(q.leadId)}`)}
+                    className="block text-[11px] font-semibold text-blue-600 hover:underline mt-0.5 cursor-pointer"
+                    title="Open linked lead"
+                  >
+                    Lead: {q.leadName || q.leadId}
+                  </button>
+                )}
               </div>
             ),
         },
@@ -370,6 +411,7 @@ export const QuotationsPage = () => {
 
       <DataTable title="Quotation Register" data={quotations} columns={columns} keyExtractor={(q) => q.id} searchPlaceholder="Search quotations..." searchFilter={(q, term) => String(q.quoteNumber ?? '').toLowerCase().includes(term) ||
             String(q.customer ?? '').toLowerCase().includes(term) ||
+            String(q.leadName ?? '').toLowerCase().includes(term) ||
             String(q.status ?? '').toLowerCase().includes(term)}/>
 
       {isModalOpen && (<div className={`fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all duration-200 ${isFullscreen ? 'p-0' : 'p-2 sm:p-4'}`}>
@@ -574,5 +616,187 @@ export const QuotationsPage = () => {
         quotation={printQuotationTarget}
         onPrint={() => recordQuotationActivity(printQuotationTarget.id, 'PDF print requested')}
       />
+
+      {/* Conversion to Sales Order Modal: Line item linking & inventory review */}
+      {conversionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+                  <Layers size={20} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-800">
+                    Convert Quotation to Sales Order: {conversionTarget.quoteNumber}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Customer: <span className="font-semibold text-slate-700">{conversionTarget.customer || conversionTarget.partyName}</span> · Total: <span className="font-semibold text-primary">{formatCurrency(conversionTarget.amount || 0)}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setConversionTarget(null)}
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Instruction Banner */}
+            <div className="px-5 py-3 bg-blue-50/70 border-b border-blue-100 flex items-start gap-2.5 text-xs text-blue-900">
+              <AlertCircle size={16} className="text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Review & Link Line Items to Stock-Managed Inventory</p>
+                <p className="text-blue-700 mt-0.5">
+                  Link stock-managed lines to inventory SKUs to enable real-time reservation and physical dispatch tracking. Custom metal lines without inventory SKUs will be preserved as custom deliverables without creating fake items.
+                </p>
+              </div>
+            </div>
+
+            {/* Body: Lines list */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
+              {(conversionTarget.items || []).map((line, idx) => {
+                const key = line.id || String(idx + 1);
+                const mapping = conversionMappings[key] || {};
+                const selectedItem = items.find((it) => it.id === mapping.itemId || it.sku === mapping.itemId);
+                const stockInfo = selectedItem ? calculateItemStock(selectedItem.id) : null;
+                const specText = lineSpecText(line);
+
+                return (
+                  <div
+                    key={key}
+                    className="p-4 rounded-lg border border-slate-200 bg-white shadow-sm hover:border-slate-300 transition-all space-y-3"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            Line #{idx + 1}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-900">
+                            {line.name || line.description || `Item ${idx + 1}`}
+                          </span>
+                        </div>
+                        {specText && (
+                          <p className="text-xs text-slate-600 mt-1 font-medium flex items-center gap-1.5">
+                            <span className="text-primary font-mono text-[11px]">Specs:</span> {specText}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs text-slate-500 block">Quoted Qty: {line.qty} {line.uom || line.unit || 'Nos'}</span>
+                        <span className="text-sm font-bold text-slate-900">{formatCurrency(line.amount || ((line.qty || 1) * (line.rate || 0)))}</span>
+                      </div>
+                    </div>
+
+                    {/* Mapping selector */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-2 border-t border-slate-100 items-center">
+                      <div className="md:col-span-8">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Inventory SKU Link
+                        </label>
+                        <select
+                          value={mapping.itemId || 'custom'}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setConversionMappings((prev) => ({
+                              ...prev,
+                              [key]: {
+                                ...prev[key],
+                                itemId: val,
+                              },
+                            }));
+                          }}
+                          className="w-full text-xs border border-slate-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                        >
+                          <option value="custom">🛠️ Keep as Custom Metal Product (No Inventory SKU)</option>
+                          {items.map((it) => (
+                            <option key={it.id} value={it.id}>
+                              [{it.sku}] {it.name} {it.grade || it.metalGrade ? `(${it.grade || it.metalGrade})` : ''} - {it.dimensions || it.uom}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-4">
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Order Qty ({mapping.uom || line.uom || 'Nos'})
+                        </label>
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.0001"
+                          value={mapping.qty ?? line.qty ?? 1}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setConversionMappings((prev) => ({
+                              ...prev,
+                              [key]: {
+                                ...prev[key],
+                                qty: val,
+                              },
+                            }));
+                          }}
+                          className="w-full text-xs border border-slate-300 rounded-md px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Stock & spec preview badge */}
+                    {selectedItem && (
+                      <div className="text-[11px] bg-slate-50 rounded p-2.5 border border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-slate-700">Type: {selectedItem.itemType || 'Metal'}</span>
+                          <span>·</span>
+                          <span className="text-slate-600">Category: {selectedItem.category || 'Stock'}</span>
+                          <span>·</span>
+                          <span className="text-slate-600">Grade: {selectedItem.grade || selectedItem.metalGrade || 'MS'}</span>
+                          <span>·</span>
+                          <span className="text-slate-600">Base UOM: {selectedItem.uom}</span>
+                        </div>
+                        {stockInfo && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-500">Available:</span>
+                            <span className={`font-mono font-bold ${stockInfo.available > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                              {stockInfo.available} {selectedItem.uom}
+                            </span>
+                            <span className="text-slate-400">({stockInfo.onHand} on hand - {stockInfo.reserved} reserved)</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  convertQuotationToSalesOrder(conversionTarget.id);
+                  setConversionTarget(null);
+                  navigate('/sales/orders');
+                }}
+              >
+                Quick Convert (Keep Existing Lines)
+              </Button>
+
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setConversionTarget(null)}>
+                  Cancel
+                </Button>
+                <Button size="sm" onClick={confirmConversion} className="gap-1.5">
+                  <Check size={14} /> Confirm & Create Sales Order
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>);
 };

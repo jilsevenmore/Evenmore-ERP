@@ -66,7 +66,7 @@ const COLLECTION_ROUTE_MAP = {
     stockPositions: '/inventory/stock',
     transfers: '/inventory/transfers',
     locations: '/inventory/locations',
-    faultyParts: '/inventory/faulty-parts',
+    // faultyParts: '/inventory/faulty-parts', // Hidden: Faulty Parts out of scope
     monthEndAudits: '/inventory/audits',
     inventoryMovements: '/inventory/stock',
 
@@ -152,6 +152,8 @@ export const ERPProvider = ({ children, }) => {
     const [itemParts, setItemParts] = useState([]);
     const [items, setItems] = useState([]);
     const [categories, setCategories] = useState([]);
+    const [itemTypes, setItemTypes] = useState([]);
+    const [materialGrades, setMaterialGrades] = useState([]);
     const [quotations, setQuotations] = useState([]);
     const [salesOrders, setSalesOrders] = useState([]);
     const [deliveryChallans, setDeliveryChallans] = useState([]);
@@ -214,7 +216,9 @@ export const ERPProvider = ({ children, }) => {
     // screen, and the failure is retried the next time something reads it.
     const syncSettersRef = useRef(null);
     syncSettersRef.current = {
+        itemTypes: setItemTypes,
         categories: setCategories,
+        materialGrades: setMaterialGrades,
         units: setUnits,
         locations: setLocations,
         items: setItems,
@@ -622,13 +626,27 @@ export const ERPProvider = ({ children, }) => {
         // Sum all movements for this item
         const moves = inventoryMovements.filter((m) => m.itemId === targetId || (m.itemSku && String(m.itemSku ?? '').toLowerCase() === targetSku.toLowerCase()));
         let netMovementQty = 0;
+        let openingStock = 0;
+        let totalInward = 0;
+        let totalOutward = 0;
         moves.forEach((m) => {
             // [PHASE-2A] For weight-based items (steel by kg) prefer the weighed quantity —
             //   stock on hand then reflects actual kg received on the weighbridge.
+            let qty = 0;
             if (item?.isWeightItem && m.weighedQty !== undefined && m.weighedQty !== null) {
-                netMovementQty += Number(m.weighedQty) || 0;
+                qty = Number(m.weighedQty) || 0;
             } else {
-                netMovementQty += m.quantity;
+                qty = Number(m.quantity) || 0;
+            }
+            netMovementQty += qty;
+
+            const isOpening = m.type === 'OPENING_STOCK' || (m.type === 'ADJUSTMENT' && String(m.notes || '').toLowerCase().includes('opening'));
+            if (isOpening) {
+                openingStock += qty;
+            } else if (qty > 0) {
+                totalInward += qty;
+            } else if (qty < 0) {
+                totalOutward += Math.abs(qty);
             }
         });
         // Count damaged parts
@@ -641,19 +659,26 @@ export const ERPProvider = ({ children, }) => {
                 if (so.items && Array.isArray(so.items)) {
                     so.items.forEach((line) => {
                         if (line.itemId === targetId || line.itemSku?.toLowerCase() === targetSku.toLowerCase()) {
-                            reservedQty += line.qty || 0;
+                            const openLineQty = Math.max(0, (Number(line.qty) || 0) - (Number(line.dispatchedQty || line.deliveredQty || 0)));
+                            reservedQty += openLineQty;
                         }
                     });
                 }
             }
         });
-        const onHand = Math.max(0, netMovementQty > 0 ? netMovementQty : (item?.availableQty ?? 0));
+        const onHand = moves.length > 0 ? Math.max(0, openingStock + totalInward - totalOutward) : Math.max(0, item?.availableQty ?? item?.onHand ?? 0);
+        if (moves.length === 0 && onHand > 0) {
+            openingStock = onHand;
+        }
         const available = Math.max(0, onHand - reservedQty);
         return {
             onHand,
             reserved: reservedQty,
             damaged: totalDamaged,
             available,
+            openingStock,
+            totalInward,
+            totalOutward,
         };
     };
     const getCustomerLedger = (customerIdOrName) => {
@@ -923,6 +948,7 @@ export const ERPProvider = ({ children, }) => {
             reversalMovementId: mov.reversalMovementId || null,
             batchNumber: mov.batchNumber || null,
             serials: Array.isArray(mov.serials) ? mov.serials : (mov.selectedSerials || []),
+            uom: mov.uom || '',
             date: mov.date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             notes: mov.notes || '',
         };
@@ -2381,6 +2407,12 @@ export const ERPProvider = ({ children, }) => {
             id: cat.id || `cat-${Date.now()}`,
             name: cat.name || 'Hardware Category',
             code: (cat.code || 'GEN').toUpperCase(),
+            itemTypeId: cat.itemTypeId || '',
+            itemType: cat.itemType || '',
+            defaultUnitId: cat.defaultUnitId || '',
+            defaultUnit: cat.defaultUnit || '',
+            defaultUom: cat.defaultUom || '',
+            isActive: cat.isActive !== undefined ? Boolean(cat.isActive) : true,
             itemCount: 0,
             totalValuation: 0,
             leadTimeDays: cat.leadTimeDays ?? 7,
@@ -2398,6 +2430,123 @@ export const ERPProvider = ({ children, }) => {
         persistUpdate('categories', id, updates, setCategories);
         showToast(`Category updated.`);
     };
+    const deleteCategory = async (id) => {
+        try {
+            await persistDelete('categories', id);
+            setCategories((prev) => prev.filter((c) => c.id !== id));
+            showToast('Category deleted.');
+            return true;
+        } catch (err) {
+            const msg = err?.message || 'Could not delete category.';
+            showToast(msg);
+            throw err;
+        }
+    };
+    const toggleCategoryActive = async (id, currentStatus) => {
+        const newStatus = !currentStatus;
+        setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, isActive: newStatus } : c)));
+        try {
+            const action = newStatus ? 'activate' : 'deactivate';
+            await pushAction('categories', id, action);
+            showToast(`Category ${newStatus ? 'activated' : 'deactivated'}.`);
+        } catch (err) {
+            persistUpdate('categories', id, { isActive: newStatus }, setCategories);
+            showToast(`Category ${newStatus ? 'activated' : 'deactivated'}.`);
+        }
+    };
+
+    // ── ITEM TYPE ACTIONS ──────────────────────────────────────────────
+    const addItemType = (itemType) => {
+        const newType = {
+            id: itemType.id || `it-${Date.now()}`,
+            name: itemType.name || '',
+            code: (itemType.code || 'TYPE').toUpperCase(),
+            description: itemType.description || '',
+            shapeProfile: itemType.shapeProfile || '',
+            dimensionSchema: itemType.dimensionSchema || {},
+            isActive: itemType.isActive !== undefined ? Boolean(itemType.isActive) : true,
+        };
+        setItemTypes((prev) => [...prev, newType]);
+        showToast(`Item Type ${newType.name} registered.`);
+        persistCreate('itemTypes', newType, setItemTypes);
+        return newType;
+    };
+    const updateItemType = (id, updates) => {
+        setItemTypes((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
+        persistUpdate('itemTypes', id, updates, setItemTypes);
+        showToast(`Item Type updated.`);
+    };
+    const deleteItemType = async (id) => {
+        try {
+            await persistDelete('itemTypes', id);
+            setItemTypes((prev) => prev.filter((t) => t.id !== id));
+            showToast('Item Type deleted.');
+            return true;
+        } catch (err) {
+            const msg = err?.message || 'Could not delete item type.';
+            showToast(msg);
+            throw err;
+        }
+    };
+    const toggleItemTypeActive = async (id, currentStatus) => {
+        const newStatus = !currentStatus;
+        setItemTypes((prev) => prev.map((t) => (t.id === id ? { ...t, ...isActive } : t)));
+        try {
+            const action = newStatus ? 'activate' : 'deactivate';
+            await pushAction('itemTypes', id, action);
+            showToast(`Item Type ${newStatus ? 'activated' : 'deactivated'}.`);
+        } catch (err) {
+            persistUpdate('itemTypes', id, { isActive: newStatus }, setItemTypes);
+            showToast(`Item Type ${newStatus ? 'activated' : 'deactivated'}.`);
+        }
+    };
+
+    // ── MATERIAL GRADE ACTIONS ─────────────────────────────────────────
+    const addMaterialGrade = (grade) => {
+        const newGrade = {
+            id: grade.id || `grd-${Date.now()}`,
+            name: grade.name || '',
+            code: (grade.code || 'GRD').toUpperCase(),
+            materialCategoryId: grade.materialCategoryId || '',
+            materialCategory: grade.materialCategory || '',
+            family: grade.family || '',
+            density: grade.density !== undefined ? Number(grade.density) : 7.85,
+            isActive: grade.isActive !== undefined ? Boolean(grade.isActive) : true,
+        };
+        setMaterialGrades((prev) => [...prev, newGrade]);
+        showToast(`Material Grade ${newGrade.name} registered.`);
+        persistCreate('materialGrades', newGrade, setMaterialGrades);
+        return newGrade;
+    };
+    const updateMaterialGrade = (id, updates) => {
+        setMaterialGrades((prev) => prev.map((g) => (g.id === id ? { ...g, ...updates } : g)));
+        persistUpdate('materialGrades', id, updates, setMaterialGrades);
+        showToast(`Material Grade updated.`);
+    };
+    const deleteMaterialGrade = async (id) => {
+        try {
+            await persistDelete('materialGrades', id);
+            setMaterialGrades((prev) => prev.filter((g) => g.id !== id));
+            showToast('Material Grade deleted.');
+            return true;
+        } catch (err) {
+            const msg = err?.message || 'Could not delete material grade.';
+            showToast(msg);
+            throw err;
+        }
+    };
+    const toggleMaterialGradeActive = async (id, currentStatus) => {
+        const newStatus = !currentStatus;
+        setMaterialGrades((prev) => prev.map((g) => (g.id === id ? { ...g, isActive: newStatus } : g)));
+        try {
+            const action = newStatus ? 'activate' : 'deactivate';
+            await pushAction('materialGrades', id, action);
+            showToast(`Material Grade ${newStatus ? 'activated' : 'deactivated'}.`);
+        } catch (err) {
+            persistUpdate('materialGrades', id, { isActive: newStatus }, setMaterialGrades);
+            showToast(`Material Grade ${newStatus ? 'activated' : 'deactivated'}.`);
+        }
+    };
     // ── ESTIMATES ACTIONS ──────────────────────────────────────────────
     // The CRM screens read estimates through `services/estimateStore`.
     useEffect(() => {
@@ -2413,6 +2562,15 @@ export const ERPProvider = ({ children, }) => {
             estimateNumber: est.estimateNumber || `EST-2026-${String(estimates.length + 1).padStart(3, '0')}`,
             customerId: est.customerId,
             customer: est.customer || '',
+            leadId: est.leadId || '',
+            leadName: est.leadName || '',
+            isOneTimeParty: Boolean(est.isOneTimeParty),
+            partyName: est.partyName || est.customer || '',
+            partyType: est.partyType || undefined,
+            partyPhone: est.partyPhone || undefined,
+            partyEmail: est.partyEmail || undefined,
+            partyGstin: est.partyGstin || undefined,
+            placeOfSupply: est.placeOfSupply || undefined,
             billingAddress: createAddressSnapshot(est.billingAddress) || defaultAddresses.billing,
             shippingAddress: createAddressSnapshot(est.shippingAddress) || defaultAddresses.shipping,
             date: formatDateDDMMYYYY(est.date || 'Today'),
@@ -2457,6 +2615,8 @@ export const ERPProvider = ({ children, }) => {
         const newQuote = {
             customerId: est.customerId,
             customer: est.customer,
+            leadId: est.leadId || '',
+            leadName: est.leadName || '',
             billingAddress: createAddressSnapshot(est.billingAddress),
             shippingAddress: createAddressSnapshot(est.shippingAddress),
             date: getCurrentDateFormatted(),
@@ -2619,7 +2779,7 @@ export const ERPProvider = ({ children, }) => {
     const approveQuotation = (id) => decideQuotation(id, 'accept', 'Accepted', 'Quotation Accepted');
     const rejectQuotation = (id, reason) => decideQuotation(id, 'reject', 'Rejected', 'Quotation Rejected', reason);
     const cancelQuotation = (id, reason) => decideQuotation(id, 'cancel', 'Cancelled', 'Quotation Cancelled', reason);
-    const convertQuotationToSalesOrder = (quoteId) => {
+    const convertQuotationToSalesOrder = (quoteId, lineMappings = null) => {
         const quote = quotations.find((q) => q.id === quoteId);
         if (!quote)
             return undefined;
@@ -2633,33 +2793,53 @@ export const ERPProvider = ({ children, }) => {
         // itself (to Converted, which reads back as 'Confirmed'); a PATCH racing
         // it would be refused once the quotation is no longer a draft.
         setQuotations((prev) => prev.map((q) => (q.id === quoteId ? { ...q, status: 'Confirmed' } : q)));
-        const orderItems = quote.items && quote.items.length > 0 ? quote.items.map((line, idx) => ({
-            id: line.id || `item-${Date.now()}-${idx}`,
-            itemId: line.itemId || '',
-            sku: line.sku || line.itemSku || '',
-            itemSku: line.sku || line.itemSku || '',
-            name: line.name || line.description || `Deliverable Item ${idx + 1}`,
-            description: line.name || line.description || `Deliverable Item ${idx + 1}`,
-            orderedQty: Number(line.qty) || 1,
-            qty: Number(line.qty) || 1,
-            deliveredQty: 0,
-            invoicedQty: 0,
-            remainingQty: Number(line.qty) || 1,
-            rate: Number(line.rate) || 0,
-            discount: Number(line.discount) || 0,
-            // Replaced (quotation-first sales): a 0% GST service line stayed 0%,
-            // not 18% — `|| 18` treated a real zero as missing.
-            // tax: Number(line.tax) || 18,
-            tax: line.tax !== undefined && line.tax !== null && line.tax !== '' ? Number(line.tax) || 0 : 18,
-            // Unit and HSN/SAC travel with custom / service lines too.
-            uom: line.uom || line.unit || undefined,
-            hsnCode: line.hsnCode || undefined,
-            // Metal-industry detail (kind, material, specification, weight).
-            lineKind: line.lineKind, materialGrade: line.materialGrade,
-            specification: line.specification, unitWeight: line.unitWeight,
-            sheetSpec: line.sheetSpec,
-            amount: Number(line.amount) || ((Number(line.qty) || 1) * (Number(line.rate) || 0)),
-        })) : [
+
+        const mappingsMap = {};
+        if (Array.isArray(lineMappings)) {
+            lineMappings.forEach((lm) => {
+                if (lm.lineId) mappingsMap[lm.lineId] = lm;
+            });
+        } else if (lineMappings && typeof lineMappings === 'object') {
+            Object.assign(mappingsMap, lineMappings);
+        }
+
+        const orderItems = quote.items && quote.items.length > 0 ? quote.items.map((line, idx) => {
+            const mapped = mappingsMap[line.id] || mappingsMap[idx + 1] || mappingsMap[idx];
+            let matchedItem = null;
+            if (mapped?.itemId && mapped.itemId !== 'custom') {
+                matchedItem = items.find((i) => i.id === mapped.itemId || i.sku === mapped.itemId);
+            }
+            const finalItemId = matchedItem ? matchedItem.id : (mapped?.itemId === 'custom' ? '' : (line.itemId || ''));
+            const finalSku = matchedItem ? matchedItem.sku : (mapped?.itemId === 'custom' ? '' : (line.sku || line.itemSku || ''));
+            const finalName = matchedItem ? matchedItem.name : (line.name || line.description || `Deliverable Item ${idx + 1}`);
+            const finalUom = matchedItem ? (matchedItem.uom || line.uom) : (line.uom || line.unit || undefined);
+            const finalQty = mapped?.qty ? Number(mapped.qty) : (Number(line.qty) || 1);
+
+            return {
+                id: line.id || `item-${Date.now()}-${idx}`,
+                itemId: finalItemId,
+                sku: finalSku,
+                itemSku: finalSku,
+                name: finalName,
+                description: finalName,
+                orderedQty: finalQty,
+                qty: finalQty,
+                deliveredQty: 0,
+                invoicedQty: 0,
+                remainingQty: finalQty,
+                rate: Number(line.rate) || 0,
+                discount: Number(line.discount) || 0,
+                tax: line.tax !== undefined && line.tax !== null && line.tax !== '' ? Number(line.tax) || 0 : 18,
+                uom: finalUom,
+                hsnCode: matchedItem?.hsnCode || line.hsnCode || undefined,
+                lineKind: mapped?.lineKind || line.lineKind || (matchedItem?.itemType || undefined),
+                materialGrade: mapped?.materialGrade || line.materialGrade || (matchedItem?.grade || matchedItem?.metalGrade || undefined),
+                specification: mapped?.specification || line.specification || (matchedItem?.specification || matchedItem?.dimensions || undefined),
+                unitWeight: line.unitWeight || matchedItem?.theoreticalWeight || undefined,
+                sheetSpec: line.sheetSpec,
+                amount: Number(line.amount) || (finalQty * (Number(line.rate) || 0)),
+            };
+        }) : [
             {
                 id: `item-${Date.now()}`,
                 description: `Deliverables per ${quote.quoteNumber}`,
@@ -2709,11 +2889,13 @@ export const ERPProvider = ({ children, }) => {
         setSalesOrders((prev) => [newOrder, ...prev]);
         if (isServerId(quote.id)) {
             persistVia(setSalesOrders, newOrder.id, `Sales order from ${quote.quoteNumber}`, async () => {
-                const created = await pushConvert('quotations', quote.id, 'convert-to-order', 'salesOrders');
+                const convertPayload = lineMappings ? { lines: Array.isArray(lineMappings) ? lineMappings : Object.values(lineMappings) } : {};
+                const created = await pushConvert('quotations', quote.id, 'convert-to-order', 'salesOrders', convertPayload);
                 // The server opens it as a Draft; the UI confirms on conversion.
                 return created && ((await pushUpdate('salesOrders', created.id, { stage: 'Confirmed' })) || created);
             });
-        } else {
+        }
+ else {
             persistCreate('salesOrders', newOrder, setSalesOrders);
         }
         showToast(`Quote ${quote.quoteNumber} converted to Sales Order ${newOrder.orderNumber}!`);
@@ -4408,7 +4590,7 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Purchase Bill ${bill.billNumber} cancelled.`);
         return { success: true, message: `Purchase Bill ${bill.billNumber} cancelled.` };
     };
-    const receivePurchaseBillGoods = (billId, receivedOverrides = null, qcStatus = 'Approved') => {
+    const receivePurchaseBillGoods = (billId, receivedOverrides = null, qcStatus = 'Approved', locationId = null) => {
         const bill = purchaseBills.find((b) => b.id === billId);
         if (!bill)
             return;
@@ -4468,18 +4650,25 @@ export const ERPProvider = ({ children, }) => {
                         addSerialNumbers(item.id, serials);
                     }
                 }
+                const targetLoc = locationId || line.locationId || item?.defaultLocationId || (locations[0]?.id || 'loc-1');
+                const targetLocName = locations.find(l => l.id === targetLoc)?.name || 'Central Warehouse';
                 recordMovement({
                     itemId: item?.id || line.itemId || `itm-${Date.now()}`,
                     itemSku: item?.sku || targetSku || 'GEN-SKU',
                     itemName: item?.name || line.name || line.description,
                     type: 'PURCHASE',
                     quantity: receivedQty,
+                    uom: line.uom || item?.uom || 'Nos',
+                    locationId: targetLoc,
+                    locationName: targetLocName,
                     unitCost: line.rate || item?.costPrice || 0,
                     // [PHASE-2A] capture weighed quantity for stock valuation on weight items
                     weighedQty: isWeightItem && receivedWeight ? receivedWeight : undefined,
                     referenceType: 'PurchaseBill',
                     referenceId: bill.id,
                     referenceNumber: bill.billNumber,
+                    sourceDocumentType: 'GoodsReceipt',
+                    sourceDocumentId: bill.id,
                     serials: line.selectedSerials || line.serialNumbers || (line.serialNumber ? [line.serialNumber] : []),
                     notes: isWeightItem && variationPct !== null
                         ? `Weighed receipt for ${bill.billNumber} (${receivedWeight} ${line.weightUnit || item?.weightUnit || 'kg'}, var ${variationPct.toFixed(2)}%)`
@@ -5473,6 +5662,20 @@ export const ERPProvider = ({ children, }) => {
             removeSerialNumbers,
             items,
             categories,
+            addCategory,
+            updateCategory,
+            deleteCategory,
+            toggleCategoryActive,
+            itemTypes,
+            addItemType,
+            updateItemType,
+            deleteItemType,
+            toggleItemTypeActive,
+            materialGrades,
+            addMaterialGrade,
+            updateMaterialGrade,
+            deleteMaterialGrade,
+            toggleMaterialGradeActive,
             estimates,
             addEstimate,
             updateEstimate,
@@ -5546,8 +5749,6 @@ export const ERPProvider = ({ children, }) => {
             updateCustomer,
             addVendor,
             updateVendor,
-            addCategory,
-            updateCategory,
             addQuotation,
             updateQuotationStatus,
             recordQuotationActivity,
