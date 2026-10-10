@@ -629,7 +629,7 @@ export default function Sidebar() {
   // `.raw` subscribes without pulling PMS: a badge in the sidebar must not be
   // the reason every screen in the app loads the project list. `useModuleWhenIdle`
   // asks for it once the browser has finished with the page the user opened.
-  const hasPmsAccess = !isCustomer && canOpenPath('/pms', permissions);
+  const hasPmsAccess = !isCustomer && canOpenPath('/pms/my-tasks', permissions);
   const hasInventoryAccess = !isCustomer && canOpenPath('/inventory/items', permissions);
   const shellReady = useModuleWhenIdle(hasPmsAccess ? 'pms' : null);
   const pmsProjects = hasPmsAccess ? usePmsStore.raw((s) => s.projects) : [];

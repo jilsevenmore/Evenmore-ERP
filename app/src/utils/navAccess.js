@@ -14,10 +14,16 @@
  * A permission value is an id, or an array meaning "any of these".
  */
 
+// Mirrors `sees_all_projects` + customers in the server's
+// `check_customer_tracking_permission`.
+const TRACKING_VIEWERS = ['view_projects', 'menu_pms', 'create_pms_project', 'assign_stage', 'menu_admin'];
+
 // Longest matching prefix wins.
 const ROUTE_PERMISSIONS = [
   ['/crm/dashboard', 'show_crm_dashboard'],
-  ['/crm/tasks', 'view_task'],
+  // Every employee works their own CRM tasks and allocations; the server
+  // returns only the ones assigned to them (managers see the team's).
+  ['/crm/tasks', null],
   ['/crm/leads/tasks-master', 'view_task'],
   ['/crm/leads/task-form', 'view_task'],
   ['/crm/leads/stage-tasks', 'view_task'],
@@ -41,9 +47,14 @@ const ROUTE_PERMISSIONS = [
   ['/administration/users', 'view_staff'],
   ['/administration/roles', 'manage_roles'],
   ['/administration/clients', 'menu_admin'],
-  ['/customer/projects', ['view_projects', 'view_pms']],
-  ['/pms/my-tasks', ['view_pms', 'view_task']],
-  ['/pms/tracking', ['view_projects', 'view_pms']],
+  // Customer Tracking is the customer's view of their orders: customers
+  // (view_projects) and the people who run projects -- not every employee.
+  ['/customer/projects', TRACKING_VIEWERS],
+  // Whoever is assigned to a project sees it, its details and their tasks,
+  // PMS access or not -- the server returns only the projects they work on.
+  ['/pms/my-tasks', null],
+  ['/pms/my-projects', null],
+  ['/pms/tracking', TRACKING_VIEWERS],
   ['/employee/portal', null],
   // Old top-level alias of HRMS › Company Policy.
   ['/company-policy', 'view_staff'],
@@ -68,6 +79,29 @@ const MODULE_MENUS = [
 // self-service too.
 const SELF_SERVICE_PREFIXES = ['/customer/projects', '/pms/tracking'];
 
+// A record's own page opens for anyone assigned to it, module access or not;
+// the server answers 404 for records the user is not on. The lists
+// (All Projects, Leads, Deals, ...) stay behind their permissions.
+const ASSIGNED_RECORD_PREFIXES = [
+  '/pms/projects/',
+  '/crm/leads/',
+  '/crm/projects/',
+  '/crm/contracts/',
+  '/crm/tasks/allocation/',
+];
+// Pages under /crm/leads/ that are not a lead.
+const LEAD_TOOL_PAGES = new Set([
+  'forms', 'tasks-master', 'task-form', 'stage-tasks', 'form-builder', 'create-form',
+]);
+
+function isAssignedRecordPath(path) {
+  const prefix = ASSIGNED_RECORD_PREFIXES.find((p) => path.startsWith(p));
+  if (!prefix) return false;
+  const rest = path.slice(prefix.length);
+  if (!rest || rest.includes('/')) return false;
+  return !(prefix === '/crm/leads/' && LEAD_TOOL_PAGES.has(rest));
+}
+
 const SELF_SERVICE_ROUTES = new Set([
   '/employee/portal',
   '/hrms/leave',
@@ -75,11 +109,14 @@ const SELF_SERVICE_ROUTES = new Set([
   '/hrms/attendance/mark',
   '/pms/my-projects',
   '/pms/my-tasks',
+  '/crm/tasks',
+  '/crm/tasks/allocation',
   '/customer/projects',
 ]);
 
 export function routePermission(path) {
   if (!path) return null;
+  if (isAssignedRecordPath(path)) return null;
   let best = null;
   for (const [prefix, permission] of ROUTE_PERMISSIONS) {
     const matches = path === prefix || path.startsWith(`${prefix}/`);
@@ -100,7 +137,11 @@ function moduleMenu(path) {
 }
 
 function isSelfService(path) {
-  return SELF_SERVICE_ROUTES.has(path) || SELF_SERVICE_PREFIXES.some((p) => path.startsWith(`${p}/`));
+  return (
+    SELF_SERVICE_ROUTES.has(path) ||
+    SELF_SERVICE_PREFIXES.some((p) => path.startsWith(`${p}/`)) ||
+    isAssignedRecordPath(path)
+  );
 }
 
 /**

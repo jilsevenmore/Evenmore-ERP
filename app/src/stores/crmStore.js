@@ -11,7 +11,7 @@
  * the row back rather than leaving a record that only exists in this tab.
  */
 import { create } from 'zustand';
-import { lazyStore } from '../services/lazyModules';
+import { lazyStore, sessionCan } from '../services/lazyModules';
 import { useAppStore } from './appStore';
 import { canOpenPath } from '../utils/navAccess';
 import {
@@ -27,21 +27,24 @@ import {
   isBackendEnabled,
 } from '../services/crmSync';
 
+// `null` = every employee pulls it. Leads, deals, projects, contracts, tasks
+// and allocations come back scoped to what the user is assigned to (managers
+// get the team's); the lookups are what those records render with.
 const CRM_KEY_PERMISSIONS = {
-  stages: '/crm/leads',
-  dealStages: '/crm/deals',
-  sources: '/crm/leads',
-  industries: '/crm/leads',
-  lostReasons: '/crm/deals',
-  leads: '/crm/leads',
-  deals: '/crm/deals',
-  tasks: '/crm/tasks',
+  stages: null,
+  dealStages: null,
+  sources: null,
+  industries: null,
+  lostReasons: null,
+  leads: null,
+  deals: null,
+  tasks: null,
   masterTasks: '/crm/leads/tasks-master',
   stageTasks: '/crm/leads/stage-tasks',
-  taskAllocations: '/crm/tasks',
-  forms: '/crm/leads/forms',
-  projects: '/crm/projects',
-  contracts: '/crm/contracts',
+  taskAllocations: null,
+  forms: null,
+  projects: null,
+  contracts: null,
 };
 
 const EMPTY = {
@@ -107,7 +110,7 @@ const useCrmStoreBase = create((set, get) => ({
         return !path || canOpenPath(path, permissions);
       });
       const canSeeLeads = canOpenPath('/crm/leads', permissions);
-      const canSeeRoster = canOpenPath('/crm', permissions) || canOpenPath('/crm/tasks', permissions);
+      const canSeeRoster = sessionCan(['view_task', 'view_pms']);
 
       const [collections, roster, stats] = await Promise.all([
         keysToPull.length ? crmSync.pullMany(keysToPull) : Promise.resolve({}),

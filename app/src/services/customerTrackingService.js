@@ -13,19 +13,19 @@ export async function fetchCustomerProjects() {
   let projects = [];
 
   if (isBackendEnabled()) {
+    // The server decides who tracks which project; its answer -- an empty
+    // list or a refusal included -- is final. No falling back to the PMS
+    // store, which would show projects the server just declined.
     try {
       const data = await api.get('/pms/customer-tracking/');
       projects = Array.isArray(data) ? data : data?.results || [];
     } catch (err) {
       console.warn('[customerTrackingService] backend fetch failed:', err);
     }
-  }
-
-  if (projects.length > 0) {
     return projects;
   }
 
-  // Fallback to local / store state (e.g. offline, mock data, or freshly created store projects)
+  // Offline / mock mode only: derive from local store state.
   try {
     const { usePmsStore } = await import('../stores/pmsStore');
     const { useAppStore } = await import('../stores/appStore');
@@ -105,11 +105,12 @@ export async function fetchCustomerProjectTracking(projectIdOrCode) {
       }
       return data;
     } catch (err) {
-      console.warn('[customerTrackingService] backend detail fetch failed, trying local fallback:', err);
+      console.warn('[customerTrackingService] backend detail fetch failed:', err);
+      return null;
     }
   }
 
-  // Local / store fallback
+  // Offline / mock mode only
   try {
     const { usePmsStore } = await import('../stores/pmsStore');
     const storeProjects = usePmsStore.getState().projects || [];
