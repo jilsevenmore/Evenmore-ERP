@@ -1,6 +1,7 @@
 import { QuotationWorkflow } from '../../components/common/QuotationWorkflow';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
+import { useCrmStore } from '../../stores/crmStore';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -45,6 +46,12 @@ export const QuotationsPage = () => {
     const { customers, quotations, items, calculateItemStock, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
+    // Leads are offered in the Customer Account dropdown alongside customers.
+    // They are the same rows the CRM reads from `/crm/leads/`; hydrating is
+    // permission-gated, so a user without CRM access simply sees customers only.
+    const crmLeads = useCrmStore((s) => s.leads);
+    const hydrateCrm = useCrmStore((s) => s.hydrate);
+    useEffect(() => { hydrateCrm?.(); }, [hydrateCrm]);
     const leadRequest = location.state && (location.state.fromLead || location.state.fromDeal) ? location.state : null;
     const autoOpened = React.useRef(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -355,7 +362,13 @@ export const QuotationsPage = () => {
             return;
         }
         const computedTotal = quoteLines.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) + (Number(freight) || 0);
-        const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => c.id === partyData.customerId)?.name : '') || 'Walk-in Customer';
+        const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => String(c.id) === String(partyData.customerId))?.name : '') || 'Walk-in Customer';
+        // A lead picked from the Customer Account dropdown is raised against the
+        // document's party columns and linked via `crm_lead` -- it has no Party
+        // row of its own to point `party` at.
+        const selectedLeadId = partyData.selectedLeadId
+            || (leadRequest && !leadRequest.fromDeal ? leadRequest.leadId : '')
+            || '';
         addQuotation({
             isOneTimeParty: Boolean(partyData.isOneTimeParty),
             customerId: partyData.isOneTimeParty ? '' : (partyData.customerId || ''),
@@ -368,8 +381,8 @@ export const QuotationsPage = () => {
             placeOfSupply: partyData.placeOfSupply || '',
             billingAddress: partyData.billingAddress || {},
             shippingAddress: partyData.shippingAddress || {},
-            leadId: leadRequest?.leadId || '',
-            leadName: leadRequest?.leadName || '',
+            leadId: selectedLeadId,
+            leadName: partyData.selectedLeadId ? partyDisplayName : (leadRequest?.leadName || ''),
             dealId: leadRequest?.fromDeal ? leadRequest.dealId : undefined,
             date: quoteDate,
             dealReference,
@@ -445,6 +458,7 @@ export const QuotationsPage = () => {
                   value={partyData}
                   onChange={setPartyData}
                   customers={customers}
+                  leads={crmLeads}
                 />
                 <div className="sm:w-1/2">
                   <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>

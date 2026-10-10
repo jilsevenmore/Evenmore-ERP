@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useERP } from '../../context/ERPContext';
+import { useCrmStore } from '../../stores/crmStore';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -43,6 +44,12 @@ export const EstimatesPage = () => {
     const { customers, addQuotation, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
+    // Leads are offered in the Customer Account dropdown alongside customers,
+    // read from `/crm/leads/`. Hydration is permission-gated, so a user without
+    // CRM access still gets the customers-only list.
+    const crmLeads = useCrmStore((s) => s.leads);
+    const hydrateCrm = useCrmStore((s) => s.hydrate);
+    useEffect(() => { hydrateCrm?.(); }, [hydrateCrm]);
     const leadRequest = location.state && location.state.fromLead ? location.state : null;
     const autoOpened = React.useRef(false);
     const estimates = useEstimates();
@@ -83,10 +90,11 @@ export const EstimatesPage = () => {
     React.useEffect(() => {
         if (!leadRequest || autoOpened.current) return;
         autoOpened.current = true;
-        const match = customers.find((c) => c.name === leadRequest.company) || customers[0];
+        const match = customers.find((c) => c.name === leadRequest.company);
         if (match) {
             setPartyData({
                 isOneTimeParty: false,
+                selectedLeadId: '',
                 customerId: match.id,
                 customer: match.name,
                 partyName: match.name,
@@ -95,6 +103,22 @@ export const EstimatesPage = () => {
                 partyEmail: match.email || '',
                 partyGstin: match.gstin || '',
                 placeOfSupply: match.placeOfSupply || '',
+            });
+        } else if (leadRequest.leadId) {
+            // No matching customer: preselect the lead itself so the dropdown
+            // shows who this estimate is really for, instead of falling back to
+            // whichever customer happens to be first.
+            setPartyData({
+                isOneTimeParty: false,
+                selectedLeadId: String(leadRequest.leadId),
+                customerId: '',
+                customer: leadRequest.leadName || leadRequest.company || '',
+                partyName: leadRequest.leadName || leadRequest.company || '',
+                partyType: 'Lead',
+                partyPhone: leadRequest.phone || '',
+                partyEmail: leadRequest.email || '',
+                partyGstin: '',
+                placeOfSupply: '',
             });
         }
         if (Array.isArray(leadRequest.items) && leadRequest.items.length > 0) {
@@ -318,7 +342,11 @@ export const EstimatesPage = () => {
     const handleCreate = (e) => {
         e.preventDefault();
         const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
-        const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => c.id === partyData.customerId)?.name : '') || 'Walk-in Customer';
+        const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => String(c.id) === String(partyData.customerId))?.name : '') || 'Walk-in Customer';
+        // A lead picked from the Customer Account dropdown has no Party row to
+        // point at, so the document carries its details and links by id.
+        const selectedLeadId = partyData.selectedLeadId || leadRequest?.leadId || '';
+        const selectedLeadName = partyData.selectedLeadId ? partyDisplayName : (leadRequest?.leadName || '');
         const next = {
             id: `est-${Date.now()}`,
             estimateNumber: `EST-2026-${String(estimates.length + 3).padStart(3, '0')}`,
@@ -333,8 +361,8 @@ export const EstimatesPage = () => {
             placeOfSupply: partyData.placeOfSupply || '',
             billingAddress: partyData.billingAddress || {},
             shippingAddress: partyData.shippingAddress || {},
-            leadId: leadRequest?.leadId || '',
-            leadName: leadRequest?.leadName || '',
+            leadId: selectedLeadId,
+            leadName: selectedLeadName,
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             validUntil: validUntil || '15 Days',
             amount: computedTotal,
@@ -342,8 +370,8 @@ export const EstimatesPage = () => {
             items: lineItems,
         };
         addEstimate(next);
-        if (leadRequest?.leadId) {
-            logLeadActivity(leadRequest.leadId, `Estimate ${next.estimateNumber} created for ${leadRequest.leadName || 'lead'}`, '#ec4899');
+        if (selectedLeadId) {
+            logLeadActivity(selectedLeadId, `Estimate ${next.estimateNumber} created for ${selectedLeadName || 'lead'}`, '#ec4899');
         }
         setIsModalOpen(false);
         setLineItems([]);
@@ -479,6 +507,7 @@ export const EstimatesPage = () => {
                                     value={partyData}
                                     onChange={setPartyData}
                                     customers={customers}
+                                    leads={crmLeads}
                                 />
                                 <div className="sm:w-1/2">
                                     <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>

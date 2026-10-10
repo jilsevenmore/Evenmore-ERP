@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UserCheck, UserPlus, Building, Phone, Mail, MapPin, FileText, Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 
@@ -16,6 +16,9 @@ export default function PartySelector({
     value = {},
     onChange,
     customers: propCustomers,
+    // Opt-in: offer CRM leads alongside registered customers. Off by default so
+    // the documents that must raise against a real party keep that rule.
+    leads = [],
     showAddressFields = true,
     disabled = false,
     className = '',
@@ -23,6 +26,16 @@ export default function PartySelector({
     const { customers: contextCustomers, parties: contextParties, companyProfile } = useERP() || {};
     const customers = propCustomers || contextCustomers || [];
     const parties = contextParties || [];
+
+    // Customers and leads live in different collections and can share a name,
+    // so an option's value is prefixed to keep the two apart when it comes back.
+    const CUSTOMER_PREFIX = 'customer:';
+    const LEAD_PREFIX = 'lead:';
+    const leadOptions = useMemo(() => leads.map((lead) => ({
+        value: `${LEAD_PREFIX}${lead.id}`,
+        lead,
+    })), [leads]);
+    const hasLeads = leadOptions.length > 0;
 
     const isOneTime = Boolean(value.isOneTimeParty);
     const [mode, setMode] = useState(isOneTime ? 'onetime' : 'registered');
@@ -42,10 +55,11 @@ export default function PartySelector({
         if (disabled) return;
         setMode(newMode);
         if (newMode === 'registered') {
-            const firstCust = customers.find(c => c.id === value.customerId) || customers[0];
-            const party = parties.find(p => p.id === firstCust?.id) || firstCust;
+            const firstCust = customers.find(c => String(c.id) === String(value.customerId)) || customers[0];
+            const party = parties.find(p => String(p.id) === String(firstCust?.id)) || firstCust;
             onChange?.({
                 isOneTimeParty: false,
+                selectedLeadId: '',
                 customerId: firstCust?.id || '',
                 customer: firstCust?.name || '',
                 partyName: firstCust?.name || '',
@@ -74,11 +88,38 @@ export default function PartySelector({
         }
     };
 
-    const handleRegisteredChange = (customerId) => {
-        const cust = customers.find(c => c.id === customerId);
-        const party = parties.find(p => p.id === customerId) || cust;
+    const handleRegisteredChange = (optionValue) => {
+        // A lead is not a party: it has no ledger, addresses or GSTIN, so it is
+        // raised against the document's own party columns and linked by id.
+        if (typeof optionValue === 'string' && optionValue.startsWith(LEAD_PREFIX)) {
+            const leadId = optionValue.slice(LEAD_PREFIX.length);
+            const lead = leads.find((l) => String(l.id) === leadId);
+            const leadName = lead?.displayName || lead?.company || lead?.name || '';
+            onChange?.({
+                isOneTimeParty: false,
+                selectedLeadId: leadId,
+                customerId: '',
+                customer: leadName,
+                partyName: leadName,
+                partyType: 'Lead',
+                partyPhone: lead?.phone || '',
+                partyEmail: lead?.email || '',
+                partyGstin: '',
+                placeOfSupply: lead?.state || '',
+                billingAddress: { line1: '', city: lead?.city || '', state: lead?.state || '', pincode: '', country: lead?.country || 'India' },
+                shippingAddress: { line1: '', city: lead?.city || '', state: lead?.state || '', pincode: '', country: lead?.country || 'India' },
+            });
+            return;
+        }
+
+        const customerId = typeof optionValue === 'string' && optionValue.startsWith(CUSTOMER_PREFIX)
+            ? optionValue.slice(CUSTOMER_PREFIX.length)
+            : optionValue;
+        const cust = customers.find(c => String(c.id) === String(customerId));
+        const party = parties.find(p => String(p.id) === String(customerId)) || cust;
         onChange?.({
             isOneTimeParty: false,
+            selectedLeadId: '',
             customerId: cust?.id || '',
             customer: cust?.name || '',
             partyName: cust?.name || '',
@@ -128,7 +169,17 @@ export default function PartySelector({
         onChange?.(updated);
     };
 
-    const selectedCust = customers.find(c => c.id === value.customerId);
+    const selectedCust = value.selectedLeadId
+        ? null
+        : customers.find(c => String(c.id) === String(value.customerId));
+    const selectedLead = value.selectedLeadId
+        ? leads.find((l) => String(l.id) === String(value.selectedLeadId)) || null
+        : null;
+    // The dropdown's value is the prefixed id, so a lead keeps its selection
+    // across a re-render instead of falling back to the first customer.
+    const registeredValue = selectedLead
+        ? `${LEAD_PREFIX}${selectedLead.id}`
+        : (value.customerId ? `${CUSTOMER_PREFIX}${value.customerId}` : '');
 
     return (
         <div className={`space-y-3 ${className}`}>
@@ -169,22 +220,64 @@ export default function PartySelector({
             {mode === 'registered' ? (
                 <div>
                     <label className="font-semibold text-slate-700 dark:text-slate-300 block mb-1">
-                        Select Registered Customer <span className="text-rose-500">*</span>
+                        Select Customer Account <span className="text-rose-500">*</span>
                     </label>
                     <select
                         required
                         disabled={disabled}
-                        value={value.customerId || ''}
+                        value={registeredValue}
                         onChange={(e) => handleRegisteredChange(e.target.value)}
                         className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-medium text-xs focus:ring-2 focus:ring-blue-500"
                     >
                         <option value="" disabled>-- Select Customer Account --</option>
-                        {customers.map((c) => (
-                            <option key={c.id} value={c.id}>
-                                {c.name} {c.code ? `(${c.code})` : ''} {c.phone ? `• ${c.phone}` : ''}
-                            </option>
-                        ))}
+                        {customers.length > 0 && (
+                            <optgroup label={`Customers (${customers.length})`}>
+                                {customers.map((c) => (
+                                    <option key={`c-${c.id}`} value={`${CUSTOMER_PREFIX}${c.id}`}>
+                                        {c.name} {c.code ? `(${c.code})` : ''} - Balance: ₹{Number(c.balance || 0).toFixed(2)}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        )}
+                        {hasLeads && (
+                            <optgroup label={`Leads (${leads.length})`}>
+                                {leadOptions.map(({ value: optValue, lead }) => (
+                                    <option key={optValue} value={optValue}>
+                                        {lead.displayName || lead.company || lead.name}
+                                        {lead.leadNumber ? ` [${lead.leadNumber}]` : ''}
+                                        {' - Balance: '}
+                                        {lead.balance !== undefined && lead.balance !== null
+                                            ? `₹${Number(lead.balance || 0).toFixed(2)}`
+                                            : 'N/A'}
+                                    </option>
+                                ))}
+                            </optgroup>
+                        )}
                     </select>
+
+                    {selectedLead && (
+                        <div className="mt-2 p-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/40 text-[11px] space-y-1">
+                            <div className="flex items-center justify-between font-bold text-slate-800 dark:text-slate-200">
+                                <span>{selectedLead.displayName || selectedLead.company || selectedLead.name}</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-blue-700 dark:text-blue-300 font-mono text-[10px] bg-white dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
+                                        {selectedLead.leadNumber ? `ID: ${selectedLead.leadNumber}` : 'Lead'}
+                                    </span>
+                                    <span className="text-slate-600 dark:text-slate-400 font-mono text-[10px] bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded">
+                                        Bal: ₹{Number(selectedLead.balance || 0).toFixed(2)}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-slate-600 dark:text-slate-400 text-[10px]">
+                                {selectedLead.phone && <span>Ph: <strong>{selectedLead.phone}</strong></span>}
+                                {selectedLead.email && <span>Email: <strong>{selectedLead.email}</strong></span>}
+                                {selectedLead.status && <span>Stage: <strong>{selectedLead.status}</strong></span>}
+                            </div>
+                            <p className="text-[10px] text-blue-700 dark:text-blue-300">
+                                This quotation will be linked to the lead.
+                            </p>
+                        </div>
+                    )}
 
                     {selectedCust && (
                         <div className="mt-2 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/60 text-[11px] space-y-1">
