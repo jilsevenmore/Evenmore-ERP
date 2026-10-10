@@ -19,7 +19,6 @@ import {
   FileText,
   ArrowUp,
   ArrowDown,
-  Check,
 } from 'lucide-react';
 
 import MasterTasksGuideModal from './MasterTasksGuideModal';
@@ -89,14 +88,9 @@ export default function MasterTasksPage() {
   // Master task templates live at `/crm/master-tasks/`; the automation that
   // generates a lead's stage tasks reads the same rows.
   const storeTasks = useCrmStore((s) => s.masterTasks);
-  // "Used in Stages" is the configured pipeline, by id -- renaming a stage in
-  // System Setup no longer breaks the link.
   const storeStages = useCrmStore((s) => s.stages);
   const storeForms = useCrmStore((s) => s.forms);
-  const pipeline = useMemo(
-    () => [...storeStages].sort((a, b) => (Number(a.order ?? a.sequence) || 0) - (Number(b.order ?? b.sequence) || 0)),
-    [storeStages],
-  );
+  // Stage ids resolve to names for the existing rows' "Used in Stages" column.
   const stageNameById = useMemo(() => new Map(storeStages.map((s) => [String(s.id), s.name])), [storeStages]);
   // Older rows may still hold a stage name rather than an id.
   const stageLabel = (value) => stageNameById.get(String(value)) || String(value);
@@ -224,21 +218,10 @@ export default function MasterTasksPage() {
     setMenuId(null);
   }
 
-  function toggleStageInForm(stage) {
-    setForm((f) => ({
-      ...f,
-      stages: f.stages.includes(stage) ? f.stages.filter((s) => s !== stage) : [...f.stages, stage],
-    }));
-  }
-
   function submitForm(e) {
     e.preventDefault();
     if (!form.name.trim()) {
       setFormError('Task name is required.');
-      return;
-    }
-    if (form.stages.length === 0) {
-      setFormError('Select at least one stage.');
       return;
     }
     if (editingId) {
@@ -575,28 +558,6 @@ export default function MasterTasksPage() {
                         className={`h-10 rounded-lg border grid place-items-center transition ${active ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-200 text-slate-400 hover:border-slate-300'}`}
                       >
                         <Icon size={16} />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">Used in Stages <span className="text-rose-500">*</span></label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {pipeline.map((stage) => {
-                    const s = stage.id;
-                    const checked = form.stages.includes(s);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => toggleStageInForm(s)}
-                        className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition ${checked ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-                      >
-                        <span className={`w-4 h-4 rounded border grid place-items-center shrink-0 ${checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300 text-transparent'}`}>
-                          <Check size={11} />
-                        </span>
-                        {stage.name}
                       </button>
                     );
                   })}

@@ -331,9 +331,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
         };
       })
     );
-    if (!openStages.includes(taskModalStageId)) {
-      setOpenStages((prev) => [...prev, taskModalStageId]);
-    }
     closeTaskModal();
     triggerSaveToast();
   }
