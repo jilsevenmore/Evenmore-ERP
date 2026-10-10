@@ -95,10 +95,13 @@ const PIPELINE_KEY = 'leadStageTasksPipelineV1';
 const EMPTY_MASTER_TASK = {
   name: '',
   description: '',
-  role: '',
-  department: '',
+  role: 'Tele Caller Executive',
+  department: 'Any',
   priority: 'Medium',
   dueIn: 1,
+  repeats: '',
+  time: '',
+  formId: '',
   autoCreate: true,
   isActive: true,
 };
@@ -136,6 +139,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const [pipeline, setPipeline] = useState(getStoredPipeline);
   const [taskModalStageId, setTaskModalStageId] = useState(null);
   const [masterTask, setMasterTask] = useState(EMPTY_MASTER_TASK);
+  const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [stageDrafts, setStageDrafts] = useState({});
@@ -322,6 +326,49 @@ export default function LeadStageTasks({ leadForms = [] }) {
     triggerSaveToast();
   }
 
+  /**
+   * Writes to the master task library (`/crm/master-tasks/`), the same rows the
+   * Tasks Master page lists -- so a task added here also shows up there. The
+   * server keeps each master's stage tasks in step, hence the re-read.
+   */
+  function commitMasterTasks(next) {
+    syncCollection('masterTasks', next, masterTasks)
+      .then(() => useCrmStore.getState().refresh('stageTasks'))
+      .catch((err) => {
+        console.warn('[CRM] could not save master task:', err?.message || err);
+      });
+  }
+
+  function createMasterTaskRecord(event) {
+    event.preventDefault();
+    const name = masterTask.name.trim();
+    if (!name) return;
+
+    const maxOrder = masterTasks.reduce((m, t) => Math.max(m, Number(t.order) || 0), 0);
+    commitMasterTasks([
+      ...masterTasks,
+      {
+        id: `mt-${Date.now()}`,
+        order: maxOrder + 1,
+        name,
+        title: name,
+        description: masterTask.description.trim(),
+        role: masterTask.role || "Tele Caller Executive",
+        department: masterTask.department || "Sales",
+        priority: masterTask.priority || "Medium",
+        dueIn: Number(masterTask.dueIn) || 0,
+        formId: masterTask.formId || '',
+        status: 'Active',
+        // No stages yet: the row is added to each stage from this page's
+        // Task Roles dropdown, or from the Tasks Master page.
+        stages: [],
+      },
+    ]);
+    setIsMasterModalOpen(false);
+    setMasterTask(EMPTY_MASTER_TASK);
+    triggerSaveToast();
+  }
+
   function updateTask(stageId, taskId, key, value) {
     updateTaskFields(stageId, taskId, { [key]: value });
   }
@@ -445,12 +492,13 @@ export default function LeadStageTasks({ leadForms = [] }) {
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              addTask(stages[0].id);
+              setMasterTask(EMPTY_MASTER_TASK);
+              setIsMasterModalOpen(true);
             }}
             className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shrink-0"
           >
             <Plus size={14} />
-            Add Task
+            Add Master Task
           </button>
         </div>
 
@@ -469,8 +517,25 @@ export default function LeadStageTasks({ leadForms = [] }) {
               <tbody className="divide-y divide-slate-100">
                 {allRoleTasks.map((task) => (
                   <tr key={task.id} className="hover:bg-slate-50/60 transition">
-                    <td className="px-5 py-3.5 font-bold text-slate-800 whitespace-nowrap">
-                      {task.name}
+                    <td className="px-5 py-3.5">
+                      <select
+                        value={task.name}
+                        onChange={(e) =>
+                          updateTaskFields(task.stageId, task.id, fieldsForName(e.target.value, task.role))
+                        }
+                        className="w-full max-w-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
+                      >
+                        {/* A stage task keeps showing its current name even if the
+                            master it was linked to was renamed or removed. */}
+                        {!taskOptions.includes(task.name) && (
+                          <option value={task.name}>{task.name}</option>
+                        )}
+                        {taskOptions.map((opt) => (
+                          <option key={opt} value={opt}>
+                            {opt}
+                          </option>
+                        ))}
+                      </select>
                     </td>
                     <td className="px-4 py-3.5">
                       <select
@@ -801,6 +866,168 @@ export default function LeadStageTasks({ leadForms = [] }) {
           })}
         </div>
       </div>
+
+      {isMasterModalOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
+          role="presentation"
+          onMouseDown={() => setIsMasterModalOpen(false)}
+        >
+          <form
+            className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden"
+            onSubmit={createMasterTaskRecord}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <h2 className="text-sm font-bold text-slate-900">Add Master Task</h2>
+              <button
+                type="button"
+                onClick={() => setIsMasterModalOpen(false)}
+                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
+                aria-label="Close master task form"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto text-xs">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Task Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  autoFocus
+                  value={masterTask.name}
+                  onChange={(e) => updateMasterTask("name", e.target.value)}
+                  placeholder="Enter Task Name"
+                  required
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Performed By (Role)
+                  </label>
+                  <select
+                    value={masterTask.role}
+                    onChange={(e) => updateMasterTask("role", e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                  >
+                    <option>Tele Caller Executive</option>
+                    <option>Sales Support Executive</option>
+                    <option>BDE</option>
+                    <option>Area Sales Manager</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Department
+                  </label>
+                  <select
+                    value={masterTask.department}
+                    onChange={(e) => updateMasterTask("department", e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                  >
+                    <option>Any</option>
+                    <option>Sales</option>
+                    <option>Support</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Default Priority
+                  </label>
+                  <select
+                    value={masterTask.priority}
+                    onChange={(e) => updateMasterTask("priority", e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                  >
+                    <option>Low</option>
+                    <option>Medium</option>
+                    <option>High</option>
+                    <option>Urgent</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Due In (Days)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={masterTask.dueIn}
+                    onChange={(e) => updateMasterTask("dueIn", e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Max Repeats
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={masterTask.repeats}
+                    onChange={(e) => updateMasterTask("repeats", e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Default Time
+                  </label>
+                  <input
+                    type="time"
+                    value={masterTask.time}
+                    onChange={(e) => updateMasterTask("time", e.target.value)}
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={2}
+                  value={masterTask.description}
+                  onChange={(e) => updateMasterTask("description", e.target.value)}
+                  placeholder="Enter Description"
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-slate-50/70 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setIsMasterModalOpen(false)}
+                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
+              >
+                Create
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {taskModalStageId && (
         <div
