@@ -94,6 +94,7 @@ const PIPELINE_KEY = 'leadStageTasksPipelineV1';
 /** A blank stage task, as the "add task" form opens it. */
 const EMPTY_MASTER_TASK = {
   name: '',
+  masterTaskId: null,
   description: '',
   role: 'Tele Caller Executive',
   department: 'Any',
@@ -275,9 +276,33 @@ export default function LeadStageTasks({ leadForms = [] }) {
     setMasterTask((current) => ({ ...current, [key]: value }));
   }
 
+  /**
+   * Picking a name in the "Add Stage Task" form copies the master task's role,
+   * department, priority, due days and form onto the form, so the stage task
+   * starts from its template. The other fields stay editable afterwards.
+   */
+  function pickTaskNameForModal(name) {
+    const linked = fieldsForName(name, "Tele Caller Executive");
+    setMasterTask((current) => ({
+      ...current,
+      name,
+      role: linked.role || current.role,
+      department: linked.department || current.department,
+      priority: linked.priority || current.priority,
+      dueIn: linked.dueIn ?? current.dueIn,
+      formId: linked.formId || current.formId,
+      masterTaskId: linked.masterTaskId ?? null,
+    }));
+  }
+
   function createMasterTask(event) {
     event.preventDefault();
-    if (!masterTask.name.trim()) return;
+    const name = masterTask.name.trim();
+    if (!name) return;
+
+    // Set when the name came from the master list, so the stage task keeps the
+    // link the server's stage automation reads.
+    const linkedMaster = masterTasks.find((m) => (m.name || m.title) === name);
 
     commitStages((current) =>
       current.map((stage) => {
@@ -288,7 +313,8 @@ export default function LeadStageTasks({ leadForms = [] }) {
             ...stage.tasks,
             {
               id: Date.now(),
-              name: masterTask.name.trim(),
+              name,
+              masterTaskId: linkedMaster?.id ?? null,
               description: masterTask.description.trim() || "New stage task",
               role: masterTask.role || "Tele Caller Executive",
               department: masterTask.department || "Any",
@@ -487,19 +513,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMasterTask(EMPTY_MASTER_TASK);
-              setIsMasterModalOpen(true);
-            }}
-            className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shrink-0"
-          >
-            <Plus size={14} />
-            Add Master Task
-          </button>
         </div>
 
         {isTaskRolesOpen && (
@@ -1057,14 +1070,22 @@ export default function LeadStageTasks({ leadForms = [] }) {
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Task Name <span className="text-rose-500">*</span>
                 </label>
-                <input
+                <select
                   autoFocus
                   value={masterTask.name}
-                  onChange={(e) => updateMasterTask("name", e.target.value)}
-                  placeholder="Enter Task Name"
+                  onChange={(e) => pickTaskNameForModal(e.target.value)}
                   required
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                />
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 cursor-pointer"
+                >
+                  <option value="" disabled>
+                    Select Task Name
+                  </option>
+                  {taskOptions.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
