@@ -284,7 +284,7 @@ const NAV = [
           { label: 'Onboarding', to: '/hrms/recruitment/onboarding' },
           // { label: 'Career', to: '/hrms/recruitment/career' }, // Hidden: Career Portal out of scope
           { label: 'Screening Questions', to: '/hrms/recruitment/questions' },
-          // { label: 'Funnel', to: '/hrms/recruitment/funnel' }, // Hidden: Recruitment Funnel feature commented out
+          // { label: 'Funnel', to: '/hrms/recruitment/funnel' },
         ],
       },
       {

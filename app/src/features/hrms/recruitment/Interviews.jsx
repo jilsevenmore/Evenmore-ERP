@@ -27,6 +27,7 @@ import {
   Search,
   X,
 } from "lucide-react";
+import UserInitials from "../../../components/common/UserInitials";
 import {
   generateMonthGrid,
   formatHumanDate,
@@ -221,11 +222,7 @@ export default function Interviews() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <img
-            src={r.avatar}
-            alt={r.candidateName}
-            className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-xs"
-          />
+          <UserInitials name={r.candidateName} className="w-8 h-8 text-xs" />
           <div>
             <span className="font-semibold text-slate-800 dark:text-slate-100 block text-[13px]">
               {r.candidateName}
@@ -744,11 +741,7 @@ export default function Interviews() {
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <img
-                            src={ev.avatar || "https://i.pravatar.cc/100?img=15"}
-                            alt={ev.candidateName}
-                            className="w-6 h-6 rounded-full object-cover border border-border"
-                          />
+                          <UserInitials name={ev.candidateName} className="w-6 h-6 text-[10px]" iconSize={12} />
                           <span className="font-bold text-[13.5px] text-text group-hover:text-primary transition">
                             {ev.candidateName}
                           </span>
@@ -863,11 +856,7 @@ export default function Interviews() {
                       className="p-3 bg-soft/30 border border-border rounded-xl flex justify-between items-center hover:border-primary/40 transition cursor-pointer"
                     >
                       <div className="flex items-center gap-2.5 truncate">
-                        <img
-                          src={iv.avatar || "https://i.pravatar.cc/100?img=15"}
-                          alt={iv.candidateName}
-                          className="w-7 h-7 rounded-full object-cover shrink-0 border border-border"
-                        />
+                        <UserInitials name={iv.candidateName} className="w-7 h-7 text-[10px]" iconSize={12} />
                         <div className="truncate">
                           <span className="font-bold text-[12.5px] text-text block truncate">
                             {iv.candidateName}

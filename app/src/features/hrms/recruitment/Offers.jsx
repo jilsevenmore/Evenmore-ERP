@@ -23,6 +23,7 @@ import {
   HelpCircle,
   DollarSign
 } from "lucide-react";
+import UserInitials from "../../../components/common/UserInitials";
 import OfferLetterModal from "../organization/OfferLetterModal";
 
 export default function Offers() {
@@ -169,11 +170,7 @@ export default function Offers() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <img
-            src={r.avatar || "https://i.pravatar.cc/100?img=15"}
-            alt=""
-            className="w-8 h-8 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-xs"
-          />
+          <UserInitials name={r.candidateName} className="w-8 h-8 text-xs" />
           <div>
             <span className="font-semibold text-slate-800 dark:text-slate-100 block text-[13px]">
               {r.candidateName}

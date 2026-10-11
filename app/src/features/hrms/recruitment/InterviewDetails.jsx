@@ -26,6 +26,7 @@ import {
   Edit3,
   CalendarClock
 } from "lucide-react";
+import UserInitials from "../../../components/common/UserInitials";
 
 export default function InterviewDetails() {
   const { id } = useParams();
@@ -108,11 +109,7 @@ export default function InterviewDetails() {
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
-            <img
-              src={it.avatar || "https://i.pravatar.cc/100?img=15"}
-              alt={it.candidateName}
-              className="w-16 h-16 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shadow-sm"
-            />
+            <UserInitials name={it.candidateName} className="w-16 h-16 text-xl" iconSize={28} />
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <h1 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -379,11 +376,7 @@ export default function InterviewDetails() {
               <span>Candidate Information</span>
             </h3>
             <div className="flex items-center gap-3 mb-4">
-              <img
-                src={cand?.avatar || it.avatar}
-                alt=""
-                className="w-11 h-11 rounded-full object-cover border border-slate-200 dark:border-slate-700"
-              />
+              <UserInitials name={cand?.name || it.candidateName} className="w-11 h-11 text-sm" iconSize={18} />
               <div>
                 <div className="font-bold text-slate-900 dark:text-white text-[13.5px]">
                   {cand?.name || it.candidateName}
