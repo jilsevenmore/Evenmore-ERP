@@ -387,9 +387,10 @@ export const CRM_RESOURCES = {
       dueIn: t.dueIn ?? t.offsetDays ?? undefined,
       order: t.order ?? undefined,
       isActive: activeFlag(t),
+      // Listed in Lead Stage Tasks' Task Roles only once picked there.
+      inTaskRoles: t.inTaskRoles ?? undefined,
       // Stage ids: the server keeps one linked stage task per stage.
       stages: Array.isArray(t.stages) ? t.stages.filter(isServerId) : undefined,
-      formId: t.formId === '' ? null : (isServerId(t.formId) ? t.formId : undefined),
     }),
     fromApi: (row) => ({
       ...asText(row, ['description', 'role', 'department', 'priority']),
@@ -413,7 +414,6 @@ export const CRM_RESOURCES = {
       isActive: t.isActive ?? undefined,
       // The Tasks Master row it was picked from, and the form its tasks open.
       masterTaskId: t.masterTaskId === null ? null : (isServerId(t.masterTaskId) ? t.masterTaskId : undefined),
-      formId: t.formId === '' || t.formId === null ? null : (isServerId(t.formId) ? t.formId : undefined),
       required: t.required ?? undefined,
       autoCreate: t.autoCreate ?? undefined,
       // The screen's "Max repeats" number; blank means once per lead.
@@ -424,7 +424,6 @@ export const CRM_RESOURCES = {
       title: row.title || row.name || '',
       // The screen edits "Max repeats" as `repeats`; the API's yes/no flag stays behind it.
       repeats: row.maxRepeats ?? '',
-      formId: row.formId || '',
       _synced: true,
     }),
   },
@@ -615,6 +614,14 @@ export async function pushDealActivity(dealId, { type = 'activity', title = '', 
 export async function createDealProject(dealId, project) {
   const row = await api.post(`/crm/deals/${dealId}/create-project/`, projectToApi(project));
   return projectFromApi(row);
+}
+
+/**
+ * `POST /crm/leads/mark-lost/` — the leads move to the Lost stage and their
+ * deals to the pipeline's Lost column (one is opened for a lead without one).
+ */
+export async function markLeadsLost(ids, lostReasonId = null) {
+  return api.post('/crm/leads/mark-lost/', { ids, lostReasonId: lostReasonId || undefined });
 }
 
 /** `POST /crm/leads/{id}/convert/` — the lead becomes a party and/or a deal. */

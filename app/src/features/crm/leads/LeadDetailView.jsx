@@ -1,7 +1,7 @@
 import { findDealForLead } from '../../../services/dealService';
 import CrmKpiCard from '../common/CrmKpiCard';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useERP } from '../../../context/ERPContext';
 import { formatCurrency } from '../../../utils/currencyUtils';
 import {
@@ -57,8 +57,6 @@ import {
   Users,
 } from 'lucide-react';
 import LeadAvatar from './LeadAvatar';
-import LeadFormBuilder from './LeadFormBuilder';
-import { createFieldFromType } from '../../../data/crm/leadFormSchema';
 import { exportToCSV } from '../../../services/exportUtils';
 import { useEstimates, estimateMatchesLead, addEstimate } from '../../../services/estimateStore';
 import { useCrmStore } from '../../../stores/crmStore';
@@ -71,7 +69,6 @@ import { useLeadDetailStore, EMPTY_DETAIL } from '../../../stores/leadDetailStor
 import { isServerId } from '../../../services/resourceSync';
 import { describeError } from '../../../services/crmSync';
 import { uploadFileToBackend } from '../../../services/fileUploadService';
-import { loadForms, saveForms, TASK_FORM } from '../../../services/crmForms';
 import { LineItemEditor } from '../../../components/common/LineItemEditor';
 import { loadCrmTasks, saveCrmTasks, runLeadStageAutomation, TASK_SOURCE_AUTOMATION } from '../../../services/leadStageAutomation';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
@@ -228,49 +225,9 @@ export function resolveSourceIcon(icon) {
 export const LEAD_TASK_PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'];
 export const LEAD_TASK_STATUS_OPTIONS = ['Open', 'In Progress', 'Waiting', 'Completed'];
 
-/** The task form definitions, from `/crm/forms/`. */
-function getLeadTaskForms() {
-  return loadForms(TASK_FORM);
-}
-
-function saveLeadTaskForms(forms) {
-  saveForms(forms, TASK_FORM);
-}
-
-function createLeadTaskForm(name, sections = []) {
-  return {
-    id: `task-form-${Date.now()}`,
-    title: String(name || 'Untitled form').trim(),
-    description: '',
-    sections,
-    fields: sections.flatMap((section) => (section.fields || []).map((field) => field.label)),
-    status: 'ACTIVE',
-    lastUpdated: new Date().toLocaleDateString('en-GB'),
-  };
-}
-
-/** A task form by its server id or the id it had before it was saved. */
-function sameTaskForm(form, formId) {
-  if (!form || formId === undefined || formId === null || formId === '') return false;
-  const key = String(formId);
-  return String(form.id) === key || (form.clientId != null && String(form.clientId) === key);
-}
-
-/** The fields of a task form, given the form itself or its id. */
-function getTaskFormFields(formOrId) {
-  const form = formOrId && typeof formOrId === 'object'
-    ? formOrId
-    : getLeadTaskForms().find((f) => sameTaskForm(f, formOrId));
-  if (!form) return [];
-  if (Array.isArray(form.sections) && form.sections.length > 0) {
-    return form.sections.flatMap((section) => section.fields || []);
-  }
-  return (form.fields || []).map((label, index) => ({ id: `f-${index}`, label, type: 'text' }));
-}
-
 /**
  * The Tasks Master rows a lead task can start from, from `/crm/master-tasks/`:
- * picking one fills the title, priority, role and the task form it uses.
+ * picking one fills the title, priority and role.
  */
 function getMasterTaskOptions() {
   return useCrmStore.getState().masterTasks
@@ -280,7 +237,6 @@ function getMasterTaskOptions() {
       name: task.name || task.title,
       priority: task.priority,
       role: task.role,
-      formId: task.formId || '',
     }));
 }
 
@@ -295,12 +251,12 @@ function parseLeadTaskDueAt(value) {
   return new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min));
 }
 
-/** The Tasks tab's editor, blank. (`createLeadTaskForm` builds a task *form* definition.) */
+/** The Tasks tab's editor, blank. */
 function emptyLeadTaskEditor(assignee, stage) {
   return {
     defaultTask: 'custom', title: '', stage: stage || 'New Lead', priority: 'Medium', status: 'Due',
     assignee: assignee || '', description: '',
-    taskFormId: '', customValues: {}, taskDate: '', taskTime: '',
+    taskDate: '', taskTime: '',
   };
 }
 
@@ -1027,13 +983,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
-  const [taskForms, setTaskForms] = useState(() => getLeadTaskForms());
-  const [showFormEditor, setShowFormEditor] = useState(false);
-  const [taskFormName, setTaskFormName] = useState('');
-  const [builderSections, setBuilderSections] = useState([]);
-  const [builderSelectedFieldId, setBuilderSelectedFieldId] = useState(null);
-  const [builderSaveSuccess, setBuilderSaveSuccess] = useState(false);
-  const [taskFormDraftError, setTaskFormDraftError] = useState('');
   const assigneeOptions = useMemo(() => {
     const names = [
       lead?.owner,
@@ -1055,9 +1004,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   const [formError, setFormError] = useState('');
   const [completeId, setCompleteId] = useState(null);
   const currentUser = useAppStore((s) => s.currentUser);
-  const selectedTaskForm = useMemo(() => taskForms.find((f) => sameTaskForm(f, form.taskFormId)) || null, [taskForms, form.taskFormId]);
-  const selectedTaskFormFields = useMemo(() => (selectedTaskForm ? getTaskFormFields(selectedTaskForm) : []), [selectedTaskForm]);
-
   React.useEffect(() => {
     onCountsChange?.({ openTasks: tasks.filter((t) => t.status !== 'Completed').length });
   }, [tasks, onCountsChange]);
@@ -1078,25 +1024,9 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
         stage: form.stage,
         dueAt: formatLeadTaskDueAt(`${form.taskDate}T${form.taskTime || '00:00'}`),
         process: form.status === 'Completed' ? 'Done' : 'Not Started',
-        taskFormId: form.taskFormId,
-        taskFormName: selectedTaskForm?.title || '',
-        customValues: form.customValues || {},
       },
     };
   }
-
-  React.useEffect(() => {
-    function refreshTaskForms() {
-      setTaskForms(getLeadTaskForms());
-    }
-    refreshTaskForms();
-    window.addEventListener('focus', refreshTaskForms);
-    window.addEventListener('storage', refreshTaskForms);
-    return () => {
-      window.removeEventListener('focus', refreshTaskForms);
-      window.removeEventListener('storage', refreshTaskForms);
-    };
-  }, [isModalOpen]);
 
   const dueTasks = useMemo(() => tasks.filter((t) => t.status === 'Due'), [tasks]);
   const doneTasks = useMemo(() => tasks.filter((t) => t.status !== 'Due'), [tasks]);
@@ -1105,12 +1035,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     setEditingId(null);
     setForm(emptyLeadTaskEditor(defaultAssignee, lead?.status));
     setFormError('');
-    setTaskForms(getLeadTaskForms());
-    setShowFormEditor(false);
-    setTaskFormName('');
-    setBuilderSections([]);
-    setBuilderSelectedFieldId(null);
-    setTaskFormDraftError('');
     setIsModalOpen(true);
   }
 
@@ -1125,15 +1049,10 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       status: task.status || 'Due',
       assignee: task.assignee || defaultAssignee,
       description: task.description || '',
-      taskFormId: task.taskFormId || '',
-      customValues: task.customValues || {},
       taskDate: due.taskDate,
       taskTime: due.taskTime,
     });
     setFormError('');
-    setTaskForms(getLeadTaskForms());
-    setShowFormEditor(false);
-    setTaskFormDraftError('');
     setIsModalOpen(true);
   }
 
@@ -1148,106 +1067,11 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
             title: current.title || preset.name || '',
             priority: preset.priority || current.priority,
             assignee: current.assignee || defaultAssignee,
-            // The master's task form opens with it (answers restart for a new form).
-            ...(preset.formId && preset.formId !== current.taskFormId ? { taskFormId: preset.formId, customValues: {} } : {}),
           };
         }
       }
-      if (key === 'taskFormId') {
-        return { ...current, taskFormId: value, customValues: {} };
-      }
       return { ...current, [key]: value };
     });
-  }
-
-  function updateCustomValue(fieldId, value) {
-    setForm((current) => ({ ...current, customValues: { ...(current.customValues || {}), [fieldId]: value } }));
-  }
-
-  function openFormBuilderEditor() {
-    setTaskForms(getLeadTaskForms());
-    setTaskFormName('');
-    setBuilderSections([{ id: `task-section-${Date.now()}`, title: 'New Section 2', fields: [] }]);
-    setBuilderSelectedFieldId(null);
-    setBuilderSaveSuccess(false);
-    setTaskFormDraftError('');
-    setShowFormEditor(true);
-  }
-
-  function updateBuilderField(fieldId, updates) {
-    setBuilderSections((cur) => cur.map((s) => ({ ...s, fields: s.fields.map((f) => (f.id === fieldId ? { ...f, ...updates } : f)) })));
-  }
-
-  function addBuilderField(sectionId, type, index) {
-    const targetId = sectionId || builderSections[0]?.id;
-    const nextField = createFieldFromType(type, Date.now());
-    setBuilderSections((cur) => cur.map((s) => {
-      if (s.id !== targetId) return s;
-      const arr = [...s.fields];
-      arr.splice(typeof index === 'number' ? index : arr.length, 0, nextField);
-      return { ...s, fields: arr };
-    }));
-    setBuilderSelectedFieldId(nextField.id);
-  }
-
-  function removeBuilderField(fieldId) {
-    setBuilderSections((cur) => cur.map((s) => ({ ...s, fields: s.fields.filter((f) => f.id !== fieldId) })));
-  }
-
-  function moveBuilderField(fieldId, targetSectionId, targetIndex) {
-    setBuilderSections((cur) => {
-      let moving = null;
-      const stripped = cur.map((s) => ({ ...s, fields: s.fields.filter((f) => { if (f.id === fieldId) { moving = f; return false; } return true; }) }));
-      if (!moving) return cur;
-      return stripped.map((s) => {
-        if (s.id !== targetSectionId) return s;
-        const arr = [...s.fields];
-        arr.splice(typeof targetIndex === 'number' ? targetIndex : arr.length, 0, moving);
-        return { ...s, fields: arr };
-      });
-    });
-    setBuilderSelectedFieldId(fieldId);
-  }
-
-  function addBuilderSection() {
-    const id = `task-section-${Date.now()}`;
-    setBuilderSections((cur) => [...cur, { id, title: `New Section ${cur.length + 1}`, fields: [] }]);
-  }
-
-  function removeBuilderSection(sectionId) {
-    setBuilderSections((cur) => (cur.length <= 1 ? cur : cur.filter((s) => s.id !== sectionId)));
-  }
-
-  function saveTaskFormDraft() {
-    const name = String(taskFormName || '').trim();
-    if (!name) {
-      setTaskFormDraftError('Form name is required.');
-      return;
-    }
-    const allFields = builderSections.flatMap((s) => s.fields || []);
-    if (allFields.length === 0) {
-      setTaskFormDraftError('Add at least one field from the left panel.');
-      return;
-    }
-    const newForm = { id: `task-form-${Date.now()}`, title: name, description: 'No description provided', fields: allFields.map((f) => f.label), sections: builderSections, lastUpdated: new Date().toLocaleDateString('en-GB'), status: 'ACTIVE', iconName: 'call' };
-    const next = [...getLeadTaskForms(), newForm];
-    saveLeadTaskForms(next);
-    setTaskForms(next);
-    setForm((current) => ({ ...current, taskFormId: newForm.id, customValues: {} }));
-    setShowFormEditor(false);
-    setTaskFormName('');
-    setBuilderSections([]);
-    setBuilderSelectedFieldId(null);
-    setTaskFormDraftError('');
-    setBuilderSaveSuccess(true);
-    setTimeout(() => setBuilderSaveSuccess(false), 1200);
-    onActivity?.(`Task form "${name}" created`, '#1d6bff');
-  }
-
-  function openSelectedFormBuilder() {
-    if (!selectedTaskForm) return;
-    try { localStorage.setItem('activeTaskFormId', selectedTaskForm.id); } catch { }
-    navigate(`/crm/leads/task-form/builder?formId=${selectedTaskForm.id}`);
   }
 
   async function submitTask(e) {
@@ -1267,12 +1091,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
     if (!form.assignee) {
       setFormError('Please select an assignee.');
       return;
-    }
-    for (const field of selectedTaskFormFields) {
-      if (field.required && !String(form.customValues?.[field.id] ?? '').trim()) {
-        setFormError(`"${field.label}" is required.`);
-        return;
-      }
     }
     const payload = crmTaskFromEditor();
     const store = useCrmStore.getState();
@@ -1314,7 +1132,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       .catch((err) => onActivity?.(`Could not reopen task: ${describeError(err)}`, '#ef4444'));
   }
 
-  async function submitCompleteTask(outcome, nextAction, note) {
+  async function submitCompleteTask(outcome, nextAction, note, options = {}) {
     const detailTask = tasks.find((t) => t.id === completeId);
     if (!detailTask) {
       return { ok: false, message: 'Task could not be found.' };
@@ -1328,6 +1146,7 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
       outcome,
       nextAction,
       note,
+      ...options,
       completedBy: actor,
       leadDetailTask: detailTask,
     });
@@ -1520,56 +1339,6 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
                     {assigneeOptions.map((name) => (<option key={name} value={name}>{name}</option>))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-[13px] font-semibold text-slate-800 mb-1.5">Task Form</label>
-                  <select value={form.taskFormId} onChange={(e) => updateTaskForm('taskFormId', e.target.value)} className="w-full h-11 px-4 bg-white border-2 border-[#1d4a79] rounded-lg text-[13px] text-slate-800 focus:outline-none">
-                    <option value="">Select Form</option>
-                    {taskForms.map((tf) => (<option key={tf.id} value={tf.id}>{tf.title}</option>))}
-                  </select>
-                  <p className="text-[11px] text-slate-500 mt-1.5">Please create Task Form first. <button type="button" onClick={() => { if (showFormEditor) { setShowFormEditor(false); } else { openFormBuilderEditor(); } }} className="text-[#1d4a79] font-bold hover:underline">Create Task Form</button></p>
-                </div>
-                {selectedTaskForm && (
-                  <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-[13px] font-bold text-slate-800">{selectedTaskForm.title} Fields</p>
-                      <button type="button" onClick={openSelectedFormBuilder} className="px-3 py-1.5 rounded-lg bg-[#1d4a79] hover:bg-[#163a61] text-white text-[11px] font-bold transition">Open Form Builder</button>
-                    </div>
-                    {selectedTaskFormFields.length === 0 && (<p className="text-[11px] text-slate-400">No fields defined in this form yet.</p>)}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {selectedTaskFormFields.map((field) => (
-                        <label key={field.id} className="block">
-                          <span className="block text-[12px] font-semibold text-slate-700 mb-1">{field.label} {field.required && <span className="text-rose-500">*</span>}</span>
-                          {String(field.type).toLowerCase() === 'multi line' ? (
-                            <textarea rows={3} value={form.customValues?.[field.id] || ''} onChange={(e) => updateCustomValue(field.id, e.target.value)} placeholder={field.placeholder || `Enter ${String(field.label).toLowerCase()}`} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
-                          ) : String(field.type).toLowerCase() === 'dropdown' || String(field.type).toLowerCase() === 'multi select' ? (
-                            <select value={form.customValues?.[field.id] || ''} onChange={(e) => updateCustomValue(field.id, e.target.value)} className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500">
-                              <option value="">{field.placeholder || 'Select option'}</option>
-                              {String(field.options || field.placeholder || '').split(',').map((o) => o.trim()).filter(Boolean).map((o) => (<option key={o} value={o}>{o}</option>))}
-                            </select>
-                          ) : (
-                            <input type={String(field.type).toLowerCase() === 'number' ? 'number' : String(field.type).toLowerCase() === 'date' ? 'date' : String(field.type).toLowerCase() === 'email' ? 'email' : String(field.type).toLowerCase() === 'phone' ? 'tel' : 'text'} value={form.customValues?.[field.id] || ''} onChange={(e) => updateCustomValue(field.id, e.target.value)} placeholder={field.placeholder || `Enter ${String(field.label).toLowerCase()}`} className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {showFormEditor && (
-                  <div className="rounded-xl border border-slate-200 bg-white p-4">
-                    <div className="mt-1">
-                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">Form Name</label>
-                      <input value={taskFormName} onChange={(e) => setTaskFormName(e.target.value)} placeholder="Enter form name" className="w-full h-10 px-3 bg-white border border-slate-300 rounded-lg text-[13px] text-slate-800 focus:outline-none focus:border-blue-500" />
-                    </div>
-                    <div className="mt-3 rounded-xl border border-slate-100 overflow-hidden">
-                      <LeadFormBuilder hideHeader sections={builderSections} selectedFieldId={builderSelectedFieldId} selectedField={builderSections.flatMap((s) => s.fields).find((f) => f.id === builderSelectedFieldId) ?? null} onSelectField={setBuilderSelectedFieldId} onUpdateField={updateBuilderField} onAddField={addBuilderField} onRemoveField={removeBuilderField} onMoveField={moveBuilderField} onAddSection={addBuilderSection} onRemoveSection={removeBuilderSection} onPreview={() => {}} onSaveAndOpen={saveTaskFormDraft} saveSuccess={builderSaveSuccess} formTitle={taskFormName || 'New Task Form'} />
-                    </div>
-                    {taskFormDraftError && <p className="text-[11px] font-semibold text-rose-600 mt-2">{taskFormDraftError}</p>}
-                    <div className="flex flex-wrap items-center gap-2 mt-3">
-                      <button type="button" onClick={saveTaskFormDraft} className="btn-primary h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1">Save Form</button>
-                      <button type="button" onClick={() => { setShowFormEditor(false); setTaskFormDraftError(''); }} className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1"><X size={13} /> Cancel</button>
-                    </div>
-                  </div>
-                )}
                 {formError && <p className="text-xs font-semibold text-rose-600">{formError}</p>}
               </div>
               <div className="flex items-center justify-end gap-2.5 mt-4">
@@ -1609,6 +1378,47 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
   );
 }
 
+/**
+ * A lead is quoted before it is a customer, so the estimate / quotation forms
+ * offer the lead itself as the first "Customer Account". Picking it sends the
+ * lead's details as a one-time party; the server links the document to the lead.
+ */
+const LEAD_ACCOUNT = '__lead__';
+
+function defaultAccountFor(lead, customers) {
+  const converted = lead?.party && (customers || []).find((c) => String(c.id) === String(lead.party));
+  return converted ? converted.id : LEAD_ACCOUNT;
+}
+
+function AccountOptions({ lead, customers }) {
+  return (
+    <>
+      <option value={LEAD_ACCOUNT}>
+        {lead?.name || 'This lead'}{lead?.company ? ` (${lead.company})` : ''} - Lead
+      </option>
+      {(customers || []).map((customer) => (
+        <option key={customer.id} value={customer.id}>
+          {customer.name} ({customer.code}) - Balance: ${Number(customer.balance || 0).toFixed(2)}
+        </option>
+      ))}
+    </>
+  );
+}
+
+function partyForAccount(accountId, lead, customers) {
+  const customer = accountId !== LEAD_ACCOUNT && (customers || []).find((c) => c.id === accountId);
+  if (customer) return { customerId: customer.id, customer: customer.name };
+  return {
+    customerId: '',
+    customer: lead?.name || '',
+    isOneTimeParty: true,
+    partyName: lead?.name || '',
+    partyType: 'Customer',
+    partyPhone: lead?.phone || undefined,
+    partyEmail: lead?.email || undefined,
+  };
+}
+
 function EstimatesTab({ lead, onCountsChange }) {
   const all = useEstimates();
   const { customers } = useERP() || {};
@@ -1625,8 +1435,7 @@ function EstimatesTab({ lead, onCountsChange }) {
   }, [linked.length, onCountsChange]);
 
   function openCreateModal() {
-    const preferredCustomer = (customers || []).find((c) => c.name === (lead?.company || lead?.name)) || (customers || [])[0];
-    setSelectedCustomerId(preferredCustomer?.id || '');
+    setSelectedCustomerId(defaultAccountFor(lead, customers));
     setValidUntil('15 Days');
     setLineItems((storedProducts || []).map((p, index) => ({
       id: `li-${Date.now()}-${index}`,
@@ -1640,13 +1449,12 @@ function EstimatesTab({ lead, onCountsChange }) {
 
   function handleCreateEstimate(event) {
     event.preventDefault();
-    const cust = (customers || []).find((c) => c.id === selectedCustomerId) || (customers || [])[0];
+    const party = partyForAccount(selectedCustomerId, lead, customers);
     const total = (lineItems || []).reduce((sum, item) => sum + ((item.amount) || (Number(item.qty || 1) * Number(item.rate || 0))), 0);
     const created = {
       id: `est-${Date.now()}`,
       estimateNumber: `EST-${new Date().getFullYear()}-${String((all.length || 0) + 1).padStart(3, '0')}`,
-      customerId: cust?.id || '',
-      customer: cust?.name || lead?.company || lead?.name || '',
+      ...party,
       leadId: String(lead?.id || ''),
       leadName: lead?.name || '',
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -1751,11 +1559,7 @@ function EstimatesTab({ lead, onCountsChange }) {
                     onChange={(event) => setSelectedCustomerId(event.target.value)}
                     className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium"
                   >
-                    {(customers || []).map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name} ({customer.code}) - Balance: ${customer.balance.toFixed(2)}
-                      </option>
-                    ))}
+                    <AccountOptions lead={lead} customers={customers} />
                   </select>
                 </div>
                 <div>
@@ -1809,18 +1613,12 @@ function QuotationsTab({ lead, onActivity }) {
   const linked = useMemo(() => (quotations || []).filter((q) => quotationMatchesLead(q, lead)), [quotations, lead]);
   const storedProducts = useLeadDetailState(lead).products;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState((customers || [])[0]?.id || '');
+  const [selectedCustomerId, setSelectedCustomerId] = useState(LEAD_ACCOUNT);
   const [validUntil, setValidUntil] = useState('30 Days');
   const [lineItems, setLineItems] = useState([]);
 
-  useEffect(() => {
-    if (!customers || customers.length === 0) return;
-    const match = (customers || []).find((customer) => customer.name === (lead?.company || lead?.name)) || (customers || [])[0];
-    if (match) setSelectedCustomerId(match.id);
-  }, [customers, lead]);
 
   function openCreateModal() {
-    const match = (customers || []).find((customer) => customer.name === (lead?.company || lead?.name)) || (customers || [])[0];
     const nextItems = (storedProducts || []).map((product, index) => ({
       id: `quote-item-${product.id ?? index}`,
       description: product.name,
@@ -1829,7 +1627,7 @@ function QuotationsTab({ lead, onActivity }) {
       amount: Number(String(product.price || '').replace(/[^0-9.]/g, '')) || 0,
     }));
 
-    setSelectedCustomerId(match?.id || '');
+    setSelectedCustomerId(defaultAccountFor(lead, customers));
     setValidUntil('30 Days');
     setLineItems(nextItems.length > 0 ? nextItems : [{
       id: `quote-item-${Date.now()}`,
@@ -1843,7 +1641,7 @@ function QuotationsTab({ lead, onActivity }) {
 
   function handleCreateQuotation(event) {
     event.preventDefault();
-    const customer = (customers || []).find((entry) => entry.id === selectedCustomerId) || (customers || [])[0];
+    const party = partyForAccount(selectedCustomerId, lead, customers);
     const computedTotal = (lineItems || []).reduce((sum, item) => {
       const qty = Number(item.qty || 1);
       const rate = Number(item.rate || 0);
@@ -1852,8 +1650,7 @@ function QuotationsTab({ lead, onActivity }) {
     }, 0);
 
     const created = addQuotation?.({
-      customerId: customer?.id,
-      customer: customer?.name || lead?.company || lead?.name || '',
+      ...party,
       leadId: String(lead?.id || ''),
       leadName: lead?.name || '',
       date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -1866,7 +1663,7 @@ function QuotationsTab({ lead, onActivity }) {
     setIsCreateOpen(false);
     setLineItems([]);
     setValidUntil('30 Days');
-    onActivity?.(`Quotation ${created?.quoteNumber || 'created'} generated for ${lead?.name || customer?.name || 'lead'}`, '#3b82f6');
+    onActivity?.(`Quotation ${created?.quoteNumber || 'created'} generated for ${lead?.name || party.customer || 'lead'}`, '#3b82f6');
   }
 
   function sendQuotation(q) {
@@ -1968,11 +1765,7 @@ function QuotationsTab({ lead, onActivity }) {
                     onChange={(event) => setSelectedCustomerId(event.target.value)}
                     className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium"
                   >
-                    {(customers || []).map((customer) => (
-                      <option key={customer.id} value={customer.id}>
-                        {customer.name} ({customer.code}) - Balance: ${customer.balance.toFixed(2)}
-                      </option>
-                    ))}
+                    <AccountOptions lead={lead} customers={customers} />
                   </select>
                 </div>
                 <div>
@@ -3102,6 +2895,17 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     const openTasks = (storedDetailState.tasks || []).filter((t) => t.status !== 'Completed').length;
     setDetailCounts((current) => (current.openTasks === openTasks ? current : { ...current, openTasks }));
   }, [viewLead, lead, storeLeads, storedDetailState]);
+
+  // The Leads list's "Edit Lead Information" lands here with `?edit=1`; open
+  // the dialog once and drop the flag so a reload does not reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('edit') !== '1' || !(viewLead ?? lead)) return;
+    openEditLead();
+    const next = new URLSearchParams(searchParams);
+    next.delete('edit');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, viewLead, lead]);
 
   function openEditLead() {
     const source = viewLead ?? lead;

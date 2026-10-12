@@ -126,7 +126,6 @@ const NAV = [
           { label: 'Leads', to: '/crm/leads', dot: true },
           { label: 'Lead Create Form', to: '/crm/leads/forms' },
           { label: 'Lead Tasks Master', to: '/crm/leads/tasks-master' },
-          { label: 'Lead Task Form', to: '/crm/leads/task-form' },
           { label: 'Lead Stage Tasks', to: '/crm/leads/stage-tasks' },
         ],
       },

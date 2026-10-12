@@ -29,8 +29,6 @@ const TaskAllocationPage = lazy(() => import('../features/crm/tasks/allocation/T
 const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/allocation/TaskAllocationDetailPage'));
 const MasterTasksPage = lazy(() => import('../features/crm/tasks/MasterTasksPage'));
 const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage'));
-const TaskFormPage = lazy(() => import('../features/crm/tasks/TaskFormPage'));
-const TaskFormBuilderPage = lazy(() => import('../features/crm/tasks/TaskFormBuilderPage'));
 const CRMDashboard = lazy(() => import('../features/crm/dashboard/CRMDashboard'));
 const ProjectsPage = lazy(() => import('../features/crm/projects/ProjectsPage'));
 const ContractsPage = lazy(() => import('../features/crm/contracts/ContractsPage'));
@@ -316,8 +314,6 @@ const router = createBrowserRouter([
       { path: 'crm/leads/:id', element: <Page component={LeadDetailPage} /> },
       { path: 'crm/leads/forms', element: <Page component={LeadFormsPage} /> },
       { path: 'crm/leads/tasks-master', element: <Page component={MasterTasksPage} /> },
-      { path: 'crm/leads/task-form', element: <Page component={TaskFormPage} /> },
-      { path: 'crm/leads/task-form/builder', element: <Page component={TaskFormBuilderPage} /> },
       { path: 'crm/leads/stage-tasks', element: <Page component={StageTasksPage} /> },
       { path: 'crm/leads/form-builder', element: <Page component={LeadFormBuilderPage} /> },
       { path: 'crm/leads/create-form', element: <Page component={DynamicLeadFormPage} /> },

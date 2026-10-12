@@ -104,7 +104,7 @@ export function getNextStageName(currentStage) {
  * Complete a task. The server decides what follows; this returns the same
  * `{ok, message, createdTask, stageChanged}` shape the screens already read.
  */
-export async function completeTaskWithOutcome({ task, outcome, nextAction, note }) {
+export async function completeTaskWithOutcome({ task, outcome, nextAction, note, followUpAt, closeOpenTasks, targetStageId }) {
   if (!task?.id) {
     return { ok: false, message: 'No task selected.', createdTask: null, stageChanged: false };
   }
@@ -114,6 +114,14 @@ export async function completeTaskWithOutcome({ task, outcome, nextAction, note 
       outcome,
       nextAction,
       note: String(note || '').trim() || undefined,
+      // "Needs another attempt": when the next attempt of this task is due.
+      // "Ready to move on": when the next stage's tasks are due.
+      followUpAt: followUpAt || undefined,
+      // "Finished with this lead": close the lead's other open tasks too.
+      closeOpenTasks: closeOpenTasks || undefined,
+      // "Ready to move on": the stage the lead is moved to, when the form let
+      // the user pick one instead of taking the next stage in the pipeline.
+      targetStageId: targetStageId || undefined,
     });
 
     // A stage change or a follow-up means other collections moved too.
@@ -131,6 +139,7 @@ export async function completeTaskWithOutcome({ task, outcome, nextAction, note 
       createdTask,
       createdTasks: result?.createdTasks || [],
       stageChanged: Boolean(result?.stageChanged),
+      movedToStage: result?.movedToStage || null,
       task: result?.task || null,
     };
   } catch (err) {

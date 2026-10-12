@@ -1,6 +1,6 @@
 import CrmKpiCard from '../common/CrmKpiCard';
 import { useState, useMemo, useEffect } from 'react';
-import { Calendar, User, Search, CheckCircle2, Pencil, X, AlertTriangle, ArrowUpDown, Clock, Users, UserPlus, TrendingUp } from 'lucide-react';
+import { Calendar, User, Search, CheckCircle2, AlertTriangle, ArrowUpDown, Clock, Users, UserPlus, TrendingUp } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import DataTable from '../../../components/ui/DataTable';
 import StatusBadge from '../../../components/ui/StatusBadge';
@@ -11,7 +11,6 @@ import {
 } from '../../../services/leadStageAutomation';
 import { completeTaskWithOutcome, resolveLeadForTask, NEXT_ACTION_LABELS } from '../../../services/taskCompletionService';
 import CompleteTaskModal from './CompleteTaskModal';
-import { useAppStore } from '../../../stores/appStore';
 import { useCrmStore } from '../../../stores/crmStore';
 import { describeError } from '../../../services/crmSync';
 import { formatCurrency } from '../../../utils/currencyUtils';
@@ -21,19 +20,9 @@ const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'];
 const STATUS_OPTIONS = ['Open', 'In Progress', 'Waiting', 'Completed'];
 
 export default function TasksPage() {
-  const currentUser = useAppStore((s) => s.currentUser);
   const tasks = useCrmStore((s) => s.tasks);
   const leads = useCrmStore((s) => s.leads);
   const deals = useCrmStore((s) => s.deals);
-  const teamMembers = useCrmStore((s) => s.teamMembers);
-  const ASSIGNEE_OPTIONS = useMemo(() => [
-    'Unassigned',
-    ...new Set(
-      [...(teamMembers || []).map((m) => m?.name), currentUser?.name, ...tasks.map((t) => t.owner)]
-        .map((name) => String(name || '').trim())
-        .filter((name) => name && name !== 'Unassigned'),
-    ),
-  ], [teamMembers, currentUser?.name, tasks]);
   const kpis = useMemo(() => {
     const currency = localStorage.getItem('evenmore_currency') || 'USD ($)';
     const openDeals = deals.filter((d) => d.stage !== 'Won' && d.stage !== 'Lost' && d.stage !== 'Declined');
@@ -52,16 +41,6 @@ export default function TasksPage() {
   const [search, setSearch] = useState('');
   const [sortField, setSortField] = useState('dueDate');
   const [sortDirection, setSortDirection] = useState('asc');
-
-  // Edit / Reassign Modal state
-  const [editingTask, setEditingTask] = useState(null);
-  const [editForm, setEditForm] = useState({
-    title: '',
-    owner: '',
-    dueDate: '',
-    priority: 'Medium',
-    status: 'Open',
-  });
 
   // Complete Task Modal state
   const [completeTarget, setCompleteTarget] = useState(null);
@@ -91,13 +70,14 @@ export default function TasksPage() {
     setCompleteTarget({ task, lead });
   }
 
-  async function handleComplete(outcome, nextAction, note) {
+  async function handleComplete(outcome, nextAction, note, options = {}) {
     if (!completeTarget?.task) return { ok: false, message: 'No task selected.' };
     const result = await completeTaskWithOutcome({
       task: completeTarget.task,
       outcome,
       nextAction,
       note,
+      ...options,
     });
     if (result.ok !== false) {
       setSuccessToast(result.message || 'Task completed successfully.');
@@ -108,36 +88,6 @@ export default function TasksPage() {
 
   function handleCompleteSuccess() {
     setCompleteTarget(null);
-  }
-
-  function openEditModal(task) {
-    setEditingTask(task);
-    setEditForm({
-      title: task.title || '',
-      owner: task.owner || 'Unassigned',
-      dueDate: task.dueDate || '',
-      priority: task.priority || 'Medium',
-      status: task.status || 'Open',
-    });
-  }
-
-  function closeEditModal() {
-    setEditingTask(null);
-  }
-
-  function handleSaveEdit(e) {
-    e.preventDefault();
-    if (!editingTask) return;
-
-    updateTask(editingTask.id, {
-      title: editForm.title.trim() || editingTask.title,
-      assigneeId: editForm.assigneeId || editingTask.assigneeId,
-      dueDate: editForm.dueDate || editingTask.dueDate,
-      priority: editForm.priority,
-      status: editForm.status,
-    }).catch((err) => console.warn('[CRM] task not saved:', describeError(err)));
-
-    closeEditModal();
   }
 
   function handleSort(field) {
@@ -157,6 +107,7 @@ export default function TasksPage() {
         !q ||
         (t.title && String(t.title ?? '').toLowerCase().includes(q)) ||
         (t.lead && String(t.lead ?? '').toLowerCase().includes(q)) ||
+        (t.leadNumber && String(t.leadNumber).toLowerCase().includes(q)) ||
         (t.owner && String(t.owner ?? '').toLowerCase().includes(q)) ||
         (t.source && String(t.source ?? '').toLowerCase().includes(q));
       return matchesStatus && matchesSearch;
@@ -182,6 +133,20 @@ export default function TasksPage() {
   }, [tasks, activeStatus, search, sortField, sortDirection]);
 
   const columns = [
+    {
+      key: 'leadNumber',
+      label: (
+        <span
+          onClick={() => handleSort('leadNumber')}
+          className="inline-flex items-center gap-1 cursor-pointer hover:text-blue-600"
+        >
+          Lead ID <ArrowUpDown size={12} />
+        </span>
+      ),
+      render: (val) => (val
+        ? <span className="font-semibold text-slate-700 whitespace-nowrap">{val}</span>
+        : <span className="text-slate-300">—</span>),
+    },
     {
       key: 'title',
       label: (
@@ -320,14 +285,6 @@ export default function TasksPage() {
           >
             <CheckCircle2 size={15} />
           </button>
-          <button
-            type="button"
-            onClick={() => openEditModal(row)}
-            title="Edit / Reassign Task"
-            className="p-1.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-blue-600 hover:bg-slate-50 transition"
-          >
-            <Pencil size={15} />
-          </button>
         </div>
       ),
     },
@@ -419,137 +376,6 @@ export default function TasksPage() {
           emptyMessage="No tasks found matching your filters."
         />
       </div>
-
-      {/* Edit / Reassign Task Modal */}
-      {editingTask && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-2 sm:p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="bg-white rounded-2xl max-w-md w-full border border-slate-200 shadow-xl max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">Edit / Reassign Task</h3>
-                <span className="text-[11px] text-slate-400">{editingTask.id}</span>
-              </div>
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="text-slate-400 hover:text-slate-600 p-1"
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="p-5 space-y-4 text-xs">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Task Title</label>
-                <input
-                  type="text"
-                  value={editForm.title}
-                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:border-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Assigned Employee</label>
-                <select
-                  value={editForm.owner}
-                  onChange={(e) => setEditForm({ ...editForm, owner: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs bg-white focus:outline-none focus:border-blue-500"
-                >
-                  {ASSIGNEE_OPTIONS.map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
-                {editForm.owner === 'Unassigned' && (
-                  <p className="text-[11px] text-amber-600 mt-1">
-                    ⚠️ Task will remain unassigned until an eligible employee is chosen.
-                  </p>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Due Date</label>
-                  <input
-                    type="date"
-                    value={editForm.dueDate}
-                    onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs focus:outline-none focus:border-blue-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Priority</label>
-                  <select
-                    value={editForm.priority}
-                    onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs bg-white focus:outline-none focus:border-blue-500"
-                  >
-                    {PRIORITY_OPTIONS.map((p) => (
-                      <option key={p} value={p}>
-                        {p}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Status</label>
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-slate-800 text-xs bg-white focus:outline-none focus:border-blue-500"
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                <span>
-                  Source:{' '}
-                  <strong className="text-slate-700">
-                    {editingTask.source || TASK_SOURCE_AUTOMATION}
-                  </strong>
-                </span>
-                {editingTask.stage && (
-                  <span>
-                    Stage: <strong className="text-slate-700">{editingTask.stage}</strong>
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Complete Task Modal */}
       <CompleteTaskModal

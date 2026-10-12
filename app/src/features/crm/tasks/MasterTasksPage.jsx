@@ -75,7 +75,6 @@ const EMPTY_FORM = {
   icon: 'call',
   // Stage ids from CRM System Setup; saving creates the linked stage tasks.
   stages: [],
-  formId: '',
   role: 'Tele Caller Executive',
   department: 'Sales',
   priority: 'Medium',
@@ -89,12 +88,10 @@ export default function MasterTasksPage() {
   // generates a lead's stage tasks reads the same rows.
   const storeTasks = useCrmStore((s) => s.masterTasks);
   const storeStages = useCrmStore((s) => s.stages);
-  const storeForms = useCrmStore((s) => s.forms);
   // Stage ids resolve to names for the existing rows' "Used in Stages" column.
   const stageNameById = useMemo(() => new Map(storeStages.map((s) => [String(s.id), s.name])), [storeStages]);
   // Older rows may still hold a stage name rather than an id.
   const stageLabel = (value) => stageNameById.get(String(value)) || String(value);
-  const taskForms = useMemo(() => storeForms.filter((f) => f.kind === 'task'), [storeForms]);
   const [tasks, setTasks] = useState([]);
   useEffect(() => { setTasks(storeTasks); }, [storeTasks]);
 
@@ -206,7 +203,6 @@ export default function MasterTasksPage() {
       name: task.name,
       icon: task.icon || 'call',
       stages: [...(task.stages || [])],
-      formId: task.formId || '',
       role: task.role,
       department: task.department,
       priority: task.priority,
@@ -241,7 +237,9 @@ export default function MasterTasksPage() {
     const src = tasks.find((t) => t.id === id);
     if (!src) return;
     const maxOrder = tasks.reduce((m, t) => Math.max(m, t.order || 0), 0);
-    const copy = { ...src, id: `mt-${Date.now()}`, order: maxOrder + 1, name: `${src.name} Copy`, stages: [...src.stages] };
+    // A copy joins the library only: carrying the stages over would have the
+    // server create stage tasks for it, i.e. duplicate tasks on every lead.
+    const copy = { ...src, id: `mt-${Date.now()}`, order: maxOrder + 1, name: `${src.name} Copy`, stages: [], inTaskRoles: false };
     commitTasks((prev) => [...prev, copy]);
     setMenuId(null);
   }
@@ -562,19 +560,6 @@ export default function MasterTasksPage() {
                     );
                   })}
                 </div>
-              </div>
-              <div>
-                <label htmlFor="master-task-form" className="block font-semibold text-slate-700 mb-1.5">Task Form</label>
-                <select
-                  id="master-task-form"
-                  value={form.formId || ''}
-                  onChange={(e) => setForm({ ...form, formId: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800"
-                >
-                  <option value="">No form</option>
-                  {taskForms.map((f) => <option key={f.id} value={f.id}>{f.title || f.name}</option>)}
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1">Tasks of this type open this Lead Task Form when worked on a lead.</p>
               </div>
               {formError && <p className="text-[11px] font-semibold text-rose-600">{formError}</p>}
             </div>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Activity, ArrowUpDown, MoreVertical, NotebookPen, Phone, Pin } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Activity, ArrowUpDown, MoreVertical, NotebookPen, Pencil, Phone, Pin, UserCheck } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 
 function EditableCell({ row, field, className = "", onUpdate, renderValue }) {
@@ -47,9 +47,44 @@ function EditableCell({ row, field, className = "", onUpdate, renderValue }) {
   );
 }
 
-export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onAddNote, onOpenLead, onUpdateLead, variant = "list" }) {
+export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [], onToggleOne, onToggleAll, onTogglePin, onAddNote, onOpenLead, onEditLead, onConvertLead, onUpdateLead, variant = "list" }) {
   const allChecked = rows.length > 0 && rows.every((row) => selected.includes(row.id));
   const [openMenuId, setOpenMenuId] = useState(null);
+  // The menu is fixed to the viewport: inside the table's scroll box an
+  // absolutely placed menu was clipped to the row's height and never showed.
+  const [menuPos, setMenuPos] = useState(null);
+
+  function toggleMenu(rowId, event) {
+    if (openMenuId === rowId) {
+      setOpenMenuId(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const menuHeight = 180;
+    const openUp = rect.bottom + menuHeight + 8 > window.innerHeight;
+    setMenuPos({
+      right: Math.max(8, window.innerWidth - rect.right),
+      ...(openUp ? { top: "auto", bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+    });
+    setOpenMenuId(rowId);
+  }
+
+  // Close on an outside click, a scroll or a resize (the fixed spot goes stale).
+  useEffect(() => {
+    if (openMenuId === null) return undefined;
+    const close = () => setOpenMenuId(null);
+    const onPointerDown = (event) => {
+      if (!event.target.closest?.(".activity-action-wrap")) close();
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+    };
+  }, [openMenuId]);
 
   return (
     <div className={`table-card screenshot-table-card${variant === "grid" ? " grid-table-card" : ""}`}>
@@ -69,6 +104,7 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                   aria-label="Select all"
                 />
               </th>
+              <th>Lead ID</th>
               <th>
                 <span className="th-inner">Lead Name <ArrowUpDown size={13} className="sort-ico" /></span>
               </th>
@@ -98,6 +134,7 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                       aria-label={`Select ${row.name}`}
                     />
                   </td>
+                  <td className="muted nowrap">{row.leadNumber || "—"}</td>
                   <EditableCell
                     row={row}
                     field="name"
@@ -153,12 +190,37 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                         type="button"
                         className="row-more"
                         aria-label={`More actions for ${row.name}`}
-                        onClick={() => setOpenMenuId((current) => (current === row.id ? null : row.id))}
+                        aria-expanded={openMenuId === row.id}
+                        onClick={(event) => toggleMenu(row.id, event)}
                       >
                         <MoreVertical size={16} />
                       </button>
                       {openMenuId === row.id && (
-                        <div className="activity-menu" style={{ left: "auto", right: 0 }}>
+                        <div className="activity-menu" role="menu" style={{ position: "fixed", left: "auto", zIndex: 60, ...menuPos }}>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              onEditLead?.(row);
+                            }}
+                          >
+                            <Pencil size={16} />
+                            Edit Lead Information
+                          </button>
+                          {/* A lead with a customer party is converted already. */}
+                          <button
+                            type="button"
+                            disabled={Boolean(row.party)}
+                            title={row.party ? "Already converted to a customer" : undefined}
+                            style={row.party ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              onConvertLead?.(row);
+                            }}
+                          >
+                            <UserCheck size={16} />
+                            {row.party ? "Converted to Customer" : "Convert to Customer"}
+                          </button>
                           <button
                             type="button"
                             onClick={() => {
@@ -188,7 +250,7 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={11} className="empty-row">No leads match the current filters.</td>
+                <td colSpan={12} className="empty-row">No leads match the current filters.</td>
               </tr>
             )}
           </tbody>

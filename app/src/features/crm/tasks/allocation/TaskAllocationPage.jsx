@@ -6,6 +6,8 @@ import InfoBanner from '../../common/InfoBanner';
 import KpiCard from '../../../../components/ui/KpiCard';
 import { useAppStore } from '../../../../stores/appStore';
 import { describeError } from '../../../../services/crmSync';
+import { useCrmStore } from '../../../../stores/crmStore';
+import { toISODate } from '../../../../utils/dateUtils';
 import {
   useAllocationTasks,
   useCanManageAllocations,
@@ -46,11 +48,39 @@ function statusDot(status) {
   return 'bg-slate-400';
 }
 
+/** A lead task's status in this page's Pending / In Progress / Completed terms. */
+const LEAD_TASK_STATUS = { Open: 'Pending', Waiting: 'Pending', 'In Progress': 'In Progress', Completed: 'Completed' };
+
+/** A CRM lead task as a row of this table, beside the allocations. */
+function leadTaskRow(task) {
+  return {
+    id: `lead-task-${task.id}`,
+    kind: 'lead',
+    leadId: task.leadId,
+    leadNumber: task.leadNumber || '',
+    leadName: task.leadName || task.lead || '',
+    title: task.title,
+    assignee: task.assigneeName || 'Unassigned',
+    assignedBy: task.createdByName || (task.source === 'Created by Lead Stage Automation' ? 'Lead Stage Automation' : '—'),
+    department: task.department || '',
+    priority: task.priority || 'Medium',
+    deadline: toISODate(task.dueDate) || '',
+    status: LEAD_TASK_STATUS[task.status] || task.status,
+  };
+}
+
 const selectCls = 'w-full h-11 px-3.5 bg-slate-50/60 border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition cursor-pointer';
 
 export default function TaskAllocationPage() {
   const navigate = useNavigate();
-  const tasks = useAllocationTasks();
+  const allocations = useAllocationTasks();
+  const crmTasks = useCrmStore((s) => s.tasks);
+  // Allocations plus every lead task. The server already sends each user only
+  // the tasks assigned to them (or by them); admins get them all.
+  const tasks = useMemo(() => [
+    ...allocations,
+    ...crmTasks.filter((t) => t.leadId && t.status !== 'Cancelled').map(leadTaskRow),
+  ], [allocations, crmTasks]);
   const canManage = useCanManageAllocations();
   const showToast = useAppStore((s) => s.showToast);
   const [statusFilter, setStatusFilter] = useState('Any');
@@ -80,7 +110,7 @@ export default function TaskAllocationPage() {
       if (statusFilter !== 'Any' && t.status !== statusFilter) return false;
       if (assigneeFilter !== 'Anyone' && t.assignee !== assigneeFilter) return false;
       if (deptFilter !== 'Any' && t.department !== deptFilter) return false;
-      if (q && !`${t.title} ${t.assignee} ${t.assignedBy} ${t.department}`.toLowerCase().includes(q)) return false;
+      if (q && !`${t.title} ${t.assignee} ${t.assignedBy} ${t.department} ${t.leadNumber || ''} ${t.leadName || ''}`.toLowerCase().includes(q)) return false;
       return true;
     });
     if (!sortKey) return out;
@@ -151,8 +181,13 @@ export default function TaskAllocationPage() {
     }
   }
 
-  function openDetail(id) {
-    navigate(`/crm/tasks/allocation/${id}`);
+  function openDetail(row) {
+    // A lead task is worked on its lead's page.
+    if (row.kind === 'lead') {
+      navigate(`/crm/leads/${row.leadId}`);
+      return;
+    }
+    navigate(`/crm/tasks/allocation/${row.id}`);
   }
 
   const hasActiveFilters = statusFilter !== 'Any' || assigneeFilter !== 'Anyone' || deptFilter !== 'Any' || search.trim() !== '';
@@ -292,6 +327,9 @@ export default function TaskAllocationPage() {
             <thead>
               <tr className="bg-[#f8fafc] border-b border-slate-100 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
                 <th className="px-5 py-3.5">
+                  <button type="button" onClick={() => toggleSort('leadNumber')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Lead ID {sortIcon('leadNumber')}</button>
+                </th>
+                <th className="px-4 py-3.5">
                   <button type="button" onClick={() => toggleSort('title')} className="inline-flex items-center gap-1.5 hover:text-slate-800 transition">Task {sortIcon('title')}</button>
                 </th>
                 <th className="px-4 py-3.5">
@@ -317,14 +355,21 @@ export default function TaskAllocationPage() {
                 const overdue = t.status !== 'Completed' && t.deadline && new Date(t.deadline) < new Date();
                 return (
                   <tr key={t.id} className="hover:bg-blue-50/40 transition-colors group">
-                    <td className="px-5 py-4">
-                      <button type="button" onClick={() => openDetail(t.id)} className="flex items-start gap-3 text-left w-full">
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      {t.leadNumber
+                        ? <span className="font-semibold text-slate-700">{t.leadNumber}</span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-4 py-4">
+                      <button type="button" onClick={() => openDetail(t)} className="flex items-start gap-3 text-left w-full">
                         <span className="w-9 h-9 shrink-0 grid place-items-center rounded-xl bg-blue-50 border border-blue-100 text-[12px] font-bold text-blue-600">
                           {initials(t.title)}
                         </span>
                         <span className="min-w-0">
                           <span className="block font-bold text-slate-800 group-hover:text-blue-700 text-[13px] leading-snug truncate transition">{t.title}</span>
-                          <span className="block text-xs text-slate-400 mt-1 font-medium">{t.department}</span>
+                          <span className="block text-xs text-slate-400 mt-1 font-medium">
+                            {t.kind === 'lead' ? `Lead task · ${t.leadName}` : t.department}
+                          </span>
                         </span>
                       </button>
                     </td>
@@ -359,10 +404,10 @@ export default function TaskAllocationPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button type="button" onClick={() => openDetail(t.id)} title="View details" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 border border-slate-200 rounded-lg transition">
+                        <button type="button" onClick={() => openDetail(t)} title={t.kind === 'lead' ? 'Open lead' : 'View details'} className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 border border-slate-200 rounded-lg transition">
                           <Eye size={15} />
                         </button>
-                        {canManage && (
+                        {canManage && t.kind !== 'lead' && (
                           <button type="button" onClick={() => setDeleteId(t.id)} title="Delete task" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-rose-600 hover:border-rose-200 hover:bg-rose-50 border border-slate-200 rounded-lg transition">
                             <Trash2 size={15} />
                           </button>
@@ -374,7 +419,7 @@ export default function TaskAllocationPage() {
               })}
               {pageItems.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-14 text-center">
+                  <td colSpan={8} className="px-5 py-14 text-center">
                     <div className="mx-auto w-11 h-11 grid place-items-center rounded-2xl bg-slate-50 border border-slate-100 text-slate-300 mb-3">
                       <Search size={18} />
                     </div>

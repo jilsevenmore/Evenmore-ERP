@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Plus,
-  Trash2,
   X,
   CheckCircle2,
 } from "lucide-react";
@@ -73,19 +72,64 @@ const TASK_ROLE_MAP = {
   "Negotiate pricing": "BDE",
 };
 
-const DEFAULT_TASK_OPTIONS = [
-  "Call",
-  "Send email",
-  "Send quotation",
-  "Schedule demo",
-  "Client meeting",
-  "Negotiate pricing",
-];
+/**
+ * A master task the Task Name pickers may offer: active, named, and saved on the
+ * server (an unsaved row has no id a stage task could link to).
+ */
+function isEligibleMaster(master) {
+  return Boolean(
+    master &&
+      !master._pending &&
+      master.status !== 'Inactive' &&
+      master.isActive !== false &&
+      (master.name || master.title)
+  );
+}
 
-/** The default task names plus every master task configured on the server. */
-function getDynamicTaskOptions(masterTasks = []) {
-  const names = (masterTasks || []).map((m) => m?.name || m?.title).filter(Boolean);
-  return [...new Set([...DEFAULT_TASK_OPTIONS, ...names])];
+/**
+ * The Task Name options: the master task library by id. `current` is the row's
+ * own task when it is no longer offered (retired master, or an old row saved by
+ * name only), so the select still shows what the row holds.
+ */
+function TaskNameOptions({ options, status, current, emptyLabel = 'No active master tasks' }) {
+  const showCurrent = current && !options.some((m) => String(m.id) === current.value);
+  let placeholder = 'Select Task Name';
+  if (!options.length) {
+    if (status === 'loading') placeholder = 'Loading tasks...';
+    else if (status === 'error') placeholder = 'Could not load tasks';
+    else placeholder = emptyLabel;
+  }
+  return (
+    <>
+      {showCurrent ? (
+        <option value={current.value} disabled>
+          {current.label}
+        </option>
+      ) : (
+        <option value="" disabled>
+          {placeholder}
+        </option>
+      )}
+      {options.map((master) => (
+        <option key={master.id} value={String(master.id)}>
+          {master.name || master.title}
+        </option>
+      ))}
+    </>
+  );
+}
+
+/** Shown under a Task Name picker when the master task library failed to load. */
+function LibraryError({ status, onRetry }) {
+  if (status !== 'error') return null;
+  return (
+    <p className="text-[10px] text-rose-500 mt-1">
+      Could not load the Master Lead Tasks library.{' '}
+      <button type="button" onClick={onRetry} className="font-semibold underline cursor-pointer">
+        Retry
+      </button>
+    </p>
+  );
 }
 
 // Which pipeline the screen is looking at is a view preference, not data.
@@ -94,7 +138,8 @@ const PIPELINE_KEY = 'leadStageTasksPipelineV1';
 /** A blank stage task, as the "add task" form opens it. */
 const EMPTY_MASTER_TASK = {
   name: '',
-  masterTaskId: null,
+  // The picked master task's id, as the Task Name select holds it.
+  masterTaskId: '',
   description: '',
   role: 'Tele Caller Executive',
   department: 'Any',
@@ -102,7 +147,6 @@ const EMPTY_MASTER_TASK = {
   dueIn: 1,
   repeats: '',
   time: '',
-  formId: '',
   autoCreate: true,
   isActive: true,
 };
@@ -140,31 +184,58 @@ export default function LeadStageTasks({ leadForms = [] }) {
   const [pipeline, setPipeline] = useState(getStoredPipeline);
   const [taskModalStageId, setTaskModalStageId] = useState(null);
   const [masterTask, setMasterTask] = useState(EMPTY_MASTER_TASK);
-  const [isMasterModalOpen, setIsMasterModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [stageDrafts, setStageDrafts] = useState({});
+  const [formError, setFormError] = useState('');
+  const [warning, setWarning] = useState('');
+  const [showStageHint, setShowStageHint] = useState(false);
+  const stageSectionRef = useRef(null);
   const masterTasks = useCrmStore((s) => s.masterTasks);
-  const taskOptions = useMemo(() => getDynamicTaskOptions(masterTasks), [masterTasks]);
 
-  // Task Roles is the master task library -- the pool of task types a stage can
-  // be given -- so it is its own list. It used to be derived from the stages'
-  // task rows, which is why a task added here turned up in New Lead.
-  const [roleTasks, setRoleTasks] = useState([]);
+  // The library is re-read on open, so a master task created or re-activated
+  // on the Tasks Master page since sign-in is offered here too.
+  const [libraryStatus, setLibraryStatus] = useState('loading');
+  function loadLibrary() {
+    setLibraryStatus('loading');
+    return useCrmStore.getState().refresh('masterTasks')
+      .then((rows) => {
+        const loaded = rows || useCrmStore.getState().masterTasks.length > 0;
+        setLibraryStatus(loaded ? 'ready' : 'error');
+      })
+      .catch(() => setLibraryStatus('error'));
+  }
   useEffect(() => {
-    setRoleTasks(masterTasks);
-  }, [masterTasks]);
+    loadLibrary();
+  }, []);
+
+  const masterById = useMemo(
+    () => new Map(masterTasks.map((m) => [String(m.id), m])),
+    [masterTasks]
+  );
+  const masterOptions = useMemo(
+    () =>
+      masterTasks
+        .filter(isEligibleMaster)
+        .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)),
+    [masterTasks]
+  );
+
+  // Task Roles lists the master tasks the user picked into it with its Add
+  // Task -- not the whole library, which a new master task joins on its own.
+  const roleTasks = useMemo(() => masterTasks.filter((m) => m.inTaskRoles), [masterTasks]);
+  // Unsaved Task Roles edits, by master task id, until that row's Save.
+  const [roleDrafts, setRoleDrafts] = useState({});
 
   /**
-   * A task name picked from the list: when it is a Tasks Master row, the stage
-   * task is linked to it by id and starts from its role, department, priority,
-   * due days and form; a plain name clears the link.
+   * A master task picked by id: the stage task links to it and starts from its
+   * role, department, priority, due days and form. `null` when the id is not in
+   * the library.
    */
-  function fieldsForName(name, fallbackRole) {
-    const master = masterTasks.find((m) => (m.name || m.title) === name);
-    if (!master) {
-      return { name, masterTaskId: null, role: TASK_ROLE_MAP[name] || fallbackRole };
-    }
+  function fieldsForMaster(masterId, fallbackRole) {
+    const master = masterById.get(String(masterId));
+    if (!master) return null;
+    const name = master.name || master.title;
     return {
       name,
       masterTaskId: master.id,
@@ -172,8 +243,22 @@ export default function LeadStageTasks({ leadForms = [] }) {
       department: master.department || undefined,
       priority: master.priority || undefined,
       dueIn: master.dueIn ?? undefined,
-      formId: master.formId || '',
     };
+  }
+
+  /** A stage holds each master task once; `exceptTaskId` is the row being edited. */
+  function stageHasMaster(stage, masterId, exceptTaskId) {
+    return (stage?.tasks || []).some(
+      (task) =>
+        task.id !== exceptTaskId &&
+        task.masterTaskId != null &&
+        String(task.masterTaskId) === String(masterId)
+    );
+  }
+
+  function showWarning(text) {
+    setWarning(text);
+    setTimeout(() => setWarning(''), 3000);
   }
 
 
@@ -219,17 +304,17 @@ export default function LeadStageTasks({ leadForms = [] }) {
     });
   }
 
+  const EMPTY_DRAFT = {
+    masterTaskId: "",
+    order: 0,
+    required: true,
+    autoCreate: true,
+    repeats: "",
+    dueIn: "",
+  };
+
   function getDraft(stageId) {
-    return (
-      stageDrafts[stageId] || {
-        name: "Call",
-        order: 0,
-        required: true,
-        autoCreate: true,
-        repeats: "",
-        dueIn: "",
-      }
-    );
+    return stageDrafts[stageId] || EMPTY_DRAFT;
   }
 
   function updateDraft(stageId, key, value) {
@@ -244,7 +329,17 @@ export default function LeadStageTasks({ leadForms = [] }) {
 
   function addDraftTask(stageId) {
     const draft = getDraft(stageId);
-    const linked = fieldsForName(draft.name, "Tele Caller Executive");
+    const linked = fieldsForMaster(draft.masterTaskId, "Tele Caller Executive");
+    if (!linked) {
+      showWarning("Select a task name first.");
+      return;
+    }
+    const target = stages.find((stage) => stage.id === stageId);
+    if (stageHasMaster(target, linked.masterTaskId)) {
+      showWarning(`${linked.name} is already in ${target.name}.`);
+      return;
+    }
+    const master = masterById.get(String(linked.masterTaskId));
     commitStages((current) =>
       current.map((stage) => {
         if (stage.id !== stageId) return stage;
@@ -254,47 +349,57 @@ export default function LeadStageTasks({ leadForms = [] }) {
             ...stage.tasks,
             {
               id: Date.now(),
-              description: `${draft.name} task`,
+              description: master?.description || `${linked.name} task`,
               department: "Any",
               ...linked,
               order: Number(draft.order) || 0,
               required: draft.required ?? true,
               autoCreate: draft.autoCreate ?? true,
               repeats: draft.repeats === "" ? 14 : Number(draft.repeats) || 0,
-              dueIn: draft.dueIn === "" ? 0 : Number(draft.dueIn) || 0,
+              dueIn: draft.dueIn === "" ? linked.dueIn ?? 0 : Number(draft.dueIn) || 0,
             },
           ],
         };
       })
     );
-    setStageDrafts((prev) => ({
-      ...prev,
-      [stageId]: {
-        name: "Call",
-        order: 0,
-        required: true,
-        autoCreate: true,
-        repeats: "",
-        dueIn: "",
-      },
-    }));
+    setStageDrafts((prev) => ({ ...prev, [stageId]: EMPTY_DRAFT }));
     refreshRoleTasks();
     triggerSaveToast();
   }
 
   /**
-   * Opens the "add to a stage" form. The per-stage `Add Task` button passes its
-   * own stage; the page header passes nothing, so the stage is chosen in the
-   * form. Defaulting it to the first stage is what used to drop every task the
-   * header created into New Lead.
+   * Opens the "add to a stage" form for one stage. The stage comes from the
+   * stage's own Add Task button, so the form has no stage picker and a task
+   * can never land in a stage the user did not open.
    */
   function addTask(stageId) {
-    setTaskModalStageId(stageId || '');
+    setTaskModalStageId(stageId);
     setMasterTask(EMPTY_MASTER_TASK);
+    setFormError('');
+    setShowStageHint(false);
+  }
+
+  /**
+   * The header's Add Stage Task has no stage of its own: it adds to the only
+   * stage there is, or the only one open; otherwise it points the user at the
+   * stages rather than guess one.
+   */
+  function addTaskFromHeader() {
+    if (stages.length === 1) {
+      addTask(stages[0].id);
+      return;
+    }
+    if (openStages.length === 1) {
+      addTask(openStages[0]);
+      return;
+    }
+    setShowStageHint(true);
+    stageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function closeTaskModal() {
     setTaskModalStageId(null);
+    setFormError('');
   }
 
   function updateMasterTask(key, value) {
@@ -302,38 +407,50 @@ export default function LeadStageTasks({ leadForms = [] }) {
   }
 
   /**
-   * Picking a name in the "Add Stage Task" form copies the master task's role,
-   * department, priority, due days and form onto the form, so the stage task
-   * starts from its template. The other fields stay editable afterwards.
+   * Picking a task in either form copies the master task's role, department,
+   * priority, due days, form and description onto it, so the mapping starts
+   * from its template. The fields stay editable afterwards.
    */
-  function pickTaskNameForModal(name) {
-    const linked = fieldsForName(name, "Tele Caller Executive");
+  function pickMasterForForm(masterId) {
+    const master = masterById.get(String(masterId));
+    if (!master) return;
+    const name = master.name || master.title;
+    setFormError('');
     setMasterTask((current) => ({
       ...current,
       name,
-      role: linked.role || current.role,
-      department: linked.department || current.department,
-      priority: linked.priority || current.priority,
-      dueIn: linked.dueIn ?? current.dueIn,
-      formId: linked.formId || current.formId,
-      masterTaskId: linked.masterTaskId ?? null,
+      masterTaskId: String(master.id),
+      role: master.role || TASK_ROLE_MAP[name] || current.role,
+      department: master.department || current.department,
+      priority: master.priority || current.priority,
+      dueIn: master.dueIn ?? current.dueIn,
+      description: master.description || current.description,
     }));
   }
 
   /**
-   * Puts a task into the stage the form named -- and only that stage. It is the
-   * deliberate "Add Task" step that assigns a task to a stage; nothing else on
-   * this page adds one behind the user's back.
+   * Puts the picked master task into the stage the form was opened for -- and
+   * only that stage. It is the deliberate "Add Task" step that assigns a task to
+   * a stage; nothing else on this page adds one behind the user's back.
    */
   function createMasterTask(event) {
     event.preventDefault();
-    const name = masterTask.name.trim();
     const stageId = taskModalStageId;
-    if (!name || !stageId) return;
-
-    // Set when the name came from the master list, so the stage task keeps the
-    // link the server's stage automation reads.
-    const linkedMaster = masterTasks.find((m) => (m.name || m.title) === name);
+    const target = stages.find((stage) => stage.id === stageId);
+    if (!target) {
+      setFormError("Open a lead stage and use its Add Task to add a task to it.");
+      return;
+    }
+    const master = masterById.get(String(masterTask.masterTaskId));
+    if (!master) {
+      setFormError("Select a task name.");
+      return;
+    }
+    const name = master.name || master.title;
+    if (stageHasMaster(target, master.id)) {
+      setFormError(`${name} is already in ${target.name}.`);
+      return;
+    }
 
     commitStages((current) =>
       current.map((stage) => {
@@ -345,13 +462,13 @@ export default function LeadStageTasks({ leadForms = [] }) {
             {
               id: Date.now(),
               name,
-              masterTaskId: linkedMaster?.id ?? null,
+              // The link the server's stage automation reads.
+              masterTaskId: master.id,
               description: masterTask.description.trim() || "New stage task",
               role: masterTask.role || "Tele Caller Executive",
               department: masterTask.department || "Any",
               priority: masterTask.priority,
               time: masterTask.time,
-              formId: masterTask.formId || '',
               order: stage.tasks.length,
               required: true,
               autoCreate: true,
@@ -383,63 +500,43 @@ export default function LeadStageTasks({ leadForms = [] }) {
   }
 
   /**
-   * Writes to the master task library (`/crm/master-tasks/`), the same rows the
-   * Tasks Master page lists -- so a task added here also shows up there. The
-   * server keeps each master's stage tasks in step, hence the re-read.
-   *
-   * Task Roles edits go through here and nowhere else, so a change of role,
-   * department or due days rewrites the library row and no stage's task list.
+   * Task Roles rows are master tasks (`/crm/master-tasks/`), so a save rewrites
+   * the library row -- the same one the Tasks Master page lists. The server
+   * keeps each master's linked stage tasks in step, hence the re-read.
    */
-  function commitRoleTasks(update) {
-    const next = typeof update === 'function' ? update(roleTasks) : update;
-    setRoleTasks(next);
-    syncCollection('masterTasks', next, roleTasks)
+  function saveMaster(masterId, patch) {
+    return useCrmStore
+      .getState()
+      .updateRecord('masterTasks', masterId, patch)
       .then(() => useCrmStore.getState().refresh('stageTasks'))
       .catch((err) => {
         console.warn('[CRM] could not save master task:', err?.message || err);
+        showWarning("Could not save the task. Please try again.");
+        throw err;
       });
   }
 
   function updateRoleTask(taskId, patch) {
-    commitRoleTasks((current) =>
-      current.map((task) => (task.id === taskId ? { ...task, ...patch } : task))
-    );
+    setRoleDrafts((prev) => ({ ...prev, [taskId]: { ...prev[taskId], ...patch } }));
   }
 
-  /** Removes the task type from the library; the server retires it from stages. */
-  function deleteRoleTask(taskId) {
-    commitRoleTasks((current) => current.filter((task) => task.id !== taskId));
-    triggerSaveToast();
-  }
-
-  function createMasterTaskRecord(event) {
-    event.preventDefault();
-    const name = masterTask.name.trim();
-    if (!name) return;
-
-    const maxOrder = roleTasks.reduce((m, t) => Math.max(m, Number(t.order) || 0), 0);
-    commitRoleTasks([
-      ...roleTasks,
-      {
-        id: `mt-${Date.now()}`,
-        order: maxOrder + 1,
-        name,
-        title: name,
-        description: masterTask.description.trim(),
-        role: masterTask.role || "Tele Caller Executive",
-        department: masterTask.department || "Sales",
-        priority: masterTask.priority || "Medium",
-        dueIn: Number(masterTask.dueIn) || 0,
-        formId: masterTask.formId || '',
-        status: 'Active',
-        // The whole point: an empty stage list. The row joins the library only,
-        // and reaches a stage when the user adds it with that stage's Add Task.
-        stages: [],
-      },
-    ]);
-    setIsMasterModalOpen(false);
-    setMasterTask(EMPTY_MASTER_TASK);
-    triggerSaveToast();
+  function saveRoleTask(taskId) {
+    const patch = roleDrafts[taskId];
+    const task = masterById.get(String(taskId));
+    if (!patch || !task) {
+      triggerSaveToast();
+      return;
+    }
+    saveMaster(taskId, { ...task, ...patch })
+      .then(() => {
+        setRoleDrafts((prev) => {
+          const next = { ...prev };
+          delete next[taskId];
+          return next;
+        });
+        triggerSaveToast();
+      })
+      .catch(() => {});
   }
 
   function updateTask(stageId, taskId, key, value) {
@@ -529,7 +626,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
             </div>
             <button
               type="button"
-              onClick={() => addTask(null)}
+              onClick={addTaskFromHeader}
               className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
             >
               <Plus size={15} />
@@ -562,24 +659,11 @@ export default function LeadStageTasks({ leadForms = [] }) {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                The task library. Each task is done by one role, and it only enters a lead
-                stage when you add it there with that stage&apos;s Add Task.
+                Tasks picked from the Master Lead Tasks library, each done by one role. A task
+                only enters a lead stage when you add it there with that stage&apos;s Add Task.
               </p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setMasterTask(EMPTY_MASTER_TASK);
-              setIsMasterModalOpen(true);
-            }}
-            className="btn-outline h-8 px-3 rounded-xl text-xs font-semibold inline-flex items-center gap-1 cursor-pointer shrink-0"
-          >
-            <Plus size={14} />
-            Add Task
-          </button>
         </div>
 
         {isTaskRolesOpen && (
@@ -596,27 +680,16 @@ export default function LeadStageTasks({ leadForms = [] }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {roleTasks.map((task) => (
+                {roleTasks.map((saved) => {
+                  const task = { ...saved, ...roleDrafts[saved.id] };
+                  return (
                   <tr key={task.id} className="hover:bg-slate-50/60 transition">
                     <td className="px-5 py-3.5">
-                      <select
-                        value={task.name || task.title}
-                        onChange={(e) =>
-                          updateRoleTask(task.id, fieldsForName(e.target.value, task.role))
-                        }
-                        className="w-full max-w-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
-                      >
-                        {/* A master keeps showing its current name even when it is not
-                            one of the shipped defaults any more. */}
-                        {!taskOptions.includes(task.name) && (
-                          <option value={task.name}>{task.name}</option>
-                        )}
-                        {taskOptions.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
+                      {/* The task's name is its identity here, so it is shown as
+                          plain text rather than a picker over the shared list. */}
+                      <div className="w-full max-w-xs bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-800 shadow-2xs truncate">
+                        {task.name || task.title}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <select
@@ -659,27 +732,20 @@ export default function LeadStageTasks({ leadForms = [] }) {
                       <div className="inline-flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => triggerSaveToast()}
+                          onClick={() => saveRoleTask(task.id)}
                           className="btn-primary btn-sm"
                         >
                           Save
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => deleteRoleTask(task.id)}
-                          className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition cursor-pointer"
-                          title="Delete task"
-                        >
-                          <Trash2 size={15} />
-                        </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {roleTasks.length === 0 && (
                   <tr>
                     <td colSpan={6} className="px-5 py-8 text-center text-slate-500">
-                      No tasks in the library yet. Use Add Task to create one.
+                      No tasks in Task Roles yet.
                     </td>
                   </tr>
                 )}
@@ -689,11 +755,16 @@ export default function LeadStageTasks({ leadForms = [] }) {
         )}
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 scroll-mt-4" ref={stageSectionRef}>
         <h3 className="text-sm font-bold text-slate-900">Lead Stage Tasks</h3>
         <p className="text-xs text-slate-500 mt-0.5 mb-3.5">
           Configure the tasks that are created when a lead enters each stage.
         </p>
+        {showStageHint && (
+          <div className="mb-3.5 px-3.5 py-2.5 rounded-xl border border-blue-100 bg-blue-50 text-xs text-blue-700">
+            Open a stage below and use its Add Task to add a task to that stage.
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-1.5 p-1 bg-slate-50/50 rounded-2xl border border-slate-200/80 mb-5">
           {stages.map((stage, idx) => {
@@ -782,15 +853,26 @@ export default function LeadStageTasks({ leadForms = [] }) {
                             <tr key={task.id} className="hover:bg-slate-50/50 transition">
                               <td className="px-3 py-2.5">
                                 <select
-                                  value={task.name}
-                                  onChange={(e) => updateTaskFields(stage.id, task.id, fieldsForName(e.target.value, task.role))}
+                                  value={task.masterTaskId != null ? String(task.masterTaskId) : ""}
+                                  onChange={(e) => {
+                                    const linked = fieldsForMaster(e.target.value, task.role);
+                                    if (!linked) return;
+                                    if (stageHasMaster(stage, linked.masterTaskId, task.id)) {
+                                      showWarning(`${linked.name} is already in ${stage.name}.`);
+                                      return;
+                                    }
+                                    updateTaskFields(stage.id, task.id, linked);
+                                  }}
                                   className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                                 >
-                                  {taskOptions.map((opt) => (
-                                    <option key={opt} value={opt}>
-                                      {opt}
-                                    </option>
-                                  ))}
+                                  <TaskNameOptions
+                                    options={masterOptions}
+                                    status={libraryStatus}
+                                    current={{
+                                      value: task.masterTaskId != null ? String(task.masterTaskId) : "",
+                                      label: task.name || task.title,
+                                    }}
+                                  />
                                 </select>
                               </td>
                               <td className="px-3 py-2.5 whitespace-nowrap">
@@ -873,15 +955,11 @@ export default function LeadStageTasks({ leadForms = [] }) {
                         <tr className="bg-white hover:bg-slate-50/50 transition">
                           <td className="px-3 py-2.5">
                             <select
-                              value={draft.name}
-                              onChange={(e) => updateDraft(stage.id, "name", e.target.value)}
+                              value={draft.masterTaskId}
+                              onChange={(e) => updateDraft(stage.id, "masterTaskId", e.target.value)}
                               className="w-full bg-white border border-slate-200 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs cursor-pointer"
                             >
-                              {taskOptions.map((opt) => (
-                                <option key={opt} value={opt}>
-                                  {opt}
-                                </option>
-                              ))}
+                              <TaskNameOptions options={masterOptions} status={libraryStatus} />
                             </select>
                           </td>
                           <td className="px-3 py-2.5 whitespace-nowrap">
@@ -955,169 +1033,6 @@ export default function LeadStageTasks({ leadForms = [] }) {
         </div>
       </div>
 
-      {isMasterModalOpen && (
-        <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
-          role="presentation"
-          onMouseDown={() => setIsMasterModalOpen(false)}
-        >
-          <form
-            className="bg-white rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 overflow-hidden"
-            onSubmit={createMasterTaskRecord}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-bold text-slate-900">Add Master Task</h2>
-              <button
-                type="button"
-                onClick={() => setIsMasterModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition cursor-pointer p-1"
-                aria-label="Close master task form"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto text-xs">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Task Name <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  autoFocus
-                  value={masterTask.name}
-                  onChange={(e) => updateMasterTask("name", e.target.value)}
-                  placeholder="Enter Task Name"
-                  required
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Performed By (Role)
-                  </label>
-                  <select
-                    value={masterTask.role}
-                    onChange={(e) => updateMasterTask("role", e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                  >
-                    <option>Tele Caller Executive</option>
-                    <option>Sales Support Executive</option>
-                    <option>BDE</option>
-                    <option>Area Sales Manager</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Department
-                  </label>
-                  <select
-                    value={masterTask.department}
-                    onChange={(e) => updateMasterTask("department", e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                  >
-                    <option>Any</option>
-                    <option>Sales</option>
-                    <option>Support</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Default Priority
-                  </label>
-                  <select
-                    value={masterTask.priority}
-                    onChange={(e) => updateMasterTask("priority", e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                  >
-                    <option>Low</option>
-                    <option>Medium</option>
-                    <option>High</option>
-                    <option>Urgent</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Due In (Days)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={masterTask.dueIn}
-                    onChange={(e) => updateMasterTask("dueIn", e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Max Repeats
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={masterTask.repeats}
-                    onChange={(e) => updateMasterTask("repeats", e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Default Time
-                  </label>
-                  <input
-                    type="time"
-                    value={masterTask.time}
-                    onChange={(e) => updateMasterTask("time", e.target.value)}
-                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  rows={2}
-                  value={masterTask.description}
-                  onChange={(e) => updateMasterTask("description", e.target.value)}
-                  placeholder="Enter Description"
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 resize-none"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-slate-50/70 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setIsMasterModalOpen(false)}
-                className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-xs cursor-pointer"
-              >
-                Create
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* `''` is the header button's "no stage chosen yet", not closed. */}
       {taskModalStageId !== null && (
         <div
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center z-50 p-2 sm:p-4"
@@ -1130,7 +1045,9 @@ export default function LeadStageTasks({ leadForms = [] }) {
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h2 className="text-sm font-bold text-slate-900">Add Task to a Lead Stage</h2>
+              <h2 className="text-sm font-bold text-slate-900">
+                Add Task to {stages.find((stage) => stage.id === taskModalStageId)?.name || "a Lead Stage"}
+              </h2>
               <button
                 type="button"
                 onClick={closeTaskModal}
@@ -1143,53 +1060,19 @@ export default function LeadStageTasks({ leadForms = [] }) {
 
             <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto text-xs">
               <div>
-                <label
-                  htmlFor="stage-task-stage"
-                  className="block text-xs font-semibold text-slate-700 mb-1"
-                >
-                  Lead Stage <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  id="stage-task-stage"
-                  autoFocus
-                  value={taskModalStageId}
-                  onChange={(e) => setTaskModalStageId(e.target.value)}
-                  required
-                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 cursor-pointer"
-                >
-                  <option value="" disabled>
-                    Select Lead Stage
-                  </option>
-                  {stages.map((stage) => (
-                    <option key={stage.id} value={stage.id}>
-                      {stage.name}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  The task is added to this stage only.
-                </p>
-              </div>
-
-              <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Task Name <span className="text-rose-500">*</span>
                 </label>
                 <select
-                  value={masterTask.name}
-                  onChange={(e) => pickTaskNameForModal(e.target.value)}
+                  autoFocus
+                  value={masterTask.masterTaskId}
+                  onChange={(e) => pickMasterForForm(e.target.value)}
                   required
                   className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 cursor-pointer"
                 >
-                  <option value="" disabled>
-                    Select Task Name
-                  </option>
-                  {taskOptions.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
-                    </option>
-                  ))}
+                  <TaskNameOptions options={masterOptions} status={libraryStatus} />
                 </select>
+                <LibraryError status={libraryStatus} onRetry={loadLibrary} />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1295,6 +1178,9 @@ export default function LeadStageTasks({ leadForms = [] }) {
                   className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 resize-none"
                 />
               </div>
+              {formError && (
+                <p className="text-xs font-medium text-rose-600" role="alert">{formError}</p>
+              )}
             </div>
 
             <div className="flex items-center justify-end gap-2.5 px-5 py-3.5 bg-slate-50/70 border-t border-slate-100">
@@ -1320,6 +1206,11 @@ export default function LeadStageTasks({ leadForms = [] }) {
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-xl shadow-lg text-xs font-semibold">
           <CheckCircle2 size={16} />
           <span>Stage tasks updated successfully!</span>
+        </div>
+      )}
+      {warning && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 bg-rose-600 text-white rounded-xl shadow-lg text-xs font-semibold" role="alert">
+          {warning}
         </div>
       )}
       <StageTasksGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
