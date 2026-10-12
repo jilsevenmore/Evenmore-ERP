@@ -2490,7 +2490,7 @@ export const ERPProvider = ({ children, }) => {
     };
     const toggleItemTypeActive = async (id, currentStatus) => {
         const newStatus = !currentStatus;
-        setItemTypes((prev) => prev.map((t) => (t.id === id ? { ...t, ...isActive } : t)));
+        setItemTypes((prev) => prev.map((t) => (t.id === id ? { ...t, isActive: newStatus } : t)));
         try {
             const action = newStatus ? 'activate' : 'deactivate';
             await pushAction('itemTypes', id, action);

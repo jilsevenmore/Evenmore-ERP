@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useERP } from '../../context/ERPContext';
+import { api } from '../../services/api';
+import { isServerId } from '../../services/resourceSync';
 import { useAppStore } from '../../stores/appStore';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
 import { CheckCircle2, AlertTriangle, UserCheck, ShieldCheck } from 'lucide-react';
 export const MonthEndAuditPage = () => {
-    const { items, calculateItemStock, formatCurrency } = useERP();
+    const { items, calculateItemStock, formatCurrency, monthEndAudits = [] } = useERP();
     const currentUser = useAppStore((s) => s.currentUser);
     const auditCycleLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     // Point-in-time audit snapshot seeded from live book quantities
@@ -18,6 +20,8 @@ export const MonthEndAuditPage = () => {
         const unitCost = it.costPrice ?? it.unitCost ?? 0;
         return {
             id: `aud-${it.id}`,
+            itemId: it.id,
+            itemKind: it.itemKind,
             sku: it.sku,
             name: it.name,
             location: it.location || '—',
@@ -30,7 +34,17 @@ export const MonthEndAuditPage = () => {
         };
     });
     const [auditItems, setAuditItems] = useState(buildSnapshot);
-    const [auditLocked, setAuditLocked] = useState(false);
+    // First of this month -- the audit's `periodMonth` on the server.
+    const periodMonth = (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    })();
+    const [signedOff, setSignedOff] = useState(false);
+    const [signingOff, setSigningOff] = useState(false);
+    // Stays locked across reloads once this month's audit is posted on the server.
+    const auditLocked = signedOff || monthEndAudits.some(
+        (a) => a.status === 'Posted' && String(a.periodMonth || '').slice(0, 7) === periodMonth.slice(0, 7)
+    );
     const [toastMessage, setToastMessage] = useState(null);
     const reconcileItem = (id) => {
         setAuditItems((prev) => prev.map((item) => item.id === id
@@ -43,10 +57,31 @@ export const MonthEndAuditPage = () => {
             }
             : item));
     };
-    const handleSignOff = () => {
-        setAuditLocked(true);
-        setToastMessage('Month-End Stock Reconciliation successfully locked & posted to GL!');
-        setTimeout(() => setToastMessage(null), 4000);
+    // Saves the count as a stock audit, then posts it: every non-zero variance
+    // becomes an ADJUSTMENT movement and the audit is marked Posted.
+    const handleSignOff = async () => {
+        if (signingOff) return;
+        setSigningOff(true);
+        try {
+            const lines = auditItems
+                .filter((i) => isServerId(i.itemId) && i.itemKind !== 'Service')
+                .map((i) => ({
+                    itemId: i.itemId,
+                    systemQty: i.systemQty,
+                    countedQty: i.physicalCount,
+                    reason: i.variance ? 'Month-end physical count' : undefined,
+                }));
+            const audit = await api.post('/inventory/audits/', { periodMonth, status: 'Counting', lines });
+            const result = await api.post(`/inventory/audits/${audit.id}/post_variances/`, {});
+            setSignedOff(true);
+            const adjustments = result?.postedAdjustments ?? 0;
+            setToastMessage(`Month-End Stock Reconciliation posted (${audit.auditNumber || 'audit'}, ${adjustments} stock adjustment${adjustments === 1 ? '' : 's'}).`);
+        } catch (err) {
+            setToastMessage(err?.message || 'Could not post the month-end reconciliation. Nothing was locked.');
+        } finally {
+            setSigningOff(false);
+            setTimeout(() => setToastMessage(null), 4000);
+        }
     };
     // Live summary stats derived from the audit snapshot (were hardcoded).
     const reconciledCount = auditItems.filter((i) => i.status === 'Reconciled').length;
@@ -144,8 +179,8 @@ export const MonthEndAuditPage = () => {
           </p>
         </div>
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-          {!auditLocked ? (<Button icon={UserCheck} onClick={handleSignOff}>
-              Lock & Sign-Off Audit
+          {!auditLocked ? (<Button icon={UserCheck} onClick={handleSignOff} disabled={signingOff}>
+              {signingOff ? 'Posting…' : 'Lock & Sign-Off Audit'}
             </Button>) : (<span className="px-3 py-1.5 bg-emerald-100 text-emerald-800 rounded font-semibold text-xs flex items-center gap-1.5 border border-emerald-300">
               <ShieldCheck size={14}/> Audit Certified & Closed
             </span>)}

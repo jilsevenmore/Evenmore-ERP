@@ -14,6 +14,7 @@ import { ProjectFilterBar } from './components/ProjectFilterBar';
 import { ProjectsTable } from './components/ProjectsTable';
 import { CreateProjectModal } from './components/CreateProjectModal';
 import { ConfigureStagePercentagesModal } from './components/ConfigureStagePercentagesModal';
+import { DeleteProjectModal } from './components/DeleteProjectModal';
 import { PmsToast } from '../components/PmsToast';
 
 /**
@@ -26,10 +27,12 @@ import { PmsToast } from '../components/PmsToast';
 export default function ProjectsPage() {
   const navigate = useNavigate();
   const projects = usePmsStore((s) => s.projects);
+  const deleteProject = usePmsStore((s) => s.deleteProject);
 
   const [filters, setFilters] = useState(emptyProjectFilters);
   const [isCreateOpen, setCreateOpen] = useState(false);
   const [configurePercentagesProject, setConfigurePercentagesProject] = useState(null);
+  const [projectToDelete, setProjectToDelete] = useState(null);
 
   const options = useMemo(() => getProjectFilterOptions(projects), [projects]);
   const visible = useMemo(() => filterProjects(projects, filters), [projects, filters]);
@@ -75,6 +78,7 @@ export default function ProjectsPage() {
         onQuickAssign={(row) => navigate(`/pms/projects/${row.id}`)}
         onLogDelay={(row) => navigate(`/pms/delays?project=${row.id}`)}
         onConfigurePercentages={(row) => setConfigurePercentagesProject(row)}
+        onDeleteProject={(row) => setProjectToDelete(row)}
       />
 
       <CreateProjectModal
@@ -90,6 +94,15 @@ export default function ProjectsPage() {
         isOpen={Boolean(configurePercentagesProject)}
         project={configurePercentagesProject}
         onClose={() => setConfigurePercentagesProject(null)}
+      />
+
+      <DeleteProjectModal
+        isOpen={Boolean(projectToDelete)}
+        project={projectToDelete}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={async (p) => {
+          await deleteProject(p.id);
+        }}
       />
       <PmsToast />
     </div>

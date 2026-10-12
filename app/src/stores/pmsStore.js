@@ -23,15 +23,32 @@ import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
  * owns projects, stages, departments and settings (api.md §10); these are the
  * shapes the selectors read while the first request is in flight.
  */
+export const DEFAULT_DELAY_CATEGORIES = [
+  "Material Issue",
+  "Design Issue",
+  "Quality Issue",
+  "Client Approval Pending",
+  "Client Revision",
+  "Resource Unavailable",
+  "Production Issue",
+  "Other",
+];
+
 const EMPTY_SETTINGS = {
   atRiskThresholdPct: 70,
   requireClientApprovalOnDesign: true,
   requireQaCertificate: true,
   notifications: { enabled: true, onDelay: true, onApproval: true, onAssignment: true, onCompletion: true },
   defaultDepartmentCapacity: 20,
-  departmentCapacity: {},
-  statusColors: {},
-  delayCategories: [],
+  departmentCapacity: {
+    Design: 18,
+    Production: 24,
+    Quality: 12,
+    Packaging: 10,
+    Installation: 8,
+  },
+  statusColors: { overdue: "#d03b3b" },
+  delayCategories: DEFAULT_DELAY_CATEGORIES,
 };
 
 // ─── Time Primitives ─────────────────────────────────────────────────
@@ -613,11 +630,15 @@ export function groupMyTasks(tasks = [], now = Date.now()) {
       groups.completed.push(task);
       continue;
     }
+    // Work already started sits under In Progress even when it is due today
+    // or late -- the card still shows the overdue date.
+    if (task.status === "In Progress" || task.status === "Blocked") {
+      groups.inProgress.push(task);
+      continue;
+    }
     const due = toDate(task.dueDate)?.getTime() ?? null;
     if (due != null && due < endOfToday) groups.dueToday.push(task);
-    else if (task.status === "In Progress" || task.status === "Blocked") {
-      groups.inProgress.push(task);
-    } else groups.upcoming.push(task);
+    else groups.upcoming.push(task);
   }
 
   // An undated task is the least urgent, not the most, so it sorts last in
@@ -1490,7 +1511,11 @@ function pushProject(projectId, request) {
   return Promise.resolve()
     .then(request)
     .then(async (result) => {
-      const project = result?.project || (result?.id && result?.stages ? result : null);
+      // Task and stage actions answer with the project *summary* (no stages);
+      // swapping that in would drop every stage and task until a reload, so
+      // only a full project replaces ours -- anything else re-reads it.
+      const full = (candidate) => (Array.isArray(candidate?.stages) ? candidate : null);
+      const project = full(result?.project) || full(result);
       const fresh = project || (await pmsApi.pullProject(projectId));
       if (fresh) applyServerProject(fresh);
       return result;
@@ -1614,7 +1639,27 @@ const usePmsStoreBase = create((set, get) => ({
         sessionCan(["view_pms", "view_task"]) ? pmsApi.pullEmployees() : null,
       ]);
 
-      const nextSettings = settings || get().settings || EMPTY_SETTINGS;
+      const base = settings || get().settings || EMPTY_SETTINGS;
+      const nextSettings = {
+        ...EMPTY_SETTINGS,
+        ...base,
+        notifications: {
+          ...EMPTY_SETTINGS.notifications,
+          ...(base.notifications || {}),
+        },
+        departmentCapacity: {
+          ...EMPTY_SETTINGS.departmentCapacity,
+          ...(base.departmentCapacity || {}),
+        },
+        statusColors: {
+          ...EMPTY_SETTINGS.statusColors,
+          ...(base.statusColors || {}),
+        },
+        delayCategories:
+          base.delayCategories && base.delayCategories.length > 0
+            ? base.delayCategories
+            : DEFAULT_DELAY_CATEGORIES,
+      };
       const threshold = nextSettings.atRiskThresholdPct;
       const now = Date.now();
 
@@ -1685,20 +1730,26 @@ const usePmsStoreBase = create((set, get) => ({
 
   // ── Settings ──
 
-  updateSettings: (patch) => {
+  updateSettings: async (patch) => {
+    let nextSettings;
     set((st) => {
-      const settings = { ...st.settings, ...patch };
+      nextSettings = { ...st.settings, ...patch };
       const projects = st.projects.map((p) =>
-        recalcProject(p, Date.now(), settings.atRiskThresholdPct)
+        recalcProject(p, Date.now(), nextSettings.atRiskThresholdPct)
       );
-      return { settings, projects };
+      return {
+        settings: nextSettings,
+        statusColors: nextSettings.statusColors || st.statusColors,
+        projects,
+      };
     });
-    // The thresholds drive the server's own at-risk and overdue maths, so they
-    // have to live there, not in this tab.
-    pmsApi.pushSettings(get().settings).catch((err) => {
+    try {
+      await pmsApi.pushSettings(nextSettings);
+      return { ok: true, settings: nextSettings };
+    } catch (err) {
       console.warn("[PMS] settings not saved:", describeError(err));
-    });
-    return get().settings;
+      return { ok: false, error: describeError(err), settings: nextSettings };
+    }
   },
 
   // ── Department catalogue ──
@@ -2080,13 +2131,19 @@ const usePmsStoreBase = create((set, get) => ({
     pushProject(projectId, () => pmsSync.update("projects", projectId, patch));
   },
 
-  deleteProject: (projectId) => {
+  deleteProject: async (projectId) => {
     const previous = get().projects;
     set({ projects: previous.filter((p) => p.id !== projectId) });
-    pmsSync.remove("projects", projectId).catch((err) => {
+    try {
+      await pmsSync.remove("projects", projectId);
+      get().showToast("Project deleted successfully.", "success");
+      return true;
+    } catch (err) {
       console.warn("[PMS] project not deleted:", describeError(err));
       set({ projects: previous });
-    });
+      get().showToast(`Failed to delete project: ${describeError(err)}`, "error");
+      throw err;
+    }
   },
 
   /** Build a project's runtime stages from the active templates. */
@@ -2740,6 +2797,19 @@ const usePmsStoreBase = create((set, get) => ({
   },
 
   updateTask: (projectId, stageId, taskId, patch, actor = null) => {
+    // Progress on a task nobody has started means it has started: the status
+    // follows here and on the server, not only after a reload.
+    const current = get().projects
+      .find((p) => p.id === projectId)
+      ?.stages.find((s2) => s2.id === stageId)
+      ?.tasks.find((t) => t.id === taskId);
+    const pct = patch.completionPct !== undefined ? clampPct(patch.completionPct) : null;
+    if (
+      pct !== null && pct > 0 && pct < 100 && patch.status === undefined &&
+      (!current?.status || current.status === "Not Started")
+    ) {
+      patch = { ...patch, status: "In Progress" };
+    }
    
     set((st) => {
       // Capture the previous percentage so the audit trail can record the

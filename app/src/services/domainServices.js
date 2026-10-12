@@ -115,10 +115,8 @@ export const partiesService = {
 export const hrmsService = {
   // Existing — preserved
   getEmployees: (query) => api.get('/hrms/employees/', { query }),
-  getAttendance: (query) => api.get('/hrms/attendance/', { query }),
   getLeaveRequests: (query) => api.get('/hrms/leave/', { query }),
   getPayroll: (query) => api.get('/hrms/payroll/', { query }),
-  getCandidates: (query) => api.get('/hrms/candidates/', { query }),
   // Attendance & regularization
   getAttendance: (query) => api.get('/hrms/attendance/', { query }),
   getRegularizations: (query) => api.get('/hrms/attendance/regularizations/', { query }),

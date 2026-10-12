@@ -55,6 +55,15 @@ export default function MyTasksPage() {
     priority: 'Medium',
   });
 
+  // The PMS store loads once per session; reload it here so tasks assigned or
+  // changed elsewhere show up without a browser refresh.
+  useEffect(() => {
+    const reload = () => usePmsStore.getState().hydrate({ force: true });
+    reload();
+    window.addEventListener('focus', reload);
+    return () => window.removeEventListener('focus', reload);
+  }, []);
+
   const loadDelegated = async () => {
     setLoadingDelegated(true);
     try {
@@ -150,6 +159,8 @@ export default function MyTasksPage() {
               stageName: stage.name,
               department: t.department ?? stage.department,
               projectId: p.id,
+              // PRJ-YYYY-NNN -- the id is a UUID nobody can read.
+              projectCode: p.code || p.id,
               projectCustomer: p.customerName,
             }))
         )
@@ -161,7 +172,7 @@ export default function MyTasksPage() {
     const byProject = new Map();
     const stageNames = new Set();
     for (const t of myTasks) {
-      byProject.set(t.projectId, t.projectCustomer ?? t.projectId);
+      byProject.set(t.projectId, t.projectCustomer ? `${t.projectCode} - ${t.projectCustomer}` : t.projectCode);
       if (t.stageName) stageNames.add(t.stageName);
     }
     return {
@@ -173,7 +184,7 @@ export default function MyTasksPage() {
   const visible = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     return myTasks.filter((t) => {
-      if (q && ![t.taskName, t.projectId, t.stageName, t.projectCustomer]
+      if (q && ![t.taskName, t.projectCode, t.stageName, t.projectCustomer]
         .filter(Boolean).join(' ').toLowerCase().includes(q)) return false;
       if (filters.projectId !== 'all' && t.projectId !== filters.projectId) return false;
       if (filters.stageName !== 'all' && t.stageName !== filters.stageName) return false;

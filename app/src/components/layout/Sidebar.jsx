@@ -210,16 +210,7 @@ const NAV = [
     icon: Package,
     children: [
       { label: 'Item Master', icon: Boxes, to: '/inventory/items' },
-      {
-        label: 'Categories',
-        icon: Layers,
-        defaultOpen: false,
-        children: [
-          { label: 'All Categories', to: '/inventory/categories', dot: true },
-          { label: 'Machine Categories', to: '/inventory/categories/machines' },
-          { label: 'Stock Categories', to: '/inventory/categories/stock' },
-        ],
-      },
+      { label: 'Category Master', icon: Layers, to: '/inventory/categories' },
       { label: 'Stock Position', icon: BarChart3, to: '/inventory/stock-position' },
       { label: 'Transfers', icon: ArrowLeftRight, to: '/inventory/transfers' },
       { label: 'Locations', icon: MapPin, to: '/inventory/locations' },

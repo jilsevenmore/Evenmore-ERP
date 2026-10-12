@@ -8,6 +8,7 @@ import { formatCurrency } from '../../utils/currencyUtils';
 import { Building2, Plus, Search, LayoutList, LayoutGrid, Edit2, Trash2 } from 'lucide-react';
 import { useOrgCollection, useEmployeeOptions, useConfirmDelete } from './useOrgCollection';
 import ConfirmDeleteModal from './ConfirmDeleteModal';
+import { UserInitials } from '../../components/common/UserInitials';
 
 const EMPTY = { name: '', code: '', headEmployeeId: '', parentId: '', budget: '', status: 'Active', description: '' };
 const inputCls = 'w-full h-9 px-3.5 bg-off border border-bdr rounded-xl text-xs focus:outline-none focus:border-navy';
@@ -32,8 +33,8 @@ function budgetText(value) {
 function HeadCell({ dept, small = false }) {
   return (
     <div className="flex items-center gap-2">
-      {dept.headAvatar && (
-        <img src={dept.headAvatar} alt="" className={`${small ? 'w-6 h-6' : 'w-7 h-7'} rounded-full object-cover`} />
+      {dept.head && (
+        <UserInitials name={dept.head} className={small ? 'w-6 h-6 text-[9px]' : 'w-7 h-7 text-[10px]'} />
       )}
       <span className="font-medium text-slate-800">{dept.head || '—'}</span>
     </div>

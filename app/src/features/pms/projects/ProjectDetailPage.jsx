@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Info, GitBranch, ListChecks, FileText, ShieldCheck, History, MessagesSquare, Bug, DollarSign, Users } from 'lucide-react';
 import { Button } from '../../../components/ui/Button';
 import { EmptyStatePms } from '../components/EmptyStatePms';
-import { usePmsStore, getProjectRowMeta } from '../../../stores/pmsStore';
+import { usePmsStore, getProjectRowMeta, isProjectCreator } from '../../../stores/pmsStore';
 import { ProjectHeader } from './components/ProjectHeader';
 import { ProjectInfoTab } from './components/ProjectInfoTab';
 import { StageTimelineTab } from './components/StageTimelineTab';
@@ -18,6 +18,7 @@ import { AssignStageModal } from './components/AssignStageModal';
 import { CreateTaskModal } from './components/CreateTaskModal';
 import { StageHandoffModal } from '../components/StageHandoffModal';
 import { CompleteProjectModal } from './components/CompleteProjectModal';
+import { DeleteProjectModal } from './components/DeleteProjectModal';
 import { PmsToast } from '../components/PmsToast';
 import { MessengerTab } from '../messenger/MessengerTab';
 import { useProjectMessenger } from '../messenger/useProjectMessenger';
@@ -50,13 +51,16 @@ export default function ProjectDetailPage() {
   const startStage = usePmsStore((s) => s.startStage);
   const setStageStatus = usePmsStore((s) => s.setStageStatus);
   const updateTask = usePmsStore((s) => s.updateTask);
+  const deleteProject = usePmsStore((s) => s.deleteProject);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentUserId = useAppStore((s) => s.currentUser?.id);
+  const currentUser = useAppStore((s) => s.currentUser);
+  const currentUserId = currentUser?.id;
 
   const [tab, setTab] = useState(() => (searchParams.get('tab') === 'messenger' ? 'messenger' : 'timeline'));
   const [focusStageId, setFocusStageId] = useState(null);
   const [confirmComplete, setConfirmComplete] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [assignStageId, setAssignStageId] = useState(null); // null = closed
   const [createTaskStageId, setCreateTaskStageId] = useState(null); // null = closed
   const [handoffStageId, setHandoffStageId] = useState(null);
@@ -165,6 +169,13 @@ export default function ProjectDetailPage() {
     setStageStatus(project.id, stage.id, 'Submitted', project.projectManager);
   }
 
+  const canDelete =
+    isProjectCreator(project, currentUser) ||
+    currentUser?.role === 'Admin' ||
+    currentUser?.role === 'Superadmin' ||
+    currentUser?.isSuperuser ||
+    (project?.projectManager?.id && String(project.projectManager.id) === String(currentUser?.id));
+
   return (
     <div className="space-y-5">
       <ProjectHeader
@@ -174,6 +185,7 @@ export default function ProjectDetailPage() {
         onSubmitForReview={() => currentStage && handleSubmitStage(currentStage)}
         onLogDelay={() => navigate(`/pms/delays?project=${project.id}`)}
         onCompleteProject={() => setConfirmComplete(true)}
+        onDeleteProject={canDelete ? () => setIsDeleteOpen(true) : null}
       />
 
       {/* Tabs */}
@@ -299,6 +311,16 @@ export default function ProjectDetailPage() {
         isOpen={confirmComplete}
         project={project}
         onClose={() => setConfirmComplete(false)}
+      />
+
+      <DeleteProjectModal
+        isOpen={isDeleteOpen}
+        project={project}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={async () => {
+          await deleteProject(project.id);
+          navigate('/pms/projects');
+        }}
       />
 
       <PmsToast />

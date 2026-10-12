@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, UserPlus, AlertTriangle, Percent } from 'lucide-react';
+import { Eye, UserPlus, AlertTriangle, Percent, Trash2 } from 'lucide-react';
 import { DataTable } from '../../../../components/ui/DataTable';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { DynamicProgressBar } from '../../components/DynamicProgressBar';
@@ -47,6 +47,7 @@ export function ProjectsTable({
   onQuickAssign,
   onLogDelay,
   onConfigurePercentages,
+  onDeleteProject,
   emptyTitle = 'No projects found',
   emptyDesc = 'No project matches the current filters.',
   emptyAction,
@@ -241,6 +242,12 @@ export function ProjectsTable({
       label: 'Actions',
       render: (_v, row) => {
         const isCreator = isProjectCreator(row, currentUser);
+        const canDelete =
+          isCreator ||
+          currentUser?.role === 'Admin' ||
+          currentUser?.role === 'Superadmin' ||
+          currentUser?.isSuperuser ||
+          (row.projectManager?.id && String(row.projectManager.id) === String(currentUser?.id));
         return (
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
             <button
@@ -284,6 +291,21 @@ export function ProjectsTable({
             >
               <AlertTriangle size={14} />
             </button>
+            {onDeleteProject && (
+              <button
+                type="button"
+                title={
+                  !canDelete
+                    ? 'Only the project creator, manager or administrators can delete this project'
+                    : 'Delete project'
+                }
+                disabled={!canDelete}
+                onClick={() => onDeleteProject(row)}
+                className="p-1.5 rounded-lg text-muted hover:text-danger hover:bg-card-hover disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         );
       },

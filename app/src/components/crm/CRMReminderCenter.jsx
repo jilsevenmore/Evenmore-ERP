@@ -10,7 +10,9 @@ function toneClasses(tone) {
 
 export function CRMReminderCenter() {
   const digest = useCrmNotificationDigest();
-  const { spotlight, counts, notifications } = digest;
+  const { spotlight, counts } = digest;
+  // The bell also carries PMS / HRMS notifications; this panel is CRM's.
+  const notifications = digest.notifications.filter((item) => !item.category || item.category === 'crm');
   const headline = counts.urgent > 0
     ? `${counts.urgent} urgent CRM reminder${counts.urgent > 1 ? 's' : ''}`
     : counts.total > 0

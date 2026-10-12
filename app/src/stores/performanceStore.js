@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
-import { writeThrough, pullTracked } from "../services/hrmsSync";
+import { writeThrough, pullTracked, hrmsSync, isServerId } from "../services/hrmsSync";
 import { RATING_SCALES } from "../services/performanceScales";
 import { useAppStore } from "./appStore";
 
@@ -37,6 +37,16 @@ export function getRatingScaleTier(rating) {
     if (r >= tier.minScore) return tier;
   }
   return RATING_SCALES[RATING_SCALES.length - 1];
+}
+
+// `stage` / `status` are read-only on the appraisal API, so the generic write
+// through cannot move an appraisal. Each workflow step also posts its own action
+// (self-review, manager-review, return, approve, finalize), which records history.
+function postAppraisalAction(id, action, payload) {
+  if (!isServerId(id)) return;
+  hrmsSync.act("appraisals", id, action, payload).catch((err) => {
+    console.warn(`Appraisal ${action} was not saved`, err);
+  });
 }
 
 const usePerformanceStoreBase = create((set, get) => ({
@@ -369,6 +379,7 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+    postAppraisalAction(id, "self-review", { rating: selfRating, comments, strengths, areasForImprovement });
   },
 
   // 2. Submit Manager Review (Manager -> HR Review OR return to Employee)
@@ -425,6 +436,11 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+    postAppraisalAction(id, "manager-review", {
+      rating: Number(rating) || overallRating,
+      comments,
+      developmentFeedback,
+    });
   },
 
   // Return Appraisal to previous stage (Manager -> Employee OR HR -> Manager)
@@ -455,6 +471,7 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+    postAppraisalAction(id, "return", { returnToStage, reason });
   },
 
   // 3. HR Review & Approval
@@ -490,6 +507,7 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+    postAppraisalAction(id, "approve", { hrComments: updated.hrReview.comments });
   },
 
   // 4. Finalize & Sync to Profile
@@ -518,6 +536,7 @@ const usePerformanceStoreBase = create((set, get) => ({
       appraisals: s.appraisals.map((a) => (a.id === id ? updated : a)),
     }));
     get().persist();
+    postAppraisalAction(id, "finalize", { finalRating: target.rating });
 
     // Sync to employee record in global appStore
     try {

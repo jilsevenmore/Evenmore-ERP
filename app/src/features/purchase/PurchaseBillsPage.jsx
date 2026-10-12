@@ -42,6 +42,14 @@ export const PurchaseBillsPage = () => {
     const [payAmount, setPayAmount] = useState(0);
     const [payMode, setPayMode] = useState('Bank Transfer');
     const [payRef, setPayRef] = useState('');
+    // Start every new bill blank -- closing the modal without saving must not carry values over.
+    const handleOpenAddModal = () => {
+        setSelectedPoId('manual');
+        setSelectedVendorId(vendors[0]?.id || '');
+        setDueDate(addDaysISO(getCurrentISODate(), 30));
+        setLineItems([]);
+        setShowAddModal(true);
+    };
     const handleSelectPo = (poId) => {
         setSelectedPoId(poId);
         if (poId !== 'manual') {
@@ -345,7 +353,7 @@ export const PurchaseBillsPage = () => {
     const unpaidBillsCount = purchaseBills.filter(b => getBillOutstanding(b.id).balanceDue > 0).length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Purchase Bills & Accounts Payable" subtitle="Supplier invoice intake, line-item inventory replenishment, remaining balance tracking, and vendor disbursements." guide={purchaseBillGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+      <PageHeader title="Purchase Bills & Accounts Payable" subtitle="Supplier invoice intake, line-item inventory replenishment, remaining balance tracking, and vendor disbursements." guide={purchaseBillGuide} actions={<Button icon={Plus} onClick={handleOpenAddModal}>
             Enter Vendor Bill
           </Button>}/>
 

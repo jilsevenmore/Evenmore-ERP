@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye } from 'lucide-react';
+import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye, Trash2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { formatCurrency } from '../../../../utils/currencyUtils';
@@ -64,6 +64,7 @@ export function ProjectHeader({
   onSubmitForReview,
   onLogDelay,
   onCompleteProject,
+  onDeleteProject,
 }) {
   const priority = PRIORITY_TONES[project.priority] ?? PRIORITY_TONES.Low;
   const isClosed = project.status === 'Completed';
@@ -141,6 +142,19 @@ export function ProjectHeader({
           <Button size="sm" icon={CheckCircle2} onClick={onCompleteProject} disabled={isClosed}>
             {isClosed ? 'Completed' : 'Complete Project'}
           </Button>
+
+          {onDeleteProject && (
+            <Button
+              size="sm"
+              variant="outline"
+              icon={Trash2}
+              onClick={onDeleteProject}
+              className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 border-rose-200"
+              title="Delete Project"
+            >
+              Delete Project
+            </Button>
+          )}
 
           <Link
             to={`/customer/projects/${project.id || project.code}`}

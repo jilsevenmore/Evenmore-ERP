@@ -46,6 +46,13 @@ function formatEventTime(value, now) {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+/** Where a server notification without its own link should open, by module. */
+function defaultEventPath(entry) {
+  const type = String(entry.type || '');
+  if (type.startsWith('hrms.leave')) return '/hrms/leave';
+  return { pms: '/pms/my-tasks', hrms: '/hrms', erp: '/dashboard' }[entry.category] || '/crm';
+}
+
 function buildEventNotifications({ eventItems, now }) {
   return (eventItems || [])
     .filter((entry) => entry && entry.title)
@@ -53,13 +60,15 @@ function buildEventNotifications({ eventItems, now }) {
       id: `crm-event-${entry.id}`,
       eventId: entry.id,
       title: entry.title,
-      subtitle: EVENT_ENTITY_LABELS[entry.entityType] || (entry.category === 'pms' ? 'PMS' : 'CRM'),
+      subtitle: EVENT_ENTITY_LABELS[entry.entityType] || String(entry.category || 'crm').toUpperCase(),
+      // The module that raised it (crm / hrms / pms / erp / system), for the bell's grouping.
+      category: entry.category || 'crm',
       desc: entry.message || entry.body || entry.title,
       time: formatEventTime(entry.createdAt, now),
       tone: 'info',
       // Server rows carry `read` and put the deep link in `payload.path`.
       unread: entry.status !== 'read' && entry.read !== true,
-      path: entry.path || entry.payload?.path || '/crm',
+      path: entry.path || entry.payload?.path || defaultEventPath(entry),
       bucket: 'crm-event',
     }));
 }
@@ -336,10 +345,12 @@ export function useCrmNotificationDigest() {
     () => (hasCrm ? allAllocations.filter((task) => currentUserId && String(task.assigneeId) === String(currentUserId)) : EMPTY_ROWS),
     [allAllocations, currentUserId, hasCrm],
   );
-  const [eventItems, setEventItems] = useState(() => (hasCrm ? loadEventNotifications() : EMPTY_ROWS));
+  // The server feed carries every module's notifications (leave, PMS tasks...),
+  // so every staff user reads it, not only CRM users.
+  const [eventItems, setEventItems] = useState(() => (isCustomer ? EMPTY_ROWS : loadEventNotifications()));
 
   useEffect(() => {
-    if (!hasCrm) return;
+    if (isCustomer) return;
     const sync = () => setEventItems(loadEventNotifications());
     sync();
 
@@ -354,7 +365,7 @@ export function useCrmNotificationDigest() {
       window.removeEventListener('focus', sync);
       window.clearInterval(timer);
     };
-  }, [hasCrm]);
+  }, [isCustomer]);
 
   return useMemo(
     () => {

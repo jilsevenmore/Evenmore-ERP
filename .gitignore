@@ -32,3 +32,9 @@ graphify-out/
 
 app/server/data/
 sewen project.pdf
+
+# Vite cache
+.vite
+**/.vite
+# Git patches
+*.patch

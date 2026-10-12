@@ -1,7 +1,7 @@
 import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, UserPlus, Clock, TrendingUp, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send } from "lucide-react";
+import { Users, UserPlus, Clock, TrendingUp, DollarSign, Search, Phone, Mail, CalendarDays, FileText, ClipboardList, Video, Send, CheckCircle2 } from "lucide-react";
 import { useCrmStore } from "../../../stores/crmStore";
 import { initials, describeError } from "../../../services/crmSync";
 import { useERP } from "../../../context/ERPContext";
@@ -12,11 +12,13 @@ import CreateLeadModal from "../leads/CreateLeadModal";
 import { runLeadStageAutomation } from "../../../services/leadStageAutomation";
 import { attachLeadSubResources } from "../leads/leadSubResources";
 import { toISODate } from "../../../utils/dateUtils";
-const DEAL_STAGES = ["Draft", "Sent", "Open", "Revised", "Declined"];
+// The Deals board's stages: every lead has a deal here, moved with the lead.
+const DEAL_STAGES = ["Draft", "Sent", "Open", "Won", "Lost"];
+const CLOSED_DEAL_STAGES = ["Won", "Lost", "Declined"];
 const SOURCE_COLORS = ["#2f6fed", "#7c3aed", "#f59e0b", "#10b981", "#ec4899", "#06b6d4", "#64748b"];
 const AVATAR_COLORS = ["#2f6fed", "#7c3aed", "#059669", "#ea580c", "#db2777", "#0891b2", "#4f46e5"];
-const PIPELINE_BG = ["#eef4ff", "#f5f0ff", "#fff7e8", "#eef4ff", "#ecfdf5"];
-const PIPELINE_FG = ["#2f6fed", "#7c3aed", "#b45309", "#2f6fed", "#059669"];
+const PIPELINE_BG = ["#eef4ff", "#f5f0ff", "#fff7e8", "#ecfdf5", "#fef2f2"];
+const PIPELINE_FG = ["#2f6fed", "#7c3aed", "#b45309", "#059669", "#dc2626"];
 /** Lower-cased text, safe on a field the server left unset. */
 function text(value) {
   return String(value ?? '').toLowerCase();
@@ -141,9 +143,9 @@ export default function DashboardView() {
   const leadsThisWeek = leads.filter((l) => toISODate(l.createdOn) >= weekAgoISO).length;
   const pendingTasks = tasks.filter((t) => t.status !== "Completed").length;
   const overdueTasks = tasks.filter((t) => t.status !== "Completed" && toISODate(t.dueDate) && toISODate(t.dueDate) < todayISO).length;
-  const activeDeals = deals.filter((d) => d.stage !== "Declined");
+  const activeDeals = deals.filter((d) => !CLOSED_DEAL_STAGES.includes(d.stage));
   const pipelineDeals = activeDeals.length;
-  const dealsTotal = deals.reduce((a, d) => a + (Number(d.price) || 0), 0);
+  const dealsTotal = activeDeals.reduce((a, d) => a + (Number(d.price) || 0), 0);
   const invoicesTotal = invoices.reduce((a, i) => a + (i.total || 0), 0);
   const quotationsTotal = quotations.reduce((a, q) => a + (q.amount || q.total || 0), 0);
   const ordersTotal = salesOrders.reduce((a, o) => a + (o.total || o.amount || 0), 0);
@@ -383,17 +385,23 @@ export default function DashboardView() {
                       </span>
                     </td>
                     <td style={{ padding: "10px 8px", textAlign: "right" }}>
-                      <button
-                        type="button"
-                        onClick={() => completeTask(t)}
-                        className={`h-8 px-3 rounded-xl text-xs font-semibold border transition shadow-2xs active:scale-[0.99] cursor-pointer ${
-                          t.status === "Completed"
-                            ? "btn-outline text-muted"
-                            : "btn-primary text-white"
-                        }`}
-                      >
-                        {t.status === "Completed" ? "Done" : "Complete"}
-                      </button>
+                      {t.status === "Completed" ? (
+                        // A finished task has nothing left to do: a status, not a button.
+                        <span
+                          className="inline-flex h-8 items-center gap-1.5 px-3 rounded-xl text-xs font-semibold border border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 select-none"
+                          title="This task is already completed"
+                        >
+                          <CheckCircle2 size={13} /> Done
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => completeTask(t)}
+                          className="h-8 px-3 rounded-xl text-xs font-semibold border transition shadow-2xs active:scale-[0.99] cursor-pointer btn-primary text-white"
+                        >
+                          Complete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
