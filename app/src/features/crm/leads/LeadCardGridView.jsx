@@ -1,4 +1,4 @@
-import { Building2, Mail, MapPin, Phone, Pin, Trash2, UserRound } from "lucide-react";
+import { Building2, Mail, MapPin, Phone, Pin, UserRound, XCircle } from "lucide-react";
 import LeadAvatar from "./LeadAvatar";
 import { formatCurrency } from "../../../utils/currencyUtils";
 
@@ -47,10 +47,10 @@ export default function LeadCardGridView({ rows = [], selected = [], pinnedLeadI
             className="lead-grid-delete row-action-icon row-delete-action"
             // Replaced: onDelete(row.id) — deleted at once, without the confirmation dialog.
             onClick={() => onRequestDelete?.(row)}
-            aria-label={`Delete ${row.name}`}
+            aria-label={`Mark ${row.name} as lost`}
           >
-            <Trash2 size={15} />
-            <span className="toolbar-tooltip">Delete</span>
+            <XCircle size={15} />
+            <span className="toolbar-tooltip">Mark as Lost</span>
           </button>
 
           <div className="lead-grid-company">

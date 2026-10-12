@@ -146,6 +146,9 @@ export default function ContractsPage() {
   const storeContracts = useCrmStore((s) => s.contracts);
   const storeDeals = useCrmStore((s) => s.deals);
   useEffect(() => { refresh(); }, [storeContracts, storeDeals]);
+  // The server generates contracts on its own (an accepted estimate), so the
+  // list is re-read from it whenever the page opens.
+  useEffect(() => { useCrmStore.getState().refresh('contracts').catch(() => {}); }, []);
 
   useEffect(() => { setPage(1); }, [search, statusFilter, typeFilter, customerFilter, fromDate, toDate]);
 

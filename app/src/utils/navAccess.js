@@ -25,8 +25,9 @@ const ROUTE_PERMISSIONS = [
   // returns only the ones assigned to them (managers see the team's).
   ['/crm/tasks', null],
   ['/crm/leads/tasks-master', 'view_task'],
-  ['/crm/leads/task-form', 'view_task'],
   ['/crm/leads/stage-tasks', 'view_task'],
+  // CRM's Projects list was removed; this still guards /crm/projects/:id, the
+  // project a deal or contract links to.
   ['/crm/projects', 'view_projects'],
   ['/crm', 'view_lead'],
   ['/pms', 'view_pms'],

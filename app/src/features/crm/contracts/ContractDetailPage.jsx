@@ -737,7 +737,7 @@ export default function ContractDetailPage() {
                 {project ? (
                   <Link className="btn-outline btn-sm w-full mt-4" to={`/crm/projects/${encodeURIComponent(project.id)}`}>View Project</Link>
                 ) : (
-                  <Link className="btn-outline btn-sm w-full mt-4" to="/crm/projects">View Project</Link>
+                  <button type="button" className="btn-outline btn-sm w-full mt-4" disabled>View Project</button>
                 )}
               </div>
             </div>
