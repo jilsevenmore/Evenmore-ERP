@@ -2080,13 +2080,19 @@ const usePmsStoreBase = create((set, get) => ({
     pushProject(projectId, () => pmsSync.update("projects", projectId, patch));
   },
 
-  deleteProject: (projectId) => {
+  deleteProject: async (projectId) => {
     const previous = get().projects;
     set({ projects: previous.filter((p) => p.id !== projectId) });
-    pmsSync.remove("projects", projectId).catch((err) => {
+    try {
+      await pmsSync.remove("projects", projectId);
+      get().showToast("Project deleted successfully.", "success");
+      return true;
+    } catch (err) {
       console.warn("[PMS] project not deleted:", describeError(err));
       set({ projects: previous });
-    });
+      get().showToast(`Failed to delete project: ${describeError(err)}`, "error");
+      throw err;
+    }
   },
 
   /** Build a project's runtime stages from the active templates. */

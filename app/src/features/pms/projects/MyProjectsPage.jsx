@@ -12,6 +12,8 @@ import {
 import { pullMyProjects } from '../../../services/pmsSync';
 import { ProjectFilterBar } from './components/ProjectFilterBar';
 import { ProjectsTable } from './components/ProjectsTable';
+import { DeleteProjectModal } from './components/DeleteProjectModal';
+import { PmsToast } from '../components/PmsToast';
 
 /**
  * MyProjectsPage (/pms/my-projects) — the projects the signed-in user works on.
@@ -23,8 +25,10 @@ import { ProjectsTable } from './components/ProjectsTable';
 export default function MyProjectsPage() {
   const navigate = useNavigate();
   const projects = usePmsStore((s) => s.projects);
+  const deleteProject = usePmsStore((s) => s.deleteProject);
   const currentUserId = usePmsStore((s) => s.currentUserId);
   const employees = usePmsStore((s) => s.employees);
+  const [projectToDelete, setProjectToDelete] = useState(null);
 
   const currentUser = useMemo(
     () => employees.find((e) => e.id === currentUserId) ?? null,
@@ -85,7 +89,18 @@ export default function MyProjectsPage() {
         }
         onQuickAssign={(row) => navigate(`/pms/projects/${row.id}`)}
         onLogDelay={(row) => navigate(`/pms/delays?project=${row.id}`)}
+        onDeleteProject={(row) => setProjectToDelete(row)}
       />
+
+      <DeleteProjectModal
+        isOpen={Boolean(projectToDelete)}
+        project={projectToDelete}
+        onClose={() => setProjectToDelete(null)}
+        onConfirm={async (p) => {
+          await deleteProject(p.id);
+        }}
+      />
+      <PmsToast />
     </div>
   );
 }
