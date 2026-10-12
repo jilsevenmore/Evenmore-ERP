@@ -2424,9 +2424,12 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
 
   // Display-only counters for the list: patched into the store row locally.
   // Sending them to the server made a PATCH every time a lead was opened.
+  // The stage (`status`) is the server's: writing this view's copy back made
+  // the row and the view overwrite each other forever once the server moved
+  // the lead (e.g. a completed task taking it to Lost).
   React.useEffect(() => {
     patchLeadRowLocally(viewLead?.id ?? lead?.id, {
-      status: isConverted ? 'Converted' : (viewLead?.status ?? lead?.status),
+      ...(isConverted ? { status: 'Converted' } : {}),
       productsCount: detailCounts.products,
       sourcesCount: detailCounts.sources,
       filesCount: detailCounts.files,
@@ -2435,7 +2438,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       estimatesCount: detailCounts.estimates,
       deliveryChallansCount: detailCounts.challans,
     });
-  }, [viewLead?.id, lead?.id, viewLead?.status, lead?.status, isConverted, detailCounts]);
+  }, [viewLead?.id, lead?.id, isConverted, detailCounts]);
 
   // The lead row and its sections both live in the CRM stores now, so this only
   // has to react to them rather than re-reading a browser cache.

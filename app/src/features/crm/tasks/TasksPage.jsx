@@ -1,4 +1,5 @@
 import CrmKpiCard from '../common/CrmKpiCard';
+import { Link } from 'react-router-dom';
 import { useState, useMemo, useEffect } from 'react';
 import { Calendar, User, Search, CheckCircle2, AlertTriangle, ArrowUpDown, Clock, Users, UserPlus, TrendingUp } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
@@ -143,9 +144,12 @@ export default function TasksPage() {
           Lead ID <ArrowUpDown size={12} />
         </span>
       ),
-      render: (val) => (val
-        ? <span className="font-semibold text-slate-700 whitespace-nowrap">{val}</span>
-        : <span className="text-slate-300">—</span>),
+      // The Lead ID opens that lead's page.
+      render: (val, row) => (val && row.leadId
+        ? <Link to={`/crm/leads/${encodeURIComponent(row.leadId)}`} className="font-semibold text-blue-600 hover:underline whitespace-nowrap">{val}</Link>
+        : val
+          ? <span className="font-semibold text-slate-700 whitespace-nowrap">{val}</span>
+          : <span className="text-slate-300">—</span>),
     },
     {
       key: 'title',

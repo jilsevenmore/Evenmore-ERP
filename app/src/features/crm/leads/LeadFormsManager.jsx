@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import InfoBanner from "../common/InfoBanner";
+import FormActiveToggle, { FormStatusBadge } from "./FormActiveToggle";
 
 function parseDateValue(dateString) {
   if (!dateString || typeof dateString !== "string") return 0;
@@ -24,7 +25,10 @@ function getFieldCount(form) {
   return form.sections.reduce((total, section) => total + (section.fields?.length || 0), 0);
 }
 
-export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDeleteForm, onOpenGuide }) {
+/** Forms saved before the Active toggle existed have no flag: they are active. */
+const isActive = (form) => form.isActive !== false;
+
+export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDeleteForm, onToggleActive, onOpenGuide }) {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [sortOrder, setSortOrder] = useState("Newest First");
   const [viewMode, setViewMode] = useState("grid");
@@ -33,7 +37,8 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
     const nextForms = forms.filter((form) => {
       const matchesStatus =
         statusFilter === "All Status" ||
-        (statusFilter === "Active" && true);
+        (statusFilter === "Active" && isActive(form)) ||
+        (statusFilter === "Inactive" && !isActive(form));
 
       return matchesStatus;
     });
@@ -109,6 +114,7 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
               >
                 <option>All Status</option>
                 <option>Active</option>
+                <option>Inactive</option>
               </select>
               <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
             </div>
@@ -191,8 +197,11 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
                       </td>
                       <td className="px-5 py-4 text-slate-700 whitespace-nowrap">{form.createdOn}</td>
                       <td className="px-5 py-4 whitespace-nowrap">
-                        <span className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
-                          ACTIVE
+                        <span className="inline-flex items-center gap-2">
+                          {onToggleActive && (
+                            <FormActiveToggle active={isActive(form)} onToggle={() => onToggleActive(form.id)} label={`${isActive(form) ? "Deactivate" : "Activate"} ${form.name}`} />
+                          )}
+                          <FormStatusBadge active={isActive(form)} />
                         </span>
                       </td>
                       <td className="px-5 py-4">
@@ -260,8 +269,11 @@ export default function LeadFormsManager({ forms, onCreateForm, onEditForm, onDe
                   </div>
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">Status</div>
-                    <div className="mt-0.5 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                      ACTIVE
+                    <div className="mt-0.5 inline-flex items-center gap-2">
+                      {onToggleActive && (
+                        <FormActiveToggle active={isActive(form)} onToggle={() => onToggleActive(form.id)} label={`${isActive(form) ? "Deactivate" : "Activate"} ${form.name}`} />
+                      )}
+                      <FormStatusBadge active={isActive(form)} />
                     </div>
                   </div>
                   <div className="col-span-2">
