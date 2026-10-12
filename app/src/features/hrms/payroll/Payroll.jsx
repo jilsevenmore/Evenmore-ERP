@@ -129,6 +129,11 @@ export default function Payroll() {
   const [editTotalDays, setEditTotalDays] = useState(24);
   const [editDailyHours, setEditDailyHours] = useState(8);
   const [editAttendedDays, setEditAttendedDays] = useState(20);
+  // Attended days as a number, or `fallback` when blank / not a number (Number() never yields undefined).
+  const attendedDaysOr = (fallback) => {
+    const parsed = Number(editAttendedDays);
+    return editAttendedDays === '' || editAttendedDays == null || Number.isNaN(parsed) ? fallback : parsed;
+  };
   const [editAdvance, setEditAdvance] = useState(0);
   const [editEarnings, setEditEarnings] = useState(0);
   const [editDeductions, setEditDeductions] = useState(0);
@@ -445,7 +450,7 @@ export default function Payroll() {
     if (!editingEmployee) return;
     const tDays = Math.max(1, Number(editTotalDays) || 24);
     const dHours = Math.max(1, Number(editDailyHours) || 8);
-    const aDays = Math.min(tDays, Math.max(0, Number(editAttendedDays) !== undefined ? Number(editAttendedDays) : tDays));
+    const aDays = Math.min(tDays, Math.max(0, attendedDaysOr(tDays)));
     const std = Number(editingEmployee.standardSalary) || 0;
     const totalH = tDays * dHours;
     const hourlyR = totalH > 0 ? Math.round(std / totalH) : 0;
@@ -1948,7 +1953,7 @@ export default function Payroll() {
                 const curH = Math.max(1, Number(editDailyHours) || 8);
                 const curTotH = curT * curH;
                 const curHourlyRate = curTotH > 0 ? Math.round(curStd / curTotH) : 0;
-                const curA = Math.min(curT, Math.max(0, Number(editAttendedDays) !== undefined ? Number(editAttendedDays) : curT));
+                const curA = Math.min(curT, Math.max(0, attendedDaysOr(curT)));
                 const curAbs = Math.max(0, curT - curA);
                 const curRate = curT > 0 ? curStd / curT : 0;
                 const curDeduct = Math.round(curRate * curAbs);
@@ -2029,7 +2034,7 @@ export default function Payroll() {
               {(() => {
                 const curStd = Number(editingEmployee.standardSalary) || 0;
                 const curT = Math.max(1, Number(editTotalDays) || 24);
-                const curA = Math.min(curT, Math.max(0, Number(editAttendedDays) !== undefined ? Number(editAttendedDays) : curT));
+                const curA = Math.min(curT, Math.max(0, attendedDaysOr(curT)));
                 const curAbs = Math.max(0, curT - curA);
                 const curRate = curT > 0 ? curStd / curT : 0;
                 const curDeduct = Math.round(curRate * curAbs);

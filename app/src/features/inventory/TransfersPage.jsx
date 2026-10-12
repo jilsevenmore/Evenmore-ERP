@@ -29,6 +29,14 @@ export const TransfersPage = () => {
     const [destLocId, setDestLocId] = useState(locations[1]?.id || '');
     const [shippedBy, setShippedBy] = useState('');
     const [lineItems, setLineItems] = useState([]);
+    // Start every new transfer blank -- closing the modal without saving must not carry values over.
+    const handleOpenAddModal = () => {
+        setSourceLocId(locations[0]?.id || '');
+        setDestLocId(locations[1]?.id || '');
+        setShippedBy('');
+        setLineItems([]);
+        setShowAddModal(true);
+    };
     const handleCreate = (e) => {
         e.preventDefault();
         const src = locations.find((l) => l.id === sourceLocId) || locations[0];
@@ -122,7 +130,7 @@ export const TransfersPage = () => {
     const receivedCount = transfers.filter(t => t.status === 'Received').length;
 
     return (<div className="space-y-6">
-      <PageHeader title="Stock Transfers & Relocation" subtitle="Inter-warehouse and inter-zone inventory shifts, internal transport manifests, and intake verification." guide={transfersGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+      <PageHeader title="Stock Transfers & Relocation" subtitle="Inter-warehouse and inter-zone inventory shifts, internal transport manifests, and intake verification." guide={transfersGuide} actions={<Button icon={Plus} onClick={handleOpenAddModal}>
             Initiate Stock Transfer
           </Button>}/>
 

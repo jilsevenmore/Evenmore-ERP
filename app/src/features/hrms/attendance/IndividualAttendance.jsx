@@ -1,7 +1,8 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronRight, X } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
+import { pullIndividualAttendance, HRMS_RESOURCES, isServerId } from "../../../services/hrmsSync";
 import Modal from "../../../components/ui/Modal";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
@@ -95,11 +96,40 @@ export default function IndividualAttendance() {
     [employeesList, selectedEmpId]
   );
 
+  // The store's attendance pull is capped, so an older month can be missing
+  // from it. Read the picked employee's month straight from the API and merge
+  // it with the store (the store copy wins -- it carries today's punches).
+  const [monthRecords, setMonthRecords] = useState(null);
+  useEffect(() => {
+    if (!isServerId(currentEmp.id)) return undefined;
+    let cancelled = false;
+    const monthIdx = MONTHS.indexOf(selectedMonth);
+    const yearNum = Number(selectedYear);
+    const pad = (n) => String(n).padStart(2, "0");
+    const lastDay = new Date(yearNum, monthIdx + 1, 0).getDate();
+    pullIndividualAttendance(currentEmp.id, {
+      date_from: `${yearNum}-${pad(monthIdx + 1)}-01`,
+      date_to: `${yearNum}-${pad(monthIdx + 1)}-${pad(lastDay)}`,
+    }).then((body) => {
+      if (cancelled) return;
+      const rows = Array.isArray(body) ? body : body?.results;
+      setMonthRecords(Array.isArray(rows) ? rows.map(HRMS_RESOURCES.attendance.fromApi) : null);
+    });
+    return () => { cancelled = true; };
+  }, [currentEmp.id, selectedMonth, selectedYear]);
+
+  const sourceRecords = useMemo(() => {
+    if (!monthRecords) return storeRecords || [];
+    const byId = new Map(monthRecords.map((r) => [r.id, r]));
+    (storeRecords || []).forEach((r) => byId.set(r.id, r));
+    return [...byId.values()];
+  }, [monthRecords, storeRecords]);
+
   const records = useMemo(() => {
     if (!currentEmp.id) return [];
     const monthIdx = MONTHS.indexOf(selectedMonth);
     const yearNum = Number(selectedYear);
-    return (storeRecords || [])
+    return sourceRecords
       .filter((r) => {
         const matchesEmp =
           String(r.employeeId ?? "") === String(currentEmp.id) ||
@@ -130,7 +160,7 @@ export default function IndividualAttendance() {
         return localEdits[key] ? { ...base, ...localEdits[key] } : base;
       })
       .sort((a, b) => a.sortTime - b.sortTime);
-  }, [storeRecords, currentEmp, selectedMonth, selectedYear, localEdits]);
+  }, [sourceRecords, currentEmp, selectedMonth, selectedYear, localEdits]);
 
   const stats = useMemo(() => {
     const overtimeMins = records.reduce((sum, r) => sum + Math.max(0, workedMinutes(r) - 8 * 60), 0);

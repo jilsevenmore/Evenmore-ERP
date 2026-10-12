@@ -17,7 +17,7 @@ function persist(state) {
   writeThrough("offers", state.offers);
   writeThrough("applications", state.applications);
   writeThrough("onboarding", state.onboarding);
-  // writeThrough("recruitmentQuestions", state.questions); // Hidden: Screening Questions out of scope
+  writeThrough("recruitmentQuestions", state.questions);
 }
 
 const useRecruitmentStoreBase = create((set) => ({
@@ -41,7 +41,7 @@ const useRecruitmentStoreBase = create((set) => ({
       pullTracked("candidates"),
       pullTracked("interviews"),
       pullTracked("offers"),
-      null, // pullTracked("recruitmentQuestions"), -- Hidden: Screening Questions out of scope (keeps rows[4] slot)
+      pullTracked("recruitmentQuestions"),
       pullTracked("applications"),
       pullTracked("onboarding"),
     ]);

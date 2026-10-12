@@ -324,7 +324,17 @@ export const HRMS_RESOURCES = {
   interviews: dated('/hrms/interviews/', ['scheduledDate', 'date']),
   offers: dated('/hrms/offers/', ['offerDate', 'joiningDate']),
   onboarding: dated('/hrms/onboarding/', ['startDate']),
-  // recruitmentQuestions: plain('/hrms/recruitment/questions/'),  // Hidden: Screening Questions out of scope; backend route commented out
+  // The page names a question `text` / `enabled`; the API calls them `question` / `isActive`.
+  recruitmentQuestions: {
+    path: '/hrms/recruitment/questions/',
+    toApi: (q) => compact({
+      question: q.text ?? q.question,
+      type: q.type || undefined,
+      options: Array.isArray(q.options) ? q.options : undefined,
+      isActive: q.enabled !== undefined ? Boolean(q.enabled) : undefined,
+    }),
+    fromApi: (row) => ({ ...row, text: row.question, enabled: row.isActive !== false, _synced: true }),
+  },
 
   // ── performance ───────────────────────────────────────────────────────────
   appraisals: dated('/hrms/performance/appraisals/', ['dueDate', 'completedDate']),

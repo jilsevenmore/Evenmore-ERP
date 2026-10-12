@@ -164,6 +164,20 @@ export const PurchaseOrdersPage = () => {
         }
     };
 
+    // Start every new advance blank -- closing the modal without saving must not carry values over.
+    const handleOpenAdvanceModal = () => {
+        setNewAdvance({
+            party: '',
+            amount: '',
+            advance_date: new Date().toISOString().slice(0, 10),
+            payment_mode: 'Bank Transfer',
+            reference_number: '',
+            purchase_order: '',
+            notes: '',
+        });
+        setShowAdvanceModal(true);
+    };
+
     const handleReconcileSubmit = async (e) => {
         e.preventDefault();
         if (!selectedAdvance) return;
@@ -360,7 +374,7 @@ export const PurchaseOrdersPage = () => {
                 <Button variant="outline" icon={RefreshCw} onClick={loadRegisterData}>
                   Refresh
                 </Button>
-                <Button icon={Plus} onClick={() => setShowAdvanceModal(true)}>
+                <Button icon={Plus} onClick={handleOpenAdvanceModal}>
                   Record Vendor Advance
                 </Button>
               </>
@@ -502,7 +516,7 @@ export const PurchaseOrdersPage = () => {
                 <h3 className="font-bold text-slate-800 text-sm">Vendor Advance Disbursements</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Prepayments made to suppliers prior to invoice presentation, eligible for settlement against final bills</p>
               </div>
-              <Button size="sm" icon={Plus} onClick={() => setShowAdvanceModal(true)}>
+              <Button size="sm" icon={Plus} onClick={handleOpenAdvanceModal}>
                 Record Advance
               </Button>
             </div>

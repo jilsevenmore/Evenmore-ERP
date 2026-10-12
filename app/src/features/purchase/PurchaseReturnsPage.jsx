@@ -257,7 +257,11 @@ export const PurchaseReturnsPage = () => {
       <PageHeader title="Purchase Returns & Debit Notes" subtitle="Supplier debit memos, selective line-item returns, condition tracking, inventory reductions, and Accounts Payable ledger write-downs." guide={purchaseReturnGuide} actions={<Button icon={Plus} onClick={() => {
                 if (purchaseBills.length > 0) {
                     handleBillSelect(purchaseBills[0].id);
+                } else {
+                    setSelectedBillId('');
+                    setReturnItems([]);
                 }
+                setReason('Damaged casing detected on intake inspection');
                 setShowAddModal(true);
             }}>
             Create Debit Note

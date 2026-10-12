@@ -28,6 +28,14 @@ export const ExpensesPage = () => {
     const [payee, setPayee] = useState('');
     const [amount, setAmount] = useState('');
     const [paidVia, setPaidVia] = useState('Corporate Card');
+    // Start every new expense blank -- closing the modal without saving must not carry values over.
+    const handleOpenAddModal = () => {
+        setCategory('Logistics');
+        setPayee('');
+        setAmount('');
+        setPaidVia('Corporate Card');
+        setShowAddModal(true);
+    };
     const handleCreate = (e) => {
         e.preventDefault();
         if (!(parseFloat(amount) > 0)) {
@@ -114,7 +122,7 @@ export const ExpensesPage = () => {
     const categoriesCount = new Set(expenses.map(e => e.category)).size;
 
     return (<div className="space-y-6">
-      <PageHeader title="Operating Expenses & OpEx" subtitle="Log overhead, logistics fees, utilities, facility maintenance, and corporate operational disbursements." guide={expensesGuide} actions={<Button icon={Plus} onClick={() => setShowAddModal(true)}>
+      <PageHeader title="Operating Expenses & OpEx" subtitle="Log overhead, logistics fees, utilities, facility maintenance, and corporate operational disbursements." guide={expensesGuide} actions={<Button icon={Plus} onClick={handleOpenAddModal}>
             Record Expense
           </Button>}/>
 
