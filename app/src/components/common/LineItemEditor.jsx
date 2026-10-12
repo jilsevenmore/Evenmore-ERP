@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Package, ShoppingCart, Boxes, AlertTriangle, Search, X, Layers, ChevronDown, Scale } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { Button } from '../ui/Button';
@@ -63,10 +63,17 @@ const KIND_FROM_ITEM = { Machine: 'Machine', Part: 'Spare Part', Service: 'Servi
 // description) -- superseded by the calculator row, kept for rollback.
 const USE_COMPACT_METAL_ROW = false;
 
+// Stock picker: a category is a metal (Mild Steel, Aluminium…) linked to one
+// item type (Sheet, Pipe, Rod…), so the same metal name repeats once per type.
+const metalKey = (name) => String(name ?? '').trim().toLowerCase();
+const categoryTypeLabel = (c, itemTypes) =>
+  c.itemType || itemTypes.find((t) => t.id === c.itemTypeId)?.name || 'General';
+
 export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly = false, onRequestPO, allowCustomLines = false }) => {
     const {
       items: masterItems = [],
       categories = [],
+      itemTypes = [],
       categoryParts = [],
       itemParts = [],
       calculateItemStock
@@ -76,6 +83,8 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
     const [stockPickerTargetMachineId, setStockPickerTargetMachineId] = useState(null);
     const [pickerSearch, setPickerSearch] = useState('');
     const [pickerCategory, setPickerCategory] = useState('All');
+    // Category id of the chosen metal + item type pair, or 'All' for every type of the metal.
+    const [pickerTypeCategoryId, setPickerTypeCategoryId] = useState('All');
     const [collapsedMachines, setCollapsedMachines] = useState({});
 
     const toggleCollapse = (machineLineId) => {
@@ -510,16 +519,62 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
         }
     };
 
+    const categoryById = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
+    const itemMetalKey = useCallback(
+        (it) => metalKey(categoryById.get(it.categoryId)?.name ?? it.category),
+        [categoryById]
+    );
+    // An item counts under a type when it sits in that exact category, or its
+    // own item type matches (items keep an item type apart from their category).
+    const itemHasType = useCallback((it, typeCategory) => {
+        if (it.categoryId && it.categoryId === typeCategory.id) return true;
+        if (it.itemTypeId && typeCategory.itemTypeId) return it.itemTypeId === typeCategory.itemTypeId;
+        return metalKey(it.itemType) === metalKey(categoryTypeLabel(typeCategory, itemTypes));
+    }, [itemTypes]);
+
+    // Each metal listed once in the picker's category dropdown, with its item count.
+    const pickerMetals = useMemo(() => {
+        const byKey = new Map();
+        categories.forEach((c) => {
+            const key = metalKey(c.name);
+            if (key && !byKey.has(key)) byKey.set(key, { name: String(c.name).trim(), count: 0 });
+        });
+        masterItems.forEach((it) => {
+            const metal = byKey.get(itemMetalKey(it));
+            if (metal) metal.count += 1;
+        });
+        return [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name));
+    }, [categories, masterItems, itemMetalKey]);
+
+    // Item types (Sheet, Pipe, Rod…) available under the chosen metal, with item counts.
+    const pickerMetalTypes = useMemo(() => {
+        if (pickerCategory === 'All') return [];
+        const metalItems = masterItems.filter((it) => itemMetalKey(it) === metalKey(pickerCategory));
+        return categories
+            .filter((c) => metalKey(c.name) === metalKey(pickerCategory))
+            .map((c) => ({
+                id: c.id,
+                label: categoryTypeLabel(c, itemTypes),
+                count: metalItems.filter((it) => itemHasType(it, c)).length,
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label));
+    }, [categories, itemTypes, masterItems, pickerCategory, itemMetalKey, itemHasType]);
+
+    const pickerTypeCategory = pickerTypeCategoryId !== 'All' ? categoryById.get(pickerTypeCategoryId) : null;
+
     const filteredStockPickerItems = useMemo(() => {
         return masterItems.filter((it) => {
-            if (pickerCategory !== 'All' && it.category !== pickerCategory) return false;
+            if (pickerCategory !== 'All') {
+                if (itemMetalKey(it) !== metalKey(pickerCategory)) return false;
+                if (pickerTypeCategory && !itemHasType(it, pickerTypeCategory)) return false;
+            }
             if (pickerSearch.trim()) {
                 const q = pickerSearch.toLowerCase().trim();
                 return String(it.name ?? '').toLowerCase().includes(q) || String(it.sku ?? '').toLowerCase().includes(q);
             }
             return true;
         });
-    }, [masterItems, pickerCategory, pickerSearch]);
+    }, [masterItems, pickerCategory, pickerTypeCategory, pickerSearch, itemMetalKey, itemHasType]);
 
     const displayItems = (!readOnly && items.length === 0) ? [createEmptyLine()] : items;
 
@@ -1203,22 +1258,63 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
               <div>
                 <select
                   value={pickerCategory}
-                  onChange={(e) => setPickerCategory(e.target.value)}
+                  onChange={(e) => {
+                    setPickerCategory(e.target.value);
+                    setPickerTypeCategoryId('All');
+                  }}
                   className="w-full py-2 px-3 border border-border rounded-xl bg-soft text-text text-xs focus:bg-card focus:outline-none focus:border-primary transition font-medium cursor-pointer"
                 >
                   <option value="All">All Categories</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
+                  {pickerMetals.map((metal) => (
+                    <option key={metal.name} value={metal.name}>{metal.name} ({metal.count})</option>
                   ))}
                 </select>
               </div>
             </div>
 
+            {/* Item types (Sheet, Pipe, Rod…) of the chosen metal */}
+            {pickerMetalTypes.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-semibold text-text-secondary mr-1">{pickerCategory} type:</span>
+                {[
+                  { id: 'All', label: 'All', count: pickerMetals.find((m) => metalKey(m.name) === metalKey(pickerCategory))?.count ?? 0 },
+                  ...pickerMetalTypes,
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setPickerTypeCategoryId(t.id)}
+                    title={t.count === 0 ? `No items assigned to ${pickerCategory} → ${t.label} yet` : undefined}
+                    className={`px-2.5 py-1 rounded-full border font-semibold transition cursor-pointer ${
+                      pickerTypeCategoryId === t.id
+                        ? 'bg-primary text-white border-primary'
+                        : t.count === 0
+                          ? 'bg-soft text-muted border-dashed border-border opacity-60 hover:opacity-100'
+                          : 'bg-soft text-text border-border hover:bg-card-hover'
+                    }`}
+                  >
+                    {t.label} <span className="font-mono opacity-80">({t.count})</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* List of items */}
             <div className="max-h-64 overflow-y-auto border border-border rounded-xl divide-y divide-border bg-card">
               {filteredStockPickerItems.length === 0 ? (
                 <div className="py-8 px-4 text-center text-muted text-xs">
-                  No inventory items match your search.
+                  {pickerCategory !== 'All' && !pickerSearch.trim() ? (
+                    <>
+                      No inventory items are assigned to{' '}
+                      <strong className="text-text">
+                        {pickerCategory}{pickerTypeCategory ? ` → ${categoryTypeLabel(pickerTypeCategory, itemTypes)}` : ''}
+                      </strong>{' '}
+                      yet.
+                      <span className="block mt-1">Set this category on the item in Inventory → Item Master, then reopen the picker.</span>
+                    </>
+                  ) : (
+                    'No inventory items match your search.'
+                  )}
                 </div>
               ) : (
                 filteredStockPickerItems.map((it) => (
@@ -1244,7 +1340,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                       <div className="text-[11px] text-muted flex items-center gap-2 mt-0.5">
                         <span className="font-mono">{it.sku}</span>
                         <span>•</span>
-                        <span>{it.category}</span>
+                        <span>{it.category}{it.itemType ? ` · ${it.itemType}` : ''}</span>
                         <span>•</span>
                         <span>Rate: ₹{type === 'sales' ? it.sellingPrice : it.costPrice}</span>
                       </div>
