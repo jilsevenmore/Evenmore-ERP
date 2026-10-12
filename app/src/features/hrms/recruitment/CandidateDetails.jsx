@@ -26,6 +26,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import OfferLetterModal from "../organization/OfferLetterModal";
+import UserInitials from "../../../components/common/UserInitials";
 
 export default function CandidateDetails() {
   const { id } = useParams();
@@ -145,11 +146,7 @@ export default function CandidateDetails() {
       <div className="bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-2xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
-            <img
-              src={c.avatar}
-              alt={c.name}
-              className="w-16 h-16 rounded-2xl object-cover border border-border shadow-xs shrink-0"
-            />
+            <UserInitials name={c.name} className="w-16 h-16 text-xl" iconSize={28} />
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-xl font-black text-text tracking-tight">{c.name}</h1>

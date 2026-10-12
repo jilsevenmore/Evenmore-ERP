@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   Plus
 } from "lucide-react";
+import UserInitials from "../../../components/common/UserInitials";
 
 export default function Recruitment() {
   const navigate = useNavigate();
@@ -50,11 +51,7 @@ export default function Recruitment() {
       sortable: true,
       render: (val, row) => (
         <div className="flex items-center gap-2.5">
-          <img
-            src={row.avatar}
-            alt=""
-            className="w-7 h-7 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-xs"
-          />
+          <UserInitials name={val} className="w-7 h-7 text-[10px]" iconSize={12} />
           <div>
             <span className="font-semibold text-slate-800 dark:text-slate-100 block text-[13px]">
               {val}

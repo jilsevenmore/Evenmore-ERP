@@ -40,14 +40,25 @@ function isCustomerSession() {
   );
 }
 
-/** name → { hydrate, loaded, promise, failedAt } */
-const modules = new Map();
+/**
+ * name → { hydrate, loaded, promise, failedAt }
+ *
+ * `appStore` and this file import each other, and a store registers itself
+ * (`lazyStore*` → `entry`) while it is being evaluated -- which, depending on
+ * which file the app happens to load first, can be before this file's body has
+ * run. A `const` would still be uninitialised then ("Cannot access 'modules'
+ * before initialization"); a hoisted function is not.
+ */
+function registry() {
+  if (!registry.map) registry.map = new Map();
+  return registry.map;
+}
 
 function entry(name) {
-  let found = modules.get(name);
+  let found = registry().get(name);
   if (!found) {
     found = { hydrate: null, loaded: false, promise: null, failedAt: 0 };
-    modules.set(name, found);
+    registry().set(name, found);
   }
   return found;
 }
@@ -72,7 +83,8 @@ export function ensureModule(name) {
   if (isCustomerSession()) return;
 
   const permissions = useAppStore.getState().permissions || [];
-  if (name === 'pms' && !canOpenPath('/pms', permissions)) return;
+  // Employees without PMS access still load the projects they are assigned to.
+  if (name === 'pms' && !canOpenPath('/pms', permissions) && !canOpenPath('/pms/my-tasks', permissions)) return;
   if (name === 'crm' && !canOpenPath('/crm', permissions) && !canOpenPath('/crm/tasks', permissions)) return;
 
   const mod = entry(name);
@@ -96,7 +108,7 @@ export function ensureModule(name) {
 
 /** True once a read has already asked for this module — the probe can stop. */
 export function isModuleRequested(name) {
-  const mod = modules.get(name);
+  const mod = registry().get(name);
   return Boolean(mod && (mod.loaded || mod.promise || mod.failedAt));
 }
 
@@ -105,7 +117,7 @@ export function isModuleRequested(name) {
  * of a store pulls it again, for whoever is signed in now.
  */
 export function resetLazyModules() {
-  modules.forEach((mod) => {
+  registry().forEach((mod) => {
     mod.loaded = false;
     mod.promise = null;
     mod.failedAt = 0;
@@ -119,7 +131,7 @@ export function resetLazyModules() {
  */
 export function refreshRequestedModules(names) {
   names.forEach((name) => {
-    const mod = modules.get(name);
+    const mod = registry().get(name);
     if (!mod?.hydrate) return;
     mod.loaded = false;
     mod.promise = null;
@@ -130,7 +142,7 @@ export function refreshRequestedModules(names) {
 
 /** The modules that have been read so far, for a session-change refresh. */
 export function requestedModuleNames() {
-  return [...modules.keys()].filter((name) => isModuleRequested(name));
+  return [...registry().keys()].filter((name) => isModuleRequested(name));
 }
 
 /**

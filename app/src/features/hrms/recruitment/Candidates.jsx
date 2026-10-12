@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import OfferLetterModal from "../organization/OfferLetterModal";
 import { CandidatePipeline } from "../../../components/hrms/CandidatePipeline";
+import UserInitials from "../../../components/common/UserInitials";
 
 const CANDIDATES_GUIDE = {
   title: "Candidate Directory & Pipeline",
@@ -227,11 +228,7 @@ export default function Candidates() {
       sortable: true,
       render: (r) => (
         <div className="flex items-center gap-2.5">
-          <img
-            src={r.avatar}
-            alt={r.name}
-            className="w-8 h-8 rounded-full object-cover border border-border shadow-2xs"
-          />
+          <UserInitials name={r.name} className="w-8 h-8 text-xs" />
           <div>
             <div className="font-bold text-text hover:text-primary transition-colors cursor-pointer" onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)}>
               {r.name}

@@ -3,6 +3,7 @@ import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, Trendi
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
+import UserInitials from "../../../components/common/UserInitials";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { hrmsSync } from "../../../services/hrmsSync";
 import {
@@ -323,7 +324,7 @@ export default function Employees() {
                   <tr key={row.id}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <img src={row.img} alt={row.name} className="emp-avatar" loading="lazy" />
+                        <UserInitials name={row.name} className="w-[34px] h-[34px] text-xs" />
                         <div>
                           <span style={{ fontWeight: 600, color: "#111827", display: "inline-block", marginRight: 8 }}>
                             {row.name}
@@ -379,7 +380,7 @@ export default function Employees() {
             {paginatedEmployees.map((row) => (
               <div key={row.id} className="emp-grid-item">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <img src={row.img} alt={row.name} className="emp-avatar-large" />
+                  <UserInitials name={row.name} className="w-[44px] h-[44px] text-sm" iconSize={20} />
                   <button
                     type="button"
                     onClick={() => handleDelete(row.id, row.name)}
@@ -565,11 +566,7 @@ export default function Employees() {
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div className="flex items-center gap-3">
-                <img
-                  src={selectedLifecycleEmp.img}
-                  alt={selectedLifecycleEmp.name}
-                  className="w-10 h-10 rounded-full object-cover border border-slate-200"
-                />
+                <UserInitials name={selectedLifecycleEmp.name} className="w-10 h-10 text-sm" iconSize={18} />
                 <div>
                   <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
                     {selectedLifecycleEmp.name}

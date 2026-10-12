@@ -12,7 +12,7 @@
  */
 
 import { create } from "zustand";
-import { lazyStore } from "../services/lazyModules";
+import { lazyStore, sessionCan } from "../services/lazyModules";
 import { useAppStore } from "./appStore";
 import { canOpenPath } from "../utils/navAccess";
 import * as pmsApi from "../services/pmsSync";
@@ -263,6 +263,19 @@ export function recalcProject(project, now = Date.now(), atRiskThresholdPct = 70
  * Sidebar nav counters, derived purely so components can memoize on the raw
  * slices rather than on a fresh object handed back by a store selector.
  */
+/**
+ * Whether `userId` is on `project` as its PM, a stage assignee or a task
+ * assignee. People added only through the Team tab are not in the project
+ * payload; `/pms/my-projects/` returns those too.
+ */
+export function worksOnProject(project, userId) {
+  if (!userId || !project) return false;
+  if (project.projectManager?.id === userId) return true;
+  return (project.stages || []).some(
+    (s) => s.assignedUser?.id === userId || (s.tasks || []).some((t) => t.assignedUser?.id === userId)
+  );
+}
+
 export function computeNavBadges(projects = [], currentUserId = null) {
   let pmsActiveCount = 0;
   let pmsDelayedCount = 0;
@@ -1589,27 +1602,40 @@ const usePmsStoreBase = create((set, get) => ({
 
     set((st) => ({ status: { ...st.status, loading: true, error: null } }));
     try {
+      // The project list is scoped server-side: someone without PMS access
+      // gets only the projects they are assigned to, and none of the PMS
+      // configuration (the server would answer 403).
+      const pmsReader = sessionCan("view_pms");
       const [projects, stageConfigs, departments, settings, employees] = await Promise.all([
         pmsApi.pullProjects(),
-        pmsSync.pull("stageConfigs"),
-        pmsSync.pull("departments"),
-        pmsApi.pullSettings(),
-        pmsApi.pullEmployees(),
+        pmsReader ? pmsSync.pull("stageConfigs") : null,
+        pmsReader ? pmsSync.pull("departments") : null,
+        pmsReader ? pmsApi.pullSettings() : null,
+        sessionCan(["view_pms", "view_task"]) ? pmsApi.pullEmployees() : null,
       ]);
 
       const nextSettings = settings || get().settings || EMPTY_SETTINGS;
       const threshold = nextSettings.atRiskThresholdPct;
       const now = Date.now();
 
-      set((st) => ({
-        projects: projects ? projects.map((p) => recalcProject(p, now, threshold)) : st.projects,
-        stageConfigs: stageConfigs || st.stageConfigs,
-        departments: departments || st.departments,
-        employees: employees || st.employees,
-        settings: nextSettings,
-        statusColors: nextSettings.statusColors || st.statusColors,
-        status: { loading: false, loaded: true, error: null, lastSyncAt: new Date().toISOString() },
-      }));
+      set((st) => {
+        let nextProjects = st.projects;
+        if (projects) {
+          const mapped = projects.map((p) => recalcProject(p, now, threshold));
+          const mappedIds = new Set(mapped.map((p) => p.id));
+          const localOnly = st.projects.filter((p) => !mappedIds.has(p.id));
+          nextProjects = [...localOnly, ...mapped];
+        }
+        return {
+          projects: nextProjects,
+          stageConfigs: stageConfigs || st.stageConfigs,
+          departments: departments || st.departments,
+          employees: employees || st.employees,
+          settings: nextSettings,
+          statusColors: nextSettings.statusColors || st.statusColors,
+          status: { loading: false, loaded: true, error: null, lastSyncAt: new Date().toISOString() },
+        };
+      });
       return true;
     } catch (err) {
       set((st) => ({ status: { ...st.status, loading: false, error: describeError(err) } }));
@@ -1985,7 +2011,7 @@ const usePmsStoreBase = create((set, get) => ({
 
     const full = (await pmsApi.pullProject(project.id)) || project;
     applyServerProject(full);
-    return full.code || full.id;
+    return full.id || full.code;
   },
 
   updateStagePercentages: async (projectId, stagePercentages) => {
@@ -3005,7 +3031,8 @@ const usePmsStoreBase = create((set, get) => ({
 
   // ── Selectors ──
 
-  getProjectById: (projectId) => get().projects.find((p) => p.id === projectId) ?? null,
+  getProjectById: (projectId) =>
+    get().projects.find((p) => p.id === projectId || p.code === projectId) ?? null,
 
   getStage: (projectId, stageId) => {
     const project = get().projects.find((p) => p.id === projectId);
@@ -3057,10 +3084,10 @@ const usePmsStoreBase = create((set, get) => ({
     return employees.find((e) => e.id === currentUserId) ?? null;
   },
 
-  /** Projects managed by the current user — backs /pms/my-projects. */
+  /** Projects the current user works on — backs /pms/my-projects. */
   getMyProjects: () => {
     const { projects, currentUserId } = get();
-    return projects.filter((p) => p.projectManager?.id === currentUserId);
+    return projects.filter((p) => worksOnProject(p, currentUserId));
   },
 
   /** Unfinished tasks assigned to the current user — backs /pms/my-tasks. */
