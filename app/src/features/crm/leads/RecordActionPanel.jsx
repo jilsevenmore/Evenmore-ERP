@@ -1,7 +1,7 @@
-import { Trash2, UserCheck, X } from "lucide-react";
+import { UserCheck, X, XCircle } from "lucide-react";
 
-// Shown above the leads table while any lead is selected. Delete only asks for
-// confirmation (the parent opens the dialog); nothing is removed from here.
+// Shown above the leads table while any lead is selected. Mark as Lost only
+// asks for confirmation (the parent opens the dialog); leads are not deleted.
 export default function RecordActionPanel({ lead, leads = [], onClose, onDelete, onBulkAssign }) {
   const selectedLeads = leads.length > 0 ? leads : lead ? [lead] : [];
   if (selectedLeads.length === 0) return null;
@@ -34,10 +34,10 @@ export default function RecordActionPanel({ lead, leads = [], onClose, onDelete,
           type="button"
           className="record-action-button delete"
           onClick={handleDelete}
-          aria-label={`Delete ${count} selected ${count === 1 ? "lead" : "leads"}`}
+          aria-label={`Mark ${count} selected ${count === 1 ? "lead" : "leads"} as lost`}
         >
-          <Trash2 size={15} />
-          <span>Delete{count > 1 ? ` (${count})` : ""}</span>
+          <XCircle size={15} />
+          <span>Mark as Lost{count > 1 ? ` (${count})` : ""}</span>
         </button>
         <button type="button" className="record-action-close" onClick={onClose} aria-label="Clear selection" title="Clear selection">
           <X size={17} />

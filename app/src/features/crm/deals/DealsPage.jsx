@@ -43,6 +43,7 @@ import { loadDeals, saveDeals, buildDeal, ownerIdFor, EMPTY_DEAL_FORM, getInitia
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
 import { useAppStore } from '../../../stores/appStore';
+import { sessionCan } from '../../../services/lazyModules';
 import { toISODate } from '../../../utils/dateUtils';
 
 const STAGES = ['Draft', 'Sent', 'Open', 'Won', 'Lost'];
@@ -159,6 +160,11 @@ export default function DealsPage() {
   const [deals, setDeals] = useState([]);
 
   useEffect(() => { setDeals(storeDeals); }, [storeDeals]);
+  // The server moves deals on its own (a new lead's Draft deal, an estimate
+  // sent or accepted, a lead marked lost), so the pipeline re-reads on open.
+  useEffect(() => {
+    useCrmStore.getState().refresh('deals').catch(() => {});
+  }, []);
 
   // Each handler below writes its own change to `/crm/deals/`. There is no
   // "save whatever changed" effect: one on [deals, storeDeals] compared a local
@@ -493,7 +499,21 @@ export default function DealsPage() {
     setDealToDelete(null);
   };
 
-  const handleMoveStage = (dealId, targetStage) => {
+  // A lost deal (and its lead) is reopened by an admin only; the server
+  // refuses anyone else too.
+  const isAdmin = sessionCan('menu_admin');
+
+  const handleMoveStage = (dealId, targetStage, message) => {
+    const current = deals.find((d) => d.id === dealId);
+    if (!current || current.stage === targetStage) {
+      setOpenMenuDealId(null);
+      return;
+    }
+    if (current.stage === 'Lost' && !isAdmin) {
+      setOpenMenuDealId(null);
+      showNotification('Only an admin can reopen a lost deal.');
+      return;
+    }
     setDeals((prev) =>
       prev.map((d) =>
         d.id === dealId
@@ -506,10 +526,15 @@ export default function DealsPage() {
       )
     );
     setOpenMenuDealId(null);
-    useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage }).catch((err) => {
-      console.warn('[CRM Deals] Server stage update error:', err);
-    });
-    showNotification(`Deal moved to ${targetStage}`);
+    useCrmStore.getState().updateRecord('deals', dealId, { stage: targetStage })
+      // The deal's lead follows Won / Lost / reopened on the server.
+      .then(() => { if (current.leadId) return useCrmStore.getState().refresh('leads'); return null; })
+      .catch((err) => {
+        console.warn('[CRM Deals] Server stage update error:', err);
+        setDeals((prev) => prev.map((d) => (d.id === dealId ? current : d)));
+        showNotification(err?.message || 'Could not move the deal.');
+      });
+    showNotification(message || `Deal moved to ${targetStage}`);
   };
 
   const handleCreateErpQuotation = (deal) => {
@@ -1027,6 +1052,23 @@ export default function DealsPage() {
                                     <span>View Deal</span>
                                   </button>
 
+                                  {deal.stage === 'Lost' && isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleMoveStage(deal.id, 'Open', deal.leadId ? 'Lead reopened' : 'Deal reopened')}
+                                      className="w-full px-3.5 py-2 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2.5 cursor-pointer"
+                                    >
+                                      <RotateCcw size={13} className="text-emerald-600" />
+                                      <span>{deal.leadId ? 'Reopen Lead' : 'Reopen Deal'}</span>
+                                    </button>
+                                  )}
+
+                                  {deal.stage === 'Lost' && !isAdmin ? (
+                                    <p className="px-3.5 py-1.5 text-[11px] text-slate-400 border-t border-slate-100 mt-1">
+                                      Only an admin can reopen a lost deal.
+                                    </p>
+                                  ) : (
+                                  <>
                                   <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
                                     Move to
                                   </div>
@@ -1042,6 +1084,8 @@ export default function DealsPage() {
                                       </button>
                                     ))}
                                   </div>
+                                  </>
+                                  )}
 
                                   <div className="px-3.5 py-1 text-[10px] uppercase font-bold text-slate-400 border-t border-slate-100 mt-1">
                                     ERP Conversion

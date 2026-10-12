@@ -10,7 +10,8 @@ import LeadMapView from './LeadMapView';
 import Pagination from '../../../components/ui/Pagination';
 import NotesDrawer from './NotesDrawer';
 import CreateLeadModal from './CreateLeadModal';
-import DeleteLeadModal from './DeleteLeadModal';
+import ConvertLeadModal from './ConvertLeadModal';
+import MarkLostLeadModal from './MarkLostLeadModal';
 import LeadGuideModal from './LeadGuideModal';
 import BulkAssignModal from './components/BulkAssignModal';
 import InfoBanner from '../common/InfoBanner';
@@ -137,9 +138,10 @@ export default function LeadsPage() {
   const crmError = useCrmStore((s) => s.status.error);
   const createLeadRecord = useCrmStore((s) => s.createLead);
   const updateLeadRecord = useCrmStore((s) => s.updateLead);
-  const deleteLeadRecord = useCrmStore((s) => s.deleteLead);
-  const deleteLeadRecords = useCrmStore((s) => s.deleteLeads);
+  const markLeadsLost = useCrmStore((s) => s.markLeadsLost);
   const toggleLeadPin = useCrmStore((s) => s.toggleLeadPin);
+  const convertLeadRecord = useCrmStore((s) => s.convertLead);
+  const [convertTarget, setConvertTarget] = useState(null);
   const showToast = useAppStore((s) => s.showToast);
   const firstStageId = useCrmStore((s) => (
     [...s.stages]
@@ -268,6 +270,22 @@ export default function LeadsPage() {
     const target = lead ?? selectedLead;
     if (!target) return;
     navigate(`/crm/leads/${target.id}`);
+  }
+
+  /** Opens the lead's own Edit Lead Information dialog. */
+  function editLeadDetails(lead) {
+    if (!lead) return;
+    navigate(`/crm/leads/${lead.id}?edit=1`);
+  }
+
+  async function convertLeadToCustomer(lead) {
+    try {
+      const result = await convertLeadRecord(lead.id, { createCustomer: true });
+      setConvertTarget(null);
+      showToast(`${lead.name} converted to customer ${result?.customer?.name || lead.company || lead.name}.`);
+    } catch (err) {
+      showToast(err?.message || 'Could not convert the lead. Please try again.');
+    }
   }
 
   function goToLeads() {
@@ -448,29 +466,19 @@ export default function LeadsPage() {
     setBulkDeleteTargets([]);
   }
 
-  async function deleteLead(id) {
+  // The Leads list no longer deletes: "Mark as Lost" moves the leads to the
+  // Lost stage and their deals to the Deals pipeline's Lost column.
+  async function markLost(leadsToMark, lostReasonId) {
+    const ids = leadsToMark.map((lead) => lead.id);
     try {
-      await deleteLeadRecord(id);
+      await markLeadsLost(ids, lostReasonId);
     } catch (err) {
-      showToast?.(`Lead not deleted — ${describeError(err)}`);
-      return;
-    }
-    setSelected((current) => current.filter((selectedId) => selectedId !== id));
-    closeDeleteLead();
-    showToast?.('Lead deleted.');
-  }
-
-  async function deleteAllLeads(leadsToDelete) {
-    const ids = leadsToDelete.map((lead) => lead.id);
-    try {
-      await deleteLeadRecords(ids);
-    } catch (err) {
-      showToast?.(`Leads not deleted — ${describeError(err)}`);
+      showToast?.(`Not marked as lost — ${describeError(err)}`);
       return;
     }
     setSelected((current) => current.filter((id) => !ids.includes(id)));
     closeDeleteLead();
-    showToast?.(`${ids.length} ${ids.length === 1 ? 'lead' : 'leads'} deleted.`);
+    showToast?.(`${ids.length} ${ids.length === 1 ? 'lead' : 'leads'} marked as lost.`);
   }
 
   async function pinLead(lead) {
@@ -643,6 +651,8 @@ export default function LeadsPage() {
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
+                onEditLead={editLeadDetails}
+                onConvertLead={setConvertTarget}
                 onUpdateLead={updateLead}
               />
               <div className="table-card pager-wrap" style={{ marginTop: 10 }}>
@@ -669,6 +679,8 @@ export default function LeadsPage() {
                 onToggleAll={toggleAll}
                 onAddNote={openNotes}
                 onOpenLead={openLeadDetails}
+                onEditLead={editLeadDetails}
+                onConvertLead={setConvertTarget}
                 onUpdateLead={updateLead}
                 variant="grid"
               />
@@ -710,14 +722,18 @@ export default function LeadsPage() {
 
       <NotesDrawer lead={noteTarget} isOpen={Boolean(noteTarget)} onClose={closeNotes} onCreateTask={openTaskForm} />
       {(deleteTarget || bulkDeleteTargets.length > 0) && (
-        <DeleteLeadModal
+        <MarkLostLeadModal
           lead={deleteTarget}
           leads={bulkDeleteTargets}
           onClose={closeDeleteLead}
-          onConfirm={deleteLead}
-          onConfirmAll={deleteAllLeads}
+          onConfirm={markLost}
         />
       )}
+      <ConvertLeadModal
+        lead={convertTarget}
+        onClose={() => setConvertTarget(null)}
+        onConfirm={convertLeadToCustomer}
+      />
       <CreateLeadModal
         isOpen={isCreateLeadOpen}
         showTour={showLeadTour}

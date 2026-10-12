@@ -20,6 +20,7 @@ import {
   pullTeamRoster,
   pullLeadStats,
   convertLead as convertLeadRequest,
+  markLeadsLost as markLeadsLostRequest,
   setLeadPinned,
   completeTask as completeTaskRequest,
   bulkDeleteLeads,
@@ -231,6 +232,13 @@ const useCrmStoreBase = create((set, get) => ({
       set((s) => ({ leads: s.leads.map((l) => (l.id === id ? { ...l, isPinned: !pinned } : l)) }));
       throw err;
     }
+  },
+
+  /** Leads to Lost (not deleted); the server moves or opens their deals, so both re-read. */
+  markLeadsLost: async (ids, lostReasonId) => {
+    const result = await markLeadsLostRequest(ids, lostReasonId);
+    await Promise.all([get().refresh('leads'), get().refresh('deals')]);
+    return result;
   },
 
   /** The server creates the party and/or deal, so both collections re-read. */

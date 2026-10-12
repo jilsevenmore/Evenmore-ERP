@@ -19,7 +19,6 @@ import {
   FileText,
   ArrowUp,
   ArrowDown,
-  Check,
 } from 'lucide-react';
 
 import MasterTasksGuideModal from './MasterTasksGuideModal';
@@ -76,7 +75,6 @@ const EMPTY_FORM = {
   icon: 'call',
   // Stage ids from CRM System Setup; saving creates the linked stage tasks.
   stages: [],
-  formId: '',
   role: 'Tele Caller Executive',
   department: 'Sales',
   priority: 'Medium',
@@ -89,18 +87,11 @@ export default function MasterTasksPage() {
   // Master task templates live at `/crm/master-tasks/`; the automation that
   // generates a lead's stage tasks reads the same rows.
   const storeTasks = useCrmStore((s) => s.masterTasks);
-  // "Used in Stages" is the configured pipeline, by id -- renaming a stage in
-  // System Setup no longer breaks the link.
   const storeStages = useCrmStore((s) => s.stages);
-  const storeForms = useCrmStore((s) => s.forms);
-  const pipeline = useMemo(
-    () => [...storeStages].sort((a, b) => (Number(a.order ?? a.sequence) || 0) - (Number(b.order ?? b.sequence) || 0)),
-    [storeStages],
-  );
+  // Stage ids resolve to names for the existing rows' "Used in Stages" column.
   const stageNameById = useMemo(() => new Map(storeStages.map((s) => [String(s.id), s.name])), [storeStages]);
   // Older rows may still hold a stage name rather than an id.
   const stageLabel = (value) => stageNameById.get(String(value)) || String(value);
-  const taskForms = useMemo(() => storeForms.filter((f) => f.kind === 'task'), [storeForms]);
   const [tasks, setTasks] = useState([]);
   useEffect(() => { setTasks(storeTasks); }, [storeTasks]);
 
@@ -212,7 +203,6 @@ export default function MasterTasksPage() {
       name: task.name,
       icon: task.icon || 'call',
       stages: [...(task.stages || [])],
-      formId: task.formId || '',
       role: task.role,
       department: task.department,
       priority: task.priority,
@@ -224,21 +214,10 @@ export default function MasterTasksPage() {
     setMenuId(null);
   }
 
-  function toggleStageInForm(stage) {
-    setForm((f) => ({
-      ...f,
-      stages: f.stages.includes(stage) ? f.stages.filter((s) => s !== stage) : [...f.stages, stage],
-    }));
-  }
-
   function submitForm(e) {
     e.preventDefault();
     if (!form.name.trim()) {
       setFormError('Task name is required.');
-      return;
-    }
-    if (form.stages.length === 0) {
-      setFormError('Select at least one stage.');
       return;
     }
     if (editingId) {
@@ -258,7 +237,9 @@ export default function MasterTasksPage() {
     const src = tasks.find((t) => t.id === id);
     if (!src) return;
     const maxOrder = tasks.reduce((m, t) => Math.max(m, t.order || 0), 0);
-    const copy = { ...src, id: `mt-${Date.now()}`, order: maxOrder + 1, name: `${src.name} Copy`, stages: [...src.stages] };
+    // A copy joins the library only: carrying the stages over would have the
+    // server create stage tasks for it, i.e. duplicate tasks on every lead.
+    const copy = { ...src, id: `mt-${Date.now()}`, order: maxOrder + 1, name: `${src.name} Copy`, stages: [], inTaskRoles: false };
     commitTasks((prev) => [...prev, copy]);
     setMenuId(null);
   }
@@ -579,41 +560,6 @@ export default function MasterTasksPage() {
                     );
                   })}
                 </div>
-              </div>
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">Used in Stages <span className="text-rose-500">*</span></label>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {pipeline.map((stage) => {
-                    const s = stage.id;
-                    const checked = form.stages.includes(s);
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => toggleStageInForm(s)}
-                        className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold transition ${checked ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
-                      >
-                        <span className={`w-4 h-4 rounded border grid place-items-center shrink-0 ${checked ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-slate-300 text-transparent'}`}>
-                          <Check size={11} />
-                        </span>
-                        {stage.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div>
-                <label htmlFor="master-task-form" className="block font-semibold text-slate-700 mb-1.5">Task Form</label>
-                <select
-                  id="master-task-form"
-                  value={form.formId || ''}
-                  onChange={(e) => setForm({ ...form, formId: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 text-slate-800"
-                >
-                  <option value="">No form</option>
-                  {taskForms.map((f) => <option key={f.id} value={f.id}>{f.title || f.name}</option>)}
-                </select>
-                <p className="text-[10px] text-slate-400 mt-1">Tasks of this type open this Lead Task Form when worked on a lead.</p>
               </div>
               {formError && <p className="text-[11px] font-semibold text-rose-600">{formError}</p>}
             </div>
