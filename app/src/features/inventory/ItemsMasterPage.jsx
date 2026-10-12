@@ -12,14 +12,15 @@ import { ImportModal } from '../../components/common/ImportModal';
 import { ItemStockDetailModal } from '../../components/common/ItemStockDetailModal';
 
 export const ItemsMasterPage = () => {
-    const { items, categories = [], itemTypes = [], materialGrades = [], itemParts = [], addInventoryItem, vendors, addPurchaseOrder, formatCurrency, calculateItemStock } = useERP();
+    const { items, categories = [], itemTypes = [], materialGrades = [], addInventoryItem, vendors, addPurchaseOrder, formatCurrency, calculateItemStock } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
     
-    // Determine if we are in Machine Master (/items/machines) or Stock (/items/stock) mode
+    // Determine optional sub-route filter (/items/machines or /items/stock) for backward compatibility
     const isMachineView = location.pathname.includes('/machines');
     const isStockView = location.pathname.includes('/stock');
 
+    const [filterKind, setFilterKind] = useState('ALL');
     const [filterItemType, setFilterItemType] = useState('ALL');
     const [filterCategory, setFilterCategory] = useState('ALL');
     const [filterGrade, setFilterGrade] = useState('ALL');
@@ -59,6 +60,21 @@ export const ItemsMasterPage = () => {
         } else if (isStockView) {
             list = list.filter((i) => i.itemKind !== 'Machine');
         }
+
+        if (filterKind !== 'ALL') {
+            if (filterKind === 'Finished') {
+                list = list.filter((i) => i.itemKind === 'Standalone' || i.itemKind === 'Machine' || i.itemKind === 'Finished Product');
+            } else if (filterKind === 'Raw') {
+                list = list.filter((i) => i.itemKind === 'Raw Material');
+            } else if (filterKind === 'Component') {
+                list = list.filter((i) => i.itemKind === 'Part' || i.itemKind === 'Component');
+            } else if (filterKind === 'Consumable') {
+                list = list.filter((i) => i.itemKind === 'Consumable');
+            } else if (filterKind === 'Service') {
+                list = list.filter((i) => i.itemKind === 'Service');
+            }
+        }
+
         if (filterItemType !== 'ALL') {
             list = list.filter((i) => i.itemTypeId === filterItemType || i.itemType === filterItemType);
         }
@@ -79,8 +95,7 @@ export const ItemsMasterPage = () => {
             list = list.filter((i) => (i.lifecycleStatus || 'Active') === filterLifecycle);
         }
         return list;
-    }, [items, isMachineView, isStockView, filterItemType, filterCategory, filterGrade, filterStatus, filterLifecycle, calculateItemStock]);
-
+    }, [items, isMachineView, isStockView, filterKind, filterItemType, filterCategory, filterGrade, filterStatus, filterLifecycle, calculateItemStock]);
 
     const handleImportCsv = (rows) => {
         rows.forEach((r, idx) => {
@@ -88,7 +103,7 @@ export const ItemsMasterPage = () => {
                 sku: r['SKU'] || r['Sku'] || r['Part Number'] || `SKU-IMP-${Date.now().toString().slice(-4)}-${idx + 1}`,
                 name: r['NAME'] || r['Name'] || r['Product Name'] || `Imported Item ${idx + 1}`,
                 category: r['CATEGORY'] || r['Category'] || '',
-                itemKind: isMachineView ? 'Machine' : (r['KIND'] || 'Part'),
+                itemKind: r['KIND'] || 'Standalone',
                 uom: r['UOM'] || r['Unit'] || 'Pcs',
                 unitCost: parseFloat(r['COST'] || r['Cost Price'] || r['costPrice'] || '0') || 0,
                 costPrice: parseFloat(r['COST'] || r['Cost Price'] || r['costPrice'] || '0') || 0,
@@ -154,7 +169,7 @@ export const ItemsMasterPage = () => {
                 <Link to={`/inventory/items/edit/${i.id}`} className="font-mono font-bold text-primary hover:underline">
                   {i.sku}
                 </Link>
-                {!isMachineView && i.itemKind === 'Machine' && (
+                {i.itemKind === 'Machine' && (
                   <span className="inline-flex items-center gap-0.5 text-[10px] font-bold uppercase bg-purple-50 text-purple-700 dark:bg-purple-500/15 dark:text-purple-400 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-500/30">
                     <Cpu size={10} /> Machine
                   </span>
@@ -165,13 +180,8 @@ export const ItemsMasterPage = () => {
         {
             key: 'name',
             header: 'Description & Taxonomy',
-            width: '24%',
-            render: (i) => {
-              const machinePartsCount = i.itemKind === 'Machine'
-                ? itemParts.filter(ip => String(ip.parentItemId || ip.itemId) === String(i.id)).length
-                : 0;
-
-              return (
+            width: '26%',
+            render: (i) => (
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-text hover:text-primary hover:underline">
@@ -219,38 +229,33 @@ export const ItemsMasterPage = () => {
                         </span>
                       </>
                     )}
-
-                    {machinePartsCount > 0 && (
-                      <>
-                        <span>•</span>
-                        <span className="font-bold text-indigo-700 bg-indigo-50 dark:bg-indigo-500/15 dark:text-indigo-400 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-500/30 text-[10px]">
-                          {machinePartsCount} BOM parts
-                        </span>
-                      </>
-                    )}
                   </div>
                 </div>
-              );
-            },
+            ),
         },
-
         {
             key: 'itemKind',
-            header: 'Item Type',
+            header: 'Classification',
             align: 'center',
-            width: '11%',
+            width: '12%',
             render: (i) => {
               const isMach = i.itemKind === 'Machine';
               const isServ = i.itemKind === 'Service';
+              const isRaw = i.itemKind === 'Raw Material';
+              const isComp = i.itemKind === 'Part' || i.itemKind === 'Component';
               return (
                 <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${
                   isMach
                     ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30'
                     : isServ
                     ? 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/30'
+                    : isRaw
+                    ? 'bg-cyan-50 text-cyan-800 border-cyan-200 dark:bg-cyan-500/15 dark:text-cyan-400'
+                    : isComp
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/15 dark:text-blue-400'
                     : 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
                 }`}>
-                  {isMach ? <Cpu size={11} /> : isServ ? <Zap size={11} /> : <Package size={11} />}
+                  {isMach ? <Cpu size={11} /> : isServ ? <Zap size={11} /> : isRaw ? <Layers size={11} /> : <Package size={11} />}
                   {i.itemKind || 'Standard Item'}
                 </span>
               );
@@ -316,7 +321,7 @@ export const ItemsMasterPage = () => {
         },
         {
             key: 'costPrice',
-            header: 'Unit Cost / Selling',
+            header: 'Cost / Selling',
             align: 'right',
             width: '15%',
             render: (i) => {
@@ -335,7 +340,7 @@ export const ItemsMasterPage = () => {
             key: 'status',
             header: 'Health Status',
             align: 'center',
-            width: '10%',
+            width: '9%',
             render: (i) => <StatusBadge status={i.computedStatus || i.status}/>,
         },
         {
@@ -375,257 +380,288 @@ export const ItemsMasterPage = () => {
     const totalCatalogValue = displayItems.reduce((sum, it) => sum + ((it.availableQty ?? it.stock ?? 0) * (it.costPrice ?? it.unitCost ?? 0)), 0);
     const uniqueCategoriesCount = new Set(displayItems.map(i => i.category)).size;
 
-    const pageTitle = isMachineView
-      ? 'Machine Master'
-      : isStockView
-      ? 'Stock Inventory'
-      : 'Items Master Catalog';
-
-    const pageSubtitle = isMachineView
-      ? 'Capital hardware machines, equipment consoles, and assembled systems with configurable BOM parts.'
-      : isStockView
-      ? 'Stock inventory parts, subassemblies, consumables, cables, and raw components.'
-      : 'Complete product catalog, valuation, unit metrics, safety buffers, and bin allocation.';
-
     const guideConfig = {
-      title: pageTitle,
-      subtitle: pageSubtitle,
-      purpose: isMachineView
-        ? 'The Machine Master manages complex equipment units and their underlying required component parts (BOMs). When added to invoices, machine BOMs auto-expand into editable lines.'
-        : 'The Stock Master manages consumable components, spare parts, and standalone items for warehouse fulfillment and machine assembly.',
-      workflow: isMachineView
-        ? ['Create Machine SKU', 'Configure Machine BOM / Required Parts', 'Set Serial Barcodes', 'Add to Quotations/Invoices']
-        : ['Create Stock Part SKU', 'Purchase & Inward Goods', 'Link to Machine BOMs', 'Issue on Sales or Service Orders'],
+      title: 'Item Master Catalog',
+      subtitle: 'Complete inventory product catalog, metal specifications, serial tracking, valuation, and stock buffers.',
+      purpose: 'The Item Master manages catalog inventory items, fabrication raw materials, components, consumables, and finished products.',
+      workflow: [
+        'Create Inventory Item',
+        'Configure Metal Technical Specifications & Theoretical Weight',
+        'Set Units of Measure & Conversion Factors',
+        'Define Reorder Thresholds & Storage Bin',
+        'Issue on Sales & Purchase Workflows',
+      ],
       keyTerms: [
-        { term: isMachineView ? 'Machine BOM' : 'Component SKU', definition: isMachineView ? 'The bill of materials defining required component parts per unit of machine.' : 'An individual stock-keeping unit with live tracked quantity and bin coordinates.' },
-        { term: 'Tracking Mode', definition: 'Quantity-only batch tracking vs. individual serial number tracking.' },
+        { term: 'Item Classification', definition: 'Differentiates Raw Material, Component Part, Finished Good, Consumable, and Service items.' },
+        { term: 'Tracking Mode', definition: 'Quantity-only tracking, Batch/Lot number tracking, or individual Serial number barcodes.' },
+        { term: 'Theoretical Weight', definition: 'Calculated kilograms per unit based on shape dimensions and metal alloy density.' },
       ],
       tips: [
-        'Each machine item can have its own customized Bill of Materials referencing live stock items.',
-        'Invoice modifications never overwrite the machine stored BOM.',
+        'Configuring precise metal dimensions allows live theoretical weight calculation to streamline weight-based receiving.',
+        'Use the Stock Ledger eye icon on any row to audit chronological physical transactions.',
       ],
     };
 
-    const newItemKind = isMachineView ? 'Machine' : 'Part';
-
-    return (<div className="space-y-6">
-      <PageHeader
-        title={pageTitle}
-        subtitle={pageSubtitle}
-        guide={guideConfig}
-        actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-            <Button variant="outline" icon={Upload} onClick={() => setIsImportOpen(true)}>
-              Import CSV
-            </Button>
-            <Button
-              variant="outline"
-              icon={Layers}
-              onClick={() => navigate(isMachineView ? '/inventory/categories/machines' : '/inventory/categories/stock')}
-            >
-              {isMachineView ? 'Machine Categories' : 'Stock Categories'}
-            </Button>
-            <Button
-              icon={Plus}
-              onClick={() => navigate(`/inventory/items/new?kind=${newItemKind}`)}
-            >
-              {isMachineView ? 'Add New Machine' : 'Add New Stock Part'}
-            </Button>
-          </div>
-        }
-      />
-
-      {/* View Segmented Tabs */}
-      <div className="flex flex-nowrap items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit max-w-full lg:max-w-none overflow-x-auto lg:overflow-visible whitespace-nowrap lg:whitespace-normal scrollbar-none text-xs font-semibold">
-        <Link
-          to="/inventory/items"
-          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
-            !isMachineView && !isStockView
-              ? 'bg-white text-blue-600 shadow-2xs font-bold'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Boxes size={15} /> All Items ({items.length})
-        </Link>
-        <Link
-          to="/inventory/items/machines"
-          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
-            isMachineView
-              ? 'bg-white text-blue-600 shadow-2xs font-bold'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Cpu size={15} /> Machine Master ({items.filter((i) => i.itemKind === 'Machine').length})
-        </Link>
-        <Link
-          to="/inventory/items/stock"
-          className={`shrink-0 lg:shrink px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 ${
-            isStockView
-              ? 'bg-white text-blue-600 shadow-2xs font-bold'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Package size={15} /> Stock Parts ({items.filter((i) => i.itemKind !== 'Machine').length})
-        </Link>
-      </div>
-
-      {/* Item Master KPI Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label={isMachineView ? 'Total Machines' : 'Total Stock SKUs'} value={`${displayItems.length} SKUs`} icon={isMachineView ? Cpu : Package} />
-        <StatCard label="Total Asset Valuation" value={formatCurrency(Math.round(totalCatalogValue), { noDecimals: true })} icon={DollarSign} />
-        <StatCard label="Low Stock Alerts" value={`${lowStockItems.length} SKUs`} icon={AlertTriangle} trend={{ positive: lowStockItems.length === 0, text: lowStockItems.length > 0 ? 'Requires Reorder' : 'Healthy Buffers' }} highlight={lowStockItems.length > 0} />
-        <StatCard label="Categories Represented" value={`${uniqueCategoriesCount} Categories`} icon={Layers} subtext="Taxonomic Hierarchy" />
-      </div>
-
-      {/* 1-Click Smart Restock Banner */}
-      {lowStockItems.length > 0 && (<div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-150">
-          <div className="flex items-center gap-2.5 text-amber-900">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0"/>
-            <div>
-              <p className="font-bold">
-                {lowStockItems.length} Items Below Minimum Safety Stock Level
-              </p>
-              <p className="text-[11px] text-amber-700">
-                Automatic replenishment order will calculate required deficit quantities and create draft POs instantly.
-              </p>
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Item Master Catalog"
+          subtitle="Unified product catalog for raw materials, metal profiles, component parts, finished goods, and services."
+          guide={guideConfig}
+          actions={
+            <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+              <Button variant="outline" icon={Upload} onClick={() => setIsImportOpen(true)}>
+                Import CSV
+              </Button>
+              <Button
+                variant="outline"
+                icon={Layers}
+                onClick={() => navigate('/inventory/categories')}
+              >
+                Category Master
+              </Button>
+              <Button
+                icon={Plus}
+                onClick={() => navigate('/inventory/items/new')}
+              >
+                Add New Item
+              </Button>
             </div>
-          </div>
-          <button onClick={handleBulkSmartRestock} className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors shrink-0">
-            <Zap size={14}/> ⚡ Smart Restock All ({lowStockItems.length})
-          </button>
-        </div>)}
+          }
+        />
 
-      {restockSuccess && (<div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-xs text-emerald-800">
-          <span className="flex items-center gap-2 font-semibold">
-            <CheckCircle2 size={16} className="text-emerald-600"/>
-            Restock Purchase Order generated successfully! View in Purchase Orders.
-          </span>
-          <button onClick={() => navigate('/purchase/orders')} className="font-bold underline text-emerald-900 hover:text-emerald-700">
-            View PO →
-          </button>
-        </div>)}
-
-      {/* Taxonomy & Dimension Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3 p-3 bg-card border border-border rounded-xl text-xs">
-        <span className="font-bold text-text-secondary flex items-center gap-1.5">
-          <Layers size={13} className="text-primary" /> Filter Catalog:
-        </span>
-
-        {/* Item Type filter */}
-        <select
-          value={filterItemType}
-          onChange={(e) => setFilterItemType(e.target.value)}
-          className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
-        >
-          <option value="ALL">All Item Types ({itemTypes.length})</option>
-          {itemTypes.map((it) => (
-            <option key={it.id} value={it.id}>
-              {it.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Category filter */}
-        <select
-          value={filterCategory}
-          onChange={(e) => setFilterCategory(e.target.value)}
-          className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
-        >
-          <option value="ALL">All Categories ({categories.length})</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.name}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Material Grade filter */}
-        <select
-          value={filterGrade}
-          onChange={(e) => setFilterGrade(e.target.value)}
-          className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
-        >
-          <option value="ALL">All Material Grades</option>
-          {materialGrades.map((g) => (
-            <option key={g.id} value={g.id}>
-              {g.name} ({g.code})
-            </option>
-          ))}
-        </select>
-
-        {/* Stock Health filter */}
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
-        >
-          <option value="ALL">All Stock Levels</option>
-          <option value="Optimal">Optimal / Healthy</option>
-          <option value="Low Stock">Low Stock</option>
-          <option value="Critical">Critical</option>
-          <option value="Out of Stock">Out of Stock</option>
-        </select>
-
-        {/* Lifecycle filter */}
-        <select
-          value={filterLifecycle}
-          onChange={(e) => setFilterLifecycle(e.target.value)}
-          className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
-        >
-          <option value="ALL">All Status (Active & Inactive)</option>
-          <option value="Active">Active Only</option>
-          <option value="Inactive">Inactive</option>
-        </select>
-
-        {(filterItemType !== 'ALL' || filterCategory !== 'ALL' || filterGrade !== 'ALL' || filterStatus !== 'ALL' || filterLifecycle !== 'ALL') && (
+        {/* View Segmented Tabs by Classification */}
+        <div className="flex flex-nowrap items-center gap-1 p-1 bg-slate-100 rounded-xl border border-slate-200/80 w-fit max-w-full lg:max-w-none overflow-x-auto whitespace-nowrap scrollbar-none text-xs font-semibold">
           <button
             type="button"
-            onClick={() => {
-              setFilterItemType('ALL');
-              setFilterCategory('ALL');
-              setFilterGrade('ALL');
-              setFilterStatus('ALL');
-              setFilterLifecycle('ALL');
-            }}
-            className="text-[11px] text-rose-600 hover:underline font-semibold ml-auto cursor-pointer"
+            onClick={() => setFilterKind('ALL')}
+            className={`shrink-0 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+              filterKind === 'ALL'
+                ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
-            Reset Filters
+            <Boxes size={15} /> All Items ({items.length})
           </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind('Raw')}
+            className={`shrink-0 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+              filterKind === 'Raw'
+                ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Layers size={15} /> Raw Materials ({items.filter((i) => i.itemKind === 'Raw Material').length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind('Component')}
+            className={`shrink-0 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+              filterKind === 'Component'
+                ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Package size={15} /> Component Parts ({items.filter((i) => i.itemKind === 'Part' || i.itemKind === 'Component').length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind('Finished')}
+            className={`shrink-0 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+              filterKind === 'Finished'
+                ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Cpu size={15} /> Finished Goods ({items.filter((i) => i.itemKind === 'Standalone' || i.itemKind === 'Machine' || i.itemKind === 'Finished Product').length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind('Consumable')}
+            className={`shrink-0 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+              filterKind === 'Consumable'
+                ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            🧪 Consumables ({items.filter((i) => i.itemKind === 'Consumable').length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterKind('Service')}
+            className={`shrink-0 px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
+              filterKind === 'Service'
+                ? 'bg-white text-blue-600 shadow-2xs font-bold'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            ⚡ Services ({items.filter((i) => i.itemKind === 'Service').length})
+          </button>
+        </div>
+
+        {/* Item Master KPI Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard label="Total Catalog Items" value={`${displayItems.length} SKUs`} icon={Package} />
+          <StatCard label="Total Asset Valuation" value={formatCurrency(Math.round(totalCatalogValue), { noDecimals: true })} icon={DollarSign} />
+          <StatCard label="Low Stock Alerts" value={`${lowStockItems.length} SKUs`} icon={AlertTriangle} trend={{ positive: lowStockItems.length === 0, text: lowStockItems.length > 0 ? 'Requires Reorder' : 'Healthy Buffers' }} highlight={lowStockItems.length > 0} />
+          <StatCard label="Categories Represented" value={`${uniqueCategoriesCount} Categories`} icon={Layers} subtext="Taxonomic Hierarchy" />
+        </div>
+
+        {/* 1-Click Smart Restock Banner */}
+        {lowStockItems.length > 0 && (
+          <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs animate-in fade-in duration-150">
+            <div className="flex items-center gap-2.5 text-amber-900">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0"/>
+              <div>
+                <p className="font-bold">
+                  {lowStockItems.length} Items Below Minimum Safety Stock Level
+                </p>
+                <p className="text-[11px] text-amber-700">
+                  Automatic replenishment order will calculate required deficit quantities and create draft POs instantly.
+                </p>
+              </div>
+            </div>
+            <button onClick={handleBulkSmartRestock} className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors shrink-0">
+              <Zap size={14}/> ⚡ Smart Restock All ({lowStockItems.length})
+            </button>
+          </div>
         )}
+
+        {restockSuccess && (
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 text-xs text-emerald-800">
+            <span className="flex items-center gap-2 font-semibold">
+              <CheckCircle2 size={16} className="text-emerald-600"/>
+              Restock Purchase Order generated successfully! View in Purchase Orders.
+            </span>
+            <button onClick={() => navigate('/purchase/orders')} className="font-bold underline text-emerald-900 hover:text-emerald-700">
+              View PO →
+            </button>
+          </div>
+        )}
+
+        {/* Taxonomy & Dimension Filter Bar */}
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-card border border-border rounded-xl text-xs">
+          <span className="font-bold text-text-secondary flex items-center gap-1.5">
+            <Layers size={13} className="text-primary" /> Filter Catalog:
+          </span>
+
+          {/* Item Type filter */}
+          <select
+            value={filterItemType}
+            onChange={(e) => setFilterItemType(e.target.value)}
+            className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
+          >
+            <option value="ALL">All Item Types ({itemTypes.length})</option>
+            {itemTypes.map((it) => (
+              <option key={it.id} value={it.id}>
+                {it.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Category filter */}
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
+          >
+            <option value="ALL">All Categories ({categories.length})</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Material Grade filter */}
+          <select
+            value={filterGrade}
+            onChange={(e) => setFilterGrade(e.target.value)}
+            className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
+          >
+            <option value="ALL">All Material Grades</option>
+            {materialGrades.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name} ({g.code})
+              </option>
+            ))}
+          </select>
+
+          {/* Stock Health filter */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
+          >
+            <option value="ALL">All Stock Levels</option>
+            <option value="Optimal">Optimal / Healthy</option>
+            <option value="Low Stock">Low Stock</option>
+            <option value="Critical">Critical</option>
+            <option value="Out of Stock">Out of Stock</option>
+          </select>
+
+          {/* Lifecycle filter */}
+          <select
+            value={filterLifecycle}
+            onChange={(e) => setFilterLifecycle(e.target.value)}
+            className="h-8 border border-border rounded-lg px-2.5 bg-background text-text text-xs focus:outline-none focus:border-primary font-medium"
+          >
+            <option value="ALL">All Status (Active & Inactive)</option>
+            <option value="Active">Active Only</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+
+          {(filterKind !== 'ALL' || filterItemType !== 'ALL' || filterCategory !== 'ALL' || filterGrade !== 'ALL' || filterStatus !== 'ALL' || filterLifecycle !== 'ALL') && (
+            <button
+              type="button"
+              onClick={() => {
+                setFilterKind('ALL');
+                setFilterItemType('ALL');
+                setFilterCategory('ALL');
+                setFilterGrade('ALL');
+                setFilterStatus('ALL');
+                setFilterLifecycle('ALL');
+              }}
+              className="text-[11px] text-rose-600 hover:underline font-semibold ml-auto cursor-pointer"
+            >
+              Reset Filters
+            </button>
+          )}
+        </div>
+
+        <DataTable
+          title="Items Master Inventory Catalog"
+          columns={columns}
+          data={displayItems}
+          keyExtractor={(i) => i.id}
+          searchPlaceholder="Search by SKU, product name, grade, type, or storage rack..."
+          searchFilter={(i, term) =>
+            String(i.sku ?? '').toLowerCase().includes(term) ||
+            String(i.name ?? '').toLowerCase().includes(term) ||
+            (i.category && String(i.category ?? '').toLowerCase().includes(term)) ||
+            (i.location && String(i.location ?? '').toLowerCase().includes(term)) ||
+            (i.itemType && String(i.itemType ?? '').toLowerCase().includes(term)) ||
+            (i.gradeName && String(i.gradeName ?? '').toLowerCase().includes(term)) ||
+            (i.metalGrade && String(i.metalGrade ?? '').toLowerCase().includes(term)) ||
+            (i.specification && String(i.specification ?? '').toLowerCase().includes(term)) ||
+            (i.dimensions && String(i.dimensions ?? '').toLowerCase().includes(term)) ||
+            (i.finishCoating && String(i.finishCoating ?? '').toLowerCase().includes(term))
+          }
+        />
+
+        {/* Barcode Tag Modal */}
+        <BarcodeLabelModal item={selectedBarcodeItem} onClose={() => setSelectedBarcodeItem(null)}/>
+
+        {/* Item Stock Detail & Movement Ledger Modal */}
+        <ItemStockDetailModal
+          item={selectedDetailItem}
+          isOpen={Boolean(selectedDetailItem)}
+          onClose={() => setSelectedDetailItem(null)}
+        />
+
+        {/* CSV Data Import Modal */}
+        <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Inventory Items" templateHeaders={['SKU', 'Name', 'Category', 'UOM', 'Cost Price', 'Selling Price', 'Stock', 'Reorder Level', 'Location']} sampleRow={['SKU-CAT6-100', 'Cat6 Shielded Cable (100m)', 'Network Hardware', 'Roll', 45.0, 79.99, 120, 25, 'Bay B-04']} onImport={handleImportCsv}/>
       </div>
-
-      <DataTable
-        title={isMachineView ? 'Machine Equipment Registry' : 'Stock Inventory & Spare Parts'}
-        columns={columns}
-        data={displayItems}
-        keyExtractor={(i) => i.id}
-        searchPlaceholder="Search by SKU, product name, grade, type, or storage rack..."
-        searchFilter={(i, term) =>
-          String(i.sku ?? '').toLowerCase().includes(term) ||
-          String(i.name ?? '').toLowerCase().includes(term) ||
-          (i.category && String(i.category ?? '').toLowerCase().includes(term)) ||
-          (i.location && String(i.location ?? '').toLowerCase().includes(term)) ||
-          (i.itemType && String(i.itemType ?? '').toLowerCase().includes(term)) ||
-          (i.gradeName && String(i.gradeName ?? '').toLowerCase().includes(term)) ||
-          (i.metalGrade && String(i.metalGrade ?? '').toLowerCase().includes(term)) ||
-          (i.specification && String(i.specification ?? '').toLowerCase().includes(term)) ||
-          (i.dimensions && String(i.dimensions ?? '').toLowerCase().includes(term)) ||
-          (i.finishCoating && String(i.finishCoating ?? '').toLowerCase().includes(term))
-        }
-      />
-
-
-      {/* Barcode Tag Modal */}
-      <BarcodeLabelModal item={selectedBarcodeItem} onClose={() => setSelectedBarcodeItem(null)}/>
-
-      {/* Item Stock Detail & Movement Ledger Modal */}
-      <ItemStockDetailModal
-        item={selectedDetailItem}
-        isOpen={Boolean(selectedDetailItem)}
-        onClose={() => setSelectedDetailItem(null)}
-      />
-
-      {/* CSV Data Import Modal */}
-      <ImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} title="Inventory Items" templateHeaders={['SKU', 'Name', 'Category', 'UOM', 'Cost Price', 'Selling Price', 'Stock', 'Reorder Level', 'Location']} sampleRow={['SKU-CAT6-100', 'Cat6 Shielded Cable (100m)', 'Network Hardware', 'Roll', 45.0, 79.99, 120, 25, 'Bay B-04']} onImport={handleImportCsv}/>
-    </div>);
+    );
 };

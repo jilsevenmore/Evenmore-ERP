@@ -52,13 +52,9 @@ export const AddEditItemPage = () => {
     vendors = [],
     units = [],
     locations = [],
-    categoryParts = [],
     addUnit,
     addInventoryItem,
     updateInventoryItem,
-    itemParts = [],
-    addItemPart,
-    removeItemPart,
     updateCategory
   } = useERP();
 
@@ -161,14 +157,6 @@ export const AddEditItemPage = () => {
   const [showCustomParameters, setShowCustomParameters] = useState(false);
   const [savedAlert, setSavedAlert] = useState(false);
 
-  // Temporary Machine BOM state (configurable before machine save)
-  const [machineBomParts, setMachineBomParts] = useState([]);
-  const [isAddPartModalOpen, setIsAddPartModalOpen] = useState(false);
-  const [partPickerSearch, setPartPickerSearch] = useState('');
-  const [partPickerCategory, setPartPickerCategory] = useState('All');
-  const [selectedPickerItem, setSelectedPickerItem] = useState(null);
-  const [pickerRequiredQty, setPickerRequiredQty] = useState(1);
-
   // Inline Unit Creation Modal
   const [showNewUnitModal, setShowNewUnitModal] = useState(false);
   const [newUnitCode, setNewUnitCode] = useState('');
@@ -222,45 +210,19 @@ export const AddEditItemPage = () => {
     }
   };
 
-  // Helper to get linked default parts template for a given category name or id
-  const getPartsForCategory = (catNameOrId) => {
-    if (!catNameOrId) return [];
-    const targetCat = categories.find(
-      (c) => c.id === catNameOrId || c.name?.toLowerCase() === catNameOrId?.toLowerCase()
-    );
-    if (!targetCat) return [];
-    return categoryParts
-      .filter((cp) => cp.categoryId === targetCat.id || cp.categoryId === targetCat.name)
-      .map((cp) => ({
-        id: `draft-cp-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-        partItemId: cp.partItemId || cp.itemId,
-        requiredQty: cp.requiredQty || cp.defaultQty || 1,
-      }));
-  };
-
   const handleCategoryChange = (newCatName) => {
     setCategory(newCatName);
     const catObj = categories.find((c) => c.name === newCatName || c.id === newCatName);
     if (catObj && catObj.itemTypeId && !itemTypeId) {
       setItemTypeId(catObj.itemTypeId);
     }
-    // Auto-load BOM parts template if editing/creating a Machine
-    if (itemKind === 'Machine') {
-      const catBoms = getPartsForCategory(newCatName);
-      if (catBoms.length > 0) {
-        setMachineBomParts(catBoms);
-      }
+    if (catObj && (catObj.defaultHsnCode || catObj.default_hsn_code) && !hsnCode) {
+      setHsnCode(catObj.defaultHsnCode || catObj.default_hsn_code);
     }
   };
 
   const handleItemKindChange = (newKind) => {
     setItemKind(newKind);
-    if (newKind === 'Machine' && machineBomParts.length === 0) {
-      const catBoms = getPartsForCategory(category);
-      if (catBoms.length > 0) {
-        setMachineBomParts(catBoms);
-      }
-    }
   };
 
   useEffect(() => {
@@ -332,27 +294,12 @@ export const AddEditItemPage = () => {
         setShowCustomParameters(true);
       }
 
-      // Load existing BOM parts for this machine into local state
-      const linkedParts = itemParts.filter((ip) => ip.parentItemId === existingItem.id);
-      if (linkedParts.length > 0) {
-        setMachineBomParts(linkedParts.map((p) => ({
-          id: p.id,
-          partItemId: p.partItemId,
-          requiredQty: p.requiredQty,
-        })));
-      } else if (existingItem.itemKind === 'Machine') {
-        const catBoms = getPartsForCategory(existingItem.category);
-        if (catBoms.length > 0) {
-          setMachineBomParts(catBoms);
-        }
-      }
     }
     else if (!isEditMode) {
       const prefix = queryKind === 'Machine' ? 'MACH' : queryKind === 'Part' ? 'PART' : 'PRD';
       const generatedSku = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
       setSku(generatedSku);
       setBatchPrefix(`SN-${generatedSku}-`);
-      const targetKind = queryKind || itemKind;
       if (queryKind) {
         setItemKind(queryKind);
       }
@@ -366,15 +313,9 @@ export const AddEditItemPage = () => {
       if (locations.length > 0 && !location) {
         setLocation(locations[0].name);
       }
-      if ((targetKind === 'Machine') && defaultCat && machineBomParts.length === 0) {
-        const catBoms = getPartsForCategory(defaultCat);
-        if (catBoms.length > 0) {
-          setMachineBomParts(catBoms);
-        }
-      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, existingItem, categories, vendors, locations, categoryParts, queryKind]);
+  }, [isEditMode, existingItem, categories, vendors, locations, queryKind]);
 
   // Parse and deduplicate serial numbers list
   const parsedSerialNumbers = useMemo(() => {
@@ -562,74 +503,6 @@ export const AddEditItemPage = () => {
     setNewFieldOptions('');
   };
 
-  // Filter available stock items for BOM Item Picker (Strictly non-machine items)
-  const availableStockItemsForPicker = useMemo(() => {
-    return items.filter((it) => {
-      // Machine cannot select another machine as a BOM part
-      if (it.itemKind === 'Machine') return false;
-      if (isEditMode && it.id === existingItem?.id) return false;
-
-      // Category filter
-      if (partPickerCategory !== 'All' && it.category !== partPickerCategory) return false;
-
-      // Search filter
-      if (partPickerSearch.trim()) {
-        const q = partPickerSearch.toLowerCase().trim();
-        const matchName = it.name?.toLowerCase().includes(q);
-        const matchSku = it.sku?.toLowerCase().includes(q);
-        const matchCat = (it.category || '').toLowerCase().includes(q);
-        return matchName || matchSku || matchCat;
-      }
-      return true;
-    });
-  }, [items, isEditMode, existingItem, partPickerCategory, partPickerSearch]);
-
-  // Check if selected picker item is already in BOM
-  const isSelectedAlreadyInBom = useMemo(() => {
-    if (!selectedPickerItem) return false;
-    return machineBomParts.some((p) => p.partItemId === selectedPickerItem.id);
-  }, [selectedPickerItem, machineBomParts]);
-
-  const handleAddPartToBom = (e) => {
-    e.preventDefault();
-    if (!selectedPickerItem) return;
-
-    const qty = Math.max(1, Number(pickerRequiredQty) || 1);
-
-    // Duplicate prevention: if already present, update requiredQty or preserve single row
-    const existingIndex = machineBomParts.findIndex((p) => p.partItemId === selectedPickerItem.id);
-    if (existingIndex >= 0) {
-      setMachineBomParts((prev) =>
-        prev.map((p, idx) => (idx === existingIndex ? { ...p, requiredQty: qty } : p))
-      );
-    } else {
-      setMachineBomParts((prev) => [
-        ...prev,
-        {
-          id: `draft-ip-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
-          partItemId: selectedPickerItem.id,
-          requiredQty: qty,
-        },
-      ]);
-    }
-
-    setIsAddPartModalOpen(false);
-    setSelectedPickerItem(null);
-    setPickerRequiredQty(1);
-    setPartPickerSearch('');
-  };
-
-  const handleRemoveBomPart = (partItemId) => {
-    setMachineBomParts((prev) => prev.filter((p) => p.partItemId !== partItemId));
-  };
-
-  const handleUpdateBomPartQty = (partItemId, newQty) => {
-    const q = Math.max(1, Number(newQty) || 1);
-    setMachineBomParts((prev) =>
-      prev.map((p) => (p.partItemId === partItemId ? { ...p, requiredQty: q } : p))
-    );
-  };
-
   const handleSubmit = (e) => {
     e.preventDefault();
     const isService = itemKind === 'Service';
@@ -722,36 +595,16 @@ export const AddEditItemPage = () => {
       customFieldValues,
     };
 
-    let targetMachineId = id;
-
     if (isEditMode && existingItem) {
       updateInventoryItem(existingItem.id, payload);
-      targetMachineId = existingItem.id;
     }
     else {
-      const created = addInventoryItem(payload);
-      targetMachineId = created.id;
-    }
-
-    // If this is a machine, synchronize machine BOM relationships in ERPContext
-    if (itemKind === 'Machine' && targetMachineId) {
-      // Remove old stored BOM parts for this machine
-      const oldParts = itemParts.filter((ip) => ip.parentItemId === targetMachineId);
-      oldParts.forEach((op) => removeItemPart(op.id));
-
-      // Save current draft parts with the permanent parentItemId
-      machineBomParts.forEach((mbp) => {
-        addItemPart({
-          parentItemId: targetMachineId,
-          partItemId: mbp.partItemId,
-          requiredQty: mbp.requiredQty,
-        });
-      });
+      addInventoryItem(payload);
     }
 
     setSavedAlert(true);
     setTimeout(() => {
-      navigate(itemKind === 'Machine' ? '/items/machines' : '/items/stock');
+      navigate('/inventory/items');
     }, 500);
   };
 
@@ -771,33 +624,29 @@ export const AddEditItemPage = () => {
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
             <Link
-              to={itemKind === 'Machine' ? '/items/machines' : '/items/stock'}
+              to="/inventory/items"
               className="text-blue-600 hover:underline font-semibold"
             >
-              {itemKind === 'Machine' ? 'Machine Master' : 'Stock Inventory'}
+              Item Master
             </Link>
             <ChevronRight size={14} className="text-slate-300" />
             <span className="font-semibold text-slate-700">
-              {isEditMode ? `Edit ${sku}` : `Add New ${itemKind}`}
+              {isEditMode ? `Edit ${sku}` : `Add New Item`}
             </span>
           </div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
-            {itemKind === 'Machine' ? (
-              <Cpu className="w-6 h-6 text-blue-600" />
-            ) : (
-              <Package className="w-6 h-6 text-blue-600" />
-            )}
-            {isEditMode ? `Edit ${itemKind}: ${existingItem?.name || sku}` : `Create New ${itemKind} SKU`}
+            <Package className="w-6 h-6 text-blue-600" />
+            {isEditMode ? `Edit Item: ${existingItem?.name || sku}` : `Create New Inventory Item`}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure catalog item parameters, item kind, required BOM components, serial tracking, and conversion rules.
+            Configure catalog item parameters, metal specifications, serial/batch tracking, units, pricing, and storage coordinates.
           </p>
         </div>
 
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-          <Link to={itemKind === 'Machine' ? '/items/machines' : '/items/stock'}>
+          <Link to="/inventory/items">
             <Button variant="outline" icon={ArrowLeft}>
-              Back to {itemKind === 'Machine' ? 'Machines' : 'Stock'}
+              Back to Item Master
             </Button>
           </Link>
         </div>
@@ -806,7 +655,7 @@ export const AddEditItemPage = () => {
       {savedAlert && (
         <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-4 rounded-xl flex items-center gap-2 text-xs font-semibold animate-pulse shadow-sm">
           <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-          Item, schematic image, and BOM configuration successfully saved! Redirecting...
+          Item specifications and parameters successfully saved! Redirecting...
         </div>
       )}
 
@@ -1018,7 +867,7 @@ export const AddEditItemPage = () => {
                     {availableCategories.length === 0 && <option value="">No matching categories</option>}
                     {availableCategories.map((c) => (
                       <option key={c.id} value={c.name}>
-                        {c.name} {c.hasSubParts ? '(Machine Category)' : ''} {c.itemType ? `[${c.itemType}]` : ''}
+                        {c.name} {c.itemType ? `[${c.itemType}]` : ''}
                       </option>
                     ))}
                   </select>
@@ -2510,136 +2359,7 @@ export const AddEditItemPage = () => {
             </div>
           </div>
 
-          {/* CRITICAL SECTION: REQUIRED PARTS / MACHINE BOM (Visible whenever itemKind === 'Machine') */}
-          {itemKind === 'Machine' && (
-            <div className="bg-blue-50/30 border-2 border-blue-200 rounded-2xl p-4 sm:p-6 space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-blue-200/80">
-                <div>
-                  <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                    <Boxes className="w-5 h-5 text-blue-600" />
-                    Required Parts / Machine BOM
-                  </h3>
-                  <p className="text-xs text-slate-600 mt-0.5 max-w-2xl">
-                    Select required Stock inventory items to configure the bill of materials for ONE unit of this Machine before saving.
-                    When this machine is added to quotes or invoices, these parts will auto-populate as editable line items.
-                  </p>
-                </div>
-                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 shrink-0">
-                  {categoryParts.some((cp) => cp.categoryId === activeCategoryObj?.id || cp.categoryId === activeCategoryObj?.name) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const catBoms = getPartsForCategory(category);
-                        if (catBoms.length > 0) {
-                          setMachineBomParts(catBoms);
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-white hover:bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                      title={`Reload default BOM parts template from category: ${category}`}
-                    >
-                      <RefreshCw size={12} /> Sync Category Template
-                    </button>
-                  )}
-                  <Button
-                    type="button"
-                    variant="primary"
-                    icon={Plus}
-                    size="sm"
-                    onClick={() => {
-                      setSelectedPickerItem(null);
-                      setPickerRequiredQty(1);
-                      setPartPickerSearch('');
-                      setIsAddPartModalOpen(true);
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm shrink-0"
-                  >
-                    Add Stock Part
-                  </Button>
-                </div>
-              </div>
 
-              {machineBomParts.length === 0 ? (
-                <div className="py-10 text-center bg-white rounded-xl border border-dashed border-blue-300">
-                  <Boxes className="w-10 h-10 mx-auto text-blue-300 mb-2" />
-                  <p className="text-xs font-bold text-slate-800">No BOM parts assigned to this machine yet.</p>
-                  <p className="text-[11px] text-slate-500 mt-1 max-w-md mx-auto">
-                    Click <strong className="text-blue-600">&quot;+ Add Stock Part&quot;</strong> above to select existing components from your warehouse stock before registering this Machine.
-                  </p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                  <table className="w-full min-w-[640px] lg:min-w-0 text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80">
-                      <tr>
-                        <th className="p-3">Component / Stock Item</th>
-                        <th className="p-3">Category</th>
-                        <th className="p-3 w-40 text-center">Required Qty (per 1 Machine)</th>
-                        <th className="p-3 w-36 text-center">Live Available Stock</th>
-                        <th className="p-3 w-20 text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {machineBomParts.map((mbp) => {
-                        const stockItem = items.find((i) => i.id === mbp.partItemId);
-                        const available = stockItem?.availableQty ?? stockItem?.stock ?? 0;
-                        const isShortage = available < mbp.requiredQty;
-
-                        return (
-                          <tr key={mbp.id || mbp.partItemId} className="hover:bg-blue-50/30 transition-colors">
-                            <td className="p-3">
-                              <div className="font-bold text-slate-800">
-                                {stockItem?.name || `Item ID #${mbp.partItemId}`}
-                              </div>
-                              <div className="text-[11px] text-slate-400 font-mono">
-                                SKU: {stockItem?.sku || '—'}
-                              </div>
-                            </td>
-                            <td className="p-3 text-slate-600 font-medium">
-                              {stockItem?.category || 'General Stock'}
-                            </td>
-                            <td className="p-3 text-center">
-                              <div className="inline-flex items-center gap-1.5">
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={mbp.requiredQty}
-                                  onChange={(e) => handleUpdateBomPartQty(mbp.partItemId, e.target.value)}
-                                  className="w-20 text-center font-mono font-bold text-xs border border-slate-300 rounded-lg p-1.5 bg-slate-50 focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                                />
-                                <span className="text-[11px] text-slate-500 font-medium">
-                                  {stockItem?.salesUnit || stockItem?.uom || 'Unit'}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="p-3 text-center font-mono">
-                              <span
-                                className={`font-bold px-2.5 py-1 rounded-full text-[11px] border ${isShortage
-                                    ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  }`}
-                              >
-                                {available} {stockItem?.salesUnit || stockItem?.uom || 'Unit'}
-                              </span>
-                            </td>
-                            <td className="p-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveBomPart(mbp.partItemId)}
-                                className="w-7 h-7 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-100 flex items-center justify-center transition cursor-pointer mx-auto shadow-2xs"
-                                title="Remove Part from BOM"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Dynamic Technical Specifications Section (Keep button to select/show, otherwise keep hidden) */}
           {!showCustomParameters ? (
@@ -2794,7 +2514,7 @@ export const AddEditItemPage = () => {
             <Button
               type="button"
               variant="outline"
-              onClick={() => navigate(itemKind === 'Machine' ? '/items/machines' : '/items/stock')}
+              onClick={() => navigate('/inventory/items')}
             >
               Cancel
             </Button>
@@ -2804,161 +2524,6 @@ export const AddEditItemPage = () => {
           </div>
         </form>
       </div>
-
-      {/* Stock Part Picker Modal for Machine BOM */}
-      {isAddPartModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-2xl w-full p-4 sm:p-6 space-y-4 max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-y-auto">
-            <div className="flex items-center justify-between gap-2 lg:gap-0 border-b border-slate-100 pb-3">
-              <div className="min-w-0 lg:min-w-auto">
-                <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
-                  <Boxes className="text-blue-600" size={18} /> Select Stock Part for Machine BOM
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Pick an existing component or standalone stock item from warehouse inventory.
-                </p>
-              </div>
-              <button
-                onClick={() => setIsAddPartModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Filter controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="relative">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search stock part name or SKU..."
-                  value={partPickerSearch}
-                  onChange={(e) => setPartPickerSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl bg-slate-50 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-              <div>
-                <select
-                  value={partPickerCategory}
-                  onChange={(e) => setPartPickerCategory(e.target.value)}
-                  className="w-full py-2 px-3 border border-slate-200 rounded-xl bg-slate-50 text-xs focus:bg-white focus:outline-none"
-                >
-                  <option value="All">All Categories</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.name}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* List of items */}
-            <div className="overflow-y-auto max-h-64 border border-slate-200 rounded-xl divide-y divide-slate-100 text-xs">
-              {availableStockItemsForPicker.length === 0 ? (
-                <div className="p-8 text-center text-slate-400">
-                  <Package className="w-8 h-8 mx-auto text-slate-300 mb-1.5" />
-                  <p className="font-semibold text-slate-600">No matching stock components found.</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">Only non-machine stock inventory can be selected.</p>
-                </div>
-              ) : (
-                availableStockItemsForPicker.map((it) => {
-                  const isSelected = selectedPickerItem?.id === it.id;
-                  const isAlreadyAdded = machineBomParts.some((p) => p.partItemId === it.id);
-
-                  return (
-                    <div
-                      key={it.id}
-                      onClick={() => {
-                        setSelectedPickerItem(it);
-                        const existingPart = machineBomParts.find((p) => p.partItemId === it.id);
-                        if (existingPart) {
-                          setPickerRequiredQty(existingPart.requiredQty);
-                        } else {
-                          setPickerRequiredQty(1);
-                        }
-                      }}
-                      className={`p-3.5 flex items-center justify-between gap-3 lg:gap-0 cursor-pointer transition-colors ${isSelected
-                          ? 'bg-blue-50/80 border-l-4 border-blue-600'
-                          : 'hover:bg-slate-50'
-                        }`}
-                    >
-                      <div className="min-w-0 lg:min-w-auto">
-                        <div className="font-bold text-slate-800 flex flex-wrap lg:flex-nowrap items-center gap-2">
-                          <span>{it.name}</span>
-                          {isAlreadyAdded && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-bold">
-                              In BOM
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-slate-500 flex flex-wrap lg:flex-nowrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-                          <span className="font-mono font-medium">{it.sku}</span>
-                          <span>•</span>
-                          <span>{it.category}</span>
-                          <span>•</span>
-                          <span>Cost: ₹{it.costPrice ?? it.unitCost ?? 0}</span>
-                        </div>
-                      </div>
-                      <div className="text-right font-mono shrink-0 lg:shrink">
-                        <span className="text-xs font-bold text-slate-800">
-                          {it.availableQty ?? it.stock ?? 0} {it.salesUnit || it.uom || 'Unit'}
-                        </span>
-                        <div className="text-[10px] text-slate-400">Available Stock</div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            {/* Already in BOM notice */}
-            {isSelectedAlreadyInBom && (
-              <div className="p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-700 flex items-center gap-2">
-                <Info size={14} className="shrink-0 text-blue-600" />
-                <span>
-                  This stock part is already in the BOM. Modifying quantity below will update the existing BOM row.
-                </span>
-              </div>
-            )}
-
-            {/* Quantity and Submit */}
-            <form onSubmit={handleAddPartToBom} className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 text-xs">
-                <label className="font-semibold text-slate-700">Required Qty per Machine:</label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={pickerRequiredQty}
-                  onChange={(e) => setPickerRequiredQty(e.target.value)}
-                  className="w-20 border border-slate-200 rounded-lg p-1.5 font-mono text-center text-xs font-bold focus:outline-none focus:border-blue-600"
-                />
-                <span className="text-slate-500 font-medium text-xs">
-                  {selectedPickerItem?.salesUnit || selectedPickerItem?.uom || 'Unit'}
-                </span>
-              </div>
-
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setIsAddPartModalOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={!selectedPickerItem}
-                >
-                  {isSelectedAlreadyInBom ? 'Update BOM Part' : 'Add Part to BOM'}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Custom Serial Batch Generator Modal */}
       {showBatchModal && (
