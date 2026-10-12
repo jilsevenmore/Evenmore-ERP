@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useCrmStore } from '../../../stores/crmStore';
 import { useERP } from '../../../context/ERPContext';
 import { CalendarDays, ChevronDown, Clock3, ImagePlus, Plus, X } from "lucide-react";
-import { customLeadFields, isBlankValue, isSupportedCustomField, leadFormLayout, missingRequiredField } from '../../../services/leadFormFields';
+import { activeLeadForm, customLeadFields, isBlankValue, isSupportedCustomField, leadFormLayout, missingRequiredField } from '../../../services/leadFormFields';
 import { PERMANENT_LEAD_FIELD_ID } from '../../../data/crm/leadFormSchema';
 import { CustomLeadFieldInput } from './CustomLeadFieldInput';
 
@@ -161,14 +161,14 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
   const [taskTime, setTaskTime] = useState("");
   // Fields added in the Lead Create Form builder, saved as lead.customValues.
   const storeForms = useCrmStore((s) => s.forms);
-  // storeForms: re-read the fields when a form is saved or arrives.
+  const activeForm = useMemo(() => activeLeadForm(), [storeForms, isOpen]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const customFields = useMemo(() => customLeadFields(), [storeForms]);
+  const customFields = useMemo(() => customLeadFields(activeForm), [activeForm]);
   // Replaced: the standard inputs were hard-coded here in a fixed order with
   // fixed labels. They now follow the builder: order, label, placeholder,
   // required, and whether they appear at all.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const layout = useMemo(() => leadFormLayout(), [storeForms]);
+  const layout = useMemo(() => leadFormLayout(activeForm), [activeForm]);
   const [customValues, setCustomValues] = useState({});
   const photoInputRef = useRef(null);
   const createdOnRef = useRef(null);
@@ -348,6 +348,8 @@ export default function CreateLeadModal({ isOpen, onClose, onCreate, onEditLayou
       leadUsers,
       photoPreview,
       customValues,
+      // The active Lead Create Form this lead is entered with (none: default layout).
+      formId: activeLeadForm()?.id,
     });
   }
 

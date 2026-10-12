@@ -310,6 +310,7 @@ export default function LeadFormBuilder({
   hideHeader = false,
   draftData = null,
   onReturnToForm = null,
+  headerStatus = null,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
@@ -428,6 +429,7 @@ export default function LeadFormBuilder({
               </p>
             </div>
             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5 shrink-0">
+              {headerStatus}
               {onReturnToForm && (
                 <button
                   type="button"

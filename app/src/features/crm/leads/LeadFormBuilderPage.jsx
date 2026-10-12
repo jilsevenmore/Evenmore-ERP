@@ -19,6 +19,8 @@ function splitLayout(sections) {
   return { visible, removed };
 }
 import { useCrmStore } from '../../../stores/crmStore';
+import FormActiveToggle, { FormStatusBadge } from './FormActiveToggle';
+import { sessionCan } from '../../../services/lazyModules';
 import { loadForms, saveForms, findForm, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
 
 export default function LeadFormBuilderPage() {
@@ -40,6 +42,7 @@ export default function LeadFormBuilderPage() {
 
   // The form being edited, from `/crm/forms/`.
   const storeForms = useCrmStore((s) => s.forms);
+  const canToggle = sessionCan('manage_pipeline');
   const currentForm = useMemo(
     () => (formId ? findForm(formId) : null) || loadForms(LEAD_FORM)[0] || null,
     [formId, storeForms],
@@ -227,9 +230,16 @@ export default function LeadFormBuilderPage() {
     const sectionsToSave = leadFormSections.map((section, index) =>
       index === 0 ? { ...section, fields: [...section.fields, ...removedStandardFields] } : section
     );
-    const updated = forms.some((f) => f.id === targetId)
-      ? forms.map((f) => (f.id === targetId ? { ...f, sections: sectionsToSave } : f))
-      : [...forms, { id: targetId, name: 'Lead create form', sections: sectionsToSave }];
+    const updated = forms.some((f) => String(f.id) === String(targetId))
+      ? forms.map((f) => (String(f.id) === String(targetId) ? { ...f, sections: sectionsToSave, isActive: true } : f))
+      : [...forms, { id: targetId || `lead-form-${Date.now()}`, name: currentForm?.name || 'Lead create form', sections: sectionsToSave, isActive: true }];
+    const effectiveId = targetId || updated[updated.length - 1]?.id;
+    if (effectiveId) {
+      setActiveFormId(effectiveId);
+    }
+    const storePrevious = useCrmStore.getState().forms || [];
+    const others = storePrevious.filter((f) => (f.kind || LEAD_FORM) !== LEAD_FORM);
+    useCrmStore.setState({ forms: [...others, ...updated] });
     saveForms(updated, LEAD_FORM);
   }
 
@@ -255,6 +265,16 @@ export default function LeadFormBuilderPage() {
     }, 600);
   }
 
+  /** The form's Active / Inactive status, switched here as on the forms list (same row). */
+  function toggleFormActive() {
+    if (!currentForm) return;
+    const forms = loadForms(LEAD_FORM);
+    saveForms(
+      forms.map((f) => (f.id === currentForm.id ? { ...f, isActive: f.isActive === false } : f)),
+      LEAD_FORM,
+    );
+  }
+
   return (
     <LeadFormBuilder
       sections={leadFormSections}
@@ -277,6 +297,12 @@ export default function LeadFormBuilderPage() {
       formTitle={currentForm?.name}
       draftData={draftData}
       onReturnToForm={handleReturnToForm}
+      headerStatus={currentForm && canToggle ? (
+        <span className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-9 text-xs font-semibold text-slate-600">
+          <FormActiveToggle active={currentForm.isActive !== false} onToggle={toggleFormActive} />
+          <FormStatusBadge active={currentForm.isActive !== false} />
+        </span>
+      ) : null}
     />
   );
 }

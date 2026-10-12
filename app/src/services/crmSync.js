@@ -117,6 +117,9 @@ function leadToApi(lead) {
     longitude: lead.longitude ?? undefined,
     createdOn: isoOut(lead.createdOn),
     customValues: lead.customValues || undefined,
+    // The (active) Lead Create Form the lead was entered with; the server
+    // refuses an inactive one.
+    formId: isServerId(lead.formId) ? lead.formId : undefined,
   });
 }
 
@@ -215,6 +218,8 @@ function taskToApi(task) {
     status: task.status || undefined,
     // Screen-level extras (due time, stage, task-form answers, linked documents).
     extra: task.extra && typeof task.extra === 'object' ? task.extra : undefined,
+    // Task Allocation's status note / reassign reason, kept on the audit line.
+    note: task.note || undefined,
   });
 }
 
@@ -236,7 +241,7 @@ const lookup = (path) => ({
 // the id the builder minted before the server answered is kept as `clientId`
 // so a builder opened on that id still finds the form (crmForms.findForm).
 
-const FORM_COLUMNS = ['id', 'name', 'kind', 'isPublished', 'publishedAt', 'slug', 'schema', 'createdAt', 'updatedAt', '_synced', '_pending'];
+const FORM_COLUMNS = ['id', 'name', 'kind', 'isPublished', 'publishedAt', 'isActive', 'slug', 'schema', 'createdAt', 'updatedAt', '_synced', '_pending'];
 
 function formToApi(form) {
   const design = Object.fromEntries(
@@ -247,6 +252,8 @@ function formToApi(form) {
     name: form.name || form.title || 'Untitled form',
     kind: form.kind || undefined,
     isPublished: form.isPublished ?? undefined,
+    // Lead Create Form's Active / Inactive toggle (a column, not layout).
+    isActive: form.isActive ?? undefined,
     schema: compact({ ...design, clientId }),
   });
 }

@@ -26,6 +26,8 @@ import { runLeadStageAutomation } from '../../../services/leadStageAutomation';
 import { emitCrmEvent, CRM_EVENT_TYPES } from '../../../services/crmEventNotifications';
 import { useERP } from '../../../context/ERPContext';
 import { attachLeadSubResources } from './leadSubResources';
+import { activeLeadForm } from '../../../services/leadFormFields';
+import { setActiveFormId } from '../../../services/crmForms';
 
 const INITIAL_FILTERS = { statuses: [], sources: [], systemDefined: [], search: '' };
 const INITIAL_SORT = { field: '', direction: 'ascending' };
@@ -389,6 +391,7 @@ export default function LeadsPage() {
         jobTitle: data.titleValue || '',
         // Fields from the Lead Create Form builder, keyed by field id.
         customValues: data.customValues && Object.keys(data.customValues).length ? data.customValues : undefined,
+        formId: data.formId || undefined,
         createdOn: data.createdOn || undefined,
         country: 'India',
       });
@@ -411,11 +414,6 @@ export default function LeadsPage() {
         }
       }
 
-      try {
-        runLeadStageAutomation(createdLead, 'New Lead');
-      } catch (err) {
-        console.error('[CRM Automation] Error generating stage tasks for new lead:', err);
-      }
       emitCrmEvent({
         type: CRM_EVENT_TYPES.LEAD_CREATED,
         entityType: 'lead',
@@ -742,7 +740,12 @@ export default function LeadsPage() {
         onEditLayout={(draft) => {
           setIsCreateLeadOpen(false);
           setShowLeadTour(false);
-          navigate('/crm/leads/form-builder', {
+          const active = activeLeadForm();
+          const targetFormId = active?.id;
+          if (targetFormId) {
+            setActiveFormId(targetFormId);
+          }
+          navigate('/crm/leads/form-builder' + (targetFormId ? `?formId=${targetFormId}` : ''), {
             state: { draftData: draft, returnTo: '/crm/leads?openCreate=true' },
           });
         }}

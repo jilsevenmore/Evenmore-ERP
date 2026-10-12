@@ -4,7 +4,6 @@ import Modal from '../../../components/ui/Modal';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  Plus,
   Search,
   RotateCcw,
   Handshake,
@@ -283,17 +282,6 @@ export default function DealsPage() {
     if (dateRange !== 'All Time') count += 1;
     return count;
   }, [dateRange, selectedProduct, selectedSource, selectedStage, selectedUser]);
-
-  const handleOpenCreateModal = (stageName = 'Draft') => {
-    setEditingDeal(null);
-    setFormState({
-      ...EMPTY_DEAL_FORM,
-      stage: stageName,
-      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-    });
-    setFormError('');
-    setIsCreateModalOpen(true);
-  };
 
   const handlePrintDeals = () => {
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
@@ -669,14 +657,6 @@ export default function DealsPage() {
             <Printer size={16} />
             <span>Print</span>
           </button>
-
-          <button
-            onClick={() => handleOpenCreateModal()}
-            className="inline-flex items-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs h-9 px-4 rounded-xl shadow-2xs transition-colors cursor-pointer active:scale-[0.99]"
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            <span>Add Deal</span>
-          </button>
         </div>
       </div>
 
@@ -974,16 +954,6 @@ export default function DealsPage() {
                     {items.length}
                   </span>
                 </div>
-
-                {/* Add Deal Button */}
-                <button
-                  type="button"
-                  onClick={() => handleOpenCreateModal(st)}
-                  className="w-full py-1.5 bg-white hover:bg-slate-50 border border-dashed border-slate-300 hover:border-blue-400 rounded-xl text-xs font-semibold text-blue-600 flex items-center justify-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                >
-                  <Plus size={14} />
-                  <span>Add Deal</span>
-                </button>
 
                 {/* Deal Cards Container */}
                 <div className="space-y-3 min-h-[120px]">

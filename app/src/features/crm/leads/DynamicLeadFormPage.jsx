@@ -187,7 +187,11 @@ export default function DynamicLeadFormPage({
       navigate("/crm/leads");
     }
   });
-  const handleEdit = onEditLayout || (() => navigate("/crm/leads/form-builder", { state: { draftData, returnTo: "/crm/leads/create-form" } }));
+  const handleEdit = onEditLayout || (() => {
+    const active = activeLeadForm();
+    const targetFormId = active?.id;
+    navigate("/crm/leads/form-builder" + (targetFormId ? `?formId=${targetFormId}` : ''), { state: { draftData, returnTo: "/crm/leads/create-form" } });
+  });
 
   // The published lead form, from `/crm/forms/` — the same one the builder saves.
   const storeForms = useCrmStore((s) => s.forms);

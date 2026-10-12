@@ -91,9 +91,17 @@ export function getLeadStageOrder() {
   return order.length > 0 ? order : DEFAULT_STAGE_ORDER;
 }
 
-/** The stage after `currentStage`, or null at the end of the pipeline. */
+/**
+ * The stage after `currentStage`, or null at the end of the pipeline. A Lost
+ * stage is never "next" -- losing a lead is Mark as Lost, not moving on.
+ */
 export function getNextStageName(currentStage) {
-  const order = getLeadStageOrder();
+  const lost = new Set(
+    useCrmStore.getState().stages
+      .filter((stage) => stage.isLost && normalizeStageName(stage.name) !== normalizeStageName(currentStage))
+      .map((stage) => normalizeStageName(stage.name))
+  );
+  const order = getLeadStageOrder().filter((name) => !lost.has(normalizeStageName(name)));
   const normalized = normalizeStageName(currentStage);
   const index = order.findIndex((name) => normalizeStageName(name) === normalized);
   if (index === -1 || index >= order.length - 1) return null;

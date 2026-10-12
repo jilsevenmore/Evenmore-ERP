@@ -123,11 +123,6 @@ export default function DashboardView() {
             console.error('[CRM] Error attaching sub-resources to new lead:', err);
           }
         }
-        try {
-          runLeadStageAutomation(newLead, 'New');
-        } catch (err) {
-          console.error(err);
-        }
       }
     } catch (err) {
       console.error('Error creating lead:', describeError(err));
