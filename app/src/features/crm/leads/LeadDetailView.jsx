@@ -31,8 +31,6 @@ import {
   Check,
   CheckSquare,
   Square,
-  FileText,
-  Truck,
   Receipt,
   Printer,
   Download,
@@ -83,8 +81,6 @@ const DETAIL_TABS = [
   'Files',
   'Tasks',
   'Estimates',
-  'Quotations',
-  'Delivery Challans',
   'Activity',
 ];
 
@@ -95,8 +91,6 @@ const DETAIL_TAB_ICONS = {
   Files: FileStack,
   Tasks: ListChecks,
   Estimates: Receipt,
-  Quotations: FileText,
-  'Delivery Challans': Truck,
   Activity: Sparkles,
 };
 
@@ -1608,425 +1602,6 @@ function quotationMatchesLead(q, lead) {
   return false;
 }
 
-function QuotationsTab({ lead, onActivity }) {
-  const { quotations, customers, updateQuotationStatus, addQuotation } = useERP() || {};
-  const navigate = useNavigate();
-  const linked = useMemo(() => (quotations || []).filter((q) => quotationMatchesLead(q, lead)), [quotations, lead]);
-  const storedProducts = useLeadDetailState(lead).products;
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [formLead, refreshFormLead] = useFormLead(lead);
-  const [validUntil, setValidUntil] = useState('30 Days');
-  const [lineItems, setLineItems] = useState([]);
-
-
-  function openCreateModal() {
-    const nextItems = (storedProducts || []).map((product, index) => ({
-      id: `quote-item-${product.id ?? index}`,
-      description: product.name,
-      qty: 1,
-      rate: Number(String(product.price || '').replace(/[^0-9.]/g, '')) || 0,
-      amount: Number(String(product.price || '').replace(/[^0-9.]/g, '')) || 0,
-    }));
-
-    refreshFormLead();
-    setValidUntil('30 Days');
-    setLineItems(nextItems.length > 0 ? nextItems : [{
-      id: `quote-item-${Date.now()}`,
-      description: '',
-      qty: 1,
-      rate: 0,
-      amount: 0,
-    }]);
-    setIsCreateOpen(true);
-  }
-
-  function handleCreateQuotation(event) {
-    event.preventDefault();
-    const party = partyForLead(formLead, customers);
-    const computedTotal = (lineItems || []).reduce((sum, item) => {
-      const qty = Number(item.qty || 1);
-      const rate = Number(item.rate || 0);
-      const amount = Number(item.amount || (qty * rate));
-      return sum + amount;
-    }, 0);
-
-    const created = addQuotation?.({
-      ...party,
-      leadId: String(lead?.id || ''),
-      leadName: lead?.name || '',
-      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      validUntil: validUntil || '30 Days',
-      amount: computedTotal,
-      status: 'Draft',
-      items: lineItems,
-    });
-
-    setIsCreateOpen(false);
-    setLineItems([]);
-    setValidUntil('30 Days');
-    onActivity?.(`Quotation ${created?.quoteNumber || 'created'} generated for ${lead?.name || party.customer || 'lead'}`, '#3b82f6');
-  }
-
-  function sendQuotation(q) {
-    window.location.assign(`/sales/quotations?quotationId=${encodeURIComponent(q.id)}&send=1`);
-  }
-
-  function quotationTone(status) {
-    if (status === 'Sent') return 'bg-blue-50 text-blue-700 border-blue-200';
-    if (status === 'Confirmed' || status === 'Accepted' || status === 'Converted') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-    return 'bg-slate-100 text-slate-600 border-slate-200';
-  }
-
-  return (
-    <div className="card">
-      <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-        <h3 className="font-bold text-sm">Quotations ({linked.length})</h3>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => navigate('/sales/quotations')} className="btn-outline btn-sm flex items-center gap-1.5">
-            Open in Sales <ArrowRight size={13} />
-          </button>
-          <button type="button" onClick={openCreateModal} className="btn-primary btn-sm flex items-center gap-1.5">
-            <Plus size={13} strokeWidth={2.4} /> New Quotation
-          </button>
-        </div>
-      </div>
-      <div className="table-scroll">
-        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
-          <thead>
-            <tr>
-              <th style={{ width: 36 }}>#</th>
-              <th>Quotation No.</th>
-              <th>Customer</th>
-              <th>Date</th>
-              <th>Valid Until</th>
-              <th style={{ textAlign: 'right' }}>Total</th>
-              <th style={{ textAlign: 'center' }}>Status</th>
-              <th style={{ width: 110, textAlign: 'center' }}>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {linked.map((q, idx) => (
-              <tr key={q.id}>
-                <td className="text-slate-500 font-mono">{idx + 1}</td>
-                <td>
-                  <button type="button" onClick={() => navigate(`/sales/quotations?quotationId=${encodeURIComponent(q.id)}`)} className="font-mono font-bold text-blue-600 hover:underline">
-                    {q.quoteNumber}
-                  </button>
-                </td>
-                <td className="font-semibold">{q.customer}</td>
-                <td className="text-slate-500 text-xs whitespace-nowrap">{q.date}</td>
-                <td className="text-slate-500 text-xs">{q.validUntil}</td>
-                <td style={{ textAlign: 'right' }} className="font-bold font-mono">
-                  ${(q.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${quotationTone(q.status)}`}>
-                    {q.status}
-                  </span>
-                </td>
-                <td>
-                  <div className="flex items-center justify-center gap-1">
-                    <button type="button" onClick={() => navigate(`/sales/quotations?quotationId=${encodeURIComponent(q.id)}`)} className="p-1 rounded text-blue-600 hover:bg-blue-50 transition cursor-pointer" title="Open quotation in Sales">
-                      <Eye size={13} />
-                    </button>
-                    {q.status !== 'Sent' && (
-                      <button type="button" onClick={() => sendQuotation(q)} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[11px] font-bold hover:bg-emerald-100 transition cursor-pointer" title="Send quotation to lead">
-                        <Send size={11} /> Send
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {linked.length === 0 && (
-              <tr>
-                <td colSpan={8} className="empty-row">No quotations for {lead?.name || 'this lead'} yet. Convert an estimate to create one automatically.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4" onClick={() => setIsCreateOpen(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 max-w-3xl w-full p-4 sm:p-6 shadow-2xl text-xs max-h-[90vh] flex flex-col overflow-hidden" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <h3 className="font-bold text-base text-[#1F2E4A]">Create Quotation Estimate</h3>
-              <button type="button" onClick={() => setIsCreateOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer" aria-label="Close quotation dialog">
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleCreateQuotation} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <LeadAccountField lead={formLead} customers={customers} />
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
-                  <input
-                    type="text"
-                    value={validUntil}
-                    onChange={(event) => setValidUntil(event.target.value)}
-                    placeholder="e.g. 30 Days"
-                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="font-semibold text-slate-700 block mb-2">Quotation Line Items</label>
-                <LineItemEditor items={lineItems} onChange={setLineItems} type="sales" />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
-                <button type="button" onClick={() => setIsCreateOpen(false)} className="btn-outline h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer">
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold cursor-pointer">
-                  Generate Quotation
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DeliveryChallansTab({ lead, onCountsChange, onActivity }) {
-  const { deliveryChallans, salesOrders, addDeliveryChallan } = useERP() || {};
-  const navigate = useNavigate();
-  const [showIssueModal, setShowIssueModal] = useState(false);
-  const [selectedSoId, setSelectedSoId] = useState('');
-  const [transporter, setTransporter] = useState('');
-  const [vehicleNo, setVehicleNo] = useState('');
-  const [driverContact, setDriverContact] = useState('');
-  const [totalPackages, setTotalPackages] = useState(1);
-  const [dispatchNote, setDispatchNote] = useState('');
-  const [lineItems, setLineItems] = useState([]);
-
-  const linked = useMemo(() => {
-    const allChallans = deliveryChallans || [];
-    const customerName = String(lead?.company || lead?.name || '').trim().toLowerCase();
-    const leadName = String(lead?.name || '').trim().toLowerCase();
-
-    return allChallans.filter((challan) => {
-      if (challan.leadId && String(challan.leadId) === String(lead?.id)) return true;
-      const customerMatch = challan.customer && (
-        String(challan.customer).trim().toLowerCase().includes(customerName) ||
-        (leadName && String(challan.customer).trim().toLowerCase().includes(leadName)) ||
-        (customerName && String(challan.customer).trim().toLowerCase().includes(customerName))
-      );
-      const orderMatch = (salesOrders || []).some((order) => {
-        const orderMatchesLead = order.customer && (
-          String(order.customer).trim().toLowerCase().includes(customerName) ||
-          (leadName && String(order.customer).trim().toLowerCase().includes(leadName))
-        );
-        return orderMatchesLead && (
-          order.id === challan.salesOrderId ||
-          order.orderNumber === challan.salesOrderNumber ||
-          order.orderNumber === challan.linkedSo
-        );
-      });
-      return customerMatch || orderMatch || !customerName;
-    });
-  }, [deliveryChallans, lead, salesOrders]);
-
-  useEffect(() => {
-    onCountsChange?.({ challans: linked.length });
-  }, [linked.length, onCountsChange]);
-
-  function openIssueModal() {
-    const relatedOrders = (salesOrders || []).filter((order) => {
-      const customerName = String(lead?.company || lead?.name || '').trim().toLowerCase();
-      const customerValue = String(order.customer || '').trim().toLowerCase();
-      return !customerName || customerValue.includes(customerName) || customerName.includes(customerValue);
-    });
-
-    const order = relatedOrders[0] || (salesOrders || [])[0];
-    setSelectedSoId(order?.id || '');
-    setLineItems(order?.items ? order.items.map((item) => ({ ...item })) : []);
-    setShowIssueModal(true);
-  }
-
-  function handleCreate(event) {
-    event.preventDefault();
-    const order = (salesOrders || []).find((entry) => entry.id === selectedSoId) || (salesOrders || [])[0];
-    if (!order) return;
-
-    const created = addDeliveryChallan?.({
-      salesOrderId: order.id,
-      salesOrderNumber: order.orderNumber,
-      linkedSo: order.orderNumber,
-      customerId: order.customerId,
-      customer: order.customer || lead?.company || lead?.name,
-      leadId: String(lead?.id || ''),
-      leadName: lead?.name || '',
-      date: new Date().toISOString().split('T')[0],
-      dispatchDate: new Date().toISOString().split('T')[0],
-      transporter,
-      vehicleNo,
-      status: 'In Transit',
-      items: lineItems.length > 0 ? lineItems : (order.items || []),
-    });
-
-    setShowIssueModal(false);
-    onCountsChange?.({ challans: (linked.length || 0) + 1 });
-    onActivity?.(`Delivery challan ${created?.challanNumber || 'issued'} created for ${lead?.name || order.customer}`, '#f97316');
-  }
-
-  return (
-    <div className="card">
-      <div className="card-header flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-        <h3 className="font-bold text-sm">Delivery Challans ({linked.length})</h3>
-        <div className="flex items-center gap-2">
-          <button type="button" onClick={() => navigate('/sales/delivery')} className="btn-outline btn-sm flex items-center gap-1.5">
-            Open in Sales <ArrowRight size={13} />
-          </button>
-          <button type="button" onClick={openIssueModal} className="btn-primary btn-sm flex items-center gap-1.5">
-            <Plus size={13} strokeWidth={2.4} /> New Challan
-          </button>
-        </div>
-      </div>
-      <div className="table-scroll">
-        <table className="data-table text-xs min-w-[640px] lg:min-w-0">
-          <thead>
-            <tr>
-              <th style={{ width: 36 }}>#</th>
-              <th>Challan No.</th>
-              <th>Linked SO</th>
-              <th>Customer</th>
-              <th>Dispatch Date</th>
-              <th>Carrier</th>
-              <th style={{ textAlign: 'center' }}>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {linked.map((challan, idx) => (
-              <tr key={challan.id}>
-                <td className="text-slate-500 font-mono">{idx + 1}</td>
-                <td><button type="button" onClick={() => navigate('/sales/delivery')} className="font-mono font-bold text-blue-600 hover:underline">{challan.challanNumber}</button></td>
-                <td className="font-mono text-slate-600">{challan.salesOrderNumber || challan.linkedSo}</td>
-                <td className="font-semibold">{challan.customer}</td>
-                <td className="text-slate-500 text-xs whitespace-nowrap">{challan.dispatchDate || challan.date}</td>
-                <td className="text-slate-600">{challan.transporter}</td>
-                <td style={{ textAlign: 'center' }}>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${challan.status === 'Delivered' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : challan.status === 'Pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>
-                    {challan.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-            {linked.length === 0 && (
-              <tr>
-                <td colSpan={7} className="empty-row">No delivery challans for {lead?.name || 'this lead'} yet. Click New Challan to create one.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {showIssueModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setShowIssueModal(false)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-3xl p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 mb-4">
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">Issue Delivery Challan</h4>
-                <p className="text-xs text-slate-500 mt-1">Create a dispatch manifest for {lead?.name || 'this lead'}.</p>
-              </div>
-              <button type="button" className="text-slate-400 hover:text-slate-700 text-lg" onClick={() => setShowIssueModal(false)} aria-label="Close delivery challan dialog">×</button>
-            </div>
-
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="form-label text-xs">Source Sales Order *</label>
-                  <select
-                    value={selectedSoId}
-                    onChange={(event) => {
-                      const nextOrder = (salesOrders || []).find((order) => order.id === event.target.value);
-                      setSelectedSoId(event.target.value);
-                      setLineItems(nextOrder?.items ? nextOrder.items.map((item) => ({ ...item })) : []);
-                    }}
-                    className="form-select text-xs"
-                  >
-                    {(salesOrders || []).map((order) => (
-                      <option key={order.id} value={order.id}>
-                        {order.orderNumber} - {order.customer}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label text-xs">Carrier / Transporter</label>
-                  <input type="text" value={transporter} onChange={(event) => setTransporter(event.target.value)} className="form-input text-xs" />
-                </div>
-                <div>
-                  <label className="form-label text-xs">Vehicle / Truck Plate #</label>
-                  <input type="text" value={vehicleNo} onChange={(event) => setVehicleNo(event.target.value)} className="form-input text-xs" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label text-xs">Driver Contact / Phone</label>
-                  <input type="text" value={driverContact} onChange={(event) => setDriverContact(event.target.value)} className="form-input text-xs" />
-                </div>
-                <div>
-                  <label className="form-label text-xs">Total Packages / Cartons</label>
-                  <input type="number" min="1" value={totalPackages} onChange={(event) => setTotalPackages(Number(event.target.value))} className="form-input text-xs" />
-                </div>
-              </div>
-
-              <div>
-                <label className="form-label text-xs">Handling / Gate Pass Instructions</label>
-                <input type="text" value={dispatchNote} onChange={(event) => setDispatchNote(event.target.value)} className="form-input text-xs" />
-              </div>
-
-              <div className="rounded-lg border border-slate-200 overflow-hidden">
-                <table className="w-full text-left text-[11px]">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-700">
-                      <th className="px-2 py-2 font-bold">SKU</th>
-                      <th className="px-2 py-2 font-bold">Description</th>
-                      <th className="px-2 py-2 font-bold text-right">Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(lineItems || []).map((item, index) => (
-                      <tr key={`${item.id || item.itemId || index}`} className="border-b border-slate-100 last:border-b-0">
-                        <td className="px-2 py-2 font-mono text-slate-600">{item.sku || item.itemSku || 'GEN-SKU'}</td>
-                        <td className="px-2 py-2 text-slate-700">{item.name || item.description}</td>
-                        <td className="px-2 py-2 text-right">
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.qty || 1}
-                            onChange={(event) => {
-                              const next = [...lineItems];
-                              next[index] = { ...next[index], qty: Number(event.target.value) || 1 };
-                              setLineItems(next);
-                            }}
-                            className="w-20 ml-auto rounded border border-slate-200 bg-white px-2 py-1 text-right text-slate-700 focus:outline-none focus:border-blue-500"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowIssueModal(false)} className="btn-ghost btn-sm">Cancel</button>
-                <button type="submit" className="btn-primary btn-sm">Create Challan</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 function ActivityTab({ lead, items }) {
   const entries = items ?? [];
   const allEstimates = useEstimates();
@@ -3014,7 +2589,6 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
     { label: 'Files', value: detailCounts.files, icon: FileStack, color: '#8b5cf6', bg: '#f5f3ff' },
     { label: 'Open Tasks', value: detailCounts.openTasks, icon: ListChecks, color: '#f59e0b', bg: '#fffbeb' },
     { label: 'Estimates', value: detailCounts.estimates, icon: Receipt, color: '#06b6d4', bg: '#ecfeff' },
-    { label: 'Delivery Challans', value: detailCounts.challans, icon: Truck, color: '#f97316', bg: '#fff7ed' },
   ];
 
   const handleConvert = () => {
@@ -3158,7 +2732,7 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {metrics.map((m, index) => (
           <CrmKpiCard key={m.label} label={m.label} value={m.value} icon={m.icon} tone={['rose', 'emerald', 'purple', 'amber', 'teal', 'orange'][index]} />
         ))}
@@ -3193,10 +2767,8 @@ export default function LeadDetailView({ lead, onBackToLeads }) {
       {activeTab === 'Files' && <FilesTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'Tasks' && <LeadTasksTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'Estimates' && <EstimatesTab lead={activeLeadData} onCountsChange={updateDetailCounts} />}
-      {activeTab === 'Quotations' && <QuotationsTab lead={activeLeadData} onActivity={logActivity} />}
-      {activeTab === 'Delivery Challans' && <DeliveryChallansTab lead={activeLeadData} onCountsChange={updateDetailCounts} onActivity={logActivity} />}
       {activeTab === 'Activity' && <ActivityTab lead={activeLeadData} items={activities} />}
-      {!['Sources & Emails', 'General', 'Users & Products', 'Files', 'Tasks', 'Estimates', 'Quotations', 'Delivery Challans', 'Activity'].includes(activeTab) && (
+      {!['Sources & Emails', 'General', 'Users & Products', 'Files', 'Tasks', 'Estimates', 'Activity'].includes(activeTab) && (
         <div className="card p-8 text-center space-y-2">
           <Info size={28} className="text-blue-500 mx-auto" />
           <h4 className="font-bold text-sm text-slate-800 dark:text-slate-200">{activeTab} Details</h4>
