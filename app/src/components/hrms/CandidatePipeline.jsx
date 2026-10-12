@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRecruitmentStore } from "../../stores/recruitmentStore";
 import { useAppStore } from "../../stores/appStore";
 import { Users, GripVertical, ArrowDownToLine, MoveHorizontal } from "lucide-react";
+import UserInitials from "../common/UserInitials";
 
 const STAGE_CONFIG = [
   {
@@ -213,11 +214,7 @@ export function CandidatePipeline({ onSelectCandidate }) {
                           <GripVertical size={14} />
                         </div>
 
-                        <img
-                          src={c.avatar}
-                          alt={c.name}
-                          className="w-7 h-7 rounded-full object-cover border border-border shrink-0"
-                        />
+                        <UserInitials name={c.name} className="w-7 h-7 text-[10px]" iconSize={12} />
 
                         <div className="min-w-0 flex-1">
                           <div className="text-xs font-bold text-text truncate group-hover:text-primary transition-colors leading-tight">

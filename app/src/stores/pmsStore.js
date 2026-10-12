@@ -1618,15 +1618,24 @@ const usePmsStoreBase = create((set, get) => ({
       const threshold = nextSettings.atRiskThresholdPct;
       const now = Date.now();
 
-      set((st) => ({
-        projects: projects ? projects.map((p) => recalcProject(p, now, threshold)) : st.projects,
-        stageConfigs: stageConfigs || st.stageConfigs,
-        departments: departments || st.departments,
-        employees: employees || st.employees,
-        settings: nextSettings,
-        statusColors: nextSettings.statusColors || st.statusColors,
-        status: { loading: false, loaded: true, error: null, lastSyncAt: new Date().toISOString() },
-      }));
+      set((st) => {
+        let nextProjects = st.projects;
+        if (projects) {
+          const mapped = projects.map((p) => recalcProject(p, now, threshold));
+          const mappedIds = new Set(mapped.map((p) => p.id));
+          const localOnly = st.projects.filter((p) => !mappedIds.has(p.id));
+          nextProjects = [...localOnly, ...mapped];
+        }
+        return {
+          projects: nextProjects,
+          stageConfigs: stageConfigs || st.stageConfigs,
+          departments: departments || st.departments,
+          employees: employees || st.employees,
+          settings: nextSettings,
+          statusColors: nextSettings.statusColors || st.statusColors,
+          status: { loading: false, loaded: true, error: null, lastSyncAt: new Date().toISOString() },
+        };
+      });
       return true;
     } catch (err) {
       set((st) => ({ status: { ...st.status, loading: false, error: describeError(err) } }));
@@ -2002,7 +2011,7 @@ const usePmsStoreBase = create((set, get) => ({
 
     const full = (await pmsApi.pullProject(project.id)) || project;
     applyServerProject(full);
-    return full.code || full.id;
+    return full.id || full.code;
   },
 
   updateStagePercentages: async (projectId, stagePercentages) => {
@@ -3022,7 +3031,8 @@ const usePmsStoreBase = create((set, get) => ({
 
   // ── Selectors ──
 
-  getProjectById: (projectId) => get().projects.find((p) => p.id === projectId) ?? null,
+  getProjectById: (projectId) =>
+    get().projects.find((p) => p.id === projectId || p.code === projectId) ?? null,
 
   getStage: (projectId, stageId) => {
     const project = get().projects.find((p) => p.id === projectId);

@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Check
 } from "lucide-react";
+import UserInitials from "../../../components/common/UserInitials";
 
 export default function Onboarding() {
   const {
@@ -195,11 +196,7 @@ export default function Onboarding() {
                 {/* Candidate Summary Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3.5">
-                    <img
-                      src={c.avatar || "https://i.pravatar.cc/100?img=15"}
-                      alt={c.name}
-                      className="w-12 h-12 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-xs"
-                    />
+                    <UserInitials name={c.name} className="w-12 h-12 text-sm" iconSize={20} />
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-slate-900 dark:text-white text-[15px]">

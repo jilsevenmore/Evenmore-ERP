@@ -45,6 +45,7 @@ export default function ProjectDetailPage() {
   const navigate = useNavigate();
 
   const projects = usePmsStore((s) => s.projects);
+  const status = usePmsStore((s) => s.status);
   const stageConfigs = usePmsStore((s) => s.stageConfigs);
   const startStage = usePmsStore((s) => s.startStage);
   const setStageStatus = usePmsStore((s) => s.setStageStatus);
@@ -60,7 +61,10 @@ export default function ProjectDetailPage() {
   const [createTaskStageId, setCreateTaskStageId] = useState(null); // null = closed
   const [handoffStageId, setHandoffStageId] = useState(null);
 
-  const project = useMemo(() => projects.find((p) => p.id === id) ?? null, [projects, id]);
+  const project = useMemo(
+    () => projects.find((p) => p.id === id || p.code === id) ?? null,
+    [projects, id]
+  );
   const meta = useMemo(() => (project ? getProjectRowMeta(project) : null), [project]);
 
   const messenger = useProjectMessenger(project?.id, { open: tab === 'messenger' });
@@ -119,6 +123,13 @@ export default function ProjectDetailPage() {
   }, [project, messenger.totalUnread]);
 
   if (!project) {
+    if (status.loading) {
+      return (
+        <div className="flex items-center justify-center py-24">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+        </div>
+      );
+    }
     return (
       <div className="rounded-xl border border-[#dce5f4] bg-white shadow-2xs">
         <EmptyStatePms

@@ -23,6 +23,7 @@ import {
   Eye,
 } from "lucide-react";
 import { Button } from "../../../components/ui/Button";
+import UserInitials from "../../../components/common/UserInitials";
 
 const RECRUITMENT_GUIDE = {
   title: "Recruitment Operations",
@@ -292,11 +293,7 @@ export default function RecruitmentDashboard() {
                     className="rounded-xl p-4 bg-soft border border-border/80 hover:border-primary/40 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                   >
                     <div className="flex items-start gap-3">
-                      <img
-                        src={it.avatar}
-                        alt={it.candidateName}
-                        className="w-11 h-11 rounded-full object-cover border border-border shrink-0 shadow-2xs"
-                      />
+                      <UserInitials name={it.candidateName} className="w-11 h-11 text-sm" iconSize={18} />
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-xs text-text">{it.candidateName}</h4>
@@ -521,11 +518,7 @@ export default function RecruitmentDashboard() {
                     <tr key={c.id} className="hover:bg-card-hover transition-colors">
                       <td className="py-2.5 px-3">
                         <div className="flex items-center gap-2">
-                          <img
-                            src={c.avatar}
-                            alt={c.name}
-                            className="w-7 h-7 rounded-full object-cover border border-border shadow-2xs"
-                          />
+                          <UserInitials name={c.name} className="w-7 h-7 text-[10px]" iconSize={12} />
                           <div>
                             <div className="font-bold text-text">{c.name}</div>
                             <div className="text-[10px] text-muted">{c.experience}</div>
@@ -581,11 +574,7 @@ export default function RecruitmentDashboard() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <img
-                          src={c.avatar}
-                          alt={c.name}
-                          className="w-8 h-8 rounded-full object-cover border border-border shadow-2xs"
-                        />
+                        <UserInitials name={c.name} className="w-8 h-8 text-xs" />
                         <div>
                           <div className="text-xs font-bold text-text">{c.name}</div>
                           <div className="text-[11px] text-muted">{c.position}</div>
