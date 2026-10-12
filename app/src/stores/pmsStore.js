@@ -23,15 +23,32 @@ import { pmsSync, describeError, isBackendEnabled } from "../services/pmsSync";
  * owns projects, stages, departments and settings (api.md §10); these are the
  * shapes the selectors read while the first request is in flight.
  */
+export const DEFAULT_DELAY_CATEGORIES = [
+  "Material Issue",
+  "Design Issue",
+  "Quality Issue",
+  "Client Approval Pending",
+  "Client Revision",
+  "Resource Unavailable",
+  "Production Issue",
+  "Other",
+];
+
 const EMPTY_SETTINGS = {
   atRiskThresholdPct: 70,
   requireClientApprovalOnDesign: true,
   requireQaCertificate: true,
   notifications: { enabled: true, onDelay: true, onApproval: true, onAssignment: true, onCompletion: true },
   defaultDepartmentCapacity: 20,
-  departmentCapacity: {},
-  statusColors: {},
-  delayCategories: [],
+  departmentCapacity: {
+    Design: 18,
+    Production: 24,
+    Quality: 12,
+    Packaging: 10,
+    Installation: 8,
+  },
+  statusColors: { overdue: "#d03b3b" },
+  delayCategories: DEFAULT_DELAY_CATEGORIES,
 };
 
 // ─── Time Primitives ─────────────────────────────────────────────────
@@ -1614,7 +1631,27 @@ const usePmsStoreBase = create((set, get) => ({
         sessionCan(["view_pms", "view_task"]) ? pmsApi.pullEmployees() : null,
       ]);
 
-      const nextSettings = settings || get().settings || EMPTY_SETTINGS;
+      const base = settings || get().settings || EMPTY_SETTINGS;
+      const nextSettings = {
+        ...EMPTY_SETTINGS,
+        ...base,
+        notifications: {
+          ...EMPTY_SETTINGS.notifications,
+          ...(base.notifications || {}),
+        },
+        departmentCapacity: {
+          ...EMPTY_SETTINGS.departmentCapacity,
+          ...(base.departmentCapacity || {}),
+        },
+        statusColors: {
+          ...EMPTY_SETTINGS.statusColors,
+          ...(base.statusColors || {}),
+        },
+        delayCategories:
+          base.delayCategories && base.delayCategories.length > 0
+            ? base.delayCategories
+            : DEFAULT_DELAY_CATEGORIES,
+      };
       const threshold = nextSettings.atRiskThresholdPct;
       const now = Date.now();
 
@@ -1685,20 +1722,26 @@ const usePmsStoreBase = create((set, get) => ({
 
   // ── Settings ──
 
-  updateSettings: (patch) => {
+  updateSettings: async (patch) => {
+    let nextSettings;
     set((st) => {
-      const settings = { ...st.settings, ...patch };
+      nextSettings = { ...st.settings, ...patch };
       const projects = st.projects.map((p) =>
-        recalcProject(p, Date.now(), settings.atRiskThresholdPct)
+        recalcProject(p, Date.now(), nextSettings.atRiskThresholdPct)
       );
-      return { settings, projects };
+      return {
+        settings: nextSettings,
+        statusColors: nextSettings.statusColors || st.statusColors,
+        projects,
+      };
     });
-    // The thresholds drive the server's own at-risk and overdue maths, so they
-    // have to live there, not in this tab.
-    pmsApi.pushSettings(get().settings).catch((err) => {
+    try {
+      await pmsApi.pushSettings(nextSettings);
+      return { ok: true, settings: nextSettings };
+    } catch (err) {
       console.warn("[PMS] settings not saved:", describeError(err));
-    });
-    return get().settings;
+      return { ok: false, error: describeError(err), settings: nextSettings };
+    }
   },
 
   // ── Department catalogue ──
