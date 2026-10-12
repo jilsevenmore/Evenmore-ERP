@@ -67,7 +67,7 @@ import {
 import { CustomLeadFieldInput } from './CustomLeadFieldInput';
 import { useLeadDetailStore, EMPTY_DETAIL } from '../../../stores/leadDetailStore';
 import { isServerId } from '../../../services/resourceSync';
-import { describeError } from '../../../services/crmSync';
+import { crmSync, describeError } from '../../../services/crmSync';
 import { uploadFileToBackend } from '../../../services/fileUploadService';
 import { LineItemEditor } from '../../../components/common/LineItemEditor';
 import { loadCrmTasks, saveCrmTasks, runLeadStageAutomation, TASK_SOURCE_AUTOMATION } from '../../../services/leadStageAutomation';
@@ -1379,35 +1379,16 @@ function LeadTasksTab({ lead, onCountsChange, onActivity }) {
 }
 
 /**
- * A lead is quoted before it is a customer, so the estimate / quotation forms
- * offer the lead itself as the first "Customer Account". Picking it sends the
- * lead's details as a one-time party; the server links the document to the lead.
+ * The estimate / quotation forms on a lead page are for that lead, so the
+ * Customer Account is not picked: it is the lead, shown read-only. A lead that
+ * was converted keeps its lead link and is billed to its linked customer;
+ * otherwise the lead's own details go on the document as a one-time party.
  */
-const LEAD_ACCOUNT = '__lead__';
-
-function defaultAccountFor(lead, customers) {
-  const converted = lead?.party && (customers || []).find((c) => String(c.id) === String(lead.party));
-  return converted ? converted.id : LEAD_ACCOUNT;
-}
-
-function AccountOptions({ lead, customers }) {
-  return (
-    <>
-      <option value={LEAD_ACCOUNT}>
-        {lead?.name || 'This lead'}{lead?.company ? ` (${lead.company})` : ''} - Lead
-      </option>
-      {(customers || []).map((customer) => (
-        <option key={customer.id} value={customer.id}>
-          {customer.name} ({customer.code}) - Balance: ${Number(customer.balance || 0).toFixed(2)}
-        </option>
-      ))}
-    </>
-  );
-}
-
-function partyForAccount(accountId, lead, customers) {
-  const customer = accountId !== LEAD_ACCOUNT && (customers || []).find((c) => c.id === accountId);
-  if (customer) return { customerId: customer.id, customer: customer.name };
+function partyForLead(lead, customers) {
+  if (lead?.party) {
+    const customer = (customers || []).find((c) => String(c.id) === String(lead.party));
+    return { customerId: lead.party, customer: customer?.name || lead.customerName || lead.name || '' };
+  }
   return {
     customerId: '',
     customer: lead?.name || '',
@@ -1419,6 +1400,36 @@ function partyForAccount(accountId, lead, customers) {
   };
 }
 
+/** The lead a form is for, re-read from the server when the form opens. */
+function useFormLead(lead) {
+  const [formLead, setFormLead] = useState(lead);
+  function refreshFormLead() {
+    setFormLead(lead);
+    if (!lead?.id) return;
+    crmSync.pullOne('leads', lead.id).then((row) => { if (row) setFormLead(row); }).catch(() => {});
+  }
+  return [formLead || lead, refreshFormLead];
+}
+
+function LeadAccountField({ lead, customers }) {
+  const customer = lead?.party
+    ? (customers || []).find((c) => String(c.id) === String(lead.party))?.name || lead.customerName
+    : null;
+  return (
+    <div>
+      <span className="font-semibold text-slate-700 block mb-1">Customer Account *</span>
+      <div className="w-full p-2 border border-slate-300 rounded bg-slate-50 text-slate-800 font-medium" aria-readonly="true">
+        {lead?.name || 'This lead'}{lead?.company ? ` (${lead.company})` : ''} - Lead
+      </div>
+      {customer && (
+        <p className="text-[11px] text-slate-500 mt-1">
+          Linked customer: <span className="font-semibold text-slate-700">{customer}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 function EstimatesTab({ lead, onCountsChange }) {
   const all = useEstimates();
   const { customers } = useERP() || {};
@@ -1426,7 +1437,7 @@ function EstimatesTab({ lead, onCountsChange }) {
   const linked = useMemo(() => all.filter((e) => estimateMatchesLead(e, lead)), [all, lead]);
   const storedProducts = useLeadDetailState(lead).products;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [formLead, refreshFormLead] = useFormLead(lead);
   const [validUntil, setValidUntil] = useState('15 Days');
   const [lineItems, setLineItems] = useState([]);
 
@@ -1435,7 +1446,7 @@ function EstimatesTab({ lead, onCountsChange }) {
   }, [linked.length, onCountsChange]);
 
   function openCreateModal() {
-    setSelectedCustomerId(defaultAccountFor(lead, customers));
+    refreshFormLead();
     setValidUntil('15 Days');
     setLineItems((storedProducts || []).map((p, index) => ({
       id: `li-${Date.now()}-${index}`,
@@ -1449,7 +1460,7 @@ function EstimatesTab({ lead, onCountsChange }) {
 
   function handleCreateEstimate(event) {
     event.preventDefault();
-    const party = partyForAccount(selectedCustomerId, lead, customers);
+    const party = partyForLead(formLead, customers);
     const total = (lineItems || []).reduce((sum, item) => sum + ((item.amount) || (Number(item.qty || 1) * Number(item.rate || 0))), 0);
     const created = {
       id: `est-${Date.now()}`,
@@ -1551,17 +1562,7 @@ function EstimatesTab({ lead, onCountsChange }) {
             </div>
             <form onSubmit={handleCreateEstimate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
-                  <select
-                    required
-                    value={selectedCustomerId}
-                    onChange={(event) => setSelectedCustomerId(event.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium"
-                  >
-                    <AccountOptions lead={lead} customers={customers} />
-                  </select>
-                </div>
+                <LeadAccountField lead={formLead} customers={customers} />
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
                   <input
@@ -1613,7 +1614,7 @@ function QuotationsTab({ lead, onActivity }) {
   const linked = useMemo(() => (quotations || []).filter((q) => quotationMatchesLead(q, lead)), [quotations, lead]);
   const storedProducts = useLeadDetailState(lead).products;
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedCustomerId, setSelectedCustomerId] = useState(LEAD_ACCOUNT);
+  const [formLead, refreshFormLead] = useFormLead(lead);
   const [validUntil, setValidUntil] = useState('30 Days');
   const [lineItems, setLineItems] = useState([]);
 
@@ -1627,7 +1628,7 @@ function QuotationsTab({ lead, onActivity }) {
       amount: Number(String(product.price || '').replace(/[^0-9.]/g, '')) || 0,
     }));
 
-    setSelectedCustomerId(defaultAccountFor(lead, customers));
+    refreshFormLead();
     setValidUntil('30 Days');
     setLineItems(nextItems.length > 0 ? nextItems : [{
       id: `quote-item-${Date.now()}`,
@@ -1641,7 +1642,7 @@ function QuotationsTab({ lead, onActivity }) {
 
   function handleCreateQuotation(event) {
     event.preventDefault();
-    const party = partyForAccount(selectedCustomerId, lead, customers);
+    const party = partyForLead(formLead, customers);
     const computedTotal = (lineItems || []).reduce((sum, item) => {
       const qty = Number(item.qty || 1);
       const rate = Number(item.rate || 0);
@@ -1757,17 +1758,7 @@ function QuotationsTab({ lead, onActivity }) {
             </div>
             <form onSubmit={handleCreateQuotation} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Customer Account *</label>
-                  <select
-                    required
-                    value={selectedCustomerId}
-                    onChange={(event) => setSelectedCustomerId(event.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-medium"
-                  >
-                    <AccountOptions lead={lead} customers={customers} />
-                  </select>
-                </div>
+                <LeadAccountField lead={formLead} customers={customers} />
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
                   <input

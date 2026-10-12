@@ -30,7 +30,6 @@ const TaskAllocationDetailPage = lazy(() => import('../features/crm/tasks/alloca
 const MasterTasksPage = lazy(() => import('../features/crm/tasks/MasterTasksPage'));
 const StageTasksPage = lazy(() => import('../features/crm/tasks/StageTasksPage'));
 const CRMDashboard = lazy(() => import('../features/crm/dashboard/CRMDashboard'));
-const ProjectsPage = lazy(() => import('../features/crm/projects/ProjectsPage'));
 const ContractsPage = lazy(() => import('../features/crm/contracts/ContractsPage'));
 const ContractDetailPage = lazy(() => import('../features/crm/contracts/ContractDetailPage'));
 const ProjectDetailPage = lazy(() => import('../features/crm/projects/ProjectDetailPage'));
@@ -322,7 +321,6 @@ const router = createBrowserRouter([
       { path: 'crm/tasks/allocation', element: <Page component={TaskAllocationPage} /> },
       { path: 'crm/tasks/allocation/:id', element: <Page component={TaskAllocationDetailPage} /> },
       // { path: 'crm/stage-tasks', element: <Page component={StageTasksPage} /> }, // Hidden: duplicate of crm/leads/stage-tasks
-      { path: 'crm/projects', element: <Page component={ProjectsPage} /> },
       { path: 'crm/contracts', element: <Page component={ContractsPage} /> },
       { path: 'crm/contracts/:id', element: <Page component={ContractDetailPage} /> },
       { path: 'crm/projects/:id', element: <Page component={ProjectDetailPage} /> },

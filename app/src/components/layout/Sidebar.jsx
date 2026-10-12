@@ -140,7 +140,6 @@ const NAV = [
       },
       // { label: 'User Tracking', icon: Users, to: '/crm/user-allocation' }, // Hidden: User Tracking & field GPS map out of scope
       { label: 'Deals', icon: TrendingUp, to: '/crm/deals' },
-      { label: 'Projects', icon: Briefcase, to: '/crm/projects' },
       { label: 'Contracts', icon: FileText, to: '/crm/contracts' },
       { label: 'CRM System Setup', icon: Settings, to: '/crm/system-setup' },
     ],

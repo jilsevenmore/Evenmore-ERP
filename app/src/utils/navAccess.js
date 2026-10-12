@@ -26,6 +26,8 @@ const ROUTE_PERMISSIONS = [
   ['/crm/tasks', null],
   ['/crm/leads/tasks-master', 'view_task'],
   ['/crm/leads/stage-tasks', 'view_task'],
+  // CRM's Projects list was removed; this still guards /crm/projects/:id, the
+  // project a deal or contract links to.
   ['/crm/projects', 'view_projects'],
   ['/crm', 'view_lead'],
   ['/pms', 'view_pms'],
