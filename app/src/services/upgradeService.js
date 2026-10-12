@@ -135,6 +135,14 @@ export async function logReworkScrap(orderId, data) {
 }
 export const logScrapFromRework = logReworkScrap;
 
+/** Move a rework order along: Pending -> In Rework -> Completed (restored to stock). */
+export async function updateReworkOrder(orderId, data) {
+  return apiClient(`/inventory/rework-orders/${orderId}/`, {
+    method: 'PATCH',
+    data,
+  });
+}
+
 export async function fetchScrapLogs(params = {}) {
   return apiClient('/inventory/scrap-logs/', { query: params });
 }

@@ -24,8 +24,33 @@ import {
   createReworkOrder, 
   logScrapFromRework, 
   fetchScrapLogs, 
-  createScrapLog 
+  createScrapLog,
+  updateReworkOrder,
 } from '../../services/upgradeService';
+import { rowsOf, isServerId } from '../../services/resourceSync';
+
+// The backend's rework statuses: Pending and In Rework / Re-inspected are open.
+const OPEN_REWORK = ['Pending', 'In Rework', 'Re-inspected'];
+
+/** API rows in the shape this page renders. */
+const listOf = (res) => rowsOf(Array.isArray(res?.data) ? res.data : res);
+const toReworkRow = (r) => ({
+  ...r,
+  order_number: r.reworkNumber,
+  item_name: r.itemName || '',
+  initial_qty: Number(r.quantity) || 0,
+  labor_cost: Number(r.laborCost) || 0,
+  material_cost: Number(r.materialCost) || 0,
+});
+const toScrapRow = (s) => ({
+  ...s,
+  log_number: s.scrapNumber,
+  item_name: s.itemName || '',
+  quantity: Number(s.quantity) || 0,
+  weight_kg: s.weightKg != null ? Number(s.weightKg) : null,
+  estimated_salvage_value: Number(s.salvageValue) || 0,
+  created_at: s.loggedAt,
+});
 
 const reworkGuide = {
   title: 'Rework Loop & Scrap Tracking',
@@ -57,7 +82,9 @@ export const ReworkDashboard = () => {
   const [selectedRework, setSelectedRework] = useState(null);
 
   // Form states
+  const stockItems = (masterItems || []).filter((it) => isServerId(it.id) && it.itemKind !== 'Service');
   const [reworkForm, setReworkForm] = useState({
+    itemId: '',
     item_name: '',
     defect_reason: '',
     initial_qty: '1',
@@ -68,6 +95,7 @@ export const ReworkDashboard = () => {
   });
 
   const [scrapForm, setScrapForm] = useState({
+    itemId: '',
     item_name: '',
     quantity: '1',
     weight_kg: '',
@@ -80,18 +108,10 @@ export const ReworkDashboard = () => {
     setLoading(true);
     try {
       const reworkRes = await fetchReworkOrders().catch(() => null);
-      if (reworkRes?.data && Array.isArray(reworkRes.data)) {
-        setReworkOrders(reworkRes.data);
-      } else if (Array.isArray(reworkRes)) {
-        setReworkOrders(reworkRes);
-      }
+      setReworkOrders(listOf(reworkRes).map(toReworkRow));
 
       const scrapRes = await fetchScrapLogs().catch(() => null);
-      if (scrapRes?.data && Array.isArray(scrapRes.data)) {
-        setScrapLogs(scrapRes.data);
-      } else if (Array.isArray(scrapRes)) {
-        setScrapLogs(scrapRes);
-      }
+      setScrapLogs(listOf(scrapRes).map(toScrapRow));
     } catch (err) {
       console.error('Failed to load rework/scrap data:', err);
     } finally {
@@ -107,17 +127,18 @@ export const ReworkDashboard = () => {
     e.preventDefault();
     try {
       await createReworkOrder({
-        item_name: reworkForm.item_name,
-        defect_reason: reworkForm.defect_reason,
-        initial_qty: parseInt(reworkForm.initial_qty, 10) || 1,
-        labor_cost: parseFloat(reworkForm.labor_cost) || 0,
-        material_cost: parseFloat(reworkForm.material_cost) || 0,
-        assigned_technician: reworkForm.assigned_technician,
-        notes: reworkForm.notes,
-        status: 'Open',
+        itemId: reworkForm.itemId,
+        defectReason: reworkForm.defect_reason,
+        quantity: parseInt(reworkForm.initial_qty, 10) || 1,
+        laborCost: parseFloat(reworkForm.labor_cost) || 0,
+        materialCost: parseFloat(reworkForm.material_cost) || 0,
+        assignedTechnician: reworkForm.assigned_technician || undefined,
+        notes: reworkForm.notes || undefined,
+        status: 'Pending',
       });
       setShowReworkModal(false);
       setReworkForm({
+        itemId: '',
         item_name: '',
         defect_reason: '',
         initial_qty: '1',
@@ -139,23 +160,22 @@ export const ReworkDashboard = () => {
         await logScrapFromRework(selectedRework.id, {
           scrap_qty: parseInt(scrapForm.quantity, 10) || 1,
           weight_kg: parseFloat(scrapForm.weight_kg) || 0,
-          scrap_reason: scrapForm.scrap_reason,
+          reason: scrapForm.scrap_reason,
           salvage_value: parseFloat(scrapForm.estimated_salvage_value) || 0,
-          notes: scrapForm.notes,
         });
       } else {
         await createScrapLog({
-          item_name: scrapForm.item_name,
+          itemId: scrapForm.itemId,
           quantity: parseInt(scrapForm.quantity, 10) || 1,
-          weight_kg: parseFloat(scrapForm.weight_kg) || 0,
-          scrap_reason: scrapForm.scrap_reason,
-          estimated_salvage_value: parseFloat(scrapForm.estimated_salvage_value) || 0,
-          notes: scrapForm.notes,
+          weightKg: parseFloat(scrapForm.weight_kg) || undefined,
+          scrapReason: scrapForm.scrap_reason,
+          salvageValue: parseFloat(scrapForm.estimated_salvage_value) || 0,
         });
       }
       setShowScrapModal(false);
       setSelectedRework(null);
       setScrapForm({
+        itemId: '',
         item_name: '',
         quantity: '1',
         weight_kg: '',
@@ -169,8 +189,18 @@ export const ReworkDashboard = () => {
     }
   };
 
+  // Start a rework job, or close it as restored (the item is good stock again).
+  const handleReworkStatus = async (order, status) => {
+    try {
+      await updateReworkOrder(order.id, { status });
+      loadData();
+    } catch (err) {
+      alert('Failed to update rework order: ' + (err.message || 'Unknown error'));
+    }
+  };
+
   // KPIs
-  const activeReworkCount = reworkOrders.filter(r => r.status === 'Open' || r.status === 'In Progress').length;
+  const activeReworkCount = reworkOrders.filter(r => OPEN_REWORK.includes(r.status)).length;
   const totalReworkCost = reworkOrders.reduce(
     (sum, r) => sum + (Number(r.labor_cost) || 0) + (Number(r.material_cost) || 0),
     0
@@ -233,7 +263,7 @@ export const ReworkDashboard = () => {
       header: 'Status',
       accessor: 'status',
       align: 'center',
-      render: (r) => <StatusBadge status={r.status || 'In Progress'} />,
+      render: (r) => <StatusBadge status={r.status || 'Pending'} />,
     },
     {
       header: 'Actions',
@@ -244,10 +274,28 @@ export const ReworkDashboard = () => {
         }
         return (
           <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            {r.status === 'Pending' ? (
+              <button
+                onClick={() => handleReworkStatus(r, 'In Rework')}
+                className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition"
+                title="Start the repair on the shop floor"
+              >
+                <Wrench size={12} /> Start Rework
+              </button>
+            ) : (
+              <button
+                onClick={() => handleReworkStatus(r, 'Completed')}
+                className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-semibold inline-flex items-center gap-1 transition"
+                title="Repair passed: the item is good stock again"
+              >
+                <RotateCcw size={12} /> Mark Restored
+              </button>
+            )}
             <button
               onClick={() => {
                 setSelectedRework(r);
                 setScrapForm({
+                  itemId: r.itemId,
                   item_name: r.item_name,
                   quantity: String(r.initial_qty || 1),
                   weight_kg: '',
@@ -338,6 +386,7 @@ export const ReworkDashboard = () => {
               onClick={() => {
                 setSelectedRework(null);
                 setScrapForm({
+                  itemId: '',
                   item_name: '',
                   quantity: '1',
                   weight_kg: '',
@@ -452,14 +501,17 @@ export const ReworkDashboard = () => {
             <form onSubmit={handleCreateReworkSubmit} className="space-y-3.5 mt-4">
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Component / Machine *</label>
-                <input
-                  type="text"
+                <select
                   required
-                  placeholder="e.g. Spindle Housing / Control Board"
-                  value={reworkForm.item_name}
-                  onChange={(e) => setReworkForm({ ...reworkForm, item_name: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
-                />
+                  value={reworkForm.itemId}
+                  onChange={(e) => setReworkForm({ ...reworkForm, itemId: e.target.value })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                >
+                  <option value="">Select item from Item Master...</option>
+                  {stockItems.map((it) => (
+                    <option key={it.id} value={it.id}>[{it.sku}] {it.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -575,14 +627,23 @@ export const ReworkDashboard = () => {
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Scrapped Material / Item *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Defective Cast Iron Gear Housing"
-                  value={scrapForm.item_name}
-                  onChange={(e) => setScrapForm({ ...scrapForm, item_name: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
-                />
+                {selectedRework ? (
+                  <div className="w-full p-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 font-semibold">
+                    {scrapForm.item_name || '—'}
+                  </div>
+                ) : (
+                  <select
+                    required
+                    value={scrapForm.itemId}
+                    onChange={(e) => setScrapForm({ ...scrapForm, itemId: e.target.value })}
+                    className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                  >
+                    <option value="">Select item from Item Master...</option>
+                    {stockItems.map((it) => (
+                      <option key={it.id} value={it.id}>[{it.sku}] {it.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

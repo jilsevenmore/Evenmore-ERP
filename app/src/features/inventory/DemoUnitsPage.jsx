@@ -28,6 +28,7 @@ import {
   returnDemoUnitInspection, 
   convertDemoUnitToSale 
 } from '../../services/upgradeService';
+import { rowsOf, isServerId } from '../../services/resourceSync';
 
 const demoUnitsGuide = {
   title: 'Trial Machines & Demo Units Tracking',
@@ -47,8 +48,47 @@ const demoUnitsGuide = {
   workflow: ['Dispatch Trial', 'Customer Evaluation', 'Return Inspection OR Conversion to Sale', 'Inventory / Deposit Settlement'],
 };
 
+// The backend's demo-unit statuses; On Trial and Overdue are still in the field.
+const ACTIVE_DEMO = ['On Trial', 'Overdue'];
+const STATUS_TABS = [
+  { id: 'ALL', label: 'All Units' },
+  { id: 'On Trial', label: 'On Trial' },
+  { id: 'Returned - Inspected', label: 'Returned' },
+  { id: 'Converted to Sale', label: 'Sold' },
+];
+
+/** An API demo unit in the shape this page renders. */
+const toDemoRow = (u) => ({
+  ...u,
+  machine_name: u.itemName || '',
+  sku: u.itemSku || '',
+  serial_number: u.serialNumber || '',
+  customer_name: u.prospectName || '',
+  dispatch_date: u.dispatchDate,
+  expected_return_date: u.expectedReturnDate,
+  security_deposit: Number(u.securityDeposit) || 0,
+  physical_condition: u.conditionOnReturn || '',
+  refurbishment_cost: Number(u.refurbishmentCost) || 0,
+  final_sale_price: Number(u.salePrice) || 0,
+});
+
+const emptyDeployForm = () => ({
+  itemId: '',
+  serial_number: '',
+  customer: '',
+  dispatch_date: new Date().toISOString().slice(0, 10),
+  expected_return_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
+  security_deposit: '',
+  notes: '',
+});
+
 export const DemoUnitsPage = () => {
-  const { customers, formatCurrency, formatDateDDMMYYYY } = useERP();
+  const { customers, items = [], formatCurrency, formatDateDDMMYYYY } = useERP();
+  // Machines first: those are what goes out on trial.
+  const machineOptions = [...items]
+    .filter((it) => isServerId(it.id) && it.itemKind !== 'Service')
+    .sort((a, b) => (a.itemKind === 'Machine' ? 0 : 1) - (b.itemKind === 'Machine' ? 0 : 1)
+      || String(a.name).localeCompare(String(b.name)));
 
   const [demoUnits, setDemoUnits] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -61,15 +101,8 @@ export const DemoUnitsPage = () => {
   const [selectedUnit, setSelectedUnit] = useState(null);
 
   // Deploy Form
-  const [deployForm, setDeployForm] = useState({
-    machine_name: '',
-    serial_number: '',
-    customer: '',
-    dispatch_date: new Date().toISOString().slice(0, 10),
-    expected_return_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
-    security_deposit: '',
-    notes: '',
-  });
+  const [deployForm, setDeployForm] = useState(emptyDeployForm);
+  const deployItem = items.find((it) => it.id === deployForm.itemId);
 
   // Return Inspection Form
   const [inspectForm, setInspectForm] = useState({
@@ -91,11 +124,7 @@ export const DemoUnitsPage = () => {
     setLoading(true);
     try {
       const res = await fetchDemoUnits();
-      if (res?.data && Array.isArray(res.data)) {
-        setDemoUnits(res.data);
-      } else if (Array.isArray(res)) {
-        setDemoUnits(res);
-      }
+      setDemoUnits(rowsOf(Array.isArray(res?.data) ? res.data : res).map(toDemoRow));
     } catch (err) {
       console.error('Failed to load demo units:', err);
     } finally {
@@ -110,26 +139,22 @@ export const DemoUnitsPage = () => {
   const handleDeploySubmit = async (e) => {
     e.preventDefault();
     try {
+      const customer = (customers || []).find((c) => c.id === deployForm.customer);
       await createDemoUnit({
-        machine_name: deployForm.machine_name,
-        serial_number: deployForm.serial_number,
-        customer: deployForm.customer,
-        dispatch_date: deployForm.dispatch_date,
-        expected_return_date: deployForm.expected_return_date,
-        security_deposit: parseFloat(deployForm.security_deposit) || 0,
-        notes: deployForm.notes,
-        status: 'In-Trial',
+        itemId: deployForm.itemId,
+        serialNumber: deployForm.serial_number.trim() || undefined,
+        prospectName: customer?.name || deployForm.customer,
+        prospectPartyId: customer && isServerId(customer.id) ? customer.id : undefined,
+        contactPhone: customer?.phone || undefined,
+        contactEmail: customer?.email || undefined,
+        dispatchDate: deployForm.dispatch_date,
+        expectedReturnDate: deployForm.expected_return_date,
+        securityDeposit: parseFloat(deployForm.security_deposit) || 0,
+        notes: deployForm.notes || undefined,
+        status: 'On Trial',
       });
       setShowDeployModal(false);
-      setDeployForm({
-        machine_name: '',
-        serial_number: '',
-        customer: '',
-        dispatch_date: new Date().toISOString().slice(0, 10),
-        expected_return_date: new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10),
-        security_deposit: '',
-        notes: '',
-      });
+      setDeployForm(emptyDeployForm());
       loadDemoUnits();
     } catch (err) {
       alert('Error deploying demo unit: ' + (err.message || 'Unknown error'));
@@ -141,9 +166,9 @@ export const DemoUnitsPage = () => {
     if (!selectedUnit) return;
     try {
       await returnDemoUnitInspection(selectedUnit.id, {
-        return_date: inspectForm.return_date,
-        physical_condition: inspectForm.physical_condition,
-        refurbishment_cost: parseFloat(inspectForm.refurbishment_cost) || 0,
+        returnDate: inspectForm.return_date,
+        condition: inspectForm.physical_condition,
+        refurbishmentCost: parseFloat(inspectForm.refurbishment_cost) || 0,
         notes: inspectForm.notes,
       });
       setShowInspectModal(false);
@@ -158,11 +183,11 @@ export const DemoUnitsPage = () => {
     e.preventDefault();
     if (!selectedUnit) return;
     try {
+      const depositOffset = parseFloat(convertForm.security_deposit_applied) || 0;
       await convertDemoUnitToSale(selectedUnit.id, {
-        invoice_number: convertForm.invoice_number,
-        final_sale_price: parseFloat(convertForm.final_sale_price) || 0,
-        security_deposit_applied: parseFloat(convertForm.security_deposit_applied) || 0,
-        notes: convertForm.notes,
+        invoice_ref: convertForm.invoice_number,
+        salePrice: parseFloat(convertForm.final_sale_price) || 0,
+        notes: [convertForm.notes, depositOffset ? `Deposit offset ${depositOffset}` : ''].filter(Boolean).join(' | '),
       });
       setShowConvertModal(false);
       setSelectedUnit(null);
@@ -173,13 +198,14 @@ export const DemoUnitsPage = () => {
   };
 
   // KPIs
-  const activeTrials = demoUnits.filter(u => u.status === 'In-Trial' || u.status === 'Deployed');
+  const activeTrials = demoUnits.filter(u => ACTIVE_DEMO.includes(u.status));
   const totalDeposits = activeTrials.reduce((sum, u) => sum + (Number(u.security_deposit) || 0), 0);
-  const returnedUnits = demoUnits.filter(u => u.status === 'Returned');
-  const convertedUnits = demoUnits.filter(u => u.status === 'Sold' || u.status === 'Converted to Sale');
+  const returnedUnits = demoUnits.filter(u => u.status === 'Returned - Inspected');
+  const convertedUnits = demoUnits.filter(u => u.status === 'Converted to Sale');
 
   const filteredData = demoUnits.filter(u => {
     if (statusFilter === 'ALL') return true;
+    if (statusFilter === 'On Trial') return ACTIVE_DEMO.includes(u.status);
     return u.status === statusFilter;
   });
 
@@ -189,8 +215,10 @@ export const DemoUnitsPage = () => {
       accessor: 'machine_name',
       render: (u) => (
         <div>
-          <p className="font-bold text-slate-900">{u.machine_name || u.name}</p>
-          <p className="font-mono text-[11px] text-slate-500">SN: {u.serial_number || 'N/A'}</p>
+          <p className="font-bold text-slate-900">{u.machine_name || '—'}</p>
+          <p className="font-mono text-[11px] text-slate-500">
+            {u.demoNumber ? `${u.demoNumber} • ` : ''}SN: {u.serial_number || 'N/A'}
+          </p>
         </div>
       ),
     },
@@ -257,7 +285,7 @@ export const DemoUnitsPage = () => {
       header: 'Actions',
       align: 'right',
       render: (u) => {
-        const canAction = u.status === 'In-Trial' || u.status === 'Deployed';
+        const canAction = ACTIVE_DEMO.includes(u.status);
         if (!canAction) {
           return <span className="text-[11px] text-slate-400 font-medium">Completed</span>;
         }
@@ -345,17 +373,17 @@ export const DemoUnitsPage = () => {
 
       {/* Status Filter Tabs */}
       <div className="flex border-b border-slate-200 text-xs">
-        {['ALL', 'In-Trial', 'Returned', 'Sold'].map((st) => (
+        {STATUS_TABS.map((tab) => (
           <button
-            key={st}
-            onClick={() => setStatusFilter(st)}
+            key={tab.id}
+            onClick={() => setStatusFilter(tab.id)}
             className={`px-4 py-2 font-semibold border-b-2 transition ${
-              statusFilter === st
+              statusFilter === tab.id
                 ? 'border-primary text-primary'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
             }`}
           >
-            {st === 'ALL' ? 'All Units' : st}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -368,6 +396,7 @@ export const DemoUnitsPage = () => {
         searchPlaceholder="Search machine model, serial #, customer..."
         searchFilter={(u, term) =>
           String(u.machine_name || '').toLowerCase().includes(term) ||
+          String(u.demoNumber || '').toLowerCase().includes(term) ||
           String(u.serial_number || '').toLowerCase().includes(term) ||
           String(u.customer_name || u.customer || '').toLowerCase().includes(term)
         }
@@ -386,27 +415,35 @@ export const DemoUnitsPage = () => {
             <form onSubmit={handleDeploySubmit} className="space-y-3.5 mt-4">
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Machine / Equipment Model *</label>
-                <input
-                  type="text"
+                <select
                   required
-                  placeholder="e.g. SEWEN Ultra-Seal 5000 CNC"
-                  value={deployForm.machine_name}
-                  onChange={(e) => setDeployForm({ ...deployForm, machine_name: e.target.value })}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
-                />
+                  value={deployForm.itemId}
+                  onChange={(e) => setDeployForm({ ...deployForm, itemId: e.target.value, serial_number: '' })}
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                >
+                  <option value="">Select machine from Item Master...</option>
+                  {machineOptions.map((it) => (
+                    <option key={it.id} value={it.id}>
+                      [{it.sku}] {it.name}{it.itemKind === 'Machine' ? ' (Machine)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Serial Number *</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Serial Number</label>
                   <input
                     type="text"
-                    required
+                    list="demo-unit-serials"
                     placeholder="e.g. SN-88392-C"
                     value={deployForm.serial_number}
                     onChange={(e) => setDeployForm({ ...deployForm, serial_number: e.target.value })}
                     className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                   />
+                  <datalist id="demo-unit-serials">
+                    {(deployItem?.serialNumbers || []).map((sn) => <option key={sn} value={sn} />)}
+                  </datalist>
                 </div>
                 <div>
                   <label className="font-semibold text-slate-700 block mb-1">Evaluation Client *</label>

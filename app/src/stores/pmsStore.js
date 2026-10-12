@@ -630,11 +630,15 @@ export function groupMyTasks(tasks = [], now = Date.now()) {
       groups.completed.push(task);
       continue;
     }
+    // Work already started sits under In Progress even when it is due today
+    // or late -- the card still shows the overdue date.
+    if (task.status === "In Progress" || task.status === "Blocked") {
+      groups.inProgress.push(task);
+      continue;
+    }
     const due = toDate(task.dueDate)?.getTime() ?? null;
     if (due != null && due < endOfToday) groups.dueToday.push(task);
-    else if (task.status === "In Progress" || task.status === "Blocked") {
-      groups.inProgress.push(task);
-    } else groups.upcoming.push(task);
+    else groups.upcoming.push(task);
   }
 
   // An undated task is the least urgent, not the most, so it sorts last in
@@ -1507,7 +1511,11 @@ function pushProject(projectId, request) {
   return Promise.resolve()
     .then(request)
     .then(async (result) => {
-      const project = result?.project || (result?.id && result?.stages ? result : null);
+      // Task and stage actions answer with the project *summary* (no stages);
+      // swapping that in would drop every stage and task until a reload, so
+      // only a full project replaces ours -- anything else re-reads it.
+      const full = (candidate) => (Array.isArray(candidate?.stages) ? candidate : null);
+      const project = full(result?.project) || full(result);
       const fresh = project || (await pmsApi.pullProject(projectId));
       if (fresh) applyServerProject(fresh);
       return result;
@@ -2789,6 +2797,19 @@ const usePmsStoreBase = create((set, get) => ({
   },
 
   updateTask: (projectId, stageId, taskId, patch, actor = null) => {
+    // Progress on a task nobody has started means it has started: the status
+    // follows here and on the server, not only after a reload.
+    const current = get().projects
+      .find((p) => p.id === projectId)
+      ?.stages.find((s2) => s2.id === stageId)
+      ?.tasks.find((t) => t.id === taskId);
+    const pct = patch.completionPct !== undefined ? clampPct(patch.completionPct) : null;
+    if (
+      pct !== null && pct > 0 && pct < 100 && patch.status === undefined &&
+      (!current?.status || current.status === "Not Started")
+    ) {
+      patch = { ...patch, status: "In Progress" };
+    }
    
     set((st) => {
       // Capture the previous percentage so the audit trail can record the

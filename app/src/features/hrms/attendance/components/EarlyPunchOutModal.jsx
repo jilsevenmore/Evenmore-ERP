@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertTriangle, Clock, FileText, CheckCircle2, X, Loader2 } from 'lucide-react';
 
 /**
@@ -51,9 +52,11 @@ export function EarlyPunchOutModal({
     });
   };
 
-  return (
+  // Rendered on <body>: the topbar's backdrop-filter would otherwise trap this
+  // fixed overlay inside its 62px strip, cut off at the top of the screen.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) onClose?.();
       }}
@@ -180,7 +183,8 @@ export function EarlyPunchOutModal({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

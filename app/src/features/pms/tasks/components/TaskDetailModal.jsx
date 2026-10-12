@@ -54,7 +54,7 @@ export function TaskDetailModal({ isOpen, onClose, task }) {
       isOpen={isOpen}
       onClose={onClose}
       title={task.taskName}
-      subtitle={`${task.projectId} — ${task.stageName}`}
+      subtitle={`${task.projectCode || task.projectId} — ${task.stageName}`}
       footer={
         <>
           <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
@@ -65,7 +65,7 @@ export function TaskDetailModal({ isOpen, onClose, task }) {
       <form id="pms-task-detail" onSubmit={handleSubmit} className="space-y-4">
         <div className="rounded-lg border border-[#dce5f4] bg-[#f6f9ff] p-3">
           <dl className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[['Project', task.projectCustomer ?? task.projectId], ['Stage', task.stageName],
+            {[['Project', task.projectCustomer ?? task.projectCode ?? task.projectId], ['Stage', task.stageName],
               ['Department', task.department], ['Due', stamp(task.dueDate)]].map(([k, v]) => (
               <div key={k} className="min-w-0">
                 <dt className="text-[10px] text-slate-500">{k}</dt>

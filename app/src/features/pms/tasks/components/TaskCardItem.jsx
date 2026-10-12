@@ -81,7 +81,7 @@ export function TaskCardItem({ task, onProgress, onCycleStatus, onOpen }) {
               to={`/pms/projects/${task.projectId}`}
               className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-600 hover:underline"
             >
-              {task.projectId} <ExternalLink size={9} />
+              {task.projectCode || task.projectId} <ExternalLink size={9} />
             </Link>
             <span className="text-[10px] text-slate-400 truncate max-w-[200px]" title={task.stageName}>
               {task.stageName}
