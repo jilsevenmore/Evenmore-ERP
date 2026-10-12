@@ -6,6 +6,7 @@ import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { bulkAttendance, isBackendEnabled } from "../../../services/hrmsSync";
+import { UserInitials } from "../../../components/common/UserInitials";
 
 const SHIFTS = ["All", "General", "Flexible", "Night"];
 const STATUS_OPTIONS = ["Present", "Absent", "Late", "Half Day", "WFH", "On Leave"];
@@ -276,7 +277,7 @@ export default function BulkAttendance() {
                   </td>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <img src={e.avatar} alt={e.name} className="bulk-avatar" loading="lazy" />
+                      <UserInitials name={e.name} className="w-8 h-8 text-xs" />
                       <span style={{ fontWeight: 600, color: "#111827", whiteSpace: "nowrap" }}>
                         {e.name}
                       </span>

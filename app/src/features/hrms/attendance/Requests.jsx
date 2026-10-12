@@ -6,6 +6,7 @@ import Modal from "../../../components/ui/Modal";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { UserInitials } from "../../../components/common/UserInitials";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -452,7 +453,7 @@ export default function Requests() {
                   </td>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <img src={r.avatar} alt={r.employee} className="req-avatar" loading="lazy" />
+                      <UserInitials name={r.employee} className="w-8 h-8 text-xs" />
                       <div>
                         <div style={{ fontWeight: 600, color: "#111827", lineHeight: 1.2 }}>
                           {r.employee}
@@ -566,7 +567,7 @@ export default function Requests() {
         {selectedReq && (
           <div style={{ display: "grid", gap: 16, fontSize: "13.5px", color: "#334155" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <img src={selectedReq.avatar} alt={selectedReq.employee} style={{ width: 44, height: 44, borderRadius: 999 }} />
+              <UserInitials name={selectedReq.employee} className="w-11 h-11 text-sm" />
               <div>
                 <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>{selectedReq.employee}</h3>
                 <p style={{ margin: "2px 0 0", fontSize: 12.5, color: "#64748b" }}>

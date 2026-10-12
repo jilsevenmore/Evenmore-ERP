@@ -24,6 +24,7 @@ import { hrmsGuides } from '../../data/hrms/hrmsGuides';
 import { hrmsSync, pullOrgChart, describeError } from '../../services/hrmsSync';
 import { useEmployeeOptions } from './useOrgCollection';
 import OrgTreeView from './OrgTreeView';
+import { UserInitials } from '../../components/common/UserInitials';
 import {
   buildTree,
   indexTree,
@@ -33,10 +34,6 @@ import {
   exportRows,
   ORG_KEY,
 } from './orgTree';
-
-function avatarFor(item) {
-  return item.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(item.id || item.name)}`;
-}
 
 function csvCell(value) {
   return `"${String(value ?? '').replace(/"/g, '""')}"`;
@@ -466,11 +463,7 @@ export function OrgChartPage() {
           <div className="flex flex-col gap-5">
             {/* Top Employee Card */}
             <div className="flex items-center gap-4 p-4 bg-off border border-bdr rounded-xl">
-              <img
-                src={avatarFor(selectedEmployee)}
-                alt={selectedEmployee.name}
-                className="w-14 h-14 rounded-full ring-2 ring-navy/20 object-cover"
-              />
+              <UserInitials name={selectedEmployee.name} className="w-14 h-14 text-base" />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="text-[16px] font-bold text-slate-900 truncate">
@@ -578,7 +571,7 @@ export function OrgChartPage() {
                       onClick={() => selectEmployee(rep)}
                       className="px-2.5 h-8 bg-white border border-bdr rounded-xl text-xs flex items-center gap-2 hover:border-navy cursor-pointer transition-colors"
                     >
-                      <img src={avatarFor(rep)} alt={rep.name} className="w-4 h-4 rounded-full" />
+                      <UserInitials name={rep.name} className="w-5 h-5 text-[8px]" />
                       <span className="font-medium text-slate-800">{rep.name}</span>
                       {rep.designation && <span className="text-[11px] text-muted">({rep.designation})</span>}
                     </div>

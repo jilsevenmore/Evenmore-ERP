@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Building, Building2, ChevronDown, ChevronUp, MapPin, UserX, Users } from 'lucide-react';
+import { UserInitials } from '../../components/common/UserInitials';
 
 /**
  * The chart canvas. Layout is plain nested flex (an `ul`/`li` tree with CSS
@@ -9,10 +10,6 @@ import { Building, Building2, ChevronDown, ChevronUp, MapPin, UserX, Users } fro
  * hundreds from becoming one very wide row.
  */
 const STACK_AFTER = 3;
-
-function avatarFor(item) {
-  return item.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(item.id || item.name)}`;
-}
 
 function Toggle({ item, open, onToggle, label }) {
   if (!item.reportCount) return null;
@@ -85,7 +82,7 @@ function EmployeeCard({ item, open, onToggle, onSelect, matched }) {
       className={`oc-card w-[180px] p-2.5 border border-bdr cursor-pointer hover:border-slate-400 hover:shadow-md group ${matched ? 'ring-2 ring-blue-500/40 border-blue-400' : ''}`}
     >
       <div className="relative">
-        <img src={avatarFor(item)} alt={item.name} className="w-9 h-9 rounded-full object-cover" loading="lazy" />
+        <UserInitials name={item.name} className="w-9 h-9 text-xs" />
         {item.relation === 'head' && (
           <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 rounded-full bg-navy text-white text-[9px] font-bold leading-4">HEAD</span>
         )}

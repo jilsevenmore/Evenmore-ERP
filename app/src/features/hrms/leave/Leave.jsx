@@ -8,6 +8,7 @@ import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { Badge } from "../../../components/hrms/Badge";
 import Modal from "../../../components/ui/Modal";
 import PageInfoButton from "../../../components/common/PageInfoButton";
+import { UserInitials } from "../../../components/common/UserInitials";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import {
   Calendar,
@@ -645,7 +646,7 @@ export default function Leave() {
                         form.delegate === emp.name ? "bg-navy/5" : ""
                       }`}
                     >
-                      <img src={emp.avatar} alt={emp.name} className="w-7 h-7 rounded-full object-cover" />
+                      <UserInitials name={emp.name} className="w-7 h-7 text-[10px]" />
                       <div>
                         <div className="text-[13px] font-medium leading-none text-slate-900">{emp.name}</div>
                         <div className="text-[11px] text-muted mt-0.5">
@@ -764,11 +765,7 @@ export default function Leave() {
                 >
                   <div className="flex justify-between items-start gap-3">
                     <div className="flex items-center gap-3 min-w-0 lg:min-w-auto">
-                      <img
-                        src={l.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(l.employee)}`}
-                        alt={l.employee}
-                        className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0 lg:shrink"
-                      />
+                      <UserInitials name={l.employee} className="w-10 h-10 text-xs shrink-0" />
                       <div className="min-w-0 lg:min-w-auto">
                         <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-2">
                           <span className="text-[13.5px] font-bold text-slate-900">{l.employee}</span>
@@ -801,11 +798,7 @@ export default function Leave() {
                   {/* Delegate Handover Card */}
                   <div className="bg-slate-50 border border-bdr/70 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <img
-                        src={l.delegateAvatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(currentDelegate)}`}
-                        alt=""
-                        className="w-7 h-7 rounded-full object-cover border border-slate-200"
-                      />
+                      <UserInitials name={currentDelegate} className="w-7 h-7 text-[10px]" />
                       <div>
                         <div className="text-[12.5px] font-semibold text-slate-800 flex items-center gap-1.5">
                           <span>Delegate: {currentDelegate}</span>
@@ -1002,11 +995,7 @@ export default function Leave() {
                   <tr key={r.id || i} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
-                        <img
-                          src={r.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(r.emp)}`}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                        />
+                        <UserInitials name={r.emp} className="w-8 h-8 text-xs" />
                         <span className="font-semibold text-slate-900">{r.emp}</span>
                       </div>
                     </td>
@@ -1073,11 +1062,7 @@ export default function Leave() {
                   <tr key={c.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
-                        <img
-                          src={c.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(c.employee)}`}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                        />
+                        <UserInitials name={c.employee} className="w-8 h-8 text-xs" />
                         <div>
                           <div className="font-semibold text-slate-900">{c.employee}</div>
                           <div className="text-[11px] text-muted">{c.id}</div>
@@ -1172,11 +1157,7 @@ export default function Leave() {
                   <tr key={e.id} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
-                        <img
-                          src={e.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(e.employee)}`}
-                          alt=""
-                          className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                        />
+                        <UserInitials name={e.employee} className="w-8 h-8 text-xs" />
                         <div>
                           <div className="font-semibold text-slate-900">{e.employee}</div>
                           <div className="text-[11px] text-muted">{e.id} • {e.requestDate}</div>
@@ -1436,11 +1417,7 @@ export default function Leave() {
         {detailModalLeave && (
           <div style={{ display: "grid", gap: 14, fontSize: "13.5px", color: "#334155" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <img
-                src={detailModalLeave.avatar}
-                alt=""
-                style={{ width: 44, height: 44, borderRadius: 999, objectFit: "cover" }}
-              />
+              <UserInitials name={detailModalLeave.emp} className="w-11 h-11 text-sm" />
               <div>
                 <h4 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
                   {detailModalLeave.emp}

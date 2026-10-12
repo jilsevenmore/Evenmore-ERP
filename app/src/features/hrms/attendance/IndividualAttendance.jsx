@@ -6,6 +6,7 @@ import { pullIndividualAttendance, HRMS_RESOURCES, isServerId } from "../../../s
 import Modal from "../../../components/ui/Modal";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
+import { UserInitials } from "../../../components/common/UserInitials";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -271,7 +272,7 @@ export default function IndividualAttendance() {
       {/* Hero Employee Card */}
       <div className="ind-card ind-hero-card">
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          {currentEmp.avatar && <img src={currentEmp.avatar} alt={currentEmp.name} className="ind-hero-avatar" />}
+          {currentEmp.id && <UserInitials name={currentEmp.name} className="ind-hero-avatar w-11 h-11 text-sm" />}
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#111827" }}>
@@ -484,7 +485,7 @@ export default function IndividualAttendance() {
         }
       >
         <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 16 }}>
-          {currentEmp.avatar && <img src={currentEmp.avatar} alt={currentEmp.name} style={{ width: 60, height: 60, borderRadius: 999 }} />}
+          {currentEmp.id && <UserInitials name={currentEmp.name} className="w-[60px] h-[60px] text-lg" />}
           <div>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>{currentEmp.name}</h3>
             <p style={{ margin: "2px 0 0", fontSize: 13, color: "#64748b" }}>{currentEmp.id} • {currentEmp.designation}</p>

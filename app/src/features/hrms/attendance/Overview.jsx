@@ -7,6 +7,7 @@ import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
 import { pullPunchTimeline, submitPunchCorrection, pullTracked } from "../../../services/hrmsSync";
 import { toISODate } from "../../../utils/dateUtils";
+import { UserInitials } from "../../../components/common/UserInitials";
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -508,7 +509,7 @@ export default function AttendanceOverview() {
                 <tr key={row.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <img src={row.img} alt={row.name} className="att-avatar" loading="lazy" />
+                      <UserInitials name={row.name} className="w-8 h-8 text-xs" />
                       <div>
                         <span style={{ fontWeight: 600, color: "#111827", display: "block", whiteSpace: "nowrap" }}>
                           {row.name}
