@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, RotateCcw, Eye, Trash2, ChevronUp, ChevronDown, ChevronsUpDown, CalendarClock, ListFilter, AlertTriangle, ClipboardList, Clock, Activity, CheckCircle2 } from 'lucide-react';
 import AssignTaskModal from './AssignTaskModal';
@@ -69,6 +69,17 @@ function leadTaskRow(task) {
   };
 }
 
+/** The list's search, filters, sort and page, kept for the tab so Back from a task returns to them. */
+const LIST_STATE_KEY = 'taskAllocationListV1';
+
+function readListState() {
+  try {
+    return JSON.parse(sessionStorage.getItem(LIST_STATE_KEY) || '{}') || {};
+  } catch {
+    return {};
+  }
+}
+
 const selectCls = 'w-full h-11 px-3.5 bg-slate-50/60 border border-slate-200 rounded-xl text-[13px] font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition cursor-pointer';
 
 export default function TaskAllocationPage() {
@@ -83,24 +94,40 @@ export default function TaskAllocationPage() {
   ], [allocations, crmTasks]);
   const canManage = useCanManageAllocations();
   const showToast = useAppStore((s) => s.showToast);
-  const [statusFilter, setStatusFilter] = useState('Any');
-  const [assigneeFilter, setAssigneeFilter] = useState('Anyone');
-  const [deptFilter, setDeptFilter] = useState('Any');
-  const [draftStatus, setDraftStatus] = useState('Any');
-  const [draftAssignee, setDraftAssignee] = useState('Anyone');
-  const [draftDept, setDraftDept] = useState('Any');
-  const [search, setSearch] = useState('');
-  const [perPage, setPerPage] = useState(10);
-  const [page, setPage] = useState(1);
-  const [sortKey, setSortKey] = useState('');
-  const [sortDir, setSortDir] = useState('asc');
+  const [saved] = useState(readListState);
+  const [statusFilter, setStatusFilter] = useState(saved.statusFilter || 'Any');
+  const [assigneeFilter, setAssigneeFilter] = useState(saved.assigneeFilter || 'Anyone');
+  const [deptFilter, setDeptFilter] = useState(saved.deptFilter || 'Any');
+  const [draftStatus, setDraftStatus] = useState(saved.statusFilter || 'Any');
+  const [draftAssignee, setDraftAssignee] = useState(saved.assigneeFilter || 'Anyone');
+  const [draftDept, setDraftDept] = useState(saved.deptFilter || 'Any');
+  const [search, setSearch] = useState(saved.search || '');
+  const [perPage, setPerPage] = useState(saved.perPage || 10);
+  const [page, setPage] = useState(saved.page || 1);
+  const [sortKey, setSortKey] = useState(saved.sortKey || '');
+  const [sortDir, setSortDir] = useState(saved.sortDir || 'asc');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteId, setDeleteId] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
 
+  // A changed filter starts from page 1 -- but not on the first render, which
+  // has just restored the page the user left from.
+  const restoring = useRef(true);
   useEffect(() => {
+    if (restoring.current) {
+      restoring.current = false;
+      return;
+    }
     setPage(1);
   }, [statusFilter, assigneeFilter, deptFilter, search, perPage]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify({
+        statusFilter, assigneeFilter, deptFilter, search, perPage, page, sortKey, sortDir,
+      }));
+    } catch { /* ignore */ }
+  }, [statusFilter, assigneeFilter, deptFilter, search, perPage, page, sortKey, sortDir]);
 
   const assigneeOptions = useMemo(() => [...new Set([...EMPLOYEES.map((e) => e.name), ...tasks.map((t) => t.assignee)].filter(Boolean))], [tasks]);
 
@@ -181,13 +208,10 @@ export default function TaskAllocationPage() {
     }
   }
 
+  // The task name and the eye icon open the same detail screen, for an
+  // allocation and a lead task (`lead-task-<id>`) alike.
   function openDetail(row) {
-    // A lead task is worked on its lead's page.
-    if (row.kind === 'lead') {
-      navigate(`/crm/leads/${row.leadId}`);
-      return;
-    }
-    navigate(`/crm/tasks/allocation/${row.id}`);
+    navigate(`/crm/tasks/allocation/${encodeURIComponent(row.id)}`);
   }
 
   const hasActiveFilters = statusFilter !== 'Any' || assigneeFilter !== 'Anyone' || deptFilter !== 'Any' || search.trim() !== '';
@@ -356,7 +380,9 @@ export default function TaskAllocationPage() {
                 return (
                   <tr key={t.id} className="hover:bg-blue-50/40 transition-colors group">
                     <td className="px-5 py-4 whitespace-nowrap">
-                      {t.leadNumber
+                      {t.leadNumber && t.leadId
+                        ? <Link to={`/crm/leads/${encodeURIComponent(t.leadId)}`} className="font-semibold text-blue-600 hover:underline">{t.leadNumber}</Link>
+                        : t.leadNumber
                         ? <span className="font-semibold text-slate-700">{t.leadNumber}</span>
                         : <span className="text-slate-300">—</span>}
                     </td>
@@ -404,7 +430,7 @@ export default function TaskAllocationPage() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button type="button" onClick={() => openDetail(t)} title={t.kind === 'lead' ? 'Open lead' : 'View details'} className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 border border-slate-200 rounded-lg transition">
+                        <button type="button" onClick={() => openDetail(t)} title="View details" className="w-8 h-8 grid place-items-center bg-white text-slate-400 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 border border-slate-200 rounded-lg transition">
                           <Eye size={15} />
                         </button>
                         {canManage && t.kind !== 'lead' && (

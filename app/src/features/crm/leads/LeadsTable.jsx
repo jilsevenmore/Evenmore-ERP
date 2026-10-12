@@ -134,7 +134,18 @@ export default function LeadsTable({ rows = [], selected = [], pinnedLeadIds = [
                       aria-label={`Select ${row.name}`}
                     />
                   </td>
-                  <td className="muted nowrap">{row.leadNumber || "—"}</td>
+                  <td className="nowrap">
+                    {row.leadNumber ? (
+                      <button
+                        type="button"
+                        className="font-semibold text-blue-600 hover:underline"
+                        onClick={() => onOpenLead?.(row)}
+                        title={`Open ${row.name}`}
+                      >
+                        {row.leadNumber}
+                      </button>
+                    ) : "—"}
+                  </td>
                   <EditableCell
                     row={row}
                     field="name"

@@ -6,8 +6,9 @@
  * custom field: its value is saved on the lead as `customValues[field.id]`.
  * Keyed by id, not label, so renaming a field in the builder keeps its data.
  *
- * Which form applies: the one open in the builder (`activeLeadFormId`), else the
- * published one, else the first. `findForm` also resolves the id a form had
+ * Which form applies -- among the forms switched Active in Lead Create Form
+ * only: the one open in the builder (`activeLeadFormId`), else the published
+ * one, else the first. None active means the default layout. `findForm` also resolves the id a form had
  * before the server assigned one, so a builder link made then still works.
  */
 import { findForm, getActiveFormId, loadForms, LEAD_FORM } from './crmForms';
@@ -19,12 +20,17 @@ export { STANDARD_LEAD_FIELD_IDS };
 /** Types a lead record can hold as a plain value. Uploads and lookups need their own flows. */
 const UNSUPPORTED_TYPES = new Set(['File Upload', 'Lead Image', 'Lookup']);
 
+/** A form Lead Create Form has not switched off (older rows have no flag yet). */
+export function isActiveLeadForm(form) {
+  return Boolean(form) && form.isActive !== false;
+}
+
 export function activeLeadForm() {
   const active = getActiveFormId();
   const fromActive = active ? findForm(active) : null;
   if (fromActive && (fromActive.kind || LEAD_FORM) === LEAD_FORM) return fromActive;
-  const forms = loadForms(LEAD_FORM);
-  return forms.find((form) => form.isPublished) || forms[0] || null;
+  const forms = loadForms(LEAD_FORM).filter(isActiveLeadForm);
+  return forms.find((form) => form.isPublished) || forms[0] || loadForms(LEAD_FORM)[0] || null;
 }
 
 function fieldsOf(form) {

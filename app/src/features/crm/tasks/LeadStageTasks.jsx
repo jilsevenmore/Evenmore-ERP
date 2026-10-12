@@ -166,7 +166,7 @@ function stagesWithTasks(stages, stageTasks) {
   return stages.map((stage) => ({
     ...stage,
     tasks: stageTasks
-      .filter((task) => task.stageId === stage.id)
+      .filter((task) => String(task.stageId) === String(stage.id))
       .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)),
   }));
 }
@@ -250,7 +250,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
   function stageHasMaster(stage, masterId, exceptTaskId) {
     return (stage?.tasks || []).some(
       (task) =>
-        task.id !== exceptTaskId &&
+        (exceptTaskId == null || String(task.id) !== String(exceptTaskId)) &&
         task.masterTaskId != null &&
         String(task.masterTaskId) === String(masterId)
     );
@@ -334,7 +334,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
       showWarning("Select a task name first.");
       return;
     }
-    const target = stages.find((stage) => stage.id === stageId);
+    const target = stages.find((stage) => String(stage.id) === String(stageId));
     if (stageHasMaster(target, linked.masterTaskId)) {
       showWarning(`${linked.name} is already in ${target.name}.`);
       return;
@@ -342,7 +342,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
     const master = masterById.get(String(linked.masterTaskId));
     commitStages((current) =>
       current.map((stage) => {
-        if (stage.id !== stageId) return stage;
+        if (String(stage.id) !== String(stageId)) return stage;
         return {
           ...stage,
           tasks: [
@@ -368,9 +368,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
   }
 
   /**
-   * Opens the "add to a stage" form for one stage. The stage comes from the
-   * stage's own Add Task button, so the form has no stage picker and a task
-   * can never land in a stage the user did not open.
+   * Opens the "add to a stage" modal for one stage.
    */
   function addTask(stageId) {
     setTaskModalStageId(stageId);
@@ -380,21 +378,16 @@ export default function LeadStageTasks({ leadForms = [] }) {
   }
 
   /**
-   * The header's Add Stage Task has no stage of its own: it adds to the only
-   * stage there is, or the only one open; otherwise it points the user at the
-   * stages rather than guess one.
+   * Opens the Add Stage Task modal from the header button.
+   * Defaults to the currently open stage (if one is open) or the first available stage.
    */
   function addTaskFromHeader() {
-    if (stages.length === 1) {
-      addTask(stages[0].id);
+    if (!stages.length) {
+      showWarning("No lead stages configured yet.");
       return;
     }
-    if (openStages.length === 1) {
-      addTask(openStages[0]);
-      return;
-    }
-    setShowStageHint(true);
-    stageSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const defaultStage = stages.find((s) => openStages.includes(s.id)) || stages[0];
+    addTask(defaultStage.id);
   }
 
   function closeTaskModal() {
@@ -436,9 +429,9 @@ export default function LeadStageTasks({ leadForms = [] }) {
   function createMasterTask(event) {
     event.preventDefault();
     const stageId = taskModalStageId;
-    const target = stages.find((stage) => stage.id === stageId);
+    const target = stages.find((stage) => String(stage.id) === String(stageId));
     if (!target) {
-      setFormError("Open a lead stage and use its Add Task to add a task to it.");
+      setFormError("Please select a lead stage.");
       return;
     }
     const master = masterById.get(String(masterTask.masterTaskId));
@@ -454,7 +447,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
 
     commitStages((current) =>
       current.map((stage) => {
-        if (stage.id !== stageId) return stage;
+        if (String(stage.id) !== String(target.id)) return stage;
         return {
           ...stage,
           tasks: [
@@ -471,7 +464,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
               time: masterTask.time,
               order: stage.tasks.length,
               required: true,
-              autoCreate: true,
+              autoCreate: Boolean(masterTask.autoCreate),
               repeats: Number(masterTask.repeats) || 1,
               dueIn: Number(masterTask.dueIn) || 0,
             },
@@ -479,6 +472,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
         };
       })
     );
+    setOpenStages((prev) => (prev.includes(target.id) ? prev : [...prev, target.id]));
     refreshRoleTasks();
     closeTaskModal();
     triggerSaveToast();
@@ -487,10 +481,10 @@ export default function LeadStageTasks({ leadForms = [] }) {
   function deleteTask(stageId, taskId) {
     commitStages((current) =>
       current.map((stage) =>
-        stage.id === stageId
+        String(stage.id) === String(stageId)
           ? {
               ...stage,
-              tasks: stage.tasks.filter((task) => task.id !== taskId),
+              tasks: stage.tasks.filter((task) => String(task.id) !== String(taskId)),
             }
           : stage
       )
@@ -547,11 +541,11 @@ export default function LeadStageTasks({ leadForms = [] }) {
   function updateTaskFields(stageId, taskId, patch) {
     commitStages((current) =>
       current.map((stage) =>
-        stage.id === stageId
+        String(stage.id) === String(stageId)
           ? {
               ...stage,
               tasks: stage.tasks.map((task) =>
-                task.id === taskId ? { ...task, ...patch } : task
+                String(task.id) === String(taskId) ? { ...task, ...patch } : task
               ),
             }
           : stage
@@ -1046,7 +1040,7 @@ export default function LeadStageTasks({ leadForms = [] }) {
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h2 className="text-sm font-bold text-slate-900">
-                Add Task to {stages.find((stage) => stage.id === taskModalStageId)?.name || "a Lead Stage"}
+                Add Task to {stages.find((stage) => String(stage.id) === String(taskModalStageId))?.name || "a Lead Stage"}
               </h2>
               <button
                 type="button"
@@ -1061,10 +1055,33 @@ export default function LeadStageTasks({ leadForms = [] }) {
             <div className="p-5 space-y-3.5 max-h-[75vh] overflow-y-auto text-xs">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Lead Stage <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={taskModalStageId ?? ""}
+                  onChange={(e) => {
+                    const selected = stages.find((s) => String(s.id) === String(e.target.value));
+                    if (selected) {
+                      setTaskModalStageId(selected.id);
+                      setFormError('');
+                    }
+                  }}
+                  required
+                  className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 cursor-pointer"
+                >
+                  {stages.map((st) => (
+                    <option key={st.id} value={st.id}>
+                      {st.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Task Name <span className="text-rose-500">*</span>
                 </label>
                 <select
-                  autoFocus
                   value={masterTask.masterTaskId}
                   onChange={(e) => pickMasterForForm(e.target.value)}
                   required
@@ -1164,6 +1181,19 @@ export default function LeadStageTasks({ leadForms = [] }) {
                     className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800"
                   />
                 </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="modal-auto-create"
+                  checked={Boolean(masterTask.autoCreate)}
+                  onChange={(e) => updateMasterTask("autoCreate", e.target.checked)}
+                  className="w-4 h-4 text-blue-600 rounded border-slate-300 cursor-pointer"
+                />
+                <label htmlFor="modal-auto-create" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                  Auto-create task when lead enters stage
+                </label>
               </div>
 
               <div>

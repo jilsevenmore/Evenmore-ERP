@@ -2,7 +2,6 @@ import CrmKpiCard from '../common/CrmKpiCard';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Users,
-  DollarSign,
   Plus,
   Search,
   Pencil,
@@ -19,11 +18,8 @@ import {
   MessageSquare,
   Trophy,
   XCircle,
-  Send,
-  RefreshCw,
   ShieldCheck,
   GitBranch,
-  Layers
 } from 'lucide-react';
 import PageHeader from '../../../components/ui/PageHeader';
 import { useCrmStore } from '../../../stores/crmStore';
@@ -76,16 +72,6 @@ function LeadStageIcon({ icon, bg, fg }) {
   return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><User size={size} /></span>;
 }
 
-function DealStageIcon({ icon, bg, fg }) {
-  const size = 14;
-  const style = { background: bg, color: fg };
-  if (icon === 'send') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><Send size={size} /></span>;
-  if (icon === 'clock') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><Clock size={size} /></span>;
-  if (icon === 'refresh') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><RefreshCw size={size} /></span>;
-  if (icon === 'lost') return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><X size={size} /></span>;
-  return <span className="w-6 h-6 rounded-md flex items-center justify-center shrink-0" style={style}><FileText size={size} /></span>;
-}
-
 function StatusPill({ status, onToggle }) {
   const active = status === 'Active';
   return (
@@ -104,19 +90,15 @@ function StatusPill({ status, onToggle }) {
 }
 
 export default function CRMSystemSetupPage() {
-  // The two pipelines are server configuration (`/crm/stages/`, `/crm/deal-stages/`),
-  // because the automation that creates stage tasks runs against them.
+  // Lead stages are server configuration (`/crm/stages/`), because the
+  // automation that creates stage tasks runs against them. (Deal Stages were
+  // removed from this screen; the Deals board keeps its fixed pipeline.)
   const storeLeadStages = useCrmStore((s) => s.stages);
-  const storeDealStages = useCrmStore((s) => s.dealStages);
   const [leadStages, setLeadStages] = useState([]);
-  const [dealStages, setDealStages] = useState([]);
 
   useEffect(() => { setLeadStages(storeLeadStages); }, [storeLeadStages]);
-  useEffect(() => { setDealStages(storeDealStages); }, [storeDealStages]);
   const [leadQuery, setLeadQuery] = useState('');
   const [leadFilter, setLeadFilter] = useState('All');
-  const [dealQuery, setDealQuery] = useState('');
-  const [dealFilter, setDealFilter] = useState('All');
   const [showBanner, setShowBanner] = useState(() => {
     try {
       if (typeof localStorage === 'undefined') return true;
@@ -126,11 +108,9 @@ export default function CRMSystemSetupPage() {
     }
   });
   const [leadModal, setLeadModal] = useState(null);
-  const [dealModal, setDealModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [showDifferenceModal, setShowDifferenceModal] = useState(false);
   const [dragLead, setDragLead] = useState(null);
-  const [dragDeal, setDragDeal] = useState(null);
 
   // Edits are written back to the pipelines they came from -- from the
   // handlers, never from an effect. An effect on [local, store] compared a
@@ -141,16 +121,8 @@ export default function CRMSystemSetupPage() {
     syncStages('stages', next, storeLeadStages);
   }
 
-  function commitDealStages(update) {
-    const next = typeof update === 'function' ? update(dealStages) : update;
-    setDealStages(next);
-    syncStages('dealStages', next, storeDealStages);
-  }
-
   const leadActive = useMemo(() => leadStages.filter((s) => s.status === 'Active').length, [leadStages]);
   const leadInactive = leadStages.length - leadActive;
-  const dealActive = useMemo(() => dealStages.filter((s) => s.status === 'Active').length, [dealStages]);
-  const dealInactive = dealStages.length - dealActive;
 
   const visibleLeads = useMemo(() => {
     return leadStages.filter((s) => {
@@ -159,14 +131,6 @@ export default function CRMSystemSetupPage() {
       return true;
     });
   }, [leadStages, leadQuery, leadFilter]);
-
-  const visibleDeals = useMemo(() => {
-    return dealStages.filter((s) => {
-      if (dealFilter !== 'All' && s.status !== dealFilter) return false;
-      if (dealQuery && !String(s.name ?? '').toLowerCase().includes(dealQuery.toLowerCase())) return false;
-      return true;
-    });
-  }, [dealStages, dealQuery, dealFilter]);
 
   function hideBanner() {
     setShowBanner(false);
@@ -203,46 +167,14 @@ export default function CRMSystemSetupPage() {
     commitLeadStages((prev) => [...prev, { ...found, id: `ld-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
   }
 
-  function openAddDeal() {
-    setDealModal({ id: null, name: '', status: 'Active', pipeline: 'Sales' });
-  }
-
-  function openEditDeal(stage) {
-    setDealModal({ id: stage.id, name: stage.name, status: stage.status, pipeline: stage.pipeline || 'Sales' });
-  }
-
-  function saveDealModal() {
-    const name = dealModal.name.trim();
-    if (!name) return;
-    const pipeline = dealModal.pipeline.trim() || 'Sales';
-    if (dealModal.id) {
-      commitDealStages((prev) => prev.map((s) => (s.id === dealModal.id ? { ...s, name, status: dealModal.status, pipeline } : s)));
-    } else {
-      const item = { id: `dl-${Date.now()}`, name, status: dealModal.status, count: 0, pipeline, icon: 'file', bg: '#eef2f7', fg: '#475569' };
-      commitDealStages((prev) => [...prev, item]);
-    }
-    setDealModal(null);
-  }
-
-  function duplicateDeal(id) {
-    const found = dealStages.find((s) => s.id === id);
-    if (!found) return;
-    commitDealStages((prev) => [...prev, { ...found, id: `dl-${Date.now()}`, name: `${found.name} Copy`, count: 0 }]);
-  }
-
   function confirmDelete() {
     if (!deleteModal) return;
     if (deleteModal.type === 'lead') commitLeadStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
-    if (deleteModal.type === 'deal') commitDealStages((prev) => prev.filter((s) => s.id !== deleteModal.id));
     setDeleteModal(null);
   }
 
   function toggleLeadStatus(id) {
     commitLeadStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
-  }
-
-  function toggleDealStatus(id) {
-    commitDealStages((prev) => prev.map((s) => (s.id === id ? { ...s, status: s.status === 'Active' ? 'Inactive' : 'Active' } : s)));
   }
 
   function dropLead(targetIndex) {
@@ -262,23 +194,6 @@ export default function CRMSystemSetupPage() {
     setDragLead(null);
   }
 
-  function dropDeal(targetIndex) {
-    if (dragDeal === null) return;
-    commitDealStages((prev) => {
-      const order = visibleDeals.map((s) => s.id);
-      const fromId = order[dragDeal];
-      const toId = order[targetIndex];
-      if (!fromId || !toId || fromId === toId) return prev;
-      const fromIdx = prev.findIndex((s) => s.id === fromId);
-      const toIdx = prev.findIndex((s) => s.id === toId);
-      const next = [...prev];
-      const moved = next.splice(fromIdx, 1)[0];
-      next.splice(toIdx, 0, moved);
-      return next;
-    });
-    setDragDeal(null);
-  }
-
   function scrollToPanel(id) {
     try {
       const el = document.getElementById(id);
@@ -292,7 +207,7 @@ export default function CRMSystemSetupPage() {
     <div className="space-y-4">
       <PageHeader
         title="CRM System Setup"
-        subtitle="Manage both Lead Stages and Deal Stages for your business process."
+        subtitle="Manage the Lead Stages for your business process."
         breadcrumb={[
           { label: 'Dashboard', path: '/dashboard' },
           { label: 'CRM', path: '/crm/leads' },
@@ -316,7 +231,7 @@ export default function CRMSystemSetupPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+      <div className="grid grid-cols-1 gap-4 items-start">
         <div id="lead-panel" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between gap-3 p-4">
             <div className="flex items-center gap-3 min-w-0">
@@ -401,92 +316,6 @@ export default function CRMSystemSetupPage() {
           <div className="h-3" />
         </div>
 
-        <div id="deal-panel" className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between gap-3 p-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <span className="w-10 h-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-                <DollarSign size={20} />
-              </span>
-              <div className="min-w-0">
-                <h3 className="font-bold text-[15px] text-slate-800 leading-tight">Deal Stages</h3>
-                <p className="text-xs text-slate-500 truncate">Manage stages for your sales pipeline process.</p>
-              </div>
-            </div>
-            <button type="button" onClick={openAddDeal} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold flex items-center gap-1.5 shrink-0 shadow-2xs active:scale-[0.99] cursor-pointer">
-              <Plus size={14} /> Add Deal Stage
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 px-4">
-            <CrmKpiCard label="Total Stages" value={dealStages.length} icon={Layers} tone="blue" />
-            <CrmKpiCard label="Active" value={dealActive} icon={ShieldCheck} tone="emerald" />
-            <CrmKpiCard label="Inactive" value={dealInactive} icon={GitBranch} tone="rose" />
-          </div>
-
-          <div className="flex gap-2 px-4 mt-3">
-            <div className="relative flex-1">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={dealQuery} onChange={(e) => setDealQuery(e.target.value)} placeholder="Search deal stages..." className="w-full h-9 border border-slate-200 rounded-lg pl-8 pr-3 text-xs outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-            </div>
-            <select value={dealFilter} onChange={(e) => setDealFilter(e.target.value)} className="h-9 border border-slate-200 rounded-lg px-2.5 text-xs font-medium text-slate-600 outline-none bg-white">
-              <option value="All">All Status</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </div>
-
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full text-xs min-w-[560px]">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wide text-slate-400 border-y border-slate-100">
-                  <th className="py-2.5 pl-4 pr-1 font-semibold w-10"></th>
-                  <th className="py-2.5 px-2 font-semibold w-8">#</th>
-                  <th className="py-2.5 px-2 font-semibold">Stage Name</th>
-                  <th className="py-2.5 px-2 font-semibold">Pipeline</th>
-                  <th className="py-2.5 px-2 font-semibold">Status</th>
-                  <th className="py-2.5 px-2 font-semibold">Deals</th>
-                  <th className="py-2.5 px-2 pr-4 font-semibold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleDeals.map((s, idx) => (
-                  <tr
-                    key={s.id}
-                    draggable
-                    onDragStart={() => setDragDeal(idx)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={() => dropDeal(idx)}
-                    className="border-b border-slate-50 hover:bg-slate-50/70"
-                  >
-                    <td className="pl-4 pr-1 py-2.5 text-slate-300 cursor-grab"><GripVertical size={15} /></td>
-                    <td className="px-2 py-2.5 text-slate-500 font-medium">{dealStages.findIndex((x) => x.id === s.id) + 1}</td>
-                    <td className="px-2 py-2.5">
-                      <span className="flex items-center gap-2 font-semibold text-slate-700">
-                        <DealStageIcon icon={s.icon} bg={s.bg} fg={s.fg} />
-                        {s.name}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2.5">
-                      <span className="inline-flex px-2.5 py-1 rounded-md text-[11px] font-semibold bg-blue-50 text-blue-600">{s.pipeline || 'Sales'}</span>
-                    </td>
-                    <td className="px-2 py-2.5"><StatusPill status={s.status} onToggle={() => toggleDealStatus(s.id)} /></td>
-                    <td className="px-2 py-2.5 text-slate-600 font-medium">{s.count}</td>
-                    <td className="px-2 pr-4 py-2.5">
-                      <span className="flex items-center gap-1.5">
-                        <button type="button" onClick={() => openEditDeal(s)} className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center hover:bg-blue-100" title="Edit"><Pencil size={13} /></button>
-                        <button type="button" onClick={() => duplicateDeal(s.id)} className="w-7 h-7 rounded-md bg-slate-100 text-slate-500 flex items-center justify-center hover:bg-slate-200" title="Duplicate"><Copy size={13} /></button>
-                        <button type="button" onClick={() => setDeleteModal({ type: 'deal', id: s.id, name: s.name })} className="w-7 h-7 rounded-md bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100" title="Delete"><Trash2 size={13} /></button>
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {visibleDeals.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-8 text-slate-400">No deal stages found.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
 
       {showDifferenceModal && (
@@ -560,40 +389,6 @@ export default function CRMSystemSetupPage() {
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" onClick={() => setLeadModal(null)} className="btn-outline">Cancel</button>
               <button type="button" onClick={saveLeadModal} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold shadow-2xs active:scale-[0.99] cursor-pointer transition-colors">Save Stage</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {dealModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/40 flex items-center justify-center p-2 sm:p-4" onClick={() => setDealModal(null)}>
-          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-md p-4 sm:p-5 max-h-[95vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-slate-800">{dealModal.id ? 'Edit Deal Stage' : 'Add Deal Stage'}</h2>
-              <button type="button" onClick={() => setDealModal(null)} className="text-slate-400 hover:text-slate-600 p-1"><X size={16} /></button>
-            </div>
-            <div className="space-y-3 mt-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-600">Stage Name *</label>
-                <input value={dealModal.name} onChange={(e) => setDealModal({ ...dealModal, name: e.target.value })} placeholder="e.g. Proposal" className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600">Pipeline</label>
-                  <input value={dealModal.pipeline} onChange={(e) => setDealModal({ ...dealModal, pipeline: e.target.value })} placeholder="Sales" className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600">Status</label>
-                  <select value={dealModal.status} onChange={(e) => setDealModal({ ...dealModal, status: e.target.value })} className="mt-1 w-full h-10 border border-slate-200 rounded-lg px-3 text-sm outline-none bg-white">
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
-              <button type="button" onClick={() => setDealModal(null)} className="btn-outline">Cancel</button>
-              <button type="button" onClick={saveDealModal} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-semibold shadow-2xs active:scale-[0.99] cursor-pointer transition-colors">Save Stage</button>
             </div>
           </div>
         </div>

@@ -6,6 +6,8 @@ import LeadGuideModal from '../leads/LeadGuideModal';
 import { withStandardLeadFields } from '../../../data/crm/leadFormSchema';
 import { useCrmStore } from '../../../stores/crmStore';
 import { loadForms, saveForms, setActiveFormId, getActiveFormId, LEAD_FORM } from '../../../services/crmForms';
+import { sessionCan } from '../../../services/lazyModules';
+import FormActiveToggle from './FormActiveToggle';
 
 export default function LeadFormsPage() {
   const navigate = useNavigate();
@@ -18,10 +20,15 @@ export default function LeadFormsPage() {
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  // New forms start Active, as every form was before the toggle existed.
+  const [formActive, setFormActive] = useState(true);
+  // Who may switch a form on or off: the pipeline managers the API lets edit forms.
+  const canToggle = sessionCan('manage_pipeline');
 
   function openCreateModal() {
     setFormName('');
     setFormDesc('');
+    setFormActive(true);
     setIsModalOpen(true);
   }
 
@@ -39,6 +46,7 @@ export default function LeadFormsPage() {
       name: formName.trim(),
       description: formDesc.trim() || 'Custom lead capture form',
       createdOn: new Date().toLocaleDateString('en-GB'),
+      isActive: formActive,
       // Starts with the standard lead fields the Create Lead modal always shows.
       sections: withStandardLeadFields([{ id: 'lead-information', title: 'Lead Information', fields: [] }]),
     };
@@ -56,6 +64,13 @@ export default function LeadFormsPage() {
     navigate(`/crm/leads/form-builder?formId=${formId}`);
   }
 
+  /** Switch a form on or off in place: the same form row, only its status changes. */
+  function handleToggleActive(formId) {
+    const updated = leadForms.map((f) => (f.id === formId ? { ...f, isActive: f.isActive === false } : f));
+    saveForms(updated, LEAD_FORM);
+    setLeadForms(updated);
+  }
+
   function handleDeleteForm(formId) {
     const updated = leadForms.filter((f) => f.id !== formId);
     saveForms(updated, LEAD_FORM);
@@ -70,6 +85,7 @@ export default function LeadFormsPage() {
         onCreateForm={openCreateModal}
         onEditForm={handleEditForm}
         onDeleteForm={handleDeleteForm}
+        onToggleActive={canToggle ? handleToggleActive : undefined}
         onOpenGuide={() => setIsGuideOpen(true)}
       />
       <LeadGuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} variant="form" />
@@ -125,6 +141,14 @@ export default function LeadFormsPage() {
                   placeholder="Enter form description (optional)"
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 shadow-2xs text-slate-800 text-xs resize-none"
                 />
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold text-slate-700">Status</p>
+                  <p className="text-[11px] text-slate-500">Only active forms are used when creating a lead.</p>
+                </div>
+                <FormActiveToggle active={formActive} onToggle={() => setFormActive((v) => !v)} />
               </div>
 
               <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
