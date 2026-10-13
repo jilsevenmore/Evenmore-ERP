@@ -10,7 +10,6 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
-import { useEstimates, addEstimate, updateEstimate } from '../../services/estimateStore';
 import { PrintEstimateModal } from '../../components/common/PrintEstimateModal';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import { importEstimatesExcel, convertEstimateToChallan } from '../../services/upgradeService';
@@ -41,7 +40,15 @@ const estimateGuide = {
 };
 
 export const EstimatesPage = () => {
-    const { customers, addQuotation, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const {
+        estimates = [],
+        addEstimate,
+        updateEstimate,
+        customers = [],
+        addQuotation,
+        formatCurrency,
+        formatDateDDMMYYYY,
+    } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
     // Leads are offered in the Customer Account dropdown alongside customers,
@@ -52,7 +59,6 @@ export const EstimatesPage = () => {
     useEffect(() => { hydrateCrm?.(); }, [hydrateCrm]);
     const leadRequest = location.state && location.state.fromLead ? location.state : null;
     const autoOpened = React.useRef(false);
-    const estimates = useEstimates();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedEstimate, setSelectedEstimate] = useState(null);

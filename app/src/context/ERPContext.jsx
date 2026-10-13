@@ -44,6 +44,7 @@ function mapCategoryToHSN(category) {
  */
 const COLLECTION_ROUTE_MAP = {
     // Sales
+    estimates: '/sales/estimates',
     salesOrders: '/sales/orders',
     quotations: '/sales/quotations',
     proformaInvoices: '/sales/proforma',
@@ -2550,7 +2551,11 @@ export const ERPProvider = ({ children, }) => {
     // ── ESTIMATES ACTIONS ──────────────────────────────────────────────
     // The CRM screens read estimates through `services/estimateStore`.
     useEffect(() => {
-        publishEstimates(estimates, { addEstimate, updateEstimate });
+        publishEstimates(estimates, {
+            addEstimate,
+            updateEstimate,
+            requestEstimates: () => requestCollection('estimates'),
+        });
     }, [estimates]);
 
     const addEstimate = (est) => {
