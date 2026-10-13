@@ -357,7 +357,15 @@ export const DashboardPage = () => {
         )}
       />
       {topStats.length > 0 && (
-      <div className="grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3 sm:gap-4">
+      <div className={`grid grid-cols-1 min-[380px]:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 ${
+        topStats.length >= 7
+          ? 'min-[1600px]:grid-cols-7'
+          : topStats.length === 6
+          ? 'min-[1600px]:grid-cols-6'
+          : topStats.length === 5
+          ? 'min-[1600px]:grid-cols-5'
+          : 'min-[1600px]:grid-cols-4'
+      } gap-3 sm:gap-4`}>
         {topStats}
       </div>
       )}

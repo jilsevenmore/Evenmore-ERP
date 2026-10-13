@@ -34,7 +34,7 @@ export function StatCard(props) {
   const icon = rawStat.icon || props.icon;
   const tone = rawStat.tone || props.tone || props.color || 'blue';
   const rawTrend = rawStat.trend ?? props.trend ?? rawStat.change ?? props.change;
-  const note = rawStat.note || props.note || props.subtitle || props.period || '';
+  const note = rawStat.note || props.note || props.subtitle || props.period || props.subtext || '';
 
   let trendText = null;
   let isUp = true;
@@ -65,13 +65,21 @@ export function StatCard(props) {
   const bg = rawStat.badgeBg || props.badgeBg || toneStyle.bg;
   const fg = rawStat.iconColor || props.iconColor || toneStyle.fg;
 
+  const valStr = String(value ?? '');
+  let valClass = '';
+  if (valStr.length >= 13) {
+    valClass = ' is-tight';
+  } else if (valStr.length >= 8) {
+    valClass = ' is-compact';
+  }
+
   return (
     <article className="stat-card">
       <span className="stat-badge" style={{ background: bg, color: fg }}>
         <Icon size={20} strokeWidth={2} />
       </span>
       <div className="stat-body">
-        <strong className="stat-num" title={String(value)}>{value}</strong>
+        <strong className={`stat-num${valClass}`} title={valStr}>{value}</strong>
         <span className="stat-label" title={label}>{label}</span>
         {trendText && (
           <p className={`stat-trend ${isUp ? 'up' : 'down'}`}>

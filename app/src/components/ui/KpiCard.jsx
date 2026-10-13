@@ -13,6 +13,13 @@ const tones = {
 
 export default function KpiCard({ label, value, icon: Icon, symbol, tone = 'blue', children }) {
   const toneStyle = tones[tone] || tones.blue;
+  const valStr = String(value ?? '');
+  let valClass = '';
+  if (valStr.length >= 13) {
+    valClass = ' is-tight';
+  } else if (valStr.length >= 8) {
+    valClass = ' is-compact';
+  }
 
   return (
     <article className="stat-card">
@@ -20,7 +27,7 @@ export default function KpiCard({ label, value, icon: Icon, symbol, tone = 'blue
         {Icon ? <Icon size={20} strokeWidth={2} aria-hidden="true" /> : <span className="font-bold text-base">{symbol}</span>}
       </span>
       <div className="stat-body">
-        <strong className="stat-num" title={String(value)}>{value}</strong>
+        <strong className={`stat-num${valClass}`} title={valStr}>{value}</strong>
         <span className="stat-label" title={label}>{label}</span>
         {children}
       </div>
