@@ -12,6 +12,7 @@ import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCa
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintPurchaseOrderModal } from '../../components/common/PrintPurchaseOrderModal';
 import { fetchPoRegister, fetchVendorAdvances, createVendorAdvance, reconcileVendorAdvance } from '../../services/upgradeService';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const purchaseOrderGuide = {
     title: 'Purchase Orders',
     subtitle: 'Supplier procurement contracts driving inventory replenishment and vendor billing.',
@@ -838,7 +839,8 @@ export const PurchaseOrdersPage = () => {
                     min="1"
                     placeholder="e.g. 50000"
                     value={newAdvance.amount}
-                    onChange={(e) => setNewAdvance({ ...newAdvance, amount: e.target.value })}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => setNewAdvance({ ...newAdvance, amount: sanitizeNumberInput(e.target.value) })}
                     className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                   />
                 </div>
@@ -965,7 +967,8 @@ export const PurchaseOrdersPage = () => {
                   min="1"
                   max={selectedAdvance.unallocated_amount ?? selectedAdvance.amount}
                   value={reconcileForm.amount}
-                  onChange={(e) => setReconcileForm({ ...reconcileForm, amount: e.target.value })}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => setReconcileForm({ ...reconcileForm, amount: sanitizeNumberInput(e.target.value) })}
                   className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                 />
               </div>

@@ -33,6 +33,7 @@ import {
   Check,
   ShieldCheck,
 } from 'lucide-react';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 export const AddEditItemPage = () => {
   const { id } = useParams();
@@ -147,7 +148,7 @@ export const AddEditItemPage = () => {
 
   const [costPrice, setCostPrice] = useState('');
   const [sellingPrice, setSellingPrice] = useState('');
-  const [availableQty, setAvailableQty] = useState('0');
+  const [availableQty, setAvailableQty] = useState('');
   const [reorderLevel, setReorderLevel] = useState('');
   const [location, setLocation] = useState(locations[0]?.name || '');
   const [description, setDescription] = useState('');
@@ -1678,7 +1679,13 @@ export const AddEditItemPage = () => {
                     type="number"
                     step="0.01"
                     value={costPrice}
-                    onChange={(e) => setCostPrice(e.target.value)}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const cleaned = sanitizeNumberInput(raw);
+                      if (cleaned !== raw) e.target.value = cleaned;
+                      setCostPrice(cleaned);
+                    }}
                     className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
                     placeholder="45.00"
                   />
@@ -1691,7 +1698,13 @@ export const AddEditItemPage = () => {
                     type="number"
                     step="0.01"
                     value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const cleaned = sanitizeNumberInput(raw);
+                      if (cleaned !== raw) e.target.value = cleaned;
+                      setSellingPrice(cleaned);
+                    }}
                     className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
                     placeholder="129.99"
                   />
@@ -2039,9 +2052,15 @@ export const AddEditItemPage = () => {
                         <input
                           type="number"
                           value={availableQty}
-                          onChange={(e) => setAvailableQty(e.target.value)}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            setAvailableQty(cleaned);
+                          }}
                           className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                          placeholder="50"
+                          placeholder="0"
                         />
                       </div>
                       <div>
@@ -2051,7 +2070,13 @@ export const AddEditItemPage = () => {
                         <input
                           type="number"
                           value={reorderLevel}
-                          onChange={(e) => setReorderLevel(e.target.value)}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            setReorderLevel(cleaned);
+                          }}
                           className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
                           placeholder="15"
                         />
@@ -2067,9 +2092,15 @@ export const AddEditItemPage = () => {
                       <input
                         type="number"
                         value={availableQty}
-                        onChange={(e) => setAvailableQty(e.target.value)}
+                        onFocus={handleNumberInputFocus}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const cleaned = sanitizeNumberInput(raw);
+                          if (cleaned !== raw) e.target.value = cleaned;
+                          setAvailableQty(cleaned);
+                        }}
                         className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                        placeholder="50"
+                        placeholder="0"
                       />
                     </div>
                     <div>
@@ -2079,7 +2110,13 @@ export const AddEditItemPage = () => {
                       <input
                         type="number"
                         value={reorderLevel}
-                        onChange={(e) => setReorderLevel(e.target.value)}
+                        onFocus={handleNumberInputFocus}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const cleaned = sanitizeNumberInput(raw);
+                          if (cleaned !== raw) e.target.value = cleaned;
+                          setReorderLevel(cleaned);
+                        }}
                         className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
                         placeholder="15"
                       />

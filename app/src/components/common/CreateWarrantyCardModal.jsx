@@ -27,6 +27,7 @@ import {
     formatWarrantyPeriod,
     getWarrantyStatusStyle
 } from '../../utils/warrantyUtils';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 export const CreateWarrantyCardModal = ({
     isOpen,
@@ -454,9 +455,16 @@ export const CreateWarrantyCardModal = ({
                                                 type="number"
                                                 min="1"
                                                 value={warrantyPeriod}
+                                                onFocus={handleNumberInputFocus}
                                                 onChange={(e) => {
-                                                    setWarrantyPeriod(Math.max(1, Number(e.target.value) || 1));
+                                                    const val = sanitizeNumberInput(e.target.value);
+                                                    setWarrantyPeriod(val === '' ? '' : Math.max(1, Number(val)));
                                                     setIsOverride(true);
+                                                }}
+                                                onBlur={() => {
+                                                    if (!warrantyPeriod || Number(warrantyPeriod) < 1) {
+                                                        setWarrantyPeriod(1);
+                                                    }
                                                 }}
                                                 className="w-full h-10 px-3 border border-slate-200 rounded-xl bg-white font-mono font-bold text-slate-900 text-xs focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 focus:outline-none shadow-2xs transition-all"
                                                 required
@@ -629,12 +637,21 @@ export const CreateWarrantyCardModal = ({
                                             <input
                                                 type="number"
                                                 min="1"
-                                                value={item.warrantyPeriod || warrantyPeriod}
+                                                value={item.warrantyPeriod !== undefined ? item.warrantyPeriod : warrantyPeriod}
+                                                onFocus={handleNumberInputFocus}
                                                 onChange={(e) => {
+                                                    const val = sanitizeNumberInput(e.target.value);
                                                     const updated = [...itemsList];
-                                                    updated[itemIdx] = { ...updated[itemIdx], warrantyPeriod: Number(e.target.value) || 1 };
+                                                    updated[itemIdx] = { ...updated[itemIdx], warrantyPeriod: val === '' ? '' : Math.max(1, Number(val)) };
                                                     setItemsList(updated);
                                                     setIsOverride(true);
+                                                }}
+                                                onBlur={() => {
+                                                    if (!item.warrantyPeriod || Number(item.warrantyPeriod) < 1) {
+                                                        const updated = [...itemsList];
+                                                        updated[itemIdx] = { ...updated[itemIdx], warrantyPeriod: 1 };
+                                                        setItemsList(updated);
+                                                    }
                                                 }}
                                                 className="w-14 h-7 text-center border border-slate-200 rounded-lg bg-white font-mono text-xs font-bold text-slate-900"
                                             />
@@ -705,8 +722,17 @@ export const CreateWarrantyCardModal = ({
                                                                     <input
                                                                         type="number"
                                                                         min="1"
-                                                                        value={comp.warrantyPeriod || 1}
-                                                                        onChange={(e) => handleUpdateComponent(itemIdx, compIdx, 'warrantyPeriod', Number(e.target.value) || 1)}
+                                                                        value={comp.warrantyPeriod !== undefined ? comp.warrantyPeriod : 1}
+                                                                        onFocus={handleNumberInputFocus}
+                                                                        onChange={(e) => {
+                                                                            const val = sanitizeNumberInput(e.target.value);
+                                                                            handleUpdateComponent(itemIdx, compIdx, 'warrantyPeriod', val === '' ? '' : Math.max(1, Number(val)));
+                                                                        }}
+                                                                        onBlur={() => {
+                                                                            if (!comp.warrantyPeriod || Number(comp.warrantyPeriod) < 1) {
+                                                                                handleUpdateComponent(itemIdx, compIdx, 'warrantyPeriod', 1);
+                                                                            }
+                                                                        }}
                                                                         className="w-14 px-1 py-1.5 text-center border border-slate-200 rounded-lg text-xs font-mono font-bold text-emerald-800 bg-white"
                                                                     />
                                                                 </td>

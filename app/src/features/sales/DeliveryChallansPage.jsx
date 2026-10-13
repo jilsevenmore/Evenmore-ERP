@@ -14,6 +14,7 @@ import { SendChallanModal } from '../../components/common/SendChallanModal';
 import { PrintDeliveryChallanModal } from '../../components/common/PrintDeliveryChallanModal';
 import { FormSection } from '../../components/common/FormSection';
 import { lineSpecText, lineTotalWeight, formatKg } from '../../utils/salesLineMetal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const challanGuide = {
     title: 'Delivery Challans & Waybills',
     subtitle: 'Warehouse logistics dispatch, non-commercial shipping waybills, and proof of delivery (POD).',
@@ -118,12 +119,11 @@ export const DeliveryChallansPage = () => {
         setValidationError('');
         const updated = [...lineItems];
         const line = updated[index];
-        const qtyVal = Number(newQty);
-        const cappedQty = Math.max(0, qtyVal);
+        const cappedQty = newQty === '' ? '' : Math.max(0, Number(newQty));
         
         let selectedSerials = line.selectedSerials || [];
         if (line.isSerial && line.availableSerials) {
-            selectedSerials = line.availableSerials.slice(0, cappedQty);
+            selectedSerials = line.availableSerials.slice(0, Number(cappedQty) || 0);
         }
 
         updated[index] = {
@@ -525,7 +525,22 @@ export const DeliveryChallansPage = () => {
                 <div>
                   {/* Replaced label: <label ...>Total Packages / Cartons</label> */}
                   <label className="font-semibold text-slate-700 block mb-1">Bundles / Packages</label>
-                  <input type="number" min="1" value={totalPackages} onChange={(e) => setTotalPackages(Number(e.target.value))} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
+                  <input
+                    type="number"
+                    min="1"
+                    value={totalPackages}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => {
+                      const val = sanitizeNumberInput(e.target.value);
+                      setTotalPackages(val === '' ? '' : Math.max(1, Number(val)));
+                    }}
+                    onBlur={() => {
+                      if (!totalPackages || Number(totalPackages) < 1) {
+                        setTotalPackages(1);
+                      }
+                    }}
+                    className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"
+                  />
                 </div>
               </div>
 
@@ -548,11 +563,27 @@ export const DeliveryChallansPage = () => {
                     </div>
                     <div>
                       <label className="font-semibold text-slate-700 block mb-1">Gross (kg)</label>
-                      <input type="number" min="0" step="any" value={grossWeight} onChange={(e) => setGrossWeight(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 text-right font-mono"/>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={grossWeight}
+                        onFocus={handleNumberInputFocus}
+                        onChange={(e) => setGrossWeight(sanitizeNumberInput(e.target.value))}
+                        className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 text-right font-mono"
+                      />
                     </div>
                     <div>
                       <label className="font-semibold text-slate-700 block mb-1">Tare (kg)</label>
-                      <input type="number" min="0" step="any" value={tareWeight} onChange={(e) => setTareWeight(e.target.value)} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 text-right font-mono"/>
+                      <input
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={tareWeight}
+                        onFocus={handleNumberInputFocus}
+                        onChange={(e) => setTareWeight(sanitizeNumberInput(e.target.value))}
+                        className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 text-right font-mono"
+                      />
                     </div>
                     <div className="p-2 rounded bg-slate-50 border border-slate-200">
                       <span className="block text-[10px] font-semibold uppercase text-slate-500">Net</span>
@@ -656,7 +687,8 @@ export const DeliveryChallansPage = () => {
                                   step="any"
                                   max={item.remainingQty ?? item.orderedQty ?? 100}
                                   value={item.qty}
-                                  onChange={(e) => handleItemQtyChange(idx, Number(e.target.value))}
+                                  onFocus={handleNumberInputFocus}
+                                  onChange={(e) => handleItemQtyChange(idx, sanitizeNumberInput(e.target.value))}
                                   className={`w-20 text-center text-xs font-semibold text-slate-800 border rounded px-1.5 py-1 focus:ring-1 ${
                                     isOverLimit ? 'border-rose-500 bg-rose-50' : 'border-slate-200 focus:ring-blue-500'
                                   }`}

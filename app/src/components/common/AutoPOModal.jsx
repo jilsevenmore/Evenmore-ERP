@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, ShoppingBag, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useERP } from '../../context/ERPContext';
 import { getCurrentDateFormatted } from '../../utils/dateUtils';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 export const AutoPOModal = ({
   isOpen,
   onClose,
@@ -191,8 +192,18 @@ export const AutoPOModal = ({
                 type="number"
                 min="1"
                 required
-                value={orderQty}
-                onChange={(e) => setOrderQty(Math.max(1, Number(e.target.value)))}
+                value={orderQty ?? ''}
+                onFocus={handleNumberInputFocus}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') { setOrderQty(''); return; }
+                  const cleaned = sanitizeNumberInput(raw);
+                  if (cleaned !== raw) e.target.value = cleaned;
+                  setOrderQty(cleaned === '' ? '' : Math.max(1, Number(cleaned)));
+                }}
+                onBlur={() => {
+                  if (!orderQty || Number(orderQty) < 1) setOrderQty(1);
+                }}
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white font-mono font-bold text-sm text-slate-900"
               />
             </div>
@@ -203,8 +214,19 @@ export const AutoPOModal = ({
                 step="0.01"
                 min="0"
                 required
-                value={unitCost}
-                onChange={(e) => setUnitCost(Math.max(0, Number(e.target.value)))}
+                placeholder="0.00"
+                value={unitCost ?? ''}
+                onFocus={handleNumberInputFocus}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === '') { setUnitCost(''); return; }
+                  const cleaned = sanitizeNumberInput(raw);
+                  if (cleaned !== raw) e.target.value = cleaned;
+                  setUnitCost(cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                }}
+                onBlur={() => {
+                  if (unitCost === '') setUnitCost(0);
+                }}
                 className="w-full p-2 border border-slate-300 rounded-lg bg-white font-mono text-slate-900"
               />
             </div>

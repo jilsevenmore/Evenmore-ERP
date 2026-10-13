@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Plus, RotateCcw, CheckCircle2, AlertCircle, X, Ban, Eye, FileText, Check, ShieldAlert } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const salesReturnGuide = {
     title: 'Sales Returns & Credit Notes',
@@ -157,18 +158,24 @@ export const SalesReturnsPage = () => {
         setValidationError('');
         const updated = [...returnLines];
         const line = updated[index];
-        const numVal = Math.max(0, parseInt(val, 10) || 0);
-        
-        if (numVal > line.returnableQty) {
-            setValidationError(`Cannot return more than ${line.returnableQty} units for ${line.description}.`);
-            line.returnQty = line.returnableQty;
+        if (val === '') {
+            line.returnQty = '';
+            if (line.isSerial) {
+                line.selectedSerials = [];
+            }
         } else {
-            line.returnQty = numVal;
-        }
+            const numVal = Math.max(0, parseInt(val, 10) || 0);
+            if (numVal > line.returnableQty) {
+                setValidationError(`Cannot return more than ${line.returnableQty} units for ${line.description}.`);
+                line.returnQty = line.returnableQty;
+            } else {
+                line.returnQty = numVal;
+            }
 
-        // Auto-adjust selected serials count if serialized
-        if (line.isSerial) {
-            line.selectedSerials = line.returnableSerials.slice(0, line.returnQty);
+            // Auto-adjust selected serials count if serialized
+            if (line.isSerial) {
+                line.selectedSerials = line.returnableSerials.slice(0, line.returnQty);
+            }
         }
 
         updated[index] = line;
@@ -520,7 +527,8 @@ export const SalesReturnsPage = () => {
                                                                     max={line.returnableQty}
                                                                     disabled={isExhausted}
                                                                     value={line.returnQty}
-                                                                    onChange={(e) => handleLineQtyChange(idx, e.target.value)}
+                                                                    onFocus={handleNumberInputFocus}
+                                                                    onChange={(e) => handleLineQtyChange(idx, sanitizeNumberInput(e.target.value))}
                                                                     className="w-20 p-1 border border-slate-300 rounded text-center font-bold font-mono focus:border-rose-500"
                                                                 />
                                                             </td>

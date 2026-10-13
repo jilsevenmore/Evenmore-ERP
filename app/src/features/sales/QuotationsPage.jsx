@@ -17,6 +17,7 @@ import { sheetAutoDescription, lineSpecText } from '../../utils/salesLineMetal';
 import { FormSection } from '../../components/common/FormSection';
 import { ShareApprovalLinkModal } from './approval/ShareApprovalLinkModal';
 import PartySelector from '../../components/common/PartySelector';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 // Replaced: moved to components/common/FormSection.jsx so every sales form shares it.
 // const FormSection = ({ number, title, hint }) => (
@@ -491,7 +492,7 @@ export const QuotationsPage = () => {
               <label className="block font-semibold text-slate-700">Terms & Conditions<textarea rows="3" value={terms} onChange={event => setTerms(event.target.value)} placeholder={'e.g. Prices ex-works; GST extra as applicable.\nWeight-based items billed at actual weight (±2% variation).\nTransport, unloading & installation extra unless stated.'} className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
               {/* Replaced: Authorized Person now sits beside Freight under its own section.
               <label className="block font-semibold text-slate-700 sm:w-1/2">Authorized Person<input value={authorizedPerson} onChange={event => setAuthorizedPerson(event.target.value)} placeholder="Name printed above the signature" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label> */}
-              <label className="block font-semibold text-slate-700 sm:w-1/2">Freight / Transport Charges (₹)<input type="number" min="0" step="0.01" value={freight} onChange={event => setFreight(event.target.value)} placeholder="Leave empty if ex-works / extra at actuals" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
+              <label className="block font-semibold text-slate-700 sm:w-1/2">Freight / Transport Charges (₹)<input type="number" min="0" step="0.01" value={freight} onFocus={handleNumberInputFocus} onChange={event => setFreight(sanitizeNumberInput(event.target.value))} placeholder="Leave empty if ex-works / extra at actuals" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
               <FormSection number="04" title="Authorisation" hint="Printed above the signature on the quotation PDF." />
               <label className="block font-semibold text-slate-700 sm:w-1/2">Authorized Person<input value={authorizedPerson} onChange={event => setAuthorizedPerson(event.target.value)} placeholder="Name printed above the signature" className="block mt-1 w-full p-2 border border-slate-300 rounded font-normal"/></label>
               <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-200">
@@ -743,8 +744,9 @@ export const QuotationsPage = () => {
                           step="any"
                           min="0.0001"
                           value={mapping.qty ?? line.qty ?? 1}
+                          onFocus={handleNumberInputFocus}
                           onChange={(e) => {
-                            const val = e.target.value;
+                            const val = sanitizeNumberInput(e.target.value);
                             setConversionMappings((prev) => ({
                               ...prev,
                               [key]: {

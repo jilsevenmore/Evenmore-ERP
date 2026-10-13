@@ -16,6 +16,7 @@ import { PrintSalesOrderModal } from '../../components/common/PrintSalesOrderMod
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
 import { usePmsStore } from '../../stores/pmsStore';
 import { CreateProjectModal } from '../pms/projects/components/CreateProjectModal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const salesOrderGuide = {
     title: 'Sales Orders',
     subtitle: 'Customer purchase agreements driving warehouse reservation, proforma billing, and dispatch.',
@@ -89,19 +90,37 @@ export const SalesOrdersPage = () => {
     }, [lineItems, showAddModal]);
 
     const handleInvoiceAmountChange = (val) => {
-        const numVal = Number(val) || 0;
+        if (val === '') {
+            setFormalInvoiceAmountInput('');
+            if (autoBalanceSplit) {
+                setCashAmountInput(totalSalesValueInput);
+            }
+            return;
+        }
+        const cleaned = sanitizeNumberInput(val);
+        const numVal = cleaned === '' ? '' : Math.max(0, Number(cleaned));
         setFormalInvoiceAmountInput(numVal);
         if (autoBalanceSplit) {
-            const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+            const numericVal = Number(numVal) || 0;
+            const rem = Math.max(0, Math.round((totalSalesValueInput - numericVal) * 100) / 100);
             setCashAmountInput(rem);
         }
     };
 
     const handleCashAmountChange = (val) => {
-        const numVal = Number(val) || 0;
+        if (val === '') {
+            setCashAmountInput('');
+            if (autoBalanceSplit) {
+                setFormalInvoiceAmountInput(totalSalesValueInput);
+            }
+            return;
+        }
+        const cleaned = sanitizeNumberInput(val);
+        const numVal = cleaned === '' ? '' : Math.max(0, Number(cleaned));
         setCashAmountInput(numVal);
         if (autoBalanceSplit) {
-            const rem = Math.max(0, Math.round((totalSalesValueInput - numVal) * 100) / 100);
+            const numericVal = Number(numVal) || 0;
+            const rem = Math.max(0, Math.round((totalSalesValueInput - numericVal) * 100) / 100);
             setFormalInvoiceAmountInput(rem);
         }
     };
@@ -845,8 +864,17 @@ export const SalesOrdersPage = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={formalInvoiceAmountInput}
-                          onChange={(e) => handleInvoiceAmountChange(e.target.value)}
+                          value={formalInvoiceAmountInput ?? ''}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            handleInvoiceAmountChange(cleaned);
+                          }}
+                          onBlur={() => {
+                            if (formalInvoiceAmountInput === '') setFormalInvoiceAmountInput(0);
+                          }}
                           className="w-full p-2 border border-blue-300 rounded-lg bg-blue-50/30 text-blue-950 font-mono font-bold text-sm focus:ring-2 focus:ring-blue-500"
                           placeholder="0.00"
                         />
@@ -917,8 +945,17 @@ export const SalesOrdersPage = () => {
                           type="number"
                           step="0.01"
                           min="0"
-                          value={cashAmountInput}
-                          onChange={(e) => handleCashAmountChange(e.target.value)}
+                          value={cashAmountInput ?? ''}
+                          onFocus={handleNumberInputFocus}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            const cleaned = sanitizeNumberInput(raw);
+                            if (cleaned !== raw) e.target.value = cleaned;
+                            handleCashAmountChange(cleaned);
+                          }}
+                          onBlur={() => {
+                            if (cashAmountInput === '') setCashAmountInput(0);
+                          }}
                           className="w-full p-2 border border-amber-300 rounded-lg bg-amber-50/30 text-amber-950 font-mono font-bold text-sm focus:ring-2 focus:ring-amber-500"
                           placeholder="0.00"
                         />
@@ -1476,11 +1513,24 @@ export const SalesOrdersPage = () => {
                       step="0.01"
                       min="0"
                       max={allocModalTotal}
-                      value={allocModalFormal}
+                      value={allocModalFormal ?? ''}
+                      onFocus={handleNumberInputFocus}
                       onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          setAllocModalFormal('');
+                          setAllocModalCash(allocModalTotal);
+                          return;
+                        }
+                        const cleaned = sanitizeNumberInput(raw);
+                        if (cleaned !== raw) e.target.value = cleaned;
+                        const val = cleaned === '' ? '' : Number(cleaned);
                         setAllocModalFormal(val);
-                        setAllocModalCash(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                        const numericVal = Number(val) || 0;
+                        setAllocModalCash(Math.max(0, Math.round((allocModalTotal - numericVal) * 100) / 100));
+                      }}
+                      onBlur={() => {
+                        if (allocModalFormal === '') setAllocModalFormal(0);
                       }}
                       className="w-full p-2 border border-blue-300 rounded-lg bg-white font-mono font-bold text-blue-900 focus:ring-2 focus:ring-blue-500 text-sm"
                     />
@@ -1496,11 +1546,24 @@ export const SalesOrdersPage = () => {
                       step="0.01"
                       min="0"
                       max={allocModalTotal}
-                      value={allocModalCash}
+                      value={allocModalCash ?? ''}
+                      onFocus={handleNumberInputFocus}
                       onChange={(e) => {
-                        const val = Number(e.target.value) || 0;
+                        const raw = e.target.value;
+                        if (raw === '') {
+                          setAllocModalCash('');
+                          setAllocModalFormal(allocModalTotal);
+                          return;
+                        }
+                        const cleaned = sanitizeNumberInput(raw);
+                        if (cleaned !== raw) e.target.value = cleaned;
+                        const val = cleaned === '' ? '' : Number(cleaned);
                         setAllocModalCash(val);
-                        setAllocModalFormal(Math.max(0, Math.round((allocModalTotal - val) * 100) / 100));
+                        const numericVal = Number(val) || 0;
+                        setAllocModalFormal(Math.max(0, Math.round((allocModalTotal - numericVal) * 100) / 100));
+                      }}
+                      onBlur={() => {
+                        if (allocModalCash === '') setAllocModalCash(0);
                       }}
                       className="w-full p-2 border border-amber-300 rounded-lg bg-white font-mono font-bold text-amber-900 focus:ring-2 focus:ring-amber-500 text-sm"
                     />

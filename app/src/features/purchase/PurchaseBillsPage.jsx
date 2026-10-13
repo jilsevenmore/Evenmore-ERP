@@ -10,6 +10,7 @@ import { DocumentTimeline } from '../../components/common/DocumentTimeline';
 import { RelatedDocumentsCard } from '../../components/common/RelatedDocumentsCard';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintBillModal } from '../../components/common/PrintBillModal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const purchaseBillGuide = {
     title: 'Purchase Bills & Accounts Payable',
     subtitle: 'Supplier invoice intake, 3-way matching audit, inventory replenishment, and disbursements.',
@@ -611,7 +612,24 @@ export const PurchaseBillsPage = () => {
 
               <div>
                 <label className="font-semibold text-slate-700 block mb-1">Disbursement Amount ($) *</label>
-                <input type="number" step="0.01" min="0.01" max={getBillOutstanding(showPayModal.id).balanceDue} value={payAmount} onChange={(e) => setPayAmount(Number(e.target.value))} required className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-mono font-bold text-sm"/>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  max={getBillOutstanding(showPayModal.id).balanceDue}
+                  value={payAmount ?? ''}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setPayAmount(''); return; }
+                    const cleaned = sanitizeNumberInput(raw);
+                    if (cleaned !== raw) e.target.value = cleaned;
+                    setPayAmount(cleaned === '' ? '' : Number(cleaned));
+                  }}
+                  placeholder="0.00"
+                  required
+                  className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-mono font-bold text-sm"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

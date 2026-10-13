@@ -14,6 +14,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { FormSection } from '../../components/common/FormSection';
 import { Pagination } from '../../components/ui/Pagination';
 import PartySelector from '../../components/common/PartySelector';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const invoiceGuide = {
     title: 'Sales Invoices & Receivables',
@@ -1135,14 +1136,29 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            value={totalSalesValueInput}
+                                            value={totalSalesValueInput ?? ''}
+                                            onFocus={handleNumberInputFocus}
                                             onChange={(e) => {
-                                                const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                                const raw = e.target.value;
+                                                if (raw === '') {
+                                                    setTotalSalesValueInput('');
+                                                    setFormalInvoiceAmountInput('');
+                                                    setCashAmountInput('');
+                                                    setErrorMessage('');
+                                                    return;
+                                                }
+                                                const cleaned = sanitizeNumberInput(raw);
+                                                if (cleaned !== raw) e.target.value = cleaned;
+                                                const val = Math.max(0, parseFloat(cleaned) || 0);
                                                 setTotalSalesValueInput(val);
-                                                const newFormal = Math.min(formalInvoiceAmountInput, val);
+                                                const currentFormal = Number(formalInvoiceAmountInput) || 0;
+                                                const newFormal = Math.min(currentFormal, val);
                                                 setFormalInvoiceAmountInput(newFormal);
                                                 setCashAmountInput(Math.max(0, val - newFormal));
                                                 setErrorMessage('');
+                                            }}
+                                            onBlur={() => {
+                                                if (totalSalesValueInput === '') setTotalSalesValueInput(0);
                                             }}
                                             className="w-full font-mono font-bold text-slate-900 border border-slate-300 rounded px-2 py-1 text-xs"
                                         />
@@ -1157,13 +1173,27 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            value={formalInvoiceAmountInput}
+                                            value={formalInvoiceAmountInput ?? ''}
+                                            onFocus={handleNumberInputFocus}
                                             onChange={(e) => {
-                                                const formal = Math.max(0, parseFloat(e.target.value) || 0);
+                                                const raw = e.target.value;
+                                                if (raw === '') {
+                                                    setFormalInvoiceAmountInput('');
+                                                    setCashAmountInput(totalSalesValueInput);
+                                                    setErrorMessage('');
+                                                    return;
+                                                }
+                                                const cleaned = sanitizeNumberInput(raw);
+                                                if (cleaned !== raw) e.target.value = cleaned;
+                                                const formal = Math.max(0, parseFloat(cleaned) || 0);
                                                 setFormalInvoiceAmountInput(formal);
-                                                const cash = Math.max(0, totalSalesValueInput - formal);
+                                                const total = Number(totalSalesValueInput) || 0;
+                                                const cash = Math.max(0, total - formal);
                                                 setCashAmountInput(cash);
                                                 setErrorMessage('');
+                                            }}
+                                            onBlur={() => {
+                                                if (formalInvoiceAmountInput === '') setFormalInvoiceAmountInput(0);
                                             }}
                                             className="w-full font-mono font-bold text-blue-950 border border-blue-300 rounded px-2 py-1 text-xs bg-white"
                                         />
@@ -1178,13 +1208,27 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             type="number"
                                             min="0"
                                             step="0.01"
-                                            value={cashAmountInput}
+                                            value={cashAmountInput ?? ''}
+                                            onFocus={handleNumberInputFocus}
                                             onChange={(e) => {
-                                                const cash = Math.max(0, parseFloat(e.target.value) || 0);
+                                                const raw = e.target.value;
+                                                if (raw === '') {
+                                                    setCashAmountInput('');
+                                                    setFormalInvoiceAmountInput(totalSalesValueInput);
+                                                    setErrorMessage('');
+                                                    return;
+                                                }
+                                                const cleaned = sanitizeNumberInput(raw);
+                                                if (cleaned !== raw) e.target.value = cleaned;
+                                                const cash = Math.max(0, parseFloat(cleaned) || 0);
                                                 setCashAmountInput(cash);
-                                                const formal = Math.max(0, totalSalesValueInput - cash);
+                                                const total = Number(totalSalesValueInput) || 0;
+                                                const formal = Math.max(0, total - cash);
                                                 setFormalInvoiceAmountInput(formal);
                                                 setErrorMessage('');
+                                            }}
+                                            onBlur={() => {
+                                                if (cashAmountInput === '') setCashAmountInput(0);
                                             }}
                                             className="w-full font-mono font-bold text-amber-950 border border-amber-300 rounded px-2 py-1 text-xs bg-white"
                                         />

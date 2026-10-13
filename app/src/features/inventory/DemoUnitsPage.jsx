@@ -29,6 +29,7 @@ import {
   convertDemoUnitToSale 
 } from '../../services/upgradeService';
 import { rowsOf, isServerId } from '../../services/resourceSync';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const demoUnitsGuide = {
   title: 'Trial Machines & Demo Units Tracking',
@@ -108,7 +109,7 @@ export const DemoUnitsPage = () => {
   const [inspectForm, setInspectForm] = useState({
     return_date: new Date().toISOString().slice(0, 10),
     physical_condition: 'Excellent',
-    refurbishment_cost: '0.00',
+    refurbishment_cost: '',
     notes: '',
   });
 
@@ -297,7 +298,7 @@ export const DemoUnitsPage = () => {
                 setInspectForm({
                   return_date: new Date().toISOString().slice(0, 10),
                   physical_condition: 'Excellent',
-                  refurbishment_cost: '0.00',
+                  refurbishment_cost: '',
                   notes: '',
                 });
                 setShowInspectModal(true);
@@ -491,7 +492,8 @@ export const DemoUnitsPage = () => {
                   step="0.01"
                   placeholder="e.g. 150000"
                   value={deployForm.security_deposit}
-                  onChange={(e) => setDeployForm({ ...deployForm, security_deposit: e.target.value })}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => setDeployForm({ ...deployForm, security_deposit: sanitizeNumberInput(e.target.value) })}
                   className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                 />
               </div>
@@ -575,8 +577,10 @@ export const DemoUnitsPage = () => {
                   type="number"
                   step="0.01"
                   min="0"
+                  placeholder="0.00"
                   value={inspectForm.refurbishment_cost}
-                  onChange={(e) => setInspectForm({ ...inspectForm, refurbishment_cost: e.target.value })}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => setInspectForm({ ...inspectForm, refurbishment_cost: sanitizeNumberInput(e.target.value) })}
                   className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                 />
                 <span className="text-[10px] text-slate-400">Deducted from security deposit if applicable</span>
@@ -651,7 +655,8 @@ export const DemoUnitsPage = () => {
                     min="1"
                     placeholder="e.g. 750000"
                     value={convertForm.final_sale_price}
-                    onChange={(e) => setConvertForm({ ...convertForm, final_sale_price: e.target.value })}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => setConvertForm({ ...convertForm, final_sale_price: sanitizeNumberInput(e.target.value) })}
                     className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                   />
                 </div>
@@ -661,7 +666,8 @@ export const DemoUnitsPage = () => {
                     type="number"
                     step="0.01"
                     value={convertForm.security_deposit_applied}
-                    onChange={(e) => setConvertForm({ ...convertForm, security_deposit_applied: e.target.value })}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => setConvertForm({ ...convertForm, security_deposit_applied: sanitizeNumberInput(e.target.value) })}
                     className="w-full p-2 border border-slate-300 rounded-lg text-slate-800 font-mono"
                   />
                 </div>

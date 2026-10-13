@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const paymentInGuide = {
     title: 'Payment In & Cash Receipts',
@@ -70,7 +71,7 @@ export const PaymentInPage = () => {
     const [paymentType, setPaymentType] = useState('WITH_BILL'); // 'WITH_BILL' | 'WITHOUT_BILL'
     const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
-    const [amount, setAmount] = useState(0);
+    const [amount, setAmount] = useState('');
     const [mode, setMode] = useState('Bank Transfer');
     const [reference, setReference] = useState('');
     const [description, setDescription] = useState('');
@@ -870,8 +871,15 @@ export const PaymentInPage = () => {
                                     required
                                     min="0.01"
                                     max={paymentType === 'WITH_BILL' && selectedOutstanding.balanceDue > 0 ? selectedOutstanding.balanceDue : undefined}
-                                    value={amount}
-                                    onChange={(e) => setAmount(e.target.value)}
+                                    placeholder="0.00"
+                                    value={amount ?? ''}
+                                    onFocus={handleNumberInputFocus}
+                                    onChange={(e) => {
+                                        const raw = e.target.value;
+                                        const cleaned = sanitizeNumberInput(raw);
+                                        if (cleaned !== raw) e.target.value = cleaned;
+                                        setAmount(cleaned);
+                                    }}
                                     className="w-full border border-slate-300 rounded-lg p-2 bg-white font-mono font-bold text-sm text-slate-900"
                                 />
                                 {paymentType === 'WITH_BILL' && selectedOutstanding.balanceDue > 0 && Number(amount) > selectedOutstanding.balanceDue + 0.01 && (

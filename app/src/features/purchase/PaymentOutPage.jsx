@@ -5,6 +5,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Plus, ArrowUpRight, CreditCard, X, DollarSign, Receipt, CheckCircle2, TrendingDown } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const paymentOutGuide = {
     title: 'Payment Out & Vendor Disbursements',
     subtitle: 'Supplier payment authorization and Accounts Payable settlement',
@@ -261,7 +262,14 @@ export const PaymentOutPage = () => {
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">Amount (max advance)</label>
             <input type="number" min="0.01" step="0.01" value={advanceApplyAmt || ''}
-              onChange={(e) => setAdvanceApplyAmt(Number(e.target.value))}
+              onFocus={handleNumberInputFocus}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') { setAdvanceApplyAmt(''); return; }
+                const cleaned = sanitizeNumberInput(raw);
+                if (cleaned !== raw) e.target.value = cleaned;
+                setAdvanceApplyAmt(cleaned === '' ? '' : Number(cleaned));
+              }}
               placeholder="Amount to adjust"
               className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-900 font-mono text-xs"
             />
@@ -430,8 +438,16 @@ export const PaymentOutPage = () => {
                   min="0.01"
                   max={paymentType === 'Final' ? Math.max(0.01, selectedBillOutstanding.balanceDue) : undefined}
                   disabled={paymentType === 'Final' && (isCancelled || isSettled)}
-                  value={amount}
-                  onChange={(e) => setAmount(Number(e.target.value))}
+                  value={amount ?? ''}
+                  onFocus={handleNumberInputFocus}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === '') { setAmount(''); return; }
+                    const cleaned = sanitizeNumberInput(raw);
+                    if (cleaned !== raw) e.target.value = cleaned;
+                    setAmount(cleaned === '' ? '' : Number(cleaned));
+                  }}
+                  placeholder="0.00"
                   className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-900 font-mono font-bold text-sm disabled:bg-slate-100"
                 />
               </div>

@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Plus, RotateCcw, CheckCircle2, X, Ban, AlertCircle, Eye, Printer, MapPin } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PrintDebitNoteModal } from '../../components/common/PrintDebitNoteModal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const purchaseReturnGuide = {
     title: 'Purchase Returns & Debit Notes',
     subtitle: 'Supplier RMA, debit memo issuance, selective item returns, and payables write-down',
@@ -93,14 +94,18 @@ export const PurchaseReturnsPage = () => {
             if (i !== idx) return item;
             const updated = { ...item, [field]: value };
             if (field === 'qty') {
-                const num = Math.max(0, Math.min(Number(value) || 0, item.returnableQty));
-                updated.qty = num;
-                if (updated.isSerial) {
-                    updated.selectedSerials = (updated.availableSerials || []).slice(0, num);
-                }
-                // [PHASE-2A] keep returned weight in sync with returned qty for steel lines
-                if (updated.isWeightItem && updated.theoreticalWeight) {
-                    updated.returnedWeight = Number((updated.theoreticalWeight * num).toFixed(3));
+                if (value === '') {
+                    updated.qty = '';
+                } else {
+                    const num = Math.max(0, Math.min(Number(value) || 0, item.returnableQty));
+                    updated.qty = num;
+                    if (updated.isSerial) {
+                        updated.selectedSerials = (updated.availableSerials || []).slice(0, num);
+                    }
+                    // [PHASE-2A] keep returned weight in sync with returned qty for steel lines
+                    if (updated.isWeightItem && updated.theoreticalWeight) {
+                        updated.returnedWeight = Number((updated.theoreticalWeight * num).toFixed(3));
+                    }
                 }
             }
             return updated;
@@ -358,7 +363,8 @@ export const PurchaseReturnsPage = () => {
                                 max={line.returnableQty}
                                 value={line.qty}
                                 disabled={line.returnableQty <= 0}
-                                onChange={(e) => handleItemChange(idx, 'qty', e.target.value)}
+                                onFocus={handleNumberInputFocus}
+                                onChange={(e) => handleItemChange(idx, 'qty', sanitizeNumberInput(e.target.value))}
                                 className="w-20 p-1 text-center font-mono font-bold border border-slate-300 rounded-lg bg-white text-slate-900 disabled:bg-slate-100"
                               />
                             </td>
@@ -371,7 +377,8 @@ export const PurchaseReturnsPage = () => {
                                   step="0.01"
                                   value={line.returnedWeight ?? ''}
                                   disabled={line.qty <= 0}
-                                  onChange={(e) => handleItemChange(idx, 'returnedWeight', e.target.value)}
+                                  onFocus={handleNumberInputFocus}
+                                  onChange={(e) => handleItemChange(idx, 'returnedWeight', sanitizeNumberInput(e.target.value))}
                                   className="w-24 p-1 text-center font-mono font-bold border border-blue-200 rounded-lg bg-white text-slate-900 disabled:bg-slate-100"
                                   title="Weighed kg returned on the weighbridge"
                                 />

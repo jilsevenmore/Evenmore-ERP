@@ -5,6 +5,7 @@ import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
 import { Plus, TrendingDown, CheckCircle2, DollarSign, Receipt, Tag } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const expensesGuide = {
     title: 'Operating Expenses Management',
@@ -167,7 +168,15 @@ export const ExpensesPage = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Amount ($)</label>
-                  <input type="number" required value={amount} onChange={(e) => setAmount(e.target.value)} className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono" placeholder="1200"/>
+                  <input
+                    type="number"
+                    required
+                    value={amount}
+                    onFocus={handleNumberInputFocus}
+                    onChange={(e) => setAmount(sanitizeNumberInput(e.target.value))}
+                    className="w-full border border-[#CED4DA] rounded p-2 bg-[#F8F9FA] font-mono"
+                    placeholder="1200"
+                  />
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Method</label>

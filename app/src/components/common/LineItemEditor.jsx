@@ -7,6 +7,7 @@ import {
   METAL_MATERIALS, METAL_FORMS, METAL_FINISHES, materialOf, formOf, dimLabel, KIND_DEFAULT_FORM,
   kindUsesCalculator, suggestHsn, calcPieceWeight, pieceWeightOf, applySheetSpec, linePieces, sheetAutoDescription,
 } from '../../utils/salesLineMetal';
+import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
 const createEmptyLine = () => ({
   id: `li-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
@@ -16,8 +17,8 @@ const createEmptyLine = () => ({
   name: '',
   description: '',
   qty: 1,
-  rate: 0,
-  discount: 0,
+  rate: '',
+  discount: '',
   tax: 18,
   amount: 0,
   isUserModified: false,
@@ -288,7 +289,7 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
             itemSku: selected.sku,
             name: selected.name,
             description: selected.name,
-            rate: unitRate,
+            rate: unitRate > 0 ? unitRate : '',
             amount,
             isUserModified: false,
             // [PHASE-2A] propagate weight-item config (steel by kg) onto the transaction line
@@ -784,7 +785,17 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                     aria-label="Weight per unit (kg)"
                                     placeholder="Wt kg/unit"
                                     value={item.unitWeight ?? ''}
-                                    onChange={(e) => handleFieldChange(index, 'unitWeight', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))}
+                                    onFocus={handleNumberInputFocus}
+                                    onChange={(e) => {
+                                      const raw = e.target.value;
+                                      if (raw === '') {
+                                        handleFieldChange(index, 'unitWeight', '');
+                                        return;
+                                      }
+                                      const cleaned = sanitizeNumberInput(raw);
+                                      if (cleaned !== raw) e.target.value = cleaned;
+                                      handleFieldChange(index, 'unitWeight', cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                                    }}
                                     className="text-[11px] text-right px-2 py-1 rounded-md border border-border/70 bg-card text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
                                   />
                                 </div>
@@ -876,13 +887,27 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                               type="number"
                               min={allowsDecimal ? "0.01" : "1"}
                               step={allowsDecimal ? "0.01" : "1"}
-                              value={item.qty ?? 1}
+                              placeholder="1"
+                              value={item.qty ?? ''}
+                              onFocus={handleNumberInputFocus}
                               onChange={(e) => {
-                                const val = parseFloat(e.target.value);
+                                const raw = e.target.value;
+                                if (raw === '') {
+                                  handleFieldChange(index, 'qty', '');
+                                  return;
+                                }
+                                const cleaned = sanitizeNumberInput(raw);
+                                if (cleaned !== raw) e.target.value = cleaned;
+                                const val = parseFloat(cleaned);
                                 if (isNaN(val) || val <= 0) {
-                                  handleFieldChange(index, 'qty', allowsDecimal ? 0.01 : 1);
+                                  handleFieldChange(index, 'qty', '');
                                 } else {
                                   handleFieldChange(index, 'qty', allowsDecimal ? val : Math.floor(val));
+                                }
+                              }}
+                              onBlur={() => {
+                                if (!item.qty || Number(item.qty) <= 0) {
+                                  handleFieldChange(index, 'qty', allowsDecimal ? 0.01 : 1);
                                 }
                               }}
                               className="w-16 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
@@ -914,8 +939,19 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             type="number"
                             min="0"
                             step="0.01"
-                            value={item.rate ?? 0}
-                            onChange={(e) => handleFieldChange(index, 'rate', Math.max(0, Number(e.target.value)))}
+                            placeholder="0.00"
+                            value={item.rate ?? ''}
+                            onFocus={handleNumberInputFocus}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') {
+                                handleFieldChange(index, 'rate', '');
+                                return;
+                              }
+                              const cleaned = sanitizeNumberInput(raw);
+                              if (cleaned !== raw) e.target.value = cleaned;
+                              handleFieldChange(index, 'rate', cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                            }}
                             className="w-24 text-right font-mono text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition ml-auto"
                           />
                         ) : (
@@ -932,8 +968,20 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             type="number"
                             min="0"
                             max="100"
-                            value={item.discount || 0}
-                            onChange={(e) => handleFieldChange(index, 'discount', Number(e.target.value))}
+                            placeholder="0"
+                            value={item.discount ?? ''}
+                            onFocus={handleNumberInputFocus}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') {
+                                handleFieldChange(index, 'discount', '');
+                                return;
+                              }
+                              const cleaned = sanitizeNumberInput(raw);
+                              if (cleaned !== raw) e.target.value = cleaned;
+                              const num = Number(cleaned);
+                              handleFieldChange(index, 'discount', Math.min(100, Math.max(0, num)));
+                            }}
                             className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
                           />
                         ) : (
@@ -947,8 +995,19 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                             type="number"
                             min="0"
                             max="100"
-                            value={item.tax ?? 18}
-                            onChange={(e) => handleFieldChange(index, 'tax', Number(e.target.value))}
+                            placeholder="18"
+                            value={item.tax ?? ''}
+                            onFocus={handleNumberInputFocus}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              if (raw === '') {
+                                handleFieldChange(index, 'tax', '');
+                                return;
+                              }
+                              const cleaned = sanitizeNumberInput(raw);
+                              if (cleaned !== raw) e.target.value = cleaned;
+                              handleFieldChange(index, 'tax', Number(cleaned));
+                            }}
                             className="w-14 text-center text-xs font-semibold px-2 py-1.5 rounded-lg border border-border bg-card text-text focus:outline-none focus:border-primary transition"
                           />
                         ) : (
@@ -1026,7 +1085,25 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                       <input value={item.specification || ''} onChange={(e) => handleFieldChange(index, 'specification', e.target.value)} placeholder="Model, size, capacity…" className={metalInput} />
                                     </MetalField>
                                     <MetalField label="Wt / unit (kg)">
-                                      <input type="number" min="0" step="0.01" value={item.unitWeight ?? ''} onChange={(e) => handleFieldChange(index, 'unitWeight', e.target.value === '' ? '' : Math.max(0, Number(e.target.value)))} className={`${metalInput} w-24 text-right`} />
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0.00"
+                                        value={item.unitWeight ?? ''}
+                                        onFocus={handleNumberInputFocus}
+                                        onChange={(e) => {
+                                          const raw = e.target.value;
+                                          if (raw === '') {
+                                            handleFieldChange(index, 'unitWeight', '');
+                                            return;
+                                          }
+                                          const cleaned = sanitizeNumberInput(raw);
+                                          if (cleaned !== raw) e.target.value = cleaned;
+                                          handleFieldChange(index, 'unitWeight', cleaned === '' ? '' : Math.max(0, Number(cleaned)));
+                                        }}
+                                        className={`${metalInput} w-24 text-right`}
+                                      />
                                     </MetalField>
                                   </>
                                 )}
@@ -1035,11 +1112,52 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                 <div className="flex flex-wrap items-end gap-2">
                                   {(form?.dims || []).map((dim) => (
                                     <MetalField key={dim} label={dimLabel(spec.form, dim)}>
-                                      <input type="number" min="0" step="0.01" value={spec[dim] ?? ''} onChange={(e) => handleSheetSpecChange(index, { [dim]: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })} className={`${metalInput} w-24 text-right font-mono`} />
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="0"
+                                        value={spec[dim] ?? ''}
+                                        onFocus={handleNumberInputFocus}
+                                        onChange={(e) => {
+                                          const raw = e.target.value;
+                                          if (raw === '') {
+                                            handleSheetSpecChange(index, { [dim]: '' });
+                                            return;
+                                          }
+                                          const cleaned = sanitizeNumberInput(raw);
+                                          if (cleaned !== raw) e.target.value = cleaned;
+                                          handleSheetSpecChange(index, { [dim]: cleaned === '' ? '' : Math.max(0, Number(cleaned)) });
+                                        }}
+                                        className={`${metalInput} w-24 text-right font-mono`}
+                                      />
                                     </MetalField>
                                   ))}
                                   <MetalField label="Pieces">
-                                    <input type="number" min="0" step="1" value={spec.pieces ?? ''} onChange={(e) => handleSheetSpecChange(index, { pieces: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) })} className={`${metalInput} w-20 text-right font-mono`} />
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="1"
+                                      placeholder="1"
+                                      value={spec.pieces ?? ''}
+                                      onFocus={handleNumberInputFocus}
+                                      onChange={(e) => {
+                                        const raw = e.target.value;
+                                        if (raw === '') {
+                                          handleSheetSpecChange(index, { pieces: '' });
+                                          return;
+                                        }
+                                        const cleaned = sanitizeNumberInput(raw);
+                                        if (cleaned !== raw) e.target.value = cleaned;
+                                        handleSheetSpecChange(index, { pieces: cleaned === '' ? '' : Math.max(0, Math.floor(Number(cleaned))) });
+                                      }}
+                                      onBlur={() => {
+                                        if (!spec.pieces || Number(spec.pieces) <= 0) {
+                                          handleSheetSpecChange(index, { pieces: 1 });
+                                        }
+                                      }}
+                                      className={`${metalInput} w-20 text-right font-mono`}
+                                    />
                                   </MetalField>
                                   <MetalField label={auto !== null && !spec.weightManual ? 'Wt / piece (auto)' : 'Wt / piece (kg)'}>
                                     {auto !== null && !spec.weightManual ? (
@@ -1049,7 +1167,25 @@ export const LineItemEditor = ({ items = [], onChange, type = 'sales', readOnly 
                                       </div>
                                     ) : (
                                       <div className="flex items-center gap-1.5">
-                                        <input type="number" min="0" step="0.001" value={spec.weightPerPiece ?? ''} onChange={(e) => handleSheetSpecChange(index, { weightManual: true, weightPerPiece: e.target.value === '' ? '' : Math.max(0, Number(e.target.value)) })} className={`${metalInput} w-24 text-right font-mono`} />
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.001"
+                                          placeholder="0.000"
+                                          value={spec.weightPerPiece ?? ''}
+                                          onFocus={handleNumberInputFocus}
+                                          onChange={(e) => {
+                                            const raw = e.target.value;
+                                            if (raw === '') {
+                                              handleSheetSpecChange(index, { weightManual: true, weightPerPiece: '' });
+                                              return;
+                                            }
+                                            const cleaned = sanitizeNumberInput(raw);
+                                            if (cleaned !== raw) e.target.value = cleaned;
+                                            handleSheetSpecChange(index, { weightManual: true, weightPerPiece: cleaned === '' ? '' : Math.max(0, Number(cleaned)) });
+                                          }}
+                                          className={`${metalInput} w-24 text-right font-mono`}
+                                        />
                                         {auto !== null && (
                                           <button type="button" onClick={() => handleSheetSpecChange(index, { weightManual: false })} className="text-[10px] font-semibold normal-case text-primary hover:underline cursor-pointer">Auto</button>
                                         )}
