@@ -46,6 +46,7 @@ export const EstimatesPage = () => {
         updateEstimate,
         customers = [],
         addQuotation,
+        addInventoryItem,
         formatCurrency,
         formatDateDDMMYYYY,
     } = useERP();
@@ -66,23 +67,21 @@ export const EstimatesPage = () => {
     const [approvalTarget, setApprovalTarget] = useState(null);
     const [partyData, setPartyData] = useState({
         isOneTimeParty: false,
-        customerId: customers[0]?.id || '',
-        customer: customers[0]?.name || '',
-        partyName: customers[0]?.name || '',
+        customerId: '',
+        customer: '',
+        partyName: '',
         partyType: 'Customer',
     });
-    const [validUntil, setValidUntil] = useState('15 Days');
     const [lineItems, setLineItems] = useState([]);
 
     const handleOpenCreateModal = () => {
         setPartyData({
             isOneTimeParty: false,
-            customerId: customers[0]?.id || '',
-            customer: customers[0]?.name || '',
-            partyName: customers[0]?.name || '',
+            customerId: '',
+            customer: '',
+            partyName: '',
             partyType: 'Customer',
         });
-        setValidUntil('15 Days');
         setLineItems([]);
         setIsFullscreen(false);
         setIsModalOpen(true);
@@ -214,7 +213,7 @@ export const EstimatesPage = () => {
             render: (e) => (
                 <div>
                     <strong className="text-slate-900 dark:text-slate-100 block">{e.customer}</strong>
-                    <span className="text-[11px] text-muted">Validity: {e.validUntil || '15 Days'}</span>
+                    {e.validUntil && <span className="text-[11px] text-muted">Validity: {e.validUntil}</span>}
                     {(e.leadId || e.leadName) && (
                         <button
                           onClick={() => e.leadId && navigate(`/crm/leads/${encodeURIComponent(e.leadId)}`)}
@@ -347,7 +346,46 @@ export const EstimatesPage = () => {
 
     const handleCreate = (e) => {
         e.preventDefault();
-        const computedTotal = lineItems.reduce((acc, it) => acc + (it.amount || it.qty * it.rate), 0);
+        if (!partyData.isOneTimeParty && !partyData.customerId && !partyData.selectedLeadId) {
+            alert('Please select a customer account before generating the estimate.');
+            return;
+        }
+
+        // Process any new custom product lines marked to be added to inventory
+        const finalItems = lineItems.map((it) => {
+            if (it.addToInventory && (it.name || it.description) && !it.itemId && addInventoryItem) {
+                const prodName = it.name || it.description;
+                try {
+                    const created = addInventoryItem({
+                        name: prodName,
+                        sku: it.itemSku || `PROD-${Math.floor(1000 + Math.random() * 9000)}`,
+                        description: it.customNotes || it.description || prodName,
+                        sellingPrice: Number(it.rate) || 0,
+                        costPrice: Math.round((Number(it.rate) || 0) * 0.7),
+                        uom: it.uom || 'Nos',
+                        salesUnit: it.uom || 'Nos',
+                        purchaseUnit: it.uom || 'Nos',
+                        taxRate: it.tax !== undefined ? Number(it.tax) : 18,
+                        category: 'Custom Products',
+                        itemKind: it.lineKind === 'Service' ? 'Service' : 'Standalone',
+                        availableQty: 0,
+                    });
+                    if (created?.id) {
+                        return {
+                            ...it,
+                            itemId: created.id,
+                            sku: created.sku,
+                            itemSku: created.sku,
+                        };
+                    }
+                } catch (err) {
+                    console.error('Error adding custom item to inventory:', err);
+                }
+            }
+            return it;
+        });
+
+        const computedTotal = finalItems.reduce((acc, it) => acc + (Number(it.amount) || ((Number(it.qty) || 1) * (Number(it.rate) || 0))), 0);
         const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => String(c.id) === String(partyData.customerId))?.name : '') || 'Walk-in Customer';
         // A lead picked from the Customer Account dropdown has no Party row to
         // point at, so the document carries its details and links by id.
@@ -370,10 +408,10 @@ export const EstimatesPage = () => {
             leadId: selectedLeadId,
             leadName: selectedLeadName,
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            validUntil: validUntil || '15 Days',
+            validUntil: '',
             amount: computedTotal,
             status: 'Draft',
-            items: lineItems,
+            items: finalItems,
         };
         addEstimate(next);
         if (selectedLeadId) {
@@ -507,7 +545,7 @@ export const EstimatesPage = () => {
                             </div>
                         </div>
                         <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
-                            <FormSection number="01" title="Customer & validity" />
+                            <FormSection number="01" title="Customer Details" />
                             <div className="space-y-3">
                                 <PartySelector
                                     value={partyData}
@@ -515,16 +553,6 @@ export const EstimatesPage = () => {
                                     customers={customers}
                                     leads={crmLeads}
                                 />
-                                <div className="sm:w-1/2">
-                                    <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
-                                    <input
-                                        type="text"
-                                        value={validUntil}
-                                        onChange={(e) => setValidUntil(e.target.value)}
-                                        placeholder="e.g. 15 Days"
-                                        className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"
-                                    />
-                                </div>
                             </div>
 
                             <FormSection number="02" title="Sheet, plate, sections & fabrication" />
@@ -594,10 +622,12 @@ export const EstimatesPage = () => {
                                         </button>
                                     )}
                                 </div>
-                                <div>
-                                    <span className="text-[10px] text-slate-400 font-semibold uppercase">Validity Window</span>
-                                    <p className="text-sm font-semibold text-slate-800 mt-0.5">{selectedEstimate.validUntil || '15 Days'}</p>
-                                </div>
+                                {selectedEstimate.validUntil && (
+                                    <div>
+                                        <span className="text-[10px] text-slate-400 font-semibold uppercase">Validity Window</span>
+                                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{selectedEstimate.validUntil}</p>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-2">

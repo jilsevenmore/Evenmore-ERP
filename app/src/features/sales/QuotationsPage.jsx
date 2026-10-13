@@ -44,7 +44,7 @@ const quotationGuide = {
     workflow: ['Quotation Created', 'Customer Approval', 'Convert to Sales Order', 'Warehouse Dispatch', 'Invoiced'],
 };
 export const QuotationsPage = () => {
-    const { customers, quotations, items, calculateItemStock, addQuotation, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { customers, quotations, items, calculateItemStock, addQuotation, addInventoryItem, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
     // Leads are offered in the Customer Account dropdown alongside customers.
@@ -66,9 +66,9 @@ export const QuotationsPage = () => {
     const openedPrintRequest = React.useRef('');
     const [partyData, setPartyData] = useState({
         isOneTimeParty: false,
-        customerId: customers[0]?.id || '',
-        customer: customers[0]?.name || '',
-        partyName: customers[0]?.name || '',
+        customerId: '',
+        customer: '',
+        partyName: '',
         partyType: 'Customer',
     });
     const [validUntil, setValidUntil] = useState('In 30 days');
@@ -140,9 +140,9 @@ export const QuotationsPage = () => {
     const handleOpenCreateModal = () => {
         setPartyData({
             isOneTimeParty: false,
-            customerId: customers[0]?.id || '',
-            customer: customers[0]?.name || '',
-            partyName: customers[0]?.name || '',
+            customerId: '',
+            customer: '',
+            partyName: '',
             partyType: 'Customer',
         });
         setValidUntil('In 30 days');
@@ -159,9 +159,9 @@ export const QuotationsPage = () => {
         setIsModalOpen(false);
         setPartyData({
             isOneTimeParty: false,
-            customerId: customers[0]?.id || '',
-            customer: customers[0]?.name || '',
-            partyName: customers[0]?.name || '',
+            customerId: '',
+            customer: '',
+            partyName: '',
             partyType: 'Customer',
         });
         setValidUntil('In 30 days');
@@ -362,7 +362,46 @@ export const QuotationsPage = () => {
             showToast('Line ' + (unnamed + 1) + ' needs a description (or pick an inventory item).');
             return;
         }
-        const computedTotal = quoteLines.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) + (Number(freight) || 0);
+        if (!partyData.isOneTimeParty && !partyData.customerId && !partyData.selectedLeadId && !(leadRequest && !leadRequest.fromDeal && leadRequest.leadId)) {
+            showToast('Please select a customer account before creating the quotation.');
+            return;
+        }
+
+        // Process any new custom products marked to be added to inventory
+        const processedQuoteLines = quoteLines.map((it) => {
+            if (it.addToInventory && (it.name || it.description) && !it.itemId && addInventoryItem) {
+                const prodName = it.name || it.description;
+                try {
+                    const created = addInventoryItem({
+                        name: prodName,
+                        sku: it.itemSku || `PROD-${Math.floor(1000 + Math.random() * 9000)}`,
+                        description: it.customNotes || it.description || prodName,
+                        sellingPrice: Number(it.rate) || 0,
+                        costPrice: Math.round((Number(it.rate) || 0) * 0.7),
+                        uom: it.uom || 'Nos',
+                        salesUnit: it.uom || 'Nos',
+                        purchaseUnit: it.uom || 'Nos',
+                        taxRate: it.tax !== undefined ? Number(it.tax) : 18,
+                        category: 'Custom Products',
+                        itemKind: it.lineKind === 'Service' ? 'Service' : 'Standalone',
+                        availableQty: 0,
+                    });
+                    if (created?.id) {
+                        return {
+                            ...it,
+                            itemId: created.id,
+                            sku: created.sku,
+                            itemSku: created.sku,
+                        };
+                    }
+                } catch (err) {
+                    console.error('Error adding custom item to inventory:', err);
+                }
+            }
+            return it;
+        });
+
+        const computedTotal = processedQuoteLines.reduce((acc, it) => acc + (it.amount ?? it.qty * it.rate), 0) + (Number(freight) || 0);
         const partyDisplayName = partyData.partyName || partyData.customer || (partyData.customerId ? customers.find(c => String(c.id) === String(partyData.customerId))?.name : '') || 'Walk-in Customer';
         // A lead picked from the Customer Account dropdown is raised against the
         // document's party columns and linked via `crm_lead` -- it has no Party
@@ -384,23 +423,24 @@ export const QuotationsPage = () => {
             shippingAddress: partyData.shippingAddress || {},
             leadId: selectedLeadId,
             leadName: partyData.selectedLeadId ? partyDisplayName : (leadRequest?.leadName || ''),
-            dealId: leadRequest?.fromDeal ? leadRequest.dealId : undefined,
             date: quoteDate,
+            validUntil: validUntil || 'In 30 days',
             dealReference,
-            terms,
+            termsAndConditions: terms,
             referenceNumber,
             salesperson,
             paymentTerms,
             deliveryTerms,
             notes,
             authorizedPerson,
-            freightCharges: freight === '' ? undefined : Number(freight) || 0,
-            validUntil: validUntil || '30 Days',
+            freightCharges: Number(freight) || 0,
             amount: computedTotal,
             status: 'Draft',
-            items: quoteLines,
+            items: processedQuoteLines,
         });
-        handleCloseCreateModal();
+        setIsModalOpen(false);
+        resetCommercialHeader();
+        setLineItems([]);
     };
     return (<div className="space-y-6">
       <PageHeader title="Quotations & Estimates" subtitle="Generate pricing estimates and convert approved quotes directly into confirmed Sales Orders." guide={quotationGuide} actions={<Button icon={Plus} onClick={handleOpenCreateModal}>
@@ -461,10 +501,6 @@ export const QuotationsPage = () => {
                   customers={customers}
                   leads={crmLeads}
                 />
-                <div className="sm:w-1/2">
-                  <label className="font-semibold text-slate-700 block mb-1">Validity Period</label>
-                  <input type="text" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} placeholder="e.g. 30 Days or Nov 30, 2026" className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
-                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><label className="font-semibold text-slate-700">Quote Date<input required type="date" value={quoteDate} onChange={event => setQuoteDate(event.target.value)} className="block mt-1 w-full p-2 border border-slate-300 rounded"/></label><label className="font-semibold text-slate-700">Deal Reference (optional)<input value={dealReference} onChange={event => setDealReference(event.target.value)} placeholder="Existing deal reference" className="block mt-1 w-full p-2 border border-slate-300 rounded"/></label></div>

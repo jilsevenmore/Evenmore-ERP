@@ -1402,6 +1402,12 @@ export const ERPProvider = ({ children, }) => {
             return target;
         }
 
+        const lines = target.items || target.lineItems || [];
+        if (lines.length === 0) {
+            showToast('Cannot finalize invoice without line items. Add at least one item first.');
+            return undefined;
+        }
+
         let finalized = null;
         setInvoices((prev) => prev.map((inv) => {
             if (inv.id !== invoiceId) return inv;
@@ -1475,7 +1481,8 @@ export const ERPProvider = ({ children, }) => {
                 })
                 .catch((err) => {
                     console.warn('[ERP] could not finalize invoice on server:', err);
-                    showToast(`Finalized locally only — ${describeError(err)}`);
+                    setInvoices((prev) => prev.map((inv) => (inv.id === invoiceId ? target : inv)));
+                    showToast(`Could not finalize invoice on server: ${describeError(err)}`);
                 });
         }
 
