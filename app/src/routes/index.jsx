@@ -152,7 +152,7 @@ const FinancialReportsPage = lazy(() => import('../features/accounts/FinancialRe
 const BudgetsPage = lazy(() => import('../features/accounts/BudgetsPage'));
 
 // ── ERP — Reports & Settings (Lazy Loaded) ────────────────────
-const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
+// const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const SettingsPage = lazy(() => import('../features/settings/SettingsPage').then(m => ({ default: m.SettingsPage })));
 const WebhooksPage = lazy(() => import('../features/settings/WebhooksPage'));
 
@@ -507,7 +507,7 @@ const router = createBrowserRouter([
       { path: 'hrms/hr-admin/travel', element: <Page component={HRAdminPage} defaultTab="travel" /> },
 
       // ── Reports ───────────────────────────────────────────
-      { path: 'reports', element: <Page component={ReportsPage} /> },
+      // { path: 'reports', element: <Page component={ReportsPage} /> },
 
       // ── Administration & Settings ─────────────────────────
       { path: 'administration', element: <Navigate to="/administration/settings" replace /> },

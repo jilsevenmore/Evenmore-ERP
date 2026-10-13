@@ -5,7 +5,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2, Upload, Truck } from 'lucide-react';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2, Upload, Truck, Edit3, AlertCircle, XCircle } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { PageHeader } from '../../components/common/PageHeader';
@@ -63,6 +63,8 @@ export const EstimatesPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedEstimate, setSelectedEstimate] = useState(null);
+    const [editingEstimate, setEditingEstimate] = useState(null);
+    const [statusFilter, setStatusFilter] = useState('All');
     const [printEstimateTarget, setPrintEstimateTarget] = useState(null);
     const [approvalTarget, setApprovalTarget] = useState(null);
     const [partyData, setPartyData] = useState({
@@ -75,6 +77,7 @@ export const EstimatesPage = () => {
     const [lineItems, setLineItems] = useState([]);
 
     const handleOpenCreateModal = () => {
+        setEditingEstimate(null);
         setPartyData({
             isOneTimeParty: false,
             customerId: '',
@@ -87,7 +90,37 @@ export const EstimatesPage = () => {
         setIsModalOpen(true);
     };
 
+    const handleEdit = (estimate) => {
+        setEditingEstimate(estimate);
+        const match = customers.find((c) => String(c.id) === String(estimate.customerId));
+        setPartyData({
+            isOneTimeParty: Boolean(estimate.isOneTimeParty),
+            selectedLeadId: estimate.leadId ? String(estimate.leadId) : '',
+            customerId: estimate.customerId || '',
+            customer: estimate.customer || estimate.partyName || '',
+            partyName: estimate.partyName || estimate.customer || '',
+            partyType: estimate.partyType || (estimate.isOneTimeParty ? 'Walk-in' : 'Customer'),
+            partyPhone: estimate.partyPhone || match?.phone || '',
+            partyEmail: estimate.partyEmail || match?.email || '',
+            partyGstin: estimate.partyGstin || match?.gstin || '',
+            placeOfSupply: estimate.placeOfSupply || match?.placeOfSupply || '',
+            billingAddress: estimate.billingAddress || match?.billingAddress || {},
+            shippingAddress: estimate.shippingAddress || match?.shippingAddress || {},
+        });
+        setLineItems(
+            Array.isArray(estimate.items) && estimate.items.length > 0
+                ? estimate.items.map((it, i) => ({
+                    ...it,
+                    id: it.id || `li-${Date.now()}-${i}`,
+                }))
+                : []
+        );
+        setIsFullscreen(false);
+        setIsModalOpen(true);
+    };
+
     const handleCloseCreateModal = () => {
+        setEditingEstimate(null);
         setIsModalOpen(false);
         setIsFullscreen(false);
     };
@@ -138,9 +171,14 @@ export const EstimatesPage = () => {
         setIsModalOpen(true);
     }, [leadRequest, customers]);
 
-    const totalValue = estimates
-        .filter((e) => e.status !== 'Converted')
-        .reduce((sum, e) => sum + (e.amount || 0), 0);
+    const isApprovedEstimate = (e) => ['Approved', 'Accepted', 'Converted'].includes(e?.status);
+    const isRejectedEstimate = (e) => e?.status === 'Rejected' || e?.status === 'Need Improvement';
+
+    const openEstimates = estimates.filter((e) => !isApprovedEstimate(e) && !isRejectedEstimate(e));
+    const totalValue = openEstimates.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const convertedEstimates = estimates.filter((e) => e.status === 'Converted');
+    const approvedEstimates = estimates.filter((e) => isApprovedEstimate(e));
+    const rejectedEstimates = estimates.filter((e) => isRejectedEstimate(e));
 
     const handleConvert = (estimateId) => {
         const estimate = estimates.find((e) => e.id === estimateId);
@@ -249,61 +287,107 @@ export const EstimatesPage = () => {
             header: 'Status',
             accessor: 'status',
             width: '14%',
-            render: (e) => <StatusBadge status={e.status} />,
+            render: (e) => {
+                if (isRejectedEstimate(e)) {
+                    return (
+                        <div className="flex flex-col gap-0.5">
+                            <span className="badge badge-orange inline-flex items-center gap-1 font-semibold w-fit" title="Client rejected — needs improvement / revision">
+                                <AlertCircle size={11} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                                Need Improvement
+                            </span>
+                            <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">Rejected by client</span>
+                        </div>
+                    );
+                }
+                if (e.status === 'Approved' || e.status === 'Accepted') {
+                    return (
+                        <span className="badge badge-green inline-flex items-center gap-1 font-semibold" title="Approved by customer">
+                            <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                            Approved
+                        </span>
+                    );
+                }
+                return <StatusBadge status={e.status} />;
+            },
         },
         {
             header: 'Actions',
             width: '10%',
-            render: (e) => (
-                <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                    <button
-                      onClick={() => setSelectedEstimate(e)}
-                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
-                      title="View Details"
-                    >
-                        <Eye size={13} />
-                    </button>
-                    <button
-                      onClick={() => setPrintEstimateTarget(e)}
-                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
-                      title="Print Official Estimate Voucher"
-                    >
-                        <Printer size={13} />
-                    </button>
-                    <button
-                      onClick={() => handleClone(e)}
-                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
-                      title="Clone / Duplicate Estimate"
-                    >
-                        <Copy size={13} />
-                    </button>
-                    {e.status === 'Converted' ? (
+            render: (e) => {
+                const approved = isApprovedEstimate(e);
+                const rejected = isRejectedEstimate(e);
+                return (
+                    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                        {/* Edit option is removed when estimate is approved / converted; prominent Improve button when rejected */}
+                        {!approved && (
+                            rejected ? (
+                                <button
+                                    onClick={() => handleEdit(e)}
+                                    className="px-2 py-1 text-xs font-semibold rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                    title="Improve / Revise rejected estimate"
+                                >
+                                    <Edit3 size={12} />
+                                    <span>Improve</span>
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleEdit(e)}
+                                    className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                                    title="Edit / Update Estimate"
+                                >
+                                    <Edit3 size={13} />
+                                </button>
+                            )
+                        )}
                         <button
-                          onClick={() => navigate('/sales/quotations')}
-                          className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                            onClick={() => setSelectedEstimate(e)}
+                            className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                            title="View Details"
                         >
-                            <CheckCircle2 size={12} /> Converted
+                            <Eye size={13} />
                         </button>
-                    ) : (
-                        <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setPrintEstimateTarget(e)}
+                            className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                            title="Print Official Estimate Voucher"
+                        >
+                            <Printer size={13} />
+                        </button>
+                        <button
+                            onClick={() => handleClone(e)}
+                            className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                            title="Clone / Duplicate Estimate"
+                        >
+                            <Copy size={13} />
+                        </button>
+                        {e.status === 'Converted' ? (
                             <button
-                              onClick={() => handleConvert(e.id)}
-                              className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
-                              title="Convert to Quotation"
+                                onClick={() => navigate('/sales/quotations')}
+                                className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
                             >
-                                Convert <ArrowRight size={12} />
+                                <CheckCircle2 size={12} /> Converted
                             </button>
-                            <button
-                              onClick={() => handleConvertToChallan(e)}
-                              className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                              title="1-Step Fast Delivery Challan Conversion"
-                            >
-                                <Truck size={12} /> Challan
-                            </button>
-                        </div>
-                    )}
-                </div>
-            ),
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => handleConvert(e.id)}
+                                    className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                    title="Convert to Quotation"
+                                >
+                                    Convert <ArrowRight size={12} />
+                                </button>
+                                <button
+                                    onClick={() => handleConvertToChallan(e)}
+                                    className="text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                    title="1-Step Fast Delivery Challan Conversion"
+                                >
+                                    <Truck size={12} /> Challan
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                );
+            },
         },
     ];
 
@@ -391,6 +475,40 @@ export const EstimatesPage = () => {
         // point at, so the document carries its details and links by id.
         const selectedLeadId = partyData.selectedLeadId || leadRequest?.leadId || '';
         const selectedLeadName = partyData.selectedLeadId ? partyDisplayName : (leadRequest?.leadName || '');
+
+        if (editingEstimate) {
+            const wasRejected = isRejectedEstimate(editingEstimate);
+            const updates = {
+                customerId: partyData.isOneTimeParty ? '' : (partyData.customerId || ''),
+                customer: partyDisplayName,
+                partyName: partyDisplayName,
+                isOneTimeParty: Boolean(partyData.isOneTimeParty),
+                partyType: partyData.partyType || (partyData.isOneTimeParty ? 'Walk-in' : 'Customer'),
+                partyPhone: partyData.partyPhone || '',
+                partyEmail: partyData.partyEmail || '',
+                partyGstin: partyData.partyGstin || '',
+                placeOfSupply: partyData.placeOfSupply || '',
+                billingAddress: partyData.billingAddress || {},
+                shippingAddress: partyData.shippingAddress || {},
+                leadId: selectedLeadId,
+                leadName: selectedLeadName,
+                amount: computedTotal,
+                items: finalItems,
+                status: wasRejected ? 'Draft' : editingEstimate.status,
+            };
+            updateEstimate(editingEstimate.id, updates);
+            if (selectedEstimate && selectedEstimate.id === editingEstimate.id) {
+                setSelectedEstimate({ ...selectedEstimate, ...updates });
+            }
+            setEditingEstimate(null);
+            setIsModalOpen(false);
+            setLineItems([]);
+            if (wasRejected && statusFilter === 'Rejected') {
+                setStatusFilter('Draft');
+            }
+            return;
+        }
+
         const next = {
             id: `est-${Date.now()}`,
             estimateNumber: `EST-2026-${String(estimates.length + 3).padStart(3, '0')}`,
@@ -495,19 +613,67 @@ export const EstimatesPage = () => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="Total Estimates" value={estimates.length} icon={FileText} />
                 <StatCard label="Open Estimate Value" value={formatCurrency(totalValue)} />
                 <StatCard
                     label="Converted to Quotation"
-                    value={`${estimates.filter((e) => e.status === 'Converted').length} Estimates`}
+                    value={`${convertedEstimates.length} Estimates`}
                     trend={{ positive: true, text: 'Direct quotation conversion' }}
                 />
+                <StatCard
+                    label="Rejected Estimates"
+                    value={`${rejectedEstimates.length} Estimates`}
+                    tone={rejectedEstimates.length > 0 ? "rose" : "gray"}
+                    icon={XCircle}
+                    trend={{ positive: false, text: rejectedEstimates.length > 0 ? 'Requires revision' : 'No rejections' }}
+                />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-xl border border-border shadow-xs">
+                <div className="flex items-center gap-1.5 overflow-x-auto">
+                    {[
+                        { key: 'All', label: 'All Estimates', count: estimates.length },
+                        { key: 'Draft', label: 'Draft', count: estimates.filter(e => (e.status || 'Draft') === 'Draft').length },
+                        { key: 'Sent', label: 'Sent', count: estimates.filter(e => e.status === 'Sent').length },
+                        { key: 'Rejected', label: 'Rejected by Client', count: rejectedEstimates.length, isReject: true },
+                        { key: 'Converted', label: 'Converted', count: convertedEstimates.length },
+                    ].map((tab) => (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => setStatusFilter(tab.key)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                statusFilter === tab.key
+                                    ? tab.isReject
+                                        ? 'bg-rose-100 text-rose-800 border border-rose-300 shadow-xs'
+                                        : 'bg-primary text-white shadow-xs'
+                                    : tab.isReject && tab.count > 0
+                                        ? 'bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100'
+                                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                        >
+                            <span>{tab.label}</span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                                statusFilter === tab.key
+                                    ? tab.isReject ? 'bg-rose-200 text-rose-900' : 'bg-white/20 text-white'
+                                    : tab.isReject ? 'bg-rose-200 text-rose-800' : 'bg-slate-200 text-slate-700'
+                            }`}>
+                                {tab.count}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+                {statusFilter === 'Rejected' && rejectedEstimates.length > 0 && (
+                    <span className="text-xs text-rose-600 font-medium flex items-center gap-1">
+                        <AlertCircle size={13} /> Showing estimates rejected by client. Click Edit to revise line items &amp; pricing.
+                    </span>
+                )}
             </div>
 
             <DataTable
                 title="Estimate Register"
-                data={estimates}
+                data={statusFilter === 'All' ? estimates : estimates.filter((e) => (e.status || 'Draft') === statusFilter)}
                 columns={columns}
                 keyExtractor={(e) => e.id}
                 searchPlaceholder="Search estimates..."
@@ -525,7 +691,9 @@ export const EstimatesPage = () => {
                         isFullscreen ? 'w-full h-full rounded-none p-4 sm:p-8' : 'max-w-5xl w-full rounded-2xl p-4 sm:p-6 max-h-[92vh]'
                     } text-xs`}>
                         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-                            <h3 className="font-bold text-base text-[#1F2E4A]">Create Sales Estimate</h3>
+                            <h3 className="font-bold text-base text-[#1F2E4A]">
+                                {editingEstimate ? `Update Sales Estimate — ${editingEstimate.estimateNumber}` : 'Create Sales Estimate'}
+                            </h3>
                             <div className="flex items-center gap-2">
                                 <button
                                     type="button"
@@ -544,6 +712,17 @@ export const EstimatesPage = () => {
                                 </button>
                             </div>
                         </div>
+
+                        {editingEstimate?.status === 'Rejected' && (
+                            <div className="mt-3 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-center gap-2.5">
+                                <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                                <div>
+                                    <strong className="block text-xs font-semibold">Revising Rejected Estimate</strong>
+                                    <span className="text-[11px] text-rose-600">Updating this estimate will save the revised items and pricing, and reset its status to Draft so you can re-share it with the client for approval.</span>
+                                </div>
+                            </div>
+                        )}
+
                         <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
                             <FormSection number="01" title="Customer Details" />
                             <div className="space-y-3">
@@ -566,7 +745,7 @@ export const EstimatesPage = () => {
                                 <Button variant="outline" type="button" onClick={handleCloseCreateModal}>
                                     Cancel
                                 </Button>
-                                <Button type="submit">Generate Estimate</Button>
+                                <Button type="submit">{editingEstimate ? 'Save & Update Estimate' : 'Generate Estimate'}</Button>
                             </div>
                         </form>
                     </div>
@@ -585,6 +764,19 @@ export const EstimatesPage = () => {
                                 <StatusBadge status={selectedEstimate.status} />
                             </div>
                             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const target = selectedEstimate;
+                                        setSelectedEstimate(null);
+                                        handleEdit(target);
+                                    }}
+                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                    title="Edit and update this estimate"
+                                >
+                                    <Edit3 size={13} />
+                                    Update Estimate
+                                </button>
                                 <button
                                     type="button"
                                     onClick={() => setApprovalTarget(selectedEstimate)}
@@ -609,6 +801,21 @@ export const EstimatesPage = () => {
                         </div>
 
                         <div className="space-y-6 mt-4 overflow-y-auto pr-1 flex-1">
+                            {selectedEstimate.status === 'Rejected' && (
+                                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                                    <div className="flex items-center gap-2.5">
+                                        <AlertCircle size={18} className="text-rose-600 shrink-0" />
+                                        <div>
+                                            <strong className="text-rose-900 block font-semibold">Client Rejected this Estimate</strong>
+                                            <span className="text-[11px] text-rose-700">The customer rejected this proposal. Click Update Estimate to revise line items, pricing, or terms.</span>
+                                        </div>
+                                    </div>
+                                    <Button size="sm" onClick={() => { const target = selectedEstimate; setSelectedEstimate(null); handleEdit(target); }}>
+                                        Revise &amp; Update
+                                    </Button>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                                 <div>
                                     <span className="text-[10px] text-slate-400 font-semibold uppercase">Client Account</span>
@@ -643,10 +850,20 @@ export const EstimatesPage = () => {
                             <div className="font-mono text-xs">
                                 Total Estimate:{' '}
                                 <strong className="text-slate-900">
-                                    ${(selectedEstimate.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    {formatCurrency(selectedEstimate.amount || 0)}
                                 </strong>
                             </div>
                             <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        const target = selectedEstimate;
+                                        setSelectedEstimate(null);
+                                        handleEdit(target);
+                                    }}
+                                >
+                                    <Edit3 size={13} className="mr-1 inline" /> Update Estimate
+                                </Button>
                                 {selectedEstimate.status !== 'Converted' && (
                                     <Button
                                         onClick={() => {

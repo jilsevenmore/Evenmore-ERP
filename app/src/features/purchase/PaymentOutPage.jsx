@@ -34,14 +34,15 @@ const paymentOutGuide = {
     ],
 };
 export const PaymentOutPage = () => {
-    const { paymentOuts, purchaseBills, purchaseOrders, vendors, addPaymentOut, applyVendorAdvanceToBill, getVendorAdvanceBalance, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
+    const { paymentOuts, purchaseBills, purchaseOrders, vendors, bankAccounts = [], addPaymentOut, applyVendorAdvanceToBill, getVendorAdvanceBalance, getBillOutstanding, formatCurrency, formatDateDDMMYYYY, getCurrentDateFormatted } = useERP();
     const [showAddModal, setShowAddModal] = useState(false);
     const [selectedBillId, setSelectedBillId] = useState(purchaseBills[0]?.id || '');
     const [paymentType, setPaymentType] = useState('Final'); // [PHASE-2D] 'Advance' | 'Final'
     const [selectedPoId, setSelectedPoId] = useState(purchaseOrders[0]?.id || '');
     const [selectedVendorId, setSelectedVendorId] = useState(vendors[0]?.id || '');
     const [amount, setAmount] = useState(0);
-    const [mode, setMode] = useState('ACH');
+    const [mode, setMode] = useState('Bank Wire');
+    const [bankAccountId, setBankAccountId] = useState('');
     const [reference, setReference] = useState('');
     // [PHASE-2D] advance-adjustment widget state
     const [advanceBillId, setAdvanceBillId] = useState('');
@@ -62,6 +63,7 @@ export const PaymentOutPage = () => {
             handleBillSelect(defaultBill.id);
         }
         setPaymentType('Final');
+        setBankAccountId(bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id || '');
         setShowAddModal(true);
     };
 
@@ -71,6 +73,7 @@ export const PaymentOutPage = () => {
             alert('Please enter a valid payment amount greater than zero.');
             return;
         }
+        const selectedBankId = bankAccountId || bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id;
         if (paymentType === 'Advance') {
             // ── [PHASE-2D] Advance released against a PO (no bill yet for steel on credit) ──
             const po = purchaseOrders.find((p) => p.id === selectedPoId) || purchaseOrders[0];
@@ -85,6 +88,7 @@ export const PaymentOutPage = () => {
                 paymentType: 'Advance',
                 date: getCurrentDateFormatted(),
                 mode,
+                bankAccountId: mode === 'Cash' ? undefined : selectedBankId,
                 amount: Number(amount),
                 reference: reference || `ADV-${Date.now()}`,
             });
@@ -106,8 +110,9 @@ export const PaymentOutPage = () => {
             paymentType: 'Final',
             date: getCurrentDateFormatted(),
             mode,
+            bankAccountId: mode === 'Cash' ? undefined : selectedBankId,
             amount: Number(amount),
-            reference: reference || `ACH-${Date.now()}`,
+            reference: reference || `VOU-${Date.now()}`,
         });
 
         if (res) {
@@ -456,17 +461,38 @@ export const PaymentOutPage = () => {
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Payment Channel</label>
                   <select value={mode} onChange={(e) => setMode(e.target.value)} disabled={paymentType === 'Final' && (isCancelled || isSettled)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 disabled:bg-slate-100">
+                    <option value="Bank Wire">Bank Wire / RTGS</option>
                     <option value="ACH">ACH Direct</option>
-                    <option value="Bank Wire">Bank Wire</option>
-                    <option value="Corporate Card">Corporate Card</option>
+                    <option value="UPI">UPI</option>
                     <option value="Cheque">Corporate Cheque</option>
+                    <option value="Corporate Card">Corporate Card</option>
+                    <option value="Cash">Cash</option>
                   </select>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Bank Voucher / Ref #</label>
-                  <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} disabled={paymentType === 'Final' && (isCancelled || isSettled)} className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono disabled:bg-slate-100"/>
+                  <input type="text" value={reference} onChange={(e) => setReference(e.target.value)} disabled={paymentType === 'Final' && (isCancelled || isSettled)} placeholder="e.g. UTR / Ref #" className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-mono disabled:bg-slate-100"/>
                 </div>
               </div>
+
+              {mode !== 'Cash' && bankAccounts.length > 0 && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Disbursing Bank Account *</label>
+                  <select
+                    value={bankAccountId}
+                    onChange={(e) => setBankAccountId(e.target.value)}
+                    disabled={paymentType === 'Final' && (isCancelled || isSettled)}
+                    className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 disabled:bg-slate-100"
+                    required
+                  >
+                    {bankAccounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.bankName || acc.name || 'Bank Account'} {acc.accountNumber ? `(${acc.accountNumber})` : ''} {acc.isDefault ? '— Primary' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="flex flex-wrap lg:flex-nowrap justify-end gap-2 pt-3 border-t border-slate-200">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition">

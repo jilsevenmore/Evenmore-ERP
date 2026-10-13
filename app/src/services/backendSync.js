@@ -141,6 +141,7 @@ function documentToApi(doc, { partyField = 'partyId', partyKeys = [], partial = 
     billing_address: doc.billing_address || doc.billingAddress || undefined,
     shipping_address: doc.shipping_address || doc.shippingAddress || undefined,
     place_of_supply: stripStateCode(doc.place_of_supply || doc.placeOfSupply) || undefined,
+    status: doc.status || undefined,
     date: isoOut(doc.date) || (partial ? undefined : isoOut('Today')),
     dueDate: isoOut(doc.dueDate),
     expectedDate: isoOut(doc.expectedDate || doc.deliveryDate),

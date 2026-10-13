@@ -6,7 +6,7 @@ import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { Button } from '../../components/ui/Button';
-import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2, Layers, AlertCircle, Check, Link as LinkIcon } from 'lucide-react';
+import { Plus, FileText, CheckCircle2, ArrowRight, X, Copy, Eye, Printer, Minimize2, Maximize2, Share2, Layers, AlertCircle, Check, Link as LinkIcon, Edit3 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { AutoPOModal } from '../../components/common/AutoPOModal';
@@ -44,7 +44,7 @@ const quotationGuide = {
     workflow: ['Quotation Created', 'Customer Approval', 'Convert to Sales Order', 'Warehouse Dispatch', 'Invoiced'],
 };
 export const QuotationsPage = () => {
-    const { customers, quotations, items, calculateItemStock, addQuotation, addInventoryItem, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
+    const { customers, quotations, items, calculateItemStock, addQuotation, updateQuotation, addInventoryItem, convertQuotationToDeliveryChallan, recordQuotationActivity, convertQuotationToSalesOrder, approveQuotation, cancelQuotation, showToast, formatCurrency, formatDateDDMMYYYY } = useERP();
     const navigate = useNavigate();
     const location = useLocation();
     // Leads are offered in the Customer Account dropdown alongside customers.
@@ -58,6 +58,7 @@ export const QuotationsPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [selectedQuoteTarget, setSelectedQuote] = useState(null);
+    const [editingQuote, setEditingQuote] = useState(null);
     const selectedQuote = quotations.find(q => q.id === selectedQuoteTarget?.id) || selectedQuoteTarget;
     const [printQuotationTarget, setPrintQuotationTarget] = useState(null);
     const [approvalTarget, setApprovalTarget] = useState(null);
@@ -138,6 +139,7 @@ export const QuotationsPage = () => {
     const totalPipeline = quotations.reduce((sum, q) => sum + (q.amount || 0), 0);
 
     const handleOpenCreateModal = () => {
+        setEditingQuote(null);
         setPartyData({
             isOneTimeParty: false,
             customerId: '',
@@ -155,7 +157,42 @@ export const QuotationsPage = () => {
         setIsModalOpen(true);
     };
 
+    const handleEditQuote = (quote) => {
+        setEditingQuote(quote);
+        const match = customers.find((c) => String(c.id) === String(quote.customerId));
+        setPartyData({
+            isOneTimeParty: Boolean(quote.isOneTimeParty),
+            selectedLeadId: quote.leadId ? String(quote.leadId) : '',
+            customerId: quote.customerId || '',
+            customer: quote.customer || quote.partyName || '',
+            partyName: quote.partyName || quote.customer || '',
+            partyType: quote.partyType || (quote.isOneTimeParty ? 'Walk-in' : 'Customer'),
+            partyPhone: quote.partyPhone || match?.phone || '',
+            partyEmail: quote.partyEmail || match?.email || '',
+            partyGstin: quote.partyGstin || match?.gstin || '',
+            placeOfSupply: quote.placeOfSupply || match?.placeOfSupply || '',
+            billingAddress: quote.billingAddress || match?.billingAddress || {},
+            shippingAddress: quote.shippingAddress || match?.shippingAddress || {},
+        });
+        setValidUntil(quote.validUntil || 'In 30 days');
+        setQuoteDate(quote.date && quote.date.includes('-') ? quote.date : new Date().toLocaleDateString('en-CA'));
+        setDealReference(quote.dealReference || '');
+        setTerms(quote.termsAndConditions || quote.terms || '');
+        resetCommercialHeader(quote);
+        setLineItems(
+            Array.isArray(quote.items) && quote.items.length > 0
+                ? quote.items.map((it, i) => ({
+                    ...it,
+                    id: it.id || `li-${Date.now()}-${i}`,
+                }))
+                : []
+        );
+        setIsFullscreen(false);
+        setIsModalOpen(true);
+    };
+
     const handleCloseCreateModal = () => {
+        setEditingQuote(null);
         setIsModalOpen(false);
         setPartyData({
             isOneTimeParty: false,
@@ -293,14 +330,58 @@ export const QuotationsPage = () => {
             accessor: 'status',
             align: 'center',
             width: '14%',
-            render: (q) => <StatusBadge status={q.status}/>,
+            render: (q) => {
+              if (q.status === 'Rejected') {
+                return (
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="badge badge-orange inline-flex items-center gap-1 font-semibold" title="Client rejected — needs improvement">
+                      <AlertCircle size={11} className="text-amber-600 shrink-0" />
+                      Need Improvement
+                    </span>
+                    <span className="text-[10px] text-rose-600 font-medium">Rejected by client</span>
+                  </div>
+                );
+              }
+              if (['Approved', 'Accepted', 'Confirmed'].includes(q.status)) {
+                return (
+                  <span className="badge badge-green inline-flex items-center gap-1 font-semibold" title="Approved by customer">
+                    <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                    {q.status}
+                  </span>
+                );
+              }
+              return <StatusBadge status={q.status}/>;
+            },
         },
         {
             header: 'Actions',
             align: 'right',
             width: '14%',
-            render: (q) => (
+            render: (q) => {
+              const approved = ['Approved', 'Accepted', 'Confirmed', 'Converted'].includes(q.status);
+              const rejected = q.status === 'Rejected';
+              return (
               <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                {!approved && (
+                  rejected ? (
+                    <button
+                      onClick={() => handleEditQuote(q)}
+                      className="px-2 py-1 text-xs font-semibold rounded-md bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 inline-flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                      title="Improve / Revise rejected quotation"
+                    >
+                      <Edit3 size={12} />
+                      <span>Improve</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleEditQuote(q)}
+                      className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
+                      title="Edit / Update Quotation"
+                    >
+                      <Edit3 size={13}/>
+                    </button>
+                  )
+                )}
                 <button
                   onClick={() => setSelectedQuote(q)}
                   className="p-1.5 text-muted hover:text-primary hover:bg-card-hover rounded-lg cursor-pointer transition-colors"
@@ -341,7 +422,8 @@ export const QuotationsPage = () => {
                   </button>
                 ) : null}
               </div>
-            ),
+            );
+          },
         },
     ];
     const handleCreate = (e) => {
@@ -409,6 +491,48 @@ export const QuotationsPage = () => {
         const selectedLeadId = partyData.selectedLeadId
             || (leadRequest && !leadRequest.fromDeal ? leadRequest.leadId : '')
             || '';
+
+        if (editingQuote) {
+            const updates = {
+                customerId: partyData.isOneTimeParty ? '' : (partyData.customerId || ''),
+                customer: partyDisplayName,
+                partyName: partyDisplayName,
+                isOneTimeParty: Boolean(partyData.isOneTimeParty),
+                partyType: partyData.partyType || (partyData.isOneTimeParty ? 'Walk-in' : 'Customer'),
+                partyPhone: partyData.partyPhone || '',
+                partyEmail: partyData.partyEmail || '',
+                partyGstin: partyData.partyGstin || '',
+                placeOfSupply: partyData.placeOfSupply || '',
+                billingAddress: partyData.billingAddress || {},
+                shippingAddress: partyData.shippingAddress || {},
+                leadId: selectedLeadId,
+                leadName: partyData.selectedLeadId ? partyDisplayName : (leadRequest?.leadName || ''),
+                date: quoteDate,
+                validUntil: validUntil || 'In 30 days',
+                dealReference,
+                termsAndConditions: terms,
+                referenceNumber,
+                salesperson,
+                paymentTerms,
+                deliveryTerms,
+                notes,
+                authorizedPerson,
+                freightCharges: Number(freight) || 0,
+                amount: computedTotal,
+                items: processedQuoteLines,
+                status: editingQuote.status === 'Rejected' ? 'Draft' : editingQuote.status,
+            };
+            updateQuotation(editingQuote.id, updates);
+            if (selectedQuoteTarget && selectedQuoteTarget.id === editingQuote.id) {
+                setSelectedQuote({ ...selectedQuoteTarget, ...updates });
+            }
+            setEditingQuote(null);
+            setIsModalOpen(false);
+            resetCommercialHeader();
+            setLineItems([]);
+            return;
+        }
+
         addQuotation({
             isOneTimeParty: Boolean(partyData.isOneTimeParty),
             customerId: partyData.isOneTimeParty ? '' : (partyData.customerId || ''),
@@ -473,7 +597,9 @@ export const QuotationsPage = () => {
             isFullscreen ? 'w-full h-full rounded-none p-4 sm:p-8' : 'max-w-5xl w-full rounded-2xl p-4 sm:p-6 max-h-[92vh]'
           } text-xs`}>
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
-              <h3 className="font-bold text-base text-[#1F2E4A]">Create Quotation Estimate</h3>
+              <h3 className="font-bold text-base text-[#1F2E4A]">
+                {editingQuote ? `Update Quotation — ${editingQuote.quoteNumber}` : 'Create Quotation Estimate'}
+              </h3>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -492,6 +618,17 @@ export const QuotationsPage = () => {
                 </button>
               </div>
             </div>
+
+            {editingQuote?.status === 'Rejected' && (
+              <div className="mt-3 bg-rose-50 border border-rose-200 text-rose-800 p-3 rounded-xl flex items-center gap-2.5">
+                <AlertCircle size={16} className="text-rose-600 shrink-0" />
+                <div>
+                  <strong className="block text-xs font-semibold">Revising Rejected Quotation</strong>
+                  <span className="text-[11px] text-rose-600">Updating this quotation will save changes and reset its status to Draft so you can re-share it with the client for approval.</span>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleCreate} className="space-y-4 mt-4 overflow-y-auto pr-1 flex-1">
               <FormSection number="01" title="Customer & quote details" />
               <div className="space-y-3">
@@ -536,7 +673,7 @@ export const QuotationsPage = () => {
                   Cancel
                 </Button>
                 <Button type="submit">
-                  Generate Quotation
+                  {editingQuote ? 'Save & Update Quotation' : 'Generate Quotation'}
                 </Button>
               </div>
             </form>
@@ -561,6 +698,31 @@ export const QuotationsPage = () => {
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
+                {!['Approved', 'Accepted', 'Confirmed', 'Converted'].includes(selectedQuote.status) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const target = selectedQuote;
+                      setSelectedQuote(null);
+                      handleEditQuote(target);
+                    }}
+                    className={`h-8 px-3 rounded-lg font-semibold inline-flex items-center gap-1.5 whitespace-nowrap cursor-pointer transition-colors shadow-2xs ${
+                      selectedQuote.status === 'Rejected'
+                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
+                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700'
+                    }`}
+                    title={selectedQuote.status === 'Rejected' ? "Improve and revise this quotation" : "Edit and update this quotation"}
+                  >
+                    <Edit3 size={13}/>
+                    <span className="hidden sm:inline">{selectedQuote.status === 'Rejected' ? 'Improve Quotation' : 'Update Quotation'}</span>
+                    <span className="sm:hidden">{selectedQuote.status === 'Rejected' ? 'Improve' : 'Update'}</span>
+                  </button>
+                ) : (
+                  <span className="h-8 px-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1">
+                    <CheckCircle2 size={13} className="text-emerald-600" />
+                    <span className="hidden sm:inline">Approved (Locked)</span>
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => setApprovalTarget(selectedQuote)}
@@ -587,6 +749,21 @@ export const QuotationsPage = () => {
             </div>
 
             <div className="space-y-6 mt-4 overflow-y-auto pr-1 flex-1">
+              {selectedQuote.status === 'Rejected' && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <AlertCircle size={18} className="text-rose-600 shrink-0" />
+                    <div>
+                      <strong className="text-rose-900 block font-semibold">Client Rejected this Quotation</strong>
+                      <span className="text-[11px] text-rose-700">The customer rejected this proposal. Click Update Quotation to adjust pricing, line items, or terms.</span>
+                    </div>
+                  </div>
+                  <Button size="sm" onClick={() => { const target = selectedQuote; setSelectedQuote(null); handleEditQuote(target); }}>
+                    Revise &amp; Update
+                  </Button>
+                </div>
+              )}
+
               <QuotationWorkflow key={selectedQuote.id} quotation={selectedQuote} initialMode={(location.state?.sendQuotation || new URLSearchParams(location.search).has('send')) ? 'send' : ''} onDownload={() => setPrintQuotationTarget(selectedQuote)} onChallan={() => {
                 const challan = convertQuotationToDeliveryChallan(selectedQuote.id);
                 if (challan) navigate('/sales/delivery', { state: { challanId: challan.id } });
@@ -623,6 +800,18 @@ export const QuotationsPage = () => {
                 <strong className="text-base font-bold text-slate-900 tabular-nums">{formatCurrency(selectedQuote.amount || 0)}</strong>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2 [&>button]:whitespace-nowrap">
+                {!['Approved', 'Accepted', 'Confirmed', 'Converted'].includes(selectedQuote.status) && (
+                  <Button
+                    variant={selectedQuote.status === 'Rejected' ? 'default' : 'outline'}
+                    onClick={() => {
+                      const target = selectedQuote;
+                      setSelectedQuote(null);
+                      handleEditQuote(target);
+                    }}
+                  >
+                    <Edit3 size={13} className="mr-1 inline" /> {selectedQuote.status === 'Rejected' ? 'Improve Quotation' : 'Update Quotation'}
+                  </Button>
+                )}
                 {/* Customer approval: recorded here when given by phone, email or in person. */}
                 {['Draft', 'Sent', 'Viewed'].includes(selectedQuote.status) && (<Button variant="outline" onClick={() => approveQuotation(selectedQuote.id)}>
                     Mark Customer Approved

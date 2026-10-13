@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAppStore } from '../stores/appStore';
 import { canOpenPath } from '../utils/navAccess';
 import { publishEstimates } from '../services/estimateStore';
@@ -471,14 +471,14 @@ export const ERPProvider = ({ children, }) => {
     /** Swap an optimistic record for the server's, matching on the local id. */
     const reconcile = (setter, localId, serverRecord) => {
         setter((prev) => prev.map((row) => (
-            row.id === localId ? { ...row, ...serverRecord, _synced: true } : row
+            row.id === localId || String(row.id) === String(localId) ? { ...row, ...serverRecord, _synced: true } : row
         )));
     };
 
     /** Flag the row so the UI can show it never reached the database. */
     const markSyncFailure = (setter, localId, err) => {
         setter((prev) => prev.map((row) => (
-            row.id === localId ? { ...row, _synced: false, _syncError: describeError(err) } : row
+            row.id === localId || String(row.id) === String(localId) ? { ...row, _synced: false, _syncError: describeError(err) } : row
         )));
     };
 
@@ -667,7 +667,11 @@ export const ERPProvider = ({ children, }) => {
                 }
             }
         });
-        const onHand = moves.length > 0 ? Math.max(0, openingStock + totalInward - totalOutward) : Math.max(0, item?.availableQty ?? item?.onHand ?? 0);
+        const hasOpeningMove = moves.some((m) => m.type === 'OPENING_STOCK' || (m.type === 'ADJUSTMENT' && String(m.notes || '').toLowerCase().includes('opening')));
+        const baseStock = (!hasOpeningMove && item)
+            ? Math.max(0, Number(item.availableQty ?? item.stock ?? item.onHand ?? 0) - totalInward + totalOutward)
+            : 0;
+        const onHand = moves.length > 0 ? Math.max(0, openingStock + baseStock + totalInward - totalOutward) : Math.max(0, item?.availableQty ?? item?.onHand ?? 0);
         if (moves.length === 0 && onHand > 0) {
             openingStock = onHand;
         }
@@ -956,13 +960,15 @@ export const ERPProvider = ({ children, }) => {
         setInventoryMovements((prev) => [newMovement, ...prev]);
         // Also update physical availableQty in InventoryItem state
         setItems((prev) => prev.map((item) => {
-            if (item.id === newMovement.itemId || item.sku?.toLowerCase() === newMovement.itemSku?.toLowerCase()) {
-                const newAvailable = Math.max(0, item.availableQty + newMovement.quantity);
+            if (item.id === newMovement.itemId || (newMovement.itemSku && item.sku?.toLowerCase() === newMovement.itemSku?.toLowerCase())) {
+                const currentAvail = Number(item.availableQty ?? item.stock ?? item.onHand ?? item.onHandQty ?? 0) || 0;
+                const newAvailable = Math.max(0, currentAvail + Number(newMovement.quantity || 0));
                 let newStatus = item.status;
-                if (newAvailable <= item.reorderLevel / 2) {
+                const rLevel = Number(item.reorderLevel ?? item.reorder_level ?? 5) || 5;
+                if (newAvailable <= rLevel / 2) {
                     newStatus = 'Critical';
                 }
-                else if (newAvailable <= item.reorderLevel) {
+                else if (newAvailable <= rLevel) {
                     newStatus = 'Low Stock';
                 }
                 else {
@@ -971,6 +977,9 @@ export const ERPProvider = ({ children, }) => {
                 return {
                     ...item,
                     availableQty: newAvailable,
+                    stock: newAvailable,
+                    onHand: newAvailable,
+                    onHandQty: newAvailable,
                     status: newStatus,
                 };
             }
@@ -1092,15 +1101,59 @@ export const ERPProvider = ({ children, }) => {
         return { billing, shipping };
     };
 
+    // Calculate party balance dynamically:
+    // For vendors: + unapplied advances (PO & vendor advances) - open due bills + debit notes
+    // When bills are due and exceed advances, balance is negative (in minus)
+    const getPartyCalculatedBalance = useCallback((party) => {
+        if (!party) return 0;
+        if (party.type === 'Customer') {
+            return party.balance ?? 0;
+        }
+        const match = (doc) => {
+            if (!doc) return false;
+            const docVendId = doc.vendorId || doc.partyId;
+            if (docVendId && (docVendId === party.id || docVendId === party.code)) return true;
+            const docVendName = doc.vendor || doc.partyName || doc.name;
+            if (docVendName && String(docVendName).toLowerCase() === String(party.name || '').toLowerCase()) return true;
+            return false;
+        };
+        const advReleased = paymentOuts
+            .filter((p) => p.paymentType === 'Advance' && match(p))
+            .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const advApplied = paymentOuts
+            .filter((p) => p.advanceApplied === true && match(p))
+            .reduce((s, p) => s + (Number(p.amount) || 0), 0);
+        const openAdvance = Math.max(0, advReleased - advApplied);
+
+        const openBillsDue = purchaseBills
+            .filter((b) => b.status !== 'Cancelled' && b.status !== 'Paid' && match(b))
+            .reduce((s, b) => {
+                const due = b.balanceDue !== undefined && b.balanceDue !== null
+                    ? Number(b.balanceDue)
+                    : Math.max(0, (Number(b.total) || Number(b.amount) || 0) - (Number(b.paidAmount) || Number(b.amountPaid) || 0));
+                return s + (due || 0);
+            }, 0);
+
+        const debitNotes = purchaseReturns
+            .filter((pr) => pr.status !== 'Cancelled' && match(pr))
+            .reduce((s, pr) => s + (Number(pr.amount) || Number(pr.total) || 0), 0);
+
+        if (advReleased > 0 || advApplied > 0 || openBillsDue > 0 || debitNotes > 0) {
+            const opening = Number(party.openingBalance || 0);
+            return Math.round((opening + openAdvance + debitNotes - openBillsDue) * 100) / 100;
+        }
+        return party.balance ?? 0;
+    }, [paymentOuts, purchaseBills, purchaseReturns]);
+
     const syncVendorBalance = (vendorId, vendorName, deltaAmount) => {
         if (!deltaAmount) return;
         setVendors((prev) => prev.map((v) => {
             const match = (vendorId && v.id === vendorId) || (vendorName && v.name?.toLowerCase() === vendorName?.toLowerCase());
-            return match ? { ...v, balance: Math.max(0, (v.balance || 0) + deltaAmount) } : v;
+            return match ? { ...v, balance: Math.round(((v.balance || 0) + deltaAmount) * 100) / 100 } : v;
         }));
         setParties((prev) => prev.map((p) => {
             const match = (vendorId && p.id === vendorId) || (vendorName && p.name?.toLowerCase() === vendorName?.toLowerCase());
-            return match ? { ...p, balance: Math.max(0, (p.balance || 0) + deltaAmount) } : p;
+            return match ? { ...p, balance: Math.round(((p.balance || 0) + deltaAmount) * 100) / 100 } : p;
         }));
     };
 
@@ -2233,7 +2286,24 @@ export const ERPProvider = ({ children, }) => {
         showToast(`Machine BOM part removed.`);
     };
 
-    // Derived compatibility helpers for customers / vendors
+    // Derived compatibility helpers with live calculated vendor balances
+    const resolvedParties = useMemo(() => {
+        return parties.map((p) => {
+            if (p.type === 'Vendor' || p.type === 'Both') {
+                const calcBal = getPartyCalculatedBalance(p);
+                return { ...p, balance: calcBal };
+            }
+            return p;
+        });
+    }, [parties, getPartyCalculatedBalance]);
+
+    const resolvedVendors = useMemo(() => {
+        return vendors.map((v) => {
+            const calcBal = getPartyCalculatedBalance(v);
+            return { ...v, balance: calcBal };
+        });
+    }, [vendors, getPartyCalculatedBalance]);
+
     const customersFromParties = parties
         .filter((p) => p.type === 'Customer' || p.type === 'Both')
         .map((p) => ({
@@ -2248,7 +2318,7 @@ export const ERPProvider = ({ children, }) => {
             status: p.status === 'Inactive' ? 'On Hold' : 'Active',
         }));
 
-    const vendorsFromParties = parties
+    const vendorsFromParties = resolvedParties
         .filter((p) => p.type === 'Vendor' || p.type === 'Both')
         .map((p) => ({
             id: p.id,
@@ -2755,6 +2825,18 @@ export const ERPProvider = ({ children, }) => {
             persistCreate('deliveryChallans', challan, setDeliveryChallans);
         }
         return challan;
+    };
+    const updateQuotation = (id, updates) => {
+        setQuotations((prev) => prev.map((q) => (q.id === id ? {
+            ...q,
+            ...updates,
+            billingAddress: updates.billingAddress ? createAddressSnapshot(updates.billingAddress) : q.billingAddress,
+            shippingAddress: updates.shippingAddress ? createAddressSnapshot(updates.shippingAddress) : q.shippingAddress,
+        } : q)));
+        const { status, ...rest } = updates || {};
+        const toPersist = status === 'Converted' || status === 'Confirmed' ? rest : updates;
+        if (Object.keys(toPersist || {}).length) persistUpdate('quotations', id, toPersist, setQuotations);
+        showToast('Quotation updated.');
     };
     const updateQuotationStatus = (id, status) => {
         const target = quotations.find((q) => String(q.id) === String(id));
@@ -4185,8 +4267,34 @@ export const ERPProvider = ({ children, }) => {
             showToast('Cannot modify a cancelled Purchase Order.');
             return;
         }
+
+        // When issuing a Purchase Order, intake and restock inventory for its line items
+        if (status === 'Issued' && po.status !== 'Issued') {
+            const poLines = po.items || po.lineItems || [];
+            poLines.forEach((line) => {
+                const targetSku = line.sku || line.itemSku;
+                const item = items.find((i) => (line.itemId && (i.id === line.itemId || String(i.id) === String(line.itemId))) || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+                const qtyToAdd = Number(line.qty) || 0;
+                if (qtyToAdd > 0) {
+                    recordMovement({
+                        itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+                        itemSku: item?.sku || targetSku || 'GEN-SKU',
+                        itemName: item?.name || line.itemName || line.name || line.description,
+                        type: 'PURCHASE',
+                        quantity: qtyToAdd,
+                        unitCost: line.rate || item?.costPrice || 0,
+                        referenceType: 'PurchaseOrder',
+                        referenceId: po.id,
+                        referenceNumber: po.poNumber,
+                        notes: `Stock replenished via Purchase Order ${po.poNumber}`,
+                    });
+                }
+            });
+        }
+
         setPurchaseOrders((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
-        showToast(`PO updated to ${status}.`);
+        persistUpdate('purchaseOrders', id, { status }, setPurchaseOrders);
+        showToast(status === 'Issued' ? `PO ${po.poNumber} issued. Inventory restocked successfully!` : `PO updated to ${status}.`);
     };
     const getPoBilledStatus = (poId) => {
         const po = typeof poId === 'object' ? poId : purchaseOrders.find((p) => p.id === poId || p.poNumber === poId);
@@ -4246,7 +4354,31 @@ export const ERPProvider = ({ children, }) => {
             return { success: false, message: `Active bill ${activeBill.billNumber} exists.` };
         }
 
+        if (po.status === 'Issued') {
+            const poLines = po.items || po.lineItems || [];
+            poLines.forEach((line) => {
+                const targetSku = line.sku || line.itemSku;
+                const item = items.find((i) => (line.itemId && (i.id === line.itemId || String(i.id) === String(line.itemId))) || (targetSku && i.sku?.toLowerCase() === targetSku.toLowerCase()));
+                const qtyToSubtract = Number(line.qty) || 0;
+                if (qtyToSubtract > 0) {
+                    recordMovement({
+                        itemId: item?.id || line.itemId || `itm-${Date.now()}`,
+                        itemSku: item?.sku || targetSku || 'GEN-SKU',
+                        itemName: item?.name || line.itemName || line.name || line.description,
+                        type: 'ADJUSTMENT',
+                        quantity: -qtyToSubtract,
+                        unitCost: line.rate || item?.costPrice || 0,
+                        referenceType: 'PurchaseOrder',
+                        referenceId: po.id,
+                        referenceNumber: po.poNumber,
+                        notes: `Stock reversed for cancelled Purchase Order ${po.poNumber}`,
+                    });
+                }
+            });
+        }
+
         setPurchaseOrders((prev) => prev.map((p) => p.id === poId ? { ...p, status: 'Cancelled' } : p));
+        persistUpdate('purchaseOrders', poId, { status: 'Cancelled' }, setPurchaseOrders);
         showToast(`Purchase Order ${po.poNumber} cancelled.`);
         return { success: true, message: `Purchase Order ${po.poNumber} cancelled.` };
     };
@@ -4438,8 +4570,8 @@ export const ERPProvider = ({ children, }) => {
             }
         }
 
-        // Increase vendor AP liability across vendors and parties
-        syncVendorBalance(newBill.vendorId, newBill.vendor, billAmt);
+        // Bill is due: reduce vendor balance (shows in minus when bill is due)
+        syncVendorBalance(newBill.vendorId, newBill.vendor, -billAmt);
         // Auto-create Journal Entry
         const newJe = {
             id: `je-${Date.now()}`,
@@ -4555,8 +4687,8 @@ export const ERPProvider = ({ children, }) => {
             });
         }
 
-        // Reverse vendor AP liability across vendors and parties
-        syncVendorBalance(bill.vendorId, bill.vendor, -(bill.total || bill.amount || 0));
+        // Reversing due bill restores vendor balance
+        syncVendorBalance(bill.vendorId, bill.vendor, (bill.total || bill.amount || 0));
 
         // Auto-create Journal Entry reversal
         const jeReversal = {
@@ -4792,6 +4924,7 @@ export const ERPProvider = ({ children, }) => {
             date: pay.date || getCurrentDateFormatted(),
             mode: pay.mode || 'ACH',
             amount: payAmt,
+            bankAccountId: pay.bankAccountId || (pay.mode !== 'Cash' ? (bankAccounts.find((a) => a.isDefault)?.id || bankAccounts[0]?.id) : undefined),
             reference: pay.reference || '',
             status: 'Paid',
         };
@@ -4816,16 +4949,20 @@ export const ERPProvider = ({ children, }) => {
                 return b;
             }));
         }
-        // Decrease vendor balance liability only for bill settlements.
-        // Advances are vendor receivables (Dr Vendor Advances) and do not reduce AP.
-        if (!isAdvance) {
-            syncVendorBalance(newPay.vendorId, newPay.vendor, -payAmt);
+        // Update vendor balance:
+        // Advances increase vendor asset balance (+payAmt).
+        // Bill payments settle bill liability (+payAmt towards 0).
+        // Advance applications against bills do not change net balance.
+        if (!newPay.advanceApplied) {
+            syncVendorBalance(newPay.vendorId, newPay.vendor, payAmt);
         }
         // Deduct from Operating Bank Account (advance-applied adjustments already drew cash earlier)
-        if (!newPay.advanceApplied) {
-            setBankAccounts((prev) => prev.map((acc, idx) => idx === 0
-                ? { ...acc, balance: Math.max(0, acc.balance - payAmt) }
-                : acc));
+        if (!newPay.advanceApplied && newPay.mode !== 'Cash') {
+            const targetAccId = newPay.bankAccountId;
+            setBankAccounts((prev) => prev.map((acc, idx) => {
+                const isTarget = targetAccId ? acc.id === targetAccId : idx === 0;
+                return isTarget ? { ...acc, balance: Math.max(0, (acc.balance || 0) - payAmt) } : acc;
+            }));
         }
         // Auto-create Journal Entry
         const newJe = {
@@ -5142,8 +5279,8 @@ export const ERPProvider = ({ children, }) => {
                 });
             }
         }
-        // Reduce vendor liability balance across vendors and parties
-        syncVendorBalance(newDebit.vendorId, newDebit.vendor, -retAmt);
+        // Reduce vendor liability / increase advance asset across vendors and parties
+        syncVendorBalance(newDebit.vendorId, newDebit.vendor, retAmt);
         // Auto-create Journal Entry
         const newJe = {
             id: `je-${Date.now()}`,
@@ -5193,8 +5330,8 @@ export const ERPProvider = ({ children, }) => {
             }
         });
 
-        // 2. Reverse vendor AP reduction across vendors and parties
-        syncVendorBalance(pr.vendorId, pr.vendor, pr.amount);
+        // 2. Reverse vendor balance credit across vendors and parties
+        syncVendorBalance(pr.vendorId, pr.vendor, -pr.amount);
 
         // 3. Reversal Journal Entry
         const jeReversal = {
@@ -5655,8 +5792,9 @@ export const ERPProvider = ({ children, }) => {
             invoices,
             zoneRequests,
             customers,
-            vendors,
-            parties,
+            vendors: resolvedVendors,
+            parties: resolvedParties,
+            getPartyCalculatedBalance,
             addParty,
             updateParty,
             units,
@@ -5762,6 +5900,7 @@ export const ERPProvider = ({ children, }) => {
             addVendor,
             updateVendor,
             addQuotation,
+            updateQuotation,
             updateQuotationStatus,
             recordQuotationActivity,
             syncQuotationShare,

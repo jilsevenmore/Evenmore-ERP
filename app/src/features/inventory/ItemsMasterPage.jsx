@@ -116,7 +116,7 @@ export const ItemsMasterPage = () => {
     };
 
     // Detect depleted items in current view
-    const lowStockItems = displayItems.filter((i) => (i.availableQty ?? i.stock ?? 0) <= (i.reorderLevel || 5));
+    const lowStockItems = displayItems.filter((i) => (i.liveAvailable ?? i.availableQty ?? i.stock ?? 0) <= (i.reorderLevel || 5));
 
     const handleBulkSmartRestock = () => {
         if (lowStockItems.length === 0) return;
@@ -127,12 +127,15 @@ export const ItemsMasterPage = () => {
         }
         
         const restockItems = lowStockItems.map((it) => {
-            const deficit = Math.max(10, (it.reorderLevel || 10) * 2 - (it.availableQty ?? it.stock ?? 0));
+            const currentStock = it.liveAvailable ?? it.availableQty ?? it.stock ?? 0;
+            const deficit = Math.max(10, (it.reorderLevel || 10) * 2 - currentStock);
             const unitRate = Number(it.costPrice ?? it.unitCost) || 0;
             return {
                 id: `li-restock-${Date.now()}-${it.id}`,
                 itemId: it.id,
                 itemSku: it.sku,
+                itemName: it.name,
+                name: it.name,
                 description: it.name,
                 qty: deficit,
                 rate: unitRate,
@@ -377,7 +380,7 @@ export const ItemsMasterPage = () => {
         },
     ];
 
-    const totalCatalogValue = displayItems.reduce((sum, it) => sum + ((it.availableQty ?? it.stock ?? 0) * (it.costPrice ?? it.unitCost ?? 0)), 0);
+    const totalCatalogValue = displayItems.reduce((sum, it) => sum + ((it.liveAvailable ?? it.availableQty ?? it.stock ?? 0) * (it.costPrice ?? it.unitCost ?? 0)), 0);
     const uniqueCategoriesCount = new Set(displayItems.map(i => i.category)).size;
 
     const guideConfig = {

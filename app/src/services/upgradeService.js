@@ -76,7 +76,7 @@ export async function createVendorAdvance(data) {
 export async function reconcileVendorAdvance(advanceId, purchaseBillId, amount) {
   return apiClient(`/purchase/advances/${advanceId}/reconcile/`, {
     method: 'POST',
-    data: { purchaseBillId, amount },
+    data: { purchaseBillId, bill_id: purchaseBillId, amount },
   });
 }
 
@@ -327,16 +327,22 @@ export async function logTimesheetHours({ projectId, taskId, taskName, hours, ho
   });
 }
 
-export async function startLiveTimer({ projectId, taskId, description, isBillable }) {
+export async function startLiveTimer({ projectId, taskId, description, isBillable, hourlyRate }) {
   return apiClient('/pms/timesheet-entries/start-timer/', {
     method: 'POST',
-    data: { projectId, taskId, description, isBillable },
+    data: { projectId, taskId, description, isBillable, hourlyRate },
   });
 }
 
 export async function stopLiveTimer(entryId) {
   return apiClient(`/pms/timesheet-entries/${entryId}/stop-timer/`, {
     method: 'POST',
+  });
+}
+
+export async function deleteTimesheetEntry(id) {
+  return apiClient(`/pms/timesheet-entries/${id}/`, {
+    method: 'DELETE',
   });
 }
 

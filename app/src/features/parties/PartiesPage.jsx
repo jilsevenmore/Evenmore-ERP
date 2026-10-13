@@ -92,7 +92,7 @@ export default function PartiesPage() {
       .reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
     const totalPayable = parties
       .filter((p) => p.type === 'Vendor' || p.type === 'Both')
-      .reduce((sum, p) => sum + (p.balance > 0 ? p.balance : 0), 0);
+      .reduce((sum, p) => sum + (p.balance < 0 ? Math.abs(p.balance) : 0), 0);
     return { total, customers, vendors, both, totalReceivable, totalPayable };
   }, [parties]);
 
@@ -211,14 +211,50 @@ export default function PartiesPage() {
       width: '14%',
       render: (party) => {
         const bal = party.balance || 0;
+        const isNegative = bal < 0;
         const isPositive = bal > 0;
+        const isVendor = party.type === 'Vendor';
+        const isCustomer = party.type === 'Customer';
+
+        let subLabel = 'Settled';
+        let colorClass = 'text-slate-500 dark:text-slate-400 font-medium';
+
+        if (isVendor) {
+          if (isNegative) {
+            subLabel = 'Payable (Bill Due)';
+            colorClass = 'text-rose-600 dark:text-rose-400 font-bold';
+          } else if (isPositive) {
+            subLabel = 'Advance Balance';
+            colorClass = 'text-emerald-600 dark:text-emerald-400 font-bold';
+          }
+        } else if (isCustomer) {
+          if (isPositive) {
+            subLabel = 'Receivable';
+            colorClass = 'text-amber-600 dark:text-amber-400 font-bold';
+          } else if (isNegative) {
+            subLabel = 'Customer Advance';
+            colorClass = 'text-emerald-600 dark:text-emerald-400 font-bold';
+          }
+        } else {
+          // Dual Role (Both)
+          if (isNegative) {
+            subLabel = 'Net Payable (Due)';
+            colorClass = 'text-rose-600 dark:text-rose-400 font-bold';
+          } else if (isPositive) {
+            subLabel = 'Net Receivable';
+            colorClass = 'text-amber-600 dark:text-amber-400 font-bold';
+          }
+        }
+
         return (
           <div className="text-right">
-            <div className={`font-semibold font-mono text-xs ${isPositive ? 'text-amber-600 dark:text-amber-400 font-bold' : 'text-text-secondary'}`}>
+            <div className={`font-mono text-xs ${colorClass}`}>
               {formatCurrency(bal)}
             </div>
-            <div className="text-[10px] text-muted">
-              {party.type === 'Vendor' ? 'Payable' : 'Receivable'}
+            <div className="text-[10px]">
+              <span className={isNegative ? 'text-rose-500 font-medium' : isPositive ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-muted'}>
+                {subLabel}
+              </span>
             </div>
           </div>
         );
@@ -308,10 +344,10 @@ export default function PartiesPage() {
           colorScheme="amber"
         />
         <MetricChip
-          icon={TrendingUp}
-          label="Total Receivables"
-          value={formatCurrency(stats.totalReceivable, { noDecimals: true })}
-          colorScheme="rose"
+          icon={selectedType === 'Vendor' ? TrendingDown : TrendingUp}
+          label={selectedType === 'Vendor' ? 'Total Payables Due' : 'Total Receivables'}
+          value={formatCurrency(selectedType === 'Vendor' ? stats.totalPayable : stats.totalReceivable, { noDecimals: true })}
+          colorScheme={selectedType === 'Vendor' ? 'amber' : 'rose'}
         />
       </div>
 
@@ -465,8 +501,13 @@ export default function PartiesPage() {
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Current Balance</span>
-                    <span className="font-mono font-bold text-amber-700">
-                      ₹{(viewingParty.balance || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    <span className={`font-mono font-bold ${(viewingParty.balance || 0) < 0 ? 'text-rose-600 dark:text-rose-400' : (viewingParty.balance || 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                      {formatCurrency(viewingParty.balance || 0)}
+                    </span>
+                    <span className="text-[10px] block font-medium">
+                      {viewingParty.type === 'Vendor'
+                        ? ((viewingParty.balance || 0) < 0 ? 'Payable (Bill Due)' : (viewingParty.balance || 0) > 0 ? 'Advance Balance' : 'Settled')
+                        : ((viewingParty.balance || 0) > 0 ? 'Receivable' : (viewingParty.balance || 0) < 0 ? 'Customer Advance' : 'Settled')}
                     </span>
                   </div>
                   <div>

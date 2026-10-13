@@ -1515,7 +1515,14 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                             {selectedInvoice.revisions.map((rev) => (
                                                                 <tr key={rev.id || rev.revisionNumber} className="hover:bg-white/80">
                                                                     <td className="py-2 px-2 font-mono font-bold text-slate-800">#{rev.revisionNumber}</td>
-                                                                    <td className="py-2 px-2 text-slate-600">{new Date(rev.createdAt).toLocaleString()}</td>
+                                                                    <td className="py-2 px-2 text-slate-600">
+                                                                        {(() => {
+                                                                            const rawDate = rev.changedAt || rev.createdAt || rev.created_at;
+                                                                            if (!rawDate) return '—';
+                                                                            const d = new Date(rawDate);
+                                                                            return isNaN(d.getTime()) ? '—' : d.toLocaleString();
+                                                                        })()}
+                                                                    </td>
                                                                     <td className="py-2 px-2 font-mono">
                                                                         <span className="line-through text-slate-400 mr-1">{formatCurrency(rev.oldInvoiceAmount)}</span>
                                                                         <span className="font-bold text-slate-800">→ {formatCurrency(rev.newInvoiceAmount)}</span>

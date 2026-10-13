@@ -194,7 +194,7 @@ const NAV = [
       { label: 'Purchase Returns', icon: RotateCcw, to: '/purchase/returns' },
       { label: 'Payment Out', icon: ArrowDownLeft, to: '/purchase/payments' },
       { label: 'Expenses', icon: Landmark, to: '/purchase/expenses' },
-      { label: 'Supplier Portal', icon: ExternalLink, to: '/vendor/portal' },
+      // { label: 'Supplier Portal', icon: ExternalLink, to: '/vendor/portal' },
     ],
   },
 
@@ -313,11 +313,11 @@ const NAV = [
     ],
   },
 
-  {
-    label: 'Reports',
-    icon: BarChart3,
-    to: '/reports',
-  },
+  // {
+  //   label: 'Reports',
+  //   icon: BarChart3,
+  //   to: '/reports',
+  // },
 
   {
     label: 'Administration',
