@@ -10,6 +10,7 @@ import { Button } from '../../../components/ui/Button';
 import { StatusBadge } from '../../../components/ui/StatusBadge';
 import { fetchCustomerProjects } from '../../../services/customerTrackingService';
 import { useAppStore } from '../../../stores/appStore';
+import PlaceOrderButton from '../../portal/client/PlaceOrder';
 
 function formatDate(isoString) {
   if (!isoString) return '—';
@@ -138,7 +139,9 @@ export default function CustomerProjectsListPage() {
               ]
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Client portal reorder; renders only for a customer who may order. */}
+            {isCustomer && <PlaceOrderButton onPlaced={() => loadProjects(true)} />}
             {!isCustomer && (
               <Button
                 variant="outline"

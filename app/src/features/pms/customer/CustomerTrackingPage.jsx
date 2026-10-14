@@ -12,6 +12,7 @@ import { ProgressBar } from '../../../components/ui/ProgressBar';
 import { fetchCustomerProjectTracking, fetchCustomerProjects } from '../../../services/customerTrackingService';
 import { useAppStore } from '../../../stores/appStore';
 import { impersonateCustomer } from '../../../services/upgradeService';
+import PlaceOrderButton from '../../portal/client/PlaceOrder';
 
 function formatDate(isoString) {
   if (!isoString) return '—';
@@ -274,7 +275,9 @@ export default function CustomerTrackingPage() {
           <span className="text-xs font-semibold text-slate-500 font-mono">{project.code}</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Client portal reorder; renders only for a customer who may order. */}
+          {isCustomer && <PlaceOrderButton onPlaced={() => loadData(true)} />}
           {(currentUser?.is_superuser || currentUser?.is_staff || ['AD', 'PM', 'SA', 'OM'].includes(currentUser?.role?.code)) && !currentUser?.impersonating?.is_impersonating && (
             <button
               onClick={() => setIsImpersonateModalOpen(true)}
