@@ -453,28 +453,36 @@ export function computeDelayWatchlist(projects = [], now = Date.now()) {
       const overdue = isStageOverdue(stage, now);
       if (!flagged && !overdue) continue;
 
+      const strVal = (v) => {
+        if (!v) return "";
+        if (typeof v === "string") return v;
+        if (typeof v === "object") return v.name || v.label || v.title || "";
+        return String(v);
+      };
+
       const timing = getStageTiming(stage, now);
       rows.push({
         id: `${p.id}:${stage.id}`,
         projectId: p.id,
         stageId: stage.id,
-        customerName: p.customerName,
-        productName: p.productDetails?.productName ?? "",
+        customerName: strVal(p.customerName),
+        productName: strVal(p.productDetails?.productName),
         priority: p.priority,
-        stageName: stage.name,
-        department: stage.department,
+        stageName: strVal(stage.name),
+        department: strVal(stage.department) || "Unassigned",
         status: stage.status,
-        owner: stage.assignedUser?.name ?? stage.assignedTeam ?? "Unassigned",
+        owner: strVal(stage.assignedUser) || strVal(stage.assignedTeam) || "Unassigned",
         // A stage can be overdue before anyone has logged a reason; the Delay
         // Center surfaces both so nothing slips through unattributed.
         isLogged: Boolean(stage.delayDetails?.isDelayed),
-        category: stage.delayDetails?.category ?? null,
-        reason: stage.delayDetails?.reason ?? "",
-        responsibleDepartment: stage.delayDetails?.responsibleDepartment ?? stage.department,
+        category: strVal(stage.delayDetails?.category) || null,
+        reason: strVal(stage.delayDetails?.reason) || "",
+        responsibleDepartment:
+          strVal(stage.delayDetails?.responsibleDepartment) || strVal(stage.department) || "Unassigned",
         responsibleUser:
-          stage.delayDetails?.responsibleUser ?? stage.assignedUser?.name ?? "Unassigned",
+          strVal(stage.delayDetails?.responsibleUser) || strVal(stage.assignedUser) || "Unassigned",
         expectedRecoveryDate: stage.delayDetails?.expectedRecoveryDate ?? null,
-        resolutionNotes: stage.delayDetails?.resolutionNotes ?? "",
+        resolutionNotes: strVal(stage.delayDetails?.resolutionNotes) || "",
         expectedCompletionDateTime: stage.expectedCompletionDateTime ?? null,
         completionPct: computeStageCompletionPct(stage),
         delayMs: timing.delayMs,
@@ -1043,7 +1051,19 @@ export function validateStageHandoff(stage, config, now = Date.now()) {
     });
   }
 
-  const blockedTasks = (stage.tasks ?? []).filter((t) => t.status === "Blocked");
+  const stageTasks = stage.tasks ?? [];
+  if (stageTasks.length > 0) {
+    const incompleteTasks = stageTasks.filter((t) => t.status !== "Completed");
+    if (incompleteTasks.length > 0) {
+      blockers.push({
+        code: "INCOMPLETE_TASKS",
+        label: `All tasks must be completed before handoff (${incompleteTasks.length} task${incompleteTasks.length === 1 ? "" : "s"} remaining).`,
+        hard: true,
+      });
+    }
+  }
+
+  const blockedTasks = stageTasks.filter((t) => t.status === "Blocked");
   if (blockedTasks.length > 0) {
     blockers.push({
       code: "BLOCKED_TASKS",
@@ -2434,28 +2454,65 @@ const usePmsStoreBase = create((set, get) => ({
   },
 
   setStageStatus: (projectId, stageId, status, actor) => {
+    const isSubmittedOrCompleted = status === "Submitted" || status === "Completed";
+    const nowIso = new Date().toISOString();
     set((st) =>
       applyToProject(
         st,
         projectId,
-        (p) => ({
-          ...p,
-          stages: p.stages.map((stage) =>
-            stage.id !== stageId
-              ? stage
-              : {
-                  ...stage,
-                  status,
-                  actualCompletionDateTime:
-                    status === "Completed"
-                      ? stage.actualCompletionDateTime ?? new Date().toISOString()
-                      : stage.actualCompletionDateTime,
-                }
-          ),
-        }),
+        (p) => {
+          const updatedStages = p.stages.map((stage) => {
+            if (stage.id !== stageId) return stage;
+            const updatedTasks = isSubmittedOrCompleted && stage.tasks
+              ? stage.tasks.map((t) => ({
+                  ...t,
+                  status: "Completed",
+                  progress: 100,
+                  actualCompletionDateTime: t.actualCompletionDateTime ?? nowIso,
+                }))
+              : stage.tasks;
+            return {
+              ...stage,
+              status,
+              completionPct: isSubmittedOrCompleted ? 100 : stage.completionPct,
+              progress: isSubmittedOrCompleted ? 100 : stage.progress,
+              actualCompletionDateTime:
+                isSubmittedOrCompleted
+                  ? stage.actualCompletionDateTime ?? nowIso
+                  : stage.actualCompletionDateTime,
+              tasks: updatedTasks,
+            };
+          });
+
+          const totalWeight = updatedStages.reduce(
+            (sum, s) => sum + (Number(s.weight) || Number(s.percentage) || 0),
+            0
+          );
+          let overallPct = 0;
+          if (totalWeight > 0) {
+            const weightedSum = updatedStages.reduce(
+              (sum, s) => sum + ((s.completionPct || 0) * (Number(s.weight) || Number(s.percentage) || 0)),
+              0
+            );
+            overallPct = Math.round(weightedSum / totalWeight);
+          } else {
+            overallPct = Math.round(
+              updatedStages.reduce((sum, s) => sum + (s.completionPct || 0), 0) / (updatedStages.length || 1)
+            );
+          }
+
+          return {
+            ...p,
+            overallCompletionPct: overallPct,
+            stages: updatedStages,
+          };
+        },
         makeActivity("STAGE_STATUS_CHANGED", "Stage", stageId, `Stage marked ${status}.`, actor)
       )
     );
+    if (status === "Submitted") {
+      get().showToast("Stage submitted. All tasks marked as completed.", "success");
+    }
     pushProject(projectId, () => pmsApi.setStageStatus(projectId, stageId, { status }));
   },
 

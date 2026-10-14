@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, UserPlus, Send, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye, Trash2 } from 'lucide-react';
+import { ChevronRight, UserPlus, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye, Trash2 } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { formatCurrency } from '../../../../utils/currencyUtils';
@@ -132,9 +132,6 @@ export function ProjectHeader({
         <div className="flex flex-wrap lg:flex-col gap-2 shrink-0">
           <Button size="sm" variant="secondary" icon={UserPlus} onClick={onAssignStage} disabled={isClosed}>
             Assign Active Stage
-          </Button>
-          <Button size="sm" variant="secondary" icon={Send} onClick={onSubmitForReview} disabled={isClosed || !meta?.currentStage}>
-            Submit for Review
           </Button>
           <Button size="sm" variant="secondary" icon={AlertTriangle} onClick={onLogDelay} disabled={isClosed}>
             Log Delay

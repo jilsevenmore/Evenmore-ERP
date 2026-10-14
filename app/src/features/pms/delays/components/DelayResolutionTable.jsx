@@ -26,6 +26,13 @@ const CATEGORY_TONES = {
   Other: { bg: '#f1f5f9', fg: '#475569' },
 };
 
+function str(v) {
+  if (!v) return '';
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object') return v.name || v.label || v.title || '';
+  return String(v);
+}
+
 function shortDate(value) {
   if (!value) return null;
   const d = new Date(value);
@@ -46,8 +53,8 @@ export function DelayResolutionTable({ rows = [], onUpdatePlan, onResolve, onLog
           >
             {row.projectId}
           </Link>
-          <div className="text-[11px] text-slate-500 truncate max-w-[150px]" title={row.customerName}>
-            {row.customerName}
+          <div className="text-[11px] text-slate-500 truncate max-w-[150px]" title={str(row.customerName)}>
+            {str(row.customerName)}
           </div>
         </div>
       ),
@@ -57,7 +64,7 @@ export function DelayResolutionTable({ rows = [], onUpdatePlan, onResolve, onLog
       label: 'Stage',
       render: (_v, row) => (
         <div className="min-w-0">
-          <div className="text-xs text-slate-700 truncate max-w-[160px]">{row.stageName}</div>
+          <div className="text-xs text-slate-700 truncate max-w-[160px]">{str(row.stageName)}</div>
           <StageStatusBadge status={row.status} size="sm" />
         </div>
       ),
@@ -79,8 +86,8 @@ export function DelayResolutionTable({ rows = [], onUpdatePlan, onResolve, onLog
       label: 'Responsible',
       render: (_v, row) => (
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold text-slate-700">{row.responsibleDepartment}</div>
-          <div className="text-[11px] text-slate-500 truncate max-w-[130px]">{row.responsibleUser}</div>
+          <div className="text-[11px] font-semibold text-slate-700">{str(row.responsibleDepartment)}</div>
+          <div className="text-[11px] text-slate-500 truncate max-w-[130px]">{str(row.responsibleUser)}</div>
         </div>
       ),
     },
@@ -88,20 +95,21 @@ export function DelayResolutionTable({ rows = [], onUpdatePlan, onResolve, onLog
       key: 'category',
       label: 'Root Cause',
       render: (_v, row) => {
-        if (!row.category) {
+        const cat = str(row.category);
+        if (!cat) {
           return (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 whitespace-nowrap">
               <FileWarning size={10} /> Unattributed
             </span>
           );
         }
-        const tone = CATEGORY_TONES[row.category] ?? CATEGORY_TONES.Other;
+        const tone = CATEGORY_TONES[cat] ?? CATEGORY_TONES.Other;
         return (
           <span
             className="text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
             style={{ background: tone.bg, color: tone.fg }}
           >
-            {row.category}
+            {cat}
           </span>
         );
       },
@@ -112,9 +120,9 @@ export function DelayResolutionTable({ rows = [], onUpdatePlan, onResolve, onLog
       render: (_v, row) => (
         <span
           className="text-[11px] text-slate-600 line-clamp-2 max-w-[220px] block"
-          title={row.reason || 'No reason logged yet'}
+          title={str(row.reason) || 'No reason logged yet'}
         >
-          {row.reason || <em className="text-slate-400">No reason logged</em>}
+          {str(row.reason) || <em className="text-slate-400">No reason logged</em>}
         </span>
       ),
     },

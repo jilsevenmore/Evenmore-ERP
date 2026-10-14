@@ -15,6 +15,7 @@
 import { createSync, compact, mapWithLimit, isBackendEnabled, isServerId, describeError } from './resourceSync';
 import { api } from './api';
 import { uploadFileToBackend } from './fileUploadService';
+import { toISODate } from '../utils/dateUtils';
 
 export { isBackendEnabled, isServerId, describeError };
 
@@ -42,11 +43,22 @@ export const PMS_RESOURCES = {
     }),
     fromApi: (row) => ({
       ...row,
+      customerName: typeof row.customerName === 'object' && row.customerName !== null ? (row.customerName.name || '') : row.customerName,
       overallCompletionPct: num(row.overallCompletionPct),
       stages: (row.stages || []).map((s) => ({
         ...s,
+        department: typeof s.department === 'object' && s.department !== null ? (s.department.name || '') : s.department,
         percentage: num(s.percentage ?? s.weightPct ?? s.weight ?? 0),
         weightPct: num(s.percentage ?? s.weightPct ?? s.weight ?? 0),
+        delayDetails: s.delayDetails ? {
+          ...s.delayDetails,
+          responsibleUser: typeof s.delayDetails.responsibleUser === 'object' && s.delayDetails.responsibleUser !== null
+            ? (s.delayDetails.responsibleUser.name || '')
+            : s.delayDetails.responsibleUser,
+          responsibleDepartment: typeof s.delayDetails.responsibleDepartment === 'object' && s.delayDetails.responsibleDepartment !== null
+            ? (s.delayDetails.responsibleDepartment.name || '')
+            : s.delayDetails.responsibleDepartment,
+        } : s.delayDetails,
       })),
       activityLog: row.activityLog || [],
       _synced: true,
@@ -227,12 +239,31 @@ export async function handoffStage(projectId, stageId, payload = {}) {
 
 export async function logDelay(projectId, stageId, payload) {
   if (!isBackendEnabled()) return null;
-  return api.post(`${stagePath(projectId, stageId)}delay/`, payload);
+  const cleanPayload = compact({
+    category: payload.category,
+    reason: payload.reason,
+    responsibleUserId: payload.responsibleUserId || undefined,
+    expectedRecoveryDate: payload.expectedRecoveryDate
+      ? (toISODate(payload.expectedRecoveryDate) || payload.expectedRecoveryDate)
+      : undefined,
+    recoveryPlan: payload.recoveryPlan || payload.resolutionNotes || '',
+  });
+  return api.post(`${stagePath(projectId, stageId)}delay/`, cleanPayload);
 }
 
 export async function updateRecoveryPlan(projectId, stageId, payload) {
   if (!isBackendEnabled()) return null;
-  return api.patch(`${stagePath(projectId, stageId)}delay/`, payload);
+  const cleanPayload = compact({
+    category: payload.category || undefined,
+    responsibleUserId: payload.responsibleUserId || undefined,
+    expectedRecoveryDate: payload.expectedRecoveryDate
+      ? (toISODate(payload.expectedRecoveryDate) || payload.expectedRecoveryDate)
+      : undefined,
+    recoveryPlan: payload.recoveryPlan !== undefined || payload.resolutionNotes !== undefined
+      ? (payload.recoveryPlan || payload.resolutionNotes || '')
+      : undefined,
+  });
+  return api.patch(`${stagePath(projectId, stageId)}delay/`, cleanPayload);
 }
 
 export async function resolveDelay(projectId, stageId, payload = {}) {

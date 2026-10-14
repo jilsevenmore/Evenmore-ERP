@@ -11,8 +11,8 @@ import { StageTasksTab } from './components/StageTasksTab';
 import { DocumentsProofTab } from './components/DocumentsProofTab';
 import { ApprovalsTab } from './components/ApprovalsTab';
 import { ActivityAuditTab } from './components/ActivityAuditTab';
-import { ProjectBugsTab } from './components/ProjectBugsTab';
-import { ProjectProfitabilityTab } from './components/ProjectProfitabilityTab';
+// import { ProjectBugsTab } from './components/ProjectBugsTab';
+// import { ProjectProfitabilityTab } from './components/ProjectProfitabilityTab';
 import { ProjectTeamTab } from './components/ProjectTeamTab';
 import { AssignStageModal } from './components/AssignStageModal';
 import { CreateTaskModal } from './components/CreateTaskModal';
@@ -32,8 +32,8 @@ const TABS = [
   { id: 'overview', label: 'Overview', icon: Info },
   { id: 'timeline', label: 'Stage Timeline', icon: GitBranch },
   { id: 'tasks', label: 'Tasks', icon: ListChecks },
-  { id: 'bugs', label: 'Bugs & Defects', icon: Bug },
-  { id: 'profitability', label: 'Profitability & Costs', icon: DollarSign },
+  // { id: 'bugs', label: 'Bugs & Defects', icon: Bug },
+  // { id: 'profitability', label: 'Profitability & Costs', icon: DollarSign },
   { id: 'documents', label: 'Design Proofs', icon: FileText },
   { id: 'approvals', label: 'Approvals', icon: ShieldCheck },
   { id: 'activity', label: 'Activity', icon: History },
@@ -51,7 +51,9 @@ export default function ProjectDetailPage() {
   const startStage = usePmsStore((s) => s.startStage);
   const setStageStatus = usePmsStore((s) => s.setStageStatus);
   const updateTask = usePmsStore((s) => s.updateTask);
+  const deleteTask = usePmsStore((s) => s.deleteTask);
   const deleteProject = usePmsStore((s) => s.deleteProject);
+  const showToast = usePmsStore((s) => s.showToast);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const currentUser = useAppStore((s) => s.currentUser);
@@ -169,6 +171,18 @@ export default function ProjectDetailPage() {
     setStageStatus(project.id, stage.id, 'Submitted', project.projectManager);
   }
 
+  function handleHandoff(stage) {
+    const tasks = stage?.tasks ?? [];
+    const incomplete = tasks.filter((t) => t.status !== 'Completed');
+    if (tasks.length > 0 && incomplete.length > 0) {
+      showToast(
+        `All tasks must be completed before handoff (${incomplete.length} task${incomplete.length === 1 ? '' : 's'} remaining).`,
+        'error'
+      );
+    }
+    setHandoffStageId(stage.id);
+  }
+
   const canDelete =
     isProjectCreator(project, currentUser) ||
     currentUser?.role === 'Admin' ||
@@ -241,7 +255,7 @@ export default function ProjectDetailPage() {
             onManageTasks={handleManageTasks}
             onAddTask={handleOpenAddTask}
             onSubmit={handleSubmitStage}
-            onHandoff={(stage) => setHandoffStageId(stage.id)}
+            onHandoff={handleHandoff}
             onChat={chatStatus === 'offline' ? undefined : handleOpenStageChat}
             chatUnread={chatUnreadByDepartment}
           />
@@ -259,14 +273,20 @@ export default function ProjectDetailPage() {
                 completionPct: willBeCompleted ? 100 : 0,
               });
             }}
+            onDeleteTask={(stageId, task) => {
+              if (window.confirm(`Delete task "${task.taskName}" from this project?`)) {
+                deleteTask(project.id, stageId, task.id);
+                showToast?.(`Task "${task.taskName}" deleted.`, 'info');
+              }
+            }}
             onTaskProgress={(stageId, task, pct) =>
               updateTask(project.id, stageId, task.id, { completionPct: pct })
             }
           />
         )}
 
-        {tab === 'bugs' && <ProjectBugsTab project={project} />}
-        {tab === 'profitability' && <ProjectProfitabilityTab project={project} />}
+        {/* {tab === 'bugs' && <ProjectBugsTab project={project} />} */}
+        {/* {tab === 'profitability' && <ProjectProfitabilityTab project={project} />} */}
 
         {tab === 'documents' && <DocumentsProofTab project={project} />}
         {tab === 'approvals' && <ApprovalsTab project={project} />}

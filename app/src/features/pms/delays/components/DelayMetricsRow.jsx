@@ -33,7 +33,7 @@ export function DelayMetricsRow({ metrics }) {
       />
       <KpiCard
         label="Bottleneck Dept"
-        value={bottleneck?.department ?? '—'}
+        value={typeof bottleneck?.department === 'object' ? (bottleneck.department?.name || '—') : (bottleneck?.department ?? '—')}
         icon={Building2}
         tone="purple"
       >

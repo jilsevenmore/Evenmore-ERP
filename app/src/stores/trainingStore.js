@@ -67,8 +67,26 @@ const useTrainingStoreBase = create((set, get) => ({
       pullTracked("trainings"),
       pullTracked("trainers"),
     ]);
+    const cleanTrainings = (rows[0] || []).map((t) => {
+      const pCount = Array.isArray(t.participants)
+        ? t.participants.length
+        : typeof t.participants === "number"
+        ? t.participants
+        : Number(t.participants) || 0;
+      return {
+        ...t,
+        name: t.name || t.title || "Untitled Training",
+        title: t.title || t.name || "Untitled Training",
+        trainer: t.trainer || t.trainerName || "Unassigned",
+        trainerName: t.trainerName || t.trainer || "Unassigned",
+        start: t.start || t.startDate || "",
+        end: t.end || t.endDate || t.start || t.startDate || "",
+        participants: pCount,
+        participantsList: Array.isArray(t.participants) ? t.participants : (t.participantsList || []),
+      };
+    });
     set((s) => ({
-      trainings: rows[0] || s.trainings,
+      trainings: cleanTrainings.length > 0 ? cleanTrainings : s.trainings,
       trainers: rows[1] || s.trainers,
     }));
     return rows;

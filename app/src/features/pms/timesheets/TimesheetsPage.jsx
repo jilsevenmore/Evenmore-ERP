@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Clock, 
   Play, 
@@ -62,13 +62,13 @@ function toRow(e) {
     timesheetNumber: e.timesheetNumber || e.timesheet_number,
     work_date: e.date,
     projectId: e.projectId || e.project_id,
-    project_name: e.projectName || e.project_name || e.projectCode || e.project_code || 'Project',
+    project_name: typeof e.projectName === 'object' && e.projectName !== null ? (e.projectName.name || 'Project') : (e.projectName || e.project_name || e.projectCode || e.project_code || 'Project'),
     project_code: e.projectCode || e.project_code || '',
     task_name: e.taskName || e.task_name || e.description || 'General Work',
     hours: Number(e.durationHours ?? e.duration_hours ?? 0),
     hourly_rate: e.hourlyRate != null ? Number(e.hourlyRate) : (e.hourly_rate != null ? Number(e.hourly_rate) : null),
     status: (e.isRunning ?? e.is_running) ? 'Recording' : (e.timesheetStatus || e.timesheet_status || 'Draft'),
-    userName: e.userName || e.user_name || 'Engineer',
+    userName: typeof e.userName === 'object' && e.userName !== null ? (e.userName.name || 'Engineer') : (e.userName || e.user_name || 'Engineer'),
     isBillable: e.isBillable ?? e.is_billable ?? true,
     startTime: e.startTime || e.start_time,
   };
@@ -76,6 +76,22 @@ function toRow(e) {
 
 function errorText(err) {
   return err?.payload?.message || err?.message || 'Unknown error';
+}
+
+function getProjectDisplayName(p) {
+  if (!p) return 'Project';
+  if (typeof p === 'string') return p;
+  const title = typeof p.title === 'string' ? p.title : '';
+  const prodName = typeof p.productDetails === 'object' && p.productDetails !== null
+    ? (p.productDetails.productName || '')
+    : (typeof p.productDetails === 'string' ? p.productDetails : '');
+  const directProd = typeof p.product_name === 'string' ? p.product_name : '';
+  const name = typeof p.name === 'string' ? p.name : '';
+  const custName = typeof p.customerName === 'object' && p.customerName !== null
+    ? (p.customerName.name || '')
+    : (typeof p.customerName === 'string' ? p.customerName : (typeof p.customer_name === 'string' ? p.customer_name : ''));
+
+  return title || prodName || directProd || name || custName || p.code || 'Project';
 }
 
 const timesheetGuide = {
@@ -95,10 +111,17 @@ const timesheetGuide = {
 };
 
 export const TimesheetsPage = () => {
-  const { formatCurrency } = useERP();
+  const { formatCurrency, showToast: erpToast } = useERP();
   const storeProjects = usePmsStore((s) => s.projects || []);
   const permissions = useAppStore((s) => s.permissions);
+  const appToast = useAppStore((s) => s.showToast);
   const canApprove = PMS_MANAGERS.some((code) => (permissions || []).includes(code));
+
+  const showToast = useCallback((msg, type = 'info') => {
+    if (erpToast) { erpToast(msg); }
+    else if (appToast) { appToast(msg); }
+    else { console.log('[Toast]', msg); }
+  }, [erpToast, appToast]);
 
   const [timesheets, setTimesheets] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -132,16 +155,27 @@ export const TimesheetsPage = () => {
 
   // Auto-hydrate PMS store so projects are always available
   useEffect(() => {
-    usePmsStore.getState().hydrate?.().catch(() => {});
+    usePmsStore.getState().hydrate?.().catch((err) => {
+      console.warn('[Timesheets] Error hydrating PMS store:', err);
+    });
   }, []);
+
+  // Auto-select first available project if none is selected yet
+  useEffect(() => {
+    if (!selectedProjectForTimer && storeProjects.length > 0) {
+      setSelectedProjectForTimer(storeProjects[0].id);
+    }
+  }, [storeProjects, selectedProjectForTimer]);
 
   const loadTimesheets = async () => {
     setLoading(true);
     try {
+      console.log('[Timesheets] Fetching timesheet entries...');
       const res = await fetchTimesheetEntries({ page_size: 200 });
+      console.log('[Timesheets] Timesheet entries response:', res);
       setTimesheets(rowsOf(res).map(toRow));
     } catch (err) {
-      console.error('Failed to load timesheets:', err);
+      console.error('[Timesheets] Failed to load timesheets:', err);
     } finally {
       setLoading(false);
     }
@@ -149,7 +183,12 @@ export const TimesheetsPage = () => {
 
   const checkActiveTimer = async () => {
     try {
-      const res = await getActiveTimesheetTimer().catch(() => null);
+      console.log('[Timesheets] Checking active stopwatch timer...');
+      const res = await getActiveTimesheetTimer().catch((err) => {
+        console.warn('[Timesheets] Active timer check returned error/none:', err);
+        return null;
+      });
+      console.log('[Timesheets] Active timer result:', res);
       if (res?.active && res.timer) {
         setActiveTimer(res.timer);
         const startTimeStr = res.timer.startTime || res.timer.start_time;
@@ -159,7 +198,7 @@ export const TimesheetsPage = () => {
         setActiveTimer(null);
       }
     } catch (err) {
-      console.error('Error checking active timer:', err);
+      console.error('[Timesheets] Error checking active timer:', err);
     }
   };
 
@@ -180,35 +219,51 @@ export const TimesheetsPage = () => {
   }, [activeTimer]);
 
   const handleStartTimer = async () => {
-    if (!selectedProjectForTimer) {
-      alert('Please select a project before starting the stopwatch.');
+    const targetProjectId = selectedProjectForTimer || (storeProjects.length > 0 ? storeProjects[0].id : null);
+    if (!targetProjectId) {
+      showToast('Please select a project before starting the stopwatch.', 'error');
+      console.warn('[Stopwatch] Cannot start timer: No project selected or available.');
       return;
     }
+    if (!selectedProjectForTimer) {
+      setSelectedProjectForTimer(targetProjectId);
+    }
+
+    const payload = {
+      projectId: targetProjectId,
+      description: timerTaskName || 'General Engineering Task',
+      hourlyRate: timerHourlyRate ? parseFloat(timerHourlyRate) : null,
+      isBillable: timerIsBillable,
+    };
+
+    console.log('[Stopwatch] Starting stopwatch timer with payload:', payload);
     try {
-      const res = await startTimesheetTimer({
-        projectId: selectedProjectForTimer,
-        description: timerTaskName || 'General Engineering Task',
-        hourlyRate: timerHourlyRate ? parseFloat(timerHourlyRate) : null,
-        isBillable: timerIsBillable,
-      });
+      const res = await startTimesheetTimer(payload);
+      console.log('[Stopwatch] Started stopwatch successfully, server response:', res);
       setActiveTimer(res);
       setTimerSeconds(0);
       setTimerTaskName('');
+      showToast('Live stopwatch started successfully!', 'success');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to start stopwatch: ' + errorText(err));
+      console.error('[Stopwatch] Failed to start stopwatch:', err);
+      showToast('Failed to start stopwatch: ' + errorText(err), 'error');
     }
   };
 
   const handleStopTimer = async () => {
     if (!activeTimer) return;
+    console.log('[Stopwatch] Stopping active stopwatch timer ID:', activeTimer.id);
     try {
-      await stopTimesheetTimer(activeTimer.id);
+      const res = await stopTimesheetTimer(activeTimer.id);
+      console.log('[Stopwatch] Stopwatch stopped successfully, server response:', res);
       setActiveTimer(null);
       setTimerSeconds(0);
+      showToast('Stopwatch recorded and hours saved to timesheet.', 'success');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to stop stopwatch: ' + errorText(err));
+      console.error('[Stopwatch] Failed to stop stopwatch:', err);
+      showToast('Failed to stop stopwatch: ' + errorText(err), 'error');
     }
   };
 
@@ -217,78 +272,105 @@ export const TimesheetsPage = () => {
     if (!window.confirm('Are you sure you want to discard this live stopwatch session without saving?')) {
       return;
     }
+    console.log('[Stopwatch] Discarding live timer session ID:', activeTimer.id);
     try {
       await deleteTimesheetEntry(activeTimer.id);
+      console.log('[Stopwatch] Discarded timer session successfully.');
       setActiveTimer(null);
       setTimerSeconds(0);
+      showToast('Stopwatch session discarded.', 'info');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to discard stopwatch session: ' + errorText(err));
+      console.error('[Stopwatch] Failed to discard stopwatch session:', err);
+      showToast('Failed to discard stopwatch session: ' + errorText(err), 'error');
     }
   };
 
   const handleDeleteEntry = async (entryId) => {
     if (!window.confirm('Are you sure you want to delete this timesheet entry?')) return;
+    console.log('[Timesheets] Deleting timesheet entry ID:', entryId);
     try {
       await deleteTimesheetEntry(entryId);
+      console.log('[Timesheets] Deleted entry successfully.');
+      showToast('Timesheet entry deleted.', 'info');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to delete timesheet entry: ' + errorText(err));
+      console.error('[Timesheets] Failed to delete timesheet entry:', err);
+      showToast('Failed to delete timesheet entry: ' + errorText(err), 'error');
     }
   };
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
+    const targetProject = logForm.project || (storeProjects.length > 0 ? storeProjects[0].id : null);
+    if (!targetProject) {
+      showToast('Please select a project before logging hours.', 'error');
+      return;
+    }
+    const payload = {
+      projectId: targetProject,
+      taskName: logForm.task_name,
+      hours: parseFloat(logForm.hours) || 0,
+      hourlyRate: logForm.hourly_rate === '' ? null : parseFloat(logForm.hourly_rate),
+      date: logForm.work_date,
+      description: logForm.description,
+    };
+    console.log('[Timesheets] Logging manual time:', payload);
     try {
-      await logTimesheetHours({
-        projectId: logForm.project,
-        taskName: logForm.task_name,
-        hours: parseFloat(logForm.hours) || 0,
-        hourlyRate: logForm.hourly_rate === '' ? null : parseFloat(logForm.hourly_rate),
-        date: logForm.work_date,
-        description: logForm.description,
-      });
+      const res = await logTimesheetHours(payload);
+      console.log('[Timesheets] Manual time logged successfully:', res);
       setShowLogModal(false);
       setLogForm({
-        project: '',
+        project: storeProjects[0]?.id || '',
         task_name: '',
         hours: '2.0',
-        hourly_rate: '650',
+        hourly_rate: '500',
         work_date: new Date().toISOString().slice(0, 10),
         description: '',
       });
+      showToast('Work hours successfully logged to timesheet.', 'success');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to log time: ' + errorText(err));
+      console.error('[Timesheets] Failed to log time:', err);
+      showToast('Failed to log time: ' + errorText(err), 'error');
     }
   };
 
   const handleSubmitForApproval = async (id, timesheetNum) => {
+    console.log('[Timesheets] Submitting timesheet for approval ID:', id);
     try {
       await submitTimesheet(id);
+      showToast('Timesheet submitted for manager approval.', 'success');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to submit timesheet: ' + errorText(err));
+      console.error('[Timesheets] Failed to submit timesheet:', err);
+      showToast('Failed to submit timesheet: ' + errorText(err), 'error');
     }
   };
 
   const handleApprove = async (id) => {
+    console.log('[Timesheets] Approving timesheet ID:', id);
     try {
       await approveTimesheet(id);
+      showToast('Timesheet approved.', 'success');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to approve timesheet: ' + errorText(err));
+      console.error('[Timesheets] Failed to approve timesheet:', err);
+      showToast('Failed to approve timesheet: ' + errorText(err), 'error');
     }
   };
 
   const handleReject = async (id) => {
     const reason = window.prompt('Reason for rejecting timesheet entry:');
     if (!reason) return;
+    console.log('[Timesheets] Rejecting timesheet ID:', id, 'reason:', reason);
     try {
       await rejectTimesheet(id, reason);
+      showToast('Timesheet rejected.', 'info');
       loadTimesheets();
     } catch (err) {
-      alert('Failed to reject timesheet: ' + errorText(err));
+      console.error('[Timesheets] Failed to reject timesheet:', err);
+      showToast('Failed to reject timesheet: ' + errorText(err), 'error');
     }
   };
 
@@ -306,13 +388,16 @@ export const TimesheetsPage = () => {
   const handleApplyPreset = (preset) => {
     setTimerTaskName(preset.name);
     setTimerHourlyRate(String(preset.rate));
+    if (!selectedProjectForTimer && storeProjects.length > 0) {
+      setSelectedProjectForTimer(storeProjects[0].id);
+    }
   };
 
   // Active timer details
   const activeProject = useMemo(() => {
     if (!activeTimer) return null;
     const projId = activeTimer.projectId || activeTimer.project_id;
-    return storeProjects.find((p) => p.id === projId) || null;
+    return storeProjects.find((p) => String(p.id) === String(projId)) || null;
   }, [activeTimer, storeProjects]);
 
   const activeRate = activeTimer?.hourlyRate || activeTimer?.hourly_rate || Number(timerHourlyRate) || 650;
@@ -470,7 +555,7 @@ export const TimesheetsPage = () => {
               <div className="space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-primary text-white shadow-2xs">
-                    {activeProject ? (activeProject.title || activeProject.name) : (activeTimer.projectName || 'Active Project')}
+                    {activeProject ? getProjectDisplayName(activeProject) : (typeof activeTimer.projectName === 'string' ? activeTimer.projectName : (typeof activeTimer.project_name === 'string' ? activeTimer.project_name : 'Active Project'))}
                   </span>
                   <span className="text-xs text-slate-500 font-mono">
                     Started at {activeTimer.startTime || activeTimer.start_time ? new Date(activeTimer.startTime || activeTimer.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'recently'}
@@ -578,7 +663,7 @@ export const TimesheetsPage = () => {
                       <option value="">Select Project ({storeProjects.length} available)...</option>
                       {storeProjects.map((p) => (
                         <option key={p.id} value={p.id}>
-                          {p.code ? `[${p.code}] ` : ''}{p.title || p.name || p.customerName}
+                          {p.code ? `[${p.code}] ` : ''}{getProjectDisplayName(p)}
                         </option>
                       ))}
                     </select>
@@ -698,7 +783,9 @@ export const TimesheetsPage = () => {
             >
               <option value="ALL">All Projects</option>
               {storeProjects.map((p) => (
-                <option key={p.id} value={p.id}>{p.title || p.name}</option>
+                <option key={p.id} value={p.id}>
+                  {p.code ? `[${p.code}] ` : ''}{getProjectDisplayName(p)}
+                </option>
               ))}
             </select>
           </div>
@@ -882,7 +969,7 @@ export const TimesheetsPage = () => {
                   <option value="">Select Project...</option>
                   {storeProjects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.code ? `[${p.code}] ` : ''}{p.title || p.name || p.customerName}
+                      {p.code ? `[${p.code}] ` : ''}{getProjectDisplayName(p)}
                     </option>
                   ))}
                 </select>

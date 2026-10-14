@@ -228,7 +228,10 @@ export function CreateProjectModal({ isOpen, onClose, onCreated, initialOrderNum
             id="pms-order"
             className={fieldClass}
             value={orderNumber}
-            onChange={(e) => setOrderNumber(e.target.value)}
+            onChange={(e) => {
+              setOrderNumber(e.target.value);
+              setErrors((prev) => ({ ...prev, order: undefined }));
+            }}
           >
             <option value="">Select a confirmed sales order…</option>
             {availableOrders.map((o) => (

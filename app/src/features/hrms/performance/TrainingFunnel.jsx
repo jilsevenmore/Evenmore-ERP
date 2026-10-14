@@ -176,16 +176,21 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
 
   const handleOpenEdit = (item) => {
     setEditingItem(item);
+    const pCount = Array.isArray(item.participants)
+      ? item.participants.length
+      : typeof item.participants === "number"
+      ? item.participants
+      : Number(item.participants) || 1;
     setForm({
-      name: item.name || "",
-      trainer: item.trainer || "Unassigned",
+      name: item.name || item.title || "",
+      trainer: item.trainer || item.trainerName || "Unassigned",
       department: item.department || "General",
       type: item.type || "Technical",
       stage: item.stage || "Requested",
       cost: item.cost || 0,
-      participants: item.participants || 1,
-      start: item.start || "",
-      end: item.end || "",
+      participants: pCount,
+      start: item.start || item.startDate || "",
+      end: item.end || item.endDate || "",
       location: item.location || "",
       description: item.description || "",
     });
@@ -568,7 +573,7 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                     TRAINING_FUNNEL_STAGES[0];
                   return (
                     <tr key={t.id} className="hover:bg-slate-50/70 transition">
-                      <td className="py-3 px-4 font-bold text-slate-900">{t.name}</td>
+                      <td className="py-3 px-4 font-bold text-slate-900">{t.name || t.title}</td>
                       <td className="py-3 px-4">
                         <span
                           className={`inline-flex px-2.5 py-0.5 rounded-full text-[11px] font-bold ${stageObj.badgeClass}`}
@@ -579,16 +584,18 @@ export default function TrainingFunnel({ embedded = false, onBack }) {
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           {t.avatar && <img src={t.avatar} alt="" className="w-6 h-6 rounded-full" />}
-                          <span>{t.trainer}</span>
+                          <span>{t.trainer || t.trainerName || "Unassigned"}</span>
                         </div>
                       </td>
                       <td className="py-3 px-4 text-slate-600">{t.department}</td>
-                      <td className="py-3 px-4 text-slate-700 font-medium">{t.participants}</td>
+                      <td className="py-3 px-4 text-slate-700 font-medium">
+                        {Array.isArray(t.participants) ? t.participants.length : (t.participants ?? 0)}
+                      </td>
                       <td className="py-3 px-4 font-semibold text-slate-900">
                         ₹ {Number(t.cost || 0).toLocaleString("en-IN")}
                       </td>
                       <td className="py-3 px-4 text-slate-500 text-[12px]">
-                        {t.start} {t.end && t.end !== t.start ? `– ${t.end}` : ""}
+                        {t.start || t.startDate || ""} {t.end && t.end !== t.start ? `– ${t.end}` : ""}
                       </td>
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">

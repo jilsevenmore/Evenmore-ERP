@@ -84,13 +84,18 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
   const plannedHours = Math.round(durationToMs(stage.plannedDuration, stage.durationUnit) / MS_PER_HOUR);
   const plannedLabel = `${stage.plannedDuration} ${stage.durationUnit} (${plannedHours} Hours)`;
 
-  const isDone = stage.status === 'Completed';
-  const notStarted = stage.status === 'Not Started';
+  const isDone = stage.status === 'Completed' || stage.status === 'Approved';
+  const isSubmitted = stage.status === 'Submitted';
+  const notStarted = stage.status === 'Not Started' || stage.status === 'Assigned';
+  const isStarted = stage.status === 'In Progress' || stage.status === 'At Risk' || stage.status === 'Delayed';
+  const canSubmit = isStarted && !isDone && !isSubmitted;
 
   // Remaining / overdue ticker
   let ticker = { text: '—', tone: '#64748b' };
   if (isDone) {
     ticker = { text: 'Finished', tone: '#065f46' };
+  } else if (isSubmitted) {
+    ticker = { text: 'Submitted', tone: '#7c3aed' };
   } else if (timing.isOverdue) {
     ticker = { text: `+${timing.delayLabel} Overdue`, tone: '#9f1239' };
   } else if (timing.remainingMs > 0) {
@@ -238,10 +243,19 @@ function StageCard({ stage, config, isLast, isCurrent, onStart, onManageTasks, o
             <button
               type="button"
               onClick={() => onSubmit?.(stage)}
-              disabled={isDone || notStarted}
+              disabled={!canSubmit}
+              title={
+                !isStarted
+                  ? 'Start the stage first before submitting'
+                  : isSubmitted
+                  ? 'Stage already submitted'
+                  : isDone
+                  ? 'Stage completed'
+                  : 'Submit stage (marks all stage tasks as completed)'
+              }
               className="btn-outline btn-sm inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Send size={12} /> Submit Stage
+              <Send size={12} /> {isSubmitted ? 'Stage Submitted' : 'Submit Stage'}
             </button>
             <button
               type="button"

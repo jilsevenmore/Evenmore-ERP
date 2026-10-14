@@ -344,8 +344,72 @@ export const HRMS_RESOURCES = {
   kpis: plain('/hrms/performance/kpis/'),
 
   // ── training ──────────────────────────────────────────────────────────────
-  trainings: dated('/hrms/trainings/', ['startDate', 'endDate']),
-  trainers: plain('/hrms/trainers/'),
+  trainings: {
+    path: '/hrms/trainings/',
+    toApi: (t) => {
+      const startIso = isoOut(t.start || t.startDate);
+      const endIso = isoOut(t.end || t.endDate || t.start || t.startDate);
+      return compact({
+        title: t.name || t.title,
+        description: t.description || undefined,
+        type: t.type || undefined,
+        trainerId: t.trainerId || undefined,
+        departmentId: t.departmentId || undefined,
+        startDate: startIso,
+        endDate: endIso,
+        venue: t.venue || t.location || undefined,
+        cost: t.cost !== undefined ? num(t.cost) : undefined,
+        stage: t.stage || t.status || undefined,
+      });
+    },
+    fromApi: (row) => {
+      const participantsList = Array.isArray(row.participants) ? row.participants : [];
+      const participantsCount = Array.isArray(row.participants)
+        ? row.participants.length
+        : (num(row.participants) || 0);
+
+      const start = displayIn(row.startDate || row.start_date || row.start);
+      const end = displayIn(row.endDate || row.end_date || row.end);
+
+      return {
+        ...row,
+        name: row.name || row.title || 'Untitled Training',
+        title: row.title || row.name || 'Untitled Training',
+        trainer: row.trainer || row.trainerName || 'Unassigned',
+        trainerName: row.trainerName || row.trainer || 'Unassigned',
+        start: start || '',
+        end: end || start || '',
+        startDate: row.startDate || row.start_date || '',
+        endDate: row.endDate || row.end_date || '',
+        stage: row.stage || row.status || 'Requested',
+        status: row.stage || row.status || 'Requested',
+        participants: participantsCount,
+        participantsList,
+        _synced: true,
+      };
+    },
+  },
+  trainers: {
+    path: '/hrms/trainers/',
+    toApi: (tr) => compact({
+      name: tr.name,
+      kind: tr.kind || (tr.type === 'External' ? 'External' : 'Internal'),
+      organisation: tr.organisation || tr.org || undefined,
+      expertise: tr.expertise || tr.specialization || undefined,
+      contact: tr.contact || tr.email || tr.phone || undefined,
+      rate: tr.rate !== undefined ? num(tr.rate) : undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      specialization: row.specialization || row.expertise || 'General',
+      expertise: row.expertise || row.specialization || 'General',
+      email: row.email || (row.contact && row.contact.includes('@') ? row.contact : '') || '',
+      phone: row.phone || (row.contact && !row.contact.includes('@') ? row.contact : '') || '',
+      status: row.status || 'Active',
+      avatar: row.avatar || `https://i.pravatar.cc/100?u=${encodeURIComponent(row.id || row.name || 'tr')}`,
+      _synced: true,
+    }),
+  },
 
   // ── policies ──────────────────────────────────────────────────────────────
   policies: dated('/hrms/policies/', ['effectiveDate', 'publishedDate']),

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle2, Circle, Ban, Loader, Plus, Filter, Check } from 'lucide-react';
+import { CheckCircle2, Circle, Ban, Loader, Plus, Filter, Check, Trash2 } from 'lucide-react';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { EmptyStatePms } from '../../components/EmptyStatePms';
 import { Button } from '../../../../components/ui/Button';
@@ -33,7 +33,7 @@ function shortDate(value) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
 }
 
-function TaskRow({ task, onToggle, readOnly }) {
+function TaskRow({ task, onToggle, onDelete, readOnly }) {
   const tone = TASK_TONES[task.status] ?? TASK_TONES['Not Started'];
   const Icon = tone.icon;
   const priority = PRIORITY_TONES[task.priority] ?? PRIORITY_TONES.Low;
@@ -90,8 +90,8 @@ function TaskRow({ task, onToggle, readOnly }) {
         </div>
       </div>
 
-      {/* Done Button */}
-      <div className="shrink-0 ml-2">
+      {/* Done & Delete Buttons */}
+      <div className="shrink-0 ml-2 flex items-center gap-1.5">
         <button
           type="button"
           onClick={() => onToggle?.(task)}
@@ -113,12 +113,23 @@ function TaskRow({ task, onToggle, readOnly }) {
             </>
           )}
         </button>
+
+        {!readOnly && onDelete && (
+          <button
+            type="button"
+            onClick={() => onDelete?.(task)}
+            title="Delete task from this project"
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
       </div>
     </li>
   );
 }
 
-export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStageId, onAddTask }) {
+export function StageTasksTab({ project, onToggleTask, onDeleteTask, onTaskProgress, focusStageId, onAddTask }) {
   const [showAllStages, setShowAllStages] = useState(true);
   const ordered = [...(project.stages ?? [])].sort((a, b) => a.sequence - b.sequence);
   const readOnly = project.status === 'Completed';
@@ -263,6 +274,7 @@ export function StageTasksTab({ project, onToggleTask, onTaskProgress, focusStag
                       task={task}
                       readOnly={readOnly}
                       onToggle={(t) => onToggleTask?.(stage.id, t)}
+                      onDelete={(t) => onDeleteTask?.(stage.id, t)}
                       onProgress={(t, pct) => onTaskProgress?.(stage.id, t, pct)}
                     />
                   ))}

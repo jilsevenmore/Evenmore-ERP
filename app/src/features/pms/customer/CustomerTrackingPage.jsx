@@ -45,10 +45,10 @@ function formatFileSize(bytes) {
 }
 
 function calculateRemainingTime(stage) {
-  if (stage.status === 'Completed') {
+  if (stage.status === 'Completed' || stage.status === 'Submitted' || stage.status === 'Approved') {
     return stage.actualCompletionDateTime
       ? `Completed on ${formatDate(stage.actualCompletionDateTime)}`
-      : 'Completed';
+      : (stage.status === 'Submitted' ? 'Submitted' : 'Completed');
   }
   const target = stage.expectedCompletionDateTime || stage.startDateTime;
   if (!target) {
@@ -190,7 +190,7 @@ export default function CustomerTrackingPage() {
 
   // Stage classification for tracker styling
   const getStageMeta = (stage) => {
-    const isCompleted = stage.status === 'Completed' || stage.status === 'Approved';
+    const isCompleted = stage.status === 'Completed' || stage.status === 'Approved' || stage.status === 'Submitted';
     const isDelayed = Boolean(stage.isDelayed || stage.status === 'Delayed');
     const isInProgress = stage.status === 'In Progress' || stage.status === 'Under Review' || stage.status === 'Assigned';
     const isUpcoming = !isCompleted && !isDelayed && !isInProgress;
