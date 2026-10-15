@@ -3,7 +3,7 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, TrendingDown, CheckCircle2, DollarSign, Receipt, Tag } from 'lucide-react';
+import { Plus, TrendingDown, CheckCircle2, IndianRupee, Receipt, Tag } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 
@@ -129,15 +129,26 @@ export const ExpensesPage = () => {
 
       {/* Expenses KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Operating Expenses" value={formatCurrency(totalSpent)} icon={DollarSign} highlight />
+        <StatCard label="Total Operating Expenses" value={formatCurrency(totalSpent)} icon={IndianRupee} highlight />
         <StatCard label="Expense Vouchers" value={`${expenses.length} Vouchers`} icon={Receipt} trend={{ positive: true, text: 'Logged to P&L' }} />
         <StatCard label="Avg Expense Cost" value={formatCurrency(avgExpense)} icon={TrendingDown} />
         <StatCard label="Active Cost Centers" value={`${categoriesCount} Categories`} icon={Tag} subtext={[...new Set(expenses.map((e) => e.category).filter(Boolean))].slice(0, 3).join(', ') || 'No expenses yet'} />
       </div>
 
-      <DataTable title="Operational Overheads & Disbursed Vouchers" columns={columns} data={expenses} keyExtractor={(e) => e.id} searchPlaceholder="Search payee, voucher #, or category..." searchFilter={(e, term) => String(e.expenseNumber ?? '').toLowerCase().includes(term) ||
-            String(e.payee ?? '').toLowerCase().includes(term) ||
-            String(e.category ?? '').toLowerCase().includes(term)}/>
+      <DataTable
+        title="Operational Overheads & Disbursed Vouchers"
+        columns={columns}
+        data={expenses}
+        keyExtractor={(e) => e.id}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
+        searchPlaceholder="Search payee, voucher #, or category..."
+        searchFilter={(e, term) =>
+          String(e.expenseNumber ?? '').toLowerCase().includes(term) ||
+          String(e.payee ?? '').toLowerCase().includes(term) ||
+          String(e.category ?? '').toLowerCase().includes(term)
+        }
+      />
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-2xs p-2 sm:p-4">
           <div className="bg-white rounded-lg border border-[#CED4DA] shadow-xl max-w-md w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto">
@@ -167,7 +178,7 @@ export const ExpensesPage = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Amount ($)</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Amount (₹)</label>
                   <input
                     type="number"
                     required

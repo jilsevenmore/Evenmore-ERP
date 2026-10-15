@@ -3,7 +3,7 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, Users, DollarSign, ShieldAlert, X, Eye } from 'lucide-react';
+import { Plus, Users, IndianRupee, ShieldAlert, X, Eye } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Customer360Drawer } from '../../components/common/Customer360Drawer';
 const customerGuide = {
@@ -150,7 +150,7 @@ export const CustomersPage = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard label="Total Customers" value={customers.length} icon={Users}/>
-        <StatCard label="Accounts Receivable" value={formatCurrency(totalOutstanding)} icon={DollarSign}/>
+        <StatCard label="Accounts Receivable" value={formatCurrency(totalOutstanding)} icon={IndianRupee}/>
         <StatCard label="Active Accounts" value={customers.filter((c) => c.status === 'Active').length} icon={ShieldAlert}/>
       </div>
 
@@ -196,7 +196,7 @@ export const CustomersPage = () => {
                   <input type="text" value={newCust.contactPerson} onChange={(e) => setNewCust({ ...newCust, contactPerson: e.target.value })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800"/>
                 </div>
                 <div>
-                  <label className="font-semibold text-slate-700 block mb-1">Credit Limit ($)</label>
+                  <label className="font-semibold text-slate-700 block mb-1">Credit Limit (₹)</label>
                   <input type="number" value={newCust.creditLimit} onChange={(e) => setNewCust({ ...newCust, creditLimit: Number(e.target.value) })} className="w-full p-2 border border-slate-300 rounded bg-white text-slate-800 font-mono"/>
                 </div>
               </div>

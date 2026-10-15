@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DataTable } from '../../../../components/ui/DataTable';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
+import { getPriorityRowClass } from '../../projects/components/ProjectsTable';
 import { AlertTriangle, ArrowUpRight } from 'lucide-react';
 
 /**
@@ -119,6 +120,7 @@ export function DelayedProjectsTable({ rows = [] }) {
       data={rows}
       rowKey="id"
       pageSize={5}
+      getRowClassName={getPriorityRowClass}
       onRowClick={(row) => navigate(`/pms/projects/${row.projectId}`)}
       emptyTitle="Nothing running late"
       emptyDesc="Overdue and delayed stages will appear here as soon as one slips."

@@ -419,7 +419,7 @@ const router = createBrowserRouter([
       // ── Accounts ──────────────────────────────────────────
       { path: 'accounts', element: <Navigate to="/accounts/cash-bank" replace /> },
       { path: 'accounts/cash-bank', element: <Page component={CashBankPage} /> },
-      { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
+      // { path: 'accounts/general-ledger', element: <Page component={GeneralLedgerPage} /> },
       { path: 'accounts/budgets', element: <Page component={BudgetsPage} /> },
       { path: 'accounts/reports', element: <Page component={FinancialReportsPage} /> },
 

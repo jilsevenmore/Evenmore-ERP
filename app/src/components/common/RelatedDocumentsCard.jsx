@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Truck, DollarSign, ArrowUpRight, CheckCircle, Clock } from 'lucide-react';
+import { FileText, Truck, IndianRupee, ArrowUpRight, CheckCircle, Clock } from 'lucide-react';
 export const RelatedDocumentsCard = ({ documents, title = 'Connected Transaction Documents', }) => {
     const getIcon = (type) => {
         switch (type) {
@@ -8,7 +8,7 @@ export const RelatedDocumentsCard = ({ documents, title = 'Connected Transaction
             case 'Payment':
             case 'Debit Note':
             case 'Credit Note':
-                return <DollarSign className="w-4 h-4 text-emerald-500"/>;
+                return <IndianRupee className="w-4 h-4 text-emerald-500"/>;
             default:
                 return <FileText className="w-4 h-4 text-blue-500"/>;
         }
@@ -46,7 +46,7 @@ export const RelatedDocumentsCard = ({ documents, title = 'Connected Transaction
               <div className="text-right flex items-center gap-3">
                 {doc.amount != null && (<div>
                     <span className="text-xs font-mono font-bold text-slate-900">
-                      ${(Number(doc.amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₹{(Number(doc.amount) || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                     {doc.status && (<p className="text-[10px] font-medium text-slate-500 flex items-center justify-end gap-1">
                         {String(doc.status ?? '').toLowerCase() === 'paid' || String(doc.status ?? '').toLowerCase() === 'delivered' ? (<CheckCircle className="w-3 h-3 text-emerald-500 inline"/>) : (<Clock className="w-3 h-3 text-amber-500 inline"/>)}

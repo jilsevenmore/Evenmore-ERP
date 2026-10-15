@@ -1130,13 +1130,13 @@ export const DashboardPage = () => {
               </span>
               <strong className="text-text font-mono font-bold shrink-0">₹{fmt(Math.round(bankBalance))}</strong>
             </Link>
-            <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
+            {/* <Link to="/accounts/general-ledger" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold text-text min-w-0">
                 <FileText size={14} className="text-primary shrink-0" />
                 <span className="truncate">General Ledger</span>
               </span>
               <span className="text-primary text-xs font-bold shrink-0">Open →</span>
-            </Link>
+            </Link> */}
             <Link to="/accounts/reports" className="flex items-center justify-between p-2.5 rounded-xl bg-soft hover:bg-card border border-border text-text transition">
               <span className="flex items-center gap-2 font-bold text-text min-w-0">
                 <PieChart size={14} className="text-primary shrink-0" />

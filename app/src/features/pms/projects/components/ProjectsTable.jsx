@@ -27,6 +27,21 @@ const PRIORITY_TONES = {
   Low: { bg: '#f1f5f9', fg: '#475569' },
 };
 
+export function getPriorityRowClass(row) {
+  const priority = row?.priority || 'Low';
+  switch (priority) {
+    case 'Urgent':
+      return 'bg-rose-50/50 hover:bg-rose-100/70 shadow-[inset_4px_0_0_0_#e11d48]';
+    case 'High':
+      return 'bg-orange-50/40 hover:bg-orange-100/60 shadow-[inset_4px_0_0_0_#f97316]';
+    case 'Medium':
+      return 'bg-sky-50/25 hover:bg-sky-100/45 shadow-[inset_4px_0_0_0_#38bdf8]';
+    case 'Low':
+    default:
+      return 'hover:bg-slate-50/80 shadow-[inset_4px_0_0_0_#cbd5e1]';
+  }
+}
+
 const DEPARTMENT_TONES = {
   Design: { bg: '#eef2ff', fg: '#4338ca' },
   Production: { bg: '#eff6ff', fg: '#1d4ed8' },
@@ -62,15 +77,33 @@ export function ProjectsTable({
     {
       key: 'id',
       label: 'Project ID',
-      render: (_v, row) => (
-        <Link
-          to={`/pms/projects/${row.id}`}
-          className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {row.code || row.id}
-        </Link>
-      ),
+      render: (_v, row) => {
+        const p = row.priority || 'Low';
+        const dotColor =
+          p === 'Urgent'
+            ? 'bg-rose-600 ring-2 ring-rose-200'
+            : p === 'High'
+            ? 'bg-orange-500 ring-2 ring-orange-200'
+            : p === 'Medium'
+            ? 'bg-sky-500'
+            : 'bg-slate-400';
+
+        return (
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2 h-2 rounded-full shrink-0 ${dotColor} ${p === 'Urgent' ? 'animate-pulse' : ''}`}
+              title={`Priority: ${p}`}
+            />
+            <Link
+              to={`/pms/projects/${row.id}`}
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline whitespace-nowrap"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {row.code || row.id}
+            </Link>
+          </div>
+        );
+      },
     },
     {
       key: 'customerName',
@@ -221,13 +254,24 @@ export function ProjectsTable({
       key: 'priority',
       label: 'Priority',
       render: (_v, row) => {
-        const tone = PRIORITY_TONES[row.priority] ?? PRIORITY_TONES.Low;
+        const p = row.priority || 'Low';
+        const tone = PRIORITY_TONES[p] ?? PRIORITY_TONES.Low;
+        const borderCls =
+          p === 'Urgent'
+            ? 'border-rose-300'
+            : p === 'High'
+            ? 'border-orange-300'
+            : p === 'Medium'
+            ? 'border-sky-300'
+            : 'border-slate-200';
+
         return (
           <span
-            className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full whitespace-nowrap border ${borderCls}`}
             style={{ background: tone.bg, color: tone.fg }}
           >
-            {row.priority}
+            {p === 'Urgent' && <span className="w-1.5 h-1.5 rounded-full bg-rose-600 animate-ping" />}
+            {p}
           </span>
         );
       },
@@ -319,6 +363,7 @@ export function ProjectsTable({
       rowKey="id"
       pageSize={10}
       pageSizeOptions={[10, 20, 50]}
+      getRowClassName={getPriorityRowClass}
       onRowClick={(row) => navigate(`/pms/projects/${row.id}`)}
       emptyTitle={emptyTitle}
       emptyDesc={emptyDesc}

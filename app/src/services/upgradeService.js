@@ -57,12 +57,15 @@ export async function impersonateCustomer(customerId, reason) {
 }
 
 // ── 2. Operations & Supply Chain (§2.2) ───────────────────────────────────
-export async function fetchPoRegister() {
-  return apiClient('/purchase/orders/register/');
+export async function fetchPoRegister(params = {}) {
+  const query = typeof params === 'object' && params !== null ? params : {};
+  return apiClient('/purchase/orders/register/', { query });
 }
 
-export async function fetchVendorAdvances(vendorId) {
-  const query = vendorId ? { vendorId } : {};
+export async function fetchVendorAdvances(vendorIdOrParams) {
+  const query = typeof vendorIdOrParams === 'object' && vendorIdOrParams !== null
+    ? vendorIdOrParams
+    : vendorIdOrParams ? { vendorId: vendorIdOrParams } : {};
   return apiClient('/purchase/advances/', { query });
 }
 
@@ -156,31 +159,31 @@ export async function createScrapLog(data) {
 
 // ── 3. Finance & Accounting (§2.4) ────────────────────────────────────────
 export async function fetchBudgets() {
-  return apiClient('/accounting/budgets/');
+  return apiClient('/accounts/budgets/');
 }
 
 export async function createBudget(data) {
-  return apiClient('/accounting/budgets/', {
+  return apiClient('/accounts/budgets/', {
     method: 'POST',
     data,
   });
 }
 
 export async function updateBudget(id, data) {
-  return apiClient(`/accounting/budgets/${id}/`, {
+  return apiClient(`/accounts/budgets/${id}/`, {
     method: 'PATCH',
     data,
   });
 }
 
 export async function deleteBudget(id) {
-  return apiClient(`/accounting/budgets/${id}/`, {
+  return apiClient(`/accounts/budgets/${id}/`, {
     method: 'DELETE',
   });
 }
 
 export async function fetchBudgetVarianceSummary() {
-  return apiClient('/accounting/budgets/variance-summary/');
+  return apiClient('/accounts/budgets/variance-summary/');
 }
 
 // ── 4. HRMS (§2.5) ────────────────────────────────────────────────────────

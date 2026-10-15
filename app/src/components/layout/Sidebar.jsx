@@ -231,7 +231,7 @@ const NAV = [
     icon: Landmark,
     children: [
       { label: 'Cash / Bank', icon: Landmark, to: '/accounts/cash-bank' },
-      { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
+      // { label: 'General Ledger', icon: FileText, to: '/accounts/general-ledger' },
       { label: 'Budgets & Burn', icon: Sliders, to: '/accounts/budgets' },
       { label: 'Financial Reports', icon: PieChart, to: '/accounts/reports' },
     ],

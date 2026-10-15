@@ -3,7 +3,7 @@ import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ArrowUpRight, CreditCard, X, DollarSign, Receipt, CheckCircle2, TrendingDown } from 'lucide-react';
+import { Plus, ArrowUpRight, CreditCard, X, IndianRupee, Receipt, CheckCircle2, TrendingDown } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 const paymentOutGuide = {
@@ -223,7 +223,7 @@ export const PaymentOutPage = () => {
 
       {/* Payment Out KPI Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={DollarSign} />
+        <StatCard label="Total Disbursed" value={formatCurrency(totalDisbursed)} icon={IndianRupee} />
         <StatCard label="Total Disbursed Vouchers" value={`${paymentOuts.length} Vouchers`} icon={Receipt} trend={{ positive: true, text: 'Cleared to Ledger' }} />
         {/* [PHASE-2D] advance exposure vs applied */}
         <StatCard label="Advances Released" value={formatCurrency(totalAdvances)} icon={ArrowUpRight} tone="blue" subtext={`${totalAdvanceApplied > 0 ? formatCurrency(totalAdvanceApplied) + ' applied · ' : ''}${formatCurrency(openAdvanceBalance)} open`} />
@@ -299,16 +299,27 @@ export const PaymentOutPage = () => {
         </div>
       </div>
 
-      <DataTable title="Vendor Disbursement Vouchers" columns={columns} data={paymentOuts} keyExtractor={(p) => p.id} searchPlaceholder="Search voucher #, vendor, or bill..." searchFilter={(p, term) => String(p.voucherNumber ?? '').toLowerCase().includes(term) ||
-            String(p.vendor ?? '').toLowerCase().includes(term) ||
-            (p.billNumber && String(p.billNumber ?? '').toLowerCase().includes(term)) ||
-            (p.reference && String(p.reference ?? '').toLowerCase().includes(term))}/>
+      <DataTable
+        title="Vendor Disbursement Vouchers"
+        columns={columns}
+        data={paymentOuts}
+        keyExtractor={(p) => p.id}
+        pageSize={20}
+        pageSizeOptions={[10, 20, 50, 100]}
+        searchPlaceholder="Search voucher #, vendor, or bill..."
+        searchFilter={(p, term) =>
+          String(p.voucherNumber ?? '').toLowerCase().includes(term) ||
+          String(p.vendor ?? '').toLowerCase().includes(term) ||
+          (p.billNumber && String(p.billNumber ?? '').toLowerCase().includes(term)) ||
+          (p.reference && String(p.reference ?? '').toLowerCase().includes(term))
+        }
+      />
 
       {showAddModal && (<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 text-xs max-h-[95vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-200">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-rose-600"/>
+                <IndianRupee className="w-5 h-5 text-rose-600"/>
                 <h3 className="font-bold text-base text-[#1F2E4A]">Issue Payment Out Voucher</h3>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600">

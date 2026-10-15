@@ -30,6 +30,8 @@ export function DataTable({
   pageSizeOptions = [5, 10, 20],
   action,
   exportable = true,
+  rowClassName,
+  getRowClassName,
 }) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState('');
@@ -282,11 +284,16 @@ export function DataTable({
             {paginated.map((row, index) => {
               const rowId = getRowKey(row, index);
               const isRowSelected = selected.includes(rowId);
+              const customRowClass = typeof getRowClassName === 'function'
+                ? getRowClassName(row, index)
+                : typeof rowClassName === 'function'
+                ? rowClassName(row, index)
+                : (rowClassName || '');
 
               return (
                 <tr
                   key={rowId}
-                  className={`transition-colors hover:bg-card-hover ${isRowSelected ? 'bg-primary-subtle' : ''} ${
+                  className={`transition-colors ${customRowClass || 'hover:bg-card-hover'} ${isRowSelected ? 'bg-primary-subtle' : ''} ${
                     onRowClick ? 'cursor-pointer' : ''
                   }`}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
@@ -350,6 +357,11 @@ export function DataTable({
             total={sorted.length}
             page={page}
             pageSize={pageSize}
+            pageSizeOptions={pageSizeOptions}
+            onPageSizeChange={(newSize) => {
+              setPageSize(newSize);
+              setPage(1);
+            }}
             onChange={setPage}
           />
         </div>
