@@ -15,6 +15,10 @@ const EVENT_ENTITY_LABELS = {
   'lead-task': 'Task',
   quotation: 'Quotation',
   contract: 'Contract',
+  EmployeeTransfer: 'Transfer',
+  EmployeePromotion: 'Promotion',
+  EmployeeWarning: 'Disciplinary',
+  EmployeeAward: 'Award',
 };
 
 /** The CRM task list, grouped by lead in the `{ [leadId]: { tasks } }` shape the reminders read. */
@@ -50,6 +54,9 @@ function formatEventTime(value, now) {
 function defaultEventPath(entry) {
   const type = String(entry.type || '');
   if (type.startsWith('hrms.leave')) return '/hrms/leave';
+  if (type.startsWith('hrms.transfer') || type.startsWith('hrms.promotion') || type.startsWith('hrms.warning') || type.startsWith('hrms.award')) {
+    return '/portal/employee';
+  }
   return { pms: '/pms/my-tasks', hrms: '/hrms', erp: '/dashboard' }[entry.category] || '/crm';
 }
 

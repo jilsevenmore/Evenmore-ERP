@@ -33,26 +33,48 @@ export default function Applications() {
   const [stageFilter, setStageFilter] = useState("All");
   const [guideOpen, setGuideOpen] = useState(false);
 
-  // If applications collection has records, use it; otherwise fall back to candidate application records
+  // All candidates in the pipeline are represented as applications, combined with any standalone application records
   const allApplicationRecords = useMemo(() => {
-    if (applications.length > 0) {
-      return applications.map((app) => {
-        const matchedCandidate = candidates.find((c) => c.id === app.candidateId || c.email === app.email);
-        return {
-          id: app.id || matchedCandidate?.id,
-          candidateId: app.candidateId || matchedCandidate?.id,
-          name: app.candidateName || matchedCandidate?.name || app.name || "Candidate",
-          email: app.email || matchedCandidate?.email || "",
-          avatar: app.avatar || matchedCandidate?.avatar,
-          position: app.jobTitle || app.position || matchedCandidate?.position || "—",
-          appliedDate: app.appliedDate || matchedCandidate?.appliedDate || "—",
-          source: app.source || matchedCandidate?.source || "Portal",
-          stage: app.stage || matchedCandidate?.stage || "Applied",
-          recruiter: app.recruiter || matchedCandidate?.recruiter || "—",
-        };
-      });
-    }
-    return candidates;
+    const list = candidates.map((cand) => {
+      const matchedApp = applications.find(
+        (a) => a.candidateId === cand.id || (a.email && cand.email && a.email.toLowerCase() === cand.email.toLowerCase())
+      );
+      return {
+        id: cand.id,
+        candidateId: cand.id,
+        name: cand.name,
+        email: cand.email || "",
+        avatar: cand.avatar,
+        position: cand.position || matchedApp?.jobTitle || "Staff",
+        appliedDate: cand.appliedDate || matchedApp?.appliedDate || "—",
+        source: cand.source || matchedApp?.source || "Career Portal",
+        stage: cand.stage || "Applied",
+        recruiter: cand.recruiter || matchedApp?.recruiter || "—",
+      };
+    });
+
+    // Also include any standalone applications not yet converted to pipeline candidates
+    applications.forEach((app) => {
+      const alreadyIncluded = list.some(
+        (c) => c.candidateId === app.candidateId || (c.email && app.email && c.email.toLowerCase() === app.email.toLowerCase())
+      );
+      if (!alreadyIncluded) {
+        list.push({
+          id: app.id,
+          candidateId: app.candidateId || app.id,
+          name: app.candidateName || app.name || "Candidate",
+          email: app.email || "",
+          avatar: app.avatar,
+          position: app.jobTitle || app.position || "—",
+          appliedDate: app.appliedDate || "—",
+          source: app.source || "Portal",
+          stage: app.stage || "Applied",
+          recruiter: app.recruiter || "—",
+        });
+      }
+    });
+
+    return list;
   }, [applications, candidates]);
 
   const filtered = useMemo(() => {
@@ -133,8 +155,13 @@ export default function Applications() {
         <select
           value={r.stage}
           onChange={(e) => {
-            changeStage(r.id, e.target.value);
-            showToast(`Moved ${r.name} to ${e.target.value}`);
+            const nextStage = e.target.value;
+            changeStage(r.id, nextStage);
+            if (nextStage === "Hired") {
+              showToast(`${r.name} hired and added to Employee Directory!`);
+            } else {
+              showToast(`Moved ${r.name} to ${nextStage}`);
+            }
           }}
           className={`h-9 px-2 text-xs font-semibold rounded-xl border outline-none cursor-pointer transition ${
             r.stage === "Hired"

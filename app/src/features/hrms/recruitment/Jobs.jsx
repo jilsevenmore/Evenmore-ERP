@@ -48,7 +48,7 @@ function todayLabel() {
 }
 
 export default function Jobs() {
-  const { jobs, addJob, updateJob, deleteJob } = useRecruitmentStore();
+  const { jobs, addJob, updateJob, deleteJob, candidates = [] } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const location = useLocation();
@@ -226,8 +226,26 @@ export default function Jobs() {
     },
     { key: "department", header: "DEPARTMENT —", sortable: true },
     { key: "branch", header: "BRANCH" },
-    { key: "openings", header: "OPENINGS" },
-    { key: "applicants", header: "APPLICANTS —", sortable: true },
+    {
+      key: "applicants",
+      header: "APPLICANTS —",
+      sortable: true,
+      render: (r) => {
+        const count = candidates.filter(
+          (c) => c.jobId === r.id || c.position?.toLowerCase() === r.title?.toLowerCase()
+        ).length;
+        return (
+          <button
+            type="button"
+            onClick={() => navigate("/hrms/recruitment/candidates", { state: { jobFilter: r.title } })}
+            className="font-bold text-blue-600 hover:underline cursor-pointer"
+            title="View candidates for this job in pipeline"
+          >
+            {count || r.applicants || 0}
+          </button>
+        );
+      },
+    },
     { key: "startDate", header: "START DATE" },
     {
       key: "status",

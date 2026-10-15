@@ -106,7 +106,7 @@ function getCategory(type) {
 }
 
 export default function Interviews() {
-  const { interviews, addInterview, candidates, jobs } = useRecruitmentStore();
+  const { interviews, addInterview, updateCandidate, candidates, jobs, changeStage } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const location = useLocation();
@@ -211,7 +211,13 @@ export default function Interviews() {
       status: "Scheduled",
       meetingLink: form.meetingLink,
     });
-    showToast("Interview scheduled successfully.");
+    if (cand) {
+      if (!cand.stage || cand.stage === "Applied" || cand.stage === "Screening") {
+        changeStage(cand.id, "Interview");
+      }
+      updateCandidate(cand.id, { interviewStatus: "Scheduled" });
+    }
+    showToast(`Interview scheduled for ${cand?.name || "Candidate"}.`);
     setDrawerOpen(false);
   }
 

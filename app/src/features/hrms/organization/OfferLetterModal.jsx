@@ -16,6 +16,7 @@ import {
   DollarSign,
   Clock,
   User,
+  UserCheck,
 } from "lucide-react";
 
 export default function OfferLetterModal({
@@ -24,6 +25,7 @@ export default function OfferLetterModal({
   offer,
   onUpdateOffer,
   onConfirmOffer,
+  onAcceptOffer,
 }) {
   const currentUser = useAppStore((s) => s.currentUser);
   const { companyProfile } = useERP();
@@ -107,6 +109,34 @@ export default function OfferLetterModal({
     }
   };
 
+  const handleAcceptAndHire = () => {
+    const updated = {
+      ...offer,
+      candidateName: formData.candidateName,
+      email: formData.email,
+      position: formData.position,
+      jobType: formData.jobType,
+      dept: formData.dept,
+      salary: formData.salary,
+      location: formData.location,
+      workMode: formData.workMode,
+      joiningDate: formData.joiningDate,
+      reportingManager: formData.reportingManager,
+      probationPeriod: formData.probationPeriod,
+      expiryDate: formData.acceptanceDeadline,
+      letterContent: { ...formData },
+      status: "Accepted",
+    };
+    if (onAcceptOffer) {
+      onAcceptOffer(updated);
+    } else if (onConfirmOffer) {
+      onConfirmOffer(updated);
+    } else if (onUpdateOffer) {
+      onUpdateOffer(updated);
+    }
+    onClose();
+  };
+
   const handleSave = () => {
     if (onUpdateOffer) {
       const updated = {
@@ -151,7 +181,7 @@ export default function OfferLetterModal({
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                Minimal &amp; simple formal offer format
+                Official offer &amp; compensation terms
               </p>
             </div>
           </div>
@@ -171,22 +201,36 @@ export default function OfferLetterModal({
               <span>{isEditing ? "Preview Letter" : "Edit Details"}</span>
             </button>
 
-            {/* Save / Confirm */}
-            {onConfirmOffer ? (
+            {/* Accept & Convert to Hired */}
+            <button
+              type="button"
+              onClick={handleAcceptAndHire}
+              className="btn-primary h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer border-transparent"
+              title="Candidate accepted offer — Convert to Hired and add to Employee Directory"
+            >
+              <UserCheck size={14} />
+              <span>Accept &amp; Convert to Hired</span>
+            </button>
+
+            {/* Issue / Confirm Offer */}
+            {onConfirmOffer && (
               <button
                 type="button"
                 onClick={handleConfirm}
-                className="btn-primary h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer border-transparent"
-                title="Confirm & Generate Offer Letter"
+                className="btn-primary h-8 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer border-transparent"
+                title="Confirm & Issue Offer Letter to Candidate"
               >
                 <CheckCircle2 size={14} />
-                <span>Confirm &amp; Generate</span>
+                <span>Issue Offer</span>
               </button>
-            ) : (
+            )}
+
+            {/* Save Changes (if edit mode) */}
+            {onUpdateOffer && !onConfirmOffer && (
               <button
                 type="button"
                 onClick={handleSave}
-                className="btn-primary h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer border-transparent"
+                className="btn-primary h-8 px-3 bg-slate-700 hover:bg-slate-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition shadow-xs cursor-pointer border-transparent"
                 title="Save Changes"
               >
                 <Save size={14} />

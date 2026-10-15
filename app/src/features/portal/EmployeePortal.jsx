@@ -35,6 +35,9 @@ import {
   HelpCircle,
   Send,
   ClipboardList,
+  Award,
+  TrendingUp,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useAttendanceStore } from '../../stores/attendanceStore';
@@ -45,6 +48,12 @@ import { Modal } from '../../components/ui/Modal';
 import { Badge } from '../../components/hrms/Badge';
 import { EarlyPunchOutModal } from '../hrms/attendance/components/EarlyPunchOutModal';
 import { usePunchActions } from '../hrms/attendance/usePunchActions';
+import {
+  fetchEmployeeTransfers,
+  fetchEmployeePromotions,
+  fetchEmployeeWarnings,
+  fetchEmployeeAwards,
+} from '../../services/upgradeService';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
@@ -214,6 +223,27 @@ export default function EmployeePortal() {
   const colleagues = useMemo(() => {
     return employees.filter((e) => e.id !== currentEmployee?.id);
   }, [employees, currentEmployee]);
+
+  // Employee Lifecycle Records (Promotions, Transfers, Warnings, Awards)
+  const [myTransfers, setMyTransfers] = useState([]);
+  const [myPromotions, setMyPromotions] = useState([]);
+  const [myWarnings, setMyWarnings] = useState([]);
+  const [myAwards, setMyAwards] = useState([]);
+
+  useEffect(() => {
+    if (!currentEmployee?.id) return;
+    Promise.all([
+      fetchEmployeeTransfers(currentEmployee.id).catch(() => []),
+      fetchEmployeePromotions(currentEmployee.id).catch(() => []),
+      fetchEmployeeWarnings(currentEmployee.id).catch(() => []),
+      fetchEmployeeAwards(currentEmployee.id).catch(() => []),
+    ]).then(([t, p, w, a]) => {
+      setMyTransfers(Array.isArray(t?.data) ? t.data : Array.isArray(t) ? t : []);
+      setMyPromotions(Array.isArray(p?.data) ? p.data : Array.isArray(p) ? p : []);
+      setMyWarnings(Array.isArray(w?.data) ? w.data : Array.isArray(w) ? w : []);
+      setMyAwards(Array.isArray(a?.data) ? a.data : Array.isArray(a) ? a : []);
+    });
+  }, [currentEmployee?.id]);
 
   // Combine all requests into a unified list
   const unifiedRequests = useMemo(() => {
@@ -1076,14 +1106,46 @@ export default function EmployeePortal() {
         </div>
       </div>
 
+      {/* Recognition & Milestone Notification Banner */}
+      {(myAwards.length > 0 || myPromotions.length > 0) && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-emerald-500/10 border border-amber-300 dark:border-amber-700/50 rounded-2xl p-4 flex items-center justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-sm shrink-0">
+              <Award size={20} />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">
+                {myAwards.length > 0 ? `Honored with: ${myAwards[0].award_name || myAwards[0].title}` : `Promoted: ${myPromotions[0].toDesignationTitle || myPromotions[0].new_designation}`}
+              </h4>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {myAwards.length > 0
+                  ? (myAwards[0].citation || 'Congratulations on your outstanding contribution and achievement!')
+                  : `Effective from ${myPromotions[0].effective_date || myPromotions[0].effectiveDate}. Congratulations!`}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setActiveTab('CAREER')}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition shadow-xs cursor-pointer"
+          >
+            View Career Milestones ({myTransfers.length + myPromotions.length + myWarnings.length + myAwards.length})
+          </button>
+        </div>
+      )}
+
       {/* Central Requests History Register */}
       <div className="bg-white border border-bdr rounded-2xl shadow-xs overflow-hidden">
         {/* Table Header & Controls */}
         <div className="p-5 border-b border-bdr flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-base font-bold text-slate-900">My Requests & HR Verification Status</h2>
+            <h2 className="text-base font-bold text-slate-900">
+              {activeTab === 'CAREER' ? 'My Career Milestones, Promotions & Notices' : 'My Requests & HR Verification Status'}
+            </h2>
             <p className="text-xs text-muted mt-0.5">
-              Live status of your submitted requests. Every request is verified by HR / Reporting Supervisors.
+              {activeTab === 'CAREER'
+                ? 'Official record of promotions, department transfers, awards, and formal conduct notices.'
+                : 'Live status of your submitted requests. Every request is verified by HR / Reporting Supervisors.'}
             </p>
           </div>
 
@@ -1101,16 +1163,18 @@ export default function EmployeePortal() {
             </div>
 
             {/* Status Filter */}
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary cursor-pointer"
-            >
-              <option value="ALL">All HR Statuses</option>
-              <option value="Pending">Pending HR Review</option>
-              <option value="Approved">Approved by HR</option>
-              <option value="Rejected">Rejected by HR</option>
-            </select>
+            {activeTab !== 'CAREER' && (
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="h-9 px-3 rounded-xl bg-slate-50 border border-bdr text-xs font-semibold text-slate-700 focus:outline-none focus:border-primary cursor-pointer"
+              >
+                <option value="ALL">All HR Statuses</option>
+                <option value="Pending">Pending HR Review</option>
+                <option value="Approved">Approved by HR</option>
+                <option value="Rejected">Rejected by HR</option>
+              </select>
+            )}
           </div>
         </div>
 
@@ -1125,6 +1189,7 @@ export default function EmployeePortal() {
             { id: 'WFH', label: 'Work From Home', count: unifiedRequests.filter((r) => r.requestType === 'WFH').length },
             { id: 'ASSET', label: 'Assets & IT', count: unifiedRequests.filter((r) => r.requestType === 'ASSET').length },
             { id: 'GENERAL', label: 'Other Requirements', count: unifiedRequests.filter((r) => r.requestType === 'GENERAL').length },
+            { id: 'CAREER', label: 'Career & Milestones', count: myTransfers.length + myPromotions.length + myWarnings.length + myAwards.length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -1144,9 +1209,180 @@ export default function EmployeePortal() {
           ))}
         </div>
 
-        {/* Requests Table */}
+        {/* Requests or Career Table */}
         <div className="overflow-x-auto">
-          {filteredRequests.length === 0 ? (
+          {activeTab === 'CAREER' ? (
+            <div className="p-6 space-y-6">
+              {/* Promotions */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                    <TrendingUp size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Career Progression & Role Revisions</h3>
+                    <p className="text-[11px] text-muted">Your designation upgrades and revised compensation records</p>
+                  </div>
+                </div>
+                {myPromotions.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No promotions recorded on file.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Previous Role</th>
+                          <th className="py-2.5 px-4">Promoted Role</th>
+                          <th className="py-2.5 px-4">Effective Date</th>
+                          <th className="py-2.5 px-4 text-right">Revised CTC</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myPromotions.map((p, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 text-slate-600">{p.fromDesignationTitle || p.previous_designation || '—'}</td>
+                            <td className="py-2.5 px-4 font-semibold text-emerald-700">{p.toDesignationTitle || p.new_designation || '—'}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{p.effective_date || p.effectiveDate || '—'}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
+                              {p.new_salary ? `Rs ${Number(p.new_salary).toLocaleString('en-IN')}` : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Transfers */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                    <ArrowRightLeft size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Department & Location Transfers</h3>
+                    <p className="text-[11px] text-muted">Movement records across teams, departments, and branch locations</p>
+                  </div>
+                </div>
+                {myTransfers.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No transfers recorded.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">From Department</th>
+                          <th className="py-2.5 px-4">To Department</th>
+                          <th className="py-2.5 px-4">Effective Date</th>
+                          <th className="py-2.5 px-4">Reason / Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myTransfers.map((t, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 text-slate-600">{t.fromDepartmentName || t.from_department || '—'}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.toDepartmentName || t.to_department || '—'}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{t.effective_date || t.effectiveDate || '—'}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{t.reason || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Awards */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                    <Award size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Awards & Spot Recognitions</h3>
+                    <p className="text-[11px] text-muted">Excellence citations, performance bonuses, and honors awarded by leadership</p>
+                  </div>
+                </div>
+                {myAwards.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No awards recorded.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Award Title</th>
+                          <th className="py-2.5 px-4">Date Presented</th>
+                          <th className="py-2.5 px-4 text-right">Prize Amount</th>
+                          <th className="py-2.5 px-4">Citation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myAwards.map((a, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 font-semibold text-amber-800 flex items-center gap-1.5">
+                              <Award size={14} className="text-amber-600" /> {a.award_name || a.title || '—'}
+                            </td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{a.award_date || a.presentation_date || '—'}</td>
+                            <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
+                              {(a.gift_amount || a.cash_reward) ? `Rs ${Number(a.gift_amount || a.cash_reward).toLocaleString('en-IN')}` : '—'}
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600">{a.citation || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Warnings */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-8 h-8 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                    <AlertTriangle size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900">Official Notices & Conduct Records</h3>
+                    <p className="text-[11px] text-muted">Formal HR performance notices and advisories</p>
+                  </div>
+                </div>
+                {myWarnings.length === 0 ? (
+                  <p className="text-xs text-slate-400 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200">No disciplinary warnings on file.</p>
+                ) : (
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Notice Title</th>
+                          <th className="py-2.5 px-4">Severity</th>
+                          <th className="py-2.5 px-4">Date Issued</th>
+                          <th className="py-2.5 px-4">Details / Explanation</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {myWarnings.map((w, idx) => (
+                          <tr key={idx} className="hover:bg-slate-50/50">
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{w.subject || w.title || '—'}</td>
+                            <td className="py-2.5 px-4">
+                              <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                (w.severity || w.warning_level) === 'Severe' || (w.severity || w.warning_level) === 'Final Written' || (w.severity || w.warning_level) === 'Suspension' ? 'bg-rose-100 text-rose-800' :
+                                (w.severity || w.warning_level) === 'Medium' || (w.severity || w.warning_level) === 'First Written' ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700'
+                              }`}>
+                                {w.severity || w.warning_level || 'Notice'}
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{w.issue_date || w.warning_date || '—'}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{w.description || w.explanation || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : filteredRequests.length === 0 ? (
             <div className="py-14 text-center">
               <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto mb-3">
                 <FileText size={20} />

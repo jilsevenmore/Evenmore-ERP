@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
-import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase, Search } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
+import { useRecruitmentStore, syncCandidateToEmployee } from "../../../stores/recruitmentStore";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import UserInitials from "../../../components/common/UserInitials";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
@@ -39,17 +41,41 @@ const statusStyles = {
 };
 
 export default function Employees() {
+  const location = useLocation();
   const storeEmployees = useAppStore((s) => s.employees || []);
   const addStoreEmployee = useAppStore((s) => s.addEmployee);
   const deleteStoreEmployee = useAppStore((s) => s.deleteEmployee);
   const refreshHrms = useAppStore((s) => s.refreshHrms);
   const setToast = useAppStore((s) => s.setToast || s.showToast);
+
+  const candidates = useRecruitmentStore((s) => s.candidates || []);
+  const offers = useRecruitmentStore((s) => s.offers || []);
+  const jobs = useRecruitmentStore((s) => s.jobs || []);
+
+  const [search, setSearch] = useState(location.state?.search || "");
   const [dept, setDept] = useState("All");
   const [status, setStatus] = useState("All");
   const [viewMode, setViewMode] = useState("Table");
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
+
+  // Sync search state if navigating from Candidate page with a search query
+  useEffect(() => {
+    if (location.state?.search) {
+      setSearch(location.state.search);
+      setCurrentPage(1);
+    }
+  }, [location.state]);
+
+  // Ensure any hired candidates from recruitment pipeline are synced to Employee directory
+  useEffect(() => {
+    candidates.forEach((cand) => {
+      if (cand.stage === "Hired") {
+        syncCandidateToEmployee(cand, offers, jobs);
+      }
+    });
+  }, [candidates, offers, jobs]);
 
   // Use store employees, normalized with img/avatar
   const employees = useMemo(() => {
@@ -104,6 +130,11 @@ export default function Employees() {
   const handleOpenLifecycle = (emp) => {
     setSelectedLifecycleEmp(emp);
     setLifecycleTab('transfers');
+    setShowEventCreateModal(false);
+    setTransferForm({ to_department: '', to_branch: '', effective_date: new Date().toISOString().slice(0, 10), reason: '' });
+    setPromotionForm({ new_designation: '', previous_salary: emp.standardSalary || emp.standard_salary || '', new_salary: '', effective_date: new Date().toISOString().slice(0, 10), notes: '' });
+    setWarningForm({ warning_level: 'First Written', title: '', explanation: '', warning_date: new Date().toISOString().slice(0, 10) });
+    setAwardForm({ award_name: '', citation: '', cash_reward: '', presentation_date: new Date().toISOString().slice(0, 10), category: 'Excellence' });
     loadLifecycleData(emp.id);
   };
 
@@ -128,13 +159,18 @@ export default function Employees() {
     [departmentsList, employees]
   );
 
-  const filtered = useMemo(
-    () =>
-      employees.filter(
-        (e) => (dept === "All" || e.department === dept) && (status === "All" || e.status === status)
-      ),
-    [employees, dept, status]
-  );
+  const filtered = useMemo(() => {
+    return employees.filter((e) => {
+      if (dept !== "All" && e.department !== dept) return false;
+      if (status !== "All" && e.status !== status) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const haystack = `${e.name || ""} ${e.email || ""} ${e.designation || ""} ${e.department || ""} ${e.employeeCode || e.empId || e.id || ""}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [employees, dept, status, search]);
 
   const totalPages = Math.ceil(filtered.length / pageSize) || 1;
   const paginatedEmployees = useMemo(() => {
@@ -224,7 +260,31 @@ export default function Employees() {
 
       {/* Filter Card */}
       <div className="emp-card emp-filter-card">
-        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 12, flex: 1 }}>
+          {/* Search Bar */}
+          <div className="relative flex items-center min-w-[220px] max-w-[340px] flex-1">
+            <Search size={14} className="absolute left-3 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search employee by name, role, email..."
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full pl-9 pr-7 py-1.5 text-xs bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-slate-100 placeholder-slate-400 transition"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => { setSearch(""); setCurrentPage(1); }}
+                className="absolute right-2.5 text-slate-400 hover:text-slate-600 text-xs cursor-pointer font-bold"
+              >
+                ×
+              </button>
+            )}
+          </div>
+
           <div className={`emp-filter-dropdown ${dept !== "All" ? "active" : ""}`}>
             <span className="emp-filter-text">
               {dept === "All" ? "Department" : dept}
@@ -269,12 +329,13 @@ export default function Employees() {
             </select>
           </div>
 
-          {(dept !== "All" || status !== "All") && (
+          {(dept !== "All" || status !== "All" || search.trim() !== "") && (
             <button
               type="button"
               onClick={() => {
                 setDept("All");
                 setStatus("All");
+                setSearch("");
                 setCurrentPage(1);
               }}
               className="emp-btn-clear"
@@ -652,16 +713,22 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeeTransfer({
-                          employee: selectedLifecycleEmp.id,
-                          from_department: selectedLifecycleEmp.department,
-                          to_department: transferForm.to_department,
-                          to_branch: transferForm.to_branch,
-                          effective_date: transferForm.effective_date,
-                          reason: transferForm.reason,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeeTransfer({
+                            employeeId: selectedLifecycleEmp.id,
+                            from_department: selectedLifecycleEmp.department,
+                            to_department: transferForm.to_department,
+                            effective_date: transferForm.effective_date,
+                            reason: transferForm.reason,
+                          });
+                          setToast("Transfer recorded successfully.");
+                          setShowEventCreateModal(false);
+                          setSelectedLifecycleEmp((prev) => prev ? { ...prev, department: transferForm.to_department } : prev);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                          refreshHrms?.("employees");
+                        } catch (err) {
+                          setToast("Failed to record transfer: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
@@ -671,11 +738,17 @@ export default function Employees() {
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Operations / R&D"
+                            list="department-options"
+                            placeholder="Select or enter department"
                             value={transferForm.to_department}
                             onChange={(e) => setTransferForm({ ...transferForm, to_department: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
                           />
+                          <datalist id="department-options">
+                            {departmentsList.map((d) => (
+                              <option key={d.id} value={d.name} />
+                            ))}
+                          </datalist>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>
@@ -698,7 +771,7 @@ export default function Employees() {
                           placeholder="Operational requirement or employee request..."
                         />
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg font-semibold">
+                      <button type="submit" className="px-4 py-2 bg-primary text-white rounded-lg font-semibold hover:opacity-95">
                         Confirm Transfer
                       </button>
                     </form>
@@ -708,17 +781,24 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeePromotion({
-                          employee: selectedLifecycleEmp.id,
-                          previous_designation: selectedLifecycleEmp.designation,
-                          new_designation: promotionForm.new_designation,
-                          previous_salary: parseFloat(promotionForm.previous_salary) || 0,
-                          new_salary: parseFloat(promotionForm.new_salary) || 0,
-                          effective_date: promotionForm.effective_date,
-                          notes: promotionForm.notes,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeePromotion({
+                            employeeId: selectedLifecycleEmp.id,
+                            previous_designation: selectedLifecycleEmp.designation,
+                            new_designation: promotionForm.new_designation,
+                            previous_salary: parseFloat(promotionForm.previous_salary) || 0,
+                            new_salary: parseFloat(promotionForm.new_salary) || 0,
+                            effective_date: promotionForm.effective_date,
+                            notes: promotionForm.notes,
+                          });
+                          setToast("Promotion confirmed successfully.");
+                          setShowEventCreateModal(false);
+                          setSelectedLifecycleEmp((prev) => prev ? { ...prev, designation: promotionForm.new_designation, standardSalary: promotionForm.new_salary } : prev);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                          refreshHrms?.("employees");
+                        } catch (err) {
+                          setToast("Failed to confirm promotion: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
@@ -728,11 +808,17 @@ export default function Employees() {
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Senior Systems Engineer"
+                            list="designation-options"
+                            placeholder="Select or enter designation"
                             value={promotionForm.new_designation}
                             onChange={(e) => setPromotionForm({ ...promotionForm, new_designation: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
                           />
+                          <datalist id="designation-options">
+                            {designationsList.map((d) => (
+                              <option key={d.id} value={d.title || d.name} />
+                            ))}
+                          </datalist>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Effective Date *</label>
@@ -765,7 +851,17 @@ export default function Employees() {
                           />
                         </div>
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold">
+                      <div>
+                        <label className="font-semibold text-slate-700 block mb-1">Promotion Notes / Justification</label>
+                        <textarea
+                          rows={2}
+                          value={promotionForm.notes}
+                          onChange={(e) => setPromotionForm({ ...promotionForm, notes: e.target.value })}
+                          className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          placeholder="Reason for promotion and revised role responsibilities..."
+                        />
+                      </div>
+                      <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:opacity-95">
                         Confirm Promotion
                       </button>
                     </form>
@@ -775,15 +871,20 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeeWarning({
-                          employee: selectedLifecycleEmp.id,
-                          warning_level: warningForm.warning_level,
-                          title: warningForm.title,
-                          explanation: warningForm.explanation,
-                          warning_date: warningForm.warning_date,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeeWarning({
+                            employeeId: selectedLifecycleEmp.id,
+                            severity: warningForm.warning_level,
+                            subject: warningForm.title,
+                            description: warningForm.explanation,
+                            issue_date: warningForm.warning_date,
+                          });
+                          setToast("Disciplinary notice issued successfully.");
+                          setShowEventCreateModal(false);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                        } catch (err) {
+                          setToast("Failed to issue warning: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
@@ -793,7 +894,7 @@ export default function Employees() {
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Unexcused Absence / Security Violation"
+                            placeholder="e.g. Unexcused Absence / Conduct Violation"
                             value={warningForm.title}
                             onChange={(e) => setWarningForm({ ...warningForm, title: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
@@ -806,9 +907,10 @@ export default function Employees() {
                             onChange={(e) => setWarningForm({ ...warningForm, warning_level: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
                           >
-                            <option value="Low">Low (Informal Counseling)</option>
-                            <option value="Medium">Medium (Written Warning)</option>
-                            <option value="Severe">Severe (Final Notice / PIP)</option>
+                            <option value="Verbal">Verbal (Informal Counseling)</option>
+                            <option value="First Written">First Written (Official Warning)</option>
+                            <option value="Final Written">Final Written (Final Notice / PIP)</option>
+                            <option value="Suspension">Suspension (Formal Action)</option>
                           </select>
                         </div>
                       </div>
@@ -822,7 +924,7 @@ export default function Employees() {
                           placeholder="Details of the infraction and corrective measures required..."
                         />
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold">
+                      <button type="submit" className="px-4 py-2 bg-rose-600 text-white rounded-lg font-semibold hover:opacity-95">
                         Issue Warning Notice
                       </button>
                     </form>
@@ -832,29 +934,49 @@ export default function Employees() {
                     <form
                       onSubmit={async (e) => {
                         e.preventDefault();
-                        await createEmployeeAward({
-                          employee: selectedLifecycleEmp.id,
-                          award_name: awardForm.award_name,
-                          citation: awardForm.citation,
-                          cash_reward: parseFloat(awardForm.cash_reward) || 0,
-                          presentation_date: awardForm.presentation_date,
-                        });
-                        setShowEventCreateModal(false);
-                        loadLifecycleData(selectedLifecycleEmp.id);
+                        try {
+                          await createEmployeeAward({
+                            employeeId: selectedLifecycleEmp.id,
+                            award_name: awardForm.award_name,
+                            category: awardForm.category || "Excellence",
+                            citation: awardForm.citation,
+                            gift_amount: parseFloat(awardForm.cash_reward) || 0,
+                            award_date: awardForm.presentation_date,
+                          });
+                          setToast("Award recorded and presented.");
+                          setShowEventCreateModal(false);
+                          await loadLifecycleData(selectedLifecycleEmp.id);
+                        } catch (err) {
+                          setToast("Failed to record award: " + (err?.message || "Server error"), "error");
+                        }
                       }}
                       className="space-y-3"
                     >
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-1">
                           <label className="font-semibold text-slate-700 block mb-1">Award Title *</label>
                           <input
                             type="text"
                             required
-                            placeholder="e.g. Star Performer of the Quarter / Innovation Award"
+                            placeholder="e.g. Star Performer of Quarter"
                             value={awardForm.award_name}
                             onChange={(e) => setAwardForm({ ...awardForm, award_name: e.target.value })}
                             className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
                           />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Category</label>
+                          <select
+                            value={awardForm.category || "Excellence"}
+                            onChange={(e) => setAwardForm({ ...awardForm, category: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                          >
+                            <option value="Excellence">Excellence</option>
+                            <option value="Star Performer">Star Performer</option>
+                            <option value="Innovation">Innovation</option>
+                            <option value="Customer Hero">Customer Hero</option>
+                            <option value="Leadership">Leadership</option>
+                          </select>
                         </div>
                         <div>
                           <label className="font-semibold text-slate-700 block mb-1">Cash Reward (Rs)</label>
@@ -877,7 +999,7 @@ export default function Employees() {
                           placeholder="Key milestone or client feedback leading to this recognition..."
                         />
                       </div>
-                      <button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold">
+                      <button type="submit" className="px-4 py-2 bg-amber-600 text-white rounded-lg font-semibold hover:opacity-95">
                         Present Award
                       </button>
                     </form>
@@ -903,9 +1025,9 @@ export default function Employees() {
                       ) : (
                         transfers.map((t, idx) => (
                           <tr key={idx}>
-                            <td className="py-2.5 px-4 text-slate-600">{t.from_department || "—"}</td>
-                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.to_department}</td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{t.effective_date}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{t.fromDepartmentName || t.from_department || "—"}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{t.toDepartmentName || t.to_department || "—"}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{t.effective_date || t.effectiveDate || "—"}</td>
                             <td className="py-2.5 px-4 text-slate-600">{t.reason || "—"}</td>
                           </tr>
                         ))
@@ -932,11 +1054,11 @@ export default function Employees() {
                       ) : (
                         promotions.map((p, idx) => (
                           <tr key={idx}>
-                            <td className="py-2.5 px-4 text-slate-600">{p.previous_designation || "—"}</td>
-                            <td className="py-2.5 px-4 font-semibold text-emerald-700">{p.new_designation}</td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{p.effective_date}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{p.fromDesignationTitle || p.previous_designation || "—"}</td>
+                            <td className="py-2.5 px-4 font-semibold text-emerald-700">{p.toDesignationTitle || p.new_designation || "—"}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{p.effective_date || p.effectiveDate || "—"}</td>
                             <td className="py-2.5 px-4 text-right font-mono font-bold text-slate-900">
-                              {p.new_salary ? `Rs ${p.new_salary}` : "—"}
+                              {p.new_salary ? `Rs ${Number(p.new_salary).toLocaleString("en-IN")}` : "—"}
                             </td>
                           </tr>
                         ))
@@ -963,17 +1085,17 @@ export default function Employees() {
                       ) : (
                         warnings.map((w, idx) => (
                           <tr key={idx}>
-                            <td className="py-2.5 px-4 font-semibold text-slate-800">{w.title}</td>
+                            <td className="py-2.5 px-4 font-semibold text-slate-800">{w.subject || w.title || "—"}</td>
                             <td className="py-2.5 px-4">
                               <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                                w.warning_level === "Severe" ? "bg-rose-100 text-rose-800" :
-                                w.warning_level === "Medium" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
+                                (w.severity || w.warning_level) === "Severe" || (w.severity || w.warning_level) === "Final Written" || (w.severity || w.warning_level) === "Suspension" ? "bg-rose-100 text-rose-800" :
+                                (w.severity || w.warning_level) === "Medium" || (w.severity || w.warning_level) === "First Written" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-700"
                               }`}>
-                                {w.warning_level}
+                                {w.severity || w.warning_level || "Notice"}
                               </span>
                             </td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{w.warning_date}</td>
-                            <td className="py-2.5 px-4 text-slate-600">{w.explanation || "—"}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{w.issue_date || w.warning_date || "—"}</td>
+                            <td className="py-2.5 px-4 text-slate-600">{w.description || w.explanation || "—"}</td>
                           </tr>
                         ))
                       )}
@@ -1000,11 +1122,11 @@ export default function Employees() {
                         awards.map((a, idx) => (
                           <tr key={idx}>
                             <td className="py-2.5 px-4 font-semibold text-amber-800 flex items-center gap-1.5">
-                              <Award size={14} className="text-amber-600" /> {a.award_name}
+                              <Award size={14} className="text-amber-600" /> {a.award_name || a.title || "—"}
                             </td>
-                            <td className="py-2.5 px-4 font-mono text-slate-600">{a.presentation_date}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-600">{a.award_date || a.presentation_date || "—"}</td>
                             <td className="py-2.5 px-4 text-right font-mono font-bold text-emerald-700">
-                              {a.cash_reward ? `Rs ${a.cash_reward}` : "—"}
+                              {(a.gift_amount || a.cash_reward) ? `Rs ${Number(a.gift_amount || a.cash_reward).toLocaleString("en-IN")}` : "—"}
                             </td>
                             <td className="py-2.5 px-4 text-slate-600">{a.citation || "—"}</td>
                           </tr>

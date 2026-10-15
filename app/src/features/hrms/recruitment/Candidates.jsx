@@ -91,6 +91,9 @@ export default function Candidates() {
     if (location.state?.openAdd) {
       openAdd();
     }
+    if (location.state?.jobFilter) {
+      setJob(location.state.jobFilter);
+    }
   }, [location.state]);
 
   const uniqueJobs = useMemo(() => {
@@ -154,7 +157,11 @@ export default function Candidates() {
         stage: form.stage,
         recruiter: form.recruiter,
       });
-      showToast("Candidate updated successfully");
+      if (form.stage === "Hired") {
+        showToast("Candidate updated and added to Employee Directory");
+      } else {
+        showToast("Candidate updated successfully");
+      }
       setDrawerOpen(false);
     } else {
       addCandidate({
@@ -174,7 +181,11 @@ export default function Candidates() {
         skills: form.skills,
         interviewStatus: "Not Scheduled",
       });
-      showToast("Candidate registered successfully");
+      if (form.stage === "Hired") {
+        showToast("Candidate registered and added to Employee Directory");
+      } else {
+        showToast("Candidate registered successfully");
+      }
       setDrawerOpen(false);
     }
   }
@@ -214,6 +225,17 @@ export default function Candidates() {
     }
     changeStage(offerData.candidateId, "Offer");
     showToast(`Offer letter confirmed and issued for ${offerData.candidateName}`);
+  };
+
+  const handleAcceptOffer = (offerData) => {
+    const existingIndex = offers.findIndex((o) => o.id === offerData.id || o.candidateId === offerData.candidateId);
+    if (existingIndex >= 0) {
+      updateOffer(offers[existingIndex].id, { ...offerData, status: "Accepted" });
+    } else {
+      addOffer({ ...offerData, status: "Accepted" });
+    }
+    changeStage(offerData.candidateId, "Hired");
+    showToast(`Offer accepted! ${offerData.candidateName} converted to Hired and added to Employee Directory.`);
   };
 
   const handleUpdateOffer = (offerData) => {
@@ -301,6 +323,17 @@ export default function Candidates() {
             <FileText size={12} />
             <span>Offer</span>
           </button>
+          {r.stage === "Hired" && (
+            <button
+              type="button"
+              title="View in Employee Directory"
+              onClick={() => navigate("/hrms/employees", { state: { search: r.name } })}
+              className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl border font-semibold bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 transition cursor-pointer"
+            >
+              <Users size={12} />
+              <span>Employee</span>
+            </button>
+          )}
           <button
             type="button"
             title="Edit Candidate"
@@ -657,6 +690,7 @@ export default function Candidates() {
         onClose={() => setIsOfferModalOpen(false)}
         offer={activeOffer}
         onConfirmOffer={handleConfirmOffer}
+        onAcceptOffer={handleAcceptOffer}
         onUpdateOffer={handleUpdateOffer}
       />
     </div>

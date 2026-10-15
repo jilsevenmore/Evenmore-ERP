@@ -193,7 +193,18 @@ export async function fetchEmployeeTransfers(employeeId) {
 }
 
 export async function createEmployeeTransfer(data) {
-  return apiClient('/hrms/transfers/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    fromDepartmentId: data.fromDepartmentId || data.from_department,
+    toDepartmentId: data.toDepartmentId || data.to_department,
+    to_department: data.to_department || data.toDepartmentId,
+    fromLocationId: data.fromLocationId || data.from_location,
+    toLocationId: data.toLocationId || data.to_location,
+    effective_date: data.effective_date || data.effectiveDate,
+    reason: data.reason || '',
+    status: data.status || 'Completed',
+  };
+  return apiClient('/hrms/transfers/', { method: 'POST', data: payload });
 }
 
 export async function fetchEmployeePromotions(employeeId) {
@@ -202,7 +213,18 @@ export async function fetchEmployeePromotions(employeeId) {
 }
 
 export async function createEmployeePromotion(data) {
-  return apiClient('/hrms/promotions/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    fromDesignationId: data.fromDesignationId || data.previous_designation,
+    toDesignationId: data.toDesignationId || data.new_designation,
+    new_designation: data.new_designation || data.toDesignationId,
+    previous_salary: data.previous_salary !== undefined ? data.previous_salary : data.previousSalary,
+    new_salary: data.new_salary !== undefined ? data.new_salary : data.newSalary,
+    effective_date: data.effective_date || data.effectiveDate,
+    justification: data.justification || data.notes || '',
+    status: data.status || 'Effective',
+  };
+  return apiClient('/hrms/promotions/', { method: 'POST', data: payload });
 }
 
 export async function fetchEmployeeWarnings(employeeId) {
@@ -211,7 +233,15 @@ export async function fetchEmployeeWarnings(employeeId) {
 }
 
 export async function createEmployeeWarning(data) {
-  return apiClient('/hrms/warnings/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    subject: data.subject || data.title,
+    severity: data.severity || data.warning_level || 'First Written',
+    issue_date: data.issue_date || data.warning_date || data.date,
+    description: data.description || data.explanation || '',
+    status: data.status || 'Issued',
+  };
+  return apiClient('/hrms/warnings/', { method: 'POST', data: payload });
 }
 
 export async function fetchEmployeeAwards(employeeId) {
@@ -220,7 +250,15 @@ export async function fetchEmployeeAwards(employeeId) {
 }
 
 export async function createEmployeeAward(data) {
-  return apiClient('/hrms/awards/', { method: 'POST', data });
+  const payload = {
+    employeeId: data.employeeId || data.employee,
+    award_name: data.award_name || data.title,
+    category: data.category || 'Excellence',
+    award_date: data.award_date || data.presentation_date || data.date,
+    gift_amount: data.gift_amount !== undefined ? data.gift_amount : (data.cash_reward || 0),
+    citation: data.citation || '',
+  };
+  return apiClient('/hrms/awards/', { method: 'POST', data: payload });
 }
 
 export async function fetchTravelRequests(employeeId) {

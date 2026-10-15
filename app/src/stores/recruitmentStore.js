@@ -1,8 +1,45 @@
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
 import { writeThrough, pullTracked } from "../services/hrmsSync";
+import { useAppStore } from "./appStore";
+import { api } from "../services/api";
 
+export function syncCandidateToEmployee(candidate, offers = [], jobs = []) {
+  if (!candidate || candidate.stage !== "Hired") return;
+  try {
+    const appState = useAppStore.getState();
+    const employees = appState?.employees || [];
+    const alreadyExists = employees.some(
+      (e) => (candidate.email && e.email?.toLowerCase() === candidate.email.toLowerCase()) ||
+             (candidate.name && e.name?.toLowerCase() === candidate.name.toLowerCase())
+    );
+    if (!alreadyExists) {
+      const matchingOffer = (offers || []).find((o) => o.candidateId === candidate.id);
+      const matchedJob = (jobs || []).find((j) => j.id === candidate.jobId || j.title === candidate.position);
+      const newEmp = {
+        name: candidate.name,
+        email: candidate.email || undefined,
+        phone: candidate.phone || undefined,
+        avatar: candidate.avatar || undefined,
+        img: candidate.avatar || undefined,
+        designation: candidate.position || matchedJob?.title || "Staff Member",
+        department: matchingOffer?.dept || matchedJob?.department || "General",
+        location: candidate.location || matchingOffer?.location || "",
+        joining: matchingOffer?.joiningDate || new Date().toISOString().split("T")[0],
+        joiningDate: matchingOffer?.joiningDate || new Date().toISOString().split("T")[0],
+        status: "Active",
+        createUserAccount: true,
+      };
+      appState.addEmployee(newEmp).catch(() => {});
+    }
 
+    if (candidate.id && typeof candidate.id === "string" && candidate.id.length === 36 && candidate.id.includes("-")) {
+      api.post(`/hrms/candidates/${candidate.id}/hire/`).catch(() => {});
+    }
+  } catch (err) {
+    console.warn("Could not sync candidate to employee:", err);
+  }
+}
 
 /**
  * Every action hands the whole recruitment state here after changing part of
@@ -45,6 +82,10 @@ const useRecruitmentStoreBase = create((set) => ({
       pullTracked("applications"),
       pullTracked("onboarding"),
     ]);
+    const loadedCandidates = rows[1] || [];
+    const loadedOffers = rows[3] || [];
+    const loadedJobs = rows[0] || [];
+
     set((s) => ({
       jobs: rows[0] || s.jobs,
       candidates: rows[1] || s.candidates,
@@ -54,6 +95,14 @@ const useRecruitmentStoreBase = create((set) => ({
       applications: rows[5] || s.applications,
       onboarding: rows[6] || s.onboarding,
     }));
+
+    // Auto-sync any hired candidates to the employee roster
+    loadedCandidates.forEach((cand) => {
+      if (cand.stage === "Hired") {
+        syncCandidateToEmployee(cand, loadedOffers, loadedJobs);
+      }
+    });
+
     return rows;
   },
 
@@ -106,6 +155,9 @@ const useRecruitmentStoreBase = create((set) => ({
       );
 
       persist({ ...st, candidates: ns, jobs: updatedJobs });
+      if (enrichedCand.stage === "Hired") {
+        syncCandidateToEmployee(enrichedCand, st.offers, st.jobs);
+      }
       return { candidates: ns, jobs: updatedJobs };
     }),
 
@@ -113,6 +165,10 @@ const useRecruitmentStoreBase = create((set) => ({
     set((st) => {
       const ns = st.candidates.map((c) => (c.id === id ? { ...c, ...p } : c));
       persist({ ...st, candidates: ns });
+      const updated = ns.find((c) => c.id === id);
+      if (updated && updated.stage === "Hired") {
+        syncCandidateToEmployee(updated, st.offers, st.jobs);
+      }
       return { candidates: ns };
     }),
 
@@ -127,6 +183,10 @@ const useRecruitmentStoreBase = create((set) => ({
     set((st) => {
       const ns = st.candidates.map((c) => (c.id === id ? { ...c, stage } : c));
       persist({ ...st, candidates: ns });
+      const target = ns.find((c) => c.id === id);
+      if (target && stage === "Hired") {
+        syncCandidateToEmployee(target, st.offers, st.jobs);
+      }
       return { candidates: ns };
     }),
 
@@ -169,11 +229,18 @@ const useRecruitmentStoreBase = create((set) => ({
   addOffer: (o) =>
     set((st) => {
       const ns = [o, ...st.offers];
-      // Automatically advance candidate stage to "Offer"
+      const isAccepted = o.status === "Accepted";
+      // Advance candidate stage to "Offer" or "Hired" if accepted
       const updatedCandidates = st.candidates.map((c) =>
-        c.id === o.candidateId ? { ...c, stage: "Offer" } : c
+        c.id === o.candidateId ? { ...c, stage: isAccepted ? "Hired" : "Offer" } : c
       );
       persist({ ...st, offers: ns, candidates: updatedCandidates });
+      if (isAccepted) {
+        const hiredCand = updatedCandidates.find((c) => c.id === o.candidateId);
+        if (hiredCand) {
+          syncCandidateToEmployee(hiredCand, ns, st.jobs);
+        }
+      }
       return { offers: ns, candidates: updatedCandidates };
     }),
 
@@ -182,12 +249,16 @@ const useRecruitmentStoreBase = create((set) => ({
       const ns = st.offers.map((o) => (o.id === id ? { ...o, ...p } : o));
       const target = ns.find((o) => o.id === id);
 
-      // If offer is Accepted, promote candidate stage to "Hired"
+      // If offer is Accepted, promote candidate stage to "Hired" and sync to Employee Directory
       let updatedCandidates = st.candidates;
       if (target && p.status === "Accepted") {
         updatedCandidates = st.candidates.map((c) =>
           c.id === target.candidateId ? { ...c, stage: "Hired" } : c
         );
+        const hiredCand = updatedCandidates.find((c) => c.id === target.candidateId);
+        if (hiredCand) {
+          syncCandidateToEmployee(hiredCand, ns, st.jobs);
+        }
       }
 
       persist({ ...st, offers: ns, candidates: updatedCandidates });
@@ -227,6 +298,10 @@ const useRecruitmentStoreBase = create((set) => ({
   completeOnboarding: (candidateId) =>
     set((st) => {
       const nextMap = { ...st.onboardedMap, [candidateId]: true };
+      const cand = st.candidates.find((c) => c.id === candidateId);
+      if (cand) {
+        syncCandidateToEmployee(cand, st.offers, st.jobs);
+      }
       persist({ ...st, onboardedMap: nextMap });
       return { onboardedMap: nextMap };
     }),

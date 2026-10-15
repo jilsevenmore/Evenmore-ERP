@@ -21,7 +21,9 @@ import {
   Calendar,
   Briefcase,
   HelpCircle,
-  DollarSign
+  DollarSign,
+  UserCheck,
+  Users,
 } from "lucide-react";
 import UserInitials from "../../../components/common/UserInitials";
 import OfferLetterModal from "../organization/OfferLetterModal";
@@ -56,15 +58,39 @@ export default function Offers() {
     }
   }, [location.state]);
 
+  // Combine stored offers with candidates in Offer or Hired stages from pipeline
+  const allOffers = useMemo(() => {
+    const list = [...offers];
+    candidates.forEach((cand) => {
+      if ((cand.stage === "Offer" || cand.stage === "Hired") && !list.some((o) => o.candidateId === cand.id)) {
+        const matchedJob = jobs.find((j) => j.id === cand.jobId || j.title === cand.position);
+        list.push({
+          id: `OFF-${cand.id.slice(0, 6)}`,
+          candidateId: cand.id,
+          candidateName: cand.name,
+          avatar: cand.avatar || "https://i.pravatar.cc/100?img=15",
+          position: cand.position || matchedJob?.title || "Team Member",
+          dept: matchedJob?.department || "General",
+          salary: "$85,000 / year",
+          sentDate: cand.appliedDate || new Date().toISOString().split("T")[0],
+          joiningDate: new Date(Date.now() + 21 * 86400000).toISOString().split("T")[0],
+          status: cand.stage === "Hired" ? "Accepted" : "Pending",
+          expiry: "Within 7 days",
+        });
+      }
+    });
+    return list;
+  }, [offers, candidates, jobs]);
+
   const summary = {
-    Pending: offers.filter((o) => o.status === "Pending").length,
-    Accepted: offers.filter((o) => o.status === "Accepted").length,
-    Rejected: offers.filter((o) => o.status === "Rejected").length,
-    Expired: offers.filter((o) => o.status === "Expired").length,
+    Pending: allOffers.filter((o) => o.status === "Pending").length,
+    Accepted: allOffers.filter((o) => o.status === "Accepted").length,
+    Rejected: allOffers.filter((o) => o.status === "Rejected").length,
+    Expired: allOffers.filter((o) => o.status === "Expired").length,
   };
 
   const filtered = useMemo(() => {
-    return offers.filter((o) => {
+    return allOffers.filter((o) => {
       if (filter !== "All" && o.status !== filter) return false;
       if (
         search &&
@@ -74,7 +100,7 @@ export default function Offers() {
       }
       return true;
     });
-  }, [offers, filter, search]);
+  }, [allOffers, filter, search]);
 
   function openCreate() {
     setEditing(null);
@@ -120,7 +146,21 @@ export default function Offers() {
 
   function handleConfirmLetter(updatedOffer) {
     updateOffer(updatedOffer.id, { ...updatedOffer, status: "Pending" });
+    changeStage(updatedOffer.candidateId, "Offer");
     showToast(`Offer letter confirmed and sent to ${updatedOffer.candidateName}`);
+  }
+
+  function handleAcceptLetter(updatedOffer) {
+    const existingIndex = offers.findIndex(
+      (o) => o.id === updatedOffer.id || o.candidateId === updatedOffer.candidateId
+    );
+    if (existingIndex >= 0) {
+      updateOffer(offers[existingIndex].id, { ...updatedOffer, status: "Accepted" });
+    } else {
+      addOffer({ ...updatedOffer, status: "Accepted" });
+    }
+    changeStage(updatedOffer.candidateId, "Hired");
+    showToast(`${updatedOffer.candidateName} accepted the offer and is now Hired (added to Employee Directory)!`);
   }
 
   function save(send) {
@@ -141,8 +181,9 @@ export default function Offers() {
         salary: form.salary,
         joiningDate: form.joiningDate,
         expiry: form.expiry,
-        status: "Pending",
+        status: send ? "Pending" : "Draft",
       });
+      if (send) changeStage(cand.id, "Offer");
       showToast(send ? "Offer sent to candidate" : "Draft saved");
       setDrawerOpen(false);
     } else {
@@ -155,9 +196,10 @@ export default function Offers() {
         salary: form.salary,
         sentDate: new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
         joiningDate: form.joiningDate,
-        status: "Pending",
+        status: send ? "Pending" : "Draft",
         expiry: form.expiry,
       });
+      if (send) changeStage(cand.id, "Offer");
       showToast(send ? "Offer created and sent" : "Draft saved");
       setDrawerOpen(false);
     }
@@ -248,6 +290,26 @@ export default function Offers() {
             <FileText size={12} />
             <span>Letter / PDF</span>
           </button>
+          {r.status !== "Accepted" && (
+            <button
+              onClick={() => handleAcceptLetter(r)}
+              className="inline-flex items-center gap-1 text-[11.5px] bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
+              title="Candidate accepted offer — Convert to Hired"
+            >
+              <CheckCircle2 size={12} />
+              <span>Accept &amp; Hire</span>
+            </button>
+          )}
+          {r.status === "Accepted" && (
+            <button
+              onClick={() => navigate("/hrms/employees", { state: { search: r.candidateName } })}
+              className="inline-flex items-center gap-1 text-[11.5px] bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
+              title="View in Employee Directory"
+            >
+              <Users size={12} />
+              <span>Employee</span>
+            </button>
+          )}
           <button
             onClick={() => {
               setForm({
@@ -570,6 +632,7 @@ export default function Offers() {
         onClose={() => setIsLetterModalOpen(false)}
         offer={selectedOfferForLetter}
         onConfirmOffer={handleConfirmLetter}
+        onAcceptOffer={handleAcceptLetter}
         onUpdateOffer={handleUpdateLetter}
       />
 

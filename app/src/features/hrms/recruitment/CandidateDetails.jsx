@@ -102,6 +102,17 @@ export default function CandidateDetails() {
     showToast(`Offer letter confirmed and issued for ${c.name}`);
   };
 
+  const handleAcceptOffer = (offerData) => {
+    const existingIndex = offers.findIndex((o) => o.id === offerData.id || o.candidateId === offerData.candidateId);
+    if (existingIndex >= 0) {
+      updateOffer(offers[existingIndex].id, { ...offerData, status: "Accepted" });
+    } else {
+      addOffer({ ...offerData, status: "Accepted" });
+    }
+    changeStage(c.id, "Hired");
+    showToast(`Offer accepted! ${c.name} converted to Hired and added to Employee Directory.`);
+  };
+
   const handleUpdateOffer = (offerData) => {
     updateOffer(offerData.id, offerData);
     showToast(`Offer letter updated for ${c.name}`);
@@ -198,7 +209,11 @@ export default function CandidateDetails() {
                 onChange={(e) => {
                   const newStage = e.target.value;
                   changeStage(c.id, newStage);
-                  showToast(`Candidate stage updated to ${newStage}`);
+                  if (newStage === "Hired") {
+                    showToast(`${c.name} hired and added to Employee Directory!`);
+                  } else {
+                    showToast(`Candidate stage updated to ${newStage}`);
+                  }
                   if (newStage === "Offer") {
                     openOfferLetter();
                   }
@@ -214,6 +229,17 @@ export default function CandidateDetails() {
                 <option>Rejected</option>
               </select>
             </div>
+
+            {c.stage === "Hired" && (
+              <Button
+                size="sm"
+                variant="secondary"
+                icon={UserCheck}
+                onClick={() => navigate("/hrms/employees", { state: { search: c.name } })}
+              >
+                View in Employees
+              </Button>
+            )}
 
             <Button
               size="sm"
@@ -463,6 +489,7 @@ export default function CandidateDetails() {
         onClose={() => setIsOfferModalOpen(false)}
         offer={activeOffer}
         onConfirmOffer={handleConfirmOffer}
+        onAcceptOffer={handleAcceptOffer}
         onUpdateOffer={handleUpdateOffer}
       />
     </div>
