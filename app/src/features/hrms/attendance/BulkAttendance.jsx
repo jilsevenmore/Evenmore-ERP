@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from "react";
-import { ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { ChevronRight, Calendar as CalendarIcon, Search, X, RotateCcw } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useAttendanceStore } from "../../../stores/attendanceStore";
 import { ConfirmModal } from "../../../components/hrms/Shared";
 import { PageInfoButton } from "../../../components/common/PageInfoButton";
 import { hrmsGuides } from "../../../data/hrms/hrmsGuides";
-import { bulkAttendance, isBackendEnabled } from "../../../services/hrmsSync";
+import { bulkAttendance, isBackendEnabled, hrmsSync } from "../../../services/hrmsSync";
 import { UserInitials } from "../../../components/common/UserInitials";
 
 const SHIFTS = ["All", "General", "Flexible", "Night"];
@@ -24,72 +24,133 @@ export default function BulkAttendance() {
   const setToast = useAppStore((s) => s.setToast || s.showToast);
   const storeRecords = useAttendanceStore((s) => s.records);
   const bulkUpdateStore = useAttendanceStore((s) => s.bulkUpdate);
+  const storeEmployees = useAppStore((s) => s.employees);
 
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [dept, setDept] = useState("All");
   const [location, setLocation] = useState("All");
   const [shift, setShift] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [employees, setEmployees] = useState(() => {
-    if (storeRecords && storeRecords.length > 0) {
-      return storeRecords.map((r) => ({
-        id: r.id,
-        name: r.name,
-        dept: r.dept,
-        status: r.status || "Present",
-        avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
+    if (storeEmployees && storeEmployees.length > 0) {
+      return storeEmployees.map((e) => ({
+        id: e.id || e.empId,
+        empId: e.empId || e.employeeCode || "",
+        name: e.name,
+        dept: e.department || e.dept || "",
+        location: e.location || e.workLocation || "",
+        shift: e.shift || "General",
+        status: "Not Marked",
+        avatar: e.avatar || `https://i.pravatar.cc/100?u=${e.id || e.name}`,
       }));
     }
     return [];
   });
 
-  const storeEmployees = useAppStore((s) => s.employees);
-
   useEffect(() => {
-    if (storeRecords && storeRecords.length > 0) {
-      setEmployees(
-        storeRecords.map((r) => ({
-          id: r.id,
-          name: r.name,
-          dept: r.dept,
-          status: r.status || "Present",
-          avatar: r.avatar || r.img || `https://i.pravatar.cc/100?u=${r.id || r.name}`,
-        }))
-      );
-    } else if (storeEmployees && storeEmployees.length > 0) {
-      setEmployees(
-        storeEmployees.map((emp, i) => ({
-          id: emp.empId || emp.id || `EMP${1024 + i}`,
-          name: emp.name,
-          dept: emp.department || "",
-          status: "Present",
-          avatar: emp.avatar || `https://i.pravatar.cc/100?u=${emp.id || emp.name}`,
-        }))
-      );
-    }
-  }, [storeRecords, storeEmployees]);
+    let cancelled = false;
+    Promise.all([
+      hrmsSync.pull("attendance", { date }),
+      (!storeEmployees || storeEmployees.length === 0) ? hrmsSync.pull("employees") : null,
+    ]).then(([attList, freshEmployees]) => {
+      if (cancelled) return;
+      const allEmps = (storeEmployees && storeEmployees.length > 0) ? storeEmployees : (freshEmployees || []);
+      const byEmp = new Map((attList || []).map((r) => [String(r.employeeId || r.id), r]));
+      if (allEmps && allEmps.length > 0) {
+        setEmployees(
+          allEmps.map((emp) => {
+            const att = byEmp.get(String(emp.id)) || byEmp.get(String(emp.empId));
+            return {
+              id: emp.id || emp.empId,
+              empId: emp.empId || emp.employeeCode || "",
+              name: emp.name,
+              dept: emp.department || emp.dept || "",
+              location: emp.location || emp.workLocation || "",
+              shift: emp.shift || "General",
+              status: att?.status || "Not Marked",
+              avatar: emp.avatar || `https://i.pravatar.cc/100?u=${emp.id || emp.name}`,
+            };
+          })
+        );
+      } else if (attList && attList.length > 0) {
+        setEmployees(
+          attList.map((r) => ({
+            id: r.employeeId || r.id,
+            empId: r.empId || r.employeeCode || "",
+            name: r.name || "Employee",
+            dept: r.dept || r.department || "",
+            location: r.location || r.workLocation || "",
+            shift: r.shift || "General",
+            status: r.status || "Not Marked",
+            avatar: r.avatar || `https://i.pravatar.cc/100?u=${r.id}`,
+          }))
+        );
+      }
+    });
+    return () => { cancelled = true; };
+  }, [date, storeEmployees]);
 
-  const DEPARTMENTS = useMemo(
-    () => ["All", ...new Set(employees.map((e) => e.dept).filter(Boolean))],
-    [employees]
-  );
-  const LOCATIONS = useMemo(
-    () => ["All", ...new Set((storeEmployees || []).map((e) => e.location).filter(Boolean))],
-    [storeEmployees]
-  );
+  const DEPARTMENTS = useMemo(() => {
+    const set = new Set();
+    employees.forEach((e) => e.dept && set.add(e.dept));
+    (storeEmployees || []).forEach((e) => (e.department || e.dept) && set.add(e.department || e.dept));
+    return ["All", ...Array.from(set).sort()];
+  }, [employees, storeEmployees]);
+
+  const LOCATIONS = useMemo(() => {
+    const set = new Set();
+    employees.forEach((e) => e.location && set.add(e.location));
+    (storeEmployees || []).forEach((e) => (e.location || e.workLocation) && set.add(e.location || e.workLocation));
+    return ["All", ...Array.from(set).sort()];
+  }, [employees, storeEmployees]);
+
+  const SHIFTS_LIST = useMemo(() => {
+    const set = new Set(["General", "Flexible", "Night"]);
+    employees.forEach((e) => e.shift && set.add(e.shift));
+    (storeEmployees || []).forEach((e) => e.shift && set.add(e.shift));
+    return ["All", ...Array.from(set)];
+  }, [employees, storeEmployees]);
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkStatus, setBulkStatus] = useState("Present");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
+  const hasActiveFilters =
+    dept !== "All" ||
+    location !== "All" ||
+    shift !== "All" ||
+    statusFilter !== "All" ||
+    Boolean(searchQuery.trim());
+
+  function resetFilters() {
+    setDept("All");
+    setLocation("All");
+    setShift("All");
+    setStatusFilter("All");
+    setSearchQuery("");
+  }
+
   const filtered = useMemo(() => {
     return employees.filter((e) => {
       if (dept !== "All" && e.dept !== dept) return false;
+      if (location !== "All" && e.location !== location) return false;
+      if (shift !== "All" && (e.shift || "General") !== shift) return false;
       if (statusFilter !== "All" && e.status !== statusFilter) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const matchesName = String(e.name || "").toLowerCase().includes(q);
+        const matchesId =
+          String(e.id || "").toLowerCase().includes(q) ||
+          String(e.empId || "").toLowerCase().includes(q);
+        const matchesDept = String(e.dept || "").toLowerCase().includes(q);
+        const matchesLoc = String(e.location || "").toLowerCase().includes(q);
+        if (!matchesName && !matchesId && !matchesDept && !matchesLoc) return false;
+      }
       return true;
     });
-  }, [employees, dept, statusFilter]);
+  }, [employees, dept, location, shift, statusFilter, searchQuery]);
 
   const allSelected = filtered.length > 0 && filtered.every((e) => selectedIds.has(e.id));
 
@@ -149,6 +210,7 @@ export default function BulkAttendance() {
       });
       try {
         await bulkAttendance(recordsToPush);
+        await useAttendanceStore.getState().refreshAttendance();
       } catch (err) {
         console.warn('[BulkAttendance] Failed to push bulk records to server:', err);
       }
@@ -182,6 +244,28 @@ export default function BulkAttendance() {
       {/* Top Filter Card */}
       <div className="bulk-card bulk-filter-card">
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          {/* Search Input */}
+          <div className="bulk-search-wrap">
+            <Search size={14} style={{ color: "#94a3b8", flexShrink: 0 }} />
+            <input
+              type="text"
+              placeholder="Search employee or ID..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bulk-search-input"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="bulk-clear-btn"
+                aria-label="Clear search"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
+
           {/* Date Picker Input */}
           <div className="bulk-date-wrap">
             <span>{date.split("-").reverse().join("-")}</span>
@@ -195,29 +279,56 @@ export default function BulkAttendance() {
             />
           </div>
 
+          {/* Department Filter */}
           <select value={dept} onChange={(e) => setDept(e.target.value)} className="bulk-select">
             {DEPARTMENTS.map((d) => (
               <option key={d} value={d}>
-                {d}
+                {d === "All" ? "All Departments" : d}
               </option>
             ))}
           </select>
 
+          {/* Location Filter */}
           <select value={location} onChange={(e) => setLocation(e.target.value)} className="bulk-select">
             {LOCATIONS.map((l) => (
               <option key={l} value={l}>
-                {l}
+                {l === "All" ? "All Locations" : l}
               </option>
             ))}
           </select>
 
+          {/* Shift Filter */}
           <select value={shift} onChange={(e) => setShift(e.target.value)} className="bulk-select">
-            {SHIFTS.map((s) => (
+            {SHIFTS_LIST.map((s) => (
               <option key={s} value={s}>
-                {s}
+                {s === "All" ? "All Shifts" : s}
               </option>
             ))}
           </select>
+
+          {/* Status Filter */}
+          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="bulk-select">
+            <option value="All">All Statuses</option>
+            <option value="Not Marked">Not Marked</option>
+            {STATUS_OPTIONS.map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+          </select>
+
+          {/* Reset Filters Button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="bulk-reset-btn"
+              title="Reset all filters"
+            >
+              <RotateCcw size={12} />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -261,6 +372,8 @@ export default function BulkAttendance() {
                 <th>EMPLOYEE</th>
                 <th>EMPLOYEE ID</th>
                 <th>DEPARTMENT</th>
+                <th>LOCATION</th>
+                <th>SHIFT</th>
                 <th>CURRENT STATUS</th>
               </tr>
             </thead>
@@ -283,8 +396,10 @@ export default function BulkAttendance() {
                       </span>
                     </div>
                   </td>
-                  <td className="bulk-id">{e.id}</td>
-                  <td style={{ color: "#374151" }}>{e.dept}</td>
+                  <td className="bulk-id">{e.empId || e.id}</td>
+                  <td style={{ color: "#374151" }}>{e.dept || "—"}</td>
+                  <td style={{ color: "#64748b", fontSize: "13px" }}>{e.location || "—"}</td>
+                  <td style={{ color: "#64748b", fontSize: "13px" }}>{e.shift || "General"}</td>
                   <td>
                     <span className="bulk-status" style={{ ...statusStyles[e.status] }}>
                       {e.status}
@@ -294,8 +409,29 @@ export default function BulkAttendance() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: "center", color: "#6b7280", padding: "32px" }}>
-                    No employees match the selected department filter.
+                  <td colSpan={7} style={{ textAlign: "center", color: "#6b7280", padding: "40px 20px" }}>
+                    <p style={{ margin: 0, fontWeight: 500, fontSize: "14px", color: "#374151" }}>
+                      No employees match the selected filters.
+                    </p>
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        onClick={resetFilters}
+                        style={{
+                          marginTop: 10,
+                          padding: "6px 14px",
+                          borderRadius: 8,
+                          border: "1px solid #cbd5e1",
+                          background: "#fff",
+                          color: "#1e293b",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                        }}
+                      >
+                        Clear All Filters
+                      </button>
+                    )}
                   </td>
                 </tr>
               )}
@@ -322,6 +458,15 @@ export default function BulkAttendance() {
 
         .bulk-card { background: #fff; border: 1px solid #e8edf3; border-radius: 16px; box-shadow: 0 1px 3px rgba(16,24,40,0.03); }
         .bulk-filter-card { border: none; padding: 14px 18px; margin-bottom: 16px; }
+
+        .bulk-search-wrap { display: flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 12px; min-width: 200px; flex: 1; max-width: 280px; }
+        .bulk-search-input { border: none; outline: none; background: transparent; font-size: 13px; color: #1e293b; width: 100%; }
+        .bulk-search-input::placeholder { color: #94a3b8; }
+        .bulk-clear-btn { background: none; border: none; padding: 2px; color: #94a3b8; cursor: pointer; display: flex; align-items: center; }
+        .bulk-clear-btn:hover { color: #475569; }
+
+        .bulk-reset-btn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 10px; font-size: 12px; font-weight: 600; cursor: pointer; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; transition: all 0.15s ease; }
+        .bulk-reset-btn:hover { background: #e2e8f0; color: #0f172a; }
 
         .bulk-date-wrap { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 7px 14px; font-size: 13px; color: #374151; min-width: 110px; cursor: pointer; }
         .bulk-date-native { position: absolute; right: 0; top: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }

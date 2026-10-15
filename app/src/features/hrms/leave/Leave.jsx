@@ -375,7 +375,6 @@ export default function Leave() {
 
   const userDelegations = useMemo(() => {
     const currentUserName = String(currentUser?.name || "").toLowerCase();
-    if (!currentUserName && !myEmployeeId) return { assigned: [], mine: [] };
     const isMe = (id, name) =>
       myEmployeeId ? String(id || "") === myEmployeeId : String(name || "").toLowerCase() === currentUserName;
 
@@ -389,6 +388,8 @@ export default function Leave() {
         note: l.handover || l.reason || "No handover notes.",
         status: l.status === "Approved" ? "Active" : l.status === "Rejected" ? "Declined" : "Upcoming",
         type: l.type,
+        pmsTask: l.pmsTask,
+        crmTask: l.crmTask,
       }));
 
     const mine = leaves
@@ -401,9 +402,25 @@ export default function Leave() {
         note: l.handover || l.reason || "No handover notes.",
         status: l.status === "Approved" ? "Active" : l.status === "Rejected" ? "Declined" : "Upcoming",
         type: l.type,
+        pmsTask: l.pmsTask,
+        crmTask: l.crmTask,
       }));
 
-    return { assigned, mine };
+    const all = leaves
+      .filter((l) => l.delegate)
+      .map((l) => ({
+        id: l.id,
+        emp: `${l.employee} (Delegate: ${l.delegate})`,
+        avatar: l.avatar,
+        dates: `${l.from} – ${l.to}`,
+        note: l.handover || l.reason || "No handover notes.",
+        status: l.status === "Approved" ? "Active" : l.status === "Rejected" ? "Declined" : "Upcoming",
+        type: l.type,
+        pmsTask: l.pmsTask,
+        crmTask: l.crmTask,
+      }));
+
+    return { assigned, mine, all };
   }, [leaves, currentUser, myEmployeeId]);
 
   const delegationLoad = useMemo(() => {
@@ -829,6 +846,20 @@ export default function Leave() {
                     )}
                   </div>
 
+                  {/* Connected Workflows: PMS & CRM Indicators */}
+                  {(l.status === "Approved" || l.pmsTask || l.crmTask) && (
+                    <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px]">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        PMS Delegated Task: {l.pmsTask ? `#${l.pmsTask.taskNumber} (${l.pmsTask.status})` : "Active in PMS"}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                        CRM Coverage Task: {l.crmTask ? `${l.crmTask.taskNumber || 'Active'} (${l.crmTask.status})` : "Active in CRM"}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Informational Overburden Alert */}
                   {isOverburdened && l.status === "Pending Review" && (
                     <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center gap-2 text-[11.5px] text-amber-800">
@@ -936,6 +967,22 @@ export default function Leave() {
                 {userDelegations.mine.length}
               </span>
             </button>
+            {canApproveLeave && (
+              <button
+                type="button"
+                onClick={() => setTab("all")}
+                className={`pb-3 text-[13px] font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 lg:shrink ${
+                  tab === "all"
+                    ? "border-navy text-navy"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <span>All Delegations</span>
+                <span className="px-2 py-0.5 text-[11px] rounded-full bg-slate-100 text-slate-700">
+                  {userDelegations.all.length}
+                </span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setTab("compoff")}
@@ -970,28 +1017,28 @@ export default function Leave() {
         </div>
 
         {/* Delegations View */}
-        {(tab === "assigned" || tab === "mine") && (
+        {(tab === "assigned" || tab === "mine" || tab === "all") && (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] lg:min-w-0 text-left">
               <thead className="bg-slate-50/75 border-y border-bdr text-[11px] uppercase tracking-wider text-muted font-bold">
                 <tr>
                   <th className="py-3.5 px-5">Colleague</th>
                   <th className="py-3.5 px-5">Leave Period</th>
-                  <th className="py-3.5 px-5">Handover Deliverables</th>
+                  <th className="py-3.5 px-5">Handover &amp; Connected Tasks</th>
                   <th className="py-3.5 px-5">Type</th>
                   <th className="py-3.5 px-5">Status</th>
                   <th className="py-3.5 px-5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-bdr/40 text-[13px]">
-                {(tab === "assigned" ? userDelegations.assigned : userDelegations.mine).length === 0 && (
+                {(tab === "assigned" ? userDelegations.assigned : tab === "mine" ? userDelegations.mine : userDelegations.all).length === 0 && (
                   <tr>
                     <td colSpan={6} className="py-8 px-5 text-center text-[13px] text-muted">
                       No delegations to show.
                     </td>
                   </tr>
                 )}
-                {(tab === "assigned" ? userDelegations.assigned : userDelegations.mine).map((r, i) => (
+                {(tab === "assigned" ? userDelegations.assigned : tab === "mine" ? userDelegations.mine : userDelegations.all).map((r, i) => (
                   <tr key={r.id || i} className="hover:bg-slate-50/60 transition">
                     <td className="py-3.5 px-5">
                       <div className="flex items-center gap-2.5">
@@ -1001,7 +1048,15 @@ export default function Leave() {
                     </td>
                     <td className="py-3.5 px-5 text-[12.5px] text-slate-700 font-medium">{r.dates}</td>
                     <td className="py-3.5 px-5 text-[12.5px] text-slate-600 max-w-[280px]">
-                      <div className="truncate">{r.note}</div>
+                      <div className="truncate font-medium">{r.note}</div>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {r.pmsTask ? `PMS: #${r.pmsTask.taskNumber}` : "PMS Linked"}
+                        </span>
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                          {r.crmTask ? `CRM: ${r.crmTask.status}` : "CRM Linked"}
+                        </span>
+                      </div>
                     </td>
                     <td className="py-3.5 px-5 text-[12.5px] text-slate-600">
                       <span className="font-medium">{r.type || "Annual Leave"}</span>
@@ -1434,6 +1489,40 @@ export default function Leave() {
               </span>
               <p style={{ margin: "6px 0 0", fontSize: 13.5, color: "#1e293b", lineHeight: 1.5 }}>
                 {detailModalLeave.note}
+              </p>
+            </div>
+
+            {/* Connected PMS Delegated Task */}
+            <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 12, padding: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#166534", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Connected PMS Delegated Task
+                </span>
+                <span style={{ fontSize: 11, background: "#dcfce7", color: "#15803d", padding: "2px 8px", borderRadius: 9999, fontWeight: 600 }}>
+                  {detailModalLeave.pmsTask ? detailModalLeave.pmsTask.status : (detailModalLeave.status === "Active" ? "Linked to PMS" : "Syncs on Approval")}
+                </span>
+              </div>
+              <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#14532d", lineHeight: 1.4 }}>
+                {detailModalLeave.pmsTask
+                  ? `Task #${detailModalLeave.pmsTask.taskNumber}: ${detailModalLeave.pmsTask.title} (Priority: ${detailModalLeave.pmsTask.priority})`
+                  : "Coverage tasks are delegated to the colleague's PMS work queue automatically upon leave approval."}
+              </p>
+            </div>
+
+            {/* Connected CRM Coverage Task */}
+            <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 12, padding: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  Connected CRM Coverage Task
+                </span>
+                <span style={{ fontSize: 11, background: "#e0f2fe", color: "#0284c7", padding: "2px 8px", borderRadius: 9999, fontWeight: 600 }}>
+                  {detailModalLeave.crmTask ? detailModalLeave.crmTask.status : (detailModalLeave.status === "Active" ? "Linked to CRM" : "Syncs on Approval")}
+                </span>
+              </div>
+              <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#0c4a6e", lineHeight: 1.4 }}>
+                {detailModalLeave.crmTask
+                  ? `Task #${detailModalLeave.crmTask.taskNumber}: ${detailModalLeave.crmTask.title} (Priority: ${detailModalLeave.crmTask.priority})`
+                  : "Client inquiries and deals are covered by the assigned delegate in CRM during this leave period."}
               </p>
             </div>
 

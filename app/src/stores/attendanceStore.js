@@ -308,13 +308,19 @@ const useAttendanceStoreBase = create((set, get) => ({
     });
 
     get().fetchTodayPunch();
+    get().refreshAttendance();
   },
 
   saveFlexibility: (flexibility) => {
     set({ flexibility });
-    pushFlexibility(flexibility).catch((err) => {
-      console.warn("[HRMS] flexibility not saved:", err?.message || err);
-    });
+    pushFlexibility(flexibility)
+      .then(() => {
+        get().refreshAttendance();
+        get().fetchTodayPunch();
+      })
+      .catch((err) => {
+        console.warn("[HRMS] flexibility not saved:", err?.message || err);
+      });
   },
 
   // Which view the screen shows (HR vs employee); a UI choice, not stored data.

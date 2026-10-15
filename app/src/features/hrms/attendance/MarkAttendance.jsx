@@ -335,6 +335,7 @@ function TeamMarkAttendance() {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees);
   const todayPunch = useAttendanceStore.raw((s) => s.todayPunch);
+  const flexibility = useAttendanceStore((s) => s.flexibility);
 
   const [date, setDate] = useState(todayISO);
   const [dept, setDept] = useState("All");
@@ -352,9 +353,11 @@ function TeamMarkAttendance() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setServerRows((await hrmsSync.pull("attendance", { date })) || []);
+      const data = (await hrmsSync.pull("attendance", { date })) || [];
+      setServerRows(data);
       setEdits({});
       setChecked({});
+      await useAttendanceStore.getState().refreshAttendance();
     } finally {
       setLoading(false);
     }
@@ -422,9 +425,9 @@ function TeamMarkAttendance() {
     absent: rows.filter((r) => r.status === "Absent").length,
   }), [rows]);
 
-  // Handle indeterminate checkbox state
-  const isAllChecked = filtered.length > 0 && filtered.every((r) => checked[r.employeeId]);
-  const isSomeChecked = filtered.some((r) => checked[r.employeeId]);
+  // Handle indeterminate checkbox state based on Present status
+  const isAllChecked = filtered.length > 0 && filtered.every((r) => r.status === "Present");
+  const isSomeChecked = filtered.some((r) => r.status === "Present");
 
   useEffect(() => {
     if (selectAllRef.current) {
@@ -444,39 +447,187 @@ function TeamMarkAttendance() {
     });
   }
 
-  function quickMark(employeeId, newStatus) {
+  async function toggleRowAttendance(r) {
+    const isCurrentlyPresent = r.status === "Present";
+    const nextStatus = isCurrentlyPresent ? "Absent" : "Present";
+    const d = new Date();
+    const nowTime = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const defaultIn = date === todayISO() ? nowTime : (flexibility?.shiftStart || "09:00");
+    const defaultOut = flexibility?.shiftEnd || "18:00";
+
+    const patch = {
+      status: nextStatus,
+      checkIn: nextStatus === "Present" ? (r.checkIn || defaultIn) : "",
+      checkOut: nextStatus === "Present" ? (r.checkOut || defaultOut) : "",
+      remark: r.remark || "",
+    };
+
+    edit(r.employeeId, patch);
+    setChecked((p) => ({ ...p, [r.employeeId]: nextStatus === "Present" }));
+
+    try {
+      await api.post("/hrms/attendance/bulk/", {
+        date,
+        records: [
+          {
+            employeeId: r.employeeId,
+            checkIn: patch.checkIn || null,
+            checkOut: patch.checkOut || null,
+            status: patch.status,
+            remark: patch.remark || null,
+          },
+        ],
+      });
+      await useAttendanceStore.getState().refreshAttendance();
+      showToast?.(`Marked ${r.name} as ${nextStatus}`);
+    } catch (err) {
+      showToast?.(`Failed to update attendance — ${err?.payload?.message || err?.message || "try again"}`);
+    }
+  }
+
+  async function toggleSelectAll() {
+    const willMarkPresent = !isAllChecked;
+    const targetStatus = willMarkPresent ? "Present" : "Absent";
+    const d = new Date();
+    const nowTime = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const defaultIn = date === todayISO() ? nowTime : (flexibility?.shiftStart || "09:00");
+    const defaultOut = flexibility?.shiftEnd || "18:00";
+
+    const nextChecked = {};
+    const records = filtered.map((r) => {
+      const patch = {
+        status: targetStatus,
+        checkIn: targetStatus === "Present" ? (r.checkIn || defaultIn) : "",
+        checkOut: targetStatus === "Present" ? (r.checkOut || defaultOut) : "",
+      };
+      edit(r.employeeId, patch);
+      nextChecked[r.employeeId] = willMarkPresent;
+      return {
+        employeeId: r.employeeId,
+        checkIn: patch.checkIn || null,
+        checkOut: patch.checkOut || null,
+        status: patch.status,
+        remark: r.remark || null,
+      };
+    });
+    setChecked(nextChecked);
+
+    try {
+      await api.post("/hrms/attendance/bulk/", { date, records });
+      await useAttendanceStore.getState().refreshAttendance();
+      showToast?.(`Marked ${records.length} employee${records.length === 1 ? "" : "s"} as ${targetStatus}`);
+    } catch (err) {
+      showToast?.(`Failed to save attendance — ${err?.payload?.message || err?.message || "try again"}`);
+    }
+  }
+
+  async function handleStatusChange(employeeId, newStatus) {
+    const r = rows.find((row) => row.employeeId === employeeId);
+    const d = new Date();
+    const nowTime = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const defaultIn = date === todayISO() ? nowTime : (flexibility?.shiftStart || "09:00");
+    const defaultOut = flexibility?.shiftEnd || "18:00";
+
+    const patch = {
+      status: newStatus,
+      checkIn: newStatus === "Absent" ? "" : (r?.checkIn || (newStatus === "Present" ? defaultIn : "")),
+      checkOut: newStatus === "Absent" ? "" : (r?.checkOut || (newStatus === "Present" ? defaultOut : "")),
+    };
+    edit(employeeId, patch);
+    setChecked((p) => ({ ...p, [employeeId]: newStatus === "Present" }));
+
+    if (newStatus) {
+      try {
+        await api.post("/hrms/attendance/bulk/", {
+          date,
+          records: [
+            {
+              employeeId,
+              checkIn: patch.checkIn || null,
+              checkOut: patch.checkOut || null,
+              status: patch.status,
+              remark: r?.remark || null,
+            },
+          ],
+        });
+        await useAttendanceStore.getState().refreshAttendance();
+        showToast?.(`Updated status for ${r?.name || "employee"} to ${newStatus}`);
+      } catch (err) {
+        showToast?.(`Failed to update status — ${err?.payload?.message || err?.message || "try again"}`);
+      }
+    }
+  }
+
+  async function quickMark(employeeId, newStatus) {
     const current = rows.find((r) => r.employeeId === employeeId);
     const d = new Date();
     const nowTime = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-    edit(employeeId, {
+    const defaultIn = date === todayISO() ? nowTime : (flexibility?.shiftStart || "09:00");
+    const defaultOut = flexibility?.shiftEnd || "18:00";
+
+    const patch = {
       status: newStatus,
-      checkIn: newStatus === "Present" ? (current?.checkIn || (date === todayISO() ? nowTime : "09:00")) : current?.checkIn || "",
-      checkOut: newStatus === "Absent" ? "" : current?.checkOut || "",
-    });
+      checkIn: newStatus === "Present" ? (current?.checkIn || defaultIn) : current?.checkIn || "",
+      checkOut: newStatus === "Absent" ? "" : current?.checkOut || (newStatus === "Present" ? defaultOut : ""),
+    };
+    edit(employeeId, patch);
+    setChecked((p) => ({ ...p, [employeeId]: newStatus === "Present" }));
+
+    try {
+      await api.post("/hrms/attendance/bulk/", {
+        date,
+        records: [
+          {
+            employeeId,
+            checkIn: patch.checkIn || null,
+            checkOut: patch.checkOut || null,
+            status: patch.status,
+            remark: current?.remark || null,
+          },
+        ],
+      });
+      await useAttendanceStore.getState().refreshAttendance();
+      showToast?.(`Marked ${current?.name || "employee"} as ${newStatus}`);
+    } catch (err) {
+      showToast?.(`Failed to update attendance — ${err?.payload?.message || err?.message || "try again"}`);
+    }
   }
 
-  function applyBulkStatus(statusToApply = bulkStatus) {
+  async function applyBulkStatus(statusToApply = bulkStatus) {
     if (!selectedIds.length) return;
     const d = new Date();
     const nowTime = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    const defaultIn = date === todayISO() ? nowTime : (flexibility?.shiftStart || "09:00");
+    const defaultOut = flexibility?.shiftEnd || "18:00";
 
-    setEdits((prev) => {
-      const next = { ...prev };
-      selectedIds.forEach((id) => {
-        const row = rows.find((r) => r.employeeId === id);
-        const patch = { status: statusToApply };
-        if (statusToApply === "Present" && !row?.checkIn) {
-          patch.checkIn = date === todayISO() ? nowTime : "09:00";
-        }
-        if (statusToApply === "Absent") {
-          patch.checkIn = "";
-          patch.checkOut = "";
-        }
-        next[id] = { ...(next[id] || {}), ...patch };
-      });
-      return next;
+    const records = selectedIds.map((id) => {
+      const row = rows.find((r) => r.employeeId === id);
+      const patch = { status: statusToApply };
+      if (statusToApply === "Present") {
+        patch.checkIn = row?.checkIn || defaultIn;
+        patch.checkOut = row?.checkOut || defaultOut;
+      }
+      if (statusToApply === "Absent") {
+        patch.checkIn = "";
+        patch.checkOut = "";
+      }
+      edit(id, patch);
+      return {
+        employeeId: id,
+        checkIn: patch.checkIn || row?.checkIn || null,
+        checkOut: patch.checkOut || row?.checkOut || null,
+        status: statusToApply,
+        remark: row?.remark || null,
+      };
     });
-    showToast?.(`Applied "${statusToApply}" to ${selectedIds.length} employee${selectedIds.length === 1 ? "" : "s"}`);
+
+    try {
+      await api.post("/hrms/attendance/bulk/", { date, records });
+      await useAttendanceStore.getState().refreshAttendance();
+      showToast?.(`Applied "${statusToApply}" to ${records.length} employee${records.length === 1 ? "" : "s"}`);
+    } catch (err) {
+      showToast?.(`Failed to apply bulk status: ${err?.message || "try again"}`);
+    }
   }
 
   function clearSelection() {
@@ -504,6 +655,7 @@ function TeamMarkAttendance() {
     try {
       await api.post("/hrms/attendance/bulk/", { date, records });
       showToast?.(`Attendance saved for ${records.length} employee${records.length === 1 ? "" : "s"} on ${formatDateDisplay(date)}`);
+      await useAttendanceStore.getState().refreshAttendance();
       await load();
     } catch (err) {
       showToast?.(`Attendance not saved — ${err?.payload?.message || err?.message || "try again"}`);
@@ -776,10 +928,8 @@ function TeamMarkAttendance() {
                     type="checkbox"
                     ref={selectAllRef}
                     checked={isAllChecked}
-                    onChange={(e) => {
-                      if (e.target.checked) selectAll();
-                      else clearSelection();
-                    }}
+                    onChange={toggleSelectAll}
+                    title={isAllChecked ? "Click to mark all Absent" : "Click to mark all Present"}
                     className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
                   />
                 </th>
@@ -813,7 +963,8 @@ function TeamMarkAttendance() {
               {filtered.map((r) => {
                 const punched = r.source === "punch" || r.punchCount > 0;
                 const dirty = Boolean(edits[r.employeeId]);
-                const isChecked = Boolean(checked[r.employeeId]);
+                const isChecked = r.status === "Present";
+                const isRowSelected = Boolean(checked[r.employeeId]);
                 const statusStyle = STATUS_CONFIG[r.status] || {
                   bg: "bg-slate-50 text-slate-600 border-slate-200",
                   dot: "bg-slate-400",
@@ -825,17 +976,18 @@ function TeamMarkAttendance() {
                     className={`transition-colors group ${
                       dirty
                         ? "bg-amber-50/35 border-l-4 border-l-amber-500"
-                        : isChecked
+                        : isRowSelected
                         ? "bg-blue-50/25"
                         : "hover:bg-slate-50/70"
                     }`}
                   >
-                    {/* Checkbox */}
+                    {/* Checkbox: directly marks Present or Absent */}
                     <td className="py-3 pl-4 pr-2">
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={(e) => setChecked((p) => ({ ...p, [r.employeeId]: e.target.checked }))}
+                        onChange={() => toggleRowAttendance(r)}
+                        title={isChecked ? "Click to mark Absent" : "Click to mark Present"}
                         className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/20 accent-primary cursor-pointer"
                       />
                     </td>
@@ -935,7 +1087,7 @@ function TeamMarkAttendance() {
                       <div className="relative inline-flex items-center">
                         <select
                           value={r.status || ""}
-                          onChange={(e) => edit(r.employeeId, { status: e.target.value })}
+                          onChange={(e) => handleStatusChange(r.employeeId, e.target.value)}
                           className={`h-8 pl-3 pr-7 text-xs font-semibold rounded-lg border appearance-none cursor-pointer outline-none transition-all shadow-2xs ${
                             r.status ? statusStyle.bg : "bg-slate-50 text-slate-500 border-slate-200 hover:border-slate-300"
                           }`}

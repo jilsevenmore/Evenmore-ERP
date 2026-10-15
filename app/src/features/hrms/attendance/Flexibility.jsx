@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Clock,
   ShieldCheck,
@@ -24,9 +24,21 @@ export default function Flexibility() {
   const role = useAttendanceStore((s) => s.role);
   const showToast = useAppStore((s) => s.showToast);
 
-  const [form, setForm] = useState(flexibility);
+  const [form, setForm] = useState(flexibility || {});
   const [activePreset, setActivePreset] = useState("Standard");
   const canEdit = role === "HR" || role === "Admin";
+
+  useEffect(() => {
+    if (!flexibility || Object.keys(flexibility).length === 0) {
+      useAttendanceStore.getState().hydrate();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (flexibility && Object.keys(flexibility).length > 0) {
+      setForm((prev) => ({ ...prev, ...flexibility }));
+    }
+  }, [flexibility]);
 
   function save() {
     if (!canEdit) {
