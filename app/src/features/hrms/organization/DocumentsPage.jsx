@@ -46,7 +46,36 @@ function dataUrlToBlob(dataUrl) {
   while (n--) {
     u8arr[n] = bstr.charCodeAt(n);
   }
-  return new Blob([u8arr], { type: mime });
+}
+
+const AVATAR_COLORS = [
+  "bg-blue-100 text-blue-700 border-blue-200",
+  "bg-indigo-100 text-indigo-700 border-indigo-200",
+  "bg-purple-100 text-purple-700 border-purple-200",
+  "bg-emerald-100 text-emerald-700 border-emerald-200",
+  "bg-amber-100 text-amber-700 border-amber-200",
+  "bg-rose-100 text-rose-700 border-rose-200",
+  "bg-teal-100 text-teal-700 border-teal-200",
+  "bg-cyan-100 text-cyan-700 border-cyan-200",
+];
+
+function getInitials(name = "") {
+  if (!name || name === "All Staff") return "AS";
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return parts[0].slice(0, 2).toUpperCase();
+}
+
+function getAvatarColor(name = "") {
+  if (!name) return AVATAR_COLORS[0];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
 }
 
 // Builds a compliant PDF 1.4 Binary Blob
@@ -275,7 +304,6 @@ export function DocumentsPage() {
         email: "",
         joining: "—",
         status: "—",
-        avatar: `https://i.pravatar.cc/100?u=${encodeURIComponent(selectedEmpName)}`,
       }
     );
   }, [employees, selectedEmpName]);
@@ -328,16 +356,16 @@ export function DocumentsPage() {
         const sizeInMb = (file.size / (1024 * 1024)).toFixed(1);
         const inferredCat = inferCategoryFromFilename(file.name);
 
+        const targetEmp = employees.find((x) => x.name === targetScope || x.id === targetScope);
+        const resolvedEmpId = targetScope === "All Staff" ? "ALL" : (targetEmp?.id || null);
+
         const newDoc = addDocument({
           title: formattedTitle || file.name,
           category: inferredCat,
-          employee: targetScope,
-          employeeId:
-            targetScope === "All Staff"
-              ? "ALL"
-              : employees.find((x) => x.name === targetScope)?.id || "EMP-VAR",
-          version: "v1.0",
-          expiry: "—",
+          employee: targetEmp?.name || targetScope,
+          employeeId: resolvedEmpId,
+          version: 1,
+          expiry: null,
           status: "Valid",
           fileType: (file.name.split(".").pop() || "").toUpperCase(),
           fileSize: `${sizeInMb} MB`,
@@ -780,12 +808,12 @@ export function DocumentsPage() {
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                                <img
-                                  src={`https://i.pravatar.cc/100?u=${encodeURIComponent(d.employee)}`}
-                                  alt=""
-                                  className="w-full h-full object-cover"
-                                />
+                              <div
+                                className={`w-6 h-6 rounded-full border text-[10px] font-bold flex items-center justify-center shrink-0 ${getAvatarColor(
+                                  d.employee
+                                )}`}
+                              >
+                                {getInitials(d.employee)}
                               </div>
                               <span className="font-medium text-slate-800">{d.employee}</span>
                             </div>
@@ -875,7 +903,7 @@ export function DocumentsPage() {
       {activeTab === "employee" && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Employee Directory Selector */}
-          <div className="lg:col-span-4 bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+          <div className="lg:col-span-5 xl:col-span-4 bg-white border border-bdr rounded-2xl p-4 shadow-xs flex flex-col gap-3">
             <div className="flex items-center justify-between pb-2 border-b border-bdr/60">
               <h3 className="font-bold text-[15px] text-slate-900 flex items-center gap-1.5">
                 <Users size={16} className="text-navy" />
@@ -922,17 +950,15 @@ export function DocumentsPage() {
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <img
-                          src={
-                            emp.avatar ||
-                            emp.img ||
-                            `https://i.pravatar.cc/100?u=${encodeURIComponent(emp.name)}`
-                          }
-                          alt={emp.name}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-200 shrink-0"
-                        />
-                        <div className="min-w-0">
-                          <div className="text-[13px] font-semibold text-slate-900 truncate">
+                        <div
+                          className={`w-9 h-9 rounded-full border text-[12px] font-bold flex items-center justify-center shrink-0 shadow-xs ${getAvatarColor(
+                            emp.name
+                          )}`}
+                        >
+                          {getInitials(emp.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-semibold text-slate-900 truncate" title={emp.name}>
                             {emp.name}
                           </div>
                           <div className="text-[11px] text-muted truncate">
@@ -965,19 +991,17 @@ export function DocumentsPage() {
           </div>
 
           {/* Right Selected Employee Dossier */}
-          <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-4">
             {/* Employee Profile Header Banner */}
             <div className="bg-white border border-bdr rounded-2xl p-5 shadow-xs flex flex-wrap justify-between items-center gap-4">
               <div className="flex items-center gap-4">
-                <img
-                  src={
-                    currentSelectedEmployee.avatar ||
-                    currentSelectedEmployee.img ||
-                    `https://i.pravatar.cc/100?u=${encodeURIComponent(currentSelectedEmployee.name)}`
-                  }
-                  alt={currentSelectedEmployee.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shadow-xs"
-                />
+                <div
+                  className={`w-14 h-14 rounded-2xl border text-[18px] font-bold flex items-center justify-center shadow-xs shrink-0 ${getAvatarColor(
+                    currentSelectedEmployee.name
+                  )}`}
+                >
+                  {getInitials(currentSelectedEmployee.name)}
+                </div>
                 <div>
                   <div className="flex items-center gap-2.5">
                     <h2 className="text-[18px] font-bold text-slate-900 leading-tight">
