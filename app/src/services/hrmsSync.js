@@ -471,7 +471,42 @@ export const HRMS_RESOURCES = {
   terminations: dated('/hrms/terminations/', ['terminationDate']),
   complaints: dated('/hrms/complaints/', ['raisedDate']),
   documents: dated('/hrms/documents/', ['uploadedDate', 'expiryDate']),
-  approvalChains: plain('/hrms/approval-chains/'),
+  approvalChains: {
+    path: '/hrms/approval-chains/',
+    toApi: (chain) => compact({
+      name: chain.name || `${chain.module || chain.applies_to || 'Workflow'} Approval Chain`,
+      applies_to: chain.applies_to || chain.module || 'General',
+      module: chain.module || chain.applies_to || 'General',
+      tier1: chain.tier1,
+      tier2: chain.tier2,
+      tier3: chain.tier3,
+      autoEscalateDays: Number(chain.autoEscalateDays) || 3,
+      status: chain.status || 'Active',
+      steps: chain.steps || [
+        chain.tier1 ? { tier: 1, role: chain.tier1, autoEscalateDays: Number(chain.autoEscalateDays) || 3 } : null,
+        chain.tier2 ? { tier: 2, role: chain.tier2 } : null,
+        chain.tier3 && chain.tier3 !== '—' && chain.tier3 !== '-' ? { tier: 3, role: chain.tier3 } : null,
+      ].filter(Boolean),
+    }),
+    fromApi: (row) => {
+      const steps = Array.isArray(row.steps) ? row.steps : [];
+      const t1 = row.tier1 || steps.find((s) => s.tier === 1 || s.level === 1)?.role || steps[0]?.role || 'Direct Line Manager';
+      const t2 = row.tier2 || steps.find((s) => s.tier === 2 || s.level === 2)?.role || steps[1]?.role || 'Department Head';
+      const t3 = row.tier3 || steps.find((s) => s.tier === 3 || s.level === 3)?.role || steps[2]?.role || '—';
+      const escalate = row.autoEscalateDays || steps[0]?.autoEscalateDays || 3;
+      return {
+        id: row.id,
+        module: row.module || row.appliesTo || row.applies_to || row.name?.replace(' Approval Chain', '') || 'General',
+        name: row.name || `${row.module || row.appliesTo || 'Workflow'} Approval Chain`,
+        tier1: t1,
+        tier2: t2,
+        tier3: t3,
+        autoEscalateDays: Number(escalate) || 3,
+        status: row.status || 'Active',
+        _synced: true,
+      };
+    },
+  },
   calendarEvents: dated('/hrms/calendar/events/', ['startDate', 'endDate', 'date']),
 };
 

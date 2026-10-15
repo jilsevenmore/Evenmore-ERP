@@ -159,10 +159,15 @@ export default function CustomerTrackingPage() {
         setError('Project tracking details not found or access denied.');
       } else {
         setProject(data);
-        // Default selected stage: current stage or first in-progress/upcoming stage
-        if (!selectedStageId && data.stages?.length > 0) {
-          const active = data.stages.find((s) => s.status === 'In Progress' || s.status === 'Delayed') || data.stages[0];
-          setSelectedStageId(active?.id || data.stages[0]?.id);
+        // Default selected stage: keep current selection if valid, or fallback to current/in-progress stage
+        if (data.stages?.length > 0) {
+          setSelectedStageId((prevId) => {
+            if (prevId && data.stages.some((s) => s.id === prevId)) {
+              return prevId;
+            }
+            const active = data.stages.find((s) => s.status === 'In Progress' || s.status === 'Delayed') || data.stages[0];
+            return active?.id || data.stages[0]?.id || null;
+          });
         }
       }
     } catch (err) {
@@ -178,7 +183,7 @@ export default function CustomerTrackingPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [projectLookup, selectedStageId]);
+  }, [projectLookup]);
 
   useEffect(() => {
     loadData();
@@ -439,8 +444,8 @@ export default function CustomerTrackingPage() {
         </div>
 
         {/* ── Desktop Horizontal Step Tracker ── */}
-        <div className="hidden md:block overflow-x-auto pb-4 pt-2">
-          <div className="flex items-start min-w-[700px] justify-between relative">
+        <div className="hidden md:block overflow-x-auto scrollbar-none pb-2 pt-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          <div className="flex items-start w-full min-w-0 justify-between relative">
             {/* Connecting baseline line */}
             <div className="absolute top-5 left-6 right-6 h-0.5 bg-slate-200 -z-0" />
 
@@ -467,7 +472,11 @@ export default function CustomerTrackingPage() {
               return (
                 <button
                   key={stage.id}
-                  onClick={() => setSelectedStageId(stage.id)}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setSelectedStageId(stage.id);
+                  }}
                   className={`flex flex-col items-center text-center group cursor-pointer relative z-10 max-w-[130px] flex-1 transition-all ${
                     isSelected ? 'scale-105' : 'hover:scale-102'
                   }`}

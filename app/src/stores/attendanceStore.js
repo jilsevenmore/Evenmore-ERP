@@ -241,7 +241,14 @@ const useAttendanceStoreBase = create((set, get) => ({
   }),
 
   bulkUpdate: (ids, status) => set((s) => {
-    const recs = s.records.map((r) => ids.includes(r.id) ? { ...r, status } : r);
+    const idsSet = new Set(ids.map(String));
+    const recs = s.records.map((r) =>
+      idsSet.has(String(r.id)) ||
+      idsSet.has(String(r.employeeId)) ||
+      idsSet.has(String(r.empId))
+        ? { ...r, status }
+        : r
+    );
     writeThrough("attendance", recs);
     return { records: recs };
   }),

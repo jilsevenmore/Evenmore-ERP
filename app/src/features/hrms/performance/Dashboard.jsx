@@ -26,8 +26,10 @@ import {
   Layers,
   Sparkles,
   Target,
+  FileText,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import PerformanceReportModal from "./PerformanceReportModal";
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -73,6 +75,10 @@ export default function Dashboard() {
 
   // Table Filter
   const [stageFilter, setStageFilter] = useState("All");
+
+  // Performance Report Modal State
+  const [perfReportOpen, setPerfReportOpen] = useState(false);
+  const [selectedPerfAppraisal, setSelectedPerfAppraisal] = useState(null);
 
   const activeCycle = cycles.find((c) => c.id === activeCycleId) || cycles[0];
 
@@ -241,12 +247,24 @@ export default function Dashboard() {
       key: "actions",
       header: "Action",
       render: (r) => (
-        <button
-          onClick={() => navigate('/hrms/performance/appraisal')}
-          className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#e2e8f0] text-slate-700 rounded-xl text-[11.5px] font-medium transition flex items-center gap-1 shadow-2xs"
-        >
-          Manage <ChevronRight size={13} />
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => {
+              setSelectedPerfAppraisal(r);
+              setPerfReportOpen(true);
+            }}
+            className="px-2 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-[11.5px] font-medium transition flex items-center gap-1"
+            title="Generate Performance Report"
+          >
+            <FileText size={12} /> Report
+          </button>
+          <button
+            onClick={() => navigate('/hrms/performance/appraisal')}
+            className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#e2e8f0] text-slate-700 rounded-xl text-[11.5px] font-medium transition flex items-center gap-1 shadow-2xs"
+          >
+            Manage <ChevronRight size={13} />
+          </button>
+        </div>
       ),
     },
   ];
@@ -265,6 +283,17 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+          <button
+            onClick={() => {
+              setSelectedPerfAppraisal(null);
+              setPerfReportOpen(true);
+            }}
+            className="btn-outline h-9 px-3.5 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
+            title="Generate Official Employee Performance Report"
+          >
+            <FileText size={14} className="text-blue-600" />
+            Performance Report
+          </button>
           <button
             onClick={handleOpenNewCycle}
             className="btn-primary h-9 px-4 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
@@ -622,6 +651,13 @@ export default function Dashboard() {
           </div>
         )}
       </Modal>
+
+      {/* Performance & Appraisal Report Modal */}
+      <PerformanceReportModal
+        isOpen={perfReportOpen}
+        onClose={() => setPerfReportOpen(false)}
+        appraisal={selectedPerfAppraisal}
+      />
     </div>
   );
 }

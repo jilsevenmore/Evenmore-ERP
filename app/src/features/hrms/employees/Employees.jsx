@@ -18,6 +18,7 @@ import {
   fetchEmployeeAwards,
   createEmployeeAward
 } from "../../../services/upgradeService";
+import PerformanceReportModal from "../performance/PerformanceReportModal";
 
 const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
@@ -59,6 +60,10 @@ export default function Employees() {
   const [showForm, setShowForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
+
+  // Performance Report Modal State
+  const [perfReportOpen, setPerfReportOpen] = useState(false);
+  const [selectedPerfEmp, setSelectedPerfEmp] = useState(null);
 
   // Sync search state if navigating from Candidate page with a search query
   useEffect(() => {
@@ -249,6 +254,18 @@ export default function Employees() {
           </p>
         </div>
         <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedPerfEmp(filtered[0] || employees[0] || null);
+              setPerfReportOpen(true);
+            }}
+            className="emp-export-btn"
+            style={{ borderColor: "#93c5fd", color: "#1d4ed8", background: "#eff6ff" }}
+            title="Generate Performance & Appraisal Report for Employees"
+          >
+            <FileText size={15} /> Performance Report
+          </button>
           <button type="button" onClick={handleExport} className="emp-export-btn">
             <Download size={15} /> Export
           </button>
@@ -408,6 +425,18 @@ export default function Employees() {
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
                       <button
                         type="button"
+                        onClick={() => {
+                          setSelectedPerfEmp(row);
+                          setPerfReportOpen(true);
+                        }}
+                        className="emp-trash-btn inline-block mr-1"
+                        style={{ color: "#059669" }}
+                        title="Generate Performance Report"
+                      >
+                        <FileText size={15} />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => handleOpenLifecycle(row)}
                         className="emp-trash-btn inline-block mr-1"
                         style={{ color: "#2563eb" }}
@@ -442,14 +471,37 @@ export default function Employees() {
               <div key={row.id} className="emp-grid-item">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                   <UserInitials name={row.name} className="w-[44px] h-[44px] text-sm" iconSize={20} />
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(row.id, row.name)}
-                    className="emp-trash-btn"
-                    title="Delete employee"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPerfEmp(row);
+                        setPerfReportOpen(true);
+                      }}
+                      className="emp-trash-btn inline-block"
+                      style={{ color: "#059669" }}
+                      title="Performance Report"
+                    >
+                      <FileText size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenLifecycle(row)}
+                      className="emp-trash-btn inline-block"
+                      style={{ color: "#2563eb" }}
+                      title="Employee Lifecycle"
+                    >
+                      <Award size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(row.id, row.name)}
+                      className="emp-trash-btn"
+                      title="Delete employee"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
                 <h3 style={{ margin: "10px 0 2px", fontSize: "15px", fontWeight: 700, color: "#111827" }}>
                   {row.name}
@@ -1150,6 +1202,13 @@ export default function Employees() {
           </div>
         </div>
       )}
+
+      {/* Performance & Appraisal Report Modal */}
+      <PerformanceReportModal
+        isOpen={perfReportOpen}
+        onClose={() => setPerfReportOpen(false)}
+        employee={selectedPerfEmp}
+      />
 
       <style>{`
         .emp-dir-page { background: #f8fafc; margin: -16px -24px -24px; padding: 18px 24px 28px; min-height: calc(100vh - 62px); }

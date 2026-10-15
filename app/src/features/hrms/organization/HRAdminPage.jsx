@@ -72,6 +72,14 @@ import { useERP } from "../../../context/ERPContext";
 const isoToday = () => new Date().toISOString().split("T")[0];
 const isoInDays = (days) => new Date(Date.now() + days * 86400000).toISOString().split("T")[0];
 
+const INITIAL_APPROVAL_CHAINS = [
+  { id: "AC-01", module: "Leave Management", tier1: "Direct Line Manager", tier2: "HR Operations Lead", tier3: "HR Director", autoEscalateDays: 3, status: "Active" },
+  { id: "AC-02", module: "Attendance Regularization", tier1: "Immediate Supervisor", tier2: "Department Head", tier3: "—", autoEscalateDays: 2, status: "Active" },
+  { id: "AC-03", module: "Asset Allocation", tier1: "IT Stock Manager", tier2: "Operations Lead", tier3: "Finance Approver", autoEscalateDays: 4, status: "Active" },
+  { id: "AC-04", module: "Payroll & Compensation Revisions", tier1: "HR Director", tier2: "Chief Financial Officer (CFO)", tier3: "Managing Director", autoEscalateDays: 5, status: "Active" },
+  { id: "AC-05", module: "Expense Reimbursement", tier1: "Project Manager", tier2: "Finance Lead", tier3: "Managing Director", autoEscalateDays: 3, status: "Active" },
+];
+
 export default function HRAdminPage({ defaultTab }) {
   const showToast = useAppStore((s) => s.showToast);
   const employees = useAppStore((s) => s.employees || []);
@@ -115,7 +123,7 @@ export default function HRAdminPage({ defaultTab }) {
     ...employees.map((e) => e.department),
   ].filter(Boolean))];
   const [teams, setTeams] = useState([]);
-  const [approvalChains, setApprovalChains] = useState([]);
+  const [approvalChains, setApprovalChains] = useState(INITIAL_APPROVAL_CHAINS);
   const [terminations, setTerminations] = useState([]);
 
   useEffect(() => {
@@ -124,7 +132,18 @@ export default function HRAdminPage({ defaultTab }) {
       .then((rows) => {
         if (cancelled) return;
         if (rows.teams) setTeams(rows.teams);
-        if (rows.approvalChains) setApprovalChains(rows.approvalChains);
+        if (rows.approvalChains && rows.approvalChains.length > 0) {
+          setApprovalChains(rows.approvalChains);
+        } else if (isBackendEnabled()) {
+          // If server currently has 0 approval chains, sync defaults to backend
+          Promise.all(
+            INITIAL_APPROVAL_CHAINS.map((c) => hrmsSync.create('approvalChains', c).catch(console.warn))
+          ).then((savedList) => {
+            if (cancelled) return;
+            const valid = (savedList || []).filter(Boolean);
+            if (valid.length > 0) setApprovalChains(valid);
+          });
+        }
         if (rows.terminations) setTerminations(rows.terminations);
         if (rows.complaints) setComplaints(rows.complaints);
         if (rows.departments) setDepartmentsConfig(rows.departments);
@@ -421,20 +440,27 @@ export default function HRAdminPage({ defaultTab }) {
     if (!newChain.tier1) return;
 
     if (editingChain) {
+      const updated = { ...editingChain, ...newChain };
       setApprovalChains((prev) =>
-        prev.map((c) => (c.id === editingChain.id ? { ...c, ...newChain } : c))
+        prev.map((c) => (c.id === editingChain.id ? updated : c))
       );
       if (isBackendEnabled()) {
-        hrmsSync.update('approvalChains', editingChain.id, newChain).catch(console.warn);
+        hrmsSync.update('approvalChains', editingChain.id, updated)
+          .then((saved) => {
+            if (saved?.id) {
+              setApprovalChains((prev) => prev.map((c) => (c.id === editingChain.id ? saved : c)));
+            }
+          })
+          .catch(console.warn);
       }
       showToast(`Approval chain for "${newChain.module}" updated`);
     } else {
       const created = {
-        id: `AC-0${approvalChains.length + 1}`,
+        id: `AC-${Date.now()}`,
         ...newChain,
         status: newChain.status || "Active",
       };
-      setApprovalChains([...approvalChains, created]);
+      setApprovalChains((prev) => [...prev, created]);
       if (isBackendEnabled()) {
         hrmsSync.create('approvalChains', created).then((saved) => {
           if (saved?.id) {
@@ -1399,23 +1425,23 @@ export default function HRAdminPage({ defaultTab }) {
                         <td className="py-4 px-5 font-bold text-slate-900">
                           <div className="flex items-center gap-2">
                             <Layers size={15} className="text-navy" />
-                            <span>{c.module}</span>
+                            <span>{c.module || "General"}</span>
                           </div>
                         </td>
                         <td className="py-4 px-5">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-medium text-slate-800">
                             <span className="w-4 h-4 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px] flex items-center justify-center">1</span>
-                            {c.tier1}
+                            {c.tier1 || "—"}
                           </span>
                         </td>
                         <td className="py-4 px-5">
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-medium text-slate-800">
                             <span className="w-4 h-4 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px] flex items-center justify-center">2</span>
-                            {c.tier2}
+                            {c.tier2 || "—"}
                           </span>
                         </td>
                         <td className="py-4 px-5">
-                          {c.tier3 && c.tier3 !== "—" ? (
+                          {c.tier3 && c.tier3 !== "—" && c.tier3 !== "-" ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[12px] font-medium text-slate-800">
                               <span className="w-4 h-4 rounded-full bg-purple-100 text-purple-800 font-bold text-[10px] flex items-center justify-center">3</span>
                               {c.tier3}
@@ -1427,7 +1453,7 @@ export default function HRAdminPage({ defaultTab }) {
                         <td className="py-4 px-5">
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-50 text-blue-800 border border-blue-200">
                             <Clock size={12} />
-                            {c.autoEscalateDays} days
+                            {c.autoEscalateDays || 3} days
                           </span>
                         </td>
                         <td className="py-4 px-5">
@@ -1441,7 +1467,7 @@ export default function HRAdminPage({ defaultTab }) {
                                 : "bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200"
                             }`}
                           >
-                            {c.status}
+                            {c.status || "Active"}
                           </button>
                         </td>
                         <td className="py-4 px-5 text-right">
@@ -1466,6 +1492,36 @@ export default function HRAdminPage({ defaultTab }) {
                         </td>
                       </tr>
                     ))}
+                  {approvalChains.filter((c) => {
+                    const matchSearch =
+                      !search ||
+                      String(c.module ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                      String(c.tier1 ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                      String(c.tier2 ?? '').toLowerCase().includes(search.toLowerCase()) ||
+                      String(c.tier3 ?? '').toLowerCase().includes(search.toLowerCase());
+                    const matchStatus =
+                      chainStatusFilter === "all" || c.status === chainStatusFilter;
+                    return matchSearch && matchStatus;
+                  }).length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-12 text-center text-muted">
+                        <ShieldCheck size={36} className="mx-auto mb-2 text-slate-300" />
+                        <p className="text-sm font-semibold text-slate-700">No approval workflows found</p>
+                        <p className="text-xs text-muted mt-0.5">
+                          {search || chainStatusFilter !== "all"
+                            ? "Try adjusting your search query or status filter."
+                            : "Configure automated approval hierarchies for Leave, Attendance, Assets, and Payroll."}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleOpenAddChain}
+                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-navy text-white text-xs font-semibold rounded-xl hover:bg-navy/90 transition shadow-xs cursor-pointer"
+                        >
+                          <Plus size={14} /> Add Approval Chain
+                        </button>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
