@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
+import { Pagination } from '../../components/ui/Pagination';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { StatCard } from '../../components/ui/StatCard';
 import { Button } from '../../components/ui/Button';
-import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, DollarSign, Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin, BookOpen, CreditCard, RefreshCw } from 'lucide-react';
+import { Plus, ClipboardList, Send, ArrowRight, X, Copy, Printer, IndianRupee, Clock, CheckCircle2, Package, Maximize2, Minimize2, Trash2, Ban, MapPin, BookOpen, CreditCard, RefreshCw, Search } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { LineItemEditor } from '../../components/common/LineItemEditor';
 import { DocumentTimeline } from '../../components/common/DocumentTimeline';
@@ -44,7 +45,17 @@ export const PurchaseOrdersPage = () => {
     
     // Commitments & Advances State
     const [registerData, setRegisterData] = useState([]);
+    const [registerAggregates, setRegisterAggregates] = useState(null);
+    const [registerPage, setRegisterPage] = useState(1);
+    const [registerPageSize, setRegisterPageSize] = useState(20);
+    const [registerSearch, setRegisterSearch] = useState('');
+
     const [advances, setAdvances] = useState([]);
+    const [advancesAggregates, setAdvancesAggregates] = useState(null);
+    const [advancesPage, setAdvancesPage] = useState(1);
+    const [advancesPageSize, setAdvancesPageSize] = useState(20);
+    const [advancesSearch, setAdvancesSearch] = useState('');
+
     const [isLoadingRegister, setIsLoadingRegister] = useState(false);
     const [showAdvanceModal, setShowAdvanceModal] = useState(false);
     const [showReconcileModal, setShowReconcileModal] = useState(false);
@@ -112,23 +123,62 @@ export const PurchaseOrdersPage = () => {
     const loadRegisterData = async () => {
         setIsLoadingRegister(true);
         try {
-            const regRes = await fetchPoRegister().catch(() => null);
+            const regRes = await fetchPoRegister({ all: true }).catch(() => null);
             const regList = Array.isArray(regRes)
                 ? regRes
                 : (regRes?.results || regRes?.data || []);
             setRegisterData(Array.isArray(regList) ? regList : []);
+            if (regRes?.aggregates) setRegisterAggregates(regRes.aggregates);
 
             const advRes = await fetchVendorAdvances().catch(() => null);
             const advList = Array.isArray(advRes)
                 ? advRes
                 : (advRes?.results || advRes?.data || []);
             setAdvances(Array.isArray(advList) ? advList : []);
+            if (advRes?.aggregates) setAdvancesAggregates(advRes.aggregates);
         } catch (err) {
             console.error('Error loading PO register / advances:', err);
         } finally {
             setIsLoadingRegister(false);
         }
     };
+
+    const filteredRegisterData = useMemo(() => {
+        if (!registerSearch.trim()) return registerData;
+        const q = registerSearch.toLowerCase().trim();
+        return registerData.filter((row) =>
+            String(row.po_number || '').toLowerCase().includes(q) ||
+            String(row.vendor_name || '').toLowerCase().includes(q) ||
+            String(row.status || '').toLowerCase().includes(q)
+        );
+    }, [registerData, registerSearch]);
+
+    const paginatedRegisterData = useMemo(() => {
+        const start = (registerPage - 1) * registerPageSize;
+        return filteredRegisterData.slice(start, start + registerPageSize);
+    }, [filteredRegisterData, registerPage, registerPageSize]);
+
+    const filteredAdvances = useMemo(() => {
+        if (!advancesSearch.trim()) return advances;
+        const q = advancesSearch.toLowerCase().trim();
+        return advances.filter((adv) => {
+            const num = adv.advance_number || adv.advanceNumber || '';
+            const party = adv.party_name || adv.partyName || adv.vendorName || adv.vendor || '';
+            const ref = adv.reference_number || adv.referenceNumber || '';
+            const status = adv.status || '';
+            return (
+                String(num).toLowerCase().includes(q) ||
+                String(party).toLowerCase().includes(q) ||
+                String(ref).toLowerCase().includes(q) ||
+                String(status).toLowerCase().includes(q)
+            );
+        });
+    }, [advances, advancesSearch]);
+
+    const paginatedAdvances = useMemo(() => {
+        const start = (advancesPage - 1) * advancesPageSize;
+        return filteredAdvances.slice(start, start + advancesPageSize);
+    }, [filteredAdvances, advancesPage, advancesPageSize]);
 
     useEffect(() => {
         if (activeTab === 'register') {
@@ -456,29 +506,41 @@ export const PurchaseOrdersPage = () => {
         <>
           {/* Purchase Orders KPI Stat Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Committed Procurement" value={formatCurrency(totalPoValue)} icon={DollarSign} />
+            <StatCard label="Committed Procurement" value={formatCurrency(totalPoValue)} icon={IndianRupee} />
             <StatCard label="Active Orders In-Flight" value={`${activePoCount} Orders`} icon={Clock} trend={{ positive: true, text: 'Awaiting dock arrival' }} highlight={activePoCount > 0} />
             <StatCard label="Draft Orders" value={`${draftPoCount} Drafts`} icon={Package} subtext="Ready for vendor dispatch" />
             <StatCard label="Fulfilled & Billed" value={`${receivedPoCount} Received`} icon={CheckCircle2} trend={{ positive: true, text: 'Inventory updated' }} />
           </div>
 
-          <DataTable title="Supplier Purchase Orders" columns={columns} data={purchaseOrders} keyExtractor={(p) => p.id} searchPlaceholder="Search PO # or vendor..." searchFilter={(p, term) => String(p.poNumber ?? '').toLowerCase().includes(term) ||
-                String(p.vendor ?? '').toLowerCase().includes(term)}/>
+          <DataTable
+            title="Supplier Purchase Orders"
+            columns={columns}
+            data={purchaseOrders}
+            keyExtractor={(p) => p.id}
+            pageSize={20}
+            pageSizeOptions={[10, 20, 50, 100]}
+            searchPlaceholder="Search PO # or vendor..."
+            searchFilter={(p, term) =>
+              String(p.poNumber ?? '').toLowerCase().includes(term) ||
+              String(p.vendor ?? '').toLowerCase().includes(term)
+            }
+          />
         </>
       ) : (
         /* Commitments Book & Vendor Advances View */
         <div className="space-y-6">
           {/* Commitments KPIs */}
           {(() => {
-            const totalCommit = registerData.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
-            const totalBilled = registerData.reduce((acc, r) => acc + (Number(r.billed_total) || 0), 0);
-            const totalUnbilled = registerData.reduce((acc, r) => acc + (Number(r.unbilled_commitment) || 0), 0);
-            const totalAdv = advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
-            const unallocAdv = advances.reduce((acc, a) => acc + (Number(a.unallocated_amount ?? a.unallocatedAmount ?? a.amount) || 0), 0);
+            const totalCommit = registerAggregates?.totalCommitted ?? registerData.reduce((acc, r) => acc + (Number(r.total) || 0), 0);
+            const totalBilled = registerAggregates?.billedTotal ?? registerData.reduce((acc, r) => acc + (Number(r.billed_total) || 0), 0);
+            const totalUnbilled = registerAggregates?.unbilledCommitment ?? registerData.reduce((acc, r) => acc + (Number(r.unbilled_commitment) || 0), 0);
+            const totalAdv = advancesAggregates?.totalAmount ?? advances.reduce((acc, a) => acc + (Number(a.amount) || 0), 0);
+            const unallocAdv = advancesAggregates?.unallocated ?? advances.reduce((acc, a) => acc + (Number(a.unallocated_amount ?? a.unallocatedAmount ?? a.amount) || 0), 0);
+            const totalOrdersCount = registerAggregates?.orderCount ?? registerData.length;
 
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Gross PO Commitments" value={formatCurrency(totalCommit)} icon={DollarSign} subtext={`${registerData.length} total orders`} />
+                <StatCard label="Gross PO Commitments" value={formatCurrency(totalCommit)} icon={IndianRupee} subtext={`${totalOrdersCount} total orders`} />
                 <StatCard label="Billed / Invoiced to Date" value={formatCurrency(totalBilled)} icon={CheckCircle2} />
                 <StatCard label="Open Unbilled Commitments" value={formatCurrency(totalUnbilled)} icon={Clock} highlight={totalUnbilled > 0} trend={{ positive: false, text: 'Future AP exposure' }} />
                 <StatCard label="Unallocated Advances" value={formatCurrency(unallocAdv)} icon={CreditCard} subtext={`${advances.length} advances recorded`} />
@@ -488,14 +550,29 @@ export const PurchaseOrdersPage = () => {
 
           {/* Section 1: PO Commitments Register */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-slate-800 text-sm">Purchase Commitments Register</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Tracking ordered quantities, warehouse receipts, and unbilled commitment liabilities</p>
+                <p className="text-xs text-slate-500 mt-0.5">Tracking ordered quantities, warehouse receipts, and unbilled commitment liabilities (20 per page)</p>
               </div>
-              <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded">
-                {registerData.length} records
-              </span>
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search commitments..."
+                    value={registerSearch}
+                    onChange={(e) => {
+                      setRegisterSearch(e.target.value);
+                      setRegisterPage(1);
+                    }}
+                    className="pl-8.5 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-1 rounded whitespace-nowrap">
+                  {filteredRegisterData.length} records
+                </span>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -514,14 +591,14 @@ export const PurchaseOrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {registerData.length === 0 ? (
+                  {filteredRegisterData.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="text-center py-8 text-slate-400">
                         {isLoadingRegister ? 'Loading commitments...' : 'No purchase commitments found.'}
                       </td>
                     </tr>
                   ) : (
-                    registerData.map((row) => (
+                    paginatedRegisterData.map((row) => (
                       <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
                         <td className="py-2.5 px-4 font-mono font-bold text-primary">{row.po_number}</td>
                         <td className="py-2.5 px-4 font-medium text-slate-800">{row.vendor_name || '—'}</td>
@@ -545,18 +622,49 @@ export const PurchaseOrdersPage = () => {
                 </tbody>
               </table>
             </div>
+
+            {filteredRegisterData.length > 0 && (
+              <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                <Pagination
+                  total={filteredRegisterData.length}
+                  page={registerPage}
+                  pageSize={registerPageSize}
+                  pageSizeOptions={[10, 20, 50, 100]}
+                  onPageSizeChange={(newSize) => {
+                    setRegisterPageSize(newSize);
+                    setRegisterPage(1);
+                  }}
+                  onChange={setRegisterPage}
+                />
+              </div>
+            )}
           </div>
 
           {/* Section 2: Vendor Advances Book */}
           <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
-            <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="font-bold text-slate-800 text-sm">Vendor Advance Disbursements</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Prepayments made to suppliers prior to invoice presentation, eligible for settlement against final bills</p>
+                <p className="text-xs text-slate-500 mt-0.5">Prepayments made to suppliers prior to invoice presentation, eligible for settlement against final bills (20 per page)</p>
               </div>
-              <Button size="sm" icon={Plus} onClick={handleOpenAdvanceModal}>
-                Record Advance
-              </Button>
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search advances..."
+                    value={advancesSearch}
+                    onChange={(e) => {
+                      setAdvancesSearch(e.target.value);
+                      setAdvancesPage(1);
+                    }}
+                    className="pl-8.5 pr-3 py-1.5 border border-slate-300 rounded-lg text-xs bg-white text-slate-800 focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <Button size="sm" icon={Plus} onClick={handleOpenAdvanceModal}>
+                  Record Advance
+                </Button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -576,14 +684,14 @@ export const PurchaseOrdersPage = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {advances.length === 0 ? (
+                  {filteredAdvances.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="text-center py-8 text-slate-400">
                         No vendor advances recorded. Click "Record Advance" to log a supplier prepayment.
                       </td>
                     </tr>
                   ) : (
-                    advances.map((adv) => {
+                    paginatedAdvances.map((adv) => {
                       const unalloc = adv.unallocated_amount !== undefined
                         ? adv.unallocated_amount
                         : adv.unallocatedAmount !== undefined
@@ -633,6 +741,22 @@ export const PurchaseOrdersPage = () => {
                 </tbody>
               </table>
             </div>
+
+            {filteredAdvances.length > 0 && (
+              <div className="border-t border-slate-200 bg-slate-50 px-4 py-2">
+                <Pagination
+                  total={filteredAdvances.length}
+                  page={advancesPage}
+                  pageSize={advancesPageSize}
+                  pageSizeOptions={[10, 20, 50, 100]}
+                  onPageSizeChange={(newSize) => {
+                    setAdvancesPageSize(newSize);
+                    setAdvancesPage(1);
+                  }}
+                  onChange={setAdvancesPage}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

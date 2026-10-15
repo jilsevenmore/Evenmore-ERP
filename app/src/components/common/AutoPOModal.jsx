@@ -13,7 +13,7 @@ export const AutoPOModal = ({
   sourceRef,
   sourceDocNumber,
 }) => {
-  const { vendors = [], items: masterItems = [], addPurchaseOrder, showToast } = useERP() || {};
+  const { vendors = [], items: masterItems = [], addPurchaseOrder, showToast, formatCurrency } = useERP() || {};
   const activeItem = shortageItem || item;
   const initialQty = requiredDeficitQty || defaultDeficitQty || 5;
   const activeSource = sourceRef || sourceDocNumber || 'Sales Order Shortage';
@@ -208,7 +208,7 @@ export const AutoPOModal = ({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-700 mb-1">Unit Cost Price ($)</label>
+              <label className="block font-semibold text-slate-700 mb-1">Unit Cost Price (₹)</label>
               <input
                 type="number"
                 step="0.01"
@@ -247,7 +247,7 @@ export const AutoPOModal = ({
             <div className="font-mono text-xs text-slate-600">
               Total PO:{' '}
               <strong className="text-slate-900 font-bold">
-                ${totalPOAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatCurrency ? formatCurrency(totalPOAmount) : `₹${totalPOAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
               </strong>
             </div>
             <div className="flex items-center gap-2">
