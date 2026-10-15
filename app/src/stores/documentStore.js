@@ -37,7 +37,11 @@ const useDocumentStoreBase = create((set, get) => ({
     };
     const updated = [newDoc, ...current];
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced) && synced.length > 0) {
+          set({ documents: synced });
+        }
+      });
     } catch {}
     set({ documents: updated });
     return newDoc;
@@ -49,7 +53,9 @@ const useDocumentStoreBase = create((set, get) => ({
       d.id === id ? { ...d, ...updates, updatedOn: new Date().toISOString().slice(0, 10) } : d
     );
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced)) set({ documents: synced });
+      });
     } catch {}
     set({ documents: updated });
   },
@@ -58,7 +64,9 @@ const useDocumentStoreBase = create((set, get) => ({
     const current = get().documents;
     const updated = current.filter((d) => d.id !== id);
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced)) set({ documents: synced });
+      });
     } catch {}
     set({ documents: updated });
   },
@@ -69,7 +77,9 @@ const useDocumentStoreBase = create((set, get) => ({
       d.id === id ? { ...d, status: "Valid", verifiedAt: new Date().toISOString().slice(0, 10) } : d
     );
     try {
-      writeThrough("documents", updated);
+      writeThrough("documents", updated).then((synced) => {
+        if (Array.isArray(synced)) set({ documents: synced });
+      });
     } catch {}
     set({ documents: updated });
   },

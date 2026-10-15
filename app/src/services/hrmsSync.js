@@ -470,7 +470,56 @@ export const HRMS_RESOURCES = {
   resignations: dated('/hrms/resignations/', ['resignationDate', 'lastWorkingDay']),
   terminations: dated('/hrms/terminations/', ['terminationDate']),
   complaints: dated('/hrms/complaints/', ['raisedDate']),
-  documents: dated('/hrms/documents/', ['uploadedDate', 'expiryDate']),
+  documents: {
+    path: '/hrms/documents/',
+    toApi: (doc) => {
+      let v = 1;
+      if (typeof doc.version === 'number') {
+        v = doc.version;
+      } else if (typeof doc.version === 'string') {
+        const cleaned = doc.version.toLowerCase().replace('v', '').split('.')[0].trim();
+        v = parseInt(cleaned, 10) || 1;
+      }
+
+      let exp = null;
+      if (doc.expiry && doc.expiry !== '—' && doc.expiry !== '-' && doc.expiry !== 'Permanent' && doc.expiry !== 'N/A') {
+        exp = isoOut(doc.expiry) || null;
+      }
+
+      let empId = doc.employeeId;
+      if (empId === 'ALL' || empId === 'All Staff' || !isServerId(empId)) {
+        empId = null;
+      }
+
+      return compact({
+        title: doc.title,
+        category: doc.category || 'General',
+        employeeId: empId,
+        version: v,
+        expiry: exp,
+        description: doc.description || undefined,
+        tags: Array.isArray(doc.tags) ? doc.tags : [doc.category || 'General'],
+        is_confidential: Boolean(doc.is_confidential || doc.isConfidential),
+        fileData: doc.fileData || undefined,
+        fileType: doc.fileType || 'PDF',
+      });
+    },
+    fromApi: (row) => {
+      const expDisplay = row.expiry ? displayIn(row.expiry) : '—';
+      return {
+        ...row,
+        employee: row.employee || (row.employeeId ? 'Staff Member' : 'All Staff'),
+        employeeId: row.employeeId || 'ALL',
+        version: typeof row.version === 'number' ? `v${row.version}.0` : (row.version || 'v1.0'),
+        expiry: expDisplay,
+        status: row.status || 'Valid',
+        updatedOn: row.updatedOn ? displayIn(row.updatedOn) : (row.created_at ? displayIn(row.created_at) : new Date().toISOString().slice(0, 10)),
+        fileType: row.fileType || 'PDF',
+        fileSize: row.fileSize ? `${(row.fileSize / (1024 * 1024)).toFixed(1)} MB` : (row.fileSize || '0.0 MB'),
+        _synced: true,
+      };
+    },
+  },
   approvalChains: {
     path: '/hrms/approval-chains/',
     toApi: (chain) => compact({
