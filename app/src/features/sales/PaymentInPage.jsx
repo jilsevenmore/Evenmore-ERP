@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button';
 import {
     Plus, ArrowDownLeft, CreditCard, X, Receipt, DollarSign, CheckCircle2,
     TrendingUp, Printer, Edit, Ban, Eye, FileText, AlertCircle, ShieldAlert,
-    Filter, RefreshCw, Calendar, User, Search
+    Filter, RefreshCw, Calendar, User, Search, Link2
 } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { PaymentReceiptModal } from '../../components/common/PaymentReceiptModal';
@@ -57,7 +57,9 @@ export const PaymentInPage = () => {
         cancelCashPaymentReceipt,
         voidCashPaymentReceipt,
         updateCashPaymentReceipt,
+        allocateCashReceiptToInvoice,
         getInvoiceOutstanding,
+        refreshFromBackend,
         formatCurrency,
         formatDateDDMMYYYY,
         getCurrentDateFormatted
@@ -69,7 +71,7 @@ export const PaymentInPage = () => {
     // Add Modal State
     const [showAddModal, setShowAddModal] = useState(false);
     const [paymentType, setPaymentType] = useState('WITH_BILL'); // 'WITH_BILL' | 'WITHOUT_BILL'
-    const [selectedInvoiceId, setSelectedInvoiceId] = useState(invoices[0]?.id || '');
+    const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
     const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
     const [amount, setAmount] = useState('');
     const [mode, setMode] = useState('Bank Transfer');
@@ -87,6 +89,12 @@ export const PaymentInPage = () => {
     const [cancelAction, setCancelAction] = useState('CANCELLED'); // 'CANCELLED' | 'VOIDED'
     const [cancelReason, setCancelReason] = useState('');
 
+    // Allocation Modal State for Unallocated Cash Receipts
+    const [allocateModalReceipt, setAllocateModalReceipt] = useState(null);
+    const [allocateInvoiceId, setAllocateInvoiceId] = useState('');
+    const [allocateAmount, setAllocateAmount] = useState('');
+    const [isAllocating, setIsAllocating] = useState(false);
+
     // Filters for Cash Payment Section
     const [filterStatus, setFilterStatus] = useState('ALL');
     const [filterCustomer, setFilterCustomer] = useState('ALL');
@@ -94,14 +102,96 @@ export const PaymentInPage = () => {
     const [filterDate, setFilterDate] = useState('');
     const [searchReceipt, setSearchReceipt] = useState('');
 
-    // Selected Invoice for With-Bill Modal
-    const selectedInv = invoices.find((i) => i.id === selectedInvoiceId) || invoices[0];
-    const selectedOutstanding = selectedInv
-        ? getInvoiceOutstanding(selectedInv.id)
-        : { balanceDue: 0, paid: 0, total: 0, taxableAmount: 0, gst: 0, paidAgainstInvoice: 0 };
+    // Helper: Find current selected customer object
+    const selectedCustomerObj = useMemo(() => {
+        return customers.find((c) => c.id === selectedCustomerId || c.name === selectedCustomerId) || customers[0] || null;
+    }, [customers, selectedCustomerId]);
+
+    // Helper: Compute eligible invoices with positive payable balance strictly for selected customer
+    const eligibleCustomerInvoices = useMemo(() => {
+        if (!selectedCustomerObj) return [];
+        return invoices.filter((inv) => {
+            // Check customer match
+            const matchesCustomer =
+                (inv.customerId && (inv.customerId === selectedCustomerObj.id || inv.customerId === selectedCustomerObj.code)) ||
+                (inv.partyId && (inv.partyId === selectedCustomerObj.id || inv.partyId === selectedCustomerObj.code)) ||
+                (inv.customer && String(inv.customer).trim().toLowerCase() === String(selectedCustomerObj.name).trim().toLowerCase()) ||
+                (inv.partyName && String(inv.partyName).trim().toLowerCase() === String(selectedCustomerObj.name).trim().toLowerCase());
+
+            if (!matchesCustomer) return false;
+
+            // Ineligibility: Cancelled, Draft, Unposted, or Voided
+            const status = String(inv.status || '').toLowerCase();
+            if (status === 'cancelled' || status === 'draft' || status === 'voided') return false;
+            if (inv.finalized === false) return false;
+
+            // Balance check using backend-consistent business logic
+            const out = getInvoiceOutstanding(inv.id);
+            if (out.balanceDue <= 0.01) return false;
+
+            return true;
+        });
+    }, [invoices, selectedCustomerObj, getInvoiceOutstanding]);
+
+    // Selected Invoice for Modal
+    const selectedInv = useMemo(() => {
+        return invoices.find((i) => i.id === selectedInvoiceId) || null;
+    }, [invoices, selectedInvoiceId]);
+
+    const selectedOutstanding = useMemo(() => {
+        return selectedInv
+            ? getInvoiceOutstanding(selectedInv.id)
+            : { balanceDue: 0, paid: 0, total: 0, taxableAmount: 0, gst: 0, paidAgainstInvoice: 0, appliedCredit: 0, balanceDueBeforeCredit: 0 };
+    }, [selectedInv, getInvoiceOutstanding]);
+
+    const handleCustomerChange = (custId) => {
+        setSelectedCustomerId(custId);
+        const custObj = customers.find((c) => c.id === custId || c.name === custId) || null;
+        if (!custObj) {
+            setSelectedInvoiceId('');
+            setAmount('');
+            return;
+        }
+
+        // Find eligible invoices for newly selected customer
+        const custInvs = invoices.filter((inv) => {
+            const matches =
+                (inv.customerId && (inv.customerId === custObj.id || inv.customerId === custObj.code)) ||
+                (inv.partyId && (inv.partyId === custObj.id || inv.partyId === custObj.code)) ||
+                (inv.customer && String(inv.customer).trim().toLowerCase() === String(custObj.name).trim().toLowerCase()) ||
+                (inv.partyName && String(inv.partyName).trim().toLowerCase() === String(custObj.name).trim().toLowerCase());
+            if (!matches) return false;
+            const status = String(inv.status || '').toLowerCase();
+            if (status === 'cancelled' || status === 'draft' || status === 'voided') return false;
+            if (inv.finalized === false) return false;
+            const out = getInvoiceOutstanding(inv.id);
+            return out.balanceDue > 0.01;
+        });
+
+        if (paymentType === 'WITH_BILL') {
+            if (custInvs.length > 0) {
+                const firstInv = custInvs[0];
+                setSelectedInvoiceId(firstInv.id);
+                const out = getInvoiceOutstanding(firstInv.id);
+                setAmount(out.balanceDue > 0 ? out.balanceDue : '');
+            } else {
+                setSelectedInvoiceId('');
+                setAmount('');
+            }
+        } else {
+            // WITHOUT_BILL: keep existing invoice selection if still belongs to this customer, otherwise clear
+            if (selectedInvoiceId && !custInvs.some((i) => i.id === selectedInvoiceId)) {
+                setSelectedInvoiceId('');
+            }
+        }
+    };
 
     const handleInvoiceChange = (invId) => {
         setSelectedInvoiceId(invId);
+        if (!invId) {
+            if (paymentType === 'WITH_BILL') setAmount('');
+            return;
+        }
         const inv = invoices.find((i) => i.id === invId);
         if (inv) {
             const out = getInvoiceOutstanding(inv.id);
@@ -109,17 +199,147 @@ export const PaymentInPage = () => {
         }
     };
 
+    // Helper: Eligible open invoices for the cash receipt being allocated
+    const eligibleAllocateInvoices = useMemo(() => {
+        if (!allocateModalReceipt) return [];
+        const receiptCust = allocateModalReceipt.customer || allocateModalReceipt.partyName || '';
+        const receiptCustId = allocateModalReceipt.customerId || allocateModalReceipt.partyId;
+
+        return invoices.filter((inv) => {
+            const matchesCustomer =
+                (receiptCustId && (inv.customerId === receiptCustId || inv.partyId === receiptCustId)) ||
+                (receiptCust && (String(inv.customer).trim().toLowerCase() === String(receiptCust).trim().toLowerCase() ||
+                    String(inv.partyName).trim().toLowerCase() === String(receiptCust).trim().toLowerCase()));
+
+            if (!matchesCustomer) return false;
+            const status = String(inv.status || '').toLowerCase();
+            if (status === 'cancelled' || status === 'draft' || status === 'voided') return false;
+            if (inv.finalized === false) return false;
+
+            const out = getInvoiceOutstanding(inv.id);
+            return out.balanceDue > 0.01;
+        });
+    }, [allocateModalReceipt, invoices, getInvoiceOutstanding]);
+
+    const handleOpenAllocateModal = (receipt) => {
+        setAllocateModalReceipt(receipt);
+        const receiptCust = receipt.customer || receipt.partyName || '';
+        const receiptCustId = receipt.customerId || receipt.partyId;
+
+        const custInvs = invoices.filter((inv) => {
+            const matchesCustomer =
+                (receiptCustId && (inv.customerId === receiptCustId || inv.partyId === receiptCustId)) ||
+                (receiptCust && (String(inv.customer).trim().toLowerCase() === String(receiptCust).trim().toLowerCase() ||
+                    String(inv.partyName).trim().toLowerCase() === String(receiptCust).trim().toLowerCase()));
+
+            if (!matchesCustomer) return false;
+            const status = String(inv.status || '').toLowerCase();
+            if (status === 'cancelled' || status === 'draft' || status === 'voided') return false;
+            if (inv.finalized === false) return false;
+
+            const out = getInvoiceOutstanding(inv.id);
+            return out.balanceDue > 0.01;
+        });
+
+        if (custInvs.length > 0) {
+            const firstInv = custInvs[0];
+            setAllocateInvoiceId(firstInv.id);
+            const out = getInvoiceOutstanding(firstInv.id);
+            const defaultAmt = Math.min(Number(receipt.amount) || 0, out.balanceDue);
+            setAllocateAmount(defaultAmt > 0 ? String(defaultAmt) : '');
+        } else {
+            setAllocateInvoiceId('');
+            setAllocateAmount('');
+        }
+    };
+
+    const handleAllocateInvoiceChange = (invId) => {
+        setAllocateInvoiceId(invId);
+        if (!invId || !allocateModalReceipt) return;
+        const inv = invoices.find((i) => i.id === invId);
+        if (inv) {
+            const out = getInvoiceOutstanding(inv.id);
+            const defaultAmt = Math.min(Number(allocateModalReceipt.amount) || 0, out.balanceDue);
+            setAllocateAmount(defaultAmt > 0 ? String(defaultAmt) : '');
+        }
+    };
+
+    const handleConfirmAllocation = async (e) => {
+        e.preventDefault();
+        if (isAllocating || !allocateModalReceipt || !allocateInvoiceId) return;
+
+        const numAmt = Number(allocateAmount);
+        if (!numAmt || numAmt <= 0) {
+            alert('Please enter a valid allocation amount greater than zero.');
+            return;
+        }
+
+        const inv = invoices.find((i) => i.id === allocateInvoiceId);
+        if (inv) {
+            const out = getInvoiceOutstanding(inv.id);
+            if (numAmt > out.balanceDue + 0.01) {
+                alert(`Allocation amount (${formatCurrency(numAmt)}) cannot exceed invoice remaining due (${formatCurrency(out.balanceDue)}).`);
+                return;
+            }
+        }
+
+        if (numAmt > Number(allocateModalReceipt.amount) + 0.01) {
+            alert(`Allocation amount (${formatCurrency(numAmt)}) cannot exceed receipt amount (${formatCurrency(allocateModalReceipt.amount)}).`);
+            return;
+        }
+
+        setIsAllocating(true);
+        try {
+            await allocateCashReceiptToInvoice(allocateModalReceipt.id, allocateInvoiceId, numAmt);
+            setAllocateModalReceipt(null);
+        } catch (err) {
+            alert('Allocation failed: ' + (err.message || 'Unknown error'));
+        } finally {
+            setIsAllocating(false);
+        }
+    };
+
     const handleOpenAddModal = (type = null) => {
+        refreshFromBackend?.();
         const targetType = type || (activeTab === 'without-bill' ? 'WITHOUT_BILL' : 'WITH_BILL');
         setPaymentType(targetType);
+
+        const initialCustId = customers[0]?.id || '';
+        setSelectedCustomerId(initialCustId);
+
+        const custObj = customers[0] || null;
+        let custInvs = [];
+        if (custObj) {
+            custInvs = invoices.filter((inv) => {
+                const matches =
+                    (inv.customerId && (inv.customerId === custObj.id || inv.customerId === custObj.code)) ||
+                    (inv.partyId && (inv.partyId === custObj.id || inv.partyId === custObj.code)) ||
+                    (inv.customer && String(inv.customer).trim().toLowerCase() === String(custObj.name).trim().toLowerCase()) ||
+                    (inv.partyName && String(inv.partyName).trim().toLowerCase() === String(custObj.name).trim().toLowerCase());
+                if (!matches) return false;
+                const status = String(inv.status || '').toLowerCase();
+                if (status === 'cancelled' || status === 'draft' || status === 'voided') return false;
+                if (inv.finalized === false) return false;
+                const out = getInvoiceOutstanding(inv.id);
+                return out.balanceDue > 0.01;
+            });
+        }
+
         if (targetType === 'WITH_BILL') {
-            if (invoices.length > 0) {
-                handleInvoiceChange(invoices[0].id);
+            if (custInvs.length > 0) {
+                const firstInv = custInvs[0];
+                setSelectedInvoiceId(firstInv.id);
+                const out = getInvoiceOutstanding(firstInv.id);
+                setAmount(out.balanceDue > 0 ? out.balanceDue : '');
+            } else {
+                setSelectedInvoiceId('');
+                setAmount('');
             }
             setMode('Bank Transfer');
+            setDescription('');
         } else {
-            setSelectedCustomerId(customers[0]?.id || '');
-            setAmount(0);
+            setSelectedInvoiceId('');
+            setAmount('');
             setMode('Cash');
             setDescription('Cash advance / counter settlement');
         }
@@ -141,16 +361,28 @@ export const PaymentInPage = () => {
         setIsSubmitting(true);
         try {
             if (paymentType === 'WITH_BILL') {
-                const inv = invoices.find((i) => i.id === selectedInvoiceId) || invoices[0];
+                const inv = invoices.find((i) => i.id === selectedInvoiceId);
                 if (!inv) {
-                    alert('Please select an invoice to record this payment against.');
+                    alert('Please select an eligible open invoice to record this payment against.');
                     return;
                 }
-                const cust = customers.find((c) => c.name === inv?.customer || c.id === inv?.customerId);
+                const out = getInvoiceOutstanding(inv.id);
+                if (out.balanceDue <= 0.01) {
+                    alert('Selected invoice has zero balance due and cannot receive payments.');
+                    return;
+                }
+                if (numAmount > out.balanceDue + 0.01) {
+                    alert(`Payment amount (${formatCurrency(numAmount)}) exceeds invoice balance due (${formatCurrency(out.balanceDue)}).`);
+                    return;
+                }
+
+                const cust = customers.find((c) => c.id === selectedCustomerId || c.name === selectedCustomerId) ||
+                    customers.find((c) => c.name === inv?.customer || c.id === inv?.customerId);
+
                 const created = addPaymentIn({
                     paymentType: 'WITH_BILL',
-                    customerId: cust?.id,
-                    customer: inv?.customer || cust?.name || 'Walk-in Customer',
+                    customerId: cust?.id || inv?.customerId,
+                    customer: cust?.name || inv?.customer || 'Customer',
                     invoiceId: inv?.id,
                     invoiceNumber: inv?.invoiceNumber || '',
                     date: getCurrentDateFormatted(),
@@ -164,10 +396,14 @@ export const PaymentInPage = () => {
                 if (created) setActiveReceipt(created);
             } else {
                 const cust = customers.find((c) => c.id === selectedCustomerId || c.name === selectedCustomerId) || customers[0];
+                const linkedInv = selectedInvoiceId ? invoices.find((i) => i.id === selectedInvoiceId) : null;
+
                 const created = addPaymentIn({
                     paymentType: 'WITHOUT_BILL',
                     customerId: cust?.id,
                     customer: cust?.name || 'Cash Customer',
+                    invoiceId: linkedInv?.id || null,
+                    invoiceNumber: linkedInv?.invoiceNumber || null,
                     date: getCurrentDateFormatted(),
                     mode: mode || 'Cash',
                     amount: numAmount,
@@ -365,7 +601,7 @@ export const PaymentInPage = () => {
             key: 'amount',
             header: 'Amount',
             align: 'right',
-            width: '12%',
+            width: '10%',
             render: (r) => (
                 <span className={`font-mono font-bold whitespace-nowrap ${r.status === 'CANCELLED' || r.status === 'VOIDED' ? 'line-through text-slate-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                     +{formatCurrency(r.amount ?? 0)}
@@ -373,10 +609,29 @@ export const PaymentInPage = () => {
             ),
         },
         {
+            key: 'allocation',
+            header: 'Allocation',
+            width: '13%',
+            render: (r) => {
+                if (r.invoiceNumber || r.invoiceId) {
+                    return (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 whitespace-nowrap">
+                            <FileText size={10} /> {r.invoiceNumber || 'Linked Invoice'}
+                        </span>
+                    );
+                }
+                return (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 whitespace-nowrap">
+                        Unallocated Advance
+                    </span>
+                );
+            },
+        },
+        {
             key: 'mode',
             header: 'Mode',
             align: 'center',
-            width: '10%',
+            width: '8%',
             render: (r) => (
                 <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-text-secondary bg-amber-50 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800 whitespace-nowrap">
                     <DollarSign size={11} /> {r.mode || 'Cash'}
@@ -386,7 +641,7 @@ export const PaymentInPage = () => {
         {
             key: 'reference',
             header: 'Reference',
-            width: '11%',
+            width: '10%',
             render: (r) => (
                 <span className="font-mono text-[11px] text-muted whitespace-nowrap truncate block">
                     {r.referenceNumber || r.reference || '—'}
@@ -396,7 +651,7 @@ export const PaymentInPage = () => {
         {
             key: 'description',
             header: 'Description',
-            width: '15%',
+            width: '14%',
             render: (r) => (
                 <span className="text-slate-600 text-xs truncate block" title={r.description}>
                     {r.description || 'Unbilled cash transaction'}
@@ -407,7 +662,7 @@ export const PaymentInPage = () => {
             key: 'status',
             header: 'Status',
             align: 'center',
-            width: '10%',
+            width: '8%',
             render: (r) => {
                 const st = (r.status || 'RECEIVED').toUpperCase();
                 if (st === 'CANCELLED') {
@@ -422,16 +677,17 @@ export const PaymentInPage = () => {
         {
             key: 'createdBy',
             header: 'Created By',
-            width: '10%',
+            width: '9%',
             render: (r) => <span className="text-[11px] text-slate-500 font-medium truncate block">{r.createdBy || '—'}</span>,
         },
         {
             key: 'actions',
             header: 'Actions',
             align: 'right',
-            width: '12%',
+            width: '14%',
             render: (r) => {
                 const isInactive = r.status === 'CANCELLED' || r.status === 'VOIDED';
+                const isUnallocated = !r.invoiceId && !r.invoiceNumber;
                 return (
                     <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                         <button
@@ -448,6 +704,15 @@ export const PaymentInPage = () => {
                         >
                             <Printer size={13} />
                         </button>
+                        {!isInactive && isUnallocated && (
+                            <button
+                                onClick={() => handleOpenAllocateModal(r)}
+                                className="p-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded"
+                                title="Allocate Advance to Invoice"
+                            >
+                                <Link2 size={13} />
+                            </button>
+                        )}
                         {!isInactive && (
                             <>
                                 <button
@@ -735,21 +1000,50 @@ export const PaymentInPage = () => {
                             {paymentType === 'WITH_BILL' ? (
                                 <>
                                     <div>
-                                        <label className="block font-semibold text-slate-700 mb-1">Target Sales Invoice *</label>
+                                        <label className="block font-semibold text-slate-700 mb-1">Customer / Party *</label>
+                                        <select
+                                            value={selectedCustomerId}
+                                            onChange={(e) => handleCustomerChange(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                                        >
+                                            {customers.map((c) => (
+                                                <option key={c.id} value={c.id}>
+                                                    {c.name} {c.balance ? `(Bal: ${formatCurrency(c.balance)})` : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">
+                                            Target Sales Invoice * {eligibleCustomerInvoices.length > 0 && `(${eligibleCustomerInvoices.length} open)`}
+                                        </label>
                                         <select
                                             value={selectedInvoiceId}
                                             onChange={(e) => handleInvoiceChange(e.target.value)}
-                                            className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                                            className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium disabled:bg-slate-100 disabled:text-slate-400"
+                                            disabled={eligibleCustomerInvoices.length === 0}
                                         >
-                                            {invoices.map((inv) => {
-                                                const outstanding = getInvoiceOutstanding(inv.id);
-                                                return (
-                                                    <option key={inv.id} value={inv.id}>
-                                                        {inv.invoiceNumber} - {inv.customer} (Due: {formatCurrency(outstanding.balanceDue)})
-                                                    </option>
-                                                );
-                                            })}
+                                            {eligibleCustomerInvoices.length === 0 ? (
+                                                <option value="" disabled>
+                                                    No eligible open invoices with payable balance for this customer
+                                                </option>
+                                            ) : (
+                                                eligibleCustomerInvoices.map((inv) => {
+                                                    const outstanding = getInvoiceOutstanding(inv.id);
+                                                    return (
+                                                        <option key={inv.id} value={inv.id}>
+                                                            {inv.invoiceNumber} — Due: {formatCurrency(outstanding.balanceDue)} (Total: {formatCurrency(outstanding.total)}, Paid: {formatCurrency(outstanding.paidAgainstInvoice)}{outstanding.appliedCredit > 0 ? `, Credit: ${formatCurrency(outstanding.appliedCredit)}` : ''})
+                                                        </option>
+                                                    );
+                                                })
+                                            )}
                                         </select>
+                                        {eligibleCustomerInvoices.length === 0 && (
+                                            <p className="text-[11px] text-amber-600 font-medium mt-1">
+                                                Selected customer has no open invoices with an outstanding payable balance. Fully paid, zero-due, and cancelled invoices cannot receive payments.
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Live Bill Outstanding Summary & Allocation Impact */}
@@ -765,8 +1059,12 @@ export const PaymentInPage = () => {
                                         return (
                                             <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2 text-xs">
                                                 <div className="flex justify-between">
+                                                    <span className="text-slate-500">Party / Customer:</span>
+                                                    <span className="font-semibold text-slate-800">{selectedInv.customer || selectedInv.partyName || selectedCustomerObj?.name}</span>
+                                                </div>
+                                                <div className="flex justify-between">
                                                     <span className="text-slate-500">Invoice Total:</span>
-                                                    <span className="font-mono text-slate-800">{formatCurrency(selectedInv.grandTotal || selectedInv.total || 0)}</span>
+                                                    <span className="font-mono text-slate-800">{formatCurrency(selectedOutstanding.total || selectedInv.grandTotal || selectedInv.total || 0)}</span>
                                                 </div>
                                                 <div className="flex justify-between text-slate-500">
                                                     <span>Taxable Amount / GST:</span>
@@ -775,11 +1073,17 @@ export const PaymentInPage = () => {
                                                     </span>
                                                 </div>
                                                 <div className="flex justify-between">
-                                                    <span className="text-slate-500">Paid Against Invoice:</span>
+                                                    <span className="text-slate-500">Allocated Payments:</span>
                                                     <span className="font-mono text-emerald-700 font-semibold">{formatCurrency(selectedOutstanding.paidAgainstInvoice)}</span>
                                                 </div>
+                                                {selectedOutstanding.appliedCredit > 0 && (
+                                                    <div className="flex justify-between text-indigo-700">
+                                                        <span>Applied Credit (Returns / Credit Notes):</span>
+                                                        <span className="font-mono font-semibold">-{formatCurrency(selectedOutstanding.appliedCredit)}</span>
+                                                    </div>
+                                                )}
                                                 <div className="flex justify-between text-amber-700 font-semibold border-t border-slate-200 pt-1.5">
-                                                    <span>Remaining Invoice Outstanding:</span>
+                                                    <span>Remaining Invoice Due:</span>
                                                     <span className="font-mono font-bold">{formatCurrency(selectedOutstanding.balanceDue)}</span>
                                                 </div>
 
@@ -788,28 +1092,28 @@ export const PaymentInPage = () => {
                                                     <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider mb-1.5">Allocation Impact</span>
                                                     <div className="grid grid-cols-4 gap-1.5 p-2 bg-white rounded border border-slate-200 text-center">
                                                         <div>
-                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">Previous Outstanding</span>
+                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">Previous Due</span>
                                                             <span className="font-mono font-bold text-slate-700">{formatCurrency(selectedOutstanding.balanceDue)}</span>
                                                         </div>
                                                         <div>
-                                                            <span className="block text-[9px] text-blue-500 font-medium uppercase">Current Allocation</span>
+                                                            <span className="block text-[9px] text-blue-500 font-medium uppercase">Current Payment</span>
                                                             <span className="font-mono font-bold text-blue-600">{formatCurrency(currentAlloc)}</span>
                                                         </div>
                                                         <div>
-                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">New Outstanding</span>
+                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">Remaining Due</span>
                                                             <span className={`font-mono font-bold ${newOutstanding <= 0.001 ? 'text-emerald-600' : 'text-amber-600'}`}>
                                                                 {formatCurrency(newOutstanding)}
                                                             </span>
                                                         </div>
                                                         <div>
-                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">Payment Status After Allocation</span>
+                                                            <span className="block text-[9px] text-slate-400 font-medium uppercase">Status After Payment</span>
                                                             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold ${
                                                                 nextStatus === 'Paid'
                                                                     ? 'bg-emerald-100 text-emerald-800'
                                                                     : nextStatus === 'Partially Paid'
                                                                         ? 'bg-amber-100 text-amber-800'
                                                                         : 'bg-slate-100 text-slate-700'
-                                                            }`}>
+                                                                }`}>
                                                                 {nextStatus}
                                                             </span>
                                                         </div>
@@ -835,7 +1139,7 @@ export const PaymentInPage = () => {
                                         <label className="block font-semibold text-slate-700 mb-1">Customer Account *</label>
                                         <select
                                             value={selectedCustomerId}
-                                            onChange={(e) => setSelectedCustomerId(e.target.value)}
+                                            onChange={(e) => handleCustomerChange(e.target.value)}
                                             className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
                                         >
                                             {customers.map((c) => (
@@ -843,6 +1147,27 @@ export const PaymentInPage = () => {
                                                     {c.name} {c.balance ? `(Bal: ${formatCurrency(c.balance)})` : ''}
                                                 </option>
                                             ))}
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block font-semibold text-slate-700 mb-1">
+                                            Linked Sales Invoice (Optional)
+                                        </label>
+                                        <select
+                                            value={selectedInvoiceId}
+                                            onChange={(e) => handleInvoiceChange(e.target.value)}
+                                            className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium"
+                                        >
+                                            <option value="">-- No Linked Invoice (General Cash Counter Receipt) --</option>
+                                            {eligibleCustomerInvoices.map((inv) => {
+                                                const outstanding = getInvoiceOutstanding(inv.id);
+                                                return (
+                                                    <option key={inv.id} value={inv.id}>
+                                                        {inv.invoiceNumber} — Due: {formatCurrency(outstanding.balanceDue)} (Total: {formatCurrency(outstanding.total)}, Paid: {formatCurrency(outstanding.paidAgainstInvoice)}{outstanding.appliedCredit > 0 ? `, Credit: ${formatCurrency(outstanding.appliedCredit)}` : ''})
+                                                    </option>
+                                                );
+                                            })}
                                         </select>
                                     </div>
 
@@ -940,6 +1265,7 @@ export const PaymentInPage = () => {
                                     disabled={
                                         isSubmitting ||
                                         Number(amount) <= 0 ||
+                                        (paymentType === 'WITH_BILL' && (!selectedInvoiceId || eligibleCustomerInvoices.length === 0 || selectedOutstanding.balanceDue <= 0.01)) ||
                                         (paymentType === 'WITH_BILL' && Number(amount) > selectedOutstanding.balanceDue + 0.01 && selectedOutstanding.balanceDue > 0)
                                     }
                                     className={`px-4 py-1.5 text-white rounded-lg font-bold shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -1220,6 +1546,154 @@ export const PaymentInPage = () => {
                     </div>
                 </div>
             )}
+
+            {/* ALLOCATE UNALLOCATED CASH RECEIPT TO INVOICE MODAL */}
+            {allocateModalReceipt && (() => {
+                const targetInv = invoices.find((i) => i.id === allocateInvoiceId);
+                const invOutstanding = targetInv ? getInvoiceOutstanding(targetInv.id) : null;
+                const receiptAmt = Number(allocateModalReceipt.amount) || 0;
+                const numAlloc = Math.max(0, Math.min(Number(allocateAmount) || 0, receiptAmt));
+                const prevDue = invOutstanding?.balanceDue || 0;
+                const newDue = Math.max(0, prevDue - numAlloc);
+                const unallocatedRemaining = Math.max(0, receiptAmt - numAlloc);
+
+                return (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-2 sm:p-4">
+                        <div className="bg-white rounded-xl border border-slate-200 shadow-2xl max-w-lg w-full p-5 text-xs max-h-[90vh] overflow-y-auto">
+                            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+                                <div className="flex items-center gap-2">
+                                    <Link2 className="w-5 h-5 text-emerald-600" />
+                                    <h3 className="font-bold text-base text-slate-900">
+                                        Allocate Cash Advance to Invoice
+                                    </h3>
+                                </div>
+                                <button onClick={() => setAllocateModalReceipt(null)} className="text-slate-400 hover:text-slate-600">
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleConfirmAllocation} className="space-y-4 mt-4">
+                                <div className="bg-amber-50 p-3 rounded-lg border border-amber-200 text-amber-900 space-y-1">
+                                    <div className="flex justify-between font-medium">
+                                        <span>Cash Receipt:</span>
+                                        <span className="font-mono font-bold">{allocateModalReceipt.receiptNumber}</span>
+                                    </div>
+                                    <div className="flex justify-between font-medium">
+                                        <span>Customer / Party:</span>
+                                        <span className="font-bold">{allocateModalReceipt.customer || allocateModalReceipt.partyName}</span>
+                                    </div>
+                                    <div className="flex justify-between font-medium text-emerald-800">
+                                        <span>Available Advance:</span>
+                                        <span className="font-mono font-bold">{formatCurrency(receiptAmt)}</span>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">
+                                        Target Sales Invoice * {eligibleAllocateInvoices.length > 0 && `(${eligibleAllocateInvoices.length} open)`}
+                                    </label>
+                                    <select
+                                        value={allocateInvoiceId}
+                                        onChange={(e) => handleAllocateInvoiceChange(e.target.value)}
+                                        className="w-full border border-slate-300 rounded-lg p-2 bg-white text-slate-800 font-medium disabled:bg-slate-100 disabled:text-slate-400"
+                                        disabled={eligibleAllocateInvoices.length === 0}
+                                        required
+                                    >
+                                        {eligibleAllocateInvoices.length === 0 ? (
+                                            <option value="" disabled>
+                                                No open invoices with outstanding payable balance for this customer
+                                            </option>
+                                        ) : (
+                                            eligibleAllocateInvoices.map((inv) => {
+                                                const out = getInvoiceOutstanding(inv.id);
+                                                return (
+                                                    <option key={inv.id} value={inv.id}>
+                                                        {inv.invoiceNumber} — Due: {formatCurrency(out.balanceDue)} (Total: {formatCurrency(out.total)})
+                                                    </option>
+                                                );
+                                            })
+                                        )}
+                                    </select>
+                                    {eligibleAllocateInvoices.length === 0 && (
+                                        <p className="text-[11px] text-amber-600 font-medium mt-1">
+                                            This customer has no open invoices with payable balance. You can allocate when new invoices are created.
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div>
+                                    <label className="block font-semibold text-slate-700 mb-1">
+                                        Allocation Amount (₹) *
+                                    </label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        required
+                                        min="0.01"
+                                        max={Math.min(receiptAmt, prevDue || receiptAmt)}
+                                        placeholder="0.00"
+                                        value={allocateAmount ?? ''}
+                                        onFocus={handleNumberInputFocus}
+                                        onChange={(e) => {
+                                            const raw = e.target.value;
+                                            const cleaned = sanitizeNumberInput(raw);
+                                            if (cleaned !== raw) e.target.value = cleaned;
+                                            setAllocateAmount(cleaned);
+                                        }}
+                                        className="w-full border border-slate-300 rounded-lg p-2 bg-white font-mono font-bold text-sm text-slate-900"
+                                    />
+                                </div>
+
+                                {targetInv && (
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 space-y-2">
+                                        <span className="block text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                                            Allocation Impact
+                                        </span>
+                                        <div className="grid grid-cols-3 gap-2 p-2 bg-white rounded border border-slate-200 text-center">
+                                            <div>
+                                                <span className="block text-[9px] text-slate-400 font-medium uppercase">Invoice Due Before</span>
+                                                <span className="font-mono font-bold text-slate-700">{formatCurrency(prevDue)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-[9px] text-emerald-600 font-medium uppercase">Allocated Cash</span>
+                                                <span className="font-mono font-bold text-emerald-600">{formatCurrency(numAlloc)}</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-[9px] text-slate-400 font-medium uppercase">Invoice Due After</span>
+                                                <span className={`font-mono font-bold ${newDue <= 0.01 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                                    {formatCurrency(newDue)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {unallocatedRemaining > 0.01 && (
+                                            <p className="text-[11px] text-slate-500 mt-1">
+                                                Remaining unallocated cash advance: <strong>{formatCurrency(unallocatedRemaining)}</strong> will stay on customer account.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                                    <button
+                                        type="button"
+                                        onClick={() => setAllocateModalReceipt(null)}
+                                        className="px-4 py-2 border border-border bg-card hover:bg-card-hover text-text rounded-xl font-semibold text-xs cursor-pointer transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isAllocating || eligibleAllocateInvoices.length === 0 || !Number(allocateAmount)}
+                                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-xs shadow-2xs transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
+                                    >
+                                        {isAllocating ? 'Allocating...' : 'Confirm Allocation'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {/* Official Printable Receipt Modal (Handles both With-Bill and Without-Bill CPR) */}
             <PaymentReceiptModal

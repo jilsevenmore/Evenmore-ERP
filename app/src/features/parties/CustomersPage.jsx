@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Plus, Users, IndianRupee, ShieldAlert, X, Eye } from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Customer360Drawer } from '../../components/common/Customer360Drawer';
+import RecordPartyFundsModal from '../../components/common/RecordPartyFundsModal';
 const customerGuide = {
     title: 'Customer Accounts & Statements',
     subtitle: 'Corporate client database, credit risk management, and statement of accounts.',
@@ -26,6 +27,7 @@ export const CustomersPage = () => {
     const { customers, addCustomer, getCustomerLedger, formatCurrency } = useERP();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedCust360, setSelectedCust360] = useState(null);
+    const [fundsCustomer, setFundsCustomer] = useState(null);
     const [newCust, setNewCust] = useState({
         name: '',
         code: '',
@@ -111,18 +113,28 @@ export const CustomersPage = () => {
             ),
         },
         {
-            header: '360° Profile',
+            header: 'Actions',
             align: 'center',
-            width: '8%',
+            width: '18%',
             render: (c) => (
-              <button
-                onClick={() => setSelectedCust360(c)}
-                className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-card-hover text-text-secondary hover:text-primary rounded-lg transition-colors inline-flex items-center gap-1 text-xs cursor-pointer font-medium whitespace-nowrap"
-                title="Open Customer 360 Statement & Ledger"
-              >
-                <Eye className="w-3.5 h-3.5"/>
-                <span>Statement</span>
-              </button>
+              <div className="flex items-center justify-center gap-1.5 whitespace-nowrap">
+                <button
+                  onClick={() => setFundsCustomer(c)}
+                  className="px-2 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors inline-flex items-center gap-1 text-xs cursor-pointer font-medium shadow-2xs"
+                  title="Record Formal or Cash Payment / Advance"
+                >
+                  <IndianRupee className="w-3.5 h-3.5"/>
+                  <span>Record Funds</span>
+                </button>
+                <button
+                  onClick={() => setSelectedCust360(c)}
+                  className="px-2 py-1 bg-slate-100 dark:bg-slate-800 hover:bg-card-hover text-text-secondary hover:text-primary rounded-lg transition-colors inline-flex items-center gap-1 text-xs cursor-pointer font-medium border border-border shadow-2xs"
+                  title="Open Customer 360 Statement & Ledger"
+                >
+                  <Eye className="w-3.5 h-3.5"/>
+                  <span>Statement</span>
+                </button>
+              </div>
             ),
         },
     ];
@@ -226,5 +238,12 @@ export const CustomersPage = () => {
 
       {/* Customer 360 Statement Drawer */}
       <Customer360Drawer customer={selectedCust360} onClose={() => setSelectedCust360(null)}/>
+
+      {/* Record Party Funds Modal */}
+      <RecordPartyFundsModal
+        isOpen={!!fundsCustomer}
+        onClose={() => setFundsCustomer(null)}
+        party={fundsCustomer}
+      />
     </div>);
 };

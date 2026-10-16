@@ -420,6 +420,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             return;
         }
 
+        const partyCredit = isOneTime ? 0 : Number(party?.availableCredit || cust?.availableCredit || 0);
+        const appliedCredit = Math.min(formalInvoice, partyCredit);
+        const remainingDue = isPaid ? 0 : Math.max(0, formalInvoice - appliedCredit);
+
         const nextNumber = `INV-2026-${String(invoices.length + 101).padStart(3, '0')}`;
         const newInvoicePayload = {
             invoiceNumber: nextNumber,
@@ -441,7 +445,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             linkedPi: pi?.proformaNumber || (linkedPiId !== 'None' ? linkedPiId : undefined),
             date: formatDateDDMMYYYY(invoiceDate),
             dueDate: formatDateDDMMYYYY(dueDate),
-            status: isDraft ? 'Draft' : isPaid ? 'Paid' : 'Unpaid',
+            status: isDraft ? 'Draft' : (isPaid || remainingDue <= 0.01) ? 'Paid' : (appliedCredit > 0) ? 'Partially Paid' : 'Unpaid',
             finalized: !isDraft,
             items: effectiveItems,
             lineItems: effectiveItems,
@@ -457,7 +461,10 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
             amount: formalInvoice,
             paidAmount: isPaid ? formalInvoice : 0,
             amountPaid: isPaid ? formalInvoice : 0,
-            balanceDue: isPaid ? 0 : formalInvoice,
+            appliedCredit,
+            creditApplied: appliedCredit,
+            balanceDue: remainingDue,
+            remainingDue: remainingDue,
             totalSalesValue: totalSales,
             formalInvoiceAmount: formalInvoice,
             cashAmount: cashAmt,
@@ -1259,6 +1266,41 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                         </span>
                                     </div>
                                 </div>
+
+                                {(() => {
+                                    const custObj = customers.find(c => c.id === selectedCustomerId || c.name === selectedCustomerId);
+                                    const partyObj = parties.find(p => p.id === selectedCustomerId || p.name === selectedCustomerId);
+                                    const availCredit = Number(partyObj?.availableCredit || custObj?.availableCredit || 0);
+                                    if (availCredit <= 0) return null;
+                                    const creditToApply = Math.min(formalInvoiceAmountInput, availCredit);
+                                    const remDue = Math.max(0, formalInvoiceAmountInput - creditToApply);
+                                    const remCredit = Math.max(0, availCredit - creditToApply);
+                                    return (
+                                        <div className="mt-3 p-3 bg-blue-50/80 border border-blue-200 rounded-xl space-y-1.5">
+                                            <div className="flex items-center justify-between text-xs font-semibold text-blue-900">
+                                                <span className="flex items-center gap-1.5">
+                                                    <CheckCircle2 size={14} className="text-blue-600" />
+                                                    Eligible Party Credit Available:
+                                                </span>
+                                                <span className="font-mono font-bold text-blue-800">{formatCurrency(availCredit)}</span>
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-2 text-[10px] text-blue-800 pt-1.5 border-t border-blue-200/60">
+                                                <div>
+                                                    <span className="text-slate-500 block">Credit to Apply:</span>
+                                                    <span className="font-mono font-bold text-emerald-700 text-xs">{formatCurrency(creditToApply)}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-500 block">Invoice Due After Credit:</span>
+                                                    <span className="font-mono font-bold text-rose-700 text-xs">{formatCurrency(remDue)}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-500 block">Remaining Party Credit:</span>
+                                                    <span className="font-mono font-bold text-blue-700 text-xs">{formatCurrency(remCredit)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             {errorMessage && (
@@ -1454,7 +1496,7 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                             </div>
 
                                             {/* Row 2: Bill Payment & Receivables Status */}
-                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                                                 <div className="bg-white p-2.5 rounded-lg border border-slate-200">
                                                     <span className="text-[10px] text-slate-500 uppercase font-semibold block truncate">Taxable Value</span>
                                                     <strong className="font-mono text-slate-700 text-xs block">{formatCurrency(invOut.taxableAmount)}</strong>
@@ -1467,6 +1509,11 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                     <span className="text-[10px] text-emerald-700 uppercase font-semibold block truncate">Paid Against Invoice</span>
                                                     <strong className="font-mono text-emerald-700 text-xs block">{formatCurrency(invOut.paidAgainstInvoice)}</strong>
                                                     <span className="text-[9px] text-emerald-600 block">(With-Bill Settled)</span>
+                                                </div>
+                                                <div className="bg-blue-50/70 p-2.5 rounded-lg border border-blue-200">
+                                                    <span className="text-[10px] text-blue-700 uppercase font-semibold block truncate">Credit Applied</span>
+                                                    <strong className="font-mono text-blue-800 text-xs block">{formatCurrency(invOut.appliedCredit || 0)}</strong>
+                                                    <span className="text-[9px] text-blue-600 block">(Party Credit)</span>
                                                 </div>
                                                 <div className={`p-2.5 rounded-lg border ${invOut.outstanding > 0.01 ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
                                                     <span className={`text-[10px] uppercase font-bold block truncate ${invOut.outstanding > 0.01 ? 'text-rose-700' : 'text-emerald-700'}`}>Invoice Outstanding</span>
@@ -1483,6 +1530,51 @@ export const SalesInvoicesView = ({ invoices = [], onCreateInvoice, searchTerm: 
                                                 * Note: Without-Bill Cash is tracked under Cash Receipts and credits customer AR balance in ledger, but does not satisfy formal Tax Invoice liability.
                                             </p>
                                         </div>
+
+                                        {/* APPLIED CREDIT ALLOCATIONS CARD */}
+                                        {selectedInvoice.creditAllocations && selectedInvoice.creditAllocations.length > 0 && (
+                                            <div className="bg-blue-50/50 border border-blue-200 rounded-xl p-4 space-y-3">
+                                                <div className="flex items-center justify-between border-b border-blue-200/60 pb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <CheckCircle2 className="w-4 h-4 text-blue-600" />
+                                                        <h4 className="font-bold text-slate-800 uppercase tracking-wider text-xs">
+                                                            Applied Party Credit Allocations ({selectedInvoice.creditAllocations.length})
+                                                        </h4>
+                                                    </div>
+                                                    <span className="text-[10px] text-blue-700 font-semibold font-mono">
+                                                        Total: {formatCurrency(selectedInvoice.creditAllocations.reduce((sum, c) => sum + Number(c.allocatedAmount || 0), 0))}
+                                                    </span>
+                                                </div>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-left text-xs">
+                                                        <thead>
+                                                            <tr className="border-b border-blue-200/60 text-[10px] uppercase text-slate-500 font-semibold">
+                                                                <th className="py-1.5 px-2">Type</th>
+                                                                <th className="py-1.5 px-2">Reference</th>
+                                                                <th className="py-1.5 px-2">Original Credit</th>
+                                                                <th className="py-1.5 px-2">Allocated Amount</th>
+                                                                <th className="py-1.5 px-2">Allocated At</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-blue-100">
+                                                            {selectedInvoice.creditAllocations.map((alloc) => (
+                                                                <tr key={alloc.id} className="hover:bg-white/80">
+                                                                    <td className="py-2 px-2 font-medium text-slate-800">
+                                                                        {alloc.sourceType === 'PAYMENT_IN' ? 'Advance Payment' : alloc.sourceType === 'SALES_RETURN' ? 'Credit Note' : 'Party Credit'}
+                                                                    </td>
+                                                                    <td className="py-2 px-2 font-mono text-blue-800 font-semibold">{alloc.sourceReference || '—'}</td>
+                                                                    <td className="py-2 px-2 font-mono text-slate-600">{formatCurrency(alloc.originalCredit)}</td>
+                                                                    <td className="py-2 px-2 font-mono font-bold text-emerald-700">{formatCurrency(alloc.allocatedAmount)}</td>
+                                                                    <td className="py-2 px-2 text-slate-500">
+                                                                        {alloc.allocatedAt ? new Date(alloc.allocatedAt).toLocaleDateString() : '—'}
+                                                                    </td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
 
                                         {/* REVISION HISTORY CARD */}
                                         {selectedInvoice.revisions && selectedInvoice.revisions.length > 0 && (

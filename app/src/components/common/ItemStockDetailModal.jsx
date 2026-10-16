@@ -3,7 +3,6 @@ import { X, ArrowDownLeft, ArrowUpRight, AlertTriangle, Layers, Sliders, ShieldC
 import { useERP } from '../../context/ERPContext';
 import { formatDisplayDate, formatWarrantyPeriod, getWarrantyStatusStyle } from '../../utils/warrantyUtils';
 import { WarrantyCardModal } from './WarrantyCardModal';
-import { resolveFileUrl } from '../../services/api';
 // Display unit without double-pluralizing ("Pcs" -> "Pcs", "Unit" -> "Units").
 const pluralizeUom = (uom) => {
     if (!uom) return '';
@@ -112,26 +111,25 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] flex flex-col overflow-hidden border border-slate-200" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="px-4 sm:px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-4 bg-slate-50">
-          <div className="flex items-center gap-3.5 min-w-0 flex-1">
-            <div className="w-12 h-12 rounded-xl bg-white border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-              {item && (item.imageUrl || item.image) ? (
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-14 h-14 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+              {(item.imageUrl || item.image) ? (
                 <img
-                  src={resolveFileUrl(item.imageUrl || item.image)}
+                  src={item.imageUrl || item.image}
                   alt={item.name}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-cover"
                   onError={(e) => {
                     e.currentTarget.style.display = 'none';
-                    const fallback = e.currentTarget.parentElement?.querySelector('.detail-fallback-icon');
-                    if (fallback) fallback.classList.remove('hidden');
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden');
                   }}
                 />
               ) : null}
-              <Package
-                className={`w-6 h-6 text-slate-400 detail-fallback-icon ${item && (item.imageUrl || item.image) ? 'hidden' : ''}`}
-              />
+              <div className={`w-full h-full flex items-center justify-center text-slate-400 ${(item.imageUrl || item.image) ? 'hidden' : ''}`}>
+                <Package className="w-7 h-7 text-slate-400" />
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap lg:flex-nowrap items-center gap-2.5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap lg:flex-nowrap items-center gap-3">
                 <h3 className="text-lg font-bold text-slate-900 truncate">{item.name}</h3>
                 <span className="font-mono text-xs font-semibold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
                   {item.sku}
@@ -151,7 +149,7 @@ export const ItemStockDetailModal = ({ item, isOpen, onClose, }) => {
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer" aria-label="Close stock detail">
+          <button onClick={onClose} className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 transition-colors cursor-pointer shrink-0" aria-label="Close stock detail">
             <X className="w-5 h-5"/>
           </button>
         </div>

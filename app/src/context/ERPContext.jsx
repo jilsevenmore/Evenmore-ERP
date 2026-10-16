@@ -838,15 +838,31 @@ export const ERPProvider = ({ children, }) => {
         if (!inv)
             return { total: 0, taxableAmount: 0, gst: 0, paid: 0, paidAgainstInvoice: 0, withoutBillCash: 0, totalReceived: 0, balanceDue: 0, outstanding: 0, status: 'Unpaid' };
         
-        // Sum all valid with-bill payments received for this invoice (exclude cancelled/voided and without-bill cash)
+        // Calculate valid with-bill payments received for this invoice (exclude cancelled/voided and without-bill cash)
         const relatedWithBillPayments = paymentIns.filter((p) => 
             p.status !== 'Cancelled' && 
             p.status !== 'Voided' && 
             p.paymentType !== 'WITHOUT_BILL' &&
-            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()))
+            (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase()) ||
+             (Array.isArray(p.allocations) && p.allocations.some(a => (a.invoiceId === inv.id || a.documentId === inv.id))))
         );
-        const paidAgainstInvoice = relatedWithBillPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0) + 
-            (inv.paidAmount && relatedWithBillPayments.length === 0 ? Number(inv.paidAmount) : 0);
+
+        let paidAgainstInvoice = Number(inv.amount_paid || inv.paidAmount || 0);
+        if (relatedWithBillPayments.length > 0) {
+            const summedFromPayments = relatedWithBillPayments.reduce((acc, p) => {
+                if (Array.isArray(p.allocations) && p.allocations.length > 0) {
+                    const matchedAlloc = p.allocations.find(a => a.invoiceId === inv.id || a.documentId === inv.id);
+                    if (matchedAlloc) {
+                        return acc + (Number(matchedAlloc.amount) || 0);
+                    }
+                }
+                if (p.invoiceId === inv.id || (p.invoiceNumber && inv.invoiceNumber && String(p.invoiceNumber ?? '').toLowerCase() === String(inv.invoiceNumber ?? '').toLowerCase())) {
+                    return acc + (Number(p.amount) || 0);
+                }
+                return acc;
+            }, 0);
+            paidAgainstInvoice = Math.max(paidAgainstInvoice, summedFromPayments);
+        }
 
         // Without-Bill cash received for this invoice
         const relatedCashReceipts = cashPaymentReceipts.filter((r) => 
@@ -868,9 +884,9 @@ export const ERPProvider = ({ children, }) => {
         const taxableAmount = Number(inv.taxableValue || inv.taxable_value || inv.subtotal || 0);
         const gst = Number(inv.totalTax || inv.total_tax || ((inv.cgst || 0) + (inv.sgst || 0) + (inv.igst || 0)) || Math.max(0, total - taxableAmount));
         
-        // Important: Invoice Outstanding = Invoice Total - Valid With-Bill Payments
-        // Without-Bill Cash does NOT reduce invoice outstanding!
-        const balanceDue = Math.max(0, total - paidAgainstInvoice);
+        // Important: Remaining Due = Invoice Gross Amount - Credit Applied - Payments Allocated
+        const appliedCredit = Number(inv.appliedCredit || inv.creditApplied || (inv.creditAllocations ? inv.creditAllocations.reduce((s, c) => s + Number(c.allocatedAmount || 0), 0) : 0));
+        const balanceDue = Math.max(0, Math.round((total - paidAgainstInvoice - appliedCredit) * 100) / 100);
         const outstanding = balanceDue;
         const totalReceived = paidAgainstInvoice + withoutBillCash;
 
@@ -878,7 +894,7 @@ export const ERPProvider = ({ children, }) => {
         if (balanceDue <= 0.01) {
             status = 'Paid';
         }
-        else if (paidAgainstInvoice > 0) {
+        else if (paidAgainstInvoice > 0 || appliedCredit > 0) {
             status = 'Partially Paid';
         }
         else {
@@ -897,9 +913,12 @@ export const ERPProvider = ({ children, }) => {
             gst, 
             paid: paidAgainstInvoice, 
             paidAgainstInvoice, 
+            appliedCredit,
+            creditApplied: appliedCredit,
             withoutBillCash, 
             totalReceived, 
             balanceDue, 
+            remainingDue: balanceDue,
             outstanding, 
             status,
             totalSalesValue: totalSales,
@@ -1229,8 +1248,14 @@ export const ERPProvider = ({ children, }) => {
 
         const isDraft = newInvoice.status === 'Draft' || newInvoice.isDraft === true || newInvoice.finalized === false;
         const isPaid = newInvoice.status === 'Paid';
-        const finalStatus = isDraft ? 'Draft' : isPaid ? 'Paid' : (newInvoice.status || 'Unpaid');
         const isFinalized = !isDraft;
+
+        // Connect party/customer eligible available credit
+        const partyCredit = Number(newInvoice.appliedCredit ?? (isFinalized ? (party?.availableCredit || cust?.availableCredit || 0) : 0));
+        const directPaid = isPaid ? total : Number(newInvoice.paidAmount || newInvoice.amountPaid || 0);
+        const appliedCredit = Math.min(Math.max(0, total - directPaid), partyCredit);
+        const balanceDue = isPaid ? 0 : Math.max(0, Math.round((total - directPaid - appliedCredit) * 100) / 100);
+        const finalStatus = isDraft ? 'Draft' : (isPaid || balanceDue <= 0.01) ? 'Paid' : (appliedCredit > 0 || directPaid > 0) ? 'Partially Paid' : (newInvoice.status || 'Unpaid');
 
         const invoice = {
             id: newInvoice.id || `inv-${Date.now()}`,
@@ -1265,9 +1290,12 @@ export const ERPProvider = ({ children, }) => {
             total,
             grandTotal: total,
             amount: total,
-            paidAmount: isPaid ? total : (newInvoice.paidAmount || 0),
-            amountPaid: isPaid ? total : (newInvoice.paidAmount || 0),
-            balanceDue: isPaid ? 0 : Math.max(0, total - (newInvoice.paidAmount || 0)),
+            paidAmount: directPaid,
+            amountPaid: directPaid,
+            appliedCredit,
+            creditApplied: appliedCredit,
+            balanceDue,
+            remainingDue: balanceDue,
             totalSalesValue: newInvoice.totalSalesValue !== undefined ? Number(newInvoice.totalSalesValue) : (newInvoice.formalInvoiceAmount !== undefined ? (Number(newInvoice.formalInvoiceAmount) + (Number(newInvoice.cashAmount) || 0)) : total),
             formalInvoiceAmount: newInvoice.formalInvoiceAmount !== undefined ? Number(newInvoice.formalInvoiceAmount) : total,
             cashAmount: Number(newInvoice.cashAmount) || 0,
@@ -1312,11 +1340,28 @@ export const ERPProvider = ({ children, }) => {
                 });
             }
 
-            // Update customer outstanding balance
-            if (invoice.customer) {
-                setCustomers((prev) => prev.map((c) => String(c.name ?? '').toLowerCase() === String(invoice.customer ?? '').toLowerCase() || (invoice.customerId && c.id === invoice.customerId)
-                    ? { ...c, balance: c.balance + invoice.total }
-                    : c));
+            // Update customer outstanding balance and available credit
+            if (invoice.customer || invoice.customerId) {
+                setCustomers((prev) => prev.map((c) => {
+                    const isTarget = String(c.name ?? '').toLowerCase() === String(invoice.customer ?? '').toLowerCase() || (invoice.customerId && c.id === invoice.customerId);
+                    if (!isTarget) return c;
+                    const currentCredit = Number(c.availableCredit || 0);
+                    return {
+                        ...c,
+                        balance: c.balance + invoice.total,
+                        availableCredit: Math.max(0, Math.round((currentCredit - appliedCredit) * 100) / 100),
+                    };
+                }));
+                setParties((prev) => prev.map((p) => {
+                    const isTarget = String(p.name ?? '').toLowerCase() === String(invoice.customer ?? '').toLowerCase() || (invoice.customerId && p.id === invoice.customerId);
+                    if (!isTarget) return p;
+                    const currentCredit = Number(p.availableCredit || 0);
+                    return {
+                        ...p,
+                        balance: p.balance + invoice.total,
+                        availableCredit: Math.max(0, Math.round((currentCredit - appliedCredit) * 100) / 100),
+                    };
+                }));
             }
 
             // Auto-create Journal Entry for Revenue & AR
@@ -3241,7 +3286,6 @@ export const ERPProvider = ({ children, }) => {
             transporter: '',
             vehicleNo: '',
             status: 'In Transit',
-            formalInvoiceAmount: order.formalInvoiceAmount !== undefined ? Number(order.formalInvoiceAmount) : Number(order.amount || 0),
             items: dispatchLines,
             lineItems: dispatchLines,
         };
@@ -3426,7 +3470,6 @@ export const ERPProvider = ({ children, }) => {
             netWeight: challan.grossWeight !== undefined && challan.tareWeight !== undefined
                 ? Number(challan.grossWeight) - Number(challan.tareWeight) : challan.netWeight,
             status: challan.status || 'In Transit',
-            formalInvoiceAmount: challan.formalInvoiceAmount !== undefined ? Number(challan.formalInvoiceAmount) : undefined,
             items: challanItems,
             lineItems: challanItems,
         };
@@ -3694,13 +3737,15 @@ export const ERPProvider = ({ children, }) => {
                     showToast('Cannot record payment against a draft invoice. Please finalize the invoice first.');
                     return null;
                 }
-                if (targetInv.status === 'Paid' || (targetInv.balanceDue !== undefined && targetInv.balanceDue <= 0.01)) {
+                const outBal = targetInv.balanceDue !== undefined 
+                    ? Number(targetInv.balanceDue) 
+                    : Math.max(0, Number(targetInv.total ?? targetInv.amount ?? 0) - Number(targetInv.paidAmount ?? targetInv.amountPaid ?? 0) - Number(targetInv.appliedCredit ?? targetInv.creditApplied ?? 0));
+                if (outBal <= 0.01) {
                     showToast('Invoice is already fully settled.');
                     return null;
                 }
-                const remainingBal = targetInv.balanceDue !== undefined ? targetInv.balanceDue : Math.max(0, targetInv.total - (targetInv.paidAmount || 0));
-                if (payAmt > remainingBal + 0.01) {
-                    showToast(`Payment amount (${formatCurrency(payAmt)}) exceeds remaining invoice balance (${formatCurrency(remainingBal)}).`);
+                if (payAmt > outBal + 0.01) {
+                    showToast(`Payment amount (${formatCurrency(payAmt)}) exceeds remaining invoice balance (${formatCurrency(outBal)}).`);
                     return null;
                 }
             }
@@ -3753,6 +3798,30 @@ export const ERPProvider = ({ children, }) => {
 
             setCashPaymentReceipts((prev) => [newCashReceipt, ...prev]);
             setPaymentIns((prev) => [newPay, ...prev]);
+
+            // If linked to an invoice, update invoice appliedCredit and balanceDue in local state
+            if (targetInv) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetInv.id || inv.invoiceNumber === targetInv.invoiceNumber) {
+                        const currentCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const updatedCredit = currentCredit + payAmt;
+                        const paid = Number(inv.paidAmount ?? inv.amountPaid ?? 0);
+                        const total = Number(inv.total ?? inv.amount ?? inv.grandTotal ?? 0);
+                        const remainingDue = Math.max(0, Math.round((total - paid - updatedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (paid > 0 || updatedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
+                        return {
+                            ...inv,
+                            appliedCredit: updatedCredit,
+                            creditApplied: updatedCredit,
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
 
             // Adjust customer balance
             if (custName) {
@@ -3820,13 +3889,16 @@ export const ERPProvider = ({ children, }) => {
                     const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
                     const updatedPaid = currentPaid + payAmt;
                     const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
-                    const isFull = updatedPaid >= (totalInvoice - 0.01);
-                    const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
+                    const appliedCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                    const remainingDue = Math.max(0, Math.round((totalInvoice - updatedPaid - appliedCredit) * 100) / 100);
+                    const isFull = remainingDue <= 0.01;
+                    const derivedStatus = isFull ? 'Paid' : (updatedPaid > 0 || appliedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
                     return {
                         ...inv,
                         paidAmount: updatedPaid,
                         amountPaid: updatedPaid,
-                        balanceDue: Math.max(0, totalInvoice - updatedPaid),
+                        balanceDue: remainingDue,
+                        remainingDue: remainingDue,
                         status: derivedStatus,
                     };
                 }
@@ -3898,13 +3970,16 @@ export const ERPProvider = ({ children, }) => {
                         const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
                         const updatedPaid = Math.max(0, currentPaid - payAmt);
                         const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
-                        const isFull = updatedPaid >= (totalInvoice - 0.01);
-                        const derivedStatus = updatedPaid <= 0 ? (inv.status === 'Draft' ? 'Draft' : 'Unpaid') : isFull ? 'Paid' : 'Partially Paid';
+                        const appliedCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const remainingDue = Math.max(0, Math.round((totalInvoice - updatedPaid - appliedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (updatedPaid > 0 || appliedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
                         return {
                             ...inv,
                             paidAmount: updatedPaid,
                             amountPaid: updatedPaid,
-                            balanceDue: Math.max(0, totalInvoice - updatedPaid),
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
                             status: derivedStatus,
                         };
                     }
@@ -3969,6 +4044,29 @@ export const ERPProvider = ({ children, }) => {
                     ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
                     : p
             ));
+            // If linked to an invoice, restore invoice outstanding
+            if (targetReceipt.invoiceId || targetReceipt.invoiceNumber) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetReceipt.invoiceId || inv.invoiceNumber === targetReceipt.invoiceNumber) {
+                        const currentCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const updatedCredit = Math.max(0, currentCredit - amt);
+                        const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
+                        const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
+                        const remainingDue = Math.max(0, Math.round((totalInvoice - currentPaid - updatedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (currentPaid > 0 || updatedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
+                        return {
+                            ...inv,
+                            appliedCredit: updatedCredit,
+                            creditApplied: updatedCredit,
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
             showToast(`Cash Receipt ${targetReceipt.receiptNumber} cancelled.`);
             if (isBackendEnabled() && isServerId(targetReceipt.id)) {
                 pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason })
@@ -4017,6 +4115,29 @@ export const ERPProvider = ({ children, }) => {
                     ? { ...p, status: 'Cancelled', cancellationReason: reason, cancelledAt: new Date().toISOString() }
                     : p
             ));
+            // If linked to an invoice, restore invoice outstanding
+            if (targetReceipt.invoiceId || targetReceipt.invoiceNumber) {
+                setInvoices((prev) => prev.map((inv) => {
+                    if (inv.id === targetReceipt.invoiceId || inv.invoiceNumber === targetReceipt.invoiceNumber) {
+                        const currentCredit = Number(inv.appliedCredit ?? inv.creditApplied ?? 0);
+                        const updatedCredit = Math.max(0, currentCredit - amt);
+                        const currentPaid = Number(inv.amountPaid ?? inv.paidAmount ?? 0);
+                        const totalInvoice = Number(inv.total ?? inv.amount ?? 0);
+                        const remainingDue = Math.max(0, Math.round((totalInvoice - currentPaid - updatedCredit) * 100) / 100);
+                        const isFull = remainingDue <= 0.01;
+                        const derivedStatus = isFull ? 'Paid' : (currentPaid > 0 || updatedCredit > 0) ? 'Partially Paid' : (inv.status === 'Draft' ? 'Draft' : 'Unpaid');
+                        return {
+                            ...inv,
+                            appliedCredit: updatedCredit,
+                            creditApplied: updatedCredit,
+                            balanceDue: remainingDue,
+                            remainingDue: remainingDue,
+                            status: derivedStatus,
+                        };
+                    }
+                    return inv;
+                }));
+            }
             showToast(`Cash Receipt ${targetReceipt.receiptNumber} voided.`);
             if (isBackendEnabled() && isServerId(targetReceipt.id)) {
                 pushAction('cashPaymentReceipts', targetReceipt.id, 'cancel', { reason, void: true })
@@ -4048,6 +4169,107 @@ export const ERPProvider = ({ children, }) => {
             persistUpdate('cashPaymentReceipts', updated.id, updated, setCashPaymentReceipts);
         }
         return updated;
+    };
+
+    const allocateCashReceiptToInvoice = async (receiptId, invoiceId, amount = null) => {
+        const receipt = cashPaymentReceipts.find((r) => r.id === receiptId || r.receiptNumber === receiptId);
+        if (!receipt) {
+            showToast('Cash receipt not found.');
+            return null;
+        }
+        if (receipt.status === 'CANCELLED' || receipt.status === 'VOIDED') {
+            showToast('Cannot allocate a cancelled or voided receipt.');
+            return null;
+        }
+        if (receipt.invoiceId) {
+            showToast('Cash receipt is already allocated to an invoice.');
+            return null;
+        }
+
+        const inv = invoices.find((i) => i.id === invoiceId || i.invoiceNumber === invoiceId);
+        if (!inv) {
+            showToast('Target invoice not found.');
+            return null;
+        }
+        if (inv.status === 'Cancelled' || inv.status === 'Draft' || inv.finalized === false) {
+            showToast('Cannot allocate to draft or cancelled invoice.');
+            return null;
+        }
+
+        // Validate party match
+        const receiptCust = receipt.customer || receipt.partyName || '';
+        const invCust = inv.customer || inv.partyName || '';
+        if (receipt.customerId && inv.customerId && receipt.customerId !== inv.customerId) {
+            showToast('Cannot allocate cash receipt to another customer’s invoice.');
+            return null;
+        }
+
+        const out = getInvoiceOutstanding(inv.id);
+        if (out.balanceDue <= 0.01) {
+            showToast('Target invoice has zero remaining balance due.');
+            return null;
+        }
+
+        const allocAmt = amount ? Math.min(Number(amount), receipt.amount, out.balanceDue) : Math.min(receipt.amount, out.balanceDue);
+        if (allocAmt <= 0) {
+            showToast('Invalid allocation amount.');
+            return null;
+        }
+
+        // Update local cash receipt
+        setCashPaymentReceipts((prev) => prev.map((r) =>
+            r.id === receipt.id || r.receiptNumber === receipt.receiptNumber
+                ? { ...r, invoiceId: inv.id, invoiceNumber: inv.invoiceNumber }
+                : r
+        ));
+
+        // Update local paymentIn
+        setPaymentIns((prev) => prev.map((p) =>
+            p.receiptNumber === receipt.receiptNumber || p.id === receipt.paymentId
+                ? { ...p, invoiceId: inv.id, invoiceNumber: inv.invoiceNumber }
+                : p
+        ));
+
+        // Update local invoice
+        setInvoices((prev) => prev.map((item) => {
+            if (item.id === inv.id || item.invoiceNumber === inv.invoiceNumber) {
+                const currentCredit = Number(item.appliedCredit ?? item.creditApplied ?? 0);
+                const updatedCredit = currentCredit + allocAmt;
+                const currentPaid = Number(item.amountPaid ?? item.paidAmount ?? 0);
+                const totalInvoice = Number(item.total ?? item.amount ?? 0);
+                const remainingDue = Math.max(0, Math.round((totalInvoice - currentPaid - updatedCredit) * 100) / 100);
+                const isFull = remainingDue <= 0.01;
+                const derivedStatus = isFull ? 'Paid' : (currentPaid > 0 || updatedCredit > 0) ? 'Partially Paid' : (item.status === 'Draft' ? 'Draft' : 'Unpaid');
+                return {
+                    ...item,
+                    appliedCredit: updatedCredit,
+                    creditApplied: updatedCredit,
+                    balanceDue: remainingDue,
+                    remainingDue: remainingDue,
+                    status: derivedStatus,
+                };
+            }
+            return item;
+        }));
+
+        showToast(`Allocated ${formatCurrency(allocAmt)} to invoice ${inv.invoiceNumber}.`);
+
+        if (isBackendEnabled() && isServerId(receipt.id)) {
+            try {
+                const serverRecord = await pushAction('cashPaymentReceipts', receipt.id, 'allocate-invoice', {
+                    invoice_id: inv.id,
+                    amount: allocAmt,
+                });
+                if (serverRecord) {
+                    reconcile(setCashPaymentReceipts, receipt.id, serverRecord);
+                }
+                refreshFromBackend();
+            } catch (err) {
+                console.warn('[ERP] allocate cash receipt failed on server:', err);
+                showToast(`Allocation saved locally only — ${describeError(err)}`);
+            }
+        }
+        return true;
     };
     const addSalesReturn = (ret) => {
         const inv = invoices.find((i) => i.id === ret.invoiceId || i.invoiceNumber === ret.invoiceRef);
@@ -5946,6 +6168,7 @@ export const ERPProvider = ({ children, }) => {
             cancelCashPaymentReceipt,
             voidCashPaymentReceipt,
             updateCashPaymentReceipt,
+            allocateCashReceiptToInvoice,
             addSalesReturn,
             cancelSalesReturn,
             addPurchaseOrder,

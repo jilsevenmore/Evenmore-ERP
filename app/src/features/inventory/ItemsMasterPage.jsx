@@ -10,7 +10,6 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { BarcodeLabelModal } from '../../components/common/BarcodeLabelModal';
 import { ImportModal } from '../../components/common/ImportModal';
 import { ItemStockDetailModal } from '../../components/common/ItemStockDetailModal';
-import { resolveFileUrl } from '../../services/api';
 
 export const ItemsMasterPage = () => {
     const { items, categories = [], itemTypes = [], materialGrades = [], addInventoryItem, vendors, addPurchaseOrder, formatCurrency, calculateItemStock } = useERP();
@@ -185,28 +184,25 @@ export const ItemsMasterPage = () => {
             key: 'name',
             header: 'Description & Taxonomy',
             width: '26%',
-            render: (i) => {
-              const imgUrl = resolveFileUrl(i.imageUrl || i.image);
-              return (
-                <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-lg bg-soft border border-border flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-                    {imgUrl ? (
+            render: (i) => (
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden shrink-0 mt-0.5">
+                    {(i.imageUrl || i.image) ? (
                       <img
-                        src={imgUrl}
+                        src={i.imageUrl || i.image}
                         alt={i.name}
                         className="w-full h-full object-cover"
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
-                          const fallback = e.currentTarget.parentElement?.querySelector('.master-img-fallback');
-                          if (fallback) fallback.classList.remove('hidden');
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
                         }}
                       />
                     ) : null}
-                    <Package
-                      size={16}
-                      className={`text-muted master-img-fallback ${imgUrl ? 'hidden' : ''}`}
-                    />
+                    <div className={`w-full h-full flex items-center justify-center text-slate-400 ${(i.imageUrl || i.image) ? 'hidden' : ''}`}>
+                      <Package size={18} />
+                    </div>
                   </div>
+
                   <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Link to={`/inventory/items/edit/${i.id}`} className="font-bold text-text hover:text-primary hover:underline">
@@ -257,8 +253,7 @@ export const ItemsMasterPage = () => {
                     </div>
                   </div>
                 </div>
-              );
-            },
+            ),
         },
         {
             key: 'itemKind',

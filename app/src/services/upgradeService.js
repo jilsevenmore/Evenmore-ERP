@@ -267,6 +267,26 @@ export async function createEmployeeAward(data) {
   return apiClient('/hrms/awards/', { method: 'POST', data: payload });
 }
 
+export async function confirmEmployeeProbation(employeeId, data = {}) {
+  return apiClient(`/hrms/employees/${employeeId}/confirm-probation/`, { method: 'POST', data });
+}
+
+export async function extendEmployeeProbation(employeeId, data = {}) {
+  return apiClient(`/hrms/employees/${employeeId}/extend-probation/`, { method: 'POST', data });
+}
+
+export async function evaluateEmployeeLifecycle() {
+  return apiClient('/hrms/employees/evaluate-lifecycle/', { method: 'POST' });
+}
+
+export async function waiveResignationNotice(resignationId, data = {}) {
+  return apiClient(`/hrms/resignations/${resignationId}/waive-notice/`, { method: 'POST', data });
+}
+
+export async function shortenResignationNotice(resignationId, data = {}) {
+  return apiClient(`/hrms/resignations/${resignationId}/shorten-notice/`, { method: 'POST', data });
+}
+
 export async function fetchTravelRequests(employeeId) {
   const query = employeeId ? { employeeId } : {};
   return apiClient('/hrms/travel-requests/', { query });

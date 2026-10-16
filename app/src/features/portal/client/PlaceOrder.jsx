@@ -8,15 +8,15 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlertTriangle, CheckCircle2, Loader2, MessageSquarePlus, PackagePlus,
-  Plus, RefreshCw, ShoppingCart, Trash2, Package, X, ChevronDown, Search, Check,
+  AlertTriangle, CheckCircle2, Loader2, MessageSquarePlus, Package, PackagePlus,
+  Plus, RefreshCw, ShoppingCart, Trash2,
 } from 'lucide-react';
+import { Drawer } from '../../../components/ui/Drawer';
 import { Button } from '../../../components/ui/Button';
 import { useAppStore } from '../../../stores/appStore';
 import { formatCurrency, getBaseCurrency } from '../../../utils/currencyUtils';
 import { getCurrentISODate, toDisplayDate } from '../../../utils/dateUtils';
 import { handleNumberInputFocus } from '../../../utils/stringUtils';
-import { resolveFileUrl } from '../../../services/api';
 import {
   fetchOrderableItems,
   newIdempotencyKey,
@@ -115,267 +115,6 @@ function FieldError({ id, children }) {
     <p id={id} className="mt-1 text-[11px] font-medium text-rose-600">
       {children}
     </p>
-  );
-}
-
-function ProductDropdownSelector({
-  value,
-  onChange,
-  items = [],
-  disabled = false,
-  error = null,
-  id,
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const containerRef = useRef(null);
-
-  const selectedItem = useMemo(() => {
-    return items.find((i) => String(i.id) === String(value));
-  }, [items, value]);
-
-  // Close when clicking outside or pressing Escape
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e) => {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation();
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen]);
-
-  const filteredItems = useMemo(() => {
-    if (!search.trim()) return items;
-    const q = search.toLowerCase().trim();
-    return items.filter(
-      (item) =>
-        item.name?.toLowerCase().includes(q) ||
-        item.itemCode?.toLowerCase().includes(q) ||
-        item.category?.toLowerCase().includes(q) ||
-        item.metalGrade?.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q)
-    );
-  }, [items, search]);
-
-  const handleSelect = (itemId) => {
-    onChange(itemId);
-    setIsOpen(false);
-    setSearch('');
-  };
-
-  const selectedImg = selectedItem ? resolveFileUrl(selectedItem.imageUrl || selectedItem.image) : null;
-
-  return (
-    <div ref={containerRef} className="relative w-full">
-      {/* Dropdown trigger button */}
-      <button
-        id={id}
-        type="button"
-        disabled={disabled}
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        aria-invalid={Boolean(error)}
-        className={`w-full rounded-xl border p-2 text-left transition-all flex items-center justify-between gap-2.5 bg-white cursor-pointer ${
-          error
-            ? 'border-rose-300 ring-2 ring-rose-100'
-            : isOpen
-            ? 'border-blue-500 ring-2 ring-blue-100 shadow-sm'
-            : 'border-slate-200 hover:border-slate-300'
-        } ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
-      >
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <div className="w-10 h-10 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-            {selectedImg ? (
-              <img
-                src={selectedImg}
-                alt={selectedItem.name}
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.parentElement?.querySelector('.trigger-fallback');
-                  if (fallback) fallback.classList.remove('hidden');
-                }}
-              />
-            ) : null}
-            <Package
-              size={18}
-              className={`text-slate-400 trigger-fallback ${selectedImg ? 'hidden' : ''}`}
-            />
-          </div>
-
-          <div className="min-w-0 flex-1 text-xs">
-            {selectedItem ? (
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-bold text-slate-800 truncate">{selectedItem.name}</span>
-                  {selectedItem.itemCode && (
-                    <span className="font-mono text-[10px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.2 rounded">
-                      {selectedItem.itemCode}
-                    </span>
-                  )}
-                  {selectedItem.metalGrade && (
-                    <span className="text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded">
-                      {selectedItem.metalGrade}
-                    </span>
-                  )}
-                </div>
-                <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
-                  <span>
-                    Rate: <strong className="text-slate-700">{money(selectedItem.lastOrderedRate)}</strong>/{selectedItem.uom}
-                  </span>
-                  <span>· GST {Number(selectedItem.taxRate)}%</span>
-                  {selectedItem.availableStock != null && (
-                    <span className={selectedItem.availableStock > 0 ? 'text-emerald-700 font-medium' : 'text-slate-400'}>
-                      · {selectedItem.availableStock > 0 ? `${qtyText(selectedItem.availableStock)} ${selectedItem.uom} in stock` : 'Out of stock'}
-                    </span>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <span className="text-slate-400 font-medium">Select an item from your order history…</span>
-            )}
-          </div>
-        </div>
-
-        <ChevronDown
-          size={16}
-          className={`text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180 text-blue-600' : ''}`}
-        />
-      </button>
-
-      {/* Dropdown Menu Popup with Product Details */}
-      {isOpen && (
-        <div
-          role="listbox"
-          className="absolute z-50 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-80 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150"
-        >
-          {/* Quick search input */}
-          {items.length > 2 && (
-            <div className="p-2 border-b border-slate-100 bg-slate-50/80 sticky top-0 z-10">
-              <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search item by name, SKU, or grade..."
-                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                  autoFocus
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Options list */}
-          <div className="overflow-y-auto divide-y divide-slate-100 p-1">
-            {filteredItems.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400">
-                No matching products found.
-              </div>
-            ) : (
-              filteredItems.map((opt) => {
-                const isSelected = String(opt.id) === String(value);
-                const optImg = resolveFileUrl(opt.imageUrl || opt.image);
-                return (
-                  <div
-                    key={opt.id}
-                    role="option"
-                    aria-selected={isSelected}
-                    onClick={() => handleSelect(String(opt.id))}
-                    className={`p-2.5 rounded-xl cursor-pointer transition-colors flex items-center justify-between gap-3 text-xs ${
-                      isSelected ? 'bg-blue-50/80 border border-blue-200' : 'hover:bg-slate-50'
-                    }`}
-                  >
-                    {/* Thumbnail & Info */}
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="w-12 h-12 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
-                        {optImg ? (
-                          <img
-                            src={optImg}
-                            alt={opt.name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.style.display = 'none';
-                              const fallback = e.currentTarget.parentElement?.querySelector('.opt-fallback');
-                              if (fallback) fallback.classList.remove('hidden');
-                            }}
-                          />
-                        ) : null}
-                        <Package
-                          size={20}
-                          className={`text-slate-400 opt-fallback ${optImg ? 'hidden' : ''}`}
-                        />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className={`font-semibold ${isSelected ? 'text-blue-900 font-bold' : 'text-slate-800'}`}>
-                            {opt.name}
-                          </span>
-                          {opt.itemCode && (
-                            <span className="font-mono text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded border border-slate-200 font-medium">
-                              {opt.itemCode}
-                            </span>
-                          )}
-                          {opt.category && (
-                            <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 py-0.2 rounded">
-                              {opt.category}
-                            </span>
-                          )}
-                          {opt.metalGrade && (
-                            <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded font-medium">
-                              {opt.metalGrade}
-                            </span>
-                          )}
-                        </div>
-
-                        {opt.description && (
-                          <p className="text-[11px] text-slate-400 truncate mt-0.5 max-w-sm">
-                            {opt.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Price & Stock */}
-                    <div className="text-right shrink-0 whitespace-nowrap pl-2 flex items-center gap-2">
-                      <div>
-                        <div className="font-bold text-slate-900">
-                          {money(opt.lastOrderedRate)}
-                          <span className="font-normal text-[10px] text-slate-400">/{opt.uom}</span>
-                        </div>
-                        <div className="text-[10px] text-slate-500 mt-0.5 flex items-center justify-end gap-1.5">
-                          <span>GST {Number(opt.taxRate)}%</span>
-                          {opt.availableStock != null && (
-                            <span className={opt.availableStock > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-400'}>
-                              · {opt.availableStock > 0 ? `${qtyText(opt.availableStock)} in stock` : 'Out of stock'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {isSelected && <Check size={16} className="text-blue-600 shrink-0 ml-1" />}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -704,27 +443,50 @@ function PlaceOrderDrawer({ isOpen, onClose, onPlaced }) {
                 key={line.key}
                 className={`rounded-xl border bg-white p-3 sm:p-4 ${Object.keys(lineErr).length ? 'border-rose-300' : 'border-slate-200'}`}
               >
-                <div className="flex items-start gap-2.5">
-                  <span className="mt-2.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
+                <div className="flex items-start gap-3">
+                  <span className="mt-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
                     {index + 1}
                   </span>
-
-                  <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
+                  <div className="mt-1 w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center overflow-hidden shrink-0">
+                    {(item?.imageUrl || item?.image) ? (
+                      <img
+                        src={item.imageUrl || item.image}
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                        }}
+                      />
+                    ) : null}
+                    <div className={`w-full h-full flex items-center justify-center text-slate-400 ${(item?.imageUrl || item?.image) ? 'hidden' : ''}`}>
+                      <Package size={18} />
+                    </div>
+                  </div>
+                  <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_150px]">
                     <div className="min-w-0">
-                      <label htmlFor={ids.item} className="mb-1 block text-[11px] font-semibold text-slate-600">
-                        Item
-                      </label>
-                      <ProductDropdownSelector
+                      <label htmlFor={ids.item} className="mb-1 block text-[11px] font-semibold text-slate-600">Item</label>
+                      <select
                         id={ids.item}
                         value={line.itemId}
-                        onChange={(itemId) => updateLine(line.key, { itemId })}
-                        items={items.filter((opt) => String(opt.id) === line.itemId || !chosenIds.has(String(opt.id)))}
+                        onChange={(e) => updateLine(line.key, { itemId: e.target.value })}
                         disabled={submitting}
-                        error={lineErr.itemId}
-                      />
+                        aria-invalid={Boolean(lineErr.itemId)}
+                        aria-describedby={lineErr.itemId ? `${ids.item}-err` : undefined}
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                      >
+                        <option value="">Select an item…</option>
+                        {line.itemId && !item && <option value={line.itemId}>Item no longer available</option>}
+                        {items
+                          .filter((opt) => String(opt.id) === line.itemId || !chosenIds.has(String(opt.id)))
+                          .map((opt) => (
+                            <option key={opt.id} value={String(opt.id)}>
+                              {opt.name}{opt.itemCode ? ` (${opt.itemCode})` : ''}
+                            </option>
+                          ))}
+                      </select>
                       <FieldError id={`${ids.item}-err`}>{lineErr.itemId}</FieldError>
                     </div>
-
                     <div>
                       <label htmlFor={ids.qty} className="mb-1 block text-[11px] font-semibold text-slate-600">
                         Quantity{item?.uom ? ` (${item.uom})` : ''}
@@ -742,51 +504,38 @@ function PlaceOrderDrawer({ isOpen, onClose, onPlaced }) {
                         placeholder="0"
                         aria-invalid={Boolean(lineErr.quantity)}
                         aria-describedby={lineErr.quantity ? `${ids.qty}-err` : undefined}
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
+                        className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-800 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100"
                       />
                       <FieldError id={`${ids.qty}-err`}>{lineErr.quantity}</FieldError>
                     </div>
                   </div>
-
                   <button
                     type="button"
                     onClick={() => removeLine(line.key)}
                     disabled={submitting}
-                    className="mt-6 rounded-lg p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40 cursor-pointer"
+                    className="mt-6 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
                     aria-label={`Remove item ${index + 1}`}
-                    title="Remove item"
+                    title="Remove"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                   </button>
                 </div>
 
                 {item && (
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-slate-100 pt-2.5 pl-8 text-[11px] text-slate-500">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span>
-                        Last rate: <strong className="text-slate-800 font-bold">{money(item.lastOrderedRate)}</strong>/{item.uom}
-                      </span>
-                      {Number(item.lastDiscountPct) > 0 && (
-                        <span className="text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 font-medium">
-                          Disc {Number(item.lastDiscountPct)}%
-                        </span>
-                      )}
-                      <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-medium">
-                        GST {Number(item.taxRate)}%
-                      </span>
-                      {item.availableStock != null && (
-                        <span className={item.availableStock > 0 ? 'text-emerald-700 font-semibold' : 'text-slate-400'}>
-                          · {item.availableStock > 0 ? `In stock: ${qtyText(Math.max(0, item.availableStock))} ${item.uom}` : 'Out of stock'}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      Est. line total: <strong className="text-slate-900 font-bold text-xs ml-1">{estimate ? money(estimate.total) : '—'}</strong>
-                    </div>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-slate-100 pt-2.5 pl-2 sm:pl-14 text-[11px] text-slate-500">
+                    <span>
+                      Last rate <strong className="text-slate-700">{money(item.lastOrderedRate)}</strong>/{item.uom}
+                      {Number(item.lastDiscountPct) > 0 && <> · Disc {Number(item.lastDiscountPct)}%</>}
+                      {' '}· GST {Number(item.taxRate)}%
+                      {item.availableStock != null && <> · In stock {qtyText(Math.max(0, item.availableStock))} {item.uom}</>}
+                    </span>
+                    <span>
+                      Est. line total <strong className="text-slate-800">{estimate ? money(estimate.total) : '—'}</strong>
+                    </span>
                   </div>
                 )}
 
-                <div className="mt-2 pl-8 text-[11px]">
+                <div className="mt-2 pl-2 sm:pl-14 text-[11px]">
                   {line.noteOpen || line.notes ? (
                     <div>
                       <label htmlFor={ids.note} className="mb-1 block text-[11px] font-semibold text-slate-600">Note for this item (optional)</label>
@@ -891,62 +640,17 @@ function PlaceOrderDrawer({ isOpen, onClose, onPlaced }) {
     );
   }
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (e) => {
-      if (e.key === 'Escape') requestClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [isOpen, requestClose]);
-
-  if (!isOpen) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
-      onClick={requestClose}
-      role="dialog"
-      aria-modal="true"
+    <Drawer
+      isOpen={isOpen}
+      onClose={requestClose}
+      title={placed ? 'Order confirmation' : 'Reorder items'}
+      subtitle={placed ? `Order ${placed.orderNumber}` : 'Order again from your purchase history'}
+      width="lg"
+      footer={footer}
     >
-      <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden border border-slate-200 animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
-          <div>
-            <h2 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-              <ShoppingCart size={18} className="text-blue-600" />
-              {placed ? 'Order Confirmation' : 'Reorder Items'}
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {placed ? `Order ${placed.orderNumber}` : 'Order again from your purchase history'}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={requestClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/80 transition-colors cursor-pointer"
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        {/* Scrollable Content Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
-          {content}
-        </div>
-
-        {/* Footer */}
-        {footer && (
-          <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3 shrink-0">
-            {footer}
-          </div>
-        )}
-      </div>
-    </div>
+      {content}
+    </Drawer>
   );
 }
 
