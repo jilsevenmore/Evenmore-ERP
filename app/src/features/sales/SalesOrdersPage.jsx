@@ -629,15 +629,21 @@ export const SalesOrdersPage = () => {
                 Confirm Order
               </button>)}
             {o.stage === 'Confirmed' && (<>
-                {!pmsProjects.some((p) => p.crmOrderId === o.orderNumber) && (
-                  <button
-                    onClick={() => setPmsModalOrder(o.orderNumber)}
-                    className="px-2 py-1 bg-violet-600 text-white rounded-md text-xs font-semibold hover:bg-violet-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap"
-                    title="Convert this Confirmed Sales Order into a PMS Production Project"
-                  >
-                    <Layers size={12}/> PMS Project
-                  </button>
-                )}
+                <button
+                  onClick={() => setPmsModalOrder(o.orderNumber)}
+                  className={`px-2 py-1 rounded-md text-xs font-semibold cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap ${
+                    pmsProjects.some((p) => p.crmOrderId === o.orderNumber)
+                      ? 'bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100'
+                      : 'bg-violet-600 text-white hover:bg-violet-700'
+                  }`}
+                  title={
+                    pmsProjects.some((p) => p.crmOrderId === o.orderNumber)
+                      ? "View or configure planned duration for linked PMS Project"
+                      : "Convert this Confirmed Sales Order into a PMS Production Project"
+                  }
+                >
+                  <Layers size={12}/> PMS Project
+                </button>
                 <button onClick={() => advanceStage(o.id, 'Confirmed')} className="px-2.5 py-1 bg-indigo-600 text-white rounded-md text-xs font-semibold hover:bg-indigo-700 cursor-pointer inline-flex items-center gap-1 shadow-xs transition-colors whitespace-nowrap">
                   <Truck size={12}/> Issue Challan
                 </button>

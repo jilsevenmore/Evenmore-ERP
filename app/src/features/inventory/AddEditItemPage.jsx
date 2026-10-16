@@ -5,10 +5,10 @@ import { Button } from '../../components/ui/Button';
 import {
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Save,
   ArrowLeft,
   UploadCloud,
-  Sliders,
   Package,
   Layers,
   MapPin,
@@ -17,25 +17,42 @@ import {
   Scale,
   Plus,
   X,
-  Boxes,
   Trash2,
-  Search,
   Cpu,
-  Info,
-  AlertTriangle,
-  QrCode,
   Sparkles,
   Image as ImageIcon,
   FileText,
   Wand2,
-  RefreshCw,
-  Eye,
   Check,
   ShieldCheck,
+  TrendingUp,
+  AlertCircle,
+  Hash,
 } from 'lucide-react';
 import { sanitizeNumberInput, handleNumberInputFocus } from '../../utils/stringUtils';
 import { uploadFileToBackend } from '../../services/fileUploadService';
 import { resolveFileUrl } from '../../services/api';
+
+// SEWEN Letter Pad / Official Product Categories (from actual catalog & website)
+const SEWEN_STANDARD_CATEGORIES = [
+  'Side Table',
+  'Desk',
+  'End Table',
+  'Metal Legs',
+  'Sofa Legs',
+  'Dining Table',
+  'Coffee Table',
+  'Work Station',
+  'Conference Table',
+  'Chair',
+  'Modern Metal Wall Art',
+  'Laser Cut Design Wall',
+  'CNC Job Work',
+  'MS Laser Cutting Service',
+  'Fabricated MS Products',
+  'Mild Steel (Pipes & Sheets)',
+  'Hardware & Consumables',
+];
 
 export const AddEditItemPage = () => {
   const { id } = useParams();
@@ -43,7 +60,7 @@ export const AddEditItemPage = () => {
   const routerLocation = useLocation();
   const fileInputRef = useRef(null);
 
-  // Parse query param kind (e.g. /items/new?kind=Machine)
+  // Parse query param kind (e.g. /items/new?kind=Part)
   const searchParams = new URLSearchParams(routerLocation.search);
   const queryKind = searchParams.get('kind');
 
@@ -58,20 +75,34 @@ export const AddEditItemPage = () => {
     addUnit,
     addInventoryItem,
     updateInventoryItem,
-    updateCategory
   } = useERP();
 
   const isEditMode = Boolean(id);
   const existingItem = items.find((i) => i.id === id || i.sku === id);
 
+  // Merge database categories with SEWEN standard categories from letter pad
+  const allCategories = useMemo(() => {
+    const list = [...categories];
+    const existingNames = new Set(categories.map((c) => (c.name || '').toLowerCase().trim()));
+    SEWEN_STANDARD_CATEGORIES.forEach((name) => {
+      if (!existingNames.has(name.toLowerCase().trim())) {
+        list.push({ id: `sewen-${name.toLowerCase().replace(/[^a-z0-9]/g, '-')}`, name });
+      }
+    });
+    return list;
+  }, [categories]);
+
   // Form state
   const [sku, setSku] = useState('');
   const [status, setStatus] = useState('Optimal');
   const [itemLifecycle, setItemLifecycle] = useState('Active');
-  const [itemKind, setItemKind] = useState(queryKind === 'Machine' ? 'Machine' : (queryKind === 'Part' ? 'Part' : 'Standalone'));
+  // SEWEN classification: 'Standalone' (Finished Furniture), 'Part' (Metal Legs/Hardware), 'Service' (Laser/CNC Job Work), 'Raw Material', 'Consumable'
+  const [itemKind, setItemKind] = useState(
+    queryKind === 'Part' ? 'Part' : (queryKind === 'Service' ? 'Service' : 'Standalone')
+  );
   const [name, setName] = useState('');
   const [itemTypeId, setItemTypeId] = useState('');
-  const [category, setCategory] = useState(categories[0]?.name || '');
+  const [category, setCategory] = useState(allCategories[0]?.name || 'Side Table');
   const [vendor, setVendor] = useState(vendors[0]?.name || '');
 
   // Dynamic Units & Conversions
@@ -80,14 +111,12 @@ export const AddEditItemPage = () => {
   const [unitConversionFactor, setUnitConversionFactor] = useState(1);
   const [uom, setUom] = useState('Pcs');
 
-  // ── [PHASE-2A] Weight-based item (steel bought/sold by weight) ──
-  // isWeightItem → item is weighed at intake (kg) instead of counted.
-  // theoreticalWeight = expected kg per unit; tolerancePct = allowed ±% variance.
+  // Weight-based item (steel bought/sold by weight)
   const [isWeightItem, setIsWeightItem] = useState(false);
   const [theoreticalWeight, setTheoreticalWeight] = useState('');
   const [tolerancePct, setTolerancePct] = useState('2');
 
-  // Metal Sheet, Tube, Rod, Angle, Beam & Channel Specification state (Phase 3)
+  // Metal Sheet, Tube, Rod, Angle, Beam & Channel Specification state
   const [gradeId, setGradeId] = useState('');
   const [metalGrade, setMetalGrade] = useState('MS');
   const [sheetThickness, setSheetThickness] = useState('');
@@ -95,7 +124,7 @@ export const AddEditItemPage = () => {
   const [sheetLength, setSheetLength] = useState('');
   const [sheetWidth, setSheetWidth] = useState('');
   const [hasTubeSpec, setHasTubeSpec] = useState(false);
-  const [tubeProfile, setTubeProfile] = useState('Round');
+  const [tubeProfile, setTubeProfile] = useState('Square'); // SEWEN uses square/rectangular pipes frequently
   const [outerDiameter, setOuterDiameter] = useState('');
   const [outerWidth, setOuterWidth] = useState('');
   const [outerHeight, setOuterHeight] = useState('');
@@ -103,7 +132,7 @@ export const AddEditItemPage = () => {
   const [tubeLength, setTubeLength] = useState('');
   const [diameter, setDiameter] = useState('');
   const [innerDiameter, setInnerDiameter] = useState('');
-  const [finishCoating, setFinishCoating] = useState('');
+  const [finishCoating, setFinishCoating] = useState('Matte Black Powder Coated');
   const [legA, setLegA] = useState('');
   const [legB, setLegB] = useState('');
   const [webThickness, setWebThickness] = useState('');
@@ -111,38 +140,31 @@ export const AddEditItemPage = () => {
   const [weightPerMeter, setWeightPerMeter] = useState('');
   const [weightPerPiece, setWeightPerPiece] = useState('');
   const [metalCalcError, setMetalCalcError] = useState('');
+  const [userToggledMetalSpecs, setUserToggledMetalSpecs] = useState(null);
 
-  // Tracking Mode & Serial / Batch numbers
-  const [trackingMode, setTrackingMode] = useState('Quantity'); // 'Quantity' | 'Serial' | 'Batch'
+  // Tracking Mode (Clean Quantity or Batch tracking)
+  const [trackingMode, setTrackingMode] = useState('Quantity'); // 'Quantity' | 'Batch'
   const [batchNumber, setBatchNumber] = useState('');
   const [lotNumber, setLotNumber] = useState('');
   const [manufactureDate, setManufactureDate] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
-  const [taxRate, setTaxRate] = useState('18');
-  // ── [PHASE-2E.1] GST compliance: HSN (goods) / SAC (services) per item ──
-  const [hsnCode, setHsnCode] = useState('');
-  const [sacCode, setSacCode] = useState('');
-  const [serialNumbersText, setSerialNumbersText] = useState('');
-  const [serialViewMode, setSerialViewMode] = useState('chips'); // 'chips' | 'raw'
-  const [singleSerialInput, setSingleSerialInput] = useState('');
-  const [serialSearchFilter, setSerialSearchFilter] = useState('');
-  const [duplicateSerialNotice, setDuplicateSerialNotice] = useState('');
 
-  // Warranty Policy & Default Configuration
+  // Commercials & GST
+  const [costPrice, setCostPrice] = useState('');
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [taxRate, setTaxRate] = useState('18');
+  const [hsnCode, setHsnCode] = useState('9403'); // Default 9403 = Metal Furniture
+  const [sacCode, setSacCode] = useState('9988'); // Default 9988 = Fabrication & Laser Services
+  const [availableQty, setAvailableQty] = useState('');
+  const [reorderLevel, setReorderLevel] = useState('');
+  const [location, setLocation] = useState(locations[0]?.name || '');
+  const [description, setDescription] = useState('');
+
+  // Simple Clean Warranty
   const [warrantyApplicable, setWarrantyApplicable] = useState(false);
   const [warrantyPeriod, setWarrantyPeriod] = useState(1);
   const [warrantyUnit, setWarrantyUnit] = useState('Years');
-  const [warrantyStartEvent, setWarrantyStartEvent] = useState('Delivery');
-  const [manufacturerWarrantyPeriod, setManufacturerWarrantyPeriod] = useState('');
-  const [manufacturerWarrantyUnit, setManufacturerWarrantyUnit] = useState('Years');
-
-  // Serial Batch Generator Modal
-  const [showBatchModal, setShowBatchModal] = useState(false);
-  const [batchPrefix, setBatchPrefix] = useState('');
-  const [batchStartNum, setBatchStartNum] = useState(1);
-  const [batchCount, setBatchCount] = useState(5);
-  const [batchPadding, setBatchPadding] = useState(3);
-  const [batchSuffix, setBatchSuffix] = useState('');
+  const [warrantyNotes, setWarrantyNotes] = useState('Structural integrity & powder coat warranty');
 
   // Product Image Upload
   const [imagePreview, setImagePreview] = useState('');
@@ -152,41 +174,20 @@ export const AddEditItemPage = () => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
 
-  const [costPrice, setCostPrice] = useState('');
-  const [sellingPrice, setSellingPrice] = useState('');
-  const [availableQty, setAvailableQty] = useState('');
-  const [reorderLevel, setReorderLevel] = useState('');
-  const [location, setLocation] = useState(locations[0]?.name || '');
-  const [description, setDescription] = useState('');
-
-  // Dynamic Custom Field Values
-  const [customFieldValues, setCustomFieldValues] = useState({});
-  const [showCustomParameters, setShowCustomParameters] = useState(false);
-  const [savedAlert, setSavedAlert] = useState(false);
-
   // Inline Unit Creation Modal
   const [showNewUnitModal, setShowNewUnitModal] = useState(false);
   const [newUnitCode, setNewUnitCode] = useState('');
   const [newUnitLabel, setNewUnitLabel] = useState('');
+  const [savedAlert, setSavedAlert] = useState(false);
 
-  // Inline Custom Field Modal
-  const [showNewFieldModal, setShowNewFieldModal] = useState(false);
-  const [newFieldName, setNewFieldName] = useState('');
-  const [newFieldType, setNewFieldType] = useState('text');
-  const [newFieldOptions, setNewFieldOptions] = useState('');
-
-  // Active category object and its schema
-  const activeCategoryObj = categories.find((c) => c.name?.toLowerCase() === category?.toLowerCase() || c.id === category);
-  const categoryCustomFields = activeCategoryObj?.customFields || [];
-
-  // Filter categories by selected Item Type (Req 6)
+  // Filter categories by selected Item Type
   const availableCategories = useMemo(() => {
-    let list = categories.filter((c) => c.isActive !== false || (existingItem && (existingItem.categoryId === c.id || existingItem.category === c.name)));
+    let list = allCategories.filter((c) => c.isActive !== false || (existingItem && (existingItem.categoryId === c.id || existingItem.category === c.name)));
     if (itemTypeId) {
       list = list.filter((c) => c.itemTypeId === itemTypeId || !c.itemTypeId);
     }
     return list;
-  }, [categories, itemTypeId, existingItem]);
+  }, [allCategories, itemTypeId, existingItem]);
 
   const selectedItemType = useMemo(() => {
     return itemTypes.find((it) => it.id === itemTypeId);
@@ -202,14 +203,69 @@ export const AddEditItemPage = () => {
   const isBeamOrChannelType = itemTypeCode === 'BEAM' || itemTypeCode === 'CHANNEL' || shapeProfile === 'BEAM' || shapeProfile === 'CHANNEL';
   const isFlatBarType = itemTypeCode === 'FLAT' || (itemTypeCode === 'BAR' && shapeProfile === 'FLAT_BAR');
 
+  const isMetalShape = Boolean(
+    isSheetType ||
+    isTubeOrPipeType ||
+    isRodType ||
+    isAngleType ||
+    isBeamOrChannelType ||
+    isFlatBarType ||
+    itemKind === 'Raw Material' ||
+    existingItem?.metalGrade ||
+    existingItem?.sheetThickness ||
+    existingItem?.diameter ||
+    existingItem?.legA
+  );
+
+  const showMetalSpecs = userToggledMetalSpecs !== null ? userToggledMetalSpecs : (itemKind === 'Raw Material' || isMetalShape);
+
+  // Helper for generating SEWEN specific SKUs
+  const generateSewenSku = (kind) => {
+    let prefix = 'SEW-FUR';
+    if (kind === 'Part' || kind === 'Component') prefix = 'SEW-LEG';
+    else if (kind === 'Service') prefix = 'SEW-SRV';
+    else if (kind === 'Raw Material') prefix = 'SEW-RAW';
+    else if (kind === 'Consumable') prefix = 'SEW-CON';
+    return `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+  };
+
+  const handleItemKindChange = (newKind) => {
+    setItemKind(newKind);
+    // Auto-update SKU prefix on create mode if standard prefix
+    if (!isEditMode && (!sku || sku.startsWith('SEW-') || sku.startsWith('PRD-') || sku.startsWith('MACH-'))) {
+      setSku(generateSewenSku(newKind));
+    }
+    // Context-sensitive defaults for units & HSN
+    if (newKind === 'Service') {
+      if (salesUnit === 'Box' || salesUnit === 'Pcs') {
+        setSalesUnit('Sq.Ft');
+        setUom('Sq.Ft');
+      }
+      setPurchaseUnit('Job');
+      if (!sacCode) setSacCode('9988');
+    } else if (newKind === 'Raw Material') {
+      if (salesUnit === 'Box') {
+        setSalesUnit('Kg');
+        setUom('Kg');
+      }
+      setPurchaseUnit('Mtr');
+      if (!hsnCode) setHsnCode('7216');
+    } else {
+      if (salesUnit === 'Sq.Ft' || salesUnit === 'Job') {
+        setSalesUnit('Pcs');
+        setUom('Pcs');
+      }
+      setPurchaseUnit('Pcs');
+      if (!hsnCode) setHsnCode('9403');
+    }
+  };
 
   const handleItemTypeChange = (newTypeId) => {
     setItemTypeId(newTypeId);
-    // If current category does not match new type, reset or pick first matching category
     if (newTypeId) {
-      const match = categories.find((c) => (c.itemTypeId === newTypeId) && (c.name?.toLowerCase() === category?.toLowerCase()));
+      const match = allCategories.find((c) => (c.itemTypeId === newTypeId) && (c.name?.toLowerCase() === category?.toLowerCase()));
       if (!match) {
-        const firstMatch = categories.find((c) => c.itemTypeId === newTypeId && c.isActive !== false);
+        const firstMatch = allCategories.find((c) => c.itemTypeId === newTypeId && c.isActive !== false);
         if (firstMatch) {
           setCategory(firstMatch.name);
         }
@@ -219,7 +275,7 @@ export const AddEditItemPage = () => {
 
   const handleCategoryChange = (newCatName) => {
     setCategory(newCatName);
-    const catObj = categories.find((c) => c.name === newCatName || c.id === newCatName);
+    const catObj = allCategories.find((c) => c.name === newCatName || c.id === newCatName);
     if (catObj && catObj.itemTypeId && !itemTypeId) {
       setItemTypeId(catObj.itemTypeId);
     }
@@ -228,23 +284,18 @@ export const AddEditItemPage = () => {
     }
   };
 
-  const handleItemKindChange = (newKind) => {
-    setItemKind(newKind);
-  };
-
   useEffect(() => {
     if (isEditMode && existingItem) {
       setSku(existingItem.sku || existingItem.code || '');
-      setName(existingItem.name);
+      setName(existingItem.name || '');
       setItemKind(existingItem.itemKind || 'Standalone');
       setItemTypeId(existingItem.itemTypeId || '');
-      setCategory(existingItem.category || categories[0]?.name || '');
+      setCategory(existingItem.category || allCategories[0]?.name || 'Side Table');
       setVendor(existingItem.vendor || vendors[0]?.name || '');
       setUom(existingItem.salesUnit || existingItem.uom || 'Pcs');
-      setPurchaseUnit(existingItem.purchaseUnit || 'Box');
+      setPurchaseUnit(existingItem.purchaseUnit || 'Pcs');
       setSalesUnit(existingItem.salesUnit || existingItem.uom || 'Pcs');
       setUnitConversionFactor(existingItem.unitConversionFactor || 1);
-      // [PHASE-2A] load weight-item config on edit
       setIsWeightItem(Boolean(existingItem.isWeightItem));
       setTheoreticalWeight(existingItem.theoreticalWeight !== undefined ? String(existingItem.theoreticalWeight) : '');
       setTolerancePct(existingItem.tolerancePct !== undefined ? String(existingItem.tolerancePct) : '2');
@@ -256,7 +307,7 @@ export const AddEditItemPage = () => {
       setSheetLength(existingItem.sheetLength !== undefined && existingItem.sheetLength !== null ? String(existingItem.sheetLength) : '');
       setSheetWidth(existingItem.sheetWidth !== undefined && existingItem.sheetWidth !== null ? String(existingItem.sheetWidth) : '');
       setHasTubeSpec(Boolean(existingItem.hasTubeSpec));
-      setTubeProfile(existingItem.tubeProfile || 'Round');
+      setTubeProfile(existingItem.tubeProfile || 'Square');
       setOuterDiameter(existingItem.outerDiameter !== undefined && existingItem.outerDiameter !== null ? String(existingItem.outerDiameter) : '');
       setOuterWidth(existingItem.outerWidth !== undefined && existingItem.outerWidth !== null ? String(existingItem.outerWidth) : '');
       setOuterHeight(existingItem.outerHeight !== undefined && existingItem.outerHeight !== null ? String(existingItem.outerHeight) : '');
@@ -264,23 +315,21 @@ export const AddEditItemPage = () => {
       setTubeLength(existingItem.tubeLength !== undefined && existingItem.tubeLength !== null ? String(existingItem.tubeLength) : '');
       setDiameter(existingItem.diameter !== undefined && existingItem.diameter !== null ? String(existingItem.diameter) : '');
       setInnerDiameter(existingItem.innerDiameter !== undefined && existingItem.innerDiameter !== null ? String(existingItem.innerDiameter) : '');
-      setFinishCoating(existingItem.finishCoating || '');
+      setFinishCoating(existingItem.finishCoating || 'Matte Black Powder Coated');
       setLegA(existingItem.legA !== undefined && existingItem.legA !== null ? String(existingItem.legA) : '');
       setLegB(existingItem.legB !== undefined && existingItem.legB !== null ? String(existingItem.legB) : '');
       setWebThickness(existingItem.webThickness !== undefined && existingItem.webThickness !== null ? String(existingItem.webThickness) : '');
       setFlangeThickness(existingItem.flangeThickness !== undefined && existingItem.flangeThickness !== null ? String(existingItem.flangeThickness) : '');
       setWeightPerMeter(existingItem.weightPerMeter !== undefined && existingItem.weightPerMeter !== null ? String(existingItem.weightPerMeter) : '');
       setWeightPerPiece(existingItem.weightPerPiece !== undefined && existingItem.weightPerPiece !== null ? String(existingItem.weightPerPiece) : '');
-      setTrackingMode(existingItem.trackingMode || (existingItem.serialNumbers?.length ? 'Serial' : existingItem.batchNumber ? 'Batch' : 'Quantity'));
+      setTrackingMode(existingItem.trackingMode === 'Batch' ? 'Batch' : 'Quantity');
       setBatchNumber(existingItem.batchNumber || '');
       setLotNumber(existingItem.lotNumber || '');
       setManufactureDate(existingItem.manufactureDate || '');
       setExpiryDate(existingItem.expiryDate || '');
       setTaxRate(existingItem.taxRate !== undefined ? String(existingItem.taxRate) : '18');
-      // [PHASE-2E.1] load HSN/SAC on edit
-      setHsnCode(existingItem.hsnCode || '');
-      setSacCode(existingItem.sacCode || '');
-      setSerialNumbersText((existingItem.serialNumbers || []).join('\n'));
+      setHsnCode(existingItem.hsnCode || '9403');
+      setSacCode(existingItem.sacCode || '9988');
       setImagePreview(resolveFileUrl(existingItem.imageUrl || existingItem.image || ''));
       setImageFileId(existingItem.imageFileId || '');
       setSelectedImageFile(null);
@@ -293,29 +342,15 @@ export const AddEditItemPage = () => {
       setDescription(existingItem.description || '');
       setItemLifecycle(existingItem.lifecycleStatus || 'Active');
       setStatus(existingItem.status || 'Optimal');
-      setCustomFieldValues(existingItem.customFieldValues || {});
       setWarrantyApplicable(Boolean(existingItem.warrantyApplicable));
       setWarrantyPeriod(existingItem.warrantyPeriod !== undefined ? existingItem.warrantyPeriod : 1);
       setWarrantyUnit(existingItem.warrantyUnit || 'Years');
-      setWarrantyStartEvent(existingItem.warrantyStartEvent || 'Delivery');
-      setManufacturerWarrantyPeriod(existingItem.manufacturerWarrantyPeriod !== undefined ? String(existingItem.manufacturerWarrantyPeriod) : '');
-      setManufacturerWarrantyUnit(existingItem.manufacturerWarrantyUnit || 'Years');
-      if (existingItem.customFieldValues && Object.keys(existingItem.customFieldValues).length > 0) {
-        setShowCustomParameters(true);
-      }
-
     }
     else if (!isEditMode) {
-      const prefix = queryKind === 'Machine' ? 'MACH' : queryKind === 'Part' ? 'PART' : 'PRD';
-      const generatedSku = `${prefix}-${Math.floor(1000 + Math.random() * 9000)}`;
+      const generatedSku = generateSewenSku(itemKind);
       setSku(generatedSku);
-      setBatchPrefix(`SN-${generatedSku}-`);
-      if (queryKind) {
-        setItemKind(queryKind);
-      }
-      const defaultCat = (categories.length > 0 && !category) ? categories[0].name : category;
-      if (categories.length > 0 && !category) {
-        setCategory(categories[0].name);
+      if (allCategories.length > 0 && !category) {
+        setCategory(allCategories[0].name);
       }
       if (vendors.length > 0 && !vendor) {
         setVendor(vendors[0].name);
@@ -329,121 +364,7 @@ export const AddEditItemPage = () => {
       setImageUploadError('');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEditMode, existingItem, categories, vendors, locations, queryKind]);
-
-  // Parse and deduplicate serial numbers list
-  const parsedSerialNumbers = useMemo(() => {
-    const list = serialNumbersText
-      .split(/[\n,]+/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return Array.from(new Set(list));
-  }, [serialNumbersText]);
-
-  // If trackingMode is Serial, dynamically synchronize availableQty with unique serial count
-  useEffect(() => {
-    if (trackingMode === 'Serial') {
-      setAvailableQty(String(parsedSerialNumbers.length));
-    }
-  }, [trackingMode, parsedSerialNumbers]);
-
-  // Compute smart prefix suggestion based on SKU and name
-  const smartPrefix = useMemo(() => {
-    if (sku) {
-      return `SN-${sku.toUpperCase()}-`;
-    }
-    return 'SN-MACH-';
-  }, [sku]);
-
-  // Compute next suggested single serial number
-  const nextSuggestedSerial = useMemo(() => {
-    const prefix = smartPrefix;
-    let nextNum = 1;
-    parsedSerialNumbers.forEach((sn) => {
-      const match = sn.match(/\d+$/);
-      if (match) {
-        const num = parseInt(match[0], 10);
-        if (num >= nextNum) {
-          nextNum = num + 1;
-        }
-      }
-    });
-    return `${prefix}${String(nextNum).padStart(3, '0')}`;
-  }, [smartPrefix, parsedSerialNumbers]);
-
-  // Handler to quickly append generated serials
-  const handleAppendSerials = (newSerials) => {
-    const currentList = [...parsedSerialNumbers];
-    newSerials.forEach((sn) => {
-      if (!currentList.includes(sn)) {
-        currentList.push(sn);
-      }
-    });
-    setSerialNumbersText(currentList.join('\n'));
-  };
-
-  // Quick One-Click Suggestion Generators
-  const handleQuickSuggestBatch = (count) => {
-    const prefix = smartPrefix;
-    let startIdx = 1;
-    parsedSerialNumbers.forEach((sn) => {
-      const match = sn.match(/\d+$/);
-      if (match) {
-        const num = parseInt(match[0], 10);
-        if (num >= startIdx) {
-          startIdx = num + 1;
-        }
-      }
-    });
-
-    const generated = [];
-    for (let i = 0; i < count; i++) {
-      generated.push(`${prefix}${String(startIdx + i).padStart(3, '0')}`);
-    }
-    handleAppendSerials(generated);
-  };
-
-  // Single Serial Add Handler
-  const handleAddSingleSerial = (e) => {
-    if (e) e.preventDefault();
-    const val = (singleSerialInput.trim() || nextSuggestedSerial).trim();
-    if (!val) return;
-
-    if (parsedSerialNumbers.includes(val)) {
-      setDuplicateSerialNotice(`Serial number "${val}" is already added.`);
-      setTimeout(() => setDuplicateSerialNotice(''), 3000);
-      return;
-    }
-
-    handleAppendSerials([val]);
-    setSingleSerialInput('');
-    setDuplicateSerialNotice('');
-  };
-
-  // Remove single serial
-  const handleRemoveSerial = (serialToRemove) => {
-    const updated = parsedSerialNumbers.filter((s) => s !== serialToRemove);
-    setSerialNumbersText(updated.join('\n'));
-  };
-
-  // Execute Custom Batch Generator
-  const handleExecuteBatchGenerator = (e) => {
-    e.preventDefault();
-    const p = batchPrefix.trim() || smartPrefix;
-    const start = Math.max(1, Number(batchStartNum) || 1);
-    const count = Math.max(1, Number(batchCount) || 1);
-    const pad = Math.max(1, Math.min(6, Number(batchPadding) || 3));
-    const s = batchSuffix.trim();
-
-    const generated = [];
-    for (let i = 0; i < count; i++) {
-      const numStr = String(start + i).padStart(pad, '0');
-      generated.push(`${p}${numStr}${s}`);
-    }
-
-    handleAppendSerials(generated);
-    setShowBatchModal(false);
-  };
+  }, [isEditMode, existingItem, allCategories, vendors, locations]);
 
   // Image Upload Handlers
   const handleFileSelect = (file) => {
@@ -493,13 +414,6 @@ export const AddEditItemPage = () => {
     }
   };
 
-  const handleCustomFieldChange = (key, value) => {
-    setCustomFieldValues((prev) => ({
-      ...prev,
-      [key]: value,
-    }));
-  };
-
   const handleCreateUnit = (e) => {
     e.preventDefault();
     if (!newUnitCode.trim() || !newUnitLabel.trim()) return;
@@ -511,29 +425,6 @@ export const AddEditItemPage = () => {
     setShowNewUnitModal(false);
     setNewUnitCode('');
     setNewUnitLabel('');
-  };
-
-  const handleCreateCustomFieldInline = (e) => {
-    e.preventDefault();
-    if (!activeCategoryObj || !newFieldName.trim()) return;
-    const currentFields = activeCategoryObj.customFields || [];
-    const optionsList = newFieldType === 'dropdown'
-      ? newFieldOptions.split(',').map((s) => s.trim()).filter(Boolean)
-      : undefined;
-
-    const newField = {
-      id: `cf-${Date.now()}`,
-      name: newFieldName.trim(),
-      type: newFieldType,
-      ...(optionsList ? { options: optionsList } : {}),
-    };
-
-    const updatedFields = [...currentFields, newField];
-    updateCategory(activeCategoryObj.id, { customFields: updatedFields });
-    setShowNewFieldModal(false);
-    setNewFieldName('');
-    setNewFieldType('text');
-    setNewFieldOptions('');
   };
 
   const handleSubmit = async (e) => {
@@ -573,7 +464,7 @@ export const AddEditItemPage = () => {
     const isService = itemKind === 'Service';
     const parsedCost = parseFloat(costPrice) || 0;
     const parsedSelling = parseFloat(sellingPrice) || 0;
-    const parsedQty = isService ? 0 : (trackingMode === 'Serial' ? parsedSerialNumbers.length : (parseInt(availableQty, 10) || 0));
+    const parsedQty = isService ? 0 : (parseInt(availableQty, 10) || 0);
     const parsedReorder = parseInt(reorderLevel, 10) || 0;
     const parsedConv = parseFloat(unitConversionFactor) || 1;
 
@@ -588,14 +479,16 @@ export const AddEditItemPage = () => {
       computedStatus = 'Optimal';
     }
 
+    const matchedCat = allCategories.find((c) => c.name === category);
+
     const payload = {
       sku,
       code: sku,
       name: name || 'Unnamed Item',
       itemKind,
-      itemTypeId: itemTypeId || activeCategoryObj?.itemTypeId || undefined,
+      itemTypeId: itemTypeId || undefined,
       category,
-      categoryId: activeCategoryObj?.id || undefined,
+      categoryId: matchedCat?.id && !matchedCat.id.startsWith('sewen-') ? matchedCat.id : undefined,
       vendor,
       description,
       lifecycleStatus: itemLifecycle,
@@ -603,11 +496,9 @@ export const AddEditItemPage = () => {
       purchaseUnit,
       salesUnit,
       unitConversionFactor: parsedConv,
-      // [PHASE-2A] persist weight-item configuration (Sweven steel)
       isWeightItem,
       theoreticalWeight: isWeightItem ? (parseFloat(theoreticalWeight) || 0) : (parseFloat(weightPerPiece) || undefined),
       tolerancePct: isWeightItem ? (parseFloat(tolerancePct) > 0 ? parseFloat(tolerancePct) : 2) : undefined,
-      // Metal Specifications (Phase 3)
       gradeId: gradeId || undefined,
       metalGrade,
       hasSheetSpec: isSheetType || Boolean(sheetThickness && (sheetLength || sheetWidth)),
@@ -632,21 +523,16 @@ export const AddEditItemPage = () => {
       weightPerMeter: weightPerMeter ? parseFloat(weightPerMeter) : undefined,
       weightPerPiece: weightPerPiece ? parseFloat(weightPerPiece) : undefined,
       trackingMode: isService ? 'None' : trackingMode,
-      serialNumbers: trackingMode === 'Serial' ? parsedSerialNumbers : [],
       batchNumber: trackingMode === 'Batch' ? batchNumber : undefined,
       lotNumber: trackingMode === 'Batch' ? lotNumber : undefined,
       manufactureDate: trackingMode === 'Batch' ? manufactureDate : undefined,
       expiryDate: trackingMode === 'Batch' ? expiryDate : undefined,
       taxRate: parseFloat(taxRate) || 18,
-      // [PHASE-2E.1] GST compliance codes — HSN for goods, SAC for services
-      hsnCode: hsnCode.trim() || (itemKind === 'Service' ? '' : undefined),
-      sacCode: sacCode.trim() || (itemKind === 'Service' ? undefined : ''),
+      hsnCode: isService ? '' : (hsnCode.trim() || '9403'),
+      sacCode: isService ? (sacCode.trim() || '9988') : '',
       warrantyApplicable,
       warrantyPeriod: Number(warrantyPeriod) || 1,
       warrantyUnit,
-      warrantyStartEvent,
-      manufacturerWarrantyPeriod: manufacturerWarrantyPeriod ? Number(manufacturerWarrantyPeriod) : undefined,
-      manufacturerWarrantyUnit: manufacturerWarrantyPeriod ? manufacturerWarrantyUnit : undefined,
       costPrice: parsedCost,
       unitCost: parsedCost,
       sellingPrice: parsedSelling,
@@ -658,7 +544,6 @@ export const AddEditItemPage = () => {
       imageFileId: finalFileId,
       image: finalImageUrl,
       imageUrl: finalImageUrl,
-      customFieldValues,
     };
 
     if (isEditMode && existingItem) {
@@ -677,314 +562,386 @@ export const AddEditItemPage = () => {
 
   const isConversionValid = Boolean(purchaseUnit && salesUnit && parseFloat(unitConversionFactor) > 0);
 
-  // Filtered serial numbers for the chip list
-  const filteredSerialList = useMemo(() => {
-    if (!serialSearchFilter.trim()) return parsedSerialNumbers;
-    const q = serialSearchFilter.toLowerCase().trim();
-    return parsedSerialNumbers.filter((s) => s.toLowerCase().includes(q));
-  }, [parsedSerialNumbers, serialSearchFilter]);
+  // Live profit margin calculation
+  const parsedCostNum = parseFloat(costPrice) || 0;
+  const parsedSellingNum = parseFloat(sellingPrice) || 0;
+  const grossMargin = parsedSellingNum - parsedCostNum;
+  const marginPercent = parsedSellingNum > 0 ? (grossMargin / parsedSellingNum) * 100 : 0;
+
+  // Context-aware placeholders based on SEWEN products
+  const productNamePlaceholder = useMemo(() => {
+    if (itemKind === 'Part' || itemKind === 'Component') {
+      return 'e.g. Heavy Duty T-Shaped Furniture Leg (Set of 4, Matte Black)';
+    }
+    if (itemKind === 'Service') {
+      return 'e.g. MS Laser Cutting Service (CNC Sheet Cutting per mm/sq.ft)';
+    }
+    if (itemKind === 'Raw Material') {
+      return 'e.g. MS Square Hollow Pipe 25×25×2.0mm (6 Mtr)';
+    }
+    if (itemKind === 'Consumable') {
+      return 'e.g. M8 Threaded Furniture Leveler Glides & Screws';
+    }
+    return 'e.g. C-Shaped End Table (Matte Black MS Frame + Wood Top)';
+  }, [itemKind]);
 
   return (
-    <div className="space-y-6">
-      {/* Breadcrumb & Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 w-full pb-12">
+      {/* Top Breadcrumb & Clean Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
             <Link
               to="/inventory/items"
               className="text-blue-600 hover:underline font-semibold"
             >
-              Item Master
+              SEWEN Item Master
             </Link>
             <ChevronRight size={14} className="text-slate-300" />
             <span className="font-semibold text-slate-700">
-              {isEditMode ? `Edit ${sku}` : `Add New Item`}
+              {isEditMode ? `Edit ${sku}` : `Add Product`}
             </span>
           </div>
           <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2.5">
             <Package className="w-6 h-6 text-blue-600" />
-            {isEditMode ? `Edit Item: ${existingItem?.name || sku}` : `Create New Inventory Item`}
+            {isEditMode ? `Edit Item: ${existingItem?.name || sku}` : `Create SEWEN Catalog Product`}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Configure catalog item parameters, metal specifications, serial/batch tracking, units, pricing, and storage coordinates.
+            SEWEN Metal Furniture, Architectural Fabrication &amp; CNC Job Work Catalog
           </p>
         </div>
 
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
+        <div className="flex items-center gap-2.5 shrink-0">
           <Link to="/inventory/items">
-            <Button variant="outline" icon={ArrowLeft}>
-              Back to Item Master
+            <Button variant="outline" icon={ArrowLeft} size="sm">
+              Back to Catalog
             </Button>
           </Link>
+          <Button
+            type="button"
+            icon={Save}
+            size="sm"
+            onClick={handleSubmit}
+            disabled={isUploadingImage}
+          >
+            {isUploadingImage ? 'Saving...' : (isEditMode ? `Update Item` : `Save & Register Product`)}
+          </Button>
         </div>
       </div>
 
       {savedAlert && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-4 rounded-xl flex items-center gap-2 text-xs font-semibold animate-pulse shadow-sm">
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-4 rounded-xl flex items-center gap-2.5 text-xs font-semibold shadow-xs animate-in fade-in">
           <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
-          Item specifications and parameters successfully saved! Redirecting...
+          <span>Product successfully registered in SEWEN catalog! Redirecting to Item Master...</span>
         </div>
       )}
 
       {/* Main Form Container */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl shadow-xs overflow-hidden">
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-8">
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+        <form onSubmit={handleSubmit} className="p-5 sm:p-7 space-y-7">
 
-          {/* Classification & Identity Bar */}
-          <div className="p-4 bg-slate-50/80 border border-slate-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* SEWEN Classification Selector Tabs */}
+          <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
-              <span className="text-xs font-bold text-slate-800 block">Item Classification</span>
+              <span className="text-xs font-bold text-slate-900 block">Product Category Type</span>
               <span className="text-[11px] text-slate-500">
-                Select whether this item is an assembled Machine, Component Part, Finished Good, Consumable, Raw Material, or Service.
+                Select whether this item is a Finished Furniture product, Metal Leg component, Job Work service, or Material.
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <label
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Machine'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="itemKind"
-                  value="Machine"
-                  checked={itemKind === 'Machine'}
-                  onChange={() => handleItemKindChange('Machine')}
-                  className="sr-only"
-                />
-                ⚙️ Machine
-              </label>
-
-              <label
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Part' || itemKind === 'Component'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="itemKind"
-                  value="Part"
-                  checked={itemKind === 'Part' || itemKind === 'Component'}
-                  onChange={() => handleItemKindChange('Part')}
-                  className="sr-only"
-                />
-                🧩 Component Part
-              </label>
-
-              <label
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Standalone' || itemKind === 'Finished Product'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="itemKind"
-                  value="Standalone"
-                  checked={itemKind === 'Standalone' || itemKind === 'Finished Product'}
-                  onChange={() => handleItemKindChange('Standalone')}
-                  className="sr-only"
-                />
-                📦 Finished Product
-              </label>
-
-              <label
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Consumable'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="itemKind"
-                  value="Consumable"
-                  checked={itemKind === 'Consumable'}
-                  onChange={() => handleItemKindChange('Consumable')}
-                  className="sr-only"
-                />
-                🧪 Consumable
-              </label>
-
-              <label
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Raw Material'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="itemKind"
-                  value="Raw Material"
-                  checked={itemKind === 'Raw Material'}
-                  onChange={() => handleItemKindChange('Raw Material')}
-                  className="sr-only"
-                />
-                🧱 Raw Material
-              </label>
-
-              <label
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border cursor-pointer transition-all shadow-2xs ${itemKind === 'Service'
-                    ? 'bg-amber-600 text-white border-amber-600 shadow-sm shadow-amber-500/20'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                  }`}
-              >
-                <input
-                  type="radio"
-                  name="itemKind"
-                  value="Service"
-                  checked={itemKind === 'Service'}
-                  onChange={() => handleItemKindChange('Service')}
-                  className="sr-only"
-                />
-                ⚡ Service
-              </label>
+              {[
+                { kind: 'Standalone', label: 'Finished Furniture', icon: Package },
+                { kind: 'Part', label: 'Metal Legs & Hardware', icon: Cpu },
+                { kind: 'Service', label: 'Laser Cutting & Job Work', icon: Wand2 },
+                { kind: 'Raw Material', label: 'Raw Steel & Materials', icon: Layers },
+                { kind: 'Consumable', label: 'Consumables', icon: Sparkles },
+              ].map(({ kind, label, icon: Icon }) => {
+                const isSelected = itemKind === kind || (kind === 'Standalone' && (itemKind === 'Standalone' || itemKind === 'Finished Product')) || (kind === 'Part' && (itemKind === 'Part' || itemKind === 'Component'));
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => handleItemKindChange(kind)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 border transition cursor-pointer shadow-2xs ${isSelected
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-500/20'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+                    }`}
+                  >
+                    <Icon size={14} className={isSelected ? 'text-white' : 'text-slate-500'} />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left Column: Core Details */}
-            <div className="space-y-5">
-              <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80">
-                <Package size={18} className="text-blue-600" />
-                <h3 className="text-base font-bold text-slate-800">Core Specifications</h3>
-              </div>
+          {/* Balanced Two-Column Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-7">
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* LEFT COLUMN: Identity, Commercials & Units */}
+            <div className="space-y-6">
+
+              {/* 1. Basic Specifications */}
+              <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
+                  <Package size={17} className="text-blue-600" />
+                  <h3 className="text-sm font-bold text-slate-800">Basic Specifications</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      SKU / Product Code *
+                    </label>
+                    <input
+                      required
+                      type="text"
+                      value={sku}
+                      onChange={(e) => setSku(e.target.value)}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 font-bold"
+                      placeholder="e.g. SEW-FUR-1042"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Catalog Status
+                    </label>
+                    <select
+                      value={itemLifecycle}
+                      onChange={(e) => setItemLifecycle(e.target.value)}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="Active">Active (In Catalog &amp; Production)</option>
+                      <option value="Draft">Draft (Design Review)</option>
+                      <option value="Archived">Archived / Discontinued</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    SKU Code *
+                    Product / Item Name *
                   </label>
                   <input
                     required
                     type="text"
-                    value={sku}
-                    onChange={(e) => {
-                      setSku(e.target.value);
-                      if (!batchPrefix || batchPrefix.startsWith('SN-')) {
-                        setBatchPrefix(`SN-${e.target.value.toUpperCase()}-`);
-                      }
-                    }}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                    placeholder="PRD-0001"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                    placeholder={productNamePlaceholder}
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Lifecycle Status
-                  </label>
-                  <select
-                    value={itemLifecycle}
-                    onChange={(e) => setItemLifecycle(e.target.value)}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Draft">Draft</option>
-                    <option value="Archived">Archived</option>
-                  </select>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Category (SEWEN Catalog)
+                    </label>
+                    <select
+                      value={category}
+                      onChange={(e) => handleCategoryChange(e.target.value)}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-2.5 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 font-medium"
+                    >
+                      {availableCategories.map((c) => (
+                        <option key={c.id || c.name} value={c.name}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Item Type
+                    </label>
+                    <select
+                      value={itemTypeId}
+                      onChange={(e) => handleItemTypeChange(e.target.value)}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-2.5 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="">-- All Types --</option>
+                      {itemTypes.map((it) => (
+                        <option key={it.id} value={it.id}>
+                          {it.name} ({it.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Primary Vendor / Supplier
+                    </label>
+                    <select
+                      value={vendor}
+                      onChange={(e) => setVendor(e.target.value)}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-2.5 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600"
+                    >
+                      <option value="">SEWEN In-House Workshop</option>
+                      {vendors.map((v) => (
+                        <option key={v.id} value={v.name}>
+                          {v.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Product / Machine Name *
-                </label>
-                <input
-                  required
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                  placeholder={
-                    itemKind === 'Machine'
-                      ? 'e.g. Endoscopy System X1 4K Master Console'
-                      : 'e.g. Camera Sensor Head 4K'
-                  }
-                />
+              {/* 2. Pricing & GST Commercials */}
+              <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp size={17} className="text-emerald-600" />
+                    <h3 className="text-sm font-bold text-slate-800">Pricing &amp; GST Compliance</h3>
+                  </div>
+                  {/* Real-time Profit Margin Badge */}
+                  {(parsedCostNum > 0 || parsedSellingNum > 0) && (
+                    <span
+                      className={`text-[11px] font-bold px-2.5 py-1 rounded-full border flex items-center gap-1 ${grossMargin > 0
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : grossMargin < 0
+                        ? 'bg-rose-50 text-rose-800 border-rose-200'
+                        : 'bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      Margin: ₹{grossMargin.toFixed(2)} ({marginPercent.toFixed(1)}%)
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Cost Price (₹ / {salesUnit || 'Unit'})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={costPrice}
+                      onFocus={handleNumberInputFocus}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const cleaned = sanitizeNumberInput(raw);
+                        if (cleaned !== raw) e.target.value = cleaned;
+                        setCostPrice(cleaned);
+                      }}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Selling Price (₹ / {salesUnit || 'Unit'})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={sellingPrice}
+                      onFocus={handleNumberInputFocus}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const cleaned = sanitizeNumberInput(raw);
+                        if (cleaned !== raw) e.target.value = cleaned;
+                        setSellingPrice(cleaned);
+                      }}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 font-bold"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      GST Tax Rate (%)
+                    </label>
+                    <select
+                      value={taxRate}
+                      onChange={(e) => setTaxRate(e.target.value)}
+                      className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 font-semibold"
+                    >
+                      <option value="18">18% (Standard Furniture &amp; Metal)</option>
+                      <option value="12">12% (Standard Low)</option>
+                      <option value="28">28% (Luxury Decor)</option>
+                      <option value="5">5% (Concessional)</option>
+                      <option value="0">0% (Exempt)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Context-aware Tax Code: Only show SAC for Service, and HSN for Goods (No disabled clutter!) */}
+                <div className="pt-2 border-t border-slate-100">
+                  {itemKind === 'Service' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        SAC Code (Service Accounting Code) *
+                      </label>
+                      <div className="relative">
+                        <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={sacCode}
+                          onChange={(e) => setSacCode(e.target.value)}
+                          placeholder="e.g. 9988 - Manufacturing &amp; Fabrication Job Work Services"
+                          className="w-full h-10 pl-8 pr-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Printed on GST tax invoices for job work &amp; laser services.</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        HSN Code (Harmonized Goods Code) *
+                      </label>
+                      <div className="relative">
+                        <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="text"
+                          value={hsnCode}
+                          onChange={(e) => setHsnCode(e.target.value)}
+                          placeholder="e.g. 9403 (Metal Furniture) or 7306 (MS Pipes)"
+                          className="w-full h-10 pl-8 pr-3 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1">Appears as HSN column on customer delivery challans &amp; invoices.</p>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Item Type
-                  </label>
-                  <select
-                    value={itemTypeId}
-                    onChange={(e) => handleItemTypeChange(e.target.value)}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option value="">-- All / Any Type --</option>
-                    {itemTypes.map((it) => (
-                      <option key={it.id} value={it.id}>
-                        {it.name} ({it.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Category {itemTypeId ? '(Filtered)' : ''}
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => handleCategoryChange(e.target.value)}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    {availableCategories.length === 0 && <option value="">No matching categories</option>}
-                    {availableCategories.map((c) => (
-                      <option key={c.id} value={c.name}>
-                        {c.name} {c.itemType ? `[${c.itemType}]` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Primary Vendor
-                  </label>
-                  <select
-                    value={vendor}
-                    onChange={(e) => setVendor(e.target.value)}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option value="">{vendors.length === 0 ? 'No vendors yet' : '-- Select Vendor --'}</option>
-                    {vendors.map((v) => (
-                      <option key={v.id} value={v.name}>
-                        {v.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Units of Measure & Conversion Factors */}
-              <div className="p-4 bg-slate-50/70 border border-slate-200/80 rounded-xl space-y-3">
-                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Scale size={14} className="text-blue-600" />
-                    Units of Measure & Conversion
+              {/* 3. Units of Measure & Weight Measurement */}
+              <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                    <Scale size={17} className="text-blue-600" />
+                    Units of Measure &amp; Conversion
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowNewUnitModal(true)}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
                   >
-                    <Plus size={12} /> Add New Unit
+                    <Plus size={13} /> Add Unit
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
                       Purchase Unit
                     </label>
                     <select
                       value={purchaseUnit}
                       onChange={(e) => setPurchaseUnit(e.target.value)}
-                      className="w-full h-9 border border-slate-200 rounded-lg px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
+                      className="w-full h-9 border border-slate-200 rounded-lg px-2.5 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600"
                     >
-                      <option value="">Select a unit</option>
+                      <option value="Pcs">Pcs (Pieces)</option>
+                      <option value="Box">Box (Carton)</option>
+                      <option value="Set">Set (e.g. 4 legs)</option>
+                      <option value="Mtr">Mtr (Meters)</option>
+                      <option value="Kg">Kg (Kilograms)</option>
+                      <option value="Sq.Ft">Sq.Ft (Square Feet)</option>
+                      <option value="Job">Job / Order</option>
                       {units.map((u) => (
                         <option key={u.id} value={u.code}>
                           {u.label || u.code}
@@ -994,8 +951,8 @@ export const AddEditItemPage = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
-                      Sales Unit
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Sales / Billing Unit
                     </label>
                     <select
                       value={salesUnit}
@@ -1003,9 +960,15 @@ export const AddEditItemPage = () => {
                         setSalesUnit(e.target.value);
                         setUom(e.target.value);
                       }}
-                      className="w-full h-9 border border-slate-200 rounded-lg px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
+                      className="w-full h-9 border border-slate-200 rounded-lg px-2.5 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 font-semibold"
                     >
-                      <option value="">Select a unit</option>
+                      <option value="Pcs">Pcs (Pieces)</option>
+                      <option value="Set">Set (e.g. 4 legs)</option>
+                      <option value="Sq.Ft">Sq.Ft (Laser / Panels)</option>
+                      <option value="Mtr">Mtr (Running Meters)</option>
+                      <option value="Kg">Kg (Steel by Weight)</option>
+                      <option value="Box">Box</option>
+                      <option value="Job">Job</option>
                       {units.map((u) => (
                         <option key={u.id} value={u.code}>
                           {u.label || u.code}
@@ -1015,7 +978,7 @@ export const AddEditItemPage = () => {
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
                       Conversion Factor
                     </label>
                     <input
@@ -1024,24 +987,21 @@ export const AddEditItemPage = () => {
                       min="0.0001"
                       value={unitConversionFactor}
                       onChange={(e) => setUnitConversionFactor(e.target.value)}
-                      className="w-full h-9 border border-slate-200 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+                      className="w-full h-9 border border-slate-200 rounded-lg px-2.5 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600"
                       placeholder="1"
                     />
                   </div>
                 </div>
 
-                {isConversionValid && (
-                  <div className="text-[11px] text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200">
+                {isConversionValid && purchaseUnit !== salesUnit && (
+                  <div className="text-[11px] text-slate-600 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                     <span className="font-semibold text-slate-800">Conversion Rule: </span>
                     1 {purchaseUnit} = <strong>{unitConversionFactor}</strong> {salesUnit}
                   </div>
                 )}
 
-                {/* ── [PHASE-2A] Weight-based item toggle (Sweven steel by kg) ──
-                      Raw metal (MS angles / chequered plates / HR sheets) is bought & sold by
-                      weight. Enabling this makes GRN weigh every intake and flag variance
-                      beyond tolerance. */}
-                <div className="mt-3 border border-blue-200 rounded-xl p-3 bg-blue-50/40">
+                {/* Weight-Based Steel Toggle */}
+                <div className="border border-blue-200 rounded-xl p-3 bg-blue-50/30">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -1050,11 +1010,11 @@ export const AddEditItemPage = () => {
                       className="w-4 h-4 accent-blue-600 cursor-pointer"
                     />
                     <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                      <Scale size={13} className="text-blue-600" /> Weight-Based Item (bought / sold by kg)
+                      <Scale size={13} className="text-blue-600" /> Steel Weight Intake (weighed by kg on GRN)
                     </span>
                   </label>
                   <p className="text-[11px] text-slate-500 mt-1 ml-6">
-                    Steel & raw metal: intake is weighed on the weighbridge; stock & billing follow the received weight.
+                    Enable for raw metal, pipes, and sheets weighed at intake; stock &amp; billing follow received weight.
                   </p>
                   {isWeightItem && (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2.5 ml-6">
@@ -1090,1030 +1050,166 @@ export const AddEditItemPage = () => {
                     </div>
                   )}
                 </div>
+              </div>
 
-                {/* ── Metal Specifications & Theoretical Weight Calculation (Phase 3 SEWEN Standard) ── */}
-                <div className="mt-4 border border-indigo-200 rounded-xl p-4 bg-indigo-50/30 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="flex items-center gap-1.5 text-xs font-bold text-indigo-950">
-                        <Layers size={14} className="text-indigo-600" /> Metal Technical Specifications
-                      </span>
-                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
-                        {isRodType
-                          ? 'Round Rod / Bar'
-                          : isAngleType
-                          ? 'Angle Section'
-                          : isBeamOrChannelType
-                          ? 'Channel / Beam'
-                          : isFlatBarType
-                          ? 'Flat Bar'
-                          : isTubeOrPipeType
-                          ? 'Tube / Hollow Section'
-                          : 'Metal Sheet / Plate'}
-                      </span>
-                    </div>
+            </div>
 
-                    {!isRodType && !isAngleType && !isBeamOrChannelType && !isFlatBarType && (
-                      <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-indigo-900">
-                        <input
-                          type="checkbox"
-                          checked={hasTubeSpec}
-                          onChange={(e) => {
-                            setHasTubeSpec(e.target.checked);
-                            setMetalCalcError('');
-                          }}
-                          className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
-                        />
-                        Hollow Section / Tube
-                      </label>
-                    )}
+            {/* RIGHT COLUMN: Media, Storage & Warranty */}
+            <div className="space-y-6">
+
+              {/* 1. Product Image / Media Upload */}
+              <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon size={17} className="text-blue-600" />
+                    <h3 className="text-sm font-bold text-slate-800">Product Image &amp; Media</h3>
                   </div>
-
-                  {/* Material Grade & Surface Finish Selection */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-700 mb-1">Material Grade *</label>
-                      <select
-                        value={gradeId || metalGrade}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const foundGrade = materialGrades.find((g) => g.id === val || g.code === val);
-                          if (foundGrade) {
-                            setGradeId(foundGrade.id);
-                            setMetalGrade(foundGrade.code);
-                          } else {
-                            setGradeId('');
-                            setMetalGrade(val);
-                          }
-                        }}
-                        className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
-                      >
-                        {materialGrades.length > 0 ? (
-                          <>
-                            {materialGrades.map((g) => (
-                              <option key={g.id} value={g.id}>
-                                {g.name} ({g.code}) — {g.density} g/cm³
-                              </option>
-                            ))}
-                            <option value="MS">Mild Steel (MS - 7.85 g/cm³)</option>
-                            <option value="IS 2062">IS 2062 Structural Steel (7.85 g/cm³)</option>
-                            <option value="SS 304">Stainless Steel 304 (7.93 g/cm³)</option>
-                            <option value="SS 316">Stainless Steel 316 (7.98 g/cm³)</option>
-                            <option value="SS 202">Stainless Steel 202 (7.80 g/cm³)</option>
-                            <option value="Aluminium">Aluminium (2.70 g/cm³)</option>
-                            <option value="Copper">Copper (8.96 g/cm³)</option>
-                            <option value="Brass">Brass (8.50 g/cm³)</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="MS">Mild Steel (MS - 7.85 g/cm³)</option>
-                            <option value="IS 2062">IS 2062 Structural Steel (7.85 g/cm³)</option>
-                            <option value="SS 304">Stainless Steel 304 (7.93 g/cm³)</option>
-                            <option value="SS 316">Stainless Steel 316 (7.98 g/cm³)</option>
-                            <option value="SS 202">Stainless Steel 202 (7.80 g/cm³)</option>
-                            <option value="Aluminium">Aluminium (2.70 g/cm³)</option>
-                            <option value="Copper">Copper (8.96 g/cm³)</option>
-                            <option value="Brass">Brass (8.50 g/cm³)</option>
-                          </>
-                        )}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-medium text-slate-700 mb-1">Surface Finish / Coating</label>
-                      <select
-                        value={finishCoating}
-                        onChange={(e) => setFinishCoating(e.target.value)}
-                        className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
-                      >
-                        <option value="">-- Standard / Mill Finish --</option>
-                        <option value="Mill Finish">Mill Finish / Hot Rolled (HR)</option>
-                        <option value="2B">2B (Cold Rolled Smooth)</option>
-                        <option value="No. 4">No. 4 (Brushed / Satin)</option>
-                        <option value="BA">Bright Annealed (BA)</option>
-                        <option value="Mirror">#8 Mirror Polished</option>
-                        <option value="Galvanized">Hot Dip Galvanized (HDG)</option>
-                        <option value="GI / GP">Galvanized Iron (GI / GP)</option>
-                        <option value="HRPO">Pickled & Oiled (HRPO)</option>
-                        <option value="Anodized">Anodized / Coated</option>
-                        <option value="Matte">Matte / Bead Blasted</option>
-                      </select>
-                    </div>
-
-                    {/* Shape Specific Profile Type (if Tube) */}
-                    {isTubeOrPipeType && (
-                      <div>
-                        <label className="block text-[11px] font-medium text-slate-700 mb-1">Tube Profile</label>
-                        <select
-                          value={tubeProfile}
-                          onChange={(e) => setTubeProfile(e.target.value)}
-                          className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
-                        >
-                          <option value="Round">Round Pipe / Tube</option>
-                          <option value="Square">Square Hollow Section (SHS)</option>
-                          <option value="Rectangular">Rectangular Hollow Section (RHS)</option>
-                        </select>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ── Dynamic Dimensional Fields by Shape ── */}
-                  <div className="pt-2 border-t border-indigo-100">
-                    {/* 1. Round Rod / Bar */}
-                    {isRodType && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Diameter (Ø mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 12 or 25"
-                            value={diameter}
-                            onChange={(e) => setDiameter(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Length (mm)</label>
-                          <input
-                            type="number"
-                            step="1"
-                            placeholder="e.g. 6000 (6 meters)"
-                            value={tubeLength || sheetLength}
-                            onChange={(e) => {
-                              setTubeLength(e.target.value);
-                              setSheetLength(e.target.value);
-                            }}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 2. Angle Section */}
-                    {isAngleType && (
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Leg A (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 40"
-                            value={legA}
-                            onChange={(e) => setLegA(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Leg B (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 40"
-                            value={legB}
-                            onChange={(e) => setLegB(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Thickness (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 5"
-                            value={sheetThickness || wallThickness}
-                            onChange={(e) => {
-                              setSheetThickness(e.target.value);
-                              setWallThickness(e.target.value);
-                            }}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Length (mm)</label>
-                          <input
-                            type="number"
-                            step="1"
-                            placeholder="e.g. 6000"
-                            value={tubeLength || sheetLength}
-                            onChange={(e) => {
-                              setTubeLength(e.target.value);
-                              setSheetLength(e.target.value);
-                            }}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 3. Channel / Beam */}
-                    {isBeamOrChannelType && (
-                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5">
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Flange Width (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 50"
-                            value={legA}
-                            onChange={(e) => setLegA(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Web Height (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 100"
-                            value={legB}
-                            onChange={(e) => setLegB(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Web Thk (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 5.0"
-                            value={webThickness}
-                            onChange={(e) => setWebThickness(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Flange Thk (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 7.5"
-                            value={flangeThickness}
-                            onChange={(e) => setFlangeThickness(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Length (mm)</label>
-                          <input
-                            type="number"
-                            step="1"
-                            placeholder="e.g. 6000"
-                            value={tubeLength || sheetLength}
-                            onChange={(e) => {
-                              setTubeLength(e.target.value);
-                              setSheetLength(e.target.value);
-                            }}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 4. Flat Bar */}
-                    {isFlatBarType && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Width (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 50"
-                            value={sheetWidth || legA}
-                            onChange={(e) => {
-                              setSheetWidth(e.target.value);
-                              setLegA(e.target.value);
-                            }}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Thickness (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 6"
-                            value={sheetThickness || wallThickness}
-                            onChange={(e) => {
-                              setSheetThickness(e.target.value);
-                              setWallThickness(e.target.value);
-                            }}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Length (mm)</label>
-                          <input
-                            type="number"
-                            step="1"
-                            placeholder="e.g. 6000"
-                            value={tubeLength || sheetLength}
-                            onChange={(e) => {
-                              setTubeLength(e.target.value);
-                              setSheetLength(e.target.value);
-                            }}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 5. Tube / Pipe */}
-                    {isTubeOrPipeType && (
-                      <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {tubeProfile === 'Round' && (
-                          <>
-                            <div>
-                              <label className="block text-[11px] font-medium text-slate-700 mb-1">Outer Diameter (OD mm) *</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="e.g. 48.3"
-                                value={outerDiameter}
-                                onChange={(e) => setOuterDiameter(e.target.value)}
-                                className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[11px] font-medium text-slate-700 mb-1">Inner Diameter (ID mm)</label>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                placeholder="e.g. 42.3"
-                                value={innerDiameter}
-                                onChange={(e) => setInnerDiameter(e.target.value)}
-                                className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                              />
-                            </div>
-                          </>
-                        )}
-                        {(tubeProfile === 'Square' || tubeProfile === 'Rectangular') && (
-                          <div>
-                            <label className="block text-[11px] font-medium text-slate-700 mb-1">
-                              {tubeProfile === 'Square' ? 'Side Width (mm) *' : 'Outer Width (mm) *'}
-                            </label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="e.g. 50"
-                              value={outerWidth}
-                              onChange={(e) => setOuterWidth(e.target.value)}
-                              className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                            />
-                          </div>
-                        )}
-                        {tubeProfile === 'Rectangular' && (
-                          <div>
-                            <label className="block text-[11px] font-medium text-slate-700 mb-1">Outer Height (mm) *</label>
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="e.g. 25"
-                              value={outerHeight}
-                              onChange={(e) => setOuterHeight(e.target.value)}
-                              className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                            />
-                          </div>
-                        )}
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Wall Thickness (mm) *</label>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="e.g. 2.0"
-                            value={wallThickness}
-                            onChange={(e) => setWallThickness(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Length (mm)</label>
-                          <input
-                            type="number"
-                            step="1"
-                            placeholder="e.g. 6000"
-                            value={tubeLength}
-                            onChange={(e) => setTubeLength(e.target.value)}
-                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 6. Sheet / Plate (default) */}
-                    {!isRodType && !isAngleType && !isBeamOrChannelType && !isFlatBarType && !isTubeOrPipeType && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Sheet Thickness</label>
-                          <div className="flex gap-1.5">
-                            <input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="e.g. 2.0"
-                              value={sheetThickness}
-                              onChange={(e) => setSheetThickness(e.target.value)}
-                              className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                            />
-                            <select
-                              value={sheetThicknessUnit}
-                              onChange={(e) => setSheetThicknessUnit(e.target.value)}
-                              className="h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-700 text-xs"
-                            >
-                              <option value="mm">mm</option>
-                              <option value="gauge">gauge</option>
-                              <option value="inch">in</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Sheet Dimensions (L × W mm)</label>
-                          <div className="flex gap-1.5 items-center">
-                            <input
-                              type="number"
-                              step="1"
-                              placeholder="Length (mm)"
-                              value={sheetLength}
-                              onChange={(e) => setSheetLength(e.target.value)}
-                              className="w-1/2 h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                            />
-                            <span className="text-slate-400 text-xs">×</span>
-                            <input
-                              type="number"
-                              step="1"
-                              placeholder="Width (mm)"
-                              value={sheetWidth}
-                              onChange={(e) => setSheetWidth(e.target.value)}
-                              className="w-1/2 h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Live Weight Calculation & Action */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-indigo-100 bg-white/70 p-2.5 rounded-lg">
-                    <div className="flex items-center gap-4 text-xs font-mono">
-                      <div>
-                        <span className="text-slate-500 font-sans block text-[10px]">Weight / Piece:</span>
-                        <span className="font-bold text-indigo-900">{weightPerPiece ? `${Number(weightPerPiece).toFixed(3)} kg` : '—'}</span>
-                      </div>
-                      {(isTubeOrPipeType || isRodType || isAngleType || isBeamOrChannelType || isFlatBarType) && (
-                        <div>
-                          <span className="text-slate-500 font-sans block text-[10px]">Weight / Meter:</span>
-                          <span className="font-bold text-indigo-900">{weightPerMeter ? `${Number(weightPerMeter).toFixed(3)} kg/m` : '—'}</span>
-                        </div>
-                      )}
-                      {metalCalcError && (
-                        <span className="text-rose-600 text-[11px] font-sans font-medium">{metalCalcError}</span>
-                      )}
-                    </div>
-
+                  {imagePreview && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setMetalCalcError('');
-                        const densities = {
-                          'MS': 7.85, 'IS 2062': 7.85, 'SS 304': 7.93, 'SS 316': 7.98,
-                          'SS 202': 7.80, 'SS 430': 7.70, 'Aluminium': 2.70, 'Copper': 8.96, 'Brass': 8.50,
-                        };
-                        const gradeObj = materialGrades.find((g) => g.id === gradeId || g.code === metalGrade);
-                        const rho = gradeObj ? Number(gradeObj.density) : (densities[metalGrade] || 7.85);
-
-                        // 1. Rod
-                        if (isRodType) {
-                          const dia = parseFloat(diameter);
-                          const l = parseFloat(tubeLength || sheetLength) || 1000;
-                          if (!dia || dia <= 0) {
-                            setMetalCalcError('Please enter valid Rod Diameter (> 0 mm).');
-                            return;
-                          }
-                          const area = Math.PI * Math.pow(dia / 2, 2);
-                          const wtPerM = (area * rho) / 1000;
-                          const wtPerPc = wtPerM * (l / 1000);
-                          setWeightPerMeter(String(Math.round(wtPerM * 1000) / 1000));
-                          setWeightPerPiece(String(Math.round(wtPerPc * 1000) / 1000));
-                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(Math.round(wtPerPc * 1000) / 1000));
-                        }
-                        // 2. Angle
-                        else if (isAngleType) {
-                          const la = parseFloat(legA);
-                          const lb = parseFloat(legB);
-                          const t = parseFloat(sheetThickness || wallThickness);
-                          const l = parseFloat(tubeLength || sheetLength) || 1000;
-                          if (!la || !lb || !t || la <= 0 || lb <= 0 || t <= 0) {
-                            setMetalCalcError('Please enter valid Leg A, Leg B, and Thickness (> 0 mm).');
-                            return;
-                          }
-                          if (t >= la || t >= lb) {
-                            setMetalCalcError('Thickness cannot be greater than or equal to leg dimensions.');
-                            return;
-                          }
-                          const area = (la + lb - t) * t;
-                          const wtPerM = (area * rho) / 1000;
-                          const wtPerPc = wtPerM * (l / 1000);
-                          setWeightPerMeter(String(Math.round(wtPerM * 1000) / 1000));
-                          setWeightPerPiece(String(Math.round(wtPerPc * 1000) / 1000));
-                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(Math.round(wtPerPc * 1000) / 1000));
-                        }
-                        // 3. Channel / Beam
-                        else if (isBeamOrChannelType) {
-                          const bf = parseFloat(legA);
-                          const hw = parseFloat(legB);
-                          const tw = parseFloat(webThickness);
-                          const tf = parseFloat(flangeThickness);
-                          const l = parseFloat(tubeLength || sheetLength) || 1000;
-                          if (!bf || !hw || !tw || !tf || bf <= 0 || hw <= 0 || tw <= 0 || tf <= 0) {
-                            setMetalCalcError('Please enter valid Flange Width, Web Height, Web Thickness, and Flange Thickness (> 0 mm).');
-                            return;
-                          }
-                          if (2 * tf >= hw) {
-                            setMetalCalcError('2× Flange thickness cannot exceed or equal Web height.');
-                            return;
-                          }
-                          const area = (2 * bf * tf) + ((hw - 2 * tf) * tw);
-                          const wtPerM = (area * rho) / 1000;
-                          const wtPerPc = wtPerM * (l / 1000);
-                          setWeightPerMeter(String(Math.round(wtPerM * 1000) / 1000));
-                          setWeightPerPiece(String(Math.round(wtPerPc * 1000) / 1000));
-                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(Math.round(wtPerPc * 1000) / 1000));
-                        }
-                        // 4. Flat Bar
-                        else if (isFlatBarType) {
-                          const w = parseFloat(sheetWidth || legA);
-                          const t = parseFloat(sheetThickness || wallThickness);
-                          const l = parseFloat(tubeLength || sheetLength) || 1000;
-                          if (!w || !t || w <= 0 || t <= 0) {
-                            setMetalCalcError('Please enter valid Flat Bar Width and Thickness (> 0 mm).');
-                            return;
-                          }
-                          const area = w * t;
-                          const wtPerM = (area * rho) / 1000;
-                          const wtPerPc = wtPerM * (l / 1000);
-                          setWeightPerMeter(String(Math.round(wtPerM * 1000) / 1000));
-                          setWeightPerPiece(String(Math.round(wtPerPc * 1000) / 1000));
-                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(Math.round(wtPerPc * 1000) / 1000));
-                        }
-                        // 5. Tube / Pipe
-                        else if (isTubeOrPipeType) {
-                          const t = parseFloat(wallThickness);
-                          const l = parseFloat(tubeLength) || 1000;
-                          if (!t || t <= 0) {
-                            setMetalCalcError('Please enter valid Wall Thickness (> 0).');
-                            return;
-                          }
-                          let area = 0;
-                          if (tubeProfile === 'Round') {
-                            const od = parseFloat(outerDiameter);
-                            if (!od || od <= 0 || t >= od / 2) {
-                              setMetalCalcError(`Outer diameter must be > 0 and > 2× wall thickness (${2 * t} mm).`);
-                              return;
-                            }
-                            area = Math.PI * (od - t) * t;
-                          } else if (tubeProfile === 'Square') {
-                            const side = parseFloat(outerWidth);
-                            if (!side || side <= 0 || t >= side / 2) {
-                              setMetalCalcError(`Side width must be > 0 and > 2× wall thickness (${2 * t} mm).`);
-                              return;
-                            }
-                            area = 4 * t * (side - t);
-                          } else if (tubeProfile === 'Rectangular') {
-                            const ow = parseFloat(outerWidth);
-                            const oh = parseFloat(outerHeight);
-                            if (!ow || !oh || ow <= 0 || oh <= 0 || t >= ow / 2 || t >= oh / 2) {
-                              setMetalCalcError(`Outer width & height must be > 0 and > 2× wall thickness (${2 * t} mm).`);
-                              return;
-                            }
-                            area = 2 * t * (ow + oh - 2 * t);
-                          }
-                          const wtPerMeter = (area * rho) / 1000;
-                          const wtPerPiece = wtPerMeter * (l / 1000);
-                          const roundMeter = Math.round(wtPerMeter * 1000) / 1000;
-                          const roundPiece = Math.round(wtPerPiece * 1000) / 1000;
-                          setWeightPerMeter(String(roundMeter));
-                          setWeightPerPiece(String(roundPiece));
-                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(roundPiece));
-                        }
-                        // 6. Sheet / Plate
-                        else {
-                          const l = parseFloat(sheetLength);
-                          const w = parseFloat(sheetWidth);
-                          const t = parseFloat(sheetThickness);
-                          if (!l || !w || !t || l <= 0 || w <= 0 || t <= 0) {
-                            setMetalCalcError('Please enter valid Sheet Length, Width, and Thickness (> 0).');
-                            return;
-                          }
-                          const wt = (l * w * t * rho) / 1000000;
-                          const rounded = Math.round(wt * 1000) / 1000;
-                          setWeightPerPiece(String(rounded));
-                          if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(rounded));
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+                      onClick={handleRemoveImage}
+                      className="text-xs text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1 cursor-pointer"
                     >
-                      <Sparkles size={12} /> Compute Theoretical Weight
+                      <Trash2 size={13} /> Remove
                     </button>
+                  )}
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                {imagePreview ? (
+                  <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 flex items-center gap-4">
+                    <img
+                      src={imagePreview}
+                      alt="Product Preview"
+                      className="w-24 h-24 rounded-xl object-contain bg-white border border-slate-200 shadow-xs shrink-0"
+                    />
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
+                        <Check size={14} className="text-emerald-600 shrink-0" /> Photo Attached
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        High-resolution furniture photo attached and visible on customer orders &amp; quotes.
+                      </p>
+                      <div className="pt-1 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition cursor-pointer shadow-2xs"
+                        >
+                          Change Photo
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-              </div>
-
-              {/* Pricing & GST Tax Rate */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Cost Price (₹ per {salesUnit || 'Unit'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={costPrice}
-                    onFocus={handleNumberInputFocus}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const cleaned = sanitizeNumberInput(raw);
-                      if (cleaned !== raw) e.target.value = cleaned;
-                      setCostPrice(cleaned);
+                ) : (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDraggingFile(true);
                     }}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                    placeholder="45.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Selling Price (₹ per {salesUnit || 'Unit'})
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={sellingPrice}
-                    onFocus={handleNumberInputFocus}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      const cleaned = sanitizeNumberInput(raw);
-                      if (cleaned !== raw) e.target.value = cleaned;
-                      setSellingPrice(cleaned);
-                    }}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
-                    placeholder="129.99"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    GST Tax Rate (%)
-                  </label>
-                  <select
-                    value={taxRate}
-                    onChange={(e) => setTaxRate(e.target.value)}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20"
+                    onDragLeave={() => setIsDraggingFile(false)}
+                    onDrop={handleDropFile}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all cursor-pointer text-center ${isDraggingFile
+                        ? 'border-blue-500 bg-blue-50/60 scale-[1.01]'
+                        : 'border-slate-300 bg-slate-50/50 hover:bg-slate-100/70 hover:border-blue-400'
+                      }`}
                   >
-                    <option value="0">0% (Exempt)</option>
-                    <option value="5">5% (Concessional)</option>
-                    <option value="12">12% (Standard Low)</option>
-                    <option value="18">18% (Standard High)</option>
-                    <option value="28">28% (Luxury / High)</option>
-                  </select>
-                </div>
+                    <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-2 shadow-2xs">
+                      <UploadCloud size={24} className="group-hover:scale-110 transition-transform" />
+                    </div>
+                    <p className="text-xs font-bold text-slate-800">
+                      Drop product photo or <span className="text-blue-600 underline">click to browse</span>
+                    </p>
+                    <span className="text-[10px] text-slate-400 mt-1">
+                      Supports PNG, JPG, JPEG, WEBP or SVG up to 25MB
+                    </span>
+                  </div>
+                )}
+
+                {imageUploadError && (
+                  <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+                    <AlertCircle size={14} className="shrink-0 text-rose-600" />
+                    <span>{imageUploadError}</span>
+                  </div>
+                )}
               </div>
 
-              {/* ── [PHASE-2E.1] GST compliance: HSN code (goods) / SAC code (services) ── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    HSN Code (Goods) {itemKind === 'Service' && <span className="text-slate-400 font-normal">— n/a for services</span>}
-                  </label>
-                  <input
-                    type="text"
-                    value={hsnCode}
-                    onChange={(e) => setHsnCode(e.target.value)}
-                    placeholder={itemKind === 'Service' ? 'HSN not required' : 'e.g. 7216.32 (MS Angle)'}
-                    disabled={itemKind === 'Service'}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">Appears as the HSN column on printed tax invoices &amp; proformas.</p>
+              {/* 2. Description & Specifications */}
+              <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs space-y-3">
+                <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
+                  <FileText size={17} className="text-blue-600" />
+                  <h3 className="text-sm font-bold text-slate-800">Description &amp; Specifications</h3>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    SAC Code (Services) {itemKind !== 'Service' && <span className="text-slate-400 font-normal">— n/a for goods</span>}
-                  </label>
-                  <input
-                    type="text"
-                    value={sacCode}
-                    onChange={(e) => setSacCode(e.target.value)}
-                    placeholder={itemKind !== 'Service' ? 'SAC not required' : 'e.g. 998715 (fabrication service)'}
-                    disabled={itemKind !== 'Service'}
-                    className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-                </div>
+                <textarea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl p-3 text-xs bg-slate-50 text-slate-800 focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 resize-none"
+                  placeholder="e.g. Dimensions: 1200mm (L) x 600mm (W) x 750mm (H). Powder coated 25x25mm MS tube frame with 18mm prelaminated wood top..."
+                />
               </div>
 
-              {/* Tracking Mode & Interactive Serial / Batch Generator */}
-              <div className="p-4 bg-amber-50/40 border border-amber-200/80 rounded-2xl space-y-3.5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Barcode size={15} className="text-amber-700" />
-                    Inventory Tracking Mode
-                  </span>
-                  <div className="flex flex-wrap lg:flex-nowrap items-center gap-x-3 gap-y-1.5">
-                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
-                      <input
-                        type="radio"
-                        name="trackingMode"
-                        value="Quantity"
-                        checked={trackingMode === 'Quantity'}
-                        onChange={() => setTrackingMode('Quantity')}
-                        className="text-blue-600"
-                      />
-                      Quantity-only
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
-                      <input
-                        type="radio"
-                        name="trackingMode"
-                        value="Batch"
-                        checked={trackingMode === 'Batch'}
-                        onChange={() => {
-                          setTrackingMode('Batch');
-                          if (!batchNumber) {
-                            setBatchNumber(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`);
-                          }
-                        }}
-                        className="text-blue-600"
-                      />
-                      Batch Tracked
-                    </label>
-                    <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 font-medium cursor-pointer">
-                      <input
-                        type="radio"
-                        name="trackingMode"
-                        value="Serial"
-                        checked={trackingMode === 'Serial'}
-                        onChange={() => setTrackingMode('Serial')}
-                        className="text-blue-600"
-                      />
-                      Serial Tracked
-                    </label>
+              {/* 3. Storage & Inventory Tracking */}
+              <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Barcode size={17} className="text-amber-600" />
+                    <h3 className="text-sm font-bold text-slate-800">Storage &amp; Stock Tracking</h3>
                   </div>
+                  <Link
+                    to="/stock/locations"
+                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
+                  >
+                    Manage Locations
+                  </Link>
                 </div>
 
-                {trackingMode === 'Serial' ? (
-                  <div className="space-y-3 bg-white p-4 rounded-xl border border-amber-200/80 shadow-2xs">
-                    {/* Top Action Bar: Count badge, Auto-suggestions, and Mode Toggle */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-800">
-                          Serial Numbers Catalog
-                        </span>
-                        <span className="font-bold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200 text-[11px]">
-                          {parsedSerialNumbers.length} Registered
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap lg:flex-nowrap items-center gap-1 text-[11px]">
-                        <button
-                          type="button"
-                          onClick={() => setSerialViewMode('chips')}
-                          className={`px-2.5 py-1 rounded-lg font-semibold transition cursor-pointer ${serialViewMode === 'chips'
-                              ? 'bg-blue-600 text-white shadow-2xs'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                            }`}
-                        >
-                          Tag Chips View
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSerialViewMode('raw')}
-                          className={`px-2.5 py-1 rounded-lg font-semibold transition cursor-pointer ${serialViewMode === 'raw'
-                              ? 'bg-blue-600 text-white shadow-2xs'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
-                            }`}
-                        >
-                          Bulk Textarea
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* SMART AUTO-SUGGESTION ROW */}
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                        <Sparkles size={12} className="text-amber-500" /> Suggestions:
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickSuggestBatch(5)}
-                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                        title="Generate and append 5 sequential serial numbers"
-                      >
-                        <Plus size={11} /> Suggest 5 Serials
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleQuickSuggestBatch(10)}
-                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg text-amber-800 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs"
-                        title="Generate and append 10 sequential serial numbers"
-                      >
-                        <Plus size={11} /> Suggest 10 Serials
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBatchPrefix(smartPrefix);
-                          setShowBatchModal(true);
-                        }}
-                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 shadow-2xs ml-auto"
-                      >
-                        <Wand2 size={11} /> Auto-Generate Batch
-                      </button>
-                    </div>
-
-                    {/* Single Serial Quick Add Input */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <div className="relative flex-1 min-w-0 lg:min-w-auto">
-                        <input
-                          type="text"
-                          value={singleSerialInput}
-                          onChange={(e) => setSingleSerialInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              handleAddSingleSerial();
-                            }
-                          }}
-                          placeholder={`Suggested: ${nextSuggestedSerial} (press Enter to add)`}
-                          className="w-full border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono bg-slate-50 text-slate-800 focus:bg-white focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        icon={Plus}
-                        onClick={handleAddSingleSerial}
-                        className="shrink-0"
-                      >
-                        Add Serial
-                      </Button>
-                    </div>
-
-                    {duplicateSerialNotice && (
-                      <div className="p-2 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs flex items-center gap-1.5 font-medium">
-                        <AlertTriangle size={13} className="shrink-0" />
-                        {duplicateSerialNotice}
-                      </div>
-                    )}
-
-                    {/* Display View: Chips or Textarea */}
-                    {serialViewMode === 'chips' ? (
-                      <div className="space-y-2">
-                        {parsedSerialNumbers.length > 8 && (
-                          <div className="relative">
-                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="text"
-                              placeholder="Filter registered serials..."
-                              value={serialSearchFilter}
-                              onChange={(e) => setSerialSearchFilter(e.target.value)}
-                              className="w-full pl-7 pr-3 py-1 text-[11px] border border-slate-200 rounded-lg bg-slate-50"
-                            />
-                          </div>
-                        )}
-
-                        {parsedSerialNumbers.length === 0 ? (
-                          <div className="p-6 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
-                            <Barcode className="w-8 h-8 mx-auto text-slate-300 mb-1" />
-                            <p className="text-xs font-semibold text-slate-600">No serial numbers registered yet.</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">
-                              Click <strong>&quot;Suggest 5 Serials&quot;</strong> or type a custom serial number above.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="max-h-48 overflow-y-auto p-2 bg-slate-50/60 rounded-xl border border-slate-200 flex flex-wrap gap-1.5">
-                            {filteredSerialList.map((sn, idx) => (
-                              <span
-                                key={sn}
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-800 text-xs font-mono font-bold shadow-2xs hover:border-slate-300 transition"
-                              >
-                                <span className="text-[10px] text-slate-400 font-sans font-normal">#{idx + 1}</span>
-                                <span>{sn}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveSerial(sn)}
-                                  className="text-slate-400 hover:text-rose-600 transition p-0.5 cursor-pointer"
-                                  title="Remove this serial number"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div>
-                        <textarea
-                          rows={4}
-                          value={serialNumbersText}
-                          onChange={(e) => setSerialNumbersText(e.target.value)}
-                          placeholder="Enter 1 serial number per line..."
-                          className="w-full border border-slate-200 rounded-xl p-2.5 font-mono text-xs bg-slate-50 text-slate-800 focus:bg-white focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                    )}
-
-                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/80 text-xs flex flex-wrap lg:flex-nowrap justify-between items-center gap-x-3 lg:gap-x-0 gap-y-1 lg:gap-y-0">
-                      <span className="text-slate-600 font-medium">Available Stock (Derived from Serials):</span>
-                      <span className="font-mono font-bold text-blue-700 text-sm">
-                        {parsedSerialNumbers.length} {salesUnit || 'Unit'}
-                      </span>
-                    </div>
+                {itemKind === 'Service' ? (
+                  <div className="p-3 bg-blue-50/60 border border-blue-200 rounded-xl text-xs text-blue-800 flex items-center gap-2">
+                    <Wand2 size={16} className="text-blue-600 shrink-0" />
+                    <span>Laser Cutting &amp; Job Work services are billed per sq.ft / hour / job and do not maintain stock on hand.</span>
                   </div>
-                ) : trackingMode === 'Batch' ? (
-                  <div className="space-y-4 bg-white p-4 rounded-xl border border-amber-200/80 shadow-2xs">
-                    <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-2 border-b border-slate-100">
-                      <span className="text-xs font-bold text-slate-800">
-                        Batch / Lot Tracking Parameters
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setBatchNumber(`LOT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`)}
-                        className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 text-[11px] font-semibold transition cursor-pointer flex items-center gap-1"
-                      >
-                        <Sparkles size={11} /> Auto-Gen Batch Code
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Batch / Lot Number *
-                        </label>
-                        <input
-                          type="text"
-                          value={batchNumber}
-                          onChange={(e) => setBatchNumber(e.target.value)}
-                          placeholder="e.g. LOT-202609-001"
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Sub-Lot / Release Code (Optional)
-                        </label>
-                        <input
-                          type="text"
-                          value={lotNumber}
-                          onChange={(e) => setLotNumber(e.target.value)}
-                          placeholder="e.g. SUB-A1"
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                        />
+                ) : (
+                  <>
+                    {/* Warehouse Location */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1">
+                        Default Warehouse Location
+                      </label>
+                      <div className="relative">
+                        <MapPin size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                        <select
+                          value={location}
+                          onChange={(e) => setLocation(e.target.value)}
+                          className="w-full h-10 pl-9 pr-8 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 appearance-none cursor-pointer"
+                        >
+                          <option value="">-- Select Warehouse Location --</option>
+                          {locations.map((loc) => (
+                            <option key={loc.id || loc.code} value={loc.name}>
+                              {loc.name} ({loc.code}) {loc.type ? `— ${loc.type}` : ''}
+                            </option>
+                          ))}
+                          {location && !locations.some((l) => l.name === location) && (
+                            <option value={location}>{location} (Custom Location)</option>
+                          )}
+                        </select>
+                        <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Stock Counts */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Manufacturing Date
-                        </label>
-                        <input
-                          type="date"
-                          value={manufactureDate}
-                          onChange={(e) => setManufactureDate(e.target.value)}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Expiry / Recertification Date
-                        </label>
-                        <input
-                          type="date"
-                          value={expiryDate}
-                          onChange={(e) => setExpiryDate(e.target.value)}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Initial Batch Quantity ({salesUnit || 'Unit'})
+                          Current Stock On Hand ({salesUnit || 'Unit'})
                         </label>
                         <input
                           type="number"
@@ -2125,13 +1221,13 @@ export const AddEditItemPage = () => {
                             if (cleaned !== raw) e.target.value = cleaned;
                             setAvailableQty(cleaned);
                           }}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
+                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600 font-bold"
                           placeholder="0"
                         />
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Safety Reorder Level ({salesUnit || 'Unit'})
+                          Reorder Alert Level ({salesUnit || 'Unit'})
                         </label>
                         <input
                           type="number"
@@ -2143,62 +1239,23 @@ export const AddEditItemPage = () => {
                             if (cleaned !== raw) e.target.value = cleaned;
                             setReorderLevel(cleaned);
                           }}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                          placeholder="15"
+                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-blue-600"
+                          placeholder="5"
                         />
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Initial Stock Level ({salesUnit || 'Unit'})
-                      </label>
-                      <input
-                        type="number"
-                        value={availableQty}
-                        onFocus={handleNumberInputFocus}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          const cleaned = sanitizeNumberInput(raw);
-                          if (cleaned !== raw) e.target.value = cleaned;
-                          setAvailableQty(cleaned);
-                        }}
-                        className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Safety Reorder Level ({salesUnit || 'Unit'})
-                      </label>
-                      <input
-                        type="number"
-                        value={reorderLevel}
-                        onFocus={handleNumberInputFocus}
-                        onChange={(e) => {
-                          const raw = e.target.value;
-                          const cleaned = sanitizeNumberInput(raw);
-                          if (cleaned !== raw) e.target.value = cleaned;
-                          setReorderLevel(cleaned);
-                        }}
-                        className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-blue-600"
-                        placeholder="15"
-                      />
-                    </div>
-                  </div>
+                  </>
                 )}
               </div>
 
-              {/* Default Warranty Policy Section */}
-              <div className="p-4 bg-emerald-50/40 border border-emerald-200/80 rounded-2xl space-y-3.5">
-                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 lg:gap-0 pb-2 border-b border-emerald-200/60">
-                  <div className="flex items-center gap-2 min-w-0 lg:min-w-auto">
+              {/* 4. SEWEN Structural Warranty Configuration */}
+              <div className="p-5 bg-white border border-slate-200/90 rounded-2xl shadow-2xs space-y-4">
+                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
                     <ShieldCheck className="w-5 h-5 text-emerald-600" />
                     <div>
-                      <h4 className="text-xs font-bold text-slate-800">Default Warranty Configuration</h4>
-                      <p className="text-[11px] text-slate-500">Default warranty policy applied to physical serials and auto-populated on customer cards</p>
+                      <h4 className="text-xs font-bold text-slate-800">SEWEN Product Warranty</h4>
+                      <p className="text-[10px] text-slate-500">Structural warranty on welds, powder coat &amp; joinery</p>
                     </div>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -2210,417 +1267,401 @@ export const AddEditItemPage = () => {
                     />
                     <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
                     <span className="ml-2 text-xs font-semibold text-slate-700">
-                      {warrantyApplicable ? 'Warranty Applicable' : 'No Warranty'}
+                      {warrantyApplicable ? '1 Year Warranty' : 'No Warranty'}
                     </span>
                   </label>
                 </div>
 
-                {warrantyApplicable ? (
+                {warrantyApplicable && (
                   <div className="space-y-3 pt-1">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Company Warranty Period *
-                        </label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Warranty Period</label>
                         <input
                           type="number"
                           min="1"
                           value={warrantyPeriod}
                           onChange={(e) => setWarrantyPeriod(Math.max(1, Number(e.target.value) || 1))}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-emerald-600"
-                          placeholder="e.g. 5"
-                          required
+                          className="w-full h-9 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 font-mono text-xs focus:bg-white focus:outline-none focus:border-emerald-600"
+                          placeholder="1"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Warranty Unit
-                        </label>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">Warranty Unit</label>
                         <select
                           value={warrantyUnit}
                           onChange={(e) => setWarrantyUnit(e.target.value)}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
-                        >
-                          <option value="Years">Years</option>
-                          <option value="Months">Months</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          Warranty Start Event *
-                        </label>
-                        <select
-                          value={warrantyStartEvent}
-                          onChange={(e) => setWarrantyStartEvent(e.target.value)}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
-                        >
-                          <option value="Delivery">Delivery (Default — Delivery Challan date)</option>
-                          <option value="Invoice">Invoice (Final Invoice date)</option>
-                          <option value="Manual Date">Manual Date (Custom specified)</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-emerald-100">
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">
-                          Manufacturer Warranty Period (Optional)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          value={manufacturerWarrantyPeriod}
-                          onChange={(e) => setManufacturerWarrantyPeriod(e.target.value)}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-emerald-600"
-                          placeholder="e.g. 10 (OEM coverage)"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-600 mb-1">
-                          Manufacturer Warranty Unit
-                        </label>
-                        <select
-                          value={manufacturerWarrantyUnit}
-                          onChange={(e) => setManufacturerWarrantyUnit(e.target.value)}
-                          className="w-full h-10 border border-slate-200 rounded-xl px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-emerald-600"
+                          className="w-full h-9 border border-slate-200 rounded-xl px-3 bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-emerald-600"
                         >
                           <option value="Years">Years</option>
                           <option value="Months">Months</option>
                         </select>
                       </div>
                     </div>
-
-                    <p className="text-[11px] text-emerald-800 bg-emerald-100/50 p-2 rounded-lg border border-emerald-200">
-                      💡 <strong>Default Warranty Rule:</strong> When physical machines or components are dispatched via Delivery Challan, this rule automatically populates the Customer Warranty Card without requiring repetitive entry.
-                    </p>
                   </div>
-                ) : (
-                  <p className="text-xs text-slate-500 italic py-1">
-                    No warranty policy configured for this SKU. Toggle above if this item includes standard equipment warranty.
-                  </p>
                 )}
               </div>
 
-              <div>
-                <div className="flex flex-wrap lg:flex-nowrap items-center justify-between gap-x-2 lg:gap-x-0 mb-1">
-                  <label className="block text-xs font-semibold text-slate-700">
-                    Default Warehouse & Storage Location
-                  </label>
-                  <Link
-                    to="/stock/locations"
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold hover:underline"
-                  >
-                    Manage Locations
-                  </Link>
-                </div>
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  <select
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    className="w-full h-10 pl-9 pr-8 border border-slate-200 rounded-xl bg-slate-50 text-slate-800 text-xs focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 appearance-none cursor-pointer"
-                  >
-                    <option value="">-- Select Warehouse Location --</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id || loc.code} value={loc.name}>
-                        {loc.name} ({loc.code}) {loc.type ? `— ${loc.type}` : ''}
-                      </option>
-                    ))}
-                    {/* Preserve custom legacy location if not matched */}
-                    {location && !locations.some((l) => l.name === location) && (
-                      <option value={location}>{location} (Custom Location)</option>
-                    )}
-                  </select>
-                  <ChevronDown size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: Media & Description */}
-            <div className="space-y-5 flex flex-col justify-between">
-              <div className="space-y-5">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-200/80">
-                  <Layers size={18} className="text-blue-600" />
-                  <h3 className="text-base font-bold text-slate-800">Description & Schematic Media</h3>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Technical Summary & Specifications
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl p-3 text-xs bg-slate-50 text-slate-800 focus:bg-white focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/20 resize-none"
-                    placeholder="Enter detailed technical narrative and specifications..."
-                  />
-                </div>
-
-                {/* WORKING PRODUCT SCHEMATIC / IMAGE UPLOAD */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-slate-700">
-                      Product Schematic / Image
-                    </label>
-                    {imagePreview && (
-                      <button
-                        type="button"
-                        onClick={handleRemoveImage}
-                        className="text-[11px] text-rose-600 hover:underline font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <Trash2 size={12} /> Remove Image
-                      </button>
-                    )}
-                  </div>
-
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
-                    accept="image/*"
-                    className="hidden"
-                  />
-
-                  {imagePreview ? (
-                    <div className="border border-slate-200 rounded-2xl p-3 sm:p-4 bg-slate-50 flex items-center gap-3 sm:gap-4">
-                      <img
-                        src={imagePreview}
-                        alt="Product Schematic Preview"
-                        className="w-24 h-24 rounded-xl object-contain bg-white border border-slate-200 shadow-sm shrink-0"
-                      />
-                      <div className="space-y-1.5 flex-1 min-w-0">
-                        <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5 truncate">
-                          <Check size={14} className="text-emerald-600 shrink-0" /> Image Attached
-                        </p>
-                        <p className="text-[11px] text-slate-500">
-                          High-resolution product schematic attached and ready for catalog display.
-                        </p>
-                        <div className="pt-1 flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold text-xs rounded-lg transition cursor-pointer shadow-2xs"
-                          >
-                            Change File
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setIsDraggingFile(true);
-                      }}
-                      onDragLeave={() => setIsDraggingFile(false)}
-                      onDrop={handleDropFile}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`border-2 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center transition-all cursor-pointer text-center ${isDraggingFile
-                          ? 'border-blue-500 bg-blue-50/60 scale-[1.01]'
-                          : 'border-slate-300 bg-slate-50/50 hover:bg-slate-100/70 hover:border-blue-400'
-                        }`}
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-2 shadow-2xs">
-                        <UploadCloud size={24} className="group-hover:scale-110 transition-transform" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-800">
-                        Drop high-resolution diagram or <span className="text-blue-600 underline">click to browse</span>
-                      </p>
-                      <span className="text-[10px] text-slate-400 mt-1">
-                        Supports PNG, JPG, JPEG, WEBP or SVG up to 25MB
-                      </span>
-                    </div>
-                  )}
-
-                  {imageUploadError && (
-                    <div className="mt-2 p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
-                      <AlertCircle size={14} className="shrink-0 text-rose-600" />
-                      <span>{imageUploadError}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Summary Card */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 text-xs space-y-2 mt-4">
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Gross Margin per {salesUnit || 'Unit'}:</span>
-                  <span className="font-mono font-bold text-emerald-700">
-                    ₹{(parseFloat(sellingPrice || '0') - parseFloat(costPrice || '0')).toFixed(2)} (
-                    {(
-                      ((parseFloat(sellingPrice || '0') - parseFloat(costPrice || '0')) /
-                        (parseFloat(sellingPrice || '1') || 1)) *
-                      100
-                    ).toFixed(1)}
-                    %)
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-slate-600">
-                  <span>Estimated Total Asset Value:</span>
-                  <span className="font-mono font-bold text-slate-800">
-                    ₹
-                    {(
-                      parseFloat(costPrice || '0') * (parseInt(availableQty, 10) || 0)
-                    ).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
             </div>
           </div>
 
-
-
-          {/* Dynamic Technical Specifications Section (Keep button to select/show, otherwise keep hidden) */}
-          {!showCustomParameters ? (
-            <div className="pt-2 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => setShowCustomParameters(true)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-blue-500 bg-slate-50/60 hover:bg-blue-50/50 text-slate-700 hover:text-blue-700 text-xs font-semibold transition cursor-pointer group shadow-2xs"
-              >
-                <Sliders size={15} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
-                <span>+ Add / Configure Custom Parameters for {category || 'Item'}</span>
-                {categoryCustomFields.length > 0 && (
-                  <span className="text-[10px] bg-blue-100/80 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                    {categoryCustomFields.length} field{categoryCustomFields.length > 1 ? 's' : ''}
-                  </span>
-                )}
-              </button>
-            </div>
-          ) : (
-            <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-4 sm:p-5 space-y-4 animate-in fade-in duration-200">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200/80">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center">
-                    <Sliders size={15} />
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-800">
-                      Custom Technical Parameters: {category}
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Optional specialized specifications for this category catalog.
-                    </p>
-                  </div>
+          {/* DEDICATED CONTEXTUAL SECTION: Metal & Steel Specifications (Collapsible) */}
+          <div className="border border-indigo-200/90 rounded-2xl bg-indigo-50/20 overflow-hidden shadow-2xs">
+            <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-100 bg-white/60">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
+                  <Layers size={17} />
                 </div>
-                <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowNewFieldModal(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs hover:bg-slate-50"
-                  >
-                    <Plus size={13} /> Add Field
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomParameters(false)}
-                    className="text-xs text-slate-500 hover:text-rose-600 font-semibold px-2.5 py-1 bg-white border border-slate-200 hover:border-rose-200 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1 transition"
-                    title="Hide custom parameters section"
-                  >
-                    <X size={13} /> Hide Section
-                  </button>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">Metal &amp; Steel Technical Specifications</h3>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      {isRodType
+                        ? 'Round Rod / Bar'
+                        : isAngleType
+                        ? 'Angle Section'
+                        : isBeamOrChannelType
+                        ? 'Channel / Beam'
+                        : isFlatBarType
+                        ? 'Flat Bar'
+                        : isTubeOrPipeType
+                        ? 'Tube / Square Pipe'
+                        : 'Sheet / Plate'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    MS tube profiles, sheet gauges, surface coatings, and theoretical steel weight calculation.
+                  </p>
                 </div>
               </div>
 
-              {categoryCustomFields.length === 0 ? (
-                <div className="text-center py-5 bg-white border border-dashed border-slate-200 rounded-xl">
-                  <p className="text-xs text-slate-500">
-                    No custom attributes configured for <strong>{category}</strong> yet.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setShowNewFieldModal(true)}
-                    className="text-xs text-blue-600 hover:underline font-semibold inline-block mt-1 cursor-pointer"
-                  >
-                    Click here to attach a custom field.
-                  </button>
+              <div className="flex items-center gap-2">
+                {!isRodType && !isAngleType && !isBeamOrChannelType && !isFlatBarType && showMetalSpecs && (
+                  <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-indigo-900 mr-2">
+                    <input
+                      type="checkbox"
+                      checked={hasTubeSpec}
+                      onChange={(e) => {
+                        setHasTubeSpec(e.target.checked);
+                        setMetalCalcError('');
+                      }}
+                      className="w-3.5 h-3.5 accent-indigo-600 cursor-pointer"
+                    />
+                    Hollow Pipe / Tube
+                  </label>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setUserToggledMetalSpecs((prev) => (prev !== null ? !prev : !showMetalSpecs))}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                >
+                  {showMetalSpecs ? (
+                    <>
+                      <ChevronUp size={14} /> Collapse Specs
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown size={14} /> Configure Steel Specs
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {showMetalSpecs && (
+              <div className="p-5 space-y-4 animate-in fade-in duration-150">
+                {/* Material Grade & Surface Finish Selection */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">Steel Material Grade *</label>
+                    <select
+                      value={gradeId || metalGrade}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const foundGrade = materialGrades.find((g) => g.id === val || g.code === val);
+                        if (foundGrade) {
+                          setGradeId(foundGrade.id);
+                          setMetalGrade(foundGrade.code);
+                        } else {
+                          setGradeId('');
+                          setMetalGrade(val);
+                        }
+                      }}
+                      className="w-full h-9 border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
+                    >
+                      {materialGrades.length > 0 ? (
+                        <>
+                          {materialGrades.map((g) => (
+                            <option key={g.id} value={g.id}>
+                              {g.name} ({g.code}) — {g.density} g/cm³
+                            </option>
+                          ))}
+                          <option value="MS">Mild Steel (MS - 7.85 g/cm³)</option>
+                          <option value="IS 2062">IS 2062 Structural Steel (7.85 g/cm³)</option>
+                          <option value="SS 304">Stainless Steel 304 (7.93 g/cm³)</option>
+                          <option value="SS 202">Stainless Steel 202 (7.80 g/cm³)</option>
+                          <option value="Aluminium">Aluminium (2.70 g/cm³)</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="MS">Mild Steel (MS - 7.85 g/cm³)</option>
+                          <option value="IS 2062">IS 2062 Structural Steel (7.85 g/cm³)</option>
+                          <option value="SS 304">Stainless Steel 304 (7.93 g/cm³)</option>
+                          <option value="SS 202">Stainless Steel 202 (7.80 g/cm³)</option>
+                          <option value="Aluminium">Aluminium (2.70 g/cm³)</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-700 mb-1">Surface Coating / Powder Coat</label>
+                    <select
+                      value={finishCoating}
+                      onChange={(e) => setFinishCoating(e.target.value)}
+                      className="w-full h-9 border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
+                    >
+                      <option value="Matte Black Powder Coated">Matte Black Powder Coated (SEWEN Standard)</option>
+                      <option value="Gloss Black Powder Coated">Gloss Black Powder Coated</option>
+                      <option value="Golden / Brass PVD Finish">Golden / Brass PVD Finish</option>
+                      <option value="White Powder Coated">White Powder Coated</option>
+                      <option value="Mill Finish">Mill Finish / Raw Steel</option>
+                      <option value="Galvanized">Hot Dip Galvanized (HDG)</option>
+                      <option value="Brushed Satin">Brushed Satin / SS Finish</option>
+                    </select>
+                  </div>
+
+                  {isTubeOrPipeType && (
+                    <div>
+                      <label className="block text-[11px] font-medium text-slate-700 mb-1">Tube Profile</label>
+                      <select
+                        value={tubeProfile}
+                        onChange={(e) => setTubeProfile(e.target.value)}
+                        className="w-full h-9 border border-slate-300 rounded-xl px-2.5 bg-white text-slate-800 text-xs focus:outline-none focus:border-indigo-600 font-medium"
+                      >
+                        <option value="Square">Square Hollow Pipe (SHS - e.g. 25x25mm)</option>
+                        <option value="Rectangular">Rectangular Hollow Pipe (RHS - e.g. 50x25mm)</option>
+                        <option value="Round">Round Pipe / Tube</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {categoryCustomFields.map((field) => {
-                    const fieldKey = field.id || String(field.name ?? '').toLowerCase().replace(/\s+/g, '_');
-                    const val = customFieldValues[fieldKey] ?? customFieldValues[field.name] ?? '';
 
-                    if ((field.type === 'dropdown' || field.type === 'select') && field.options && field.options.length > 0) {
-                      return (
-                        <div key={field.id || field.name}>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            {field.name}
-                          </label>
-                          <select
-                            value={val}
-                            onChange={(e) => handleCustomFieldChange(fieldKey, e.target.value)}
-                            className="w-full h-9 border border-slate-200 rounded-lg px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
-                          >
-                            <option value="">-- Select {field.name} --</option>
-                            {field.options.map((opt) => (
-                              <option key={opt} value={opt}>
-                                {opt}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      );
-                    }
-
-                    if (field.type === 'boolean') {
-                      return (
-                        <div key={field.id || field.name} className="flex items-center gap-2 pt-5">
-                          <input
-                            type="checkbox"
-                            id={fieldKey}
-                            checked={Boolean(val)}
-                            onChange={(e) => handleCustomFieldChange(fieldKey, e.target.checked)}
-                            className="rounded text-blue-600 h-4 w-4"
-                          >
-                          </input>
-                          <label htmlFor={fieldKey} className="text-xs font-semibold text-slate-700 cursor-pointer">
-                            {field.name}
-                          </label>
-                        </div>
-                      );
-                    }
-
-                    if (field.type === 'number') {
-                      return (
-                        <div key={field.id || field.name}>
-                          <label className="block text-xs font-semibold text-slate-700 mb-1">
-                            {field.name}
+                {/* Dynamic Dimensional Fields by Shape */}
+                <div className="pt-2 border-t border-indigo-100">
+                  {/* Tube / Pipe */}
+                  {isTubeOrPipeType && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {(tubeProfile === 'Square' || tubeProfile === 'Rectangular') && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">
+                            {tubeProfile === 'Square' ? 'Side Width (mm) *' : 'Outer Width (mm) *'}
                           </label>
                           <input
                             type="number"
-                            value={val}
-                            onChange={(e) => handleCustomFieldChange(fieldKey, e.target.value)}
-                            className="w-full h-9 border border-slate-200 rounded-lg px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
-                            placeholder={`Enter ${field.name}`}
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 25"
+                            value={outerWidth}
+                            onChange={(e) => setOuterWidth(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
                           />
                         </div>
-                      );
-                    }
-
-                    return (
-                      <div key={field.id || field.name}>
-                        <label className="block text-xs font-semibold text-slate-700 mb-1">
-                          {field.name}
-                        </label>
+                      )}
+                      {tubeProfile === 'Rectangular' && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Outer Height (mm) *</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 50"
+                            value={outerHeight}
+                            onChange={(e) => setOuterHeight(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      )}
+                      {tubeProfile === 'Round' && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-700 mb-1">Outer Diameter (OD mm) *</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 25.4"
+                            value={outerDiameter}
+                            onChange={(e) => setOuterDiameter(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">Wall Thickness (mm) *</label>
                         <input
-                          type="text"
-                          value={val}
-                          onChange={(e) => handleCustomFieldChange(fieldKey, e.target.value)}
-                          className="w-full h-9 border border-slate-200 rounded-lg px-3 bg-white text-slate-800 text-xs focus:outline-none focus:border-blue-600"
-                          placeholder={`Enter ${field.name}`}
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="e.g. 2.0"
+                          value={wallThickness}
+                          onChange={(e) => setWallThickness(e.target.value)}
+                          className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
                         />
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">Pipe Length (mm)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          placeholder="e.g. 6000 (6 meters)"
+                          value={tubeLength}
+                          onChange={(e) => setTubeLength(e.target.value)}
+                          className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                        />
+                      </div>
+                    </div>
+                  )}
 
-          {/* Footer Action Buttons */}
-          <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-3 pt-4 border-t border-slate-200/80">
+                  {/* Sheet / Plate (default) */}
+                  {!isRodType && !isAngleType && !isBeamOrChannelType && !isFlatBarType && !isTubeOrPipeType && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">Sheet Thickness</label>
+                        <div className="flex gap-1.5">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="e.g. 2.0"
+                            value={sheetThickness}
+                            onChange={(e) => setSheetThickness(e.target.value)}
+                            className="w-full h-8 border border-slate-300 rounded-lg px-2.5 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                          <select
+                            value={sheetThicknessUnit}
+                            onChange={(e) => setSheetThicknessUnit(e.target.value)}
+                            className="h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-700 text-xs"
+                          >
+                            <option value="mm">mm</option>
+                            <option value="gauge">gauge</option>
+                            <option value="inch">in</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-700 mb-1">Sheet Dimensions (L × W mm)</label>
+                        <div className="flex gap-1.5 items-center">
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="Length (e.g. 2440)"
+                            value={sheetLength}
+                            onChange={(e) => setSheetLength(e.target.value)}
+                            className="w-1/2 h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                          <span className="text-slate-400 text-xs">×</span>
+                          <input
+                            type="number"
+                            step="1"
+                            placeholder="Width (e.g. 1220)"
+                            value={sheetWidth}
+                            onChange={(e) => setSheetWidth(e.target.value)}
+                            className="w-1/2 h-8 border border-slate-300 rounded-lg px-2 bg-white text-slate-800 font-mono text-xs focus:outline-none focus:border-indigo-600"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Live Weight Calculation & Action */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-indigo-100 bg-white/80 p-3 rounded-xl">
+                  <div className="flex items-center gap-5 text-xs font-mono">
+                    <div>
+                      <span className="text-slate-500 font-sans block text-[10px]">Weight / Piece:</span>
+                      <span className="font-bold text-indigo-950 text-sm">{weightPerPiece ? `${Number(weightPerPiece).toFixed(3)} kg` : '—'}</span>
+                    </div>
+                    {isTubeOrPipeType && (
+                      <div>
+                        <span className="text-slate-500 font-sans block text-[10px]">Weight / Meter:</span>
+                        <span className="font-bold text-indigo-950 text-sm">{weightPerMeter ? `${Number(weightPerMeter).toFixed(3)} kg/m` : '—'}</span>
+                      </div>
+                    )}
+                    {metalCalcError && (
+                      <span className="text-rose-600 text-xs font-sans font-medium">{metalCalcError}</span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMetalCalcError('');
+                      const rho = 7.85; // MS Mild steel standard density
+
+                      if (isTubeOrPipeType) {
+                        const t = parseFloat(wallThickness);
+                        const l = parseFloat(tubeLength) || 1000;
+                        if (!t || t <= 0) {
+                          setMetalCalcError('Please enter valid Wall Thickness (> 0 mm).');
+                          return;
+                        }
+                        let area = 0;
+                        if (tubeProfile === 'Square') {
+                          const side = parseFloat(outerWidth);
+                          if (!side || side <= 0 || t >= side / 2) {
+                            setMetalCalcError(`Side width must be > 0 and > 2× wall thickness (${2 * t} mm).`);
+                            return;
+                          }
+                          area = 4 * t * (side - t);
+                        } else if (tubeProfile === 'Rectangular') {
+                          const ow = parseFloat(outerWidth);
+                          const oh = parseFloat(outerHeight);
+                          if (!ow || !oh || ow <= 0 || oh <= 0 || t >= ow / 2 || t >= oh / 2) {
+                            setMetalCalcError(`Outer width & height must be > 0 and > 2× wall thickness (${2 * t} mm).`);
+                            return;
+                          }
+                          area = 2 * t * (ow + oh - 2 * t);
+                        } else {
+                          const od = parseFloat(outerDiameter);
+                          if (!od || od <= 0 || t >= od / 2) {
+                            setMetalCalcError(`Outer diameter must be > 0 and > 2× wall thickness (${2 * t} mm).`);
+                            return;
+                          }
+                          area = Math.PI * (od - t) * t;
+                        }
+                        const wtPerMeter = (area * rho) / 1000;
+                        const wtPerPiece = wtPerMeter * (l / 1000);
+                        const roundMeter = Math.round(wtPerMeter * 1000) / 1000;
+                        const roundPiece = Math.round(wtPerPiece * 1000) / 1000;
+                        setWeightPerMeter(String(roundMeter));
+                        setWeightPerPiece(String(roundPiece));
+                        if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(roundPiece));
+                      } else {
+                        const l = parseFloat(sheetLength);
+                        const w = parseFloat(sheetWidth);
+                        const t = parseFloat(sheetThickness);
+                        if (!l || !w || !t || l <= 0 || w <= 0 || t <= 0) {
+                          setMetalCalcError('Please enter valid Sheet Length, Width, and Thickness (> 0).');
+                          return;
+                        }
+                        const wt = (l * w * t * rho) / 1000000;
+                        const rounded = Math.round(wt * 1000) / 1000;
+                        setWeightPerPiece(String(rounded));
+                        if (isWeightItem || !theoreticalWeight) setTheoreticalWeight(String(rounded));
+                      }
+                    }}
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  >
+                    <Sparkles size={13} /> Compute Theoretical Weight
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Footer Action Bar */}
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-slate-200">
             <Button
               type="button"
               variant="outline"
@@ -2629,130 +1670,11 @@ export const AddEditItemPage = () => {
               Cancel
             </Button>
             <Button type="submit" icon={Save} disabled={isUploadingImage}>
-              {isUploadingImage ? 'Uploading Image & Saving...' : (isEditMode ? `Update ${itemKind} SKU` : `Save & Register ${itemKind}`)}
+              {isUploadingImage ? 'Saving Product...' : (isEditMode ? `Update Item` : `Save & Register Product`)}
             </Button>
           </div>
         </form>
       </div>
-
-      {/* Custom Serial Batch Generator Modal */}
-      {showBatchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4 max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="font-bold text-base text-slate-800 flex items-center gap-2">
-                <Wand2 size={18} className="text-blue-600" /> Auto-Generate Serial Numbers Batch
-              </h3>
-              <button
-                onClick={() => setShowBatchModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleExecuteBatchGenerator} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Serial Prefix (e.g. Model / SKU identifier)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={batchPrefix}
-                  onChange={(e) => setBatchPrefix(e.target.value)}
-                  placeholder="e.g. SN-ENDO-X1- or SN-MACH-2026-"
-                  className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono text-xs text-slate-800"
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Start #</label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={batchStartNum}
-                    onChange={(e) => setBatchStartNum(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono text-xs text-center font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Count (Qty)</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="500"
-                    required
-                    value={batchCount}
-                    onChange={(e) => setBatchCount(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono text-xs text-center font-bold"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Padding Digits</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="6"
-                    required
-                    value={batchPadding}
-                    onChange={(e) => setBatchPadding(e.target.value)}
-                    className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono text-xs text-center font-bold"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Suffix / Batch Tag (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={batchSuffix}
-                  onChange={(e) => setBatchSuffix(e.target.value)}
-                  placeholder="e.g. -2026, -M1, -IN"
-                  className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 font-mono text-xs text-slate-800"
-                />
-              </div>
-
-              {/* Live Preview */}
-              <div className="p-3 bg-blue-50/70 border border-blue-200 rounded-xl space-y-1">
-                <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider block">
-                  Generation Sample Preview:
-                </span>
-                <p className="font-mono text-xs text-slate-800 font-semibold">
-                  {batchPrefix || 'SN-ITEM-'}
-                  {String(Number(batchStartNum) || 1).padStart(Number(batchPadding) || 3, '0')}
-                  {batchSuffix}
-                  {' ... '}
-                  {batchPrefix || 'SN-ITEM-'}
-                  {String((Number(batchStartNum) || 1) + Math.max(1, Number(batchCount) || 1) - 1).padStart(
-                    Number(batchPadding) || 3,
-                    '0'
-                  )}
-                  {batchSuffix}
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowBatchModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" icon={Sparkles}>
-                  Append {batchCount || 5} Serials
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* Inline Unit Create Modal */}
       {showNewUnitModal && (
@@ -2764,7 +1686,7 @@ export const AddEditItemPage = () => {
               </h3>
               <button
                 onClick={() => setShowNewUnitModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1"
+                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
               >
                 <X size={16} />
               </button>
@@ -2803,78 +1725,6 @@ export const AddEditItemPage = () => {
                 </Button>
                 <Button type="submit" size="sm" icon={Plus}>
                   Save Unit
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Inline Add Field Modal */}
-      {showNewFieldModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-2 sm:p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-md w-full p-4 sm:p-5 space-y-4 max-h-[95vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-1.5">
-                <Sliders size={16} className="text-blue-600" /> Add Custom Parameter for {category}
-              </h3>
-              <button
-                onClick={() => setShowNewFieldModal(false)}
-                className="text-slate-400 hover:text-slate-700 p-1"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateCustomFieldInline} className="space-y-3 text-xs">
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Parameter Label *</label>
-                <input
-                  required
-                  value={newFieldName}
-                  onChange={(e) => setNewFieldName(e.target.value)}
-                  placeholder="e.g. Laser Wavelength (nm), Sensor Resolution"
-                  className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 text-xs"
-                />
-              </div>
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Field Type</label>
-                <select
-                  value={newFieldType}
-                  onChange={(e) => setNewFieldType(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 text-xs"
-                >
-                  <option value="text">Text (String)</option>
-                  <option value="number">Numeric</option>
-                  <option value="dropdown">Dropdown Selection</option>
-                  <option value="boolean">Checkbox (Yes/No)</option>
-                </select>
-              </div>
-
-              {newFieldType === 'dropdown' && (
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">Options (comma-separated)</label>
-                  <input
-                    required
-                    value={newFieldOptions}
-                    onChange={(e) => setNewFieldOptions(e.target.value)}
-                    placeholder="e.g. 532nm, 1064nm, 2940nm"
-                    className="w-full border border-slate-200 rounded-xl p-2.5 bg-slate-50 text-xs"
-                  />
-                </div>
-              )}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowNewFieldModal(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" icon={Plus}>
-                  Attach Field
                 </Button>
               </div>
             </form>

@@ -40,9 +40,13 @@ export const PMS_RESOURCES = {
       status: p.status || undefined,
       startDate: p.startDate || undefined,
       expectedCompletionDate: p.expectedCompletionDate || undefined,
+      plannedDuration: p.plannedDuration !== undefined && p.plannedDuration !== null ? num(p.plannedDuration) : undefined,
+      durationUnit: p.durationUnit || undefined,
     }),
     fromApi: (row) => ({
       ...row,
+      plannedDuration: row.plannedDuration !== undefined && row.plannedDuration !== null ? num(row.plannedDuration) : null,
+      durationUnit: row.durationUnit || 'Days',
       customerName: typeof row.customerName === 'object' && row.customerName !== null ? (row.customerName.name || '') : row.customerName,
       overallCompletionPct: num(row.overallCompletionPct),
       stages: (row.stages || []).map((s) => ({

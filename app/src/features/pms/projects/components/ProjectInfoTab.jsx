@@ -1,7 +1,9 @@
-import React from 'react';
-import { Building2, Package, User, CalendarDays } from 'lucide-react';
+import React, { useState } from 'react';
+import { Building2, Package, User, CalendarDays, Edit3, Check, X, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../../../../utils/currencyUtils';
 import { useERP } from '../../../../context/ERPContext';
+import { usePmsStore, isProjectCreator } from '../../../../stores/pmsStore';
+import { useAppStore } from '../../../../stores/appStore';
 
 /**
  * ProjectInfoTab — order context for the project.
@@ -11,26 +13,30 @@ import { useERP } from '../../../../context/ERPContext';
  * rather than a PMS-local copy that could drift.
  */
 
-function Card({ title, icon: Icon, children }) {
+function Card({ title, icon: Icon, action, children }) {
   return (
     <section className="rounded-xl border border-[#dce5f4] bg-white p-5 shadow-2xs">
-      <header className="flex items-center gap-2 mb-4">
-        <Icon size={14} className="text-slate-400" />
-        <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+      <header className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Icon size={14} className="text-slate-400" />
+          <h3 className="text-sm font-bold text-slate-800">{title}</h3>
+        </div>
+        {action}
       </header>
       {children}
     </section>
   );
 }
 
-function Row({ label, value, mono = false }) {
+function Row({ label, value, mono = false, action }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-2 border-b border-slate-100 last:border-0">
+    <div className="flex items-center justify-between gap-4 py-2 border-b border-slate-100 last:border-0">
       <dt className="text-[11px] text-slate-500 shrink-0">{label}</dt>
       <dd
-        className={`text-[11px] font-semibold text-slate-800 text-right min-w-0 break-words ${mono ? 'font-mono' : ''}`}
+        className={`text-[11px] font-semibold text-slate-800 text-right min-w-0 break-words flex items-center gap-2 ${mono ? 'font-mono' : ''}`}
       >
-        {value ?? '—'}
+        <span>{value ?? '—'}</span>
+        {action}
       </dd>
     </div>
   );
@@ -50,6 +56,51 @@ export function ProjectInfoTab({ project, meta }) {
   const { customers = [] } = useERP() || {};
   const customer = customers.find((c) => c.id === project.crmCustomerId) ?? null;
   const details = project.productDetails ?? {};
+
+  const currentUser = useAppStore((s) => s.currentUser);
+  const updateProject = usePmsStore((s) => s.updateProject);
+  const showToast = usePmsStore((s) => s.showToast);
+
+  const isClosed = project.status === 'Completed';
+  const isCreator = isProjectCreator(project, currentUser);
+  const isManager = project.projectManager?.id && String(project.projectManager.id) === String(currentUser?.id);
+  const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Superadmin' || currentUser?.isSuperuser;
+  const hasPmsPermission = (currentUser?.permissions || []).includes('create_pms_project') || (currentUser?.permissions || []).includes('view_pms');
+  const canEditDuration = (isCreator || isManager || isAdmin || hasPmsPermission) && !isClosed;
+
+  const [isEditingDuration, setIsEditingDuration] = useState(false);
+  const [durationValue, setDurationValue] = useState(project.plannedDuration ? String(project.plannedDuration) : '');
+  const [durationUnit, setDurationUnit] = useState(project.durationUnit || 'Days');
+  const [durationError, setDurationError] = useState('');
+
+  function handleStartEdit() {
+    setDurationValue(project.plannedDuration ? String(project.plannedDuration) : '');
+    setDurationUnit(project.durationUnit || 'Days');
+    setDurationError('');
+    setIsEditingDuration(true);
+  }
+
+  function handleCancelEdit() {
+    setIsEditingDuration(false);
+    setDurationError('');
+  }
+
+  function handleSaveDuration(e) {
+    e.preventDefault();
+    if (!durationValue || isNaN(Number(durationValue)) || Number(durationValue) <= 0) {
+      setDurationError('Planned duration must be greater than zero.');
+      return;
+    }
+
+    const numVal = Number(durationValue);
+    updateProject(project.id, {
+      plannedDuration: numVal,
+      durationUnit,
+    });
+    showToast(`Planned duration updated to ${numVal} ${durationUnit}.`);
+    setIsEditingDuration(false);
+    setDurationError('');
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -113,8 +164,99 @@ export function ProjectInfoTab({ project, meta }) {
         </dl>
       </Card>
 
-      <Card title="Schedule" icon={CalendarDays}>
+      <Card
+        title="Schedule"
+        icon={CalendarDays}
+        action={
+          canEditDuration && !isEditingDuration ? (
+            <button
+              type="button"
+              onClick={handleStartEdit}
+              className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer transition-colors"
+              title="Edit project planned duration"
+            >
+              <Edit3 size={12} />
+              <span>Edit Duration</span>
+            </button>
+          ) : isClosed ? (
+            <span className="text-[10px] text-slate-400 font-medium">Completed</span>
+          ) : null
+        }
+      >
+        {isEditingDuration ? (
+          <form onSubmit={handleSaveDuration} className="mb-4 p-3 rounded-lg border border-blue-200 bg-blue-50/50 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-700">Configure Planned Duration</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="submit"
+                  className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 cursor-pointer flex items-center gap-1 shadow-xs"
+                  title="Save duration"
+                >
+                  <Check size={12} /> Save
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer rounded"
+                  title="Cancel"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min="0.01"
+                step="any"
+                className="flex-1 text-xs rounded-lg border border-[#dce5f4] bg-white px-2.5 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                placeholder="e.g. 14"
+                value={durationValue}
+                onChange={(e) => {
+                  setDurationValue(e.target.value);
+                  setDurationError('');
+                }}
+                autoFocus
+              />
+              <select
+                className="w-24 text-xs rounded-lg border border-[#dce5f4] bg-white px-2 py-1.5 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-100 focus:border-blue-400"
+                value={durationUnit}
+                onChange={(e) => setDurationUnit(e.target.value)}
+              >
+                <option value="Days">Days</option>
+                <option value="Hours">Hours</option>
+              </select>
+            </div>
+            {durationError && (
+              <p className="flex items-center gap-1 text-[11px] text-rose-600">
+                <AlertCircle size={11} /> {durationError}
+              </p>
+            )}
+          </form>
+        ) : null}
+
         <dl>
+          <Row
+            label="Planned Duration"
+            value={
+              project.plannedDuration
+                ? `${project.plannedDuration} ${project.durationUnit || 'Days'}`
+                : '—'
+            }
+            action={
+              canEditDuration && !isEditingDuration ? (
+                <button
+                  type="button"
+                  onClick={handleStartEdit}
+                  className="text-slate-400 hover:text-blue-600 cursor-pointer p-0.5"
+                  title="Edit planned duration"
+                >
+                  <Edit3 size={11} />
+                </button>
+              ) : null
+            }
+          />
           <Row label="Start Date" value={stamp(project.startDate)} />
           <Row label="Expected Completion" value={stamp(project.expectedCompletionDate)} />
           <Row label="Actual Completion" value={stamp(project.actualCompletionDate)} />

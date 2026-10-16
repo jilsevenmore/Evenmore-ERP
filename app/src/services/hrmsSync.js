@@ -26,6 +26,8 @@ function displayIn(value) {
   return value ? formatDateDDMMYYYY(value) : value;
 }
 
+const isoIn = displayIn;
+
 function num(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -784,21 +786,39 @@ export const HRMS_RESOURCES = {
         tags: Array.isArray(doc.tags) ? doc.tags : [doc.category || 'General'],
         is_confidential: Boolean(doc.is_confidential || doc.isConfidential),
         fileData: doc.fileData || undefined,
+        fileName: doc.fileName || undefined,
         fileType: doc.fileType || 'PDF',
       });
     },
     fromApi: (row) => {
       const expDisplay = row.expiry ? displayIn(row.expiry) : '—';
+      const rawCat = String(row.category || '').trim();
+      const catLower = rawCat.toLowerCase();
+      let canonicalCat = 'General';
+      if (catLower === 'identity') canonicalCat = 'Identity';
+      else if (catLower === 'contract') canonicalCat = 'Contract';
+      else if (catLower === 'financial') canonicalCat = 'Financial';
+      else if (catLower === 'compliance' || catLower === 'security') canonicalCat = 'Compliance';
+      else if (catLower === 'legal') canonicalCat = 'Legal';
+      else if (catLower === 'educational' || catLower === 'education') canonicalCat = 'Educational';
+      else if (catLower === 'general' || catLower === 'policy') canonicalCat = 'General';
+      else if (rawCat) canonicalCat = rawCat.charAt(0).toUpperCase() + rawCat.slice(1).toLowerCase();
+
       return {
         ...row,
-        employee: row.employee || (row.employeeId ? 'Staff Member' : 'All Staff'),
+        category: canonicalCat,
+        employee: row.employee || (row.employeeId && row.employeeId !== 'ALL' ? 'Staff Member' : 'All Staff'),
         employeeId: row.employeeId || 'ALL',
+        employeeCode: row.employeeCode || undefined,
         version: typeof row.version === 'number' ? `v${row.version}.0` : (row.version || 'v1.0'),
         expiry: expDisplay,
         status: row.status || 'Valid',
+        fileName: row.fileName || (row.title ? `${row.title}.pdf` : 'Document.pdf'),
+        fileUrl: row.fileUrl || undefined,
+        uploadDate: displayIn(row.uploadDate || row.created_at) || row.uploadDate || row.created_at,
         updatedOn: row.updatedOn ? displayIn(row.updatedOn) : (row.created_at ? displayIn(row.created_at) : new Date().toISOString().slice(0, 10)),
         fileType: row.fileType || 'PDF',
-        fileSize: row.fileSize ? `${(row.fileSize / (1024 * 1024)).toFixed(1)} MB` : (row.fileSize || '0.0 MB'),
+        fileSize: typeof row.fileSize === 'number' ? `${(row.fileSize / (1024 * 1024)).toFixed(1)} MB` : (row.fileSize || '0.1 MB'),
         _synced: true,
       };
     },

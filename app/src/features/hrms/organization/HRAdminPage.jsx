@@ -3205,8 +3205,21 @@ export default function HRAdminPage({ defaultTab }) {
             </div>
             <div className="flex items-center gap-3">
               <span className="text-[12px] font-medium text-amber-800 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-200">
-                {resignations.length} Active Notice Periods
+                {resignations.length} Total Records • {resignations.filter((r) => r.status?.includes("Pending")).length} Pending Review
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  hrmsSync.pull('resignations').then((rows) => {
+                    if (rows) setResignations(rows);
+                  }).catch(console.warn);
+                }}
+                className="h-8 px-2.5 rounded-lg border border-bdr text-slate-600 hover:text-slate-900 hover:bg-slate-50 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                title="Refresh Resignations"
+              >
+                <RefreshCw size={13} />
+                <span>Refresh</span>
+              </button>
             </div>
           </div>
 
@@ -3227,7 +3240,7 @@ export default function HRAdminPage({ defaultTab }) {
 
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[12px] text-muted font-medium mr-1">Status:</span>
-              {["all", "Approved", "Clearance"].map((st) => (
+              {["all", "Pending", "Approved", "Notice Period", "Clearance"].map((st) => (
                 <button
                   key={st}
                   type="button"
@@ -3238,7 +3251,7 @@ export default function HRAdminPage({ defaultTab }) {
                       : "bg-off text-muted hover:text-slate-800"
                   }`}
                 >
-                  {st === "all" ? "All Notice Periods" : st}
+                  {st === "all" ? "All Resignations" : st}
                 </button>
               ))}
             </div>

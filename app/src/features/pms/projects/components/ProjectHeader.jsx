@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, UserPlus, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye, Trash2 } from 'lucide-react';
+import { ChevronRight, UserPlus, AlertTriangle, CheckCircle2, Truck, Receipt, ShoppingCart, Eye, Trash2, Clock } from 'lucide-react';
 import { Button } from '../../../../components/ui/Button';
 import { StageStatusBadge } from '../../components/StageStatusBadge';
 import { formatCurrency } from '../../../../utils/currencyUtils';
@@ -65,6 +65,7 @@ export function ProjectHeader({
   onLogDelay,
   onCompleteProject,
   onDeleteProject,
+  onEditDuration,
 }) {
   const priority = PRIORITY_TONES[project.priority] ?? PRIORITY_TONES.Low;
   const isClosed = project.status === 'Completed';
@@ -138,6 +139,7 @@ export function ProjectHeader({
               ) : '—'],
               ['Order Value', formatCurrency(project.productDetails?.orderValue ?? 0)],
               ['Current Stage', meta?.sequenceLabel ?? '—'],
+              ['Planned Duration', project.plannedDuration ? `${project.plannedDuration} ${project.durationUnit || 'Days'}` : '—'],
             ].map(([k, v]) => (
               <div key={k} className="min-w-0">
                 <dt className="text-[10px] text-slate-400 font-medium">{k}</dt>
@@ -157,6 +159,11 @@ export function ProjectHeader({
           <Button size="sm" variant="secondary" icon={AlertTriangle} onClick={onLogDelay} disabled={isClosed}>
             Log Delay
           </Button>
+          {onEditDuration && (
+            <Button size="sm" variant="secondary" icon={Clock} onClick={onEditDuration} disabled={isClosed} title="Edit Project Planned Duration">
+              Edit Duration
+            </Button>
+          )}
           <Button size="sm" icon={CheckCircle2} onClick={onCompleteProject} disabled={isClosed}>
             {isClosed ? 'Completed' : 'Complete Project'}
           </Button>

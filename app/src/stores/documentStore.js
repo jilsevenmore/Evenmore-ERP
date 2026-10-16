@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { lazyStore } from "../services/lazyModules";
-import { writeThrough, pullTracked } from "../services/hrmsSync";
+import { writeThrough, pullTracked, hrmsSync } from "../services/hrmsSync";
 
 const STORAGE_KEY = "hrms_documents_v2";
 
@@ -45,6 +45,29 @@ const useDocumentStoreBase = create((set, get) => ({
     } catch {}
     set({ documents: updated });
     return newDoc;
+  },
+
+  uploadDocument: async (docData) => {
+    const payload = {
+      title: docData.title,
+      category: docData.category || "General",
+      expiry: docData.expiry || null,
+      description: docData.description || undefined,
+      fileName: docData.fileName,
+      fileData: docData.fileData,
+      fileType: docData.fileType || "PDF",
+      tags: docData.tags || [docData.category || "General"],
+      employeeId: docData.employeeId,
+      status: "Valid",
+      version: 1,
+    };
+    try {
+      const created = await hrmsSync.create("documents", payload);
+      await get().hydrate();
+      return created;
+    } catch (err) {
+      return get().addDocument(docData);
+    }
   },
 
   updateDocument: (id, updates) => {
