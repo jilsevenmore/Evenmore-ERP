@@ -277,9 +277,19 @@ export const SalesOrdersPage = () => {
         });
         handleCloseCreateModal();
     };
-    const advanceStage = (orderId, currentStage) => {
+    const advanceStage = async (orderId, currentStage, options = {}) => {
         if (currentStage === 'Draft') {
-            updateSalesOrderStage(orderId, 'Confirmed');
+            const res = await updateSalesOrderStage(orderId, 'Confirmed', options);
+            if (res && !res.success && res.error) {
+                const errCode = res.error?.code || res.error?.data?.code;
+                if (errCode === 'CREDIT_LIMIT_EXCEEDED') {
+                    const msg = res.error?.message || res.error?.data?.message || 'Customer credit limit exceeded.';
+                    const ok = window.confirm(`${msg}\n\nDo you want to override the credit limit and confirm this order?`);
+                    if (ok) {
+                        await updateSalesOrderStage(orderId, 'Confirmed', { overrideCreditLimit: true });
+                    }
+                }
+            }
         }
         else if (currentStage === 'Confirmed' || currentStage === 'Partially Dispatched') {
             convertSalesOrderToChallan(orderId);

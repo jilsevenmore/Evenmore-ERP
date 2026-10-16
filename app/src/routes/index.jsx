@@ -461,10 +461,10 @@ const router = createBrowserRouter([
       // { path: 'hrms/performance/goal-tracking', element: <Page component={GoalTracking} /> }, // Hidden: Goal Tracking feature commented out
       // { path: 'hrms/performance/goal-funnel', element: <Page component={GoalFunnel} /> }, // Hidden: Goal Funnel feature commented out
       { path: 'hrms/training', element: <Page component={TrainingDashboard} /> },
-      { path: 'hrms/training/list', element: <Page component={() => <TrainingDashboard initialTab="list" />} /> },
-      { path: 'hrms/training/training-funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
-      { path: 'hrms/training/trainers', element: <Page component={() => <TrainingDashboard initialTab="trainers" />} /> },
-      { path: 'hrms/training/funnel', element: <Page component={() => <TrainingDashboard initialTab="funnel" />} /> },
+      { path: 'hrms/training/list', element: <Page component={TrainingList} /> },
+      { path: 'hrms/training/training-funnel', element: <Page component={TrainingFunnel} /> },
+      { path: 'hrms/training/trainers', element: <Page component={Trainers} /> },
+      { path: 'hrms/training/funnel', element: <Page component={TrainingFunnel} /> },
       { path: 'hrms/meetings', element: <Page component={MeetingsPage} /> },
       // Moved to the Organization section; old links still land there.
       { path: 'hrms/org-chart', element: <Navigate to="/organization/org-chart" replace /> },

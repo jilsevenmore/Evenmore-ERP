@@ -270,6 +270,26 @@ export async function createTravelRequest(data) {
   return apiClient('/hrms/travel-requests/', { method: 'POST', data });
 }
 
+export async function updateTravelRequest(id, data) {
+  return apiClient(`/hrms/travel-requests/${id}/`, { method: 'PATCH', data });
+}
+
+export async function deleteTravelRequest(id) {
+  return apiClient(`/hrms/travel-requests/${id}/`, { method: 'DELETE' });
+}
+
+export async function approveTravelRequest(id, remark = "") {
+  return apiClient(`/hrms/travel-requests/${id}/approve/`, { method: 'POST', data: { remark } });
+}
+
+export async function rejectTravelRequest(id, reason = "") {
+  return apiClient(`/hrms/travel-requests/${id}/reject/`, { method: 'POST', data: { remark: reason, reason } });
+}
+
+export async function settleTravelRequest(id, data = {}) {
+  return apiClient(`/hrms/travel-requests/${id}/settle/`, { method: 'POST', data });
+}
+
 export async function fetchAnnouncements() {
   return apiClient('/hrms/announcements/');
 }
@@ -277,6 +297,39 @@ export async function fetchAnnouncements() {
 export async function createAnnouncement(data) {
   return apiClient('/hrms/announcements/', { method: 'POST', data });
 }
+
+export async function updateAnnouncement(id, data) {
+  return apiClient(`/hrms/announcements/${id}/`, { method: 'PATCH', data });
+}
+
+export async function publishAnnouncement(id) {
+  return apiClient(`/hrms/announcements/${id}/publish/`, { method: 'POST' });
+}
+
+export async function archiveAnnouncement(id) {
+  return apiClient(`/hrms/announcements/${id}/archive/`, { method: 'POST' });
+}
+
+export async function deleteAnnouncement(id) {
+  return apiClient(`/hrms/announcements/${id}/`, { method: 'DELETE' });
+}
+
+export async function addComplaintComment(complaintId, text) {
+  return apiClient(`/hrms/complaints/${complaintId}/comment/`, { method: 'POST', data: { text } });
+}
+
+export async function resolveComplaint(complaintId, resolution) {
+  return apiClient(`/hrms/complaints/${complaintId}/resolve/`, { method: 'POST', data: { resolution } });
+}
+
+export async function sendOfferLetter(offerId) {
+  return apiClient(`/hrms/offers/${offerId}/send_offer/`, { method: 'POST' });
+}
+
+export async function acceptOfferLetter(offerId) {
+  return apiClient(`/hrms/offers/${offerId}/accept_offer/`, { method: 'POST' });
+}
+
 
 export async function calculateLeaveDaysPreview(fromDate, toDate, leaveTypeId) {
   return apiClient('/hrms/leave/calculate-days/', {

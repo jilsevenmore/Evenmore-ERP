@@ -22,7 +22,7 @@ import PerformanceReportModal from "../performance/PerformanceReportModal";
 
 const EMPTY_FORM = { name: "", email: "", designation: "", dept: "", location: "", createUserAccount: true, password: "" };
 
-const STATUSES = ["All", "Active", "On Leave", "Probation"];
+const STATUSES = ["All Active", "Active", "On Leave", "Probation", "Notice Period", "Resigned", "Terminated", "All Records"];
 
 /** The employee's Administration login, kept in step with this record. */
 function LoginBadge({ login }) {
@@ -39,6 +39,9 @@ const statusStyles = {
   Active: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
   "On Leave": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
   Probation: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  "Notice Period": { background: "#fff7ed", color: "#c2410c", border: "#ffedd5" },
+  Resigned: { background: "#f3f4f6", color: "#4b5563", border: "#e5e7eb" },
+  Terminated: { background: "#fee2e2", color: "#b91c1c", border: "#fca5a5" },
 };
 
 export default function Employees() {
@@ -167,7 +170,16 @@ export default function Employees() {
   const filtered = useMemo(() => {
     return employees.filter((e) => {
       if (dept !== "All" && e.department !== dept) return false;
-      if (status !== "All" && e.status !== status) return false;
+      if (status === "All Active") {
+        if (["Resigned", "Terminated"].includes(e.status)) return false;
+      } else if (status === "All Records") {
+        // Show everything including historical records
+      } else if (status !== "All") {
+        if (e.status !== status) return false;
+      } else {
+        // Default "All" excludes exited employees
+        if (["Resigned", "Terminated"].includes(e.status)) return false;
+      }
       if (search.trim()) {
         const q = search.trim().toLowerCase();
         const haystack = `${e.name || ""} ${e.email || ""} ${e.designation || ""} ${e.department || ""} ${e.employeeCode || e.empId || e.id || ""}`.toLowerCase();

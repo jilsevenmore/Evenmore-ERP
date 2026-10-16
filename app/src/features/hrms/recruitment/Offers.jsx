@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import UserInitials from "../../../components/common/UserInitials";
 import OfferLetterModal from "../organization/OfferLetterModal";
+import { sendOfferLetter, acceptOfferLetter } from "../../../services/upgradeService";
 
 export default function Offers() {
   const { offers, addOffer, updateOffer, candidates, jobs = [], changeStage } = useRecruitmentStore();
@@ -147,6 +148,9 @@ export default function Offers() {
   function handleConfirmLetter(updatedOffer) {
     updateOffer(updatedOffer.id, { ...updatedOffer, status: "Pending" });
     changeStage(updatedOffer.candidateId, "Offer");
+    if (updatedOffer.id && typeof updatedOffer.id === "string" && updatedOffer.id.length === 36 && updatedOffer.id.includes("-")) {
+      sendOfferLetter(updatedOffer.id).catch(console.warn);
+    }
     showToast(`Offer letter confirmed and sent to ${updatedOffer.candidateName}`);
   }
 
@@ -160,6 +164,10 @@ export default function Offers() {
       addOffer({ ...updatedOffer, status: "Accepted" });
     }
     changeStage(updatedOffer.candidateId, "Hired");
+    const offerId = existingIndex >= 0 ? offers[existingIndex].id : updatedOffer.id;
+    if (offerId && typeof offerId === "string" && offerId.length === 36 && offerId.includes("-")) {
+      acceptOfferLetter(offerId).catch(console.warn);
+    }
     showToast(`${updatedOffer.candidateName} accepted the offer and is now Hired (added to Employee Directory)!`);
   }
 

@@ -3155,10 +3155,28 @@ export const ERPProvider = ({ children, }) => {
         showToast('Sales order split updated locally.');
         return updated;
     };
-    const updateSalesOrderStage = (id, stage) => {
+    const updateSalesOrderStage = async (id, stage, options = {}) => {
+        const previousOrder = salesOrders.find((o) => o.id === id);
+        const previousStage = previousOrder?.stage;
+        const previousStatus = previousOrder?.status;
+
         setSalesOrders((prev) => prev.map((o) => (o.id === id ? { ...o, stage, status: stage } : o)));
-        // Draft → Confirmed is where the server enforces the credit limit.
-        persistUpdate('salesOrders', id, { stage }, setSalesOrders);
+
+        if (!isBackendEnabled() || !isServerId(id)) return { success: true };
+        try {
+            const updates = { stage, ...options };
+            const serverRecord = await pushUpdate('salesOrders', id, updates);
+            if (serverRecord) reconcile(setSalesOrders, id, serverRecord);
+            return { success: true, record: serverRecord };
+        } catch (err) {
+            console.warn('[ERP] could not update salesOrders:', err);
+            if (previousOrder) {
+                setSalesOrders((prev) => prev.map((o) => (o.id === id ? { ...o, stage: previousStage, status: previousStatus } : o)));
+            }
+            markSyncFailure(setSalesOrders, id, err);
+            showToast(`Change not saved to server — ${describeError(err)}`);
+            return { success: false, error: err };
+        }
     };
     const cancelSalesOrder = (orderId, reason = 'Cancelled by user') => {
         const order = salesOrders.find((o) => o.id === orderId);

@@ -6,14 +6,17 @@ import { api } from "../services/api";
 
 export function syncCandidateToEmployee(candidate, offers = [], jobs = []) {
   if (!candidate || candidate.stage !== "Hired") return;
+  // If candidate is already linked to an employee record, no duplicate creation needed
+  if (candidate.employee || candidate.employeeId) return;
+
   try {
     const appState = useAppStore.getState();
     const employees = appState?.employees || [];
     const alreadyExists = employees.some(
-      (e) => (candidate.email && e.email?.toLowerCase() === candidate.email.toLowerCase()) ||
-             (candidate.name && e.name?.toLowerCase() === candidate.name.toLowerCase())
+      (e) => (candidate.email && e.email?.toLowerCase().trim() === candidate.email.toLowerCase().trim()) ||
+             (candidate.name && e.name?.toLowerCase().trim() === candidate.name.toLowerCase().trim())
     );
-    if (!alreadyExists) {
+    if (!alreadyExists && employees.length > 0) {
       const matchingOffer = (offers || []).find((o) => o.candidateId === candidate.id);
       const matchedJob = (jobs || []).find((j) => j.id === candidate.jobId || j.title === candidate.position);
       const newEmp = {
@@ -95,13 +98,6 @@ const useRecruitmentStoreBase = create((set) => ({
       applications: rows[5] || s.applications,
       onboarding: rows[6] || s.onboarding,
     }));
-
-    // Auto-sync any hired candidates to the employee roster
-    loadedCandidates.forEach((cand) => {
-      if (cand.stage === "Hired") {
-        syncCandidateToEmployee(cand, loadedOffers, loadedJobs);
-      }
-    });
 
     return rows;
   },
@@ -263,6 +259,13 @@ const useRecruitmentStoreBase = create((set) => ({
 
       persist({ ...st, offers: ns, candidates: updatedCandidates });
       return { offers: ns, candidates: updatedCandidates };
+    }),
+
+  deleteOffer: (id) =>
+    set((st) => {
+      const ns = st.offers.filter((o) => o.id !== id);
+      persist({ ...st, offers: ns });
+      return { offers: ns };
     }),
 
   // ─── QUESTIONS ─────────────────────────────────────

@@ -596,6 +596,7 @@ export const RESOURCES = {
         totalSalesValue: doc.totalSalesValue !== undefined ? num(doc.totalSalesValue) : undefined,
         formalInvoiceAmount: doc.formalInvoiceAmount !== undefined ? num(doc.formalInvoiceAmount) : undefined,
         cashAmount: doc.cashAmount !== undefined ? num(doc.cashAmount) : undefined,
+        overrideCreditLimit: doc.overrideCreditLimit !== undefined ? Boolean(doc.overrideCreditLimit) : undefined,
       }),
       fromApi: (row) => ({
         ...base.fromApi(row),

@@ -826,7 +826,7 @@ export default function Leave() {
                       </div>
                     </div>
 
-                    {canApproveLeave && l.status === "Pending Review" && (
+                    {canApproveLeave && (l.status === "Pending Review" || l.status?.startsWith("Pending")) && (
                       <div className="flex items-center gap-1.5 self-end sm:self-center">
                         <span className="text-[11.5px] text-muted">Reassign:</span>
                         <select
@@ -846,22 +846,32 @@ export default function Leave() {
                     )}
                   </div>
 
-                  {/* Connected Workflows: PMS & CRM Indicators */}
-                  {(l.status === "Approved" || l.pmsTask || l.crmTask) && (
+                  {/* Connected Workflows: Multi-tier, PMS & CRM Indicators */}
+                  {(l.status === "Approved" || l.pmsTask || l.crmTask || l.currentStep > 1) && (
                     <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px]">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        PMS Delegated Task: {l.pmsTask ? `#${l.pmsTask.taskNumber} (${l.pmsTask.status})` : "Active in PMS"}
-                      </span>
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 font-medium">
-                        <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
-                        CRM Coverage Task: {l.crmTask ? `${l.crmTask.taskNumber || 'Active'} (${l.crmTask.status})` : "Active in CRM"}
-                      </span>
+                      {l.currentStep > 1 && l.status?.startsWith("Pending") && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200 font-semibold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                          Workflow Tier {l.currentStep} ({l.nextApproverRole || "Escalated"})
+                        </span>
+                      )}
+                      {(l.status === "Approved" || l.pmsTask) && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                          PMS Delegated Task: {l.pmsTask ? `#${l.pmsTask.taskNumber} (${l.pmsTask.status})` : "Active in PMS"}
+                        </span>
+                      )}
+                      {(l.status === "Approved" || l.crmTask) && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-800 border border-sky-200 font-medium">
+                          <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                          CRM Coverage Task: {l.crmTask ? `${l.crmTask.taskNumber || 'Active'} (${l.crmTask.status})` : "Active in CRM"}
+                        </span>
+                      )}
                     </div>
                   )}
 
                   {/* Informational Overburden Alert */}
-                  {isOverburdened && l.status === "Pending Review" && (
+                  {isOverburdened && (l.status === "Pending Review" || l.status?.startsWith("Pending")) && (
                     <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl flex items-center gap-2 text-[11.5px] text-amber-800">
                       <AlertTriangle size={14} className="shrink-0 text-amber-600" />
                       <span>{currentDelegate} is currently assigned to {otherDelegations} other coverage delegations.</span>
@@ -874,7 +884,7 @@ export default function Leave() {
                     </div>
                   )}
 
-                  {canApproveLeave && l.status === "Pending Review" && (
+                  {canApproveLeave && (l.status === "Pending Review" || l.status?.startsWith("Pending")) && (
                     <div className="flex flex-wrap lg:flex-nowrap items-center justify-end gap-2 pt-1 border-t border-bdr/40">
                       <button
                         type="button"

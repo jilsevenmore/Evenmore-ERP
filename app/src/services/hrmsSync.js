@@ -171,8 +171,135 @@ export const HRMS_RESOURCES = {
       _synced: true,
     }),
   },
-  teams: plain('/hrms/teams/'),
-  holidays: dated('/hrms/holidays/', ['date']),
+  teams: {
+    path: '/hrms/teams/',
+    toApi: (team) => {
+      const memberIds = Array.isArray(team.memberIds)
+        ? team.memberIds
+        : Array.isArray(team.members)
+          ? team.members
+          : undefined;
+      const headcount = !Array.isArray(team.members) && (typeof team.members === 'number' || !isNaN(Number(team.members)))
+        ? Number(team.members)
+        : (memberIds ? memberIds.length : undefined);
+      return compact({
+        code: team.code || team.teamCode || undefined,
+        name: team.name,
+        department: team.dept || team.department || undefined,
+        departmentId: team.departmentId || team.deptId || undefined,
+        dept: team.dept || team.department || undefined,
+        lead: team.leadId || team.lead || undefined,
+        leadId: team.leadId || undefined,
+        leadName: team.leadName || (typeof team.lead === 'string' ? team.lead : undefined),
+        approver: team.approverId || team.approver || undefined,
+        approverId: team.approverId || undefined,
+        approverName: team.approverName || (typeof team.approver === 'string' ? team.approver : undefined),
+        memberIds: memberIds,
+        members: memberIds || headcount,
+        headcount: headcount,
+        description: team.description || undefined,
+        status: team.status || undefined,
+      });
+    },
+    fromApi: (row) => ({
+      ...row,
+      id: row.id,
+      code: row.code || '',
+      teamCode: row.code || '',
+      name: row.name || '',
+      dept: row.dept || row.department || '',
+      department: row.dept || row.department || '',
+      departmentId: row.departmentId || undefined,
+      lead: row.lead || row.leadName || '',
+      leadName: row.leadName || row.lead || '',
+      leadId: row.leadId || undefined,
+      approver: row.approver || row.approverName || '',
+      approverName: row.approverName || row.approver || '',
+      approverId: row.approverId || undefined,
+      members: Array.isArray(row.members) ? row.members.length : (row.headcount ?? row.memberCount ?? row.members ?? 0),
+      memberIds: Array.isArray(row.memberIds)
+        ? row.memberIds
+        : (Array.isArray(row.membersDetail) ? row.membersDetail.map((m) => m.id) : (Array.isArray(row.members) ? row.members : [])),
+      membersDetail: Array.isArray(row.membersDetail) ? row.membersDetail : [],
+      memberCount: row.headcount ?? row.memberCount ?? (Array.isArray(row.members) ? row.members.length : 0),
+      headcount: row.headcount ?? row.memberCount ?? 0,
+      description: row.description || '',
+      status: row.status || 'Active',
+      _synced: true,
+    }),
+  },
+  holidays: {
+    path: '/hrms/holidays/',
+    toApi: (h) => compact({
+      id: h.id,
+      name: h.name,
+      date: isoOut(h.date),
+      holidayType: h.holidayType || h.type,
+      isOptional: h.isOptional !== undefined ? h.isOptional : (h.type === 'Optional' || h.type === 'Restricted'),
+      status: h.status || 'Published',
+      description: h.description,
+      locationId: h.locationId,
+      departmentId: h.departmentId,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      date: isoIn(row.date),
+      type: row.holidayType || (row.isOptional ? 'Optional' : 'Gazetted'),
+      appliesTo: row.departmentName
+        ? `${row.departmentName} Dept`
+        : (row.locationName ? `${row.locationName} Hub` : 'All Hubs & Remote'),
+      status: row.status || 'Published',
+      _synced: true,
+    }),
+  },
+  workSchedules: {
+    path: '/hrms/work-schedules/',
+    toApi: (s) => compact({
+      id: s.id,
+      name: s.name,
+      code: s.code,
+      shiftType: s.shiftType || 'Regular',
+      shiftStart: s.shiftStart || '09:30',
+      shiftEnd: s.shiftEnd || '18:30',
+      breakDuration: s.breakDuration !== undefined ? num(s.breakDuration) : 60,
+      workingHours: s.workingHours !== undefined ? num(s.workingHours) : 8.0,
+      workingDays: Array.isArray(s.workingDays) ? s.workingDays : [0, 1, 2, 3, 4],
+      weeklyOffs: Array.isArray(s.weeklyOffs) ? s.weeklyOffs : [5, 6],
+      departmentId: s.departmentId || null,
+      teamId: s.teamId || null,
+      locationId: s.locationId || null,
+      isDefault: !!s.isDefault,
+      status: s.status || 'Active',
+      effectiveFrom: isoOut(s.effectiveFrom),
+      effectiveTo: isoOut(s.effectiveTo),
+      description: s.description,
+    }),
+    fromApi: (row) => ({
+      id: row.id,
+      name: row.name,
+      code: row.code || '',
+      shiftType: row.shiftType || 'Regular',
+      shiftStart: row.shiftStart ? String(row.shiftStart).slice(0, 5) : '09:30',
+      shiftEnd: row.shiftEnd ? String(row.shiftEnd).slice(0, 5) : '18:30',
+      breakDuration: row.breakDuration ?? 60,
+      workingHours: Number(row.workingHours ?? 8),
+      workingDays: row.workingDays || [0, 1, 2, 3, 4],
+      weeklyOffs: row.weeklyOffs || [5, 6],
+      departmentId: row.departmentId,
+      departmentName: row.departmentName || '',
+      teamId: row.teamId,
+      teamName: row.teamName || '',
+      locationId: row.locationId,
+      locationName: row.locationName || '',
+      isDefault: !!row.isDefault,
+      status: row.status || 'Active',
+      effectiveFrom: isoIn(row.effectiveFrom),
+      effectiveTo: isoIn(row.effectiveTo),
+      description: row.description || '',
+      assignedCount: row.assignedCount || 0,
+      _synced: true,
+    }),
+  },
 
   // ── leave ─────────────────────────────────────────────────────────────────
   leaves: {
@@ -329,7 +456,59 @@ export const HRMS_RESOURCES = {
   candidates: dated('/hrms/candidates/', ['appliedDate']),
   applications: dated('/hrms/applications/', ['appliedDate']),
   interviews: dated('/hrms/interviews/', ['scheduledDate', 'date']),
-  offers: dated('/hrms/offers/', ['offerDate', 'joiningDate']),
+  offers: {
+    path: '/hrms/offers/',
+    toApi: (o) => compact({
+      applicationId: o.applicationId || undefined,
+      candidateId: o.candidateId || undefined,
+      candidateName: o.candidateName || o.candidate || undefined,
+      email: o.email || undefined,
+      position: o.position || o.role || undefined,
+      department: o.dept || o.department || undefined,
+      dept: o.dept || o.department || undefined,
+      location: o.location || undefined,
+      jobType: o.jobType || undefined,
+      workMode: o.workMode || undefined,
+      salary: o.salary || undefined,
+      offeredCtc: o.offeredCtc !== undefined ? num(o.offeredCtc) : undefined,
+      joiningDate: isoOut(o.joiningDate),
+      expiryDate: isoOut(o.expiryDate),
+      reportingManager: o.reportingManager || undefined,
+      probationPeriod: o.probationPeriod || undefined,
+      letterContent: o.letterContent || undefined,
+      approvalChainId: o.approvalChainId || undefined,
+      status: o.status || undefined,
+      notes: o.notes || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      id: row.id,
+      candidateName: row.candidateName || row.candidate || 'Candidate',
+      candidateId: row.candidateId || undefined,
+      email: row.email || '',
+      position: row.position || 'Staff Member',
+      dept: row.dept || row.department || '',
+      department: row.department || row.dept || '',
+      location: row.location || 'HQ',
+      jobType: row.jobType || 'Full-time',
+      workMode: row.workMode || 'Hybrid',
+      salary: row.salary || (row.offeredCtc ? `$${Number(row.offeredCtc).toLocaleString()} / year` : 'Competitive'),
+      joiningDate: displayIn(row.joiningDate),
+      expiryDate: displayIn(row.expiryDate),
+      reportingManager: row.reportingManager || '',
+      probationPeriod: row.probationPeriod || '3 Months',
+      letterContent: row.letterContent || null,
+      approvalChainId: row.approvalChainId || null,
+      currentStep: row.currentStep || 1,
+      approvalHistory: row.approvalHistory || [],
+      approverName: row.approverName || '',
+      decidedAt: row.decidedAt || null,
+      status: row.status || 'Pending',
+      sentDate: row.sentDate || displayIn(row.sent_at || row.created_at) || '',
+      _synced: true,
+    }),
+
+  },
   onboarding: dated('/hrms/onboarding/', ['startDate']),
   // The page names a question `text` / `enabled`; the API calls them `question` / `isActive`.
   recruitmentQuestions: {
@@ -466,10 +645,114 @@ export const HRMS_RESOURCES = {
     }),
   },
 
-  // ── employee lifecycle ────────────────────────────────────────────────────
-  resignations: dated('/hrms/resignations/', ['resignationDate', 'lastWorkingDay']),
-  terminations: dated('/hrms/terminations/', ['terminationDate']),
-  complaints: dated('/hrms/complaints/', ['raisedDate']),
+  resignations: {
+    path: '/hrms/resignations/',
+    toApi: (r) => compact({
+      employeeId: r.employeeId || undefined,
+      employee: r.employee || undefined,
+      submittedOn: isoOut(r.submittedDate || r.submittedOn),
+      submittedDate: isoOut(r.submittedDate || r.submittedOn),
+      noticePeriod: r.noticePeriod || undefined,
+      noticePeriodDays: r.noticePeriodDays !== undefined ? num(r.noticePeriodDays) : undefined,
+      lastWorkingDay: isoOut(r.lastWorkingDay),
+      handoverTo: r.handoverTo || undefined,
+      handoverToId: r.handoverToId || undefined,
+      reason: r.reason || undefined,
+      status: r.status || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      id: row.id,
+      employee: row.employee || row.employeeName || 'Staff Member',
+      employeeName: row.employeeName || row.employee || 'Staff Member',
+      employeeId: row.employeeId || row.employeeCode || row.id,
+      employeeCode: row.employeeCode || row.employeeId || '',
+      dept: row.dept || row.department || '',
+      role: row.role || row.designation || 'Staff',
+      submittedDate: displayIn(row.submittedDate || row.submittedOn) || row.submittedDate || row.submittedOn || '',
+      submittedOn: displayIn(row.submittedOn || row.submittedDate) || row.submittedOn || row.submittedDate || '',
+      noticePeriod: row.noticePeriod || `${row.noticePeriodDays || 60} Days`,
+      noticePeriodDays: row.noticePeriodDays || 60,
+      lastWorkingDay: displayIn(row.lastWorkingDay) || row.lastWorkingDay || '',
+      handoverTo: row.handoverTo || row.handoverName || 'Pending Assignment',
+      reason: row.reason || '',
+      status: row.status || 'Pending Manager Review',
+      _synced: true,
+    }),
+  },
+  terminations: {
+    path: '/hrms/terminations/',
+    toApi: (t) => compact({
+      employeeId: t.employeeId || undefined,
+      employee: t.employee || undefined,
+      terminationType: t.terminationType || undefined,
+      noticeDate: isoOut(t.noticeDate),
+      exitDate: isoOut(t.exitDate || t.lastWorkingDay),
+      lastWorkingDay: isoOut(t.lastWorkingDay || t.exitDate),
+      severance: t.severance || undefined,
+      reason: t.reason || undefined,
+      letterContent: t.letterContent || undefined,
+      settlement_amount: t.settlementAmount !== undefined ? num(t.settlementAmount) : undefined,
+      status: t.status || undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      id: row.id,
+      employee: row.employee || row.employeeName || 'Staff Member',
+      employeeName: row.employeeName || row.employee || 'Staff Member',
+      employeeId: row.employeeId || row.employeeCode || row.id,
+      employeeCode: row.employeeCode || row.employeeId || '',
+      dept: row.dept || row.department || '',
+      role: row.role || row.designation || 'Staff',
+      terminationType: row.terminationType || 'Performance / Restructuring',
+      noticeDate: displayIn(row.noticeDate) || row.noticeDate || '',
+      exitDate: displayIn(row.exitDate || row.lastWorkingDay) || row.exitDate || row.lastWorkingDay || '',
+      lastWorkingDay: displayIn(row.lastWorkingDay || row.exitDate) || row.lastWorkingDay || row.exitDate || '',
+      severance: row.severance || '1 Month Gross Settlement',
+      reason: row.reason || '',
+      letterContent: row.letterContent || null,
+      status: row.status || 'In Exit Clearance',
+      _synced: true,
+    }),
+  },
+  complaints: {
+    path: '/hrms/complaints/',
+    toApi: (c) => compact({
+      raisedByEmployeeId: c.raisedByEmployeeId || undefined,
+      complainant: c.complainant || c.raisedBy || undefined,
+      againstEmployeeId: c.againstEmployeeId || undefined,
+      against: c.against || c.againstName || undefined,
+      category: c.category || undefined,
+      description: c.summary || c.description || undefined,
+      summary: c.summary || c.description || undefined,
+      priority: c.priority || undefined,
+      assignedInvestigator: c.assignedInvestigator || undefined,
+      assigned_to: c.assignedTo || c.assigned_to || undefined,
+      filedOn: isoOut(c.filedOn),
+      isAnonymous: Boolean(c.isAnonymous),
+      status: c.status || undefined,
+      resolution: c.resolution || undefined,
+      comments: Array.isArray(c.comments) ? c.comments : undefined,
+    }),
+    fromApi: (row) => ({
+      ...row,
+      id: row.id,
+      complainant: row.complainant || row.raisedBy || 'Staff Member',
+      raisedBy: row.raisedBy || row.complainant || 'Staff Member',
+      against: row.against || row.againstName || 'Management / General',
+      againstName: row.againstName || row.against || 'Management / General',
+      category: row.category || 'General Workplace',
+      priority: row.priority || 'Medium',
+      assignedInvestigator: row.assignedInvestigator || row.assigned_investigator_name || 'Ethics Committee',
+      filedOn: displayIn(row.filedOn) || row.filedOn || (row.created_at ? row.created_at.slice(0, 10) : ''),
+      summary: row.summary || row.description || '',
+      description: row.description || row.summary || '',
+      status: row.status || 'Open',
+      resolution: row.resolution || '',
+      comments: Array.isArray(row.comments) ? row.comments : [],
+      _synced: true,
+    }),
+  },
   documents: {
     path: '/hrms/documents/',
     toApi: (doc) => {
@@ -564,7 +847,7 @@ export const hrmsSync = createSync(HRMS_RESOURCES, { label: 'hrmsSync' });
 /** What the HRMS shell loads on sign-in. The rest load per screen. */
 export const HRMS_CORE_KEYS = [
   'employees', 'departments', 'designations', 'locations', 'teams', 'holidays',
-  'leaves', 'leaveTypes', 'attendance', 'payroll',
+  'workSchedules', 'leaves', 'leaveTypes', 'attendance', 'payroll',
 ];
 
 /** The wider set, for screens that need their own collection. */
@@ -756,4 +1039,17 @@ export async function submitPunchCorrection(payload) {
   return api.post('/hrms/attendance/correct-punch/', payload);
 }
 
+/** Add an employee to a squad. */
+export async function addTeamMember(teamId, employeeId) {
+  if (!isBackendEnabled()) return null;
+  return api.post(`/hrms/teams/${teamId}/add-member/`, { employeeId });
+}
+
+/** Remove an employee from a squad. */
+export async function removeTeamMember(teamId, employeeId) {
+  if (!isBackendEnabled()) return null;
+  return api.post(`/hrms/teams/${teamId}/remove-member/`, { employeeId });
+}
+
 export default hrmsSync;
+
