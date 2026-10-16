@@ -1,10 +1,26 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useERP } from '../../context/ERPContext';
 import { DataTable } from '../../components/ui/DataTable';
 import { Button } from '../../components/ui/Button';
-import { Plus, Layers, Clock, Sliders, Trash2, X, Boxes, Wrench, CheckCircle2, Cpu } from 'lucide-react';
+import {
+    Plus,
+    Layers,
+    Clock,
+    Sliders,
+    Trash2,
+    X,
+    Boxes,
+    Wrench,
+    CheckCircle2,
+    Cpu,
+    UploadCloud,
+    Image as ImageIcon,
+    Check,
+} from 'lucide-react';
 import { PageHeader } from '../../components/common/PageHeader';
 import { useLocation, Link, useNavigate } from 'react-router-dom';
+import { uploadFileToBackend } from '../../services/fileUploadService';
+import { resolveFileUrl } from '../../services/api';
 
 const categoryGuide = {
     title: 'Category Hierarchy & Taxonomy',
@@ -78,11 +94,28 @@ export const CategoriesPage = () => {
     const [isActive, setIsActive] = useState(true);
     const [formError, setFormError] = useState('');
 
+    // Category Image Upload State
+    const categoryFileInputRef = useRef(null);
+    const [categoryImagePreview, setCategoryImagePreview] = useState('');
+    const [selectedCategoryImageFile, setSelectedCategoryImageFile] = useState(null);
+    const [categoryImageFileId, setCategoryImageFileId] = useState('');
+    const [categoryImageError, setCategoryImageError] = useState('');
+    const [isUploadingCategoryImage, setIsUploadingCategoryImage] = useState(false);
+    const [isDraggingCategoryFile, setIsDraggingCategoryFile] = useState(false);
+
     // Item Type Drawer State
     const [newTypeName, setNewTypeName] = useState('');
     const [newTypeCode, setNewTypeCode] = useState('');
     const [newTypeShape, setNewTypeShape] = useState('Flat');
     const [newTypeDesc, setNewTypeDesc] = useState('');
+
+    // Item Type Image State
+    const typeFileInputRef = useRef(null);
+    const [typeImagePreview, setTypeImagePreview] = useState('');
+    const [selectedTypeImageFile, setSelectedTypeImageFile] = useState(null);
+    const [typeImageFileId, setTypeImageFileId] = useState('');
+    const [typeImageError, setTypeImageError] = useState('');
+    const [isUploadingTypeImage, setIsUploadingTypeImage] = useState(false);
 
     const displayCategories = useMemo(() => {
         let list = categories;
@@ -99,6 +132,79 @@ export const CategoriesPage = () => {
         return list;
     }, [categories, selectedItemTypeFilter, statusFilter]);
 
+    // Category Image Handlers
+    const handleCategoryFileSelect = (file) => {
+        if (!file) return;
+        setCategoryImageError('');
+
+        const validExtensions = /\.(png|jpe?g|webp|svg|gif)$/i;
+        if (!file.type.startsWith('image/') && !validExtensions.test(file.name)) {
+            setCategoryImageError('Please select a valid image file (PNG, JPG, JPEG, WEBP, SVG, or GIF).');
+            return;
+        }
+
+        const maxSizeBytes = 25 * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            setCategoryImageError('Image file size exceeds the 25MB limit.');
+            return;
+        }
+
+        setSelectedCategoryImageFile(file);
+        try {
+            setCategoryImagePreview(URL.createObjectURL(file));
+        } catch {
+            const reader = new FileReader();
+            reader.onload = (e) => setCategoryImagePreview(e.target.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleRemoveCategoryImage = () => {
+        setCategoryImagePreview('');
+        setSelectedCategoryImageFile(null);
+        setCategoryImageFileId(null);
+        setCategoryImageError('');
+        if (categoryFileInputRef.current) {
+            categoryFileInputRef.current.value = '';
+        }
+    };
+
+    // Item Type Image Handlers
+    const handleTypeFileSelect = (file) => {
+        if (!file) return;
+        setTypeImageError('');
+
+        const validExtensions = /\.(png|jpe?g|webp|svg|gif)$/i;
+        if (!file.type.startsWith('image/') && !validExtensions.test(file.name)) {
+            setTypeImageError('Please select a valid image file (PNG, JPG, JPEG, WEBP, SVG, or GIF).');
+            return;
+        }
+
+        if (file.size > 25 * 1024 * 1024) {
+            setTypeImageError('Image size exceeds 25MB limit.');
+            return;
+        }
+
+        setSelectedTypeImageFile(file);
+        try {
+            setTypeImagePreview(URL.createObjectURL(file));
+        } catch {
+            const reader = new FileReader();
+            reader.onload = (e) => setTypeImagePreview(e.target.result);
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const handleRemoveTypeImage = () => {
+        setTypeImagePreview('');
+        setSelectedTypeImageFile(null);
+        setTypeImageFileId(null);
+        setTypeImageError('');
+        if (typeFileInputRef.current) {
+            typeFileInputRef.current.value = '';
+        }
+    };
+
     // Open Add Modal
     const handleOpenAdd = () => {
         setEditingCategory(null);
@@ -111,6 +217,10 @@ export const CategoriesPage = () => {
         setLeadTime('7');
         setIsActive(true);
         setFormError('');
+        setCategoryImagePreview('');
+        setSelectedCategoryImageFile(null);
+        setCategoryImageFileId('');
+        setCategoryImageError('');
         setShowAddModal(true);
     };
 
@@ -126,10 +236,15 @@ export const CategoriesPage = () => {
         setLeadTime(String(c.leadTimeDays ?? 7));
         setIsActive(c.isActive !== false);
         setFormError('');
+        const existingImg = c.image || c.imageUrl || c.image_url || '';
+        setCategoryImagePreview(existingImg ? resolveFileUrl(existingImg) : '');
+        setSelectedCategoryImageFile(null);
+        setCategoryImageFileId(c.imageFileId || c.image_file_id || '');
+        setCategoryImageError('');
         setShowAddModal(true);
     };
 
-    const handleSaveCategory = (e) => {
+    const handleSaveCategory = async (e) => {
         e.preventDefault();
         setFormError('');
         if (!name.trim()) return;
@@ -148,6 +263,38 @@ export const CategoriesPage = () => {
 
         const targetUnit = units.find((u) => u.id === selectedDefaultUnitId);
 
+        let finalFileId = categoryImageFileId || null;
+        let finalImageUrl = categoryImagePreview || '';
+
+        if (selectedCategoryImageFile) {
+            try {
+                setIsUploadingCategoryImage(true);
+                setCategoryImageError('');
+                const uploadRes = await uploadFileToBackend(
+                    selectedCategoryImageFile,
+                    selectedCategoryImageFile.name,
+                    'category_image',
+                    { returnDetails: true }
+                );
+                if (uploadRes?.fileId) {
+                    finalFileId = uploadRes.fileId;
+                }
+                if (uploadRes?.url) {
+                    finalImageUrl = uploadRes.url;
+                }
+            } catch (err) {
+                console.error('Failed to upload category image:', err);
+                setCategoryImageError('Failed to upload category image: ' + (err.message || 'Server error'));
+                setIsUploadingCategoryImage(false);
+                return;
+            } finally {
+                setIsUploadingCategoryImage(false);
+            }
+        } else if (!categoryImagePreview) {
+            finalFileId = null;
+            finalImageUrl = '';
+        }
+
         if (editingCategory) {
             updateCategory(editingCategory.id, {
                 name: name.trim(),
@@ -162,6 +309,9 @@ export const CategoriesPage = () => {
                 leadTimeDays: parseInt(leadTime, 10) || 7,
                 hasSubParts: false,
                 isActive: Boolean(isActive),
+                imageFileId: finalFileId,
+                image: finalImageUrl,
+                imageUrl: finalImageUrl,
             });
         } else {
             addCategory({
@@ -177,6 +327,9 @@ export const CategoriesPage = () => {
                 leadTimeDays: parseInt(leadTime, 10) || 7,
                 hasSubParts: false,
                 isActive: Boolean(isActive),
+                imageFileId: finalFileId,
+                image: finalImageUrl,
+                imageUrl: finalImageUrl,
                 customFields: [],
             });
         }
@@ -202,19 +355,55 @@ export const CategoriesPage = () => {
         }
     };
 
-    const handleAddTypeFromDrawer = (e) => {
+    const handleAddTypeFromDrawer = async (e) => {
         e.preventDefault();
         if (!newTypeName.trim()) return;
+
+        let finalFileId = typeImageFileId || null;
+        let finalImageUrl = typeImagePreview || '';
+
+        if (selectedTypeImageFile) {
+            try {
+                setIsUploadingTypeImage(true);
+                setTypeImageError('');
+                const uploadRes = await uploadFileToBackend(
+                    selectedTypeImageFile,
+                    selectedTypeImageFile.name,
+                    'item_type_image',
+                    { returnDetails: true }
+                );
+                if (uploadRes?.fileId) {
+                    finalFileId = uploadRes.fileId;
+                }
+                if (uploadRes?.url) {
+                    finalImageUrl = uploadRes.url;
+                }
+            } catch (err) {
+                console.error('Failed to upload item type image:', err);
+                setTypeImageError('Failed to upload item type image: ' + (err.message || 'Server error'));
+                setIsUploadingTypeImage(false);
+                return;
+            } finally {
+                setIsUploadingTypeImage(false);
+            }
+        }
+
         addItemType({
             name: newTypeName.trim(),
             code: (newTypeCode || 'TYPE').toUpperCase(),
             shapeProfile: newTypeShape,
             description: newTypeDesc.trim(),
             isActive: true,
+            imageFileId: finalFileId,
+            image: finalImageUrl,
+            imageUrl: finalImageUrl,
         });
         setNewTypeName('');
         setNewTypeCode('');
         setNewTypeDesc('');
+        setTypeImagePreview('');
+        setSelectedTypeImageFile(null);
+        setTypeImageFileId('');
     };
 
     // State for managing custom fields
@@ -266,19 +455,43 @@ export const CategoriesPage = () => {
         {
             key: 'name',
             header: 'Category Hierarchy Name',
-            width: '26%',
-            render: (c) => (
-              <div>
-                <span className="font-bold text-text flex items-center gap-1.5">
-                  <Layers size={13} className="text-muted"/> {c.name}
-                </span>
-                {c.description && (
-                  <p className="text-[11px] text-muted truncate max-w-sm mt-0.5" title={c.description}>
-                    {c.description}
-                  </p>
-                )}
-              </div>
-            ),
+            width: '28%',
+            render: (c) => {
+                const imgUrl = c.image || c.imageUrl || c.image_url;
+                const resolvedUrl = imgUrl ? resolveFileUrl(imgUrl) : '';
+                return (
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden shadow-2xs">
+                            {resolvedUrl ? (
+                                <img
+                                    src={resolvedUrl}
+                                    alt={c.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                        e.target.style.display = 'none';
+                                    }}
+                                />
+                            ) : (
+                                <Layers size={18} className="text-slate-400" />
+                            )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <span className="font-bold text-text flex items-center gap-1.5 truncate">
+                                {c.name}
+                            </span>
+                            {c.description ? (
+                                <p className="text-[11px] text-muted truncate max-w-sm mt-0.5" title={c.description}>
+                                    {c.description}
+                                </p>
+                            ) : (
+                                <span className="text-[10px] text-slate-400 uppercase tracking-wider font-mono">
+                                    {c.code || 'CAT'}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                );
+            },
         },
         {
             key: 'itemType',
@@ -620,6 +833,88 @@ export const CategoriesPage = () => {
                                 </div>
                             </div>
 
+                            {/* Optional Category Image Upload */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block font-semibold text-slate-700">
+                                        Category Image <span className="text-slate-400 font-normal">(Optional)</span>
+                                    </label>
+                                    {categoryImagePreview && (
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveCategoryImage}
+                                            className="text-[11px] text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <Trash2 size={12} /> Remove
+                                        </button>
+                                    )}
+                                </div>
+
+                                <input
+                                    type="file"
+                                    ref={categoryFileInputRef}
+                                    onChange={(e) => e.target.files && handleCategoryFileSelect(e.target.files[0])}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+
+                                {categoryImagePreview ? (
+                                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 flex items-center gap-3">
+                                        <img
+                                            src={categoryImagePreview}
+                                            alt="Category Preview"
+                                            className="w-16 h-16 rounded-md object-contain bg-white border border-slate-200 shadow-2xs shrink-0"
+                                        />
+                                        <div className="space-y-1 flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-slate-800 flex items-center gap-1 truncate">
+                                                <Check size={13} className="text-emerald-600 shrink-0" /> Image Selected
+                                            </p>
+                                            <p className="text-[11px] text-slate-500">
+                                                Shown in category catalog list and filters.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => categoryFileInputRef.current?.click()}
+                                                className="px-2 py-0.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-medium text-[11px] rounded transition cursor-pointer"
+                                            >
+                                                Change Image
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div
+                                        onDragOver={(e) => {
+                                            e.preventDefault();
+                                            setIsDraggingCategoryFile(true);
+                                        }}
+                                        onDragLeave={() => setIsDraggingCategoryFile(false)}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            setIsDraggingCategoryFile(false);
+                                            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                                                handleCategoryFileSelect(e.dataTransfer.files[0]);
+                                            }
+                                        }}
+                                        onClick={() => categoryFileInputRef.current?.click()}
+                                        className={`border border-dashed rounded-lg p-3 flex flex-col items-center justify-center transition cursor-pointer text-center bg-[#F8F9FA] hover:bg-white ${
+                                            isDraggingCategoryFile ? 'border-blue-500 bg-blue-50/50' : 'border-[#CED4DA]'
+                                        }`}
+                                    >
+                                        <UploadCloud size={20} className="text-slate-400 mb-1" />
+                                        <p className="text-xs font-semibold text-slate-700">
+                                            Click or drag category image here
+                                        </p>
+                                        <p className="text-[10px] text-slate-400 mt-0.5">
+                                            PNG, JPG, WEBP, SVG up to 25MB (Optional)
+                                        </p>
+                                    </div>
+                                )}
+
+                                {categoryImageError && (
+                                    <p className="text-[11px] text-rose-600 mt-1 font-medium">{categoryImageError}</p>
+                                )}
+                            </div>
+
                             <div className="flex items-center gap-2 pt-2 pb-1">
                                 <input
                                     type="checkbox"
@@ -719,6 +1014,7 @@ export const CategoriesPage = () => {
                             <table className="w-full text-xs text-left">
                                 <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-200">
                                     <tr>
+                                        <th className="p-2.5 w-12 text-center">Photo</th>
                                         <th className="p-2.5">Code</th>
                                         <th className="p-2.5">Item Type Name</th>
                                         <th className="p-2.5">Shape Profile</th>
@@ -728,42 +1024,62 @@ export const CategoriesPage = () => {
                                 <tbody className="divide-y divide-slate-100">
                                     {itemTypes.length === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="p-4 text-center text-slate-400 italic">
+                                            <td colSpan={5} className="p-4 text-center text-slate-400 italic">
                                                 No item types registered yet.
                                             </td>
                                         </tr>
                                     ) : (
-                                        itemTypes.map((it) => (
-                                            <tr key={it.id} className="hover:bg-slate-50/60">
-                                                <td className="p-2.5 font-mono font-bold text-slate-700">{it.code}</td>
-                                                <td className="p-2.5 font-semibold text-slate-800">{it.name}</td>
-                                                <td className="p-2.5 text-slate-600">{it.shapeProfile || '—'}</td>
-                                                <td className="p-2.5 text-center">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => toggleItemTypeActive(it.id, it.isActive !== false)}
-                                                        className={`px-2 py-0.5 rounded-full text-[10px] font-semibold cursor-pointer ${
-                                                            it.isActive !== false
-                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                                : 'bg-slate-100 text-slate-500 border border-slate-300'
-                                                        }`}
-                                                    >
-                                                        {it.isActive !== false ? 'Active' : 'Inactive'}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        ))
+                                        itemTypes.map((it) => {
+                                            const typeImg = it.image || it.imageUrl;
+                                            const resolvedTypeImg = typeImg ? resolveFileUrl(typeImg) : '';
+                                            return (
+                                                <tr key={it.id} className="hover:bg-slate-50/60">
+                                                    <td className="p-2.5 text-center">
+                                                        <div className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center shrink-0 overflow-hidden mx-auto shadow-2xs">
+                                                            {resolvedTypeImg ? (
+                                                                <img
+                                                                    src={resolvedTypeImg}
+                                                                    alt={it.name}
+                                                                    className="w-full h-full object-cover"
+                                                                    onError={(e) => {
+                                                                        e.target.style.display = 'none';
+                                                                    }}
+                                                                />
+                                                            ) : (
+                                                                <Layers size={14} className="text-slate-400" />
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-2.5 font-mono font-bold text-slate-700">{it.code}</td>
+                                                    <td className="p-2.5 font-semibold text-slate-800">{it.name}</td>
+                                                    <td className="p-2.5 text-slate-600">{it.shapeProfile || '—'}</td>
+                                                    <td className="p-2.5 text-center">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => toggleItemTypeActive(it.id, it.isActive !== false)}
+                                                            className={`px-2 py-0.5 rounded-full text-[10px] font-semibold cursor-pointer ${
+                                                                it.isActive !== false
+                                                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                    : 'bg-slate-100 text-slate-500 border border-slate-300'
+                                                            }`}
+                                                        >
+                                                            {it.isActive !== false ? 'Active' : 'Inactive'}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
                         </div>
 
                         {/* Quick Add Form */}
-                        <form onSubmit={handleAddTypeFromDrawer} className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2 text-xs">
+                        <form onSubmit={handleAddTypeFromDrawer} className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5 text-xs">
                             <span className="font-bold text-slate-800 block">Add New Item Type</span>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                 <div>
-                                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Name</label>
+                                    <label className="block text-[11px] font-medium text-slate-600 mb-1">Name *</label>
                                     <input
                                         required
                                         value={newTypeName}
@@ -799,9 +1115,66 @@ export const CategoriesPage = () => {
                                     </select>
                                 </div>
                             </div>
+
+                            {/* Optional Item Type Image */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-[11px] font-medium text-slate-600">
+                                        Item Type Photo <span className="text-slate-400 font-normal">(Optional)</span>
+                                    </label>
+                                    {typeImagePreview && (
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveTypeImage}
+                                            className="text-[10px] text-rose-600 hover:text-rose-800 font-semibold flex items-center gap-1 cursor-pointer"
+                                        >
+                                            <Trash2 size={11} /> Remove
+                                        </button>
+                                    )}
+                                </div>
+                                <input
+                                    type="file"
+                                    ref={typeFileInputRef}
+                                    onChange={(e) => e.target.files && handleTypeFileSelect(e.target.files[0])}
+                                    accept="image/*"
+                                    className="hidden"
+                                />
+                                {typeImagePreview ? (
+                                    <div className="flex items-center gap-2.5 p-2 bg-white border border-slate-200 rounded-lg">
+                                        <img
+                                            src={typeImagePreview}
+                                            alt="Preview"
+                                            className="w-9 h-9 rounded-md object-contain border border-slate-200 bg-slate-50 shrink-0"
+                                        />
+                                        <span className="text-[11px] font-medium text-slate-700 flex items-center gap-1 truncate">
+                                            <Check size={12} className="text-emerald-600 shrink-0" /> Photo attached
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => typeFileInputRef.current?.click()}
+                                            className="ml-auto text-[11px] text-blue-600 hover:underline font-semibold shrink-0 cursor-pointer"
+                                        >
+                                            Change
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => typeFileInputRef.current?.click()}
+                                        className="w-full py-2 px-3 bg-white border border-dashed border-slate-300 hover:border-blue-400 rounded-lg text-[11px] text-slate-500 hover:text-slate-700 flex items-center justify-center gap-1.5 transition cursor-pointer"
+                                    >
+                                        <UploadCloud size={14} className="text-slate-400" />
+                                        <span>Click to upload item type photo (optional)</span>
+                                    </button>
+                                )}
+                                {typeImageError && (
+                                    <p className="text-[10px] text-rose-600 mt-1 font-medium">{typeImageError}</p>
+                                )}
+                            </div>
+
                             <div className="flex justify-end pt-1">
-                                <Button type="submit" size="sm" icon={Plus}>
-                                    Register Item Type
+                                <Button type="submit" size="sm" icon={Plus} disabled={isUploadingTypeImage}>
+                                    {isUploadingTypeImage ? 'Saving...' : 'Register Item Type'}
                                 </Button>
                             </div>
                         </form>
