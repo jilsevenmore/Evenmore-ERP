@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useLocation } from "react-router-dom";
-import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase, Search } from "lucide-react";
+import { Download, ChevronRight, ChevronLeft, ChevronDown, Trash2, Award, TrendingUp, AlertTriangle, ArrowRightLeft, Plus, X, Calendar, FileText, Briefcase, Search, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import Modal from "../../../components/ui/Modal";
 import { useAppStore } from "../../../stores/appStore";
 import { useRecruitmentStore, syncCandidateToEmployee } from "../../../stores/recruitmentStore";
@@ -16,7 +16,10 @@ import {
   fetchEmployeeWarnings,
   createEmployeeWarning,
   fetchEmployeeAwards,
-  createEmployeeAward
+  createEmployeeAward,
+  confirmEmployeeProbation,
+  extendEmployeeProbation,
+  evaluateEmployeeLifecycle,
 } from "../../../services/upgradeService";
 import PerformanceReportModal from "../performance/PerformanceReportModal";
 
@@ -38,10 +41,17 @@ function LoginBadge({ login }) {
 const statusStyles = {
   Active: { background: "#e6f4ea", color: "#15803d", border: "#a7f3d0" },
   "On Leave": { background: "#fef3c7", color: "#b45309", border: "#fde68a" },
-  Probation: { background: "#f1f5f9", color: "#475569", border: "#cbd5e1" },
+  Probation: { background: "#eff6ff", color: "#1d4ed8", border: "#bfdbfe" },
   "Notice Period": { background: "#fff7ed", color: "#c2410c", border: "#ffedd5" },
   Resigned: { background: "#f3f4f6", color: "#4b5563", border: "#e5e7eb" },
   Terminated: { background: "#fee2e2", color: "#b91c1c", border: "#fca5a5" },
+};
+
+const confirmationBadgeStyles = {
+  "On Probation": { bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+  "Due for Confirmation": { bg: "bg-amber-50", text: "text-amber-800", border: "border-amber-300" },
+  Confirmed: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  Extended: { bg: "bg-purple-50", text: "text-purple-700", border: "border-purple-300" },
 };
 
 export default function Employees() {
@@ -101,19 +111,100 @@ export default function Employees() {
 
   // Lifecycle State
   const [selectedLifecycleEmp, setSelectedLifecycleEmp] = useState(null);
-  const [lifecycleTab, setLifecycleTab] = useState("transfers"); // 'transfers' | 'promotions' | 'warnings' | 'awards'
+  const [lifecycleTab, setLifecycleTab] = useState("probation"); // 'probation' | 'transfers' | 'promotions' | 'warnings' | 'awards'
   const [transfers, setTransfers] = useState([]);
   const [promotions, setPromotions] = useState([]);
   const [warnings, setWarnings] = useState([]);
   const [awards, setAwards] = useState([]);
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
+  const [evaluatingLifecycle, setEvaluatingLifecycle] = useState(false);
 
   // Sub-forms for creating lifecycle events
   const [showEventCreateModal, setShowEventCreateModal] = useState(false);
+  const [probationAction, setProbationAction] = useState(null); // null | 'confirm' | 'extend'
+  const [actionLoading, setActionLoading] = useState(false);
+  const [confirmForm, setConfirmForm] = useState({ effective_date: new Date().toISOString().slice(0, 10), remarks: '' });
+  const [extendForm, setExtendForm] = useState({ extension_days: '30', reason: '' });
   const [transferForm, setTransferForm] = useState({ to_department: '', to_branch: '', effective_date: new Date().toISOString().slice(0, 10), reason: '' });
   const [promotionForm, setPromotionForm] = useState({ new_designation: '', previous_salary: '', new_salary: '', effective_date: new Date().toISOString().slice(0, 10), notes: '' });
   const [warningForm, setWarningForm] = useState({ warning_level: 'Medium', title: '', explanation: '', warning_date: new Date().toISOString().slice(0, 10) });
   const [awardForm, setAwardForm] = useState({ award_name: '', citation: '', cash_reward: '', presentation_date: new Date().toISOString().slice(0, 10) });
+
+  const handleEvaluateLifecycle = async () => {
+    setEvaluatingLifecycle(true);
+    try {
+      const res = await evaluateEmployeeLifecycle();
+      await refreshHrms?.("employees");
+      const data = res?.data || res;
+      setToast(
+        data?.message ||
+        `Lifecycle evaluated: ${data?.probation_due_count ?? 0} due for confirmation, ${data?.probation_confirmed_count ?? 0} confirmed, ${data?.exits_processed ?? 0} exit(s) processed.`
+      );
+    } catch (err) {
+      setToast("Failed to evaluate lifecycle: " + (err?.message || "Server error"), "error");
+    } finally {
+      setEvaluatingLifecycle(false);
+    }
+  };
+
+  const handleConfirmProbationSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedLifecycleEmp) return;
+    setActionLoading(true);
+    try {
+      const res = await confirmEmployeeProbation(selectedLifecycleEmp.id, {
+        effective_date: confirmForm.effective_date,
+        remarks: confirmForm.remarks,
+      });
+      setToast("Employee probation confirmed successfully.");
+      setProbationAction(null);
+      await refreshHrms?.("employees");
+      const updated = res?.data || res;
+      setSelectedLifecycleEmp((prev) => ({
+        ...prev,
+        status: updated.status || "Active",
+        confirmationStatus: updated.confirmationStatus || updated.confirmation_status || "Confirmed",
+        confirmationDate: updated.confirmationDate || updated.confirmation_date || confirmForm.effective_date,
+        confirmationRemarks: updated.confirmationRemarks || updated.confirmation_remarks || confirmForm.remarks,
+        probationHistory: updated.probationHistory || updated.probation_history || prev?.probationHistory || [],
+      }));
+    } catch (err) {
+      setToast("Failed to confirm probation: " + (err?.message || "Server error"), "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleExtendProbationSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedLifecycleEmp) return;
+    if (!extendForm.reason.trim()) {
+      setToast("Reason for probation extension is required.", "error");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      const res = await extendEmployeeProbation(selectedLifecycleEmp.id, {
+        extension_days: parseInt(extendForm.extension_days, 10),
+        reason: extendForm.reason,
+      });
+      setToast("Employee probation extended successfully.");
+      setProbationAction(null);
+      await refreshHrms?.("employees");
+      const updated = res?.data || res;
+      setSelectedLifecycleEmp((prev) => ({
+        ...prev,
+        confirmationStatus: updated.confirmationStatus || updated.confirmation_status || "Extended",
+        probationEndDate: updated.probationEndDate || updated.probation_end_date || prev?.probationEndDate,
+        probationPeriod: updated.probationPeriod || updated.probation_period || prev?.probationPeriod,
+        probationHistory: updated.probationHistory || updated.probation_history || prev?.probationHistory || [],
+      }));
+    } catch (err) {
+      setToast("Failed to extend probation: " + (err?.message || "Server error"), "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   const loadLifecycleData = async (empId) => {
     setLifecycleLoading(true);
@@ -135,10 +226,13 @@ export default function Employees() {
     }
   };
 
-  const handleOpenLifecycle = (emp) => {
+  const handleOpenLifecycle = (emp, initialTab = 'probation') => {
     setSelectedLifecycleEmp(emp);
-    setLifecycleTab('transfers');
+    setLifecycleTab(initialTab);
     setShowEventCreateModal(false);
+    setProbationAction(null);
+    setConfirmForm({ effective_date: new Date().toISOString().slice(0, 10), remarks: '' });
+    setExtendForm({ extension_days: '30', reason: '' });
     setTransferForm({ to_department: '', to_branch: '', effective_date: new Date().toISOString().slice(0, 10), reason: '' });
     setPromotionForm({ new_designation: '', previous_salary: emp.standardSalary || emp.standard_salary || '', new_salary: '', effective_date: new Date().toISOString().slice(0, 10), notes: '' });
     setWarningForm({ warning_level: 'First Written', title: '', explanation: '', warning_date: new Date().toISOString().slice(0, 10) });
@@ -266,6 +360,17 @@ export default function Employees() {
           </p>
         </div>
         <div className="flex-wrap lg:flex-nowrap" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            type="button"
+            disabled={evaluatingLifecycle}
+            onClick={handleEvaluateLifecycle}
+            className="emp-export-btn"
+            style={{ borderColor: "#cbd5e1", color: "#334155", background: "#f8fafc" }}
+            title="Evaluate probation confirmations and notice periods across all employees"
+          >
+            <Clock size={15} className={evaluatingLifecycle ? "animate-spin text-blue-600" : "text-slate-600"} />
+            {evaluatingLifecycle ? "Evaluating..." : "Evaluate Lifecycle"}
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -427,14 +532,41 @@ export default function Employees() {
                     <td style={{ color: "#374151" }}>{row.designation}</td>
                     <td style={{ color: "#374151" }}>{row.department}</td>
                     <td>
-                      <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                        {row.status}
-                      </span>
+                      <div className="flex flex-col gap-1 items-start">
+                        <span className="emp-status" style={{ ...statusStyles[row.status] }}>
+                          {row.status}
+                        </span>
+                        {row.confirmationStatus && row.confirmationStatus !== "Confirmed" && (
+                          <span
+                            onClick={() => handleOpenLifecycle(row, "probation")}
+                            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border cursor-pointer hover:opacity-80 transition ${
+                              row.confirmationStatus === "Due for Confirmation"
+                                ? "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                                : row.confirmationStatus === "Extended"
+                                ? "bg-purple-100 text-purple-800 border-purple-300"
+                                : "bg-blue-50 text-blue-700 border-blue-200"
+                            }`}
+                            title={`Click to review probation: ${row.confirmationStatus}${row.probationEndDate ? ` (Due ${row.probationEndDate})` : ""}`}
+                          >
+                            {row.confirmationStatus}
+                            {row.probationEndDate ? ` • Due ${row.probationEndDate}` : ""}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <LoginBadge login={row.login} />
                     </td>
                     <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenLifecycle(row, "probation")}
+                        className="emp-trash-btn inline-block mr-1"
+                        style={{ color: row.confirmationStatus === "Due for Confirmation" ? "#b45309" : "#0284c7" }}
+                        title="Probation & Notice Lifecycle"
+                      >
+                        <Clock size={15} />
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -449,7 +581,7 @@ export default function Employees() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleOpenLifecycle(row)}
+                        onClick={() => handleOpenLifecycle(row, "transfers")}
                         className="emp-trash-btn inline-block mr-1"
                         style={{ color: "#2563eb" }}
                         title="Employee Lifecycle (Transfers, Promotions, Warnings, Awards)"
@@ -498,7 +630,16 @@ export default function Employees() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleOpenLifecycle(row)}
+                      onClick={() => handleOpenLifecycle(row, "probation")}
+                      className="emp-trash-btn inline-block"
+                      style={{ color: row.confirmationStatus === "Due for Confirmation" ? "#b45309" : "#0284c7" }}
+                      title="Probation & Notice Lifecycle"
+                    >
+                      <Clock size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenLifecycle(row, "transfers")}
                       className="emp-trash-btn inline-block"
                       style={{ color: "#2563eb" }}
                       title="Employee Lifecycle"
@@ -525,9 +666,26 @@ export default function Employees() {
                 <LoginBadge login={row.login} />
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12 }}>
                   <span className="emp-id">{row.employeeCode || row.empId || row.id}</span>
-                  <span className="emp-status" style={{ ...statusStyles[row.status] }}>
-                    {row.status}
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="emp-status" style={{ ...statusStyles[row.status] }}>
+                      {row.status}
+                    </span>
+                    {row.confirmationStatus && row.confirmationStatus !== "Confirmed" && (
+                      <span
+                        onClick={() => handleOpenLifecycle(row, "probation")}
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border cursor-pointer hover:opacity-80 transition ${
+                          row.confirmationStatus === "Due for Confirmation"
+                            ? "bg-amber-100 text-amber-800 border-amber-300 animate-pulse"
+                            : row.confirmationStatus === "Extended"
+                            ? "bg-purple-100 text-purple-800 border-purple-300"
+                            : "bg-blue-50 text-blue-700 border-blue-200"
+                        }`}
+                        title={`Click to review probation: ${row.confirmationStatus}${row.probationEndDate ? ` (Due ${row.probationEndDate})` : ""}`}
+                      >
+                        {row.confirmationStatus}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}
@@ -714,10 +872,29 @@ export default function Employees() {
             </div>
 
             {/* Lifecycle Tabs */}
-            <div className="flex border-b border-slate-200 px-6 pt-2 bg-white">
+            <div className="flex border-b border-slate-200 px-6 pt-2 bg-white overflow-x-auto">
+              <button
+                onClick={() => { setLifecycleTab("probation"); setShowEventCreateModal(false); }}
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
+                  lifecycleTab === "probation" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                <Clock size={14} /> Probation & Notice
+                {selectedLifecycleEmp.confirmationStatus && (
+                  <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    selectedLifecycleEmp.confirmationStatus === "Due for Confirmation"
+                      ? "bg-amber-100 text-amber-800"
+                      : selectedLifecycleEmp.confirmationStatus === "Confirmed"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-blue-100 text-blue-800"
+                  }`}>
+                    {selectedLifecycleEmp.confirmationStatus}
+                  </span>
+                )}
+              </button>
               <button
                 onClick={() => { setLifecycleTab("transfers"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "transfers" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -725,7 +902,7 @@ export default function Employees() {
               </button>
               <button
                 onClick={() => { setLifecycleTab("promotions"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "promotions" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -733,7 +910,7 @@ export default function Employees() {
               </button>
               <button
                 onClick={() => { setLifecycleTab("warnings"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "warnings" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -741,7 +918,7 @@ export default function Employees() {
               </button>
               <button
                 onClick={() => { setLifecycleTab("awards"); setShowEventCreateModal(false); }}
-                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 font-semibold text-xs border-b-2 transition flex items-center gap-1.5 whitespace-nowrap ${
                   lifecycleTab === "awards" ? "border-primary text-primary" : "border-transparent text-slate-500 hover:text-slate-800"
                 }`}
               >
@@ -753,18 +930,21 @@ export default function Employees() {
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               <div className="flex items-center justify-between">
                 <p className="font-semibold text-slate-700">
+                  {lifecycleTab === "probation" && "Probation Period & Employment Confirmation Lifecycle"}
                   {lifecycleTab === "transfers" && "Department & Location Transfer History"}
                   {lifecycleTab === "promotions" && "Career Progression & Salary Revisions"}
                   {lifecycleTab === "warnings" && "Formal Performance & Conduct Notices"}
                   {lifecycleTab === "awards" && "Excellence Awards & Spot Recognition"}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setShowEventCreateModal(!showEventCreateModal)}
-                  className="px-3 py-1.5 bg-primary text-white rounded-lg font-semibold flex items-center gap-1 hover:bg-primary/90 transition"
-                >
-                  <Plus size={13} /> {showEventCreateModal ? "Close Form" : `Record ${lifecycleTab.slice(0, -1)}`}
-                </button>
+                {lifecycleTab !== "probation" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEventCreateModal(!showEventCreateModal)}
+                    className="px-3 py-1.5 bg-primary text-white rounded-lg font-semibold flex items-center gap-1 hover:bg-primary/90 transition"
+                  >
+                    <Plus size={13} /> {showEventCreateModal ? "Close Form" : `Record ${lifecycleTab.slice(0, -1)}`}
+                  </button>
+                )}
               </div>
 
               {/* Event Creation Forms */}
@@ -1072,6 +1252,218 @@ export default function Employees() {
               )}
 
               {/* Data Tables */}
+              {lifecycleTab === "probation" && (
+                <div className="space-y-4">
+                  {/* Status & Timing Overview */}
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-200 flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800 text-sm">Lifecycle Status:</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border inline-flex items-center gap-1 ${
+                          selectedLifecycleEmp.confirmationStatus === "Due for Confirmation"
+                            ? "bg-amber-100 text-amber-800 border-amber-300"
+                            : selectedLifecycleEmp.confirmationStatus === "Confirmed"
+                            ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                            : selectedLifecycleEmp.confirmationStatus === "Extended"
+                            ? "bg-purple-100 text-purple-800 border-purple-300"
+                            : "bg-blue-100 text-blue-800 border-blue-300"
+                        }`}>
+                          {selectedLifecycleEmp.confirmationStatus === "Confirmed" && <CheckCircle2 size={13} />}
+                          {selectedLifecycleEmp.confirmationStatus === "Due for Confirmation" && <AlertCircle size={13} />}
+                          {selectedLifecycleEmp.confirmationStatus || "On Probation"}
+                        </span>
+                      </div>
+                      {selectedLifecycleEmp.confirmationStatus !== "Confirmed" && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setProbationAction(probationAction === 'confirm' ? null : 'confirm')}
+                            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition flex items-center gap-1 text-xs cursor-pointer"
+                          >
+                            <CheckCircle2 size={13} /> Confirm Employee
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setProbationAction(probationAction === 'extend' ? null : 'extend')}
+                            className="px-3 py-1.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition flex items-center gap-1 text-xs cursor-pointer"
+                          >
+                            <Clock size={13} /> Extend Probation
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Probation Period</div>
+                        <div className="font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.probationPeriod || "90 Days (3 Months)"}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Probation Start</div>
+                        <div className="font-mono font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.probationStartDate || selectedLifecycleEmp.joining || selectedLifecycleEmp.doj || "—"}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Scheduled End Date</div>
+                        <div className="font-mono font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.probationEndDate || "—"}</div>
+                      </div>
+                      <div className="bg-white p-3 rounded-lg border border-slate-200">
+                        <div className="text-slate-400 font-medium">Standard Notice Period</div>
+                        <div className="font-bold text-slate-800 mt-0.5">{selectedLifecycleEmp.noticePeriod || `${selectedLifecycleEmp.noticePeriodDays || 60} Days`}</div>
+                      </div>
+                    </div>
+
+                    {selectedLifecycleEmp.confirmationStatus === "Confirmed" && (
+                      <div className="mt-3 p-3 bg-emerald-50/60 border border-emerald-200 rounded-lg text-xs">
+                        <span className="font-bold text-emerald-800">Confirmed on: </span>
+                        <span className="font-mono text-emerald-900">{selectedLifecycleEmp.confirmationDate || "—"}</span>
+                        {selectedLifecycleEmp.confirmationRemarks && (
+                          <p className="text-emerald-700 mt-1 italic">"{selectedLifecycleEmp.confirmationRemarks}"</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Inline Confirmation Action Form */}
+                  {probationAction === 'confirm' && (
+                    <form onSubmit={handleConfirmProbationSubmit} className="p-4 bg-emerald-50/40 border border-emerald-200 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-emerald-900 flex items-center gap-1.5">
+                          <CheckCircle2 size={16} className="text-emerald-600" /> Confirm Employee Probation
+                        </h4>
+                        <button type="button" onClick={() => setProbationAction(null)} className="text-slate-400 hover:text-slate-600">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        Confirming marks the employee as Confirmed, transitions their status to Active, and records an official confirmation audit entry.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Effective Confirmation Date *</label>
+                          <input
+                            type="date"
+                            required
+                            value={confirmForm.effective_date}
+                            onChange={(e) => setConfirmForm({ ...confirmForm, effective_date: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Confirmation Remarks / Appraisal Notes</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Satisfactory completion of probation period and performance goals."
+                            value={confirmForm.remarks}
+                            onChange={(e) => setConfirmForm({ ...confirmForm, remarks: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setProbationAction(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer">
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={actionLoading} className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 transition cursor-pointer">
+                          {actionLoading ? "Confirming..." : "Confirm Probation"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Inline Extension Action Form */}
+                  {probationAction === 'extend' && (
+                    <form onSubmit={handleExtendProbationSubmit} className="p-4 bg-purple-50/40 border border-purple-200 rounded-xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-purple-900 flex items-center gap-1.5">
+                          <Clock size={16} className="text-purple-600" /> Extend Employee Probation
+                        </h4>
+                        <button type="button" onClick={() => setProbationAction(null)} className="text-slate-400 hover:text-slate-600">
+                          <X size={16} />
+                        </button>
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        Extending probation recalculates the end date, marks the status as Extended, and stores the reason in the employee's audit log.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="font-semibold text-slate-700 block mb-1">Extension Duration *</label>
+                          <select
+                            value={extendForm.extension_days}
+                            onChange={(e) => setExtendForm({ ...extendForm, extension_days: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg bg-white text-slate-800"
+                          >
+                            <option value="30">30 Days (1 Month)</option>
+                            <option value="60">60 Days (2 Months)</option>
+                            <option value="90">90 Days (3 Months)</option>
+                            <option value="180">180 Days (6 Months)</option>
+                          </select>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <label className="font-semibold text-slate-700 block mb-1">Reason for Extension *</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="e.g. Additional performance review required for project deliveries."
+                            value={extendForm.reason}
+                            onChange={(e) => setExtendForm({ ...extendForm, reason: e.target.value })}
+                            className="w-full p-2 border border-slate-300 rounded-lg text-slate-800"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setProbationAction(null)} className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold cursor-pointer">
+                          Cancel
+                        </button>
+                        <button type="submit" disabled={actionLoading} className="px-4 py-1.5 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 transition cursor-pointer">
+                          {actionLoading ? "Extending..." : "Confirm Extension"}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {/* Probation History Table */}
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 font-semibold text-slate-700">
+                      Probation & Lifecycle History
+                    </div>
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50/50 text-slate-600 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-4">Event</th>
+                          <th className="py-2.5 px-4">Date</th>
+                          <th className="py-2.5 px-4">Details / Remarks</th>
+                          <th className="py-2.5 px-4 text-right">Updated By</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(!selectedLifecycleEmp.probationHistory || selectedLifecycleEmp.probationHistory.length === 0) ? (
+                          <tr><td colSpan={4} className="py-6 text-center text-slate-400">No probation history events logged yet.</td></tr>
+                        ) : (
+                          selectedLifecycleEmp.probationHistory.map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="py-2.5 px-4 font-semibold text-slate-800">
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                                  (item.action || item.event) === "Confirmed" ? "bg-emerald-100 text-emerald-800" :
+                                  (item.action || item.event) === "Extended" ? "bg-purple-100 text-purple-800" :
+                                  "bg-blue-100 text-blue-800"
+                                }`}>
+                                  {item.action || item.event || "Lifecycle Event"}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 font-mono text-slate-600">{item.date || item.effective_date || item.timestamp || "—"}</td>
+                              <td className="py-2.5 px-4 text-slate-700">
+                                {item.remarks || item.reason || (item.new_end_date ? `End date set to ${item.new_end_date}` : "—")}
+                              </td>
+                              <td className="py-2.5 px-4 text-right text-slate-500 font-mono">{item.changed_by || item.user || "System"}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               {lifecycleTab === "transfers" && (
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
                   <table className="w-full text-xs text-left">

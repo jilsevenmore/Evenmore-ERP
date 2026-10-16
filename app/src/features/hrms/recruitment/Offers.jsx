@@ -29,6 +29,23 @@ import UserInitials from "../../../components/common/UserInitials";
 import OfferLetterModal from "../organization/OfferLetterModal";
 import { sendOfferLetter, acceptOfferLetter } from "../../../services/upgradeService";
 
+const OFFERS_GUIDE = {
+  title: "Offer Letters & Rollouts",
+  subtitle: "Generate, send, and monitor candidate compensation packages and acceptance.",
+  purpose: "Formulate official offer letters with itemized compensation terms, manage electronic acceptance, and trigger onboarding handoff.",
+  workflow: [
+    "Draft Offer Terms & Compensation",
+    "Preview & Edit Corporate Letter",
+    "Issue Formal Offer to Candidate",
+    "Candidate Electronic Acceptance",
+    "Automatic Onboarding Transition",
+  ],
+  keyTerms: [
+    { term: "Letter / PDF Preview", definition: "Interactive preview and print-ready export of the official corporate offer letter." },
+    { term: "Accept & Convert", definition: "Records candidate acceptance and marks candidate as Hired into the Employee Directory." },
+  ],
+};
+
 export default function Offers() {
   const { offers, addOffer, updateOffer, candidates, jobs = [], changeStage } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
@@ -37,7 +54,6 @@ export default function Offers() {
   const [filter, setFilter] = useState("All");
   const [search, setSearch] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
   const [form, setForm] = useState({
@@ -288,11 +304,13 @@ export default function Offers() {
     {
       key: "actions",
       header: "Actions",
+      align: "right",
       render: (r) => (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-end gap-1.5">
           <button
+            type="button"
             onClick={() => handleOpenLetterModal(r)}
-            className="inline-flex items-center gap-1 text-[11.5px] bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-xl px-2.5 py-1 font-medium transition cursor-pointer"
+            className="inline-flex items-center gap-1 text-xs bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
             title="View, edit and print offer letter"
           >
             <FileText size={12} />
@@ -300,8 +318,9 @@ export default function Offers() {
           </button>
           {r.status !== "Accepted" && (
             <button
+              type="button"
               onClick={() => handleAcceptLetter(r)}
-              className="inline-flex items-center gap-1 text-[11.5px] bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border border-blue-300 dark:border-blue-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
               title="Candidate accepted offer — Convert to Hired"
             >
               <CheckCircle2 size={12} />
@@ -310,8 +329,9 @@ export default function Offers() {
           )}
           {r.status === "Accepted" && (
             <button
+              type="button"
               onClick={() => navigate("/hrms/employees", { state: { search: r.candidateName } })}
-              className="inline-flex items-center gap-1 text-[11.5px] bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
               title="View in Employee Directory"
             >
               <Users size={12} />
@@ -319,6 +339,7 @@ export default function Offers() {
             </button>
           )}
           <button
+            type="button"
             onClick={() => {
               setForm({
                 candidateId: r.candidateId,
@@ -332,28 +353,30 @@ export default function Offers() {
               setEditing(r.id);
               setDrawerOpen(true);
             }}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+            className="p-1.5 rounded-xl hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 transition cursor-pointer"
             title="Edit Offer"
           >
-            <Edit2 size={13} />
+            <Edit2 size={15} />
           </button>
           <button
+            type="button"
             onClick={() => {
               updateOffer(r.id, { status: "Pending" });
               showToast("Offer re-sent to candidate");
             }}
-            className="inline-flex items-center gap-1 text-[11.5px] bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 rounded-xl px-2 py-1 font-medium transition cursor-pointer"
+            className="inline-flex items-center gap-1 text-xs bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 rounded-xl px-2.5 py-1 font-semibold transition cursor-pointer"
             title="Send Offer"
           >
-            <Send size={11} />
+            <Send size={12} />
             <span>Send</span>
           </button>
           <button
+            type="button"
             onClick={() => setDeleteId(r.id)}
-            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition cursor-pointer"
+            className="p-1.5 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
             title="Withdraw Offer"
           >
-            <Trash2 size={13} />
+            <Trash2 size={15} />
           </button>
         </div>
       ),
@@ -371,25 +394,16 @@ export default function Offers() {
           { label: "Recruitment", path: "/hrms/recruitment" },
           { label: "Offers" },
         ]}
+        guide={OFFERS_GUIDE}
         actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
-            >
-              <HelpCircle size={14} />
-              <span>Guide</span>
-            </button>
-            <Button
-              size="sm"
-              onClick={openCreate}
-              className="flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <Plus size={15} />
-              <span>Create Offer</span>
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={openCreate}
+          >
+            Create Offer
+          </Button>
         }
       />
 
@@ -495,13 +509,15 @@ export default function Offers() {
         size="lg"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => setDrawerOpen(false)}>
               Cancel
             </Button>
-            <Button variant="secondary" onClick={() => save(false)}>
+            <Button variant="secondary" size="sm" onClick={() => save(false)}>
               Save Draft
             </Button>
-            <Button onClick={() => save(true)}>Send Offer</Button>
+            <Button variant="primary" size="sm" onClick={() => save(true)}>
+              Send Offer
+            </Button>
           </>
         }
       >
@@ -611,13 +627,15 @@ export default function Offers() {
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
         title="Withdraw Offer?"
+        subtitle="This action revokes the candidate offer package"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDeleteId(null)}>
+            <Button variant="outline" size="sm" onClick={() => setDeleteId(null)}>
               Cancel
             </Button>
             <Button
               variant="danger"
+              size="sm"
               onClick={() => {
                 if (deleteId) updateOffer(deleteId, { status: "Expired" });
                 setDeleteId(null);
@@ -629,7 +647,7 @@ export default function Offers() {
           </>
         }
       >
-        <p className="text-[13px] text-slate-600 dark:text-slate-300">
+        <p className="text-xs text-muted leading-relaxed">
           Are you sure you want to withdraw this offer? The candidate will no longer be able to accept it.
         </p>
       </Modal>
@@ -643,59 +661,6 @@ export default function Offers() {
         onAcceptOffer={handleAcceptLetter}
         onUpdateOffer={handleUpdateLetter}
       />
-
-      {/* Guide Modal */}
-      {guideOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
-          onClick={() => setGuideOpen(false)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600">
-                  <HelpCircle size={18} />
-                </div>
-                <h3 className="text-[16px] font-bold text-slate-900 dark:text-white">
-                  Offers & Rollouts Guide
-                </h3>
-              </div>
-              <button
-                onClick={() => setGuideOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  1. Formal Offer Letter & PDF
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Click 'Letter / PDF' on any offer to preview the official corporate offer letter with salary breakdown, reporting manager, and instant print/download capabilities.
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  2. Acceptance & Onboarding Sync
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  When a candidate accepts an offer, they transition seamlessly into Job Onboarding to complete document verification and employee directory induction.
-                </p>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Button size="sm" onClick={() => setGuideOpen(false)}>
-                Got it
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

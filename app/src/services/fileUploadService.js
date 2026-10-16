@@ -12,7 +12,7 @@ import { isBackendEnabled } from './resourceSync';
  * @param {string} scope - default 'pms_document'
  * @returns {Promise<string>} fileId
  */
-export async function uploadFileToBackend(file, fileName, scope = 'pms_document', { returnDetails = false } = {}) {
+export async function uploadFileToBackend(file, fileName, scope = 'pms_document') {
   if (!isBackendEnabled()) return null;
   if (!file) {
     throw new Error('No file provided for upload.');
@@ -64,16 +64,7 @@ export async function uploadFileToBackend(file, fileName, scope = 'pms_document'
   }
 
   // Step 3: Commit the upload
-  const commitRes = await api.post(`/files/${fileId}/commit/`, {});
-  const commitData = commitRes?.data || commitRes;
-
-  if (returnDetails) {
-    return {
-      fileId,
-      url: commitData?.url || null,
-      ...commitData,
-    };
-  }
+  await api.post(`/files/${fileId}/commit/`, {});
 
   return fileId;
 }

@@ -19,6 +19,23 @@ import {
 } from "lucide-react";
 import UserInitials from "../../../components/common/UserInitials";
 
+const ONBOARDING_GUIDE = {
+  title: "Candidate Onboarding & Induction",
+  subtitle: "Track document verification, IT provisioning, and employee directory handoff.",
+  purpose: "Manage the crucial transitional phase after offer acceptance to ensure full compliance before day-one orientation.",
+  workflow: [
+    "Offer Accepted",
+    "Collect Pre-boarding Documents",
+    "Verify Identity & Compliance",
+    "Provision IT & Hardware",
+    "Induct into Employee Directory",
+  ],
+  keyTerms: [
+    { term: "Document Verification", definition: "Validation of identity, educational certificates, and employment history." },
+    { term: "Directory Induction", definition: "Automatic creation of the employee profile with Employee ID and hierarchy setup." },
+  ],
+};
+
 export default function Onboarding() {
   const {
     candidates,
@@ -31,7 +48,6 @@ export default function Onboarding() {
   } = useRecruitmentStore();
   const { showToast, addEmployee, employees } = useAppStore();
   const navigate = useNavigate();
-  const [guideOpen, setGuideOpen] = useState(false);
 
   const hired = candidates.filter((c) => c.stage === "Hired");
   const steps = [
@@ -42,43 +58,17 @@ export default function Onboarding() {
     "Onboarding Complete",
   ];
 
-  function handleCompleteOnboarding(c) {
-    const isAlreadyEmployee = employees.some(
-      (e) =>
-        e.email?.toLowerCase() === c.email?.toLowerCase() ||
-        e.name?.toLowerCase() === c.name?.toLowerCase()
-    );
-
-    if (!isAlreadyEmployee) {
-      const matchingOffer = offers.find((o) => o.candidateId === c.id);
-      const matchedJob = jobs.find((j) => j.id === c.jobId || j.title === c.position);
-      const newEmp = {
-        id: `EMP${1035 + (employees.length % 50)}`,
-        name: c.name,
-        email: c.email || undefined,
-        avatar: c.avatar || "https://i.pravatar.cc/100?img=15",
-        img: c.avatar || "https://i.pravatar.cc/100?img=15",
-        designation: c.position || "",
-        department: matchingOffer?.dept || matchedJob?.department || "",
-        manager: matchingOffer?.reportingManager || matchedJob?.hiringManager || "",
-        location: c.location || "",
-        joining:
-          matchingOffer?.joiningDate ||
-          new Date().toLocaleDateString("en-IN", {
-            month: "short",
-            day: "2-digit",
-            year: "numeric",
-          }),
-        status: "Active",
-      };
-      addEmployee(newEmp);
+  async function handleCompleteOnboarding(c) {
+    try {
+      await completeOnboarding(c.id);
+      await useAppStore.getState().refreshHrms("employees");
+      showToast(`Onboarding completed & ${c.name} inducted into Employee Directory!`);
+    } catch (err) {
+      showToast(`Could not complete onboarding: ${err?.message || err}`);
     }
-
-    completeOnboarding(c.id);
-    showToast(`Onboarding completed & ${c.name} added to Employee Directory!`);
   }
 
-  const completedCount = hired.filter((c) => onboardedMap?.[c.id]).length;
+  const completedCount = hired.filter((c) => c.isOnboarded || onboardedMap?.[c.id]).length;
   const pendingCount = hired.length - completedCount;
 
   return (
@@ -92,26 +82,16 @@ export default function Onboarding() {
           { label: "Recruitment", path: "/hrms/recruitment" },
           { label: "Onboarding" },
         ]}
+        guide={ONBOARDING_GUIDE}
         actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
-            >
-              <HelpCircle size={14} />
-              <span>Guide</span>
-            </button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => navigate("/hrms/employees")}
-              className="flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <Users size={15} />
-              <span>Employee Directory</span>
-            </Button>
-          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            icon={Users}
+            onClick={() => navigate("/hrms/employees")}
+          >
+            Employee Directory
+          </Button>
         }
       />
 
@@ -184,8 +164,8 @@ export default function Onboarding() {
       ) : (
         <div className="space-y-4">
           {hired.map((c) => {
-            const isDone = Boolean(onboardedMap?.[c.id]);
-            const isDocsDone = Boolean(verifiedDocsMap?.[c.id] || isDone);
+            const isDone = Boolean(c.isOnboarded || onboardedMap?.[c.id]);
+            const isDocsDone = Boolean(c.documentsVerified || verifiedDocsMap?.[c.id] || isDone);
             const matchingOffer = offers.find((o) => o.candidateId === c.id);
 
             return (
@@ -229,37 +209,33 @@ export default function Onboarding() {
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
-                      variant="secondary"
+                      variant="outline"
+                      icon={ShieldCheck}
                       onClick={() => {
                         verifyDocuments(c.id);
                         showToast(`All documents verified for ${c.name}`);
                       }}
-                      className="flex items-center gap-1.5"
                     >
-                      <ShieldCheck size={14} className={isDocsDone ? "text-emerald-500" : "text-slate-500"} />
                       <span>{isDocsDone ? "Docs Verified ✓" : "Verify Docs"}</span>
                     </Button>
 
                     <Button
                       size="sm"
+                      variant={isDone ? "secondary" : "primary"}
                       disabled={isDone}
+                      icon={CheckCircle2}
                       onClick={() => handleCompleteOnboarding(c)}
-                      className={`flex items-center gap-1.5 cursor-pointer ${
-                        isDone ? "opacity-70 cursor-not-allowed bg-emerald-600 text-white" : ""
-                      }`}
                     >
-                      <CheckCircle2 size={14} />
                       <span>{isDone ? "Onboarding Complete ✓" : "Complete Onboarding"}</span>
                     </Button>
 
                     {isDone && (
                       <Button
                         size="sm"
-                        variant="secondary"
+                        variant="outline"
+                        icon={Users}
                         onClick={() => navigate("/hrms/employees")}
-                        className="flex items-center gap-1.5"
                       >
-                        <Users size={14} />
                         <span>View in Directory</span>
                       </Button>
                     )}
@@ -314,59 +290,6 @@ export default function Onboarding() {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* Guide Modal */}
-      {guideOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
-          onClick={() => setGuideOpen(false)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600">
-                  <HelpCircle size={18} />
-                </div>
-                <h3 className="text-[16px] font-bold text-slate-900 dark:text-white">
-                  Job Onboarding Guide
-                </h3>
-              </div>
-              <button
-                onClick={() => setGuideOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  1. Automatic Pipeline Ingestion
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Candidates marked 'Hired' automatically land in Onboarding with their matched offer details and expected joining dates.
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  2. One-Click Employee Directory Handoff
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Clicking 'Complete Onboarding' creates their official company profile, assigns an Employee ID, sets reporting hierarchy, and provisions their account in the Employee Directory.
-                </p>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Button size="sm" onClick={() => setGuideOpen(false)}>
-                Got it
-              </Button>
-            </div>
-          </div>
         </div>
       )}
     </div>

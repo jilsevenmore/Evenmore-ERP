@@ -108,6 +108,9 @@ export const partiesService = {
   updateParty: (id, data) => api.patch(`/parties/${id}/`, data),
   getCustomers: (query) => api.get('/parties/customers/', { query }),
   getVendors: (query) => api.get('/parties/vendors/', { query }),
+  getSummary: (id) => api.get(`/parties/${id}/summary/`),
+  getDocuments: (id, query) => api.get(`/parties/${id}/documents/`, { query }),
+  recordFunds: (id, data) => api.post(`/parties/${id}/record-funds/`, data),
 };
 
 // ── HRMS ─────────────────────────────────────────────────────────────────

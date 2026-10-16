@@ -4,6 +4,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { useNavigate, useLocation } from "react-router-dom";
 import { DataTable } from "../../../components/hrms/DataTable";
 import { FilterBar } from "../../../components/hrms/FilterBar";
+import { sendOfferLetter, acceptOfferLetter } from "../../../services/hrmsSync";
 import { Modal } from "../../../components/hrms/Modal";
 import { Button } from "../../../components/ui/Button";
 import PageHeader from "../../../components/ui/PageHeader";
@@ -224,6 +225,10 @@ export default function Candidates() {
       addOffer({ ...offerData, status: "Pending" });
     }
     changeStage(offerData.candidateId, "Offer");
+    const offerId = existingIndex >= 0 ? offers[existingIndex].id : offerData.id;
+    if (offerId && typeof offerId === "string" && offerId.length === 36 && offerId.includes("-")) {
+      sendOfferLetter(offerId).catch(console.warn);
+    }
     showToast(`Offer letter confirmed and issued for ${offerData.candidateName}`);
   };
 
@@ -235,6 +240,10 @@ export default function Candidates() {
       addOffer({ ...offerData, status: "Accepted" });
     }
     changeStage(offerData.candidateId, "Hired");
+    const offerId = existingIndex >= 0 ? offers[existingIndex].id : offerData.id;
+    if (offerId && typeof offerId === "string" && offerId.length === 36 && offerId.includes("-")) {
+      acceptOfferLetter(offerId).catch(console.warn);
+    }
     showToast(`Offer accepted! ${offerData.candidateName} converted to Hired and added to Employee Directory.`);
   };
 
@@ -306,7 +315,7 @@ export default function Candidates() {
             type="button"
             title="View Profile"
             onClick={() => navigate(`/hrms/recruitment/candidates/${r.id}`)}
-            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-500 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-400 dark:text-slate-500 transition cursor-pointer"
           >
             <Eye size={15} />
           </button>
@@ -314,9 +323,9 @@ export default function Candidates() {
             type="button"
             title="Generate / View Offer Letter"
             onClick={() => handleOpenOffer(r)}
-            className={`inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl border font-semibold transition cursor-pointer ${
+            className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-xl border font-semibold transition cursor-pointer ${
               r.stage === "Offer" || r.stage === "Hired" || offers.some((o) => o.candidateId === r.id)
-                ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                ? "bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800"
                 : "bg-soft text-text border-border hover:bg-card-hover"
             }`}
           >
@@ -328,7 +337,7 @@ export default function Candidates() {
               type="button"
               title="View in Employee Directory"
               onClick={() => navigate("/hrms/employees", { state: { search: r.name } })}
-              className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-xl border font-semibold bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 transition cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-xl border font-semibold bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800 transition cursor-pointer"
             >
               <Users size={12} />
               <span>Employee</span>
@@ -353,7 +362,7 @@ export default function Candidates() {
               setEditing(r.id);
               setDrawerOpen(true);
             }}
-            className="p-1.5 rounded-xl hover:text-slate-800 hover:bg-slate-100 text-slate-500 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 transition cursor-pointer"
           >
             <Pencil size={15} />
           </button>
@@ -361,7 +370,7 @@ export default function Candidates() {
             type="button"
             title="Delete Candidate"
             onClick={() => setDeleteId(r.id)}
-            className="p-1.5 rounded-xl hover:text-rose-700 hover:bg-rose-50 text-rose-500 transition cursor-pointer"
+            className="p-1.5 rounded-xl hover:text-rose-700 hover:bg-rose-50 text-rose-500 dark:hover:bg-rose-950/40 transition cursor-pointer"
           >
             <Trash2 size={15} />
           </button>

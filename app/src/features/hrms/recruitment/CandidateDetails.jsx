@@ -202,7 +202,7 @@ export default function CandidateDetails() {
 
           {/* Action Toolbar */}
           <div className="flex flex-wrap items-center gap-2 pt-2 lg:pt-0">
-            <div className="flex items-center gap-1 bg-soft border border-border rounded-xl px-2 py-1">
+            <div className="inline-flex items-center gap-1.5 h-[30px] px-2.5 bg-soft border border-border rounded-xl">
               <span className="text-[10px] uppercase font-bold text-muted">Stage:</span>
               <select
                 value={c.stage}
@@ -218,7 +218,7 @@ export default function CandidateDetails() {
                     openOfferLetter();
                   }
                 }}
-                className="h-9 px-2 bg-transparent text-xs font-semibold text-text focus:outline-none cursor-pointer"
+                className="h-full bg-transparent text-xs font-semibold text-text focus:outline-none cursor-pointer"
               >
                 <option>Applied</option>
                 <option>Screening</option>

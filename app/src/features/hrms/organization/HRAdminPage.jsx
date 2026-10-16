@@ -90,6 +90,8 @@ import {
   settleTravelRequest,
   addComplaintComment,
   resolveComplaint,
+  waiveResignationNotice,
+  shortenResignationNotice,
 } from "../../../services/upgradeService";
 import TerminationLetterModal from "./TerminationLetterModal";
 import OfferLetterModal from "./OfferLetterModal";
@@ -265,6 +267,14 @@ export default function HRAdminPage({ defaultTab }) {
   }, []);
   // Offers are owned by the persisted Recruitment offers resource.
   const [resignations, setResignations] = useState([]);
+  const [noticeActionModal, setNoticeActionModal] = useState({
+    open: false,
+    type: 'waive',
+    resignation: null,
+    date: '',
+    reason: '',
+    loading: false,
+  });
   const [complaints, setComplaints] = useState([]);
   const [holidays, setHolidays] = useState([]);
   const [workSchedules, setWorkSchedules] = useState([]);
@@ -1396,6 +1406,37 @@ export default function HRAdminPage({ defaultTab }) {
       reason: "",
     });
     showToast(`Resignation recorded & status updated to Notice Period for ${created.employee}`);
+  };
+
+  const handleNoticeActionSubmit = async (e) => {
+    e.preventDefault();
+    if (!noticeActionModal.resignation) return;
+    if (!noticeActionModal.reason.trim()) {
+      showToast("Reason is required.", "error");
+      return;
+    }
+    setNoticeActionModal((prev) => ({ ...prev, loading: true }));
+    try {
+      if (noticeActionModal.type === 'waive') {
+        await waiveResignationNotice(noticeActionModal.resignation.id, {
+          effective_last_day: noticeActionModal.date || undefined,
+          reason: noticeActionModal.reason,
+        });
+        showToast("Notice period waived successfully.", "success");
+      } else {
+        await shortenResignationNotice(noticeActionModal.resignation.id, {
+          revised_last_working_day: noticeActionModal.date,
+          reason: noticeActionModal.reason,
+        });
+        showToast("Notice period shortened successfully.", "success");
+      }
+      setNoticeActionModal({ open: false, type: 'waive', resignation: null, date: '', reason: '', loading: false });
+      const refreshed = await hrmsSync.pull('resignations');
+      if (refreshed) setResignations(refreshed);
+    } catch (err) {
+      showToast(err?.message || "Failed to update notice period", "error");
+      setNoticeActionModal((prev) => ({ ...prev, loading: false }));
+    }
   };
 
   const handleDeleteResignation = (id, name) => {
@@ -3322,6 +3363,14 @@ export default function HRAdminPage({ defaultTab }) {
                         <td className="py-4 px-5">
                           <div className="font-bold text-slate-900">{r.lastWorkingDay}</div>
                           <div className="text-[11px] text-muted">Notice: {r.noticePeriod}</div>
+                          {r.noticeWaived && (
+                            <span className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                              Notice Waived
+                            </span>
+                          )}
+                          {r.originalLastWorkingDay && r.originalLastWorkingDay !== r.lastWorkingDay && (
+                            <div className="text-[10px] text-slate-400 line-through">Orig: {r.originalLastWorkingDay}</div>
+                          )}
                         </td>
                         <td className="py-4 px-5 text-slate-800">{r.handoverTo}</td>
                         <td className="py-4 px-5">
@@ -3341,6 +3390,42 @@ export default function HRAdminPage({ defaultTab }) {
                         </td>
                         <td className="py-4 px-5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNoticeActionModal({
+                                  open: true,
+                                  type: 'shorten',
+                                  resignation: r,
+                                  date: r.lastWorkingDay ? new Date().toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+                                  reason: '',
+                                  loading: false,
+                                });
+                              }}
+                              className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 cursor-pointer"
+                              title="Shorten Notice Period"
+                            >
+                              Shorten
+                            </button>
+                            {!r.noticeWaived && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNoticeActionModal({
+                                    open: true,
+                                    type: 'waive',
+                                    resignation: r,
+                                    date: new Date().toISOString().slice(0, 10),
+                                    reason: '',
+                                    loading: false,
+                                  });
+                                }}
+                                className="px-2 py-1 text-[11px] font-semibold rounded-lg border border-amber-200 hover:bg-amber-50 text-amber-800 cursor-pointer"
+                                title="Waive Notice Period"
+                              >
+                                Waive
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={() => showToast(`Resignation Reason: ${r.reason}`)}
@@ -6984,6 +7069,90 @@ export default function HRAdminPage({ defaultTab }) {
                 >
                   <Receipt size={14} />
                   <span>Confirm Settlement</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Waive or Shorten Resignation Notice Period ── */}
+      {noticeActionModal.open && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white rounded-2xl border border-bdr shadow-xl w-full max-w-md p-5 sm:p-6 max-h-[95vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-bdr">
+              <div className="flex items-center gap-2">
+                <Clock size={18} className="text-amber-600" />
+                <h3 className="font-bold text-[16px] text-slate-900">
+                  {noticeActionModal.type === 'waive' ? 'Waive Notice Period' : 'Shorten Notice Period'}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNoticeActionModal({ open: false, type: 'waive', resignation: null, date: '', reason: '', loading: false })}
+                className="w-8 h-8 rounded-xl hover:bg-off grid place-items-center text-muted hover:text-slate-800 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleNoticeActionSubmit} className="flex flex-col gap-3.5">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs">
+                <p className="font-semibold text-slate-800">{noticeActionModal.resignation?.employee}</p>
+                <p className="text-slate-500 mt-0.5">
+                  Current Last Working Day: <span className="font-semibold text-slate-700">{noticeActionModal.resignation?.lastWorkingDay || '—'}</span>
+                </p>
+                <p className="text-slate-500">
+                  Notice Duration: <span className="font-semibold text-slate-700">{noticeActionModal.resignation?.noticePeriod}</span>
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  {noticeActionModal.type === 'waive' ? 'Effective Departure Date' : 'Revised Last Working Day *'}
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={noticeActionModal.date}
+                  onChange={(e) => setNoticeActionModal({ ...noticeActionModal, date: e.target.value })}
+                  className="h-10 w-full px-3.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Reason / Management Approval *
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder={
+                    noticeActionModal.type === 'waive'
+                      ? "e.g. Mutual consent waiver approved by Department Head and HR..."
+                      : "e.g. Early handover completion and project transition concluded..."
+                  }
+                  value={noticeActionModal.reason}
+                  onChange={(e) => setNoticeActionModal({ ...noticeActionModal, reason: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-bdr text-[13px] bg-off focus:bg-white focus:outline-none focus:border-navy transition"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-3 border-t border-bdr">
+                <button
+                  type="button"
+                  onClick={() => setNoticeActionModal({ open: false, type: 'waive', resignation: null, date: '', reason: '', loading: false })}
+                  className="h-9 px-4 border border-bdr rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={noticeActionModal.loading}
+                  className={`h-9 px-4 text-white rounded-xl text-xs font-semibold shadow-xs cursor-pointer inline-flex items-center gap-2 transition ${
+                    noticeActionModal.type === 'waive' ? 'bg-amber-600 hover:bg-amber-700' : 'bg-navy hover:bg-navy/90'
+                  }`}
+                >
+                  <span>{noticeActionModal.loading ? 'Saving...' : noticeActionModal.type === 'waive' ? 'Confirm Waiver' : 'Update Notice'}</span>
                 </button>
               </div>
             </form>

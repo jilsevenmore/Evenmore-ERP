@@ -29,12 +29,28 @@ const QUESTION_TYPES = [
   "Number",
 ];
 
+const CUSTOM_QUESTIONS_GUIDE = {
+  title: "Custom Screening Questions",
+  subtitle: "Design pre-screening questions, compliance checks, and assessment inputs for job applicants.",
+  purpose: "Filter out disqualified applicants early by asking notice periods, salary expectations, work authorization, or key technical qualification criteria.",
+  workflow: [
+    "Define Screening Prompt",
+    "Select Input Format",
+    "Assign to Open Requisitions",
+    "Collect Candidate Responses",
+    "Automate Candidate Qualification",
+  ],
+  keyTerms: [
+    { term: "Response Type", definition: "Format of applicant answer: Short/Long text, Dropdown choice, Number, or Yes/No." },
+    { term: "Dynamic Activation", definition: "Instantly toggles questions on candidate application forms without modifying past records." },
+  ],
+};
+
 export default function CustomQuestions() {
   const { questions, addQuestion, updateQuestion, deleteQuestion, toggleQuestion } = useRecruitmentStore();
   const showToast = useAppStore((s) => s.showToast);
   const navigate = useNavigate();
   const [addOpen, setAddOpen] = useState(false);
-  const [guideOpen, setGuideOpen] = useState(false);
   const [viewRow, setViewRow] = useState(null);
   const [editRow, setEditRow] = useState(null);
   const [deleteRow, setDeleteRow] = useState(null);
@@ -136,31 +152,35 @@ export default function CustomQuestions() {
     {
       key: "actions",
       header: "Actions",
+      align: "right",
       render: (r) => (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center justify-end gap-1">
           <button
+            type="button"
             onClick={() => setViewRow(r)}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+            className="p-1.5 rounded-xl hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-400 dark:text-slate-500 transition cursor-pointer"
             title="View details"
           >
-            <Eye size={13} />
+            <Eye size={15} />
           </button>
           <button
+            type="button"
             onClick={() => {
               setForm({ text: r.text, type: r.type, enabled: r.enabled });
               setEditRow(r);
             }}
-            className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+            className="p-1.5 rounded-xl hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 dark:text-slate-500 transition cursor-pointer"
             title="Edit question"
           >
-            <Pencil size={13} />
+            <Pencil size={15} />
           </button>
           <button
+            type="button"
             onClick={() => setDeleteRow(r)}
-            className="p-1.5 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition"
+            className="p-1.5 rounded-xl text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition cursor-pointer"
             title="Delete question"
           >
-            <Trash2 size={13} />
+            <Trash2 size={15} />
           </button>
         </div>
       ),
@@ -169,27 +189,27 @@ export default function CustomQuestions() {
 
   function FormFields() {
     return (
-      <div className="space-y-4 text-[13px]">
+      <div className="space-y-4 text-xs">
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-300">
+          <span className="font-semibold text-text text-xs">
             Question Prompt *
           </span>
           <input
             value={form.text}
             onChange={(e) => setForm({ ...form, text: e.target.value })}
-            className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-[13px]"
+            className="h-9 px-3.5 bg-card border border-border rounded-xl text-xs text-text placeholder:text-muted focus:outline-none focus:border-primary transition"
             placeholder="e.g. What is your notice period in days?"
           />
         </label>
 
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-300">
+          <span className="font-semibold text-text text-xs">
             Response Type
           </span>
           <select
             value={form.type}
             onChange={(e) => setForm({ ...form, type: e.target.value })}
-            className="h-9 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 text-[13px]"
+            className="h-9 px-3 bg-card border border-border rounded-xl text-xs text-text focus:outline-none focus:border-primary transition"
           >
             {QUESTION_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -204,9 +224,9 @@ export default function CustomQuestions() {
             type="checkbox"
             checked={form.enabled}
             onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
-            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer"
+            className="rounded border-border text-primary focus:ring-primary w-4 h-4 cursor-pointer"
           />
-          <span className="text-[13px] font-medium text-slate-700 dark:text-slate-300">
+          <span className="text-xs font-semibold text-text">
             Enable question immediately on application forms
           </span>
         </label>
@@ -225,28 +245,19 @@ export default function CustomQuestions() {
           { label: "Recruitment", path: "/hrms/recruitment" },
           { label: "Custom Questions" },
         ]}
+        guide={CUSTOM_QUESTIONS_GUIDE}
         actions={
-          <div className="flex flex-wrap lg:flex-nowrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setGuideOpen(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-[12px] font-medium transition cursor-pointer"
-            >
-              <HelpCircle size={14} />
-              <span>Guide</span>
-            </button>
-            <Button
-              size="sm"
-              onClick={() => {
-                setForm({ text: "", type: "Short Answer", enabled: true });
-                setAddOpen(true);
-              }}
-              className="flex items-center gap-1.5 cursor-pointer shadow-xs"
-            >
-              <Plus size={15} />
-              <span>Add Question</span>
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            onClick={() => {
+              setForm({ text: "", type: "Short Answer", enabled: true });
+              setAddOpen(true);
+            }}
+          >
+            Add Question
+          </Button>
         }
       />
 
@@ -324,12 +335,16 @@ export default function CustomQuestions() {
         isOpen={addOpen}
         onClose={() => setAddOpen(false)}
         title="Create Custom Question"
+        subtitle="Define new qualification or compliance question"
+        size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setAddOpen(false)}>
+            <Button variant="outline" size="sm" onClick={() => setAddOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={save}>Save Question</Button>
+            <Button variant="primary" size="sm" onClick={save}>
+              Save Question
+            </Button>
           </>
         }
       >
@@ -341,12 +356,16 @@ export default function CustomQuestions() {
         isOpen={!!editRow}
         onClose={() => setEditRow(null)}
         title="Edit Screening Question"
+        subtitle="Update question text and input format"
+        size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setEditRow(null)}>
+            <Button variant="outline" size="sm" onClick={() => setEditRow(null)}>
               Cancel
             </Button>
-            <Button onClick={save}>Update Question</Button>
+            <Button variant="primary" size="sm" onClick={save}>
+              Update Question
+            </Button>
           </>
         }
       >
@@ -361,25 +380,25 @@ export default function CustomQuestions() {
         subtitle={`${viewRow?.type} • ${viewRow?.enabled ? "Enabled" : "Disabled"}`}
         size="md"
         footer={
-          <Button variant="secondary" onClick={() => setViewRow(null)}>
+          <Button variant="outline" size="sm" onClick={() => setViewRow(null)}>
             Close
           </Button>
         }
       >
         {viewRow && (
-          <div className="space-y-4 text-[13px] text-slate-600 dark:text-slate-300">
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+          <div className="space-y-4 text-xs text-text">
+            <div className="p-3.5 rounded-xl bg-card border border-border">
+              <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1">
                 Full Prompt
               </span>
-              <p className="font-medium text-slate-800 dark:text-white">{viewRow.text}</p>
+              <p className="font-semibold text-text">{viewRow.text}</p>
             </div>
 
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">
+            <div className="p-3.5 rounded-xl bg-card border border-border">
+              <span className="text-[11px] font-bold text-muted uppercase tracking-wider block mb-1">
                 Associated Openings
               </span>
-              <p className="text-slate-700 dark:text-slate-300">
+              <p className="text-muted">
                 {viewRow.assignedJobs?.length
                   ? viewRow.assignedJobs.join(", ")
                   : "Included in all default open applications"}
@@ -394,13 +413,15 @@ export default function CustomQuestions() {
         isOpen={!!deleteRow}
         onClose={() => setDeleteRow(null)}
         title="Delete Question?"
+        subtitle="This action cannot be undone"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDeleteRow(null)}>
+            <Button variant="outline" size="sm" onClick={() => setDeleteRow(null)}>
               Cancel
             </Button>
             <Button
               variant="danger"
+              size="sm"
               onClick={() => {
                 if (deleteRow) deleteQuestion(deleteRow.id);
                 setDeleteRow(null);
@@ -412,63 +433,10 @@ export default function CustomQuestions() {
           </>
         }
       >
-        <p className="text-[13px] text-slate-600 dark:text-slate-300">
+        <p className="text-xs text-muted leading-relaxed">
           Are you sure you want to remove <b>"{deleteRow?.text}"</b>? It will no longer appear on applicant forms.
         </p>
       </Modal>
-
-      {/* Guide Modal */}
-      {guideOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
-          onClick={() => setGuideOpen(false)}
-        >
-          <div
-            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xl max-w-lg w-full p-4 sm:p-6 max-h-[95vh] overflow-y-auto text-[13px] text-slate-600 dark:text-slate-300 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600">
-                  <HelpCircle size={18} />
-                </div>
-                <h3 className="text-[16px] font-bold text-slate-900 dark:text-white">
-                  Custom Questions Guide
-                </h3>
-              </div>
-              <button
-                onClick={() => setGuideOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg leading-none"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  1. Pre-Screening Efficiency
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Filter out disqualified applicants early by asking notice periods, salary expectations, work authorization, or key coding questions.
-                </p>
-              </div>
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700">
-                <div className="font-semibold text-slate-800 dark:text-slate-100 mb-1">
-                  2. Dynamic Toggle
-                </div>
-                <p className="text-[12px] text-slate-500 dark:text-slate-400">
-                  Easily disable questions without deleting them to pause their appearance during specific hiring sprints.
-                </p>
-              </div>
-            </div>
-            <div className="pt-2 flex justify-end">
-              <Button size="sm" onClick={() => setGuideOpen(false)}>
-                Got it
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
